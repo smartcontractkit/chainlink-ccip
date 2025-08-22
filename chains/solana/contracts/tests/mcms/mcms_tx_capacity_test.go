@@ -17,10 +17,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/access_controller"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/external_program_cpi_stub"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/access_controller"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/external_program_cpi_stub"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/mcm"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
@@ -912,7 +912,7 @@ func TestMcmsCapacity(t *testing.T) {
 					tcResult.finalTxSize = measureInstructionSize(vIx)
 
 					if tc.expectError {
-						testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"solana_sdk::transaction::versioned::VersionedTransaction too large"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"VersionedTransaction too large"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
 						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 

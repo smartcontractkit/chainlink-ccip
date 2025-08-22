@@ -1,7 +1,140 @@
 export type BurnmintTokenPool = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "burnmint_token_pool",
   "instructions": [
+    {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "routerAddress",
+          "type": "publicKey"
+        },
+        {
+          "name": "rmnAddress",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "updateSelfServedAllowed",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "updateDefaultRouter",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "routerAddress",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "updateDefaultRmn",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnAddress",
+          "type": "publicKey"
+        }
+      ]
+    },
     {
       "name": "initialize",
       "accounts": [
@@ -34,18 +167,79 @@ export type BurnmintTokenPool = {
           "name": "programData",
           "isMut": false,
           "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
         },
         {
-          "name": "rmnRemote",
-          "type": "publicKey"
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
         }
-      ]
+      ],
+      "args": []
+    },
+    {
+      "name": "transferMintAuthorityToMultisig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "newMultisigMintAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",
@@ -99,7 +293,7 @@ export type BurnmintTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -109,13 +303,59 @@ export type BurnmintTokenPool = {
         },
         {
           "name": "authority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "newRouter",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "setRmn",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnAddress",
           "type": "publicKey"
         }
       ]
@@ -300,6 +540,31 @@ export type BurnmintTokenPool = {
           "type": {
             "defined": "RateLimitConfig"
           }
+        }
+      ]
+    },
+    {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
         }
       ]
     },
@@ -561,6 +826,30 @@ export type BurnmintTokenPool = {
   ],
   "accounts": [
     {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          },
+          {
+            "name": "router",
+            "type": "publicKey"
+          },
+          {
+            "name": "rmnRemote",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
       "name": "state",
       "type": {
         "kind": "struct",
@@ -591,14 +880,209 @@ export type BurnmintTokenPool = {
           }
         ]
       }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidMultisig",
+      "msg": "Invalid Multisig Mint"
+    },
+    {
+      "code": 6001,
+      "name": "MintAuthorityAlreadySet",
+      "msg": "Mint Authority already set"
+    },
+    {
+      "code": 6002,
+      "name": "FixedMintToken",
+      "msg": "Token with no Mint Authority"
+    },
+    {
+      "code": 6003,
+      "name": "UnsupportedTokenProgram",
+      "msg": "Unsupported Token Program"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidToken2022Multisig",
+      "msg": "Invalid Multisig Account Data for Token 2022"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidSPLTokenMultisig",
+      "msg": "Invalid Multisig Account Data for SPL Token"
+    },
+    {
+      "code": 6006,
+      "name": "PoolSignerNotInMultisig",
+      "msg": "Token Pool Signer PDA must be m times a signer of the Multisig"
+    },
+    {
+      "code": 6007,
+      "name": "MultisigMustHaveAtLeastTwoSigners",
+      "msg": "Multisig must have more than 2 valid signers"
+    },
+    {
+      "code": 6008,
+      "name": "MultisigMustHaveMoreThanOneSigner",
+      "msg": "Multisig must have more than one required signer"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidMultisigOwner",
+      "msg": "Multisig Owner must match Token Program ID"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidMultisigThreshold",
+      "msg": "Invalid multisig threshold: required signatures cannot exceed total signers"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidMultisigThresholdTooHigh",
+      "msg": "Invalid multisig m: required signatures cannot exceed the available for outside signers"
     }
   ]
 };
 
 export const IDL: BurnmintTokenPool = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "burnmint_token_pool",
   "instructions": [
+    {
+      "name": "initGlobalConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "routerAddress",
+          "type": "publicKey"
+        },
+        {
+          "name": "rmnAddress",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "updateSelfServedAllowed",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "selfServedAllowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "updateDefaultRouter",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "routerAddress",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "updateDefaultRmn",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnAddress",
+          "type": "publicKey"
+        }
+      ]
+    },
     {
       "name": "initialize",
       "accounts": [
@@ -631,18 +1115,79 @@ export const IDL: BurnmintTokenPool = {
           "name": "programData",
           "isMut": false,
           "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
         },
         {
-          "name": "rmnRemote",
-          "type": "publicKey"
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
         }
-      ]
+      ],
+      "args": []
+    },
+    {
+      "name": "transferMintAuthorityToMultisig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "newMultisigMintAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",
@@ -696,7 +1241,7 @@ export const IDL: BurnmintTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -706,13 +1251,59 @@ export const IDL: BurnmintTokenPool = {
         },
         {
           "name": "authority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "newRouter",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "setRmn",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnAddress",
           "type": "publicKey"
         }
       ]
@@ -897,6 +1488,31 @@ export const IDL: BurnmintTokenPool = {
           "type": {
             "defined": "RateLimitConfig"
           }
+        }
+      ]
+    },
+    {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
         }
       ]
     },
@@ -1158,6 +1774,30 @@ export const IDL: BurnmintTokenPool = {
   ],
   "accounts": [
     {
+      "name": "poolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "selfServedAllowed",
+            "type": "bool"
+          },
+          {
+            "name": "router",
+            "type": "publicKey"
+          },
+          {
+            "name": "rmnRemote",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
       "name": "state",
       "type": {
         "kind": "struct",
@@ -1188,6 +1828,68 @@ export const IDL: BurnmintTokenPool = {
           }
         ]
       }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidMultisig",
+      "msg": "Invalid Multisig Mint"
+    },
+    {
+      "code": 6001,
+      "name": "MintAuthorityAlreadySet",
+      "msg": "Mint Authority already set"
+    },
+    {
+      "code": 6002,
+      "name": "FixedMintToken",
+      "msg": "Token with no Mint Authority"
+    },
+    {
+      "code": 6003,
+      "name": "UnsupportedTokenProgram",
+      "msg": "Unsupported Token Program"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidToken2022Multisig",
+      "msg": "Invalid Multisig Account Data for Token 2022"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidSPLTokenMultisig",
+      "msg": "Invalid Multisig Account Data for SPL Token"
+    },
+    {
+      "code": 6006,
+      "name": "PoolSignerNotInMultisig",
+      "msg": "Token Pool Signer PDA must be m times a signer of the Multisig"
+    },
+    {
+      "code": 6007,
+      "name": "MultisigMustHaveAtLeastTwoSigners",
+      "msg": "Multisig must have more than 2 valid signers"
+    },
+    {
+      "code": 6008,
+      "name": "MultisigMustHaveMoreThanOneSigner",
+      "msg": "Multisig must have more than one required signer"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidMultisigOwner",
+      "msg": "Multisig Owner must match Token Program ID"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidMultisigThreshold",
+      "msg": "Invalid multisig threshold: required signatures cannot exceed total signers"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidMultisigThresholdTooHigh",
+      "msg": "Invalid multisig m: required signatures cannot exceed the available for outside signers"
     }
   ]
 };

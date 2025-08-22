@@ -14,12 +14,13 @@ import (
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 const SendingOutcome = "Sending Outcome"
@@ -122,9 +123,14 @@ func reportRangesOutcome(
 		}
 
 		if onRampMaxSeqNum < offRampNextSeqNum-1 {
-			lggr.Errorw("sequence numbers between offRamp and onRamp reached an impossible state, "+
-				"offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
-				"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+			if onRampMaxSeqNum == 0 {
+				lggr.Infow("OnRamp max sequence numbers consensus = 0. This might not indicate an issue" +
+					" but if it persists without progress on the commit plugin, investigate why oracles observe 0")
+			} else {
+				lggr.Errorw("sequence numbers between offRamp and onRamp reached an impossible state, "+
+					"offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
+					"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+			}
 		}
 
 		newMsgsExist := offRampNextSeqNum <= onRampMaxSeqNum
@@ -138,9 +144,9 @@ func reportRangesOutcome(
 			rangesToReport = append(rangesToReport, chainRange)
 
 			if rng.End() != chainRange.SeqNumRange.End() { // Check if the range was truncated.
-				lggr.Infof("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
+				lggr.Debugf("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
 			} else {
-				lggr.Infof("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
+				lggr.Debugf("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
 			}
 		}
 	}
@@ -159,7 +165,7 @@ func reportRangesOutcome(
 	}
 
 	if len(rangesToReport) == 0 {
-		lggr.Info("No ranges to report, outcomeType is ReportEmpty")
+		lggr.Debug("No ranges to report, outcomeType is ReportEmpty")
 		return Outcome{OutcomeType: ReportEmpty}
 	}
 
@@ -333,10 +339,10 @@ func filterValidRoots(
 			"root", rk, "isSigned", signedRoots.Contains(rk), "rmnEnabled", rmnEnabledChains[root.ChainSel])
 
 		if rootIsValid {
-			lggr2.Infow("root valid, added to the results")
+			lggr2.Debugw("root valid, added to the results")
 			validRoots = append(validRoots, root)
 		} else {
-			lggr2.Infow("root invalid, skipping")
+			lggr2.Debugw("root invalid, skipping")
 		}
 	}
 
@@ -448,6 +454,11 @@ func getConsensusObservation(
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 	fChain := consensus.MakeMultiThreshold(fChains, consensus.F)
 
+	fDestChain, ok := fChain.Get(destChain)
+	if !ok {
+		return consensusObservation{}, fmt.Errorf("no consensus value for fDestChain(%d): %v", fDestChain, fChain)
+	}
+
 	consensusObs := consensusObservation{
 		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
 		RMNEnabledChains: consensus.GetConsensusMap(lggr, "RMNEnabledChains", aggObs.RMNEnabledChains, twoFChainPlus1),
@@ -456,14 +467,40 @@ func getConsensusObservation(
 			"OnRamp Max Seq Nums",
 			aggObs.OnRampMaxSeqNums,
 			fChain),
-		OffRampNextSeqNums: consensus.GetOrderedConsensus(
-			lggr,
-			"OffRamp Next Seq Nums",
-			aggObs.OffRampNextSeqNums,
-			fChain),
-		RMNRemoteConfig: consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
-		FChain:          fChains,
+		OffRampNextSeqNums: getOffRampNextSequenceNumbersConsensus(lggr, uint(fDestChain), aggObs.OffRampNextSeqNums),
+		RMNRemoteConfig:    consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
+		FChain:             fChains,
 	}
 
 	return consensusObs, nil
+}
+
+// getOffRampNextSequenceNumbersConsensus accepts a list of offramp sequence number observations per chain
+// and computes the consensus value for each chain.
+//
+// Similar to consensus.GetOrderedConsensus but uses fDestChain, since this values are observed
+// from the destination chain, instead of fChain for each source chain.
+func getOffRampNextSequenceNumbersConsensus(
+	lggr logger.Logger,
+	fDestChain uint,
+	observationsPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
+) map[cciptypes.ChainSelector]cciptypes.SeqNum {
+	lggr = logger.With(lggr, "fDestChain", fDestChain)
+
+	offRampNextSeqNumsConsensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
+	for sourceChain, observedNextSeqNums := range observationsPerChain {
+		if uint(len(observedNextSeqNums)) < 2*fDestChain+1 {
+			lggr.Warnw("not enough observations for OffRampNextSeqNums consensus on chain",
+				"sourceChain", sourceChain, "observedNextSeqNums", observedNextSeqNums,
+			)
+			continue
+		}
+
+		sort.Slice(observedNextSeqNums, func(i, j int) bool { return observedNextSeqNums[i] < observedNextSeqNums[j] })
+		offRampNextSeqNumsConsensus[sourceChain] = observedNextSeqNums[fDestChain]
+	}
+
+	lggr.Debugw("computed offRampNextSeqNumsConsensus",
+		"offRampNextSeqNumsConsensus", offRampNextSeqNumsConsensus, "observations", observationsPerChain)
+	return offRampNextSeqNumsConsensus
 }

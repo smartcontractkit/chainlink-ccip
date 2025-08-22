@@ -2,8 +2,8 @@
 pragma solidity ^0.8.4;
 
 import {Internal} from "../libraries/Internal.sol";
-import {Ownable2StepMsgSender} from "@chainlink/shared/access/Ownable2StepMsgSender.sol";
-import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 /// @notice Onchain verification of reports from the offchain reporting protocol with multiple OCR plugin support.
 abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
@@ -43,7 +43,6 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
   error NonUniqueSignatures();
   error OracleCannotBeZeroAddress();
   error StaticConfigCannotBeChanged(uint8 ocrPluginType);
-  error InsufficientGasToCompleteTx(bytes4 err);
 
   /// @dev Packing these fields used on the hot path in a ConfigInfo variable reduces the retrieval of all
   /// of them to a minimum number of SLOADs.

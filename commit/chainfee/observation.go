@@ -9,9 +9,14 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // Observation will make several calls to fetch:
@@ -28,11 +33,43 @@ func (p *processor) Observation(
 ) (Observation, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
 
-	feeComponents := p.obs.getChainsFeeComponents(ctx, lggr)
-	nativeTokenPrices := p.obs.getNativeTokenPrices(ctx, lggr)
-	chainFeeUpdates := p.obs.getChainFeePriceUpdates(ctx, lggr)
-	fChain := p.observeFChain(lggr)
+	if invalidateCache, ok := ctx.Value(consts.InvalidateCacheKey).(bool); ok && invalidateCache {
+		p.obs.invalidateCaches(ctx, lggr)
+	}
+
+	var (
+		feeComponents     map[cciptypes.ChainSelector]types.ChainFeeComponents
+		nativeTokenPrices map[cciptypes.ChainSelector]cciptypes.BigInt
+		chainFeeUpdates   map[cciptypes.ChainSelector]Update
+		fChain            map[cciptypes.ChainSelector]int
+	)
+
+	operations := asynclib.AsyncNoErrOperationsMap{
+		"getChainsFeeComponents": func(ctx context.Context, l logger.Logger) {
+			feeComponents = p.obs.getChainsFeeComponents(ctx, l)
+		},
+		"getNativeTokenPrices": func(ctx context.Context, l logger.Logger) {
+			nativeTokenPrices = p.obs.getNativeTokenPrices(ctx, l)
+		},
+		"getChainFeePriceUpdates": func(ctx context.Context, l logger.Logger) {
+			chainFeeUpdates = p.obs.getChainFeePriceUpdates(ctx, l)
+		},
+		"observeFChain": func(_ context.Context, l logger.Logger) {
+			fChain = p.observeFChain(l)
+		},
+	}
+
+	asynclib.WaitForAllNoErrOperations(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
 	now := time.Now().UTC()
+
+	chainsWithNativeTokenPrices := mapset.NewSet(maps.Keys(feeComponents)...).
+		Intersect(
+			mapset.NewSet(maps.Keys(nativeTokenPrices)...),
+		)
+	chainsWithoutNativeTokenPrices := mapset.NewSet(maps.Keys(feeComponents)...).
+		Difference(
+			mapset.NewSet(maps.Keys(nativeTokenPrices)...),
+		)
 
 	lggr.Infow("observed fee components",
 		"feeComponents", feeComponents,
@@ -40,28 +77,34 @@ func (p *processor) Observation(
 		"chainFeeUpdates", chainFeeUpdates,
 		"fChain", fChain,
 		"timestampNow", now,
+		"chainsWithNativeTokenPrices", chainsWithNativeTokenPrices.ToSlice(),
+		"chainsWithoutNativeTokenPrices", chainsWithoutNativeTokenPrices.ToSlice(),
 	)
 
-	uniqueChains := mapset.NewSet[cciptypes.ChainSelector](maps.Keys(feeComponents)...)
-	uniqueChains = uniqueChains.Intersect(mapset.NewSet(maps.Keys(nativeTokenPrices)...))
-
-	if len(uniqueChains.ToSlice()) == 0 {
-		lggr.Info("observations don't have any unique chains")
-		return Observation{}, nil
+	if len(chainsWithNativeTokenPrices.ToSlice()) == 0 {
+		lggr.Infow("don't have any chains with native token prices",
+			"chainsWithoutNativeTokenPrices", chainsWithoutNativeTokenPrices.ToSlice())
+		return Observation{
+			FChain:          fChain,
+			TimestampNow:    now,
+			ChainFeeUpdates: chainFeeUpdates,
+		}, nil
 	}
 
 	obs := Observation{
 		FChain:            fChain,
-		FeeComponents:     filterMapByUniqueChains(feeComponents, uniqueChains),
-		NativeTokenPrices: filterMapByUniqueChains(nativeTokenPrices, uniqueChains),
+		FeeComponents:     selectMapKeysInSet(feeComponents, chainsWithNativeTokenPrices),
+		NativeTokenPrices: selectMapKeysInSet(nativeTokenPrices, chainsWithNativeTokenPrices),
 		ChainFeeUpdates:   chainFeeUpdates,
 		TimestampNow:      now,
 	}
 	return obs, nil
 }
 
-// filterMapBySet filters a map based on the keys present in the set.
-func filterMapByUniqueChains[T comparable](
+// selectMapKeysInSet returns a new map containing only the key-value pairs
+// from the input map whose keys are present in the specified set.
+// This effectively performs an intersection between the map keys and the set.
+func selectMapKeysInSet[T comparable](
 	m map[cciptypes.ChainSelector]T,
 	s mapset.Set[cciptypes.ChainSelector],
 ) map[cciptypes.ChainSelector]T {

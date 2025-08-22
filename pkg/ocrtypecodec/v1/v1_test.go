@@ -16,6 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -25,7 +27,6 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var dataGenerators = []dataGenerator{
@@ -405,8 +406,9 @@ func (d *dataGenerator) commitObservation() committypes.Observation {
 			FChain:            fChain,
 			TimestampNow:      time.Now().UTC(),
 		},
-		DiscoveryObs: genDiscoveryObservation(d.numSourceChains, d.numContractsPerChain),
-		FChain:       fChain,
+		DiscoveryObs:          genDiscoveryObservation(d.numSourceChains, d.numContractsPerChain),
+		FChain:                fChain,
+		OnChainPriceOcrSeqNum: rand.Uint64(),
 	}
 }
 
@@ -589,9 +591,9 @@ func (d *dataGenerator) execOutcome() exectypes.Outcome {
 	return exectypes.Outcome{
 		State:         exectypes.PluginState(genRandomString(128)),
 		CommitReports: commitReports,
-		Report: cciptypes.ExecutePluginReport{
+		Reports: []cciptypes.ExecutePluginReport{{
 			ChainReports: chainReports,
-		},
+		}},
 	}
 }
 

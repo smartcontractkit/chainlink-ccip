@@ -5,10 +5,11 @@ import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
-import {Ownable2Step} from "@chainlink/shared/access/Ownable2Step.sol";
-import {BurnMintERC677} from "@chainlink/shared/token/ERC677/BurnMintERC677.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
+import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract TokenPool_applyChainUpdates is BaseTest {
   IERC20 internal s_token;
@@ -218,7 +219,7 @@ contract TokenPool_applyChainUpdates is BaseTest {
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e18})
     });
 
-    vm.expectRevert(TokenPool.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
 
     chainUpdates = new TokenPool.ChainUpdate[](1);
@@ -230,7 +231,7 @@ contract TokenPool_applyChainUpdates is BaseTest {
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e18})
     });
 
-    vm.expectRevert(TokenPool.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
   }
 
@@ -250,25 +251,11 @@ contract TokenPool_applyChainUpdates is BaseTest {
       remoteChainSelector: unusedChainSelector,
       remotePoolAddresses: new bytes[](0),
       remoteTokenAddress: abi.encode(address(2)),
-      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
-      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12})
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 100}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 101, rate: 100})
     });
 
     // Outbound
-
-    vm.expectRevert(
-      abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
-    );
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
-
-    chainUpdates[0].outboundRateLimiterConfig.rate = 100;
-
-    vm.expectRevert(
-      abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
-    );
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
-
-    chainUpdates[0].outboundRateLimiterConfig.capacity = 100;
 
     vm.expectRevert(
       abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
@@ -285,21 +272,6 @@ contract TokenPool_applyChainUpdates is BaseTest {
     // Inbound
 
     chainUpdates[0].inboundRateLimiterConfig.capacity = 0;
-    chainUpdates[0].inboundRateLimiterConfig.rate = 0;
-
-    vm.expectRevert(
-      abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
-    );
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
-
-    chainUpdates[0].inboundRateLimiterConfig.rate = 100;
-
-    vm.expectRevert(
-      abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
-    );
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
-
-    chainUpdates[0].inboundRateLimiterConfig.capacity = 100;
 
     vm.expectRevert(
       abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)

@@ -1,5 +1,11 @@
 package ccip
 
+// Mod sec
+//go:generate go run generation/generate/wrap.go ccip CCVProxy ccv_proxy latest
+//go:generate go run generation/generate/wrap.go ccip CommitOnRamp commit_onramp latest
+//go:generate go run generation/generate/wrap.go ccip CCVAggregator ccv_aggregator latest
+//go:generate go run generation/generate/wrap.go ccip CommitOffRamp commit_offramp latest
+
 //go:generate go run generation/generate/wrap.go ccip Router router latest
 //go:generate go run generation/generate/wrap.go ccip CCIPHome ccip_home latest
 //go:generate go run generation/generate/wrap.go ccip OnRamp onramp latest
@@ -8,7 +14,6 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip OffRampWithMessageTransformer offramp_with_message_transformer latest
 //go:generate go run generation/generate/wrap.go ccip FeeQuoter fee_quoter latest
 //go:generate go run generation/generate/wrap.go ccip NonceManager nonce_manager latest
-//go:generate go run generation/generate/wrap.go ccip MultiAggregateRateLimiter multi_aggregate_rate_limiter latest
 //go:generate go run generation/generate/wrap.go ccip TokenAdminRegistry token_admin_registry latest
 //go:generate go run generation/generate/wrap.go ccip TokenPoolFactory token_pool_factory latest
 //go:generate go run generation/generate/wrap.go ccip FactoryBurnMintERC20 factory_burn_mint_erc20 latest
@@ -26,6 +31,11 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip USDCTokenPool usdc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnToAddressMintTokenPool burn_to_address_mint_token_pool latest
+//go:generate go run generation/generate/wrap.go ccip BurnMintFastTransferTokenPool fast_transfer_token_pool latest
+//go:generate go run generation/generate/wrap.go ccip CCTPMessageTransmitterProxy cctp_message_transmitter_proxy latest
+//go:generate go run generation/generate/wrap.go ccip ERC20LockBox erc20_lock_box latest
+//go:generate go run generation/generate/wrap.go ccip SiloedUSDCTokenPool siloed_usdc_token_pool latest
+//go:generate go run generation/generate/wrap.go ccip USDCTokenPoolCCTPV2 usdc_token_pool_cctp_v2 latest
 
 // Helpers
 //go:generate go run generation/generate/wrap.go ccip MaybeRevertMessageReceiver maybe_revert_message_receiver latest
@@ -38,7 +48,12 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip EtherSenderReceiver ether_sender_receiver latest
 //go:generate go run generation/generate/wrap.go ccip MockE2EUSDCTokenMessenger mock_usdc_token_messenger latest
 //go:generate go run generation/generate/wrap.go ccip MockE2EUSDCTransmitter mock_usdc_token_transmitter latest
+//go:generate go run generation/generate/wrap.go ccip MockE2ELBTCTokenPool mock_lbtc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip CCIPReaderTester ccip_reader_tester latest
 
 // EncodingUtils
 //go:generate go run generation/generate/wrap.go ccip EncodingUtils ccip_encoding_utils latest
+
+// Superchain Interop
+//go:generate go run generation/generate/wrap.go ccip OnRampOverSuperchainInterop onramp_over_superchain_interop latest
+//go:generate go run generation/generate/wrap.go ccip OffRampOverSuperchainInterop offramp_over_superchain_interop latest

@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import {Pool} from "../libraries/Pool.sol";
 
-import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 /// @notice Shared public interface for multiple V1 pool types.
 /// Each pool type handles a different child token model e.g. lock/unlock, mint/burn.
@@ -19,7 +20,7 @@ interface IPoolV1 is IERC165 {
   /// @param releaseOrMintIn All data required to release or mint tokens.
   /// @return releaseOrMintOut The amount of tokens released or minted on the local chain, denominated
   /// in the local token's decimals.
-  /// @dev The offramp asserts that the balanceOf of the receiver has been incremented by exactly the number
+  /// @dev The offRamp asserts that the balanceOf of the receiver has been incremented by exactly the number
   /// of tokens that is returned in ReleaseOrMintOutV1.destinationAmount. If the amounts do not match, the tx reverts.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn

@@ -1,5 +1,5 @@
 export type CcipCommon = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "ccip_common",
   "instructions": [],
   "accounts": [
@@ -36,6 +36,10 @@ export type CcipCommon = {
           {
             "name": "mint",
             "type": "publicKey"
+          },
+          {
+            "name": "supportsAutoDerivation",
+            "type": "bool"
           }
         ]
       }
@@ -101,7 +105,7 @@ export type CcipCommon = {
 };
 
 export const IDL: CcipCommon = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "ccip_common",
   "instructions": [],
   "accounts": [
@@ -138,6 +142,10 @@ export const IDL: CcipCommon = {
           {
             "name": "mint",
             "type": "publicKey"
+          },
+          {
+            "name": "supportsAutoDerivation",
+            "type": "bool"
           }
         ]
       }

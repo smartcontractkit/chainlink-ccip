@@ -1,6 +1,6 @@
 [package]
 name = "ping_pong_demo"
-version = "0.1.0-dev"
+version = "0.1.1"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -21,3 +21,10 @@ anchor-lang = { version = "0.29.0", features = [] }
 anchor-spl = "0.29.0"
 example_ccip_receiver = { path = "../example-ccip-receiver", features = ["no-entrypoint"]}
 ccip_router = { path = "../ccip-router", features = ["cpi"] }
+
+[build-dependencies]
+build_commit = { path = "../../crates/build-commit" }
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic", "custom-heap"))']

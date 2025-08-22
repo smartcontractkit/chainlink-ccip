@@ -7,11 +7,14 @@ import {IRouter} from "../../interfaces/IRouter.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
-import {Ownable2StepMsgSender} from "@chainlink/shared/access/Ownable2StepMsgSender.sol";
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
-import {EnumerableSet} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice This contract is a proof of concept and should NOT be used in production.
 abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
@@ -198,7 +201,9 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
     ) {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
-    _consumeInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
+    _consumeInboundRateLimit(
+      releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourceDenominatedAmount
+    );
   }
 
   // ================================================================
@@ -262,8 +267,8 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
   function applyChainUpdates(address token, ChainUpdate[] calldata chains) external virtual onlyOwner {
     for (uint256 i = 0; i < chains.length; ++i) {
       ChainUpdate memory update = chains[i];
-      RateLimiter._validateTokenBucketConfig(update.outboundRateLimiterConfig, !update.allowed);
-      RateLimiter._validateTokenBucketConfig(update.inboundRateLimiterConfig, !update.allowed);
+      RateLimiter._validateTokenBucketConfig(update.outboundRateLimiterConfig);
+      RateLimiter._validateTokenBucketConfig(update.inboundRateLimiterConfig);
 
       if (update.allowed) {
         // If the chain already exists, revert
@@ -356,9 +361,9 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
     RateLimiter.Config memory inboundConfig
   ) internal {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
-    RateLimiter._validateTokenBucketConfig(outboundConfig, false);
+    RateLimiter._validateTokenBucketConfig(outboundConfig);
     s_remoteChainConfigs[token][remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
-    RateLimiter._validateTokenBucketConfig(inboundConfig, false);
+    RateLimiter._validateTokenBucketConfig(inboundConfig);
     s_remoteChainConfigs[token][remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
     emit ChainConfigured(remoteChainSelector, outboundConfig, inboundConfig);
   }

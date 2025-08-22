@@ -9,7 +9,7 @@ import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
-import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
@@ -17,10 +17,12 @@ import {Internal} from "../libraries/Internal.sol";
 import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {MultiOCR3Base} from "../ocr/MultiOCR3Base.sol";
-import {CallWithExactGas} from "@chainlink/shared/call/CallWithExactGas.sol";
+import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
-import {EnumerableSet} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice OffRamp enables OCR networks to execute multiple messages in an OffRamp in a single transaction.
 /// @dev The OnRamp and OffRamp form a cross chain upgradeable unit. Any change to one of them results an
@@ -66,6 +68,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error CommitOnRampMismatch(bytes reportOnRamp, bytes configOnRamp);
   error InvalidOnRampUpdate(uint64 sourceChainSelector);
   error RootBlessingMismatch(uint64 sourceChainSelector, bytes32 merkleRoot, bool isBlessed);
+  error InsufficientGasToCompleteTx(bytes4 err);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -144,7 +147,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "OffRamp 1.6.0";
   /// @dev Hash of encoded address(0) used for empty address checks.
   bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev ChainSelector of this chain.
@@ -206,6 +208,11 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
     _setDynamicConfig(dynamicConfig);
     _applySourceChainConfigUpdates(sourceChainConfigs);
+  }
+
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "OffRamp 1.6.2-dev";
   }
 
   // ================================================================
@@ -387,45 +394,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     if (numMsgs == 0) revert EmptyReport(report.sourceChainSelector);
     if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
 
-    bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
-
-    {
-      // We do this hash here instead of in _verify to avoid two separate loops over the same data. Hashing all of the
-      // message fields ensures that the message being executed is correct and not tampered with. Including the known
-      // OnRamp ensures that the message originates from the correct on ramp version. We know the sourceChainSelector
-      // and i_destChainSelector are correct because we revert below when they are not.
-      bytes32 metaDataHash = keccak256(
-        abi.encode(
-          Internal.ANY_2_EVM_MESSAGE_HASH,
-          sourceChainSelector,
-          i_chainSelector,
-          keccak256(_getEnabledSourceChainConfig(sourceChainSelector).onRamp)
-        )
-      );
-
-      for (uint256 i = 0; i < numMsgs; ++i) {
-        Internal.Any2EVMRampMessage memory message = report.messages[i];
-
-        // Commits do not verify the destChainSelector in the message since only the root is committed, so we
-        // have to check it explicitly. This check is also important as we have assumed the metaDataHash above uses
-        // the i_chainSelector as the destChainSelector.
-        if (message.header.destChainSelector != i_chainSelector) {
-          revert InvalidMessageDestChainSelector(message.header.destChainSelector);
-        }
-        // If the message source chain selector does not match the report's source chain selector and the root has not
-        // been committed for the report source chain selector this will be caught by the root verification.
-        // This acts as an extra check to ensure the message source chain selector matches the report's source chain.
-        if (message.header.sourceChainSelector != sourceChainSelector) {
-          revert SourceChainSelectorMismatch(sourceChainSelector, message.header.sourceChainSelector);
-        }
-
-        hashedLeaves[i] = Internal._hash(message, metaDataHash);
-      }
-    }
-
-    // SECURITY CRITICAL CHECK.
-    uint256 timestampCommitted = _verify(sourceChainSelector, hashedLeaves, report.proofs, report.proofFlagBits);
-    if (timestampCommitted == 0) revert RootNotCommitted(sourceChainSelector);
+    (uint256 timestampCommitted, bytes32[] memory hashedLeaves) = _verifyReport(sourceChainSelector, report);
 
     // Execute messages.
     for (uint256 i = 0; i < numMsgs; ++i) {
@@ -691,7 +660,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         Pool.ReleaseOrMintInV1({
           originalSender: originalSender,
           receiver: receiver,
-          amount: sourceTokenAmount.amount,
+          sourceDenominatedAmount: sourceTokenAmount.amount,
           localToken: localToken,
           remoteChainSelector: sourceChainSelector,
           sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
@@ -810,7 +779,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes32[] calldata rs,
     bytes32[] calldata ss,
     bytes32 rawVs
-  ) external {
+  ) external virtual {
     CommitReport memory commitReport = abi.decode(report, (CommitReport));
     DynamicConfig storage dynamicConfig = s_dynamicConfig;
 
@@ -907,6 +876,58 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @return timestamp The timestamp of the committed root or zero in the case that it was never committed.
   function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256) {
     return s_roots[sourceChainSelector][root];
+  }
+
+  /// @notice Security check on the report, verifies that it has been signed by the Commit DON.
+  /// @dev This function is virtual. Inheriting contracts can override how message security is guaranteed.
+  /// @param sourceChainSelector The source chain selector.
+  /// @param report The report to verify.
+  /// @return timestampCommitted The timestamp of the committed root.
+  /// @return hashedLeaves The hash for every message in the report.
+  function _verifyReport(
+    uint64 sourceChainSelector,
+    Internal.ExecutionReport memory report
+  ) internal virtual returns (uint256 timestampCommitted, bytes32[] memory hashedLeaves) {
+    uint256 numMsgs = report.messages.length;
+    hashedLeaves = new bytes32[](numMsgs);
+
+    // We do this hash here instead of in _verify to avoid two separate loops over the same data. Hashing all of the
+    // message fields ensures that the message being executed is correct and not tampered with. Including the known
+    // OnRamp ensures that the message originates from the correct OnRamp version. We know the sourceChainSelector
+    // and i_destChainSelector are correct because we revert below when they are not.
+    bytes32 metaDataHash = keccak256(
+      abi.encode(
+        Internal.ANY_2_EVM_MESSAGE_HASH,
+        sourceChainSelector,
+        i_chainSelector,
+        keccak256(_getEnabledSourceChainConfig(sourceChainSelector).onRamp)
+      )
+    );
+
+    for (uint256 i = 0; i < numMsgs; ++i) {
+      Internal.Any2EVMRampMessage memory message = report.messages[i];
+
+      // Commits do not verify the destChainSelector in the message since only the root is committed, so we
+      // have to check it explicitly. This check is also important as we have assumed the metaDataHash above uses
+      // the i_chainSelector as the destChainSelector.
+      if (message.header.destChainSelector != i_chainSelector) {
+        revert InvalidMessageDestChainSelector(message.header.destChainSelector);
+      }
+      // If the message source chain selector does not match the report's source chain selector and the root has not
+      // been committed for the report source chain selector this will be caught by the root verification.
+      // This acts as an extra check to ensure the message source chain selector matches the report's source chain.
+      if (message.header.sourceChainSelector != sourceChainSelector) {
+        revert SourceChainSelectorMismatch(sourceChainSelector, message.header.sourceChainSelector);
+      }
+
+      hashedLeaves[i] = Internal._hash(message, metaDataHash);
+    }
+
+    // SECURITY CRITICAL CHECK.
+    timestampCommitted = _verify(sourceChainSelector, hashedLeaves, report.proofs, report.proofFlagBits);
+    if (timestampCommitted == 0) revert RootNotCommitted(sourceChainSelector);
+
+    return (timestampCommitted, hashedLeaves);
   }
 
   /// @notice Returns timestamp of when root was accepted or 0 if verification fails.

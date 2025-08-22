@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 import {ERC165CheckerReverting} from "../../../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
-import {MultiOCR3Base} from "../../../ocr/MultiOCR3Base.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
-import {CallWithExactGas} from "@chainlink/shared/call/CallWithExactGas.sol";
+import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract OffRamp_trialExecute is OffRampSetup {
   function setUp() public virtual override {
@@ -159,7 +159,7 @@ contract OffRamp_trialExecute is OffRampSetup {
 
       changePrank(Internal.GAS_ESTIMATION_SENDER);
 
-      vm.expectRevert(abi.encodeWithSelector(MultiOCR3Base.InsufficientGasToCompleteTx.selector, sigs[i]));
+      vm.expectRevert(abi.encodeWithSelector(OffRamp.InsufficientGasToCompleteTx.selector, sigs[i]));
       s_offRamp.trialExecute(message, offchainTokenData, new uint32[](0));
     }
   }

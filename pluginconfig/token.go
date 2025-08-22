@@ -8,11 +8,12 @@ import (
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 const (
 	USDCCCTPHandlerType = "usdc-cctp"
+	LBTCHandlerType     = "lbtc"
 )
 
 // TokenDataObserverConfig is the base struct for token data observers. Every token data observer
@@ -53,6 +54,7 @@ type TokenDataObserverConfig struct {
 	Version string `json:"version"`
 
 	*USDCCCTPObserverConfig
+	*LBTCObserverConfig
 }
 
 // WellFormed checks that the observer's config is syntactically correct - proper struct is initialized based on type
@@ -60,6 +62,12 @@ func (t *TokenDataObserverConfig) WellFormed() error {
 	if t.IsUSDC() {
 		if t.USDCCCTPObserverConfig == nil {
 			return errors.New("USDCCCTPObserverConfig is empty")
+		}
+		return nil
+	}
+	if t.IsLBTC() {
+		if t.LBTCObserverConfig == nil {
+			return errors.New("LBTCObserverConfig is empty")
 		}
 		return nil
 	}
@@ -73,13 +81,26 @@ func (t *TokenDataObserverConfig) Validate() error {
 		return err
 	}
 	if t.IsUSDC() {
+		if t.LBTCObserverConfig != nil {
+			return errors.New("LBTCObserverConfig must be null with USDC plugin type")
+		}
 		return t.USDCCCTPObserverConfig.Validate()
+	}
+	if t.IsLBTC() {
+		if t.USDCCCTPObserverConfig != nil {
+			return errors.New("USDCCCTPObserverConfig must be null with LBTC plugin type")
+		}
+		return t.LBTCObserverConfig.Validate()
 	}
 	return errors.New("unknown token data observer type " + t.Type)
 }
 
 func (t *TokenDataObserverConfig) IsUSDC() bool {
 	return t.Type == USDCCCTPHandlerType
+}
+
+func (t *TokenDataObserverConfig) IsLBTC() bool {
+	return t.Type == LBTCHandlerType
 }
 
 // MarshalJSON is a custom JSON marshaller for TokenDataObserverConfig.
@@ -97,16 +118,26 @@ func (t *TokenDataObserverConfig) MarshalJSON() ([]byte, error) {
 			Version:                t.Version,
 			USDCCCTPObserverConfig: t.USDCCCTPObserverConfig,
 		})
+	case LBTCHandlerType:
+		return json.Marshal(&struct {
+			Type    string `json:"type"`
+			Version string `json:"version"`
+			*LBTCObserverConfig
+		}{
+			Type:               t.Type,
+			Version:            t.Version,
+			LBTCObserverConfig: t.LBTCObserverConfig,
+		})
 	default:
 		return nil, fmt.Errorf("unknown token data observer type: %q", t.Type)
 	}
 }
 
 // UnmarshalJSON is a custom JSON unmarshaller for TokenDataObserverConfig.
-// It first reads top-level fields, then allocates the correct embedded config pointer.
-// (only USDCCCTPObserverConfig for now) before finally unmarshalling into that pointer.
-// Custom unmarshaller is needed because default golang marshaller doesn't unmarshal clashing fields
-// (when they appear beside USDC) of pointer embeddings
+// It first reads top-level fields, then allocates the correct embedded config pointer
+// (USDCCCTPObserverConfig or LBTCObserverConfig) before finally unmarshalling into that pointer.
+// Custom unmarshaller is needed because default golang marshaller doesn't unmarshal clashing fields of
+// pointer embeddings
 func (t *TokenDataObserverConfig) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Type    string `json:"type"`
@@ -124,6 +155,11 @@ func (t *TokenDataObserverConfig) UnmarshalJSON(data []byte) error {
 		t.USDCCCTPObserverConfig = &USDCCCTPObserverConfig{}
 		if err := json.Unmarshal(data, t.USDCCCTPObserverConfig); err != nil {
 			return fmt.Errorf("failed to unmarshal USDCCCTPObserverConfig: %w", err)
+		}
+	case LBTCHandlerType:
+		t.LBTCObserverConfig = &LBTCObserverConfig{}
+		if err := json.Unmarshal(data, t.LBTCObserverConfig); err != nil {
+			return fmt.Errorf("failed to unmarshal LBTCObserverConfig: %w", err)
 		}
 	default:
 		return fmt.Errorf("unknown token data observer type: %q", t.Type)
@@ -269,5 +305,43 @@ func (t USDCCCTPTokenConfig) Validate() error {
 	if t.SourceMessageTransmitterAddr == "" {
 		return errors.New("SourceMessageTransmitterAddress not set")
 	}
+	return nil
+}
+
+type LBTCObserverConfig struct {
+	AttestationConfig
+	WorkerConfig
+	AttestationAPIBatchSize  int                                `json:"attestationAPIBatchSize"`
+	SourcePoolAddressByChain map[cciptypes.ChainSelector]string `json:"sourcePoolAddressByChain"`
+}
+
+func (c *LBTCObserverConfig) setDefaults() {
+	if c.AttestationAPIBatchSize == 0 {
+		c.AttestationAPIBatchSize = 50
+	}
+}
+
+func (c *LBTCObserverConfig) Validate() error {
+	c.setDefaults()
+	if c.AttestationAPIBatchSize == 0 {
+		return errors.New("AttestationAPIBatchSize is not set")
+	}
+	if len(c.SourcePoolAddressByChain) == 0 {
+		return errors.New("SourcePoolAddressByChain is not set")
+	}
+	for _, sourcePoolAddress := range c.SourcePoolAddressByChain {
+		if sourcePoolAddress == "" {
+			return errors.New("SourcePoolAddressByChain is empty")
+		}
+	}
+	err := c.AttestationConfig.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.WorkerConfig.Validate()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

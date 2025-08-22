@@ -7,10 +7,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/lbtc"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -55,7 +58,7 @@ func NewConfigBasedCompositeObservers(
 	destChainSelector cciptypes.ChainSelector,
 	config []pluginconfig.TokenDataObserverConfig,
 	encoder cciptypes.TokenDataEncoder,
-	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+	readers map[cciptypes.ChainSelector]contractreader.Extended,
 	addrCodec cciptypes.AddressCodec,
 ) (TokenDataObserver, error) {
 	observers := make([]TokenDataObserver, len(config))
@@ -83,6 +86,26 @@ func NewConfigBasedCompositeObservers(
 					c.USDCCCTPObserverConfig.CacheExpirationInterval.Duration(),
 					c.USDCCCTPObserverConfig.CacheCleanupInterval.Duration(),
 					c.USDCCCTPObserverConfig.ObserveTimeout.Duration(),
+				)
+			}
+		case c.LBTCObserverConfig != nil:
+			observer, err := lbtc.NewLBTCTokenDataObserver(lggr, destChainSelector, *c.LBTCObserverConfig)
+			if err != nil {
+				return nil, fmt.Errorf("create LBTC token observer: %w", err)
+			}
+
+			if c.LBTCObserverConfig.IsForeground() {
+				lggr.Info("Using foreground observer for LBTC")
+				observers[i] = observer
+			} else {
+				lggr.Info("Using background observer for LBTC")
+				observers[i] = NewBackgroundObserver(
+					lggr,
+					observer,
+					c.LBTCObserverConfig.NumWorkers,
+					c.LBTCObserverConfig.CacheExpirationInterval.Duration(),
+					c.LBTCObserverConfig.CacheCleanupInterval.Duration(),
+					c.LBTCObserverConfig.ObserveTimeout.Duration(),
 				)
 			}
 		default:
@@ -113,7 +136,7 @@ func (c *compositeTokenDataObserver) Observe(
 			c.lggr.Error("Error while observing token data", "error", err)
 			continue
 		}
-		merged, err = merge(tokenDataObservations, tokenData)
+		merged, err = merge(c.lggr, tokenDataObservations, tokenData)
 		if err != nil {
 			c.lggr.Error("Error while merging token data",
 				"error", err)
@@ -177,6 +200,7 @@ func (c *compositeTokenDataObserver) initTokenDataObservations(
 // merge merges token data from two observations, it's used to combine token data from multiple observers.
 // In case of token data mismatch, it returns an error and the base observation.
 func merge(
+	lggr logger.Logger,
 	base exectypes.TokenDataObservations,
 	from exectypes.TokenDataObservations,
 ) (exectypes.TokenDataObservations, error) {
@@ -189,7 +213,9 @@ func merge(
 			// Merge only TokenData created by the observer
 			for i, newTokenData := range messageTokenData.TokenData {
 				if base[chainSelector][seq].TokenData[i].IsReady() {
-					// Already processed by another observer, skip or raise a warning
+					lggr.Warnw("Token data already processed by another observer",
+						"chainSelector", chainSelector,
+						"seqNum", seq)
 					continue
 				}
 				if newTokenData.Supported {

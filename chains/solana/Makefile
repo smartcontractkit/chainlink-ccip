@@ -6,7 +6,6 @@ export ANCHOR_IMAGE ?= backpackapp/build:$(ANCHOR_VERSION)
 export ANCHOR_BUILD_ARGS ?=
 # Allow overriding the output directory for docker builds
 TARGET_DIR ?= $(PWD)/contracts/target
-CCIP_BUILD_GIT_HASH := $(shell git rev-parse HEAD)
 
 .PHONY: projectserum_version
 anchor_version:
@@ -42,7 +41,7 @@ lint-go-fix:
 
 .PHONY: anchor-go-gen
 anchor-go-gen:
-	cd ./contracts && rm -rf ./target && anchor build && cd .. && ./scripts/anchor-go-gen.sh
+	cd ./contracts && find ./target -mindepth 1 ! -path './target/vendor*' -exec rm -rf {} + && anchor build && cd .. && ./scripts/anchor-go-gen.sh
 
 .PHONY: format
 format:
@@ -58,7 +57,7 @@ ccip-router-contracts-go-tests:
 
 .PHONY: test-token-pool-contracts-go-tests
 test-token-pool-contracts-go-tests:
-	go test -run TestBaseTokenPoolHappyPath -v -failfast ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
+	go test -run TestBaseTokenPoolHappyPath -run TestTokenPool -v -failfast ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
 
 .PHONY: build-contracts
 build-contracts:
@@ -73,7 +72,6 @@ docker-build-contracts:
 		-v ${TARGET_DIR}:/workdir/target \
 		-e CARGO_TARGET_DIR=/workdir/target \
 		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
-		-e CCIP_BUILD_GIT_HASH=${CCIP_BUILD_GIT_HASH} \
 		${ANCHOR_IMAGE} anchor build ${ANCHOR_BUILD_ARGS}
 
 .PHONY: docker-update-contracts
@@ -83,7 +81,6 @@ docker-update-contracts:
 		-v ${TARGET_DIR}:/workdir/target \
 		-e CARGO_TARGET_DIR=/workdir/target \
 		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
-		-e CCIP_BUILD_GIT_HASH=${CCIP_BUILD_GIT_HASH} \
 		${ANCHOR_IMAGE} anchor keys sync
 
 .PHONY: solana-checks

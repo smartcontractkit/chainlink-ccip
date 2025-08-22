@@ -16,7 +16,25 @@ const (
 	ContractNameRMNProxy               = "RMNProxy"
 	ContractNameRouter                 = "Router"
 	ContractNameCCTPMessageTransmitter = "MessageTransmitter"
+	ContractNameUSDCTokenPool          = "USDCTokenPool" //nolint:gosec // Solana USDC Token Pool contract name
 )
+
+func AllContractNames() []string {
+	return []string{
+		ContractNameOffRamp,
+		ContractNameOnRamp,
+		ContractNameFeeQuoter,
+		ContractNameCapabilitiesRegistry,
+		ContractNameCCIPConfig,
+		ContractNamePriceAggregator,
+		ContractNameNonceManager,
+		ContractNameRMNHome,
+		ContractNameRMNRemote,
+		ContractNameRMNProxy,
+		ContractNameRouter,
+		ContractNameCCTPMessageTransmitter,
+	}
+}
 
 // Method Names
 // TODO: these should be better organized, maybe separate packages.
@@ -59,15 +77,6 @@ const (
 	// NonceManager methods
 	MethodNameGetInboundNonce  = "GetInboundNonce"
 	MethodNameGetOutboundNonce = "GetOutboundNonce"
-
-	// Deprecated: TODO: remove after chainlink is updated.
-	MethodNameOfframpGetDynamicConfig = "OfframpGetDynamicConfig"
-	// Deprecated: TODO: remove after chainlink is updated.
-	MethodNameOfframpGetStaticConfig = "OfframpGetStaticConfig"
-	// Deprecated: TODO: remove after chainlink is updated.
-	MethodNameOnrampGetDynamicConfig = "OnrampGetDynamicConfig"
-	// Deprecated: TODO: remove after chainlink is updated.
-	MethodNameOnrampGetStaticConfig = "OnrampGetStaticConfig"
 
 	/*
 		// On EVM:
@@ -124,6 +133,10 @@ const (
 	EventAttributeSourceChain    = "SourceChain"
 	EventAttributeDestChain      = "DestChain"
 	EventAttributeState          = "State"
+
+	// Required for Solana CCTP
+	EventAttributeCCTPNonce    = "CctpNonce"
+	EventAttributeSourceDomain = "SourceDomain"
 )
 
 // Dedicated filters
@@ -136,3 +149,7 @@ const (
 	PluginTypeCommit  uint8 = 0
 	PluginTypeExecute uint8 = 1
 )
+
+type CtxKey string
+
+const InvalidateCacheKey = CtxKey("invalidate-cache")

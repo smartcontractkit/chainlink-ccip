@@ -1,9 +1,12 @@
 package discovery
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +17,7 @@ import (
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -22,19 +25,18 @@ import (
 	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source := cciptypes.ChainSelector(2)
 	fRoleDON := 1
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	expectedFChain := map[cciptypes.ChainSelector]int{
 		dest:   1,
 		source: 2,
@@ -64,7 +66,7 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	}
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, mock.Anything).
+		DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).
 		Return(expectedContracts, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
@@ -78,8 +80,11 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test,
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
+
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(ragep2ptypes.PeerID{}).Return(mapset.NewSet(source, dest), nil)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
 	assert.NoError(t, err)
@@ -99,11 +104,11 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	fRoleDON := 1
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	expectedErr := fmt.Errorf("error getting fchain")
 	mockHomeChain.EXPECT().GetFChain().Return(nil, expectedErr)
 	defer mockReader.AssertExpectations(t)
@@ -115,7 +120,8 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -129,19 +135,19 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source := cciptypes.ChainSelector(2)
 	fRoleDON := 1
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	expectedFChain := map[cciptypes.ChainSelector]int{
 		dest:   1,
 		source: 2,
 	}
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, mock.Anything).
+		DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
@@ -155,9 +161,11 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(ragep2ptypes.PeerID{}).Return(mapset.NewSet(source, dest), nil)
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
 	assert.NoError(t, err)
 	assert.Equal(t, expectedFChain, observation.FChain)
@@ -168,12 +176,12 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source := cciptypes.ChainSelector(2)
 	fRoleDON := 1
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	expectedFChain := map[cciptypes.ChainSelector]int{
 		dest:   1,
 		source: 2,
@@ -181,7 +189,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 	discoveryErr := fmt.Errorf("discovery error")
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, mock.Anything).
+		DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, discoveryErr)
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	mockHomeChain.EXPECT().GetAllChainConfigs().Return(nil, nil)
@@ -194,9 +202,11 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(ragep2ptypes.PeerID{}).Return(mapset.NewSet(source, dest), nil)
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
 	assert.Error(t, err)
 	assert.Empty(t, observation.FChain)
@@ -207,7 +217,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source1 := cciptypes.ChainSelector(2)
 	source2 := cciptypes.ChainSelector(3)
@@ -240,11 +250,12 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		},
 		consts.ContractNameRouter: {},
 	}
+	syncCalled := make(chan struct{})
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
+		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
-	defer mockReader.AssertExpectations(t)
 
 	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
@@ -252,7 +263,8 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
 	obsSrc := discoverytypes.Observation{
@@ -281,17 +293,19 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		{Observation: obsSrc},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
+
+	waitForSync(t, syncCalled)
 }
 
 func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source1 := cciptypes.ChainSelector(2)
 	source2 := cciptypes.ChainSelector(3)
@@ -323,11 +337,12 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		},
 		consts.ContractNameFeeQuoter: {}, // no consensus
 	}
+	syncCalled := make(chan struct{})
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
+		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
-	defer mockReader.AssertExpectations(t)
 
 	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
@@ -335,7 +350,8 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
 	fChainObs := discoverytypes.Observation{
@@ -375,17 +391,18 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		{Observation: fChainObs}, // no consensus on fChainObs
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
+	waitForSync(t, syncCalled)
 }
 
 func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source1 := cciptypes.ChainSelector(2)
 	source2 := cciptypes.ChainSelector(3)
@@ -413,11 +430,12 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		consts.ContractNameFeeQuoter:    {},
 		consts.ContractNameRouter:       {},
 	}
+	syncCalled := make(chan struct{})
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
+		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
-	defer mockReader.AssertExpectations(t)
 
 	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
@@ -425,7 +443,8 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
 	fChainObs := discoverytypes.Observation{
@@ -458,17 +477,18 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		{Observation: fChainObs},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
+	waitForSync(t, syncCalled)
 }
 
 func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	source1 := cciptypes.ChainSelector(2)
 	source2 := cciptypes.ChainSelector(3)
@@ -498,12 +518,13 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		consts.ContractNameFeeQuoter: {},
 		consts.ContractNameRouter:    {},
 	}
+	syncCalled := make(chan struct{})
 	syncErr := errors.New("sync error")
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
+		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
 		Return(syncErr)
-	defer mockReader.AssertExpectations(t)
 
 	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
@@ -511,7 +532,8 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		map[commontypes.OracleID]ragep2ptypes.PeerID{0: {}},
+		0,
 	)
 
 	obs := discoverytypes.Observation{
@@ -535,16 +557,16 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		{Observation: obs},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, syncErr)
-	assert.Empty(t, outcome)
+	require.NoError(t, err)
+	require.Equal(t, outcome, discoverytypes.Outcome{})
+	waitForSync(t, syncCalled)
 }
 
 func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) {
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	fRoleDON := 1
 	oracleID := commontypes.OracleID(1)
@@ -565,6 +587,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) 
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		oracleID,
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -578,13 +601,11 @@ func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) 
 
 func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	fRoleDON := 1
 	oracleID := commontypes.OracleID(1)
-
-	oracleIDToP2PID := map[commontypes.OracleID]ragep2ptypes.PeerID{}
-
+	oracleIDToP2PID := map[commontypes.OracleID]ragep2ptypes.PeerID{oracleID: {}}
 	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		nil, // reader, not needed for this test
@@ -592,10 +613,11 @@ func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		oracleID,
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
-		OracleID:    oracleID,
+		OracleID:    oracleID + 1, // +1 implies another oracle
 		Observation: dummyObservation,
 	}
 
@@ -606,7 +628,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 
 func TestContractDiscoveryProcessor_ValidateObservation_ErrorGettingSupportedChains(t *testing.T) {
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	dest := cciptypes.ChainSelector(1)
 	fRoleDON := 1
 	oracleID := commontypes.OracleID(1)
@@ -627,6 +649,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_ErrorGettingSupportedCha
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		oracleID,
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -724,7 +747,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			lggr := logger.Test(t)
+			lggr := logger.Nop()
 			fRoleDON := 1
 			oracleID := commontypes.OracleID(1)
 			peerID := ragep2ptypes.PeerID([32]byte{1, 2, 3})
@@ -745,6 +768,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 				dest,
 				fRoleDON,
 				oracleIDToP2PID,
+				oracleID,
 			)
 
 			ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -786,6 +810,7 @@ func internalNewContractDiscoveryProcessor(
 	dest cciptypes.ChainSelector,
 	fRoleDON int,
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
+	oracleID commontypes.OracleID,
 ) plugincommon.PluginProcessor[discoverytypes.Query, discoverytypes.Observation, discoverytypes.Outcome] {
 	return NewContractDiscoveryProcessor(
 		lggr,
@@ -794,6 +819,123 @@ func internalNewContractDiscoveryProcessor(
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		oracleID,
 		plugincommon.NoopReporter{},
 	)
+}
+
+func TestReaderSyncer_Sync_FirstCall(t *testing.T) {
+	mockReader := mock_reader.NewMockCCIPReader(t)
+	var readerInstance reader.CCIPReader = mockReader
+	syncer := &readerSyncer{reader: &readerInstance}
+
+	contracts := reader.ContractAddresses{}
+	mockReader.On("Sync", mock.Anything, contracts).Return(nil)
+
+	alreadySyncing, err := syncer.Sync(t.Context(), contracts)
+
+	assert.NoError(t, err)
+	assert.False(t, alreadySyncing)
+}
+
+func TestReaderSyncer_Sync_ConcurrentCall(t *testing.T) {
+	mockReader := mock_reader.NewMockCCIPReader(t)
+	var readerInstance reader.CCIPReader = mockReader
+	syncer := &readerSyncer{reader: &readerInstance}
+	contracts := reader.ContractAddresses{}
+
+	// Simulate a long-running sync operation
+	syncStarted := make(chan struct{})
+	mockReader.On("Sync", mock.Anything, contracts).Run(func(args mock.Arguments) {
+		close(syncStarted)
+		time.Sleep(100 * time.Millisecond)
+	}).Return(nil).Once()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var alreadySyncing1, alreadySyncing2 bool
+	var err1, err2 error
+
+	// First call starts the sync
+	go func() {
+		defer wg.Done()
+		alreadySyncing1, err1 = syncer.Sync(t.Context(), contracts)
+	}()
+
+	// Wait for the first sync to actually start
+	<-syncStarted
+
+	// Second call should find that the syncer is busy
+	go func() {
+		defer wg.Done()
+		alreadySyncing2, err2 = syncer.Sync(t.Context(), contracts)
+	}()
+
+	wg.Wait()
+
+	// The first call should not have been reported as 'already syncing'
+	assert.False(t, alreadySyncing1)
+	assert.NoError(t, err1)
+
+	// The second call should have been reported as 'already syncing'
+	assert.True(t, alreadySyncing2)
+	assert.NoError(t, err2)
+
+	// Ensure that subsequent calls are not blocked
+	mockReader.On("Sync", mock.Anything, contracts).Return(nil).Once()
+	alreadySyncing3, err3 := syncer.Sync(t.Context(), contracts)
+	assert.False(t, alreadySyncing3)
+	assert.NoError(t, err3)
+}
+
+func TestReaderSyncer_Sync_AfterCompletion(t *testing.T) {
+	mockReader := mock_reader.NewMockCCIPReader(t)
+	var readerInstance reader.CCIPReader = mockReader
+	syncer := &readerSyncer{reader: &readerInstance}
+	contracts := reader.ContractAddresses{}
+
+	// First call
+	mockReader.On("Sync", mock.Anything, contracts).Return(nil).Once()
+	alreadySyncing, err := syncer.Sync(t.Context(), contracts)
+	assert.NoError(t, err)
+	assert.False(t, alreadySyncing)
+
+	// Second call after completion
+	mockReader.On("Sync", mock.Anything, contracts).Return(nil).Once()
+	alreadySyncing, err = syncer.Sync(t.Context(), contracts)
+	assert.NoError(t, err)
+	assert.False(t, alreadySyncing)
+}
+
+func TestReaderSyncer_Sync_ErrorPropagation(t *testing.T) {
+	mockReader := mock_reader.NewMockCCIPReader(t)
+	var readerInstance reader.CCIPReader = mockReader
+	syncer := &readerSyncer{reader: &readerInstance}
+	contracts := reader.ContractAddresses{}
+
+	expectedErr := errors.New("sync error")
+	mockReader.On("Sync", mock.Anything, contracts).Return(expectedErr)
+
+	alreadySyncing, err := syncer.Sync(t.Context(), contracts)
+
+	assert.ErrorIs(t, err, expectedErr)
+	assert.False(t, alreadySyncing)
+}
+
+func waitForSync(t *testing.T, syncCalled chan struct{}) {
+	t.Helper()
+	var timer <-chan time.Time
+	if d, ok := t.Deadline(); ok {
+		// Give a small buffer before the deadline expires.
+		timer = time.After(time.Until(d) - 100*time.Millisecond)
+	} else {
+		timer = time.After(2 * time.Second)
+	}
+
+	select {
+	case <-syncCalled:
+	case <-timer:
+		t.Fatal("timed out waiting for syncer.Sync to be called")
+	}
 }

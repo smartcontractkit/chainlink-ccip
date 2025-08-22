@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/sync/errgroup"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -20,14 +21,16 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
@@ -103,8 +106,6 @@ func (p *Processor) prepareRMNController(ctx context.Context, lggr logger.Logger
 		return nil
 	}
 
-	lggr.Infow("Initializing RMN controller", "rmnRemoteCfg", prevOutcome.RMNRemoteCfg)
-
 	rmnNodesInfo, err := p.rmnHomeReader.GetRMNNodesInfo(prevOutcome.RMNRemoteCfg.ConfigDigest)
 	if err != nil {
 		return fmt.Errorf("failed to get RMN nodes info: %w", err)
@@ -112,9 +113,11 @@ func (p *Processor) prepareRMNController(ctx context.Context, lggr logger.Logger
 
 	oraclePeerIDs := make([]ragep2ptypes.PeerID, 0, len(p.oracleIDToP2pID))
 	for _, p2pID := range p.oracleIDToP2pID {
-		lggr.Infow("Adding oracle node to peerIDs", "p2pID", p2pID.String())
 		oraclePeerIDs = append(oraclePeerIDs, p2pID)
 	}
+
+	lggr.Debugw("Initializing RMN controller", "oraclePeerIDs", oraclePeerIDs,
+		"rmnRemoteConfig", prevOutcome.RMNRemoteCfg, "rmnNodesInfo", rmnNodesInfo)
 
 	if err := p.rmnController.InitConnection(
 		ctx,
@@ -544,27 +547,34 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 		return nil
 	}
 
-	sourceChainsConfig, err := o.ccipReader.GetOffRampSourceChainsConfig(ctx, allSourceChains)
+	supportedChains, err := o.chainSupport.SupportedChains(o.oracleID)
 	if err != nil {
-		lggr.Errorw("get offRamp source chains config failed", "err", err)
+		lggr.Warnw("call to SupportedChains failed", "err", err, "oracleID", o.oracleID)
 		return nil
 	}
 
+	supportedSourceChains := mapset.NewSet(allSourceChains...).
+		Intersect(supportedChains).ToSlice()
+
+	sort.Slice(supportedSourceChains, func(i, j int) bool { return supportedSourceChains[i] < supportedSourceChains[j] })
+
 	mu := &sync.Mutex{}
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChainsConfig))
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(supportedSourceChains))
 
 	wg := &sync.WaitGroup{}
-	for sourceChain, cfg := range sourceChainsConfig {
-		if !cfg.IsEnabled {
-			lggr.Debugw("ObserveLatestOnRampSeqNums source chain is disabled, skipping", "chain", sourceChain)
-			continue
-		}
+	for _, sourceChain := range supportedSourceChains {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
-				lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
+				if errors.Is(err, contractreader.ErrNoBindings) {
+					// when a source chain is disabled there will not be a binding for the onRamp contract
+					// we don't want to log this as an error.
+					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
+				} else {
+					lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
+				}
 				return
 			}
 
@@ -726,6 +736,17 @@ func (o observerImpl) computeMerkleRoot(
 // NOTE: At least two external calls are made.
 func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
+
+	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.oracleID)
+	if err != nil {
+		lggr.Errorw("call to SupportsDestChain failed", "err", err)
+		return cciptypes.RemoteConfig{}
+	}
+
+	if !supportsDestChain {
+		lggr.Debugw("cannot observe RMN remote config since destination chain is not supported")
+		return cciptypes.RemoteConfig{}
+	}
 
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {

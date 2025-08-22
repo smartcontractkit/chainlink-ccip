@@ -1,6 +1,6 @@
 [package]
 name = "base-token-pool"
-version = "0.1.0-dev"
+version = "0.1.1"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -21,3 +21,7 @@ anchor-spl = "0.29.0"
 solana-program = "1.17.25" # pin solana to 1.17
 spl-math = { version = "0.2.0", features = [ "no-entrypoint" ] }
 rmn_remote = {path = "../rmn-remote", features = ["cpi"]}
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic"))']

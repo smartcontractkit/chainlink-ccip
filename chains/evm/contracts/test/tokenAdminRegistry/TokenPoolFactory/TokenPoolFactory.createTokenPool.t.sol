@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {IOwner} from "../../../interfaces/IOwner.sol";
-import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
+import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {Ownable2Step} from "@chainlink/shared/access/Ownable2Step.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
@@ -19,8 +19,8 @@ import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/Tok
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 
 import {IERC20Metadata} from
-  "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {Create2} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Create2} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
 contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
   using Create2 for bytes32;
@@ -284,8 +284,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       LOCAL_TOKEN_DECIMALS,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
-      FAKE_SALT,
-      TokenPoolFactory.PoolType.BURN_MINT
+      FAKE_SALT
     );
 
     assertEq(
@@ -394,12 +393,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions
     address poolAddress = s_tokenPoolFactory.deployTokenPoolWithExistingToken(
-      address(newLocalToken),
-      LOCAL_TOKEN_DECIMALS,
-      remoteTokenPools,
-      type(LockReleaseTokenPool).creationCode,
-      FAKE_SALT,
-      TokenPoolFactory.PoolType.LOCK_RELEASE
+      address(newLocalToken), LOCAL_TOKEN_DECIMALS, remoteTokenPools, type(LockReleaseTokenPool).creationCode, FAKE_SALT
     );
 
     // Check that the pool was correctly deployed on the local chain first
@@ -423,8 +417,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       LOCAL_TOKEN_DECIMALS,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0), // No existing remote pools
       type(LockReleaseTokenPool).creationCode, // Pool Init Code
-      FAKE_SALT, // Salt
-      TokenPoolFactory.PoolType.LOCK_RELEASE
+      FAKE_SALT // Salt
     );
 
     assertEq(
@@ -577,8 +570,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       REMOTE_TOKEN_DECIMALS,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
-      FAKE_SALT,
-      TokenPoolFactory.PoolType.BURN_MINT
+      FAKE_SALT
     );
 
     assertEq(

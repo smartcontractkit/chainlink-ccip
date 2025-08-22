@@ -6,12 +6,17 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
+
+	mapset "github.com/deckarep/golang-set/v2"
 
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -20,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func encodeReports(
@@ -38,7 +42,7 @@ func encodeReports(
 			return nil, fmt.Errorf("found empty report")
 		}
 
-		lggr.Infow("encoding report and report info",
+		lggr.Debugw("encoding report and report info",
 			"report", report.Report,
 			"reportInfo", report.ReportInfo)
 
@@ -74,7 +78,7 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("decode outcome: %w", err)
 	}
 
-	lggr.Infow("generating report",
+	lggr.Debugw("generating report",
 		"roots", outcome.MerkleRootOutcome.RootsToReport,
 		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
 		"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
@@ -181,7 +185,7 @@ func (p *Plugin) validateReport(
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.BlessedMerkleRoots) > 0 &&
 		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
-		lggr.Infof("report with insufficient RMN signatures %d < %d+1",
+		lggr.Debugf("report with insufficient RMN signatures %d < %d+1",
 			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("insufficient RMN signatures")
 	}
@@ -202,7 +206,10 @@ func (p *Plugin) validateReport(
 	}
 
 	if !supports {
-		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
+			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
+			"assigned as readers of the destination chain, or if " +
+			"this oracle should support the destination chain but isn't!")
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
 
@@ -220,28 +227,20 @@ func (p *Plugin) validateReport(
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("config digest mismatch")
 	}
 
-	latestPriceSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	err = p.isStaleReport(ctx, seqNr, decodedReport)
 	if err != nil {
-		return cciptypes.CommitPluginReport{},
-			plugincommon.NewErrValidatingReport(fmt.Errorf("get latest price seq nr: %w", err))
+		return cciptypes.CommitPluginReport{}, plugincommon.NewErrStaleReport(fmt.Sprintf("%v", err))
 	}
 
-	if p.isStaleReport(lggr, seqNr, latestPriceSeqNr, decodedReport) {
-		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("stale report")
-	}
-
-	err = merkleroot.ValidateMerkleRootsState(
+	err = merkleroot.ValidateRootBlessings(
 		ctx,
+		p.ccipReader,
 		decodedReport.BlessedMerkleRoots,
 		decodedReport.UnblessedMerkleRoots,
-		p.ccipReader,
 	)
 	if err != nil {
-		lggr.Infow("report reached transmission protocol but not transmitted, invalid merkle roots state",
-			"err", err,
-			"blessedMerkleRoots", decodedReport.BlessedMerkleRoots,
-			"unblessedMerkleRoots", decodedReport.UnblessedMerkleRoots)
-		err = plugincommon.NewErrInvalidReport(fmt.Sprintf("invalid merkle roots state %v", err))
+		lggr.Errorw("report not accepted due to root blessings validation error", "err", err)
+		err = plugincommon.NewErrInvalidReport(fmt.Sprintf("root blessings validation: %v", err))
 		return cciptypes.CommitPluginReport{}, err
 	}
 
@@ -254,12 +253,12 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
 
 	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
-	if errors.Is(err, plugincommon.ErrInvalidReport) {
-		lggr.Infow("report not valid, not accepting", "err", err)
+	if errors.Is(err, plugincommon.ErrStaleReport) {
+		lggr.Infow("stale report, not accepting", "err", err)
 		return false, nil
 	}
 	if err != nil {
-		lggr.Infow("validation error", "err", err)
+		lggr.Errorw("validation error", "err", err)
 		return false, fmt.Errorf("validating report: %w", err)
 	}
 
@@ -290,20 +289,69 @@ func (p *Plugin) decodeReport(
 }
 
 func (p *Plugin) isStaleReport(
-	lggr logger.Logger,
-	seqNr,
-	latestPriceSeqNr uint64,
+	ctx context.Context,
+	ocrSeqNr uint64,
 	decodedReport cciptypes.CommitPluginReport,
-) bool {
-	if seqNr <= latestPriceSeqNr &&
+) error {
+	latestPriceSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	if err != nil {
+		return fmt.Errorf("get latest price seq nr: %w", err)
+	}
+
+	if ocrSeqNr <= latestPriceSeqNr &&
 		len(decodedReport.BlessedMerkleRoots) == 0 &&
 		len(decodedReport.UnblessedMerkleRoots) == 0 {
-		lggr.Infow(
-			"skipping stale report due to stale price seq nr and no merkle roots",
-			"latestPriceSeqNr", latestPriceSeqNr)
-		return true
+		return fmt.Errorf(
+			"stale report: ocrSeqNr %d <= latestPriceSeqNr %d and no merkle roots", ocrSeqNr, latestPriceSeqNr,
+		)
 	}
-	return false
+	proposedBlessedMerkleRoots := decodedReport.BlessedMerkleRoots
+	proposedUnblessedMerkleRoots := decodedReport.UnblessedMerkleRoots
+
+	if len(proposedBlessedMerkleRoots) == 0 && len(proposedUnblessedMerkleRoots) == 0 {
+		return nil
+	}
+
+	proposedMerkleRoots := append(proposedBlessedMerkleRoots, proposedUnblessedMerkleRoots...)
+
+	chainSet := mapset.NewSet[cciptypes.ChainSelector]()
+	newNextOnRampSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
+
+	for _, r := range proposedMerkleRoots {
+		if chainSet.Contains(r.ChainSel) {
+			return fmt.Errorf("duplicate chain %d", r.ChainSel)
+		}
+		chainSet.Add(r.ChainSel)
+		newNextOnRampSeqNums[r.ChainSel] = r.SeqNumsRange.Start()
+	}
+
+	chainSlice := chainSet.ToSlice()
+	sort.Slice(chainSlice, func(i, j int) bool { return chainSlice[i] < chainSlice[j] })
+
+	offRampExpNextSeqNums, err := p.ccipReader.NextSeqNum(ctx, chainSlice)
+	if err != nil {
+		return fmt.Errorf("get next sequence numbers: %w", err)
+	}
+
+	for chain, newNextOnRampSeqNum := range newNextOnRampSeqNums {
+		offRampExpNextSeqNum, ok := offRampExpNextSeqNums[chain]
+		if !ok {
+			// Due to some chain being disabled while the sequence numbers were already observed.
+			// Report should not be considered valid in that case.
+			return fmt.Errorf("offRamp expected next sequence number for chain %d was not found", chain)
+		}
+
+		if newNextOnRampSeqNum != offRampExpNextSeqNum {
+			return fmt.Errorf("the merkle root that we are about to propose is stale, some previous report "+
+				"made it on-chain, consider waiting more time for the reports to make it on chain. "+
+				"offramp expects %d but we are proposing a root with min seq num %d for chain %d. "+
+				"BlessedRoots: %v \nUnblessedRoots: %v",
+				offRampExpNextSeqNum, newNextOnRampSeqNum, chain,
+				proposedBlessedMerkleRoots, proposedUnblessedMerkleRoots,
+			)
+		}
+	}
+	return nil
 }
 
 func (p *Plugin) checkReportCursed(
@@ -312,6 +360,19 @@ func (p *Plugin) checkReportCursed(
 	decodedReport cciptypes.CommitPluginReport,
 ) (bool, error) {
 	allRoots := append(decodedReport.BlessedMerkleRoots, decodedReport.UnblessedMerkleRoots...)
+
+	supportsDest, err := p.chainSupport.SupportsDestChain(p.oracleID)
+	if err != nil {
+		lggr.Errorw("error checking if destination chain is supported", "err", err)
+		return false, fmt.Errorf("checking if destination chain is supported: %w", err)
+	}
+	if !supportsDest {
+		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
+			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
+			"assigned as readers of the destination chain, or if " +
+			"this oracle should support the destination chain but isn't!")
+		return false, plugincommon.NewErrInvalidReport("destination chain not supported")
+	}
 
 	sourceChains := slicelib.Map(allRoots,
 		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector { return r.ChainSel })
@@ -330,12 +391,12 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldTransmit)
 
 	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
-	if errors.Is(err, plugincommon.ErrInvalidReport) {
-		lggr.Infow("report not valid, transmitting", "err", err)
+	if errors.Is(err, plugincommon.ErrStaleReport) {
+		lggr.Infow("stale report, not accepting", "err", err)
 		return false, nil
 	}
 	if err != nil {
-		lggr.Infow("validation error", "err", err)
+		lggr.Errorw("validation error", "err", err)
 		return false, fmt.Errorf("validating report: %w", err)
 	}
 

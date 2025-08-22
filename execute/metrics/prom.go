@@ -1,19 +1,21 @@
 package metrics
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/exp/maps"
 
-	sel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var (
@@ -22,7 +24,7 @@ var (
 			Name: "ccip_exec_output_sizes",
 			Help: "This metric tracks the number of different items in the exec plugin",
 		},
-		[]string{"chainID", "method", "state", "type"},
+		[]string{"chainFamily", "chainID", "method", "state", "type"},
 	)
 	PromExecLatencyHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -42,14 +44,14 @@ var (
 				float64(20 * time.Second),
 			},
 		},
-		[]string{"chainID", "method", "state"},
+		[]string{"chainFamily", "chainID", "method", "state"},
 	)
 	PromExecErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "ccip_exec_errors",
 			Help: "This metric tracks the number of errors in the exec plugin",
 		},
-		[]string{"chainID", "method", "state"},
+		[]string{"chainFamily", "chainID", "method", "state"},
 	)
 	PromExecProcessorLatencyHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -69,27 +71,28 @@ var (
 				float64(20 * time.Second),
 			},
 		},
-		[]string{"chainID", "processor", "method"},
+		[]string{"chainFamily", "chainID", "processor", "method"},
 	)
 	PromExecProcessorErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "ccip_exec_processor_errors",
 			Help: "This metric tracks the number of errors in the exec plugin processor",
 		},
-		[]string{"chainID", "processor", "method"},
+		[]string{"chainFamily", "chainID", "processor", "method"},
 	)
 	PromSequenceNumbers = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ccip_exec_max_sequence_number",
 			Help: "This metric tracks the max sequence number observed by the commit processor",
 		},
-		[]string{"chainID", "sourceChain", "method"},
+		[]string{"chainFamily", "chainID", "sourceChainFamily", "sourceChain", "method"},
 	)
 )
 
 type PromReporter struct {
-	lggr    logger.Logger
-	chainID string
+	lggr        logger.Logger
+	chainFamily string
+	chainID     string
 
 	// Prometheus reporters
 	latencyHistogram          *prometheus.HistogramVec
@@ -101,14 +104,15 @@ type PromReporter struct {
 }
 
 func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*PromReporter, error) {
-	chainID, err := sel.GetChainIDFromSelector(uint64(selector))
-	if err != nil {
-		return nil, err
+	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(selector)
+	if !ok {
+		return nil, fmt.Errorf("chainFamily and chainID not found for selector %d", selector)
 	}
 
 	return &PromReporter{
-		lggr:    lggr,
-		chainID: chainID,
+		lggr:        lggr,
+		chainFamily: chainFamily,
+		chainID:     chainID,
 
 		latencyHistogram:          PromExecLatencyHistogram,
 		execErrors:                PromExecErrors,
@@ -146,13 +150,13 @@ func (p *PromReporter) TrackLatency(
 ) {
 	if err != nil {
 		p.execErrors.
-			WithLabelValues(p.chainID, method, string(state)).
+			WithLabelValues(p.chainFamily, p.chainID, method, string(state)).
 			Inc()
 		return
 	}
 
 	p.latencyHistogram.
-		WithLabelValues(p.chainID, method, string(state)).
+		WithLabelValues(p.chainFamily, p.chainID, method, string(state)).
 		Observe(float64(latency))
 }
 
@@ -164,13 +168,13 @@ func (p *PromReporter) TrackProcessorLatency(
 ) {
 	if err != nil {
 		p.processorErrors.
-			WithLabelValues(p.chainID, processor, method).
+			WithLabelValues(p.chainFamily, p.chainID, processor, method).
 			Inc()
 		return
 	}
 
 	p.processorLatencyHistogram.
-		WithLabelValues(p.chainID, processor, method).
+		WithLabelValues(p.chainFamily, p.chainID, processor, method).
 		Observe(float64(latency))
 }
 
@@ -189,21 +193,23 @@ func (p *PromReporter) trackMaxSequenceNumber(
 		return
 	}
 
-	sourceChain, err := sel.GetChainIDFromSelector(uint64(sourceChainSelector))
-	if err != nil {
-		p.lggr.Errorw("failed to get chain ID from selector", "err", err)
+	sourceFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChainSelector)
+	if !ok {
+		p.lggr.Errorw("failed to get chain ID from selector", "selector", sourceChainSelector)
 		return
 	}
 
 	p.sequenceNumbers.
-		WithLabelValues(p.chainID, sourceChain, method).
+		WithLabelValues(p.chainFamily, p.chainID, sourceFamily, sourceChainID, method).
 		Set(float64(maxSeqNr))
 
 	p.lggr.Debugw(
 		"commit latest max seq num",
 		"method", method,
-		"sourceChain", sourceChain,
+		"sourceChain", sourceChainID,
+		"sourceChainFamily", sourceFamily,
 		"destChain", p.chainID,
+		"destChainFamily", p.chainFamily,
 		"maxSeqNr", maxSeqNr,
 	)
 }
@@ -216,7 +222,7 @@ func (p *PromReporter) trackOutputStats(
 	stringState := string(state)
 	for key, val := range output.Stats() {
 		p.outputDetailsCounter.
-			WithLabelValues(p.chainID, method, stringState, key).
+			WithLabelValues(p.chainFamily, p.chainID, method, stringState, key).
 			Add(float64(val))
 	}
 }

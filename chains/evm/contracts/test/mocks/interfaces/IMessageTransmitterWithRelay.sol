@@ -15,7 +15,7 @@
  */
 pragma solidity ^0.8.0;
 
-import {IMessageTransmitter} from "../../../pools/USDC/IMessageTransmitter.sol";
+import {IMessageTransmitter} from "../../../pools/USDC/interfaces/IMessageTransmitter.sol";
 
 // This follows https://github.com/circlefin/evm-cctp-contracts/blob/master/src/interfaces/IMessageTransmitter.sol
 interface IMessageTransmitterWithRelay is IMessageTransmitter {

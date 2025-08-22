@@ -5,7 +5,8 @@ import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol
 
 import {Client} from "../libraries/Client.sol";
 
-import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
 abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
@@ -30,7 +31,7 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
   /// execution (EXTCODESIZE returns 0), only tokens will be transferred.
   function supportsInterface(
     bytes4 interfaceId
-  ) public view virtual override returns (bool) {
+  ) public pure virtual override returns (bool) {
     return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 

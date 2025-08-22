@@ -2,7 +2,7 @@ package tokenprice
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -15,11 +15,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -34,8 +35,8 @@ func Test_Observation(t *testing.T) {
 		tokenB: cciptypes.NewBigInt(bi200),
 	}
 	feeQuoterTokenUpdates := map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
-		tokenA: cciptypes.NewTimestampedBig(bi100.Int64(), timestamp),
-		tokenB: cciptypes.NewTimestampedBig(bi200.Int64(), timestamp),
+		tokenA: cciptypes.NewTimestampedBig(100, timestamp), // bi100 is big.NewInt(100)
+		tokenB: cciptypes.NewTimestampedBig(200, timestamp), // bi200 is big.NewInt(200)
 	}
 	oracleID := commontypes.OracleID(1)
 	lggr := logger.Test(t)
@@ -68,8 +69,8 @@ func Test_Observation(t *testing.T) {
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).Return(
 					map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
-						tokenA: cciptypes.NewTimestampedBig(bi100.Int64(), timestamp),
-						tokenB: cciptypes.NewTimestampedBig(bi200.Int64(), timestamp),
+						tokenA: cciptypes.NewTimestampedBig(100, timestamp),
+						tokenB: cciptypes.NewTimestampedBig(200, timestamp),
 					},
 					nil,
 				)
@@ -102,11 +103,35 @@ func Test_Observation(t *testing.T) {
 		{
 			name: "Failed to get FDestChain",
 			getProcessor: func(t *testing.T) plugincommon.PluginProcessor[Query, Observation, Outcome] {
-				homeChain := readermock.NewMockHomeChain(t)
-				homeChain.EXPECT().GetFChain().Return(nil, errors.New("failed to get FChain"))
-
 				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportedChains(mock.Anything).Return(
+					mapset.NewSet(feedChainSel, destChainSel), nil,
+				)
+				chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil).Maybe()
+
 				tokenPriceReader := readerpkg_mock.NewMockPriceReader(t)
+				tokenPriceReader.EXPECT().GetFeedPricesUSD(mock.Anything, mock.MatchedBy(
+					func(tokens []cciptypes.UnknownEncodedAddress) bool {
+						expectedTokens := mapset.NewSet(tokenA, tokenB)
+						actualTokens := mapset.NewSet(tokens...)
+						return expectedTokens.Equal(actualTokens)
+					})).
+					Return(cciptypes.TokenPriceMap{
+						tokenA: cciptypes.NewBigInt(bi100),
+						tokenB: cciptypes.NewBigInt(bi200)}, nil)
+
+				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).Return(
+					map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
+						tokenA: cciptypes.NewTimestampedBig(100, timestamp),
+						tokenB: cciptypes.NewTimestampedBig(200, timestamp),
+					},
+					nil,
+				)
+
+				homeChain := readermock.NewMockHomeChain(t)
+				homeChain.EXPECT().GetFChain().Return(nil,
+					fmt.Errorf("some unexpected error getting fChain"), // <----------------
+				)
 
 				return NewProcessor(
 					oracleID,
@@ -120,7 +145,12 @@ func Test_Observation(t *testing.T) {
 					plugincommon.NoopReporter{},
 				)
 			},
-			expObs: Observation{},
+			expObs: Observation{
+				FeedTokenPrices:       feedTokenPrices,
+				FeeQuoterTokenUpdates: feeQuoterTokenUpdates,
+				FChain:                map[cciptypes.ChainSelector]int{},
+				Timestamp:             time.Now().UTC(),
+			},
 		},
 	}
 

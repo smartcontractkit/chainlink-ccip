@@ -3,17 +3,28 @@ package internal
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"math/big"
 	"strings"
 	"testing"
+
+	cciptypesmocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 
 	"github.com/prometheus/client_golang/prometheus"
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	sel "github.com/smartcontractkit/chain-selectors"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+)
+
+var (
+	SolChainSelector  = cciptypes.ChainSelector(sel.SOLANA_DEVNET.Selector)
+	EvmChainSelector  = cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	EvmChainSelector2 = cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector)
 )
 
 func MessageWithTokens(t *testing.T, tokenPoolAddr ...string) cciptypes.Message {
@@ -69,8 +80,8 @@ func MustDecodeRaw(s string) []byte {
 }
 
 // NewMockAddressCodecHex returns a mock address codec that hex-encodes and decodes addresses.
-func NewMockAddressCodecHex(t *testing.T) *ccipocr3.MockAddressCodec {
-	mockAddrCodec := ccipocr3.NewMockAddressCodec(t)
+func NewMockAddressCodecHex(t *testing.T) *cciptypesmocks.MockAddressCodec {
+	mockAddrCodec := cciptypesmocks.NewMockAddressCodec(t)
 	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
 		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
 			return "0x" + hex.EncodeToString(addr)
@@ -84,4 +95,15 @@ func NewMockAddressCodecHex(t *testing.T) *ccipocr3.MockAddressCodec {
 			return addrBytes, nil
 		}).Maybe()
 	return mockAddrCodec
+}
+
+func MustCalculateUsdPerUnitGas(sourceChainSelector cciptypes.ChainSelector,
+	sourceGasPrice *big.Int,
+	usdPerFeeCoin *big.Int) *big.Int {
+	gas, err := mathslib.CalculateUsdPerUnitGas(sourceChainSelector, sourceGasPrice, usdPerFeeCoin)
+	if err != nil {
+		panic("failed to CalculateUsdPerUnitGas: " + err.Error())
+	}
+
+	return gas
 }

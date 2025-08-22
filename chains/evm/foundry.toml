@@ -19,7 +19,12 @@ block_number = 12345
 
 # This profile should be used for testing CCIP locally and in CI.
 [profile.ccip]
-optimizer_runs = 500
+# We don't need optimization for CCIP tests, the wrappers are built with the `ccip-compile` profile.
+# Having lower optimization runs speeds up compilation.
+optimizer_runs = 1
+# https://book.getfoundry.sh/config/dynamic-test-linking/
+# This should, under certain conditions, speed up compilation.
+dynamic_test_linking = true
 
 # This profile should be used prior to any release to ensure the tests are passing with via-ir enabled. Enabling via-ir
 # locally or in CI will slow down the compilation process, so it is not recommended to use it for everyday development.

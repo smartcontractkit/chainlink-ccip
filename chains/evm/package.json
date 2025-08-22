@@ -1,13 +1,14 @@
 {
   "name": "@chainlink/contracts-ccip",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Chainlink smart contracts for CCIP",
   "author": "Chainlink devs",
+  "repository": "github:smartcontractkit/chainlink-ccip",
   "license": "BUSL-1.1",
   "private": false,
   "scripts": {
     "publish-beta": "pnpm publish --tag beta",
-    "publish-prod": "npm dist-tag add @chainlink/contracts-ccip@1.6.0 latest",
+    "publish-prod": "pnpm publish --tag latest",
     "compile": "./scripts/compile_all",
     "solhint": "solhint --max-warnings 0 \"./contracts/**/*.sol\"",
     "solhint-test": "solhint --config \".solhint-test.json\"  --ignore-path \".solhintignore-test\" --max-warnings 0 \"./contracts/**/*.sol\""
@@ -22,7 +23,7 @@
     "!contracts/test/mocks/test/*",
     "contracts/test/helpers/**/*",
     "scripts/compile_all",
-    "abi/v0.8/",
+    "abi/*.abi",
     "remappings.txt",
     ".solhint.json",
     ".solhint-test.json",
@@ -34,13 +35,13 @@
     "pnpm": ">=10"
   },
   "dependencies": {
-    "@changesets/cli": "^2.28.1",
+    "@changesets/cli": "^2.29.5",
     "@changesets/get-github-info": "^0.6.0",
-    "semver": "^7.6.3",
-    "@chainlink/contracts": "1.4.0-beta.0"
+    "semver": "^7.7.2",
+    "@chainlink/contracts": "1.4.0"
   },
   "devDependencies": {
-    "solhint": "^5.0.5",
+    "solhint": "^6.0.0",
     "solhint-plugin-chainlink-solidity": "github:smartcontractkit/chainlink-solhint-rules#v1.2.1"
   },
   "pnpm": {

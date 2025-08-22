@@ -1,5 +1,5 @@
 export type FeeQuoter = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "fee_quoter",
   "instructions": [
     {
@@ -59,6 +59,25 @@ export type FeeQuoter = {
           "type": "publicKey"
         }
       ]
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",
@@ -182,6 +201,36 @@ export type FeeQuoter = {
           "type": "u128"
         }
       ]
+    },
+    {
+      "name": "setLinkTokenMint",
+      "docs": [
+        "Sets the link_token_mint and updates the link_token_local_decimals.",
+        "",
+        "Only the admin may set this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "linkTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
     },
     {
       "name": "addBillingTokenConfig",
@@ -1687,12 +1736,17 @@ export type FeeQuoter = {
       "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 8037,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };
 
 export const IDL: FeeQuoter = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "fee_quoter",
   "instructions": [
     {
@@ -1752,6 +1806,25 @@ export const IDL: FeeQuoter = {
           "type": "publicKey"
         }
       ]
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",
@@ -1875,6 +1948,36 @@ export const IDL: FeeQuoter = {
           "type": "u128"
         }
       ]
+    },
+    {
+      "name": "setLinkTokenMint",
+      "docs": [
+        "Sets the link_token_mint and updates the link_token_local_decimals.",
+        "",
+        "Only the admin may set this.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "linkTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
     },
     {
       "name": "addBillingTokenConfig",
@@ -3380,6 +3483,11 @@ export const IDL: FeeQuoter = {
       "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 8037,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };

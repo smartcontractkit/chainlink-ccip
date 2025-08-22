@@ -20,17 +20,19 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/cctp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_ccip_sender"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/base_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/example_ccip_sender"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -47,6 +49,7 @@ func TestCCIPRouter(t *testing.T) {
 	ccip_offramp.SetProgramID(config.CcipOfframpProgram)
 	example_ccip_sender.SetProgramID(config.CcipBaseSender)
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
+	cctp_token_pool.SetProgramID(config.CctpTokenPoolProgram)
 
 	ctx := tests.Context(t)
 	user := solana.MustPrivateKeyFromBase58("ZZdVf32Npuhci4u4ir2NW9491Y3FTv2Gwk41HMpvgJoh81UM42LcNqAN8SXapHfPcr61QP7sJj7K2mKHt7qFCoV")
@@ -57,6 +60,7 @@ func TestCCIPRouter(t *testing.T) {
 	token0PoolAdmin := solana.MustPrivateKeyFromBase58("2NqkEEvMWf5Y8aUTSZvGCfyqPi4KjBKJShXWH4BrTWVyfxBzJm22S1K4gtkgzHcAhStseHypRV7mKPsx5nVa9h2e")
 	token1PoolAdmin := solana.MustPrivateKeyFromBase58("rAJULkVqwXHED22STrDdUPxfGqSi6gkHfSpgaYSTzp3X9MCqsYegEcWMJVZ5yQFw5H3mNdsBAJpR9xfdYRGfb7J")
 	token2PoolAdmin := solana.MustPrivateKeyFromBase58("3UUqZ5xa3xv9fX1UJQyHsJtovE2gzmJUJjybizjrAvxh7NUmVyVQHUkJVkQwBKtVr5vLVCp1DWAeAzv46WzLoEmS")
+	usdcPoolAdmin := solana.MustPrivateKeyFromBase58("2Gjx3b1ZY7P3A63EnPRSVWQsKth8BXXjQQNLjzAsiLFrDxbBQwZ62yDG8BiN5RjG8VYveMdZFy7gLjzsdKboPM7N")
 	feeAggregator := solana.MustPrivateKeyFromBase58("NPchsbT3bkkziJPBUxto3eVTVKHcV4tou33NjRY8inArmzi7EXKBf5cC7MX47xqYMwkZGbkw7t55jCciCStSwNs")
 
 	nonceEvmPDA, gerr := state.FindNoncePDA(config.EvmChainSelector, user.PublicKey(), config.CcipRouterProgram)
@@ -94,22 +98,29 @@ func TestCCIPRouter(t *testing.T) {
 	token0Decimals := uint8(9)
 	token1Decimals := uint8(18)
 	token2Decimals := uint8(9)
+	link22Decimals := uint8(9) // Solana Decimals for Link Token2022 token
+	usdcDecimals := uint8(6)   // Solana Decimals for USDC token
 
 	// token addresses
 	// Create link22 token, managed by "legacyAdmin" (not "ccipAdmin" who manages CCIP).
-	// Random-generated key, but fixing it adds determinism to tests to make it easier to debug.
-	linkMintPrivK := solana.MustPrivateKeyFromBase58("32YVeJArcWWWV96fztfkRQhohyFz5Hwno93AeGVrN4g2LuFyvwznrNd9A6tbvaTU6BuyBsynwJEMLre8vSy3CrVU")
+
+	token0Multisig := solana.MustPrivateKeyFromBase58("5BayUa1C1nfiSptuV521hYPKZZsjHJM5YDfWZJkyrDgnEhzvZS4x5Nuqn6n4E6anuqAc7dJpAr1faNUwyK99cf3C") // EkopXthh6nbLKkgEnACc94mygKsSfcaX4EjXLgt1LiR4
 
 	token0Mint := solana.MustPrivateKeyFromBase58("42uJJqZk4gFz6Q6ghMiaYrFdDapXhbufQdTCGJDMeyv2wN6wNBbXkBBPibF7xQQZemzRaDH66ouJmjfvWhPJKtQC")
-	token0, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, token0Mint.PublicKey())
+	token0, gerr := tokens.NewTokenPool(config.SPLTokenProgram, config.CcipTokenPoolProgram, token0Mint.PublicKey())
 	require.NoError(t, gerr)
 	token1Mint := solana.MustPrivateKeyFromBase58("5uBhsiup2KiXPNznVSZaFeuegvLXCtmVmuW4u7kfBbP3xSmT1BZgmapKYiCCwi8GUgwdSQniAah3rJaUJdhPprcB")
 	token1, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, token1Mint.PublicKey())
 	require.NoError(t, gerr)
+	token1.WithTokenExtensions = true // token1 is a token2022 with extensions enabled
 	token2Mint := solana.MustPrivateKeyFromBase58("2b4zgrXRBDkAuhFMEUEaMJHXwPfPX5REmy3gA3Vxhj7efTLkZEBuq49mDSdQyCJFyG3KPRGt2PVoGF8VqhGUTo9")
 	token2, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, token2Mint.PublicKey())
 	require.NoError(t, gerr)
+	linkMintPrivK := solana.MustPrivateKeyFromBase58("32YVeJArcWWWV96fztfkRQhohyFz5Hwno93AeGVrN4g2LuFyvwznrNd9A6tbvaTU6BuyBsynwJEMLre8vSy3CrVU")
 	linkPool, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, linkMintPrivK.PublicKey())
+	require.NoError(t, gerr)
+	usdcMintPrivK := solana.MustPrivateKeyFromBase58("3NnpbE8mrtqhC99YLxhZU4xQTBQBha6tKjfTa123DtR6bmGH1NQS59QELnNarvgHzzvRjAdDTqsfGYjyWHf6mwtA")
+	usdcPool, gerr := tokens.NewTokenPool(config.SPLTokenProgram, config.CctpTokenPoolProgram, usdcMintPrivK.PublicKey())
 	require.NoError(t, gerr)
 
 	signers, transmitters, getTransmitter := testutils.GenerateSignersAndTransmitters(t, config.MaxOracles)
@@ -180,6 +191,14 @@ func TestCCIPRouter(t *testing.T) {
 
 	var ccipSendLookupTable map[solana.PublicKey]solana.PublicKeySlice
 	var offrampLookupTable map[solana.PublicKey]solana.PublicKeySlice
+	var offrampLookupTableAddr solana.PublicKey
+
+	// Using 0 as a cctpDomain because we're only partially configuring the pool for this test suite,
+	// so it contains the default.
+	cctpDomain := uint32(0)
+
+	messageTransmitter := cctp.GetMessageTransmitterPDAs(t)
+	tokenMessengerMinter := cctp.GetTokenMessengerMinterPDAs(t, cctpDomain, usdcMintPrivK.PublicKey(), config.EVMUsdcAddressBytes)
 
 	t.Run("setup", func(t *testing.T) {
 		t.Run("funding", func(t *testing.T) {
@@ -193,9 +212,42 @@ func TestCCIPRouter(t *testing.T) {
 				token0PoolAdmin,
 				token1PoolAdmin,
 				token2PoolAdmin,
+				usdcPoolAdmin,
 				feeAggregator),
 				solanaGoClient,
 				t)
+		})
+
+		t.Run("Type version", func(t *testing.T) {
+			testcases := []struct {
+				ContractName              string
+				Program                   solana.PublicKey
+				NewTypeVersionInstruction solana.Instruction
+			}{
+				{"ccip-router", config.CcipRouterProgram, ccip_router.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
+				{"fee-quoter", config.FeeQuoterProgram, fee_quoter.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
+				{"ccip-offramp", config.CcipOfframpProgram, ccip_offramp.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
+				{"rmn-remote", config.RMNRemoteProgram, rmn_remote.NewTypeVersionInstruction(solana.SysVarClockPubkey).Build()},
+			}
+			for _, testcase := range testcases {
+				t.Run(testcase.ContractName, func(t *testing.T) {
+					t.Parallel()
+
+					result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{testcase.NewTypeVersionInstruction}, legacyAdmin, config.DefaultCommitment)
+					require.NotNil(t, result)
+
+					output, err := common.ExtractTypedReturnValue(ctx, result.Meta.LogMessages, testcase.Program.String(), func(b []byte) string {
+						require.Len(t, b, int(binary.LittleEndian.Uint32(b[:4]))+4) // the first 4 bytes just encodes the length
+						return string(b[4:])
+					})
+					require.NoError(t, err)
+
+					// regex from https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
+					semverRegex := "(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?"
+					require.Regexp(t, fmt.Sprintf("^%s %s$", testcase.ContractName, semverRegex), output)
+					fmt.Printf(testcase.ContractName+" Type Version: %s\n", output)
+				})
+			}
 		})
 
 		t.Run("receiver", func(t *testing.T) {
@@ -217,21 +269,21 @@ func TestCCIPRouter(t *testing.T) {
 
 			wsolPDA, _, aerr := state.FindFqBillingTokenConfigPDA(solana.SolMint, config.FeeQuoterProgram)
 			require.NoError(t, aerr)
-			wsolReceiver, _, rerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, config.BillingSignerPDA)
+			wsolReceiver, _, rerr := tokens.FindAssociatedTokenAddress(config.SPLTokenProgram, solana.SolMint, config.BillingSignerPDA)
 			require.NoError(t, rerr)
 			wsolEvmConfigPDA, _, perr := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, solana.SolMint, config.FeeQuoterProgram)
 			require.NoError(t, perr)
-			wsolUserATA, _, uerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, user.PublicKey())
+			wsolUserATA, _, uerr := tokens.FindAssociatedTokenAddress(config.SPLTokenProgram, solana.SolMint, user.PublicKey())
 			require.NoError(t, uerr)
-			wsolAnotherUserATA, _, auerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, anotherUser.PublicKey())
+			wsolAnotherUserATA, _, auerr := tokens.FindAssociatedTokenAddress(config.SPLTokenProgram, solana.SolMint, anotherUser.PublicKey())
 			require.NoError(t, auerr)
-			wsolTokenlessUserATA, _, tuerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, tokenlessUser.PublicKey())
+			wsolTokenlessUserATA, _, tuerr := tokens.FindAssociatedTokenAddress(config.SPLTokenProgram, solana.SolMint, tokenlessUser.PublicKey())
 			require.NoError(t, tuerr)
-			wsolFeeAggregatorATA, _, fuerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, feeAggregator.PublicKey())
+			wsolFeeAggregatorATA, _, fuerr := tokens.FindAssociatedTokenAddress(config.SPLTokenProgram, solana.SolMint, feeAggregator.PublicKey())
 			require.NoError(t, fuerr)
 
 			// persist the WSOL config for later use
-			wsol.program = solana.TokenProgramID
+			wsol.program = config.SPLTokenProgram
 			wsol.mint = solana.SolMint
 			wsol.fqBillingConfigPDA = wsolPDA
 			wsol.userATA = wsolUserATA
@@ -245,7 +297,7 @@ func TestCCIPRouter(t *testing.T) {
 			// link22 //
 			///////////////
 			linkMint := linkMintPrivK.PublicKey()
-			ixToken, terr := tokens.CreateToken(ctx, config.Token2022Program, linkMint, legacyAdmin.PublicKey(), 9, solanaGoClient, config.DefaultCommitment)
+			ixToken, terr := tokens.CreateToken(ctx, config.Token2022Program, linkMint, legacyAdmin.PublicKey(), link22Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, terr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixToken, legacyAdmin, config.DefaultCommitment, common.AddSigners(linkMintPrivK))
 
@@ -336,7 +388,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// fund user WSOL (transfer SOL + syncNative)
 					transferAmount := 1.0 * solana.LAMPORTS_PER_SOL
-					ixTransfer, terr := tokens.NativeTransfer(wsol.program, transferAmount, it.user.PublicKey(), it.getATA(&wsol))
+					ixTransfer, terr := tokens.NativeTransfer(transferAmount, it.user.PublicKey(), it.getATA(&wsol))
 					require.NoError(t, terr)
 					ixSync, serr := tokens.SyncNative(wsol.program, it.getATA(&wsol))
 					require.NoError(t, serr)
@@ -346,14 +398,21 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("token", func(t *testing.T) {
-			ix0, ixErr0 := tokens.CreateToken(ctx, token0.Program, token0.Mint, token0PoolAdmin.PublicKey(), token0Decimals, solanaGoClient, config.DefaultCommitment)
+			ix0, ixErr0 := tokens.CreateTokenFrom(ctx, token0, token0PoolAdmin.PublicKey(), token0Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr0)
 
-			ix1, ixErr1 := tokens.CreateToken(ctx, token1.Program, token1.Mint, token1PoolAdmin.PublicKey(), token1Decimals, solanaGoClient, config.DefaultCommitment)
+			ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, user.PublicKey(), config.SPLTokenProgram, token0Multisig.PublicKey(), 1, []solana.PublicKey{token0PoolAdmin.PublicKey(), token0.PoolSigner}, solanaGoClient, config.DefaultCommitment)
+			require.NoError(t, ixErrMsig)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token0Multisig, user))
+
+			ix1, ixErr1 := tokens.CreateTokenFrom(ctx, token1, token1PoolAdmin.PublicKey(), token1Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr1)
 
-			ix2, ixErr2 := tokens.CreateToken(ctx, token2.Program, token2.Mint, token2PoolAdmin.PublicKey(), token2Decimals, solanaGoClient, config.DefaultCommitment)
+			ix2, ixErr2 := tokens.CreateTokenFrom(ctx, token2, token2PoolAdmin.PublicKey(), token2Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr2)
+
+			ixUsdc, ixErrUsdc := tokens.CreateToken(ctx, usdcPool.Program, usdcPool.Mint, usdcPoolAdmin.PublicKey(), usdcDecimals, solanaGoClient, config.DefaultCommitment)
+			require.NoError(t, ixErrUsdc)
 
 			// mint tokens to user
 			ixAta0, addr0, ataErr := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint, user.PublicKey(), token0PoolAdmin.PublicKey())
@@ -368,6 +427,10 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, ataErr)
 			ixMintTo2, mintErr := tokens.MintTo(10000000, token2.Program, token2.Mint, addr2, token2PoolAdmin.PublicKey())
 			require.NoError(t, mintErr)
+			ixAtaUsdc, usdcAddr, ataErr := tokens.CreateAssociatedTokenAccount(usdcPool.Program, usdcPool.Mint, user.PublicKey(), usdcPoolAdmin.PublicKey())
+			require.NoError(t, ataErr)
+			ixMintToUsdc, mintErr := tokens.MintTo(10000000, usdcPool.Program, usdcPool.Mint, usdcAddr, usdcPoolAdmin.PublicKey())
+			require.NoError(t, mintErr)
 
 			// create ATA for receiver (receiver program address)
 			ixAtaReceiver0, recAddr0, recErr := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint, config.ReceiverExternalExecutionConfigPDA, token0PoolAdmin.PublicKey())
@@ -378,6 +441,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, recErr)
 			ixAtaReceiverLink, recAddrLink, recErr := tokens.CreateAssociatedTokenAccount(link22.program, link22.mint, config.ReceiverExternalExecutionConfigPDA, legacyAdmin.PublicKey())
 			require.NoError(t, recErr)
+			ixAtaReceiverUsdc, recAddrUsdc, recErr := tokens.CreateAssociatedTokenAccount(usdcPool.Program, usdcPool.Mint, config.ReceiverExternalExecutionConfigPDA, usdcPoolAdmin.PublicKey())
+			require.NoError(t, recErr)
 
 			token0.User[user.PublicKey()] = addr0
 			token0.User[config.ReceiverExternalExecutionConfigPDA] = recAddr0
@@ -387,6 +452,8 @@ func TestCCIPRouter(t *testing.T) {
 			token2.User[config.ReceiverExternalExecutionConfigPDA] = recAddr2
 			linkPool.User[user.PublicKey()] = link22.userATA
 			linkPool.User[config.ReceiverExternalExecutionConfigPDA] = recAddrLink
+			usdcPool.User[user.PublicKey()] = usdcAddr
+			usdcPool.User[config.ReceiverExternalExecutionConfigPDA] = recAddrUsdc
 
 			ix0 = append(ix0, ixAta0, ixMintTo0, ixAtaReceiver0)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ix0, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token0Mint))
@@ -394,12 +461,14 @@ func TestCCIPRouter(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ix1, token1PoolAdmin, config.DefaultCommitment, common.AddSigners(token1Mint))
 			ix2 = append(ix2, ixAta2, ixMintTo2, ixAtaReceiver2)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ix2, token2PoolAdmin, config.DefaultCommitment, common.AddSigners(token2Mint))
+			ixUsdc = append(ixUsdc, ixAtaUsdc, ixMintToUsdc, ixAtaReceiverUsdc)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixUsdc, usdcPoolAdmin, config.DefaultCommitment, common.AddSigners(usdcMintPrivK))
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixAtaReceiverLink}, legacyAdmin, config.DefaultCommitment)
 		})
 
 		t.Run("token-pool", func(t *testing.T) {
-			token0.AdditionalAccounts = append(token0.AdditionalAccounts, solana.MemoProgramID) // add test additional accounts in pool interactions
+			token0.AdditionalAccounts = append(token0.AdditionalAccounts, token0Multisig.PublicKey()) // add test additional accounts in pool interactions
 
 			type ProgramData struct {
 				DataType uint32
@@ -527,7 +596,7 @@ func TestCCIPRouter(t *testing.T) {
 			linkPool.PoolTokenAccount = addrLink
 			linkPool.User[linkPool.PoolSigner] = linkPool.PoolTokenAccount
 
-			ixAuth, err := tokens.SetTokenMintAuthority(token0.Program, token0.PoolSigner, token0.Mint, token0PoolAdmin.PublicKey())
+			ixAuth, err := tokens.SetTokenMintAuthority(token0.Program, token0Multisig.PublicKey(), token0.Mint, token0PoolAdmin.PublicKey())
 			require.NoError(t, err)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixInit0, ixInit1, ixInit2, ixInitLink}, legacyAdmin, config.DefaultCommitment)
@@ -564,6 +633,85 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, len(link22Entries), len(lookupTableEntriesLink))
 			require.Equal(t, link22Entries, lookupTableEntriesLink)
+
+			t.Run("CCTP USDC token pool", func(t *testing.T) {
+				// get program data account
+				data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.CctpTokenPoolProgram, &rpc.GetAccountInfoOpts{
+					Commitment: config.DefaultCommitment,
+				})
+				require.NoError(t, err)
+				// Decode program data
+				var programData ProgramData
+				require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+				poolGlobalInitI, err := cctp_token_pool.NewInitGlobalConfigInstruction(
+					usdcPool.GlobalConfig,
+					legacyAdmin.PublicKey(),
+					solana.SystemProgramID,
+					usdcPool.PoolProgram,
+					programData.Address,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				ixInit, err := cctp_token_pool.NewInitializeInstruction(
+					config.CcipRouterProgram,
+					config.RMNRemoteProgram,
+					usdcPool.PoolConfig,
+					usdcPool.Mint,
+					legacyAdmin.PublicKey(),
+					solana.SystemProgramID,
+					config.CctpTokenPoolProgram,
+					programData.Address,
+					usdcPool.GlobalConfig,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				ixTransfer, err := cctp_token_pool.NewTransferOwnershipInstruction(
+					usdcPoolAdmin.PublicKey(),
+					usdcPool.PoolConfig,
+					usdcPool.Mint,
+					legacyAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolGlobalInitI, ixInit, ixTransfer}, legacyAdmin, config.DefaultCommitment)
+
+				ixAccept, err := cctp_token_pool.NewAcceptOwnershipInstruction(
+					usdcPool.PoolConfig,
+					usdcPool.Mint,
+					usdcPoolAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				ixAta, addr, err := tokens.CreateAssociatedTokenAccount(usdcPool.Program, usdcPool.Mint, usdcPool.PoolSigner, usdcPoolAdmin.PublicKey())
+				require.NoError(t, err)
+				usdcPool.PoolTokenAccount = addr
+				usdcPool.User[usdcPool.PoolSigner] = usdcPool.PoolTokenAccount
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixAccept, ixAta}, usdcPoolAdmin, config.DefaultCommitment)
+
+				usdcPool.AdditionalAccounts = append(usdcPool.AdditionalAccounts,
+					messageTransmitter.MessageTransmitter, // 10 - writable
+					config.CctpTokenMessengerMinter,
+					solana.SystemProgramID,
+					config.CctpMessageTransmitter,
+					tokenMessengerMinter.TokenMessenger,
+					tokenMessengerMinter.TokenMinter,
+					tokenMessengerMinter.LocalToken, // 16 - writable
+					tokenMessengerMinter.EventAuthority,
+				) // add test additional accounts in pool interactions
+				usdcPool.WritableIndexes = append(usdcPool.WritableIndexes, 10, 16)
+
+				// Lookup Table for Tokens
+				require.NoError(t, usdcPool.SetupLookupTable(ctx, solanaGoClient, usdcPoolAdmin))
+				usdcEntries := usdcPool.ToTokenPoolEntries()
+
+				// Verify Lookup tables where correctly initialized
+				lookupTableEntriesUsdc, err := common.GetAddressLookupTable(ctx, solanaGoClient, usdcPool.PoolLookupTable)
+				require.NoError(t, err)
+				require.Equal(t, len(usdcEntries), len(lookupTableEntriesUsdc))
+				require.Equal(t, usdcEntries, lookupTableEntriesUsdc)
+			})
 		})
 
 		t.Run("Ccip Send address lookup table", func(t *testing.T) {
@@ -578,8 +726,8 @@ func TestCCIPRouter(t *testing.T) {
 				config.EvmDestChainStatePDA,
 				config.SvmDestChainStatePDA,
 				solana.SystemProgramID,
-				solana.TokenProgramID,
-				solana.Token2022ProgramID,
+				config.SPLTokenProgram,
+				config.Token2022Program,
 				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
@@ -629,11 +777,12 @@ func TestCCIPRouter(t *testing.T) {
 				link22.fqBillingConfigPDA,
 				link22.fqEvmConfigPDA,
 			}
-			lookupTableAddr, err := common.SetupLookupTable(ctx, solanaGoClient, legacyAdmin, lookupEntries)
+			var err error
+			offrampLookupTableAddr, err = common.SetupLookupTable(ctx, solanaGoClient, legacyAdmin, lookupEntries)
 			require.NoError(t, err)
 
 			offrampLookupTable = map[solana.PublicKey]solana.PublicKeySlice{
-				lookupTableAddr: lookupEntries,
+				offrampLookupTableAddr: lookupEntries,
 			}
 		})
 
@@ -695,7 +844,7 @@ func TestCCIPRouter(t *testing.T) {
 				invalidSVMChainSelector,
 				tempFeeAggregator,
 				config.FeeQuoterProgram,
-				link22.mint,
+				token0.Mint, // to be changed in the next tests
 				config.RMNRemoteProgram,
 				config.RouterConfigPDA,
 				legacyAdmin.PublicKey(),
@@ -713,7 +862,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, invalidSVMChainSelector, configSetEvent.SvmChainSelector)
 			require.Equal(t, config.FeeQuoterProgram, configSetEvent.FeeQuoter)
 			require.Equal(t, config.RMNRemoteProgram, configSetEvent.RMNRemote)
-			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+			require.Equal(t, token0.Mint, configSetEvent.LinkTokenMint) // to be changed in the next tests
 			require.Equal(t, tempFeeAggregator, configSetEvent.FeeAggregator)
 
 			// Fetch account data
@@ -724,6 +873,46 @@ func TestCCIPRouter(t *testing.T) {
 			}
 			require.Equal(t, uint64(17), configAccount.SvmChainSelector)
 			require.Equal(t, config.FeeQuoterProgram, configAccount.FeeQuoter)
+		})
+
+		t.Run("Router: Update link mint", func(t *testing.T) {
+			t.Run("When a non-admin tries to make the update, it fails", func(t *testing.T) {
+				ix, err := ccip_router.NewSetLinkTokenMintInstruction(
+					link22.mint,
+					config.RouterConfigPDA,
+					user.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
+			})
+			t.Run("When an admin tries to make the update, it succeeds", func(t *testing.T) {
+				// Fetch account data
+				var configAccount ccip_router.Config
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount))
+				require.Equal(t, token0.Mint, configAccount.LinkTokenMint) // initially set to token0 mint
+
+				ix, err := ccip_router.NewSetLinkTokenMintInstruction(
+					link22.mint,
+					config.RouterConfigPDA,
+					legacyAdmin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				// Check that the event was emitted with the updated value
+				var configSetEvent ccip.EventRouterConfigSet
+				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+				require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+
+				// Check the onchain state
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount))
+				require.Equal(t, link22.mint, configAccount.LinkTokenMint)
+			})
 		})
 
 		t.Run("FeeQuoter is initialized", func(t *testing.T) {
@@ -742,9 +931,8 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := fee_quoter.NewInitializeInstruction(
 				initialMaxFeeJuelsPerMsg,
 				config.CcipRouterProgram,
-				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
-				link22.mint,
+				token0.Mint, // to be changed in the next tests
 				legacyAdmin.PublicKey(),
 				solana.SystemProgramID,
 				config.FeeQuoterProgram,
@@ -758,7 +946,7 @@ func TestCCIPRouter(t *testing.T) {
 			var configSetEvent ccip.EventFeeQuoterConfigSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
 			require.Equal(t, initialMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
-			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+			require.Equal(t, token0.Mint, configSetEvent.LinkTokenMint) // to be changed in the next tests
 			require.Equal(t, uint8(9), configSetEvent.LinkTokenDecimals)
 			require.Equal(t, config.CcipRouterProgram, configSetEvent.Onramp)
 			require.Equal(t, fee_quoter.V1_CodeVersion, configSetEvent.DefaultCodeVersion)
@@ -767,11 +955,53 @@ func TestCCIPRouter(t *testing.T) {
 			var fqConfig fee_quoter.Config
 			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
 
-			require.Equal(t, link22.mint, fqConfig.LinkTokenMint)
+			require.Equal(t, token0.Mint, fqConfig.LinkTokenMint) // to be changed in the next tests
+			require.Equal(t, token0Decimals, fqConfig.LinkTokenLocalDecimals)
 			require.Equal(t, initialMaxFeeJuelsPerMsg, fqConfig.MaxFeeJuelsPerMsg)
 			require.Equal(t, legacyAdmin.PublicKey(), fqConfig.Owner)
 			require.True(t, fqConfig.ProposedOwner.IsZero())
 			require.Equal(t, config.CcipRouterProgram, fqConfig.Onramp)
+		})
+
+		t.Run("FeeQuoter: Update link mint", func(t *testing.T) {
+			t.Run("When a non-admin tries to make the update, it fails", func(t *testing.T) {
+				ix, err := fee_quoter.NewSetLinkTokenMintInstruction(
+					config.FqConfigPDA,
+					link22.mint,
+					user.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
+			})
+			t.Run("When an admin tries to make the update, it succeeds", func(t *testing.T) {
+				// Fetch account data
+				var configAccount fee_quoter.Config
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount))
+				require.Equal(t, token0.Mint, configAccount.LinkTokenMint)             // initially set to token0 mint
+				require.Equal(t, token0Decimals, configAccount.LinkTokenLocalDecimals) // initially set to token0 mint decimals
+
+				ix, err := fee_quoter.NewSetLinkTokenMintInstruction(
+					config.FqConfigPDA,
+					link22.mint,
+					legacyAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				// Check that the event was emitted with the updated value
+				var configSetEvent ccip.EventFeeQuoterConfigSet
+				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+				require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+				require.Equal(t, link22Decimals, configSetEvent.LinkTokenDecimals)
+
+				// Check the onchain state
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount))
+				require.Equal(t, link22.mint, configAccount.LinkTokenMint)
+				require.Equal(t, link22Decimals, configAccount.LinkTokenLocalDecimals)
+			})
 		})
 
 		t.Run("FeeQuoter: Update max fee juels per msg", func(t *testing.T) {
@@ -2385,7 +2615,7 @@ func TestCCIPRouter(t *testing.T) {
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
@@ -2432,7 +2662,7 @@ func TestCCIPRouter(t *testing.T) {
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
@@ -2532,9 +2762,28 @@ func TestCCIPRouter(t *testing.T) {
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, token0.PoolLookupTable, tokenAdminRegistry.LookupTable)
+				})
+
+				t.Run("Setting up token autoderivation", func(t *testing.T) {
+					base := ccip_router.NewSetPoolSupportsAutoDerivationInstruction(
+						token0.Mint,
+						true,
+						config.RouterConfigPDA,
+						token0.AdminRegistryPDA,
+						token0PoolAdmin.PublicKey(),
+					)
+					instruction, err := base.ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
+
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
 				})
 
 				t.Run("When Token Pool Admin wants to set up the pool again to zero, it is none", func(t *testing.T) {
@@ -2555,7 +2804,7 @@ func TestCCIPRouter(t *testing.T) {
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
 
@@ -2605,7 +2854,7 @@ func TestCCIPRouter(t *testing.T) {
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, token0.PoolLookupTable, tokenAdminRegistry.LookupTable)
 
@@ -2652,7 +2901,7 @@ func TestCCIPRouter(t *testing.T) {
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, token0.PoolLookupTable, tokenAdminRegistry.LookupTable)
 
@@ -2681,6 +2930,99 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
+				})
+			})
+
+			t.Run("setup: CCTP USDC pool", func(t *testing.T) {
+				t.Run("propose pool as CCIP Admin", func(t *testing.T) {
+					instruction, err := ccip_router.NewCcipAdminProposeAdministratorInstruction(
+						usdcPoolAdmin.PublicKey(),
+						config.RouterConfigPDA,
+						usdcPool.AdminRegistryPDA,
+						usdcPool.Mint,
+						ccipAdmin.PublicKey(),
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment)
+
+					// Validate Token Pool Registry PDA
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
+					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
+				})
+
+				t.Run("accept token admin registry as token admin", func(t *testing.T) {
+					instruction, err := ccip_router.NewAcceptAdminRoleTokenAdminRegistryInstruction(
+						config.RouterConfigPDA,
+						usdcPool.AdminRegistryPDA,
+						usdcPool.Mint,
+						usdcPoolAdmin.PublicKey(),
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, usdcPoolAdmin, config.DefaultCommitment)
+
+					// Validate Token Pool Registry PDA
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
+					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
+				})
+
+				t.Run("set pool", func(t *testing.T) {
+					ix, err := ccip_router.NewSetPoolInstruction(
+						usdcPool.WritableIndexes,
+						config.RouterConfigPDA,
+						usdcPool.AdminRegistryPDA,
+						usdcPool.Mint,
+						usdcPool.PoolLookupTable,
+						usdcPoolAdmin.PublicKey(),
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, usdcPoolAdmin, config.DefaultCommitment)
+
+					// Validate Token Pool Registry PDA
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
+					require.Equal(t, usdcPool.PoolLookupTable, tokenAdminRegistry.LookupTable)
+					require.Equal(t, false, tokenAdminRegistry.SupportsAutoDerivation)
+				})
+
+				t.Run("set pool account auto-derivation support", func(t *testing.T) {
+					ix, err := ccip_router.NewSetPoolSupportsAutoDerivationInstruction(
+						usdcPool.Mint,
+						true,
+						config.RouterConfigPDA,
+						usdcPool.AdminRegistryPDA,
+						usdcPoolAdmin.PublicKey(),
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, usdcPoolAdmin, config.DefaultCommitment)
+
+					// Validate Token Pool Registry PDA
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
+					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
+					require.Equal(t, usdcPool.PoolLookupTable, tokenAdminRegistry.LookupTable)
+					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
 				})
 			})
 		})
@@ -2747,7 +3089,7 @@ func TestCCIPRouter(t *testing.T) {
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
@@ -2770,7 +3112,7 @@ func TestCCIPRouter(t *testing.T) {
 				tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 				require.NoError(t, err)
-				require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+				require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
 				require.Equal(t, token2PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
 				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
@@ -2791,7 +3133,7 @@ func TestCCIPRouter(t *testing.T) {
 				tokenAdminRegistry = ccip_common.TokenAdminRegistry{}
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 				require.NoError(t, err)
-				require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+				require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
 				require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
 				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
@@ -2837,7 +3179,7 @@ func TestCCIPRouter(t *testing.T) {
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
@@ -2881,9 +3223,27 @@ func TestCCIPRouter(t *testing.T) {
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, token1.PoolLookupTable, tokenAdminRegistry.LookupTable)
+				})
+
+				t.Run("Setting up token autoderivation", func(t *testing.T) {
+					base := ccip_router.NewSetPoolSupportsAutoDerivationInstruction(
+						token1.Mint,
+						true,
+						config.RouterConfigPDA,
+						token1.AdminRegistryPDA,
+						token1PoolAdmin.PublicKey(),
+					)
+					instruction, err := base.ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					require.NoError(t, err)
+					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
 				})
 			})
 
@@ -2917,7 +3277,7 @@ func TestCCIPRouter(t *testing.T) {
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, token1.PoolLookupTable, tokenAdminRegistry.LookupTable)
 
@@ -2964,7 +3324,7 @@ func TestCCIPRouter(t *testing.T) {
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, token1.PoolLookupTable, tokenAdminRegistry.LookupTable)
 
@@ -3014,7 +3374,7 @@ func TestCCIPRouter(t *testing.T) {
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
 					require.Equal(t, legacyAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
@@ -3035,7 +3395,7 @@ func TestCCIPRouter(t *testing.T) {
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, legacyAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
@@ -3063,7 +3423,7 @@ func TestCCIPRouter(t *testing.T) {
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, legacyAdmin.PublicKey(), tokenAdminRegistry.Administrator)
-					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, linkPool.PoolLookupTable, tokenAdminRegistry.LookupTable)
 				})
@@ -3178,6 +3538,39 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, token1PoolAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 			})
+		})
+
+		t.Run("CCTP Token Pool", func(t *testing.T) {
+			/*
+				This is only a partial setup of the CCTP Token Pool. The goal here is to be able to test the account
+				derivation, integrating the onramp/offramp derivation with the pool derivation.
+				Full setup of the CCTP Token Pool is done in the tokenpool_test.go, and not here, as CCTP's vendored
+				contracts need to be configured as well and we don't want this suite to keep growing unboundedly.
+			*/
+
+			initIx, err := cctp_token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, usdcPool.Mint, cctp_token_pool.RemoteConfig{
+				TokenAddress: cctp_token_pool.RemoteAddress{Address: config.EVMUsdcAddressBytes},
+				Decimals:     usdcDecimals,
+			}, usdcPool.PoolConfig, usdcPool.Chain[config.EvmChainSelector], usdcPoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+
+			editIx, err := cctp_token_pool.NewEditChainRemoteConfigCctpInstruction(
+				config.EvmChainSelector,
+				usdcPool.Mint,
+				cctp_token_pool.CctpChain{
+					DomainId:          0,
+					DestinationCaller: solana.PublicKey{},
+				},
+				usdcPool.PoolConfig,
+				usdcPool.Chain[config.EvmChainSelector],
+				usdcPoolAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			rlIx, err := cctp_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, usdcPool.Mint, cctp_token_pool.RateLimitConfig{}, cctp_token_pool.RateLimitConfig{}, usdcPool.PoolConfig, usdcPool.Chain[config.EvmChainSelector], usdcPoolAdmin.PublicKey()).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initIx, editIx, rlIx}, usdcPoolAdmin, config.DefaultCommitment)
 		})
 	})
 
@@ -3673,6 +4066,27 @@ func TestCCIPRouter(t *testing.T) {
 	//////////////////////////
 
 	t.Run("OnRamp ccipSend", func(t *testing.T) {
+		type UserFullNonce struct {
+			user        uint64
+			admin       uint64
+			anotherUser uint64
+		}
+		NewUserFullNonces := func() UserFullNonce {
+			return UserFullNonce{
+				user:        0,
+				admin:       0,
+				anotherUser: 0,
+			}
+		}
+		type ChainUserFullNonce struct {
+			evm UserFullNonce
+			svm UserFullNonce
+		}
+		fullNonces := ChainUserFullNonce{
+			evm: NewUserFullNonces(),
+			svm: NewUserFullNonces(),
+		}
+
 		t.Run("When sending to an invalid destination chain selector it fails", func(t *testing.T) {
 			destinationChainSelector := uint64(189)
 			destinationChainStatePDA, err := state.FindDestChainStatePDA(destinationChainSelector, config.CcipRouterProgram)
@@ -3824,6 +4238,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
+
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
 
@@ -3836,7 +4251,10 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(1), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(1), nonceCounterAccount.OrderedNonce)
+
+			fullNonces.evm.user++ // we just sent a successful message from the user to EVM
+			require.Equal(t, fullNonces.evm.user, nonceCounterAccount.TotalNonce)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -3909,7 +4327,9 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(1), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(1), nonceCounterAccount.OrderedNonce)
+			fullNonces.evm.user++ // we just sent a successful message from the user to EVM
+			require.Equal(t, fullNonces.evm.user, nonceCounterAccount.TotalNonce)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -3977,7 +4397,9 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(2), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(2), nonceCounterAccount.OrderedNonce)
+			fullNonces.evm.user++ // we just sent a successful message from the user to EVM
+			require.Equal(t, fullNonces.evm.user, nonceCounterAccount.TotalNonce)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -4046,7 +4468,9 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(2), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(2), nonceCounterAccount.OrderedNonce)
+			fullNonces.evm.user++
+			require.Equal(t, fullNonces.evm.user, nonceCounterAccount.TotalNonce)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -4114,7 +4538,9 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(3), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(3), nonceCounterAccount.OrderedNonce)
+			fullNonces.evm.user++ // we just sent a successful message from the user to EVM
+			require.Equal(t, fullNonces.evm.user, nonceCounterAccount.TotalNonce)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -4408,7 +4834,9 @@ func TestCCIPRouter(t *testing.T) {
 			var nonceCounterAccount ccip_router.Nonce
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, anotherUserNonceEVMPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(1), nonceCounterAccount.Counter)
+			require.Equal(t, uint64(1), nonceCounterAccount.OrderedNonce)
+			fullNonces.evm.anotherUser++ // we just sent a successful message from anotherUser to EVM
+			require.Equal(t, fullNonces.evm.anotherUser, nonceCounterAccount.TotalNonce)
 
 			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
@@ -4434,7 +4862,6 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				destinationChainSelector := config.EvmChainSelector
-				destinationChainStatePDA := config.EvmDestChainStatePDA
 				message := ccip_router.SVM2AnyMessage{
 					FeeToken: wsol.mint,
 					Receiver: validReceiverAddress[:],
@@ -4451,43 +4878,37 @@ func TestCCIPRouter(t *testing.T) {
 				userTokenAccount, ok := token0.User[user.PublicKey()]
 				require.True(t, ok)
 
-				base := ccip_router.NewCcipSendInstruction(
-					destinationChainSelector,
+				derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveSendAccounts(ctx,
+					t,
+					user,
 					message,
-					[]byte{0}, // starting indices for accounts
-					config.RouterConfigPDA,
-					destinationChainStatePDA,
-					nonceEvmPDA,
-					user.PublicKey(),
-					solana.SystemProgramID,
-					wsol.program,
-					wsol.mint,
-					wsol.userATA,
-					wsol.billingATA,
-					config.BillingSignerPDA,
-					config.FeeQuoterProgram,
-					config.FqConfigPDA,
-					config.FqEvmDestChainPDA,
-					wsol.fqBillingConfigPDA,
-					link22.fqBillingConfigPDA,
-					config.RMNRemoteProgram,
-					config.RMNRemoteCursesPDA,
-					config.RMNRemoteConfigPDA,
-				)
-				base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+					destinationChainSelector,
+					solanaGoClient,
+					config.CcipRouterProgram)
 
-				tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, userTokenAccount)
-				require.NoError(t, err)
-				base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas...)
+				builder := ccip_router.NewCcipSendInstructionBuilder().
+					SetDestChainSelector(destinationChainSelector).
+					SetMessage(message).
+					SetTokenIndexes(tokenIndices)
+				builder.AccountMetaSlice = derivedAccounts
 
-				ix, err := base.ValidateAndBuild()
+				ix, err := builder.ValidateAndBuild()
+
 				require.NoError(t, err)
+				lookupTables := ccipSendLookupTable
+				for _, table := range derivedLookUpTables {
+					entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+					require.NoError(t, lutErr)
+					lookupTables[table] = entries
+				}
 
 				ixApprove, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount, token0.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
-				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
+				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(300_000))
 				require.NotNil(t, result)
+
+				fullNonces.evm.user++ // we just sent a successful message from the user to EVM
 
 				// check CCIP event
 				ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
@@ -4544,7 +4965,6 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				destinationChainSelector := config.EvmChainSelector
-				destinationChainStatePDA := config.EvmDestChainStatePDA
 				message := ccip_router.SVM2AnyMessage{
 					FeeToken: wsol.mint,
 					Receiver: validReceiverAddress[:],
@@ -4567,52 +4987,39 @@ func TestCCIPRouter(t *testing.T) {
 				userTokenAccount1, ok := token1.User[user.PublicKey()]
 				require.True(t, ok)
 
-				base := ccip_router.NewCcipSendInstruction(
-					destinationChainSelector,
+				derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveSendAccounts(ctx,
+					t,
+					user,
 					message,
-					[]byte{0, 14}, // starting indices for accounts
-					config.RouterConfigPDA,
-					destinationChainStatePDA,
-					nonceEvmPDA,
-					user.PublicKey(),
-					solana.SystemProgramID,
-					wsol.program,
-					wsol.mint,
-					wsol.userATA,
-					wsol.billingATA,
-					config.BillingSignerPDA,
-					config.FeeQuoterProgram,
-					config.FqConfigPDA,
-					config.FqEvmDestChainPDA,
-					wsol.fqBillingConfigPDA,
-					link22.fqBillingConfigPDA,
-					config.RMNRemoteProgram,
-					config.RMNRemoteCursesPDA,
-					config.RMNRemoteConfigPDA,
-				)
-				base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+					destinationChainSelector,
+					solanaGoClient,
+					config.CcipRouterProgram)
 
-				tokenMetas0, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, userTokenAccount0)
+				builder := ccip_router.NewCcipSendInstructionBuilder().
+					SetDestChainSelector(destinationChainSelector).
+					SetMessage(message).
+					SetTokenIndexes(tokenIndices)
+				builder.AccountMetaSlice = derivedAccounts
+
+				ix, err := builder.ValidateAndBuild()
+
 				require.NoError(t, err)
-				base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas0...)
-				tokenMetas1, addressTables1, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token1, userTokenAccount1)
-				require.NoError(t, err)
-				base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
-				addressTables[token1.PoolLookupTable] = addressTables1[token1.PoolLookupTable]
-				for k, v := range ccipSendLookupTable {
-					addressTables[k] = v
+				lookupTables := ccipSendLookupTable
+				for _, table := range derivedLookUpTables {
+					entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+					require.NoError(t, lutErr)
+					lookupTables[table] = entries
 				}
-
-				ix, err := base.ValidateAndBuild()
-				require.NoError(t, err)
 
 				ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 				ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
-				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(800_000))
+				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(800_000))
 				require.NotNil(t, result)
+
+				fullNonces.evm.user++ // we just sent a successful message from the user to EVM
 
 				// check balances
 				_, currBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[user.PublicKey()], config.DefaultCommitment)
@@ -4692,6 +5099,8 @@ func TestCCIPRouter(t *testing.T) {
 			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
 
+			fullNonces.evm.user++ // we just sent a successful message from the user to EVM
+
 			// We now restore the config to keep the test state-neutral
 			updateDestChainIx, err = ccip_router.NewUpdateDestChainConfigInstruction(
 				config.EvmChainSelector,
@@ -4760,12 +5169,6 @@ func TestCCIPRouter(t *testing.T) {
 					errorStr:    common.ConstraintSeeds_AnchorError.String(),
 				},
 				{
-					name:        "is pool config but missing write permissions",
-					index:       6,
-					replaceWith: solana.Meta(token0.PoolConfig),
-					errorStr:    ccip.InvalidInputsLookupTableAccountWritable_CcipRouterError.String(),
-				},
-				{
 					name:        "is pool lookup table but has write permissions",
 					index:       3,
 					replaceWith: solana.Meta(token0.PoolLookupTable).WRITE(),
@@ -4796,11 +5199,6 @@ func TestCCIPRouter(t *testing.T) {
 					name:     "invalid fee token config",
 					index:    11,
 					errorStr: common.ConstraintSeeds_AnchorError.String(),
-				},
-				{
-					name:     "extra accounts not in lookup table",
-					index:    1_000, // large number to indicate append
-					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
 				},
 				{
 					name:     "remaining accounts mismatch",
@@ -4936,6 +5334,8 @@ func TestCCIPRouter(t *testing.T) {
 					result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 					require.NotNil(t, result)
 
+					fullNonces.evm.user++ // we just sent a successful message from the user to EVM
+
 					finalBalance := getBalance(token.billingATA)
 
 					// Check that the billing receiver account balance has increased by the fee amount
@@ -5046,6 +5446,8 @@ func TestCCIPRouter(t *testing.T) {
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
 
+			fullNonces.evm.user++ // we just sent a successful message from the user to EVM
+
 			finalBalance := getBalance(wsol.billingATA)
 			finalLamports := getLamports(user.PublicKey())
 
@@ -5060,6 +5462,218 @@ func TestCCIPRouter(t *testing.T) {
 			var event ccip.EventCCIPMessageSent
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &event, config.PrintEvents))
 			require.Equal(t, wsol.mint, event.Message.FeeToken)
+		})
+
+		t.Run("Sending a Valid CCIP Message with derived accounts emits CCIPMessageSent", func(t *testing.T) {
+			destinationChainSelector := config.EvmChainSelector
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken:  wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyGenericExtraArgsV2,
+			}
+
+			derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveSendAccounts(ctx,
+				t,
+				user,
+				message,
+				destinationChainSelector,
+				solanaGoClient,
+				config.CcipRouterProgram)
+
+			builder := ccip_router.NewCcipSendInstructionBuilder().
+				SetDestChainSelector(destinationChainSelector).
+				SetMessage(message).
+				SetTokenIndexes(tokenIndices)
+			builder.AccountMetaSlice = derivedAccounts
+			instruction, err := builder.ValidateAndBuild()
+			require.NoError(t, err)
+
+			lookupTables := ccipSendLookupTable
+			for _, table := range derivedLookUpTables {
+				entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+				require.NoError(t, lutErr)
+				lookupTables[table] = entries
+			}
+
+			result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, lookupTables)
+			require.NotNil(t, result)
+
+			ccipMessageSentEvent := ccip.EventCCIPMessageSent{}
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
+			require.Equal(t, uint64(21), ccipMessageSentEvent.DestinationChainSelector)
+			require.Equal(t, user.PublicKey(), ccipMessageSentEvent.Message.Sender)
+			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
+			data := [3]uint8{4, 5, 6}
+			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
+			require.Equal(t, bin.Uint128{Lo: uint64(validFqDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &fee_quoter.GenericExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.GenericExtraArgsV2Tag).GasLimit) // default gas limit
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &fee_quoter.GenericExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.GenericExtraArgsV2Tag).AllowOutOfOrderExecution)                                                    // default OOO Execution
+			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
+			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
+			hash, err := ccip.HashSVMToAnyMessage(ccipMessageSentEvent.Message)
+			require.NoError(t, err)
+			require.Equal(t, hash, ccipMessageSentEvent.Message.Header.MessageId[:])
+		})
+
+		t.Run("Two tokens transferred with derived accounts", func(t *testing.T) {
+			_, initBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[user.PublicKey()], config.DefaultCommitment)
+			require.NoError(t, err)
+			_, initBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[user.PublicKey()], config.DefaultCommitment)
+			require.NoError(t, err)
+
+			destinationChainSelector := config.EvmChainSelector
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken: wsol.mint,
+				Receiver: validReceiverAddress[:],
+				Data:     []byte{4, 5, 6},
+				TokenAmounts: []ccip_router.SVMTokenAmount{
+					{
+						Token:  token0.Mint,
+						Amount: 1,
+					},
+					{
+						Token:  token1.Mint,
+						Amount: 2,
+					},
+				},
+				ExtraArgs: emptyGenericExtraArgsV2,
+			}
+
+			userTokenAccount0, ok := token0.User[user.PublicKey()]
+			require.True(t, ok)
+			userTokenAccount1, ok := token1.User[user.PublicKey()]
+			require.True(t, ok)
+			ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
+			require.NoError(t, err)
+			ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, config.BillingSignerPDA, user.PublicKey(), nil)
+			require.NoError(t, err)
+
+			derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveSendAccounts(ctx,
+				t,
+				user,
+				message,
+				destinationChainSelector,
+				solanaGoClient,
+				config.CcipRouterProgram,
+			)
+
+			lookupTables := ccipSendLookupTable
+			for _, table := range derivedLookUpTables {
+				entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+				require.NoError(t, lutErr)
+				lookupTables[table] = entries
+			}
+
+			builder := ccip_router.NewCcipSendInstructionBuilder().
+				SetDestChainSelector(destinationChainSelector).
+				SetMessage(message).
+				SetTokenIndexes(tokenIndices)
+			builder.AccountMetaSlice = derivedAccounts
+			instruction, err := builder.ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, instruction}, user, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(800_000))
+			require.NotNil(t, result)
+
+			// check balances
+			_, currBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[user.PublicKey()], config.DefaultCommitment)
+			require.NoError(t, err)
+			require.Equal(t, 1, initBal0-currBal0) // burned amount
+			_, currBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[user.PublicKey()], config.DefaultCommitment)
+			require.NoError(t, err)
+			require.Equal(t, 2, initBal1-currBal1) // burned amount
+		})
+
+		t.Run("Deriving accounts with a token pool that also requires derivation", func(t *testing.T) {
+			message := ccip_router.SVM2AnyMessage{
+				Receiver: validReceiverAddress[:],
+				Data:     []byte{},
+				TokenAmounts: []ccip_router.SVMTokenAmount{
+					{Token: usdcPool.Mint, Amount: 7},
+				},
+				FeeToken:  solana.PublicKey{},
+				ExtraArgs: emptyGenericExtraArgsV2,
+			}
+
+			var nonces ccip_router.Nonce
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, rpc.CommitmentFinalized, &nonces)) // read finalized, not just confirmed, as that is what the derivation will use
+			fmt.Printf("Current nonces: %+v from PDA %s\n", nonces, nonceEvmPDA)
+
+			messageSendEvent, _, _ := solana.FindProgramAddress([][]byte{
+				[]byte("ccip_cctp_message_sent_event"),
+				user.PublicKey().Bytes(),
+				common.Uint64ToLE(config.EvmChainSelector),
+				common.Uint64ToLE(nonces.TotalNonce + 1), // +1 as it will be incremented during the ccip_send
+			},
+				config.CctpTokenPoolProgram)
+
+			// as there are many accounts to check, we print the index of the first mismatch by checking them one
+			// by one instead of all at once
+			expectedAccounts := []*solana.AccountMeta{
+				solana.Meta(config.RouterConfigPDA),
+				solana.Meta(config.EvmDestChainStatePDA).WRITE(),
+				solana.Meta(nonceEvmPDA).WRITE(),
+				solana.Meta(user.PublicKey()).WRITE().SIGNER(),
+				solana.Meta(solana.SystemProgramID),
+				// billing:
+				solana.Meta(wsol.program),
+				solana.Meta(wsol.mint),          // paying in native SOL
+				solana.Meta(common.ZeroAddress), // no user ATA, as paying in native SOL
+				solana.Meta(wsol.billingATA).WRITE(),
+				solana.Meta(config.BillingSignerPDA),
+				// fee quoter CPI:
+				solana.Meta(config.FeeQuoterProgram),
+				solana.Meta(config.FqConfigPDA),
+				solana.Meta(config.FqEvmDestChainPDA),
+				solana.Meta(wsol.fqBillingConfigPDA),
+				solana.Meta(link22.fqBillingConfigPDA),
+				// RMN CPI:
+				solana.Meta(config.RMNRemoteProgram),
+				solana.Meta(config.RMNRemoteCursesPDA),
+				solana.Meta(config.RMNRemoteConfigPDA),
+				// token pool (static accounts):
+				solana.Meta(usdcPool.User[user.PublicKey()]).WRITE(),
+				solana.Meta(usdcPool.Billing[config.EvmChainSelector]),
+				solana.Meta(usdcPool.Chain[config.EvmChainSelector]).WRITE(),
+				solana.Meta(usdcPool.PoolLookupTable),
+				solana.Meta(usdcPool.AdminRegistryPDA),
+				solana.Meta(usdcPool.PoolProgram),
+				solana.Meta(usdcPool.PoolConfig),
+				solana.Meta(usdcPool.PoolTokenAccount).WRITE(),
+				solana.Meta(usdcPool.PoolSigner),
+				solana.Meta(usdcPool.Program),
+				solana.Meta(usdcPool.Mint).WRITE(),
+				solana.Meta(usdcPool.FeeTokenConfig),
+				solana.Meta(usdcPool.RouterSigner),
+				// token pool (derived additional accounts):
+				solana.Meta(messageTransmitter.MessageTransmitter).WRITE(),
+				solana.Meta(config.CctpTokenMessengerMinter),
+				solana.Meta(solana.SystemProgramID),
+				solana.Meta(config.CctpMessageTransmitter),
+				solana.Meta(tokenMessengerMinter.TokenMessenger),
+				solana.Meta(tokenMessengerMinter.TokenMinter),
+				solana.Meta(tokenMessengerMinter.LocalToken).WRITE(),
+				solana.Meta(tokenMessengerMinter.EventAuthority),
+				solana.Meta(tokenMessengerMinter.AuthorityPda),
+				solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
+				solana.Meta(messageSendEvent).WRITE(),
+			}
+
+			derivedAccounts, _, tokenIndices := testutils.DeriveSendAccounts(
+				ctx,
+				t,
+				user,
+				message,
+				config.EvmChainSelector,
+				solanaGoClient,
+				config.CcipRouterProgram,
+			)
+
+			require.Equal(t, []uint8{0}, tokenIndices)
+
+			require.Len(t, derivedAccounts, len(expectedAccounts), "Derived accounts length mismatch")
+			for i, expected := range expectedAccounts {
+				require.Equal(t, expected, derivedAccounts[i], "Account at index %d does not match expected", i)
+			}
 		})
 	})
 
@@ -5076,7 +5690,7 @@ func TestCCIPRouter(t *testing.T) {
 		require.NoError(t, err)
 		senderSvmDestChainConfigPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_chain_config"), common.Uint64ToLE(config.SvmChainSelector)}, config.CcipBaseSender)
 		require.NoError(t, err)
-		wsolATAIx, wsolSenderATA, err := tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, solana.SolMint, senderPDA, user.PublicKey())
+		wsolATAIx, wsolSenderATA, err := tokens.CreateAssociatedTokenAccount(config.SPLTokenProgram, solana.SolMint, senderPDA, user.PublicKey())
 		require.NoError(t, err)
 		link22ATAIx, link22SenderATA, err := tokens.CreateAssociatedTokenAccount(config.Token2022Program, link22.mint, senderPDA, user.PublicKey())
 		require.NoError(t, err)
@@ -5385,7 +5999,7 @@ func TestCCIPRouter(t *testing.T) {
 				config.RouterConfigPDA,
 				config.EvmDestChainStatePDA,
 				senderEvmNoncePDA,
-				solana.TokenProgramID,
+				config.SPLTokenProgram,
 				wsol.mint,
 				wsolSenderATA,
 				wsol.billingATA,
@@ -7084,10 +7698,134 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
+
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
-
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
+
+				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				require.NoError(t, err)
+
+				require.Equal(t, 2, len(executionEvents))
+				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+				require.Equal(t, sequenceNumber, executionEvents[0].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(root[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+				require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+				require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+				require.Equal(t, sequenceNumber, executionEvents[1].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(root[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
+
+				var rootAccount ccip_offramp.CommitReport
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
+				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
+				require.Equal(t, sequenceNumber, rootAccount.MinMsgNr)
+				require.Equal(t, sequenceNumber, rootAccount.MaxMsgNr)
+			})
+
+			t.Run("When executing a report with merkle tree of size 1, auto-deriving PDAs, it succeeds", func(t *testing.T) {
+				transmitter := getTransmitter()
+
+				sourceChainSelector := config.EvmChainSelector
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+				sequenceNumber := message.Header.SequenceNumber
+				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: sourceChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: sourceChainSelector,
+					Message:             message,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+
+				rawExecutionReport := testutils.MustMarshalBorsh(t, executionReport)
+				messagingAccounts := []ccip_offramp.CcipAccountMeta{}
+				messagingAccounts = append(
+					messagingAccounts,
+					ccip_offramp.CcipAccountMeta{Pubkey: config.CcipLogicReceiver, IsSigner: false, IsWritable: false},
+					ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverExternalExecutionConfigPDA, IsSigner: false, IsWritable: true},
+					ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
+					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
+				)
+
+				bufferID := []byte{}
+				tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{}
+
+				derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveExecutionAccounts(ctx,
+					t,
+					transmitter,
+					messagingAccounts,
+					sourceChainSelector,
+					tokenTransferAndOffchainData,
+					root,
+					bufferID,
+					executionReport.Message.TokenReceiver,
+					solanaGoClient,
+					config.CcipOfframpProgram,
+				)
+
+				builder := ccip_offramp.NewExecuteInstructionBuilder().
+					SetRawExecutionReport(rawExecutionReport).
+					SetReportContextByteWords(reportContext).
+					SetTokenIndexes(tokenIndices)
+				builder.AccountMetaSlice = derivedAccounts
+
+				instruction, err = builder.ValidateAndBuild()
+				require.NoError(t, err)
+
+				lookupTables := offrampLookupTable
+				for _, table := range derivedLookUpTables {
+					entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+					require.NoError(t, lutErr)
+					lookupTables[table] = entries
+				}
+
+				tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, lookupTables)
 
 				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err)
@@ -8106,6 +8844,100 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"writable privilege escalated", "Cross-program invocation with unauthorized signer or writable account"})
 			})
 
+			t.Run("When executing a report with an account with read permissions but sent as write, it uses the correct permissions", func(t *testing.T) {
+				// This test is to check that the receiver program can execute a message with an account that is configured as readable but sent as writable
+				// This is for a particular case when an account used in the message as read is also sent in the transaction (for example for the token pool program)
+				// as writable. So, the CCIP Receiver program should be able to use the account as readable and NOT as writable.
+				// All the accounts sent in the CPI to the CCIP Receiver must used the writable bitmap declared on source, but the check for that bitmap should be
+				// as flexible to support using the same account with different permissions in the same message.
+				transmitter := getTransmitter()
+
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+				message.ExtraArgs.IsWritableBitmap = ccip.GenerateBitMapForIndexes([]int{1})
+
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				require.NoError(t, err)
+
+				root := [32]byte(hash)
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: config.EvmChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            message.Header.SequenceNumber,
+						MaxSeqNr:            message.Header.SequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: config.EvmChainSelector,
+					Message:             message,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+				raw := ccip_offramp.NewExecuteInstruction(
+					testutils.MustMarshalBorsh(t, executionReport),
+					reportContext,
+					[]byte{},
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				)
+				raw.AccountMetaSlice = append(
+					raw.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false), // index 0 --> configured as readable
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),           // index 1
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),                   // index 2
+				)
+				instruction, err = raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				// Fails in the CCIP Receiver contract as it expects the config.ReceiverExternalExecutionConfigPDA account to be writable, but it was sent as read only (the same way it was configured on source).
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Program log: Instruction: CcipReceive Program log: AnchorError caused by account: external_execution_config. Error Code: ConstraintMut. Error Number: 2000. Error Message: A mut constraint was violated."})
+			})
+
 			t.Run("message can be executed with empty Any2SVMRampMessage.Data", func(t *testing.T) {
 				transmitter := getTransmitter()
 
@@ -8303,7 +9135,151 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = raw.ValidateAndBuild()
 					require.NoError(t, err)
 
+					for i, acc := range raw.AccountMetaSlice {
+						fmt.Printf("Raw [%d]: %v\n", i, acc)
+					}
 					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
+
+					executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+					require.NoError(t, err)
+
+					require.Equal(t, 2, len(executionEvents))
+					require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+					require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
+
+					mintEvent := tokens.EventMintRelease{}
+					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "Minted", &mintEvent, config.PrintEvents))
+					require.Equal(t, config.ReceiverExternalExecutionConfigPDA, mintEvent.Recipient)
+					require.Equal(t, token0.PoolSigner, mintEvent.Sender)
+					require.Equal(t, uint64(1), mintEvent.Amount)
+					require.Equal(t, token0.Mint, mintEvent.Mint)
+
+					_, finalSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
+					require.NoError(t, err)
+					_, finalBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
+					require.NoError(t, err)
+					require.Equal(t, 1, finalSupply-initSupply)
+					require.Equal(t, 1, finalBal-initBal)
+				})
+
+				t.Run("single token with autoderived execute accounts", func(t *testing.T) {
+					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
+					require.NoError(t, err)
+					_, initBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
+					require.NoError(t, err)
+
+					transmitter := getTransmitter()
+
+					sourceChainSelector := config.EvmChainSelector
+					msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+					message.TokenReceiver = config.ReceiverExternalExecutionConfigPDA
+					message.TokenAmounts = []ccip_offramp.Any2SVMTokenTransfer{{
+						SourcePoolAddress: []byte{1, 2, 3},
+						DestTokenAddress:  token0.Mint,
+						// 1 token * 1e9 due to decimal differences (18 in EVM, 9 in SVM). This will result in 1 unit in SVM.
+						Amount: ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1000000000)},
+					}}
+					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+					require.NoError(t, err)
+
+					root := [32]byte(rootBytes)
+					sequenceNumber := message.Header.SequenceNumber
+
+					commitReport := ccip_offramp.CommitInput{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
+							SourceChainSelector: sourceChainSelector,
+							OnRampAddress:       config.OnRampAddress,
+							MinSeqNr:            sequenceNumber,
+							MaxSeqNr:            sequenceNumber,
+							MerkleRoot:          root,
+						},
+					}
+					sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+					require.NoError(t, err)
+					rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+					require.NoError(t, err)
+
+					instruction, err := ccip_offramp.NewCommitInstruction(
+						reportContext,
+						testutils.MustMarshalBorsh(t, commitReport),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
+						config.OfframpConfigPDA,
+						config.OfframpReferenceAddressesPDA,
+						config.OfframpEvmSourceChainPDA,
+						rootPDA,
+						transmitter.PublicKey(),
+						solana.SystemProgramID,
+						solana.SysVarInstructionsPubkey,
+						config.OfframpBillingSignerPDA,
+						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
+						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
+					event := common.EventCommitReportAccepted{}
+					require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+
+					executionReport := ccip_offramp.ExecutionReportSingleChain{
+						SourceChainSelector: sourceChainSelector,
+						Message:             message,
+						OffchainTokenData:   [][]byte{{}},
+						Proofs:              [][32]uint8{},
+					}
+					rawExecutionReport := testutils.MustMarshalBorsh(t, executionReport)
+
+					messagingAccounts := []ccip_offramp.CcipAccountMeta{}
+					messagingAccounts = append(
+						messagingAccounts,
+						ccip_offramp.CcipAccountMeta{Pubkey: config.CcipLogicReceiver, IsSigner: false, IsWritable: false},
+						ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverExternalExecutionConfigPDA, IsSigner: false, IsWritable: true},
+						ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
+						ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
+					)
+					bufferID := []byte{}
+					tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{{
+						Transfer: message.TokenAmounts[0],
+						Data:     executionReport.OffchainTokenData[0],
+					}}
+					derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveExecutionAccounts(ctx,
+						t,
+						transmitter,
+						messagingAccounts,
+						sourceChainSelector,
+						tokenTransferAndOffchainData,
+						root,
+						bufferID,
+						executionReport.Message.TokenReceiver,
+						solanaGoClient,
+						config.CcipOfframpProgram,
+					)
+
+					builder := ccip_offramp.NewExecuteInstructionBuilder().
+						SetRawExecutionReport(rawExecutionReport).
+						SetReportContextByteWords(reportContext).
+						SetTokenIndexes(tokenIndices)
+
+					fmt.Printf("Token indices: %v\n", tokenIndices)
+					builder.AccountMetaSlice = derivedAccounts
+					for i, acc := range builder.AccountMetaSlice {
+						fmt.Printf("Derived [%d]: %v\n", i, acc)
+					}
+					instruction, err = builder.ValidateAndBuild()
+					require.NoError(t, err)
+
+					lookupTables := offrampLookupTable
+					for _, table := range derivedLookUpTables {
+						entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+						require.NoError(t, lutErr)
+						lookupTables[table] = entries
+					}
+					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(400_000))
 
 					executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 					require.NoError(t, err)
@@ -8448,6 +9424,132 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 					require.Equal(t, 2, finalBal1-initBal1)
 				})
+			})
+
+			t.Run("two tokens with autoderived accounts", func(t *testing.T) {
+				_, initBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
+				require.NoError(t, err)
+				_, initBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
+				require.NoError(t, err)
+
+				transmitter := getTransmitter()
+
+				sourceChainSelector := config.EvmChainSelector
+				msgAccounts := []solana.PublicKey{}
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+				message.ExtraArgs = ccip_offramp.Any2SVMRampExtraArgs{}
+				message.Data = []byte{}
+				message.TokenReceiver = config.ReceiverExternalExecutionConfigPDA
+				message.TokenAmounts = []ccip_offramp.Any2SVMTokenTransfer{{
+					SourcePoolAddress: []byte{1, 2, 3},
+					DestTokenAddress:  token0.Mint,
+					// 1 token * 1e9 due to decimal differences (18 in EVM, 9 in SVM). This will result in 1 unit in SVM.
+					Amount: ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1000000000)},
+				}, {
+					SourcePoolAddress: []byte{4, 5, 6},
+					DestTokenAddress:  token1.Mint,
+					// Token 2 has 18 decimals on both sides, no conversion will occur.
+					Amount: ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(2)},
+				}}
+				rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				require.NoError(t, err)
+
+				root := [32]byte(rootBytes)
+				sequenceNumber := message.Header.SequenceNumber
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: sourceChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(result.Meta.LogMessages, "CommitReportAccepted", &event))
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: sourceChainSelector,
+					Message:             message,
+					OffchainTokenData:   [][]byte{{}, {}},
+					Proofs:              [][32]uint8{},
+				}
+
+				tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{}
+				for _, transfer := range message.TokenAmounts {
+					tokenTransferAndOffchainData = append(tokenTransferAndOffchainData, ccip_offramp.TokenTransferAndOffchainData{
+						Data:     []byte{},
+						Transfer: transfer,
+					})
+				}
+				derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveExecutionAccounts(ctx,
+					t,
+					transmitter,
+					[]ccip_offramp.CcipAccountMeta{},
+					sourceChainSelector,
+					tokenTransferAndOffchainData,
+					root,
+					[]byte{},
+					executionReport.Message.TokenReceiver,
+					solanaGoClient,
+					config.CcipOfframpProgram,
+				)
+
+				rawExecutionReport := testutils.MustMarshalBorsh(t, executionReport)
+				builder := ccip_offramp.NewExecuteInstructionBuilder().
+					SetRawExecutionReport(rawExecutionReport).
+					SetReportContextByteWords(reportContext).
+					SetTokenIndexes(tokenIndices)
+
+				builder.AccountMetaSlice = derivedAccounts
+				instruction, err = builder.ValidateAndBuild()
+				require.NoError(t, err)
+
+				lookupTables := offrampLookupTable
+				for _, table := range derivedLookUpTables {
+					entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+					require.NoError(t, lutErr)
+					lookupTables[table] = entries
+				}
+				result = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(400_000))
+				require.NotNil(t, result)
+
+				// validate amounts
+				_, finalBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
+				require.NoError(t, err)
+				require.Equal(t, 1, finalBal0-initBal0)
+				_, finalBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
+				require.NoError(t, err)
+				require.Equal(t, 2, finalBal1-initBal1)
 			})
 
 			t.Run("execute measure compute units", func(t *testing.T) {
@@ -9296,6 +10398,764 @@ func TestCCIPRouter(t *testing.T) {
 						require.Equal(t, commitReport.MerkleRoot.MaxSeqNr, rootAccount.MaxMsgNr)
 					})
 				})
+			})
+
+			sendChunk := func(
+				t *testing.T,
+				i int,
+				chunkSize int,
+				numChunks int,
+				rawReport []byte,
+				buffer_id [32]byte,
+				bufferPDA solana.PublicKey,
+				transmitter solana.PrivateKey,
+			) *ccip_offramp.Instruction {
+				start := i * chunkSize
+				end := min(((i + 1) * chunkSize), len(rawReport))
+
+				chunk := rawReport[start:end]
+
+				appendIx, appendErr := ccip_offramp.NewBufferExecutionReportInstruction(
+					buffer_id[:],
+					uint32(len(rawReport)),
+					chunk,
+					uint8(i),
+					uint8(numChunks),
+					bufferPDA,
+					config.OfframpConfigPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID).ValidateAndBuild()
+
+				require.NoError(t, appendErr)
+
+				return appendIx
+			}
+
+			t.Run("Execution report pre-buffering", func(t *testing.T) {
+				getLamports := func(account solana.PublicKey) uint64 {
+					out, err := solanaGoClient.GetBalance(ctx, account, rpc.CommitmentConfirmed)
+					require.NoError(t, err)
+					return out.Value
+				}
+
+				transmitter := getTransmitter()
+				initialLamports := getLamports(transmitter.PublicKey())
+				bufferID := [32]byte{}
+				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_report_buffer"), bufferID[:], transmitter.PublicKey().Bytes()}, config.CcipOfframpProgram)
+				// Deliberately chosen not a whole divider, to prove that a smaller terminator chunk is accepted.
+				const chunkSize = 300
+				const terminatorSize = 100
+				data := make([]byte, 1000)
+				for i := range data {
+					data[i] = byte(i % 256)
+				}
+
+				totalSolSpentInFees := uint64(0)
+
+				ix := sendChunk(t, 0, 0, 4, data, bufferID, bufferPDA, transmitter)
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferInvalidChunkSize"})
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 3, terminatorSize, 4, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment)
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 3, terminatorSize, 4, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferAlreadyContainsChunk"})
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 0, chunkSize, 4, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment)
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 1, terminatorSize, 4, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferInvalidChunkSize"})
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 0, chunkSize, 4, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferAlreadyContainsChunk"})
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 1, chunkSize, 4, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment)
+				totalSolSpentInFees += result.Meta.Fee
+				ix = sendChunk(t, 2, chunkSize, 4, data, bufferID, bufferPDA, transmitter)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, transmitter, config.DefaultCommitment)
+				totalSolSpentInFees += result.Meta.Fee
+
+				finalLamportsBeforeClose := getLamports(transmitter.PublicKey())
+				rent := (initialLamports - finalLamportsBeforeClose) - totalSolSpentInFees
+
+				// We now close the buffer to recover the rent
+				closeIx, err := ccip_offramp.NewCloseExecutionReportBufferInstruction(bufferID[:], bufferPDA, config.OfframpConfigPDA, transmitter.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{closeIx}, transmitter, config.DefaultCommitment)
+				finalLamportsAfterClose := getLamports(transmitter.PublicKey())
+				closeDiff := finalLamportsAfterClose - finalLamportsBeforeClose
+				require.Equal(t, rent-result.Meta.Fee, closeDiff)
+			})
+
+			t.Run("When executing a report with oversized data, it fails, but it succeeds when buffered", func(t *testing.T) {
+				transmitter := getTransmitter()
+
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+
+				sourceChainSelector := config.EvmChainSelector
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+
+				buf := make([]byte, 1000)
+				for i := range buf {
+					buf[i] = byte(i % 256)
+				}
+				message.Data = buf
+				sequenceNumber := message.Header.SequenceNumber
+				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
+
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				require.NoError(t, err)
+				root, err := ccip.MerkleFrom([][32]byte{[32]byte(hash)})
+				require.NoError(t, err)
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: sourceChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: sourceChainSelector,
+					Message:             message,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+				rawReport := testutils.MustMarshalBorsh(t, executionReport)
+				raw := ccip_offramp.NewExecuteInstruction(
+					rawReport,
+					reportContext,
+					[]byte{},
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				)
+
+				raw.AccountMetaSlice = append(
+					raw.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),
+				)
+				instruction, err = raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"VersionedTransaction too large"})
+
+				// We failed to execute, so we will attempt buffering now. We first build the buffering execution instruction, which
+				// is identical except it includes an empty report, and an additional PDA.
+
+				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_report_buffer"), root[:], transmitter.PublicKey().Bytes()}, config.CcipOfframpProgram)
+				raw2 := ccip_offramp.NewExecuteInstruction(
+					// Empty report to execute from the buffer
+					[]byte{},
+					reportContext,
+					[]byte{},
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				)
+
+				raw2.AccountMetaSlice = append(
+					raw2.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),
+					// PDA of the buffer account
+					solana.NewAccountMeta(bufferPDA, true, false),
+				)
+				bufferedExecutionIx, err := raw2.ValidateAndBuild()
+				require.NoError(t, err)
+
+				// If we attempt to execute now, it will fail as we haven't yet buffered anything.
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportUnavailable"})
+
+				// Deliberately chosen not a divider of 1000, to prove that a smaller terminator chunk is accepted.
+				const chunkSize = 300
+
+				// Arbitrary, starting on the buffer terminator, for maximum complexity.
+				firstIndices := []int{3, 1}
+				lastIndices := []int{2, 0}
+
+				for _, i := range firstIndices {
+					appendIx := sendChunk(t, i, chunkSize, 4, rawReport, root, bufferPDA, transmitter)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIx}, transmitter, config.DefaultCommitment)
+				}
+
+				// This will still fail as the buffer is not yet complete
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportBufferIncomplete"})
+
+				for _, i := range lastIndices {
+					appendIx := sendChunk(t, i, chunkSize, 4, rawReport, root, bufferPDA, transmitter)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIx}, transmitter, config.DefaultCommitment)
+				}
+
+				// It now succeeds, since the buffer is complete.
+				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(1000000))
+				// Repeating it, however, will fail.
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{bufferedExecutionIx}, transmitter, config.DefaultCommitment, []string{"Error Code: ExecutionReportUnavailable"})
+
+				executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				require.NoError(t, err2)
+
+				require.Equal(t, 2, len(executionEvents))
+				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+				require.Equal(t, message.Header.SequenceNumber, executionEvents[0].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+				require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+				require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+				require.Equal(t, message.Header.SequenceNumber, executionEvents[1].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
+
+				var rootAccount ccip_offramp.CommitReport
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
+				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
+				require.Equal(t, commitReport.MerkleRoot.MinSeqNr, rootAccount.MinMsgNr)
+				require.Equal(t, commitReport.MerkleRoot.MaxSeqNr, rootAccount.MaxMsgNr)
+			})
+
+			t.Run("Buffered execution, happy path", func(t *testing.T) {
+				transmitter := getTransmitter()
+
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+
+				sourceChainSelector := config.EvmChainSelector
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+
+				buf := make([]byte, 1000)
+				for i := range buf {
+					buf[i] = byte(i % 256)
+				}
+				message.Data = buf
+				sequenceNumber := message.Header.SequenceNumber
+				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
+
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				require.NoError(t, err)
+				root, err := ccip.MerkleFrom([][32]byte{[32]byte(hash)})
+				require.NoError(t, err)
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: sourceChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: sourceChainSelector,
+					Message:             message,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+
+				rawReport := testutils.MustMarshalBorsh(t, executionReport)
+				// Could be anything that fits in a TX, safe upper bound is 800
+				const chunkSize = 300
+				order := []int{0, 1, 2, 3}
+				// Buffer ID doesn't need to be the merkle root, but it's a convenient identifier.
+				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_report_buffer"), root[:], transmitter.PublicKey().Bytes()}, config.CcipOfframpProgram)
+
+				for _, i := range order {
+					appendIx := sendChunk(t, i, chunkSize, len(order), rawReport, root, bufferPDA, transmitter)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIx}, transmitter, config.DefaultCommitment)
+				}
+
+				raw := ccip_offramp.NewExecuteInstruction(
+					// Empty report
+					[]byte{},
+					reportContext,
+					[]byte{},
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				)
+
+				raw.AccountMetaSlice = append(
+					raw.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.OfframpReceiverExternalExecPDA, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),
+					// PDA of the buffer account
+					solana.NewAccountMeta(bufferPDA, true, false),
+				)
+				instruction, err = raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(1000000))
+
+				executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				require.NoError(t, err2)
+
+				require.Equal(t, 2, len(executionEvents))
+				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+				require.Equal(t, message.Header.SequenceNumber, executionEvents[0].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+				require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+				require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+				require.Equal(t, message.Header.SequenceNumber, executionEvents[1].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
+
+				var rootAccount ccip_offramp.CommitReport
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
+				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
+				require.Equal(t, commitReport.MerkleRoot.MinSeqNr, rootAccount.MinMsgNr)
+				require.Equal(t, commitReport.MerkleRoot.MaxSeqNr, rootAccount.MaxMsgNr)
+			})
+
+			t.Run("Buffered execution auto-derivation when pool also requires derivation", func(t *testing.T) {
+				transmitter := getTransmitter()
+
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+
+				sourceChainSelector := config.EvmChainSelector
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+				message.TokenAmounts = []ccip_offramp.Any2SVMTokenTransfer{
+					{
+						SourcePoolAddress: []byte{},
+						DestTokenAddress:  usdcPool.Mint,
+						DestGasAmount:     0,
+						ExtraData:         []byte{},
+						Amount: ccip_offramp.CrossChainAmount{
+							LeBytes: [32]uint8{1},
+						},
+					},
+				}
+				message.TokenReceiver = user.PublicKey()
+
+				buf := make([]byte, 1000)
+				for i := range buf {
+					buf[i] = byte(i % 256)
+				}
+				message.Data = buf
+				sequenceNumber := message.Header.SequenceNumber
+				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
+
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				require.NoError(t, err)
+				root, err := ccip.MerkleFrom([][32]byte{[32]byte(hash)})
+				require.NoError(t, err)
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: sourceChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+
+				cctpMessageBytes := make([]byte, 200) // just has to have at least enough bytes to read the CCTP nonce
+				cctp.SetNonce(&cctpMessageBytes, 123)
+				cctp.SetSrcDomain(&cctpMessageBytes, cctpDomain)
+
+				// the length of message, plus 4 bytes for the length of the CCTP message prefix, plus 4 bytes
+				// for the length of the attestation prefix (but keeping attestation to 0 bytes just for simplicity)
+				messageAndAttestation := make([]byte, 208)
+				binary.LittleEndian.PutUint32(messageAndAttestation[0:4], uint32(len(cctpMessageBytes))) // borsh-encode message
+				copy(messageAndAttestation[4:], cctpMessageBytes)                                        // copy the CCTP message bytes
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: sourceChainSelector,
+					Message:             message,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+					OffchainTokenData:   [][]byte{messageAndAttestation},
+				}
+
+				rawReport := testutils.MustMarshalBorsh(t, executionReport)
+				// Could be anything that fits in a TX, safe upper bound is 800
+				const chunkSize = 400
+				order := []int{0, 1, 2, 3}
+				// Buffer ID doesn't need to be the merkle root, but it's a convenient identifier.
+				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_report_buffer"), root[:], transmitter.PublicKey().Bytes()}, config.CcipOfframpProgram)
+
+				for _, i := range order {
+					appendIx := sendChunk(t, i, chunkSize, len(order), rawReport, root, bufferPDA, transmitter)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIx}, transmitter, config.DefaultCommitment)
+				}
+
+				messagingAccounts := []ccip_offramp.CcipAccountMeta{}
+				messagingAccounts = append(
+					messagingAccounts,
+					ccip_offramp.CcipAccountMeta{Pubkey: config.CcipLogicReceiver, IsSigner: false, IsWritable: false},
+					ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverExternalExecutionConfigPDA, IsSigner: false, IsWritable: true},
+					ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
+					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
+				)
+				tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{
+					{
+						Transfer: message.TokenAmounts[0],
+						Data:     executionReport.OffchainTokenData[0],
+					},
+				}
+
+				derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveExecutionAccounts(ctx,
+					t,
+					transmitter,
+					messagingAccounts,
+					sourceChainSelector,
+					tokenTransferAndOffchainData,
+					root,
+					root[:],
+					executionReport.Message.TokenReceiver,
+					solanaGoClient,
+					config.CcipOfframpProgram,
+				)
+
+				require.Len(t, derivedLookUpTables, 2, "Expected two lookup tables to be derived")
+				require.Contains(t, derivedLookUpTables, usdcPool.PoolLookupTable, "Expected USDC pool lookup table to be derived")
+				require.Contains(t, derivedLookUpTables, offrampLookupTableAddr, "Expected offramp lookup table to be derived")
+
+				require.Equal(t, []uint8{5}, tokenIndices)
+
+				offrampCctpSigner, _, err := state.FindExternalTokenPoolsSignerPDA(config.CctpTokenPoolProgram, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				// as there are many accounts to check, we print the index of the first mismatch by checking them one
+				// by one instead of all at once
+				expectedAccounts := []*solana.AccountMeta{
+					// Mandatory execution accounts:
+					solana.Meta(config.OfframpConfigPDA), // index 0
+					solana.Meta(config.OfframpReferenceAddressesPDA),
+					solana.Meta(config.OfframpEvmSourceChainPDA),
+					solana.Meta(rootPDA).WRITE(),
+					solana.Meta(config.CcipOfframpProgram),
+					solana.Meta(config.AllowedOfframpEvmPDA),
+					solana.Meta(transmitter.PublicKey()).WRITE().SIGNER(),
+					solana.Meta(solana.SystemProgramID),
+					solana.Meta(solana.SysVarInstructionsPubkey),
+					solana.Meta(config.RMNRemoteProgram),
+					solana.Meta(config.RMNRemoteCursesPDA), // index 10
+					solana.Meta(config.RMNRemoteConfigPDA),
+					// Arbitrary messaging accounts:
+					solana.Meta(config.CcipLogicReceiver),
+					solana.Meta(config.OfframpReceiverExternalExecPDA),
+					solana.Meta(config.ReceiverExternalExecutionConfigPDA).WRITE(),
+					solana.Meta(config.ReceiverTargetAccountPDA).WRITE(),
+					solana.Meta(solana.SystemProgramID),
+					// Token transfer accounts (mandatory for all offramps, not in LUT):
+					solana.Meta(offrampCctpSigner),
+					solana.Meta(usdcPool.User[user.PublicKey()]).WRITE(),
+					solana.Meta(usdcPool.Billing[config.EvmChainSelector]),
+					solana.Meta(usdcPool.Chain[config.EvmChainSelector]).WRITE(), // index 20
+					// Token transfer accounts (mandatory for all offramps, in LUT):
+					solana.Meta(usdcPool.PoolLookupTable),
+					solana.Meta(usdcPool.AdminRegistryPDA),
+					solana.Meta(usdcPool.PoolProgram),
+					solana.Meta(usdcPool.PoolConfig),
+					solana.Meta(usdcPool.PoolTokenAccount).WRITE(),
+					solana.Meta(usdcPool.PoolSigner),
+					solana.Meta(usdcPool.Program),
+					solana.Meta(usdcPool.Mint).WRITE(),
+					solana.Meta(usdcPool.FeeTokenConfig),
+					solana.Meta(usdcPool.RouterSigner), // index 30
+					// Token transfer accounts (specific for CCTP, in LUT):
+					solana.Meta(messageTransmitter.MessageTransmitter).WRITE(),
+					solana.Meta(config.CctpTokenMessengerMinter),
+					solana.Meta(solana.SystemProgramID),
+					solana.Meta(config.CctpMessageTransmitter),
+					solana.Meta(tokenMessengerMinter.TokenMessenger),
+					solana.Meta(tokenMessengerMinter.TokenMinter),
+					solana.Meta(tokenMessengerMinter.LocalToken).WRITE(),
+					solana.Meta(tokenMessengerMinter.EventAuthority),
+					// Token transfer accounts (specific for CCTP, NOT in LUT):
+					solana.Meta(messageTransmitter.AuthorityPda),
+					solana.Meta(messageTransmitter.EventAuthority), // index 40
+					solana.Meta(tokenMessengerMinter.CustodyTokenAccount).WRITE(),
+					solana.Meta(tokenMessengerMinter.RemoteTokenMessenger),
+					solana.Meta(tokenMessengerMinter.TokenPair),
+					solana.Meta(cctp.GetUsedNoncesPDA(t, cctpMessageBytes[:])).WRITE(),
+					// Buffered exec report account:
+					solana.Meta(bufferPDA).WRITE(),
+				}
+
+				require.Len(t, derivedAccounts, len(expectedAccounts), "Derived accounts length mismatch")
+				for i, expected := range expectedAccounts {
+					require.Equal(t, expected, derivedAccounts[i], "Account at index %d (%s) does not match expected (%s)", i, expected, derivedAccounts[i])
+				}
+			})
+			t.Run("Buffered execution, autoderived", func(t *testing.T) {
+				transmitter := getTransmitter()
+
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+
+				sourceChainSelector := config.EvmChainSelector
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+
+				buf := make([]byte, 1000)
+				for i := range buf {
+					buf[i] = byte(i % 256)
+				}
+				message.Data = buf
+				sequenceNumber := message.Header.SequenceNumber
+				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
+
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				require.NoError(t, err)
+				root, err := ccip.MerkleFrom([][32]byte{[32]byte(hash)})
+				require.NoError(t, err)
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: sourceChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: sourceChainSelector,
+					Message:             message,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+
+				rawReport := testutils.MustMarshalBorsh(t, executionReport)
+				// Could be anything that fits in a TX, safe upper bound is 800
+				const chunkSize = 300
+				order := []int{0, 1, 2, 3}
+				// Buffer ID doesn't need to be the merkle root, but it's a convenient identifier.
+				bufferPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("execution_report_buffer"), root[:], transmitter.PublicKey().Bytes()}, config.CcipOfframpProgram)
+
+				for _, i := range order {
+					appendIx := sendChunk(t, i, chunkSize, len(order), rawReport, root, bufferPDA, transmitter)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIx}, transmitter, config.DefaultCommitment)
+				}
+
+				messagingAccounts := []ccip_offramp.CcipAccountMeta{}
+				messagingAccounts = append(
+					messagingAccounts,
+					ccip_offramp.CcipAccountMeta{Pubkey: config.CcipLogicReceiver, IsSigner: false, IsWritable: false},
+					ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverExternalExecutionConfigPDA, IsSigner: false, IsWritable: true},
+					ccip_offramp.CcipAccountMeta{Pubkey: config.ReceiverTargetAccountPDA, IsSigner: false, IsWritable: true},
+					ccip_offramp.CcipAccountMeta{Pubkey: solana.SystemProgramID, IsSigner: false, IsWritable: false},
+				)
+				tokenTransferAndOffchainData := []ccip_offramp.TokenTransferAndOffchainData{}
+
+				derivedAccounts, derivedLookUpTables, tokenIndices := testutils.DeriveExecutionAccounts(ctx,
+					t,
+					transmitter,
+					messagingAccounts,
+					sourceChainSelector,
+					tokenTransferAndOffchainData,
+					root,
+					root[:],
+					executionReport.Message.TokenReceiver,
+					solanaGoClient,
+					config.CcipOfframpProgram,
+				)
+				builder := ccip_offramp.NewExecuteInstructionBuilder().
+					SetRawExecutionReport([]byte{}).
+					SetReportContextByteWords(reportContext).
+					SetTokenIndexes(tokenIndices)
+				builder.AccountMetaSlice = derivedAccounts
+				instruction, err = builder.ValidateAndBuild()
+				require.NoError(t, err)
+
+				lookupTables := offrampLookupTable
+				for _, table := range derivedLookUpTables {
+					entries, lutErr := common.GetAddressLookupTable(ctx, solanaGoClient, table)
+					require.NoError(t, lutErr)
+					lookupTables[table] = entries
+				}
+				tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, lookupTables, common.AddComputeUnitLimit(1000000))
+
+				executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				require.NoError(t, err2)
+
+				require.Equal(t, 2, len(executionEvents))
+				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+				require.Equal(t, message.Header.SequenceNumber, executionEvents[0].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+				require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+				require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+				require.Equal(t, message.Header.SequenceNumber, executionEvents[1].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
+
+				var rootAccount ccip_offramp.CommitReport
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
+				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
+				require.Equal(t, commitReport.MerkleRoot.MinSeqNr, rootAccount.MinMsgNr)
+				require.Equal(t, commitReport.MerkleRoot.MaxSeqNr, rootAccount.MaxMsgNr)
 			})
 
 			t.Run("uninitialized token account can be manually executed", func(t *testing.T) {

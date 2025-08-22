@@ -55,6 +55,12 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
+pub struct Empty<'info> {
+    // This is unused, but Anchor requires that there is at least one account in the context
+    pub clock: Sysvar<'info, Clock>,
+}
+
+#[derive(Accounts)]
 pub struct UpdateConfig<'info> {
     #[account(
         mut,
@@ -63,6 +69,23 @@ pub struct UpdateConfig<'info> {
         constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
+
+    // validate signer is registered admin
+    #[account(address = config.owner @ FeeQuoterError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateConfigLinkMint<'info> {
+    #[account(
+        mut,
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    pub link_token_mint: InterfaceAccount<'info, Mint>,
 
     // validate signer is registered admin
     #[account(address = config.owner @ FeeQuoterError::Unauthorized)]

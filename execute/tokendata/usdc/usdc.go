@@ -12,15 +12,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-)
-
-const (
-	USDCToken = "USDC"
 )
 
 type USDCTokenDataObserver struct {
@@ -38,9 +35,10 @@ func NewUSDCTokenDataObserver(
 	destChainSelector cciptypes.ChainSelector,
 	usdcConfig pluginconfig.USDCCCTPObserverConfig,
 	attestationEncoder AttestationEncoder,
-	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+	readers map[cciptypes.ChainSelector]contractreader.Extended,
 	addrCodec cciptypes.AddressCodec,
 ) (*USDCTokenDataObserver, error) {
+	// TODO: Pass in a multi-family USDC message reader from the factory?
 	usdcReader, err := reader.NewUSDCMessageReader(
 		ctx,
 		lggr,
@@ -51,6 +49,17 @@ func NewUSDCTokenDataObserver(
 	if err != nil {
 		return nil, err
 	}
+
+	return internalNewUSDCTokenDataObserver(lggr, destChainSelector, usdcConfig, attestationEncoder, usdcReader)
+}
+
+func internalNewUSDCTokenDataObserver(
+	lggr logger.Logger,
+	destChainSelector cciptypes.ChainSelector,
+	usdcConfig pluginconfig.USDCCCTPObserverConfig,
+	attestationEncoder AttestationEncoder,
+	usdcReader reader.USDCMessageReader,
+) (*USDCTokenDataObserver, error) {
 	attestationClient, err := NewSequentialAttestationClient(lggr, usdcConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create attestation client: %w", err)

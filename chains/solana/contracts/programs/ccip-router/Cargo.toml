@@ -1,8 +1,9 @@
 [package]
 name = "ccip_router"
-version = "0.1.0-dev"
+version = "0.1.1"
 description = "Created with Anchor"
 edition = "2021"
+build = "build.rs"
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -27,3 +28,10 @@ ccip_common = {path = "../ccip-common"}
 
 [dev-dependencies]
 hex = "0.4.3"
+
+[build-dependencies]
+build_commit = { path = "../../crates/build-commit" }
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic"))']

@@ -11,6 +11,7 @@ import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 library Internal {
   error InvalidEVMAddress(bytes encodedAddress);
   error Invalid32ByteAddress(bytes encodedAddress);
+  error InvalidTVMAddress(bytes encodedAddress);
 
   /// @dev We limit return data to a selector plus 4 words. This is to avoid malicious contracts from returning
   /// large amounts of data and causing repeated out-of-gas scenarios.
@@ -192,6 +193,24 @@ library Internal {
     }
   }
 
+  /// @notice This methods provides validation for TON User-friendly addresses by ensuring the address is 36 bytes long.
+  /// @dev The encodedAddress is expected to be the 36-byte raw representation:
+  /// - 1 byte: flags (isBounceable, isTestnetOnly, etc.)
+  /// - 1 byte: workchain_id (0x00 for BaseChain, 0xff for MasterChain)
+  /// - 32 bytes: account_id
+  /// - 2 bytes: CRC16 checksum(computationally heavy, validation omitted for simplicity)
+  /// @param encodedAddress The 36-byte TON address.
+  function _validateTVMAddress(
+    bytes memory encodedAddress
+  ) internal pure {
+    if (encodedAddress.length != 36) revert InvalidTVMAddress(encodedAddress);
+    bytes32 accountId;
+    assembly {
+      accountId := mload(add(encodedAddress, 0x22)) // 0x22 = 0x20 (data start) + 2 (offset for account_id)
+    }
+    if (accountId == bytes32(0)) revert InvalidTVMAddress(encodedAddress);
+  }
+
   /// @notice Enum listing the possible message execution states within the offRamp contract.
   /// UNTOUCHED never executed.
   /// IN_PROGRESS currently being executed, used a replay protection.
@@ -287,6 +306,12 @@ library Internal {
   // bytes4(keccak256("CCIP ChainFamilySelector APTOS"));
   bytes4 public constant CHAIN_FAMILY_SELECTOR_APTOS = 0xac77ffec;
 
+  // bytes4(keccak256("CCIP ChainFamilySelector SUI"));
+  bytes4 public constant CHAIN_FAMILY_SELECTOR_SUI = 0xc4e05953;
+
+  // byte4(keccak256("CCIP ChainFamilySelector TVM"));
+  bytes4 public constant CHAIN_FAMILY_SELECTOR_TVM = 0x647e2ba9;
+
   /// @dev Holds a merkle root and interval for a source chain so that an array of these can be passed in the CommitReport.
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   /// @dev inefficient struct packing intentionally chosen to maintain order of specificity. Not a storage struct so impact is minimal.
@@ -298,4 +323,118 @@ library Internal {
     uint64 maxSeqNr; // ─────────╯ Maximum sequence number, inclusive
     bytes32 merkleRoot; //         Merkle root covering the interval & source chain messages
   }
+
+  // ================================================================
+  // │                            1.7                               │
+  // ================================================================
+
+  // TODO better naming
+  struct EVM2AnyVerifierMessage {
+    Header header; // Message header.
+    address sender; // sender address on the source chain.
+    bytes data; // arbitrary data payload supplied by the message sender.
+    bytes receiver; // receiver address on the destination chain.
+    address feeToken; // fee token.
+    uint256 feeTokenAmount; // fee token amount.
+    uint256 feeValueJuels; // fee amount in Juels.
+    EVMTokenTransfer[] tokenTransfer;
+    Receipt[] verifierReceipts;
+    Receipt executorReceipt;
+  }
+
+  struct Header {
+    bytes32 messageId; // Unique identifier for the message, generated with the source chain's encoding scheme (i.e. not necessarily abi.encoded).
+    uint64 sourceChainSelector; // ─╮ the chain selector of the source chain, note: not chainId.
+    uint64 destChainSelector; //    │ the chain selector of the destination chain, note: not chainId.
+    uint64 sequenceNumber; // ──────╯ sequence number, not unique across lanes.
+  }
+
+  struct Receipt {
+    address issuer;
+    uint64 destGasLimit;
+    uint32 destBytesOverhead;
+    uint256 feeTokenAmount;
+    bytes extraArgs;
+  }
+
+  // TODO better naming
+  struct EVMTokenTransfer {
+    address sourceTokenAddress;
+    // The EVM address of the destination token.
+    // This value is UNTRUSTED as any pool owner can return whatever value they want.
+    bytes destTokenAddress;
+    uint256 amount; // Number of tokens.
+    bytes extraData; // Optional pool data to be transferred to the destination chain.
+    Receipt receipt;
+  }
+
+  // receive
+
+  struct Any2EVMMessage {
+    Header header; // Message header.
+    bytes sender; // sender address on the source chain.
+    bytes data; // arbitrary data payload supplied by the message sender.
+    address receiver; // receiver address on the destination chain.
+    uint32 gasLimit; // user supplied maximum gas amount available for dest chain execution.
+    // TODO make a list for gas reasons
+    TokenTransfer tokenAmounts; // array of tokens and amounts to transfer.
+  }
+
+  struct TokenTransfer {
+    // The source pool EVM address encoded to bytes. This value is trusted as it is obtained through the onRamp. It can
+    // be relied upon by the destination pool to validate the source pool.
+    bytes sourcePoolAddress;
+    address destTokenAddress; // Address of destination token
+    // Optional pool data to be transferred to the destination chain. Be default this is capped at
+    // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
+    // has to be set for the specific token.
+    bytes extraData;
+    uint256 amount; // Number of tokens.
+  }
+
+  // TODO optimize & ensure everything is included
+  function _hash(EVM2AnyVerifierMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+    // Fixed-size message fields are included in nested hash to reduce stack pressure.
+    // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
+    return keccak256(
+      abi.encode(
+        MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+        metadataHash,
+        keccak256(
+          abi.encode(original.sender, original.header.sequenceNumber, original.feeToken, original.feeTokenAmount)
+        ),
+        keccak256(original.receiver),
+        keccak256(original.data),
+        keccak256(abi.encode(original.tokenTransfer))
+      )
+    );
+  }
+
+  //  function _evm2AnyToAny2EVMMultiProofMessage(
+  //    EVM2AnyVerifierMessage memory evm2Any,
+  //    uint32 gasLimit
+  //  ) internal pure returns (Any2EVMMultiProofMessage memory) {
+  //    Any2EVMMultiProofTokenTransfer[] memory tokenAmounts =
+  //      new Any2EVMMultiProofTokenTransfer[](evm2Any.tokenAmounts.length);
+  //
+  //    for (uint256 i = 0; i < evm2Any.tokenAmounts.length; i++) {
+  //      EVMTokenTransfer memory tokenTransfer = evm2Any.tokenAmounts[i];
+  //      tokenAmounts[i] = Any2EVMMultiProofTokenTransfer({
+  //        sourcePoolAddress: abi.encode(tokenTransfer.sourcePoolAddress),
+  //        destTokenAddress: abi.decode(tokenTransfer.destTokenAddress, (address)),
+  //        extraData: tokenTransfer.destExecData,
+  //        amount: tokenTransfer.amount
+  //      });
+  //    }
+  //
+  //    return Any2EVMMultiProofMessage({
+  //      header: evm2Any.header,
+  //      sender: abi.encode(evm2Any.sender),
+  //      data: evm2Any.data,
+  //      receiver: abi.decode(evm2Any.receiver, (address)),
+  //      gasLimit: gasLimit,
+  //      tokenAmounts: tokenAmounts,
+  //      requiredVerifiers: evm2Any.requiredVerifiers
+  //    });
+  //  }
 }

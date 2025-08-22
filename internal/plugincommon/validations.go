@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // ValidateFChain validates that the FChain values are positive.
@@ -23,6 +23,24 @@ var ErrReportValidation = errors.New("report validation errors")
 
 // ErrInvalidReport is used when a report is found to be invalid.
 var ErrInvalidReport = errors.New("invalid report")
+
+var ErrStaleReport = errors.New("stale report")
+
+// NewErrStaleReport is returned when the report is stale, meaning it has already been processed or is outdated.
+func NewErrStaleReport(reason string) error {
+	return &errWrappedStaleReport{reason: reason}
+}
+
+type errWrappedStaleReport struct {
+	reason string
+}
+
+func (e *errWrappedStaleReport) Error() string {
+	return fmt.Sprintf("stale report error: %v", e.reason)
+}
+func (e *errWrappedStaleReport) Unwrap() error {
+	return ErrStaleReport
+}
 
 // NewErrValidatingReport is returned when the report could not be validated due to an error.
 func NewErrValidatingReport(err error) error {

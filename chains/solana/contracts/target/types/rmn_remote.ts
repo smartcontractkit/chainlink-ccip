@@ -1,5 +1,5 @@
 export type RmnRemote = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "rmn_remote",
   "instructions": [
     {
@@ -46,6 +46,25 @@ export type RmnRemote = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",
@@ -469,12 +488,17 @@ export type RmnRemote = {
       "code": 9007,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 9008,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };
 
 export const IDL: RmnRemote = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "rmn_remote",
   "instructions": [
     {
@@ -521,6 +545,25 @@ export const IDL: RmnRemote = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "transferOwnership",
@@ -944,6 +987,11 @@ export const IDL: RmnRemote = {
       "code": 9007,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 9008,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };

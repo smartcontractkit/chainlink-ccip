@@ -38,7 +38,6 @@ pub mod fee_quoter {
     /// * `onramp` - The public key of the onramp.
     ///
     /// The function also uses the link_token_mint account from the context.
-    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<Initialize>,
         max_fee_juels_per_msg: u128,
@@ -72,6 +71,17 @@ pub mod fee_quoter {
         });
 
         Ok(())
+    }
+
+    /// Returns the program type (name) and version.
+    /// Used by offchain code to easily determine which program & version is being interacted with.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context
+    pub fn type_version(_ctx: Context<Empty>) -> Result<String> {
+        let response = env!("CCIP_BUILD_TYPE_VERSION").to_string();
+        msg!("{}", response);
+        Ok(response)
     }
 
     /// Transfers the ownership of the fee quoter to a new proposed owner.
@@ -130,6 +140,17 @@ pub mod fee_quoter {
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
             .set_max_fee_juels_per_msg(ctx, max_fee_juels_per_msg)
+    }
+
+    /// Sets the link_token_mint and updates the link_token_local_decimals.
+    ///
+    /// Only the admin may set this.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    pub fn set_link_token_mint(ctx: Context<UpdateConfigLinkMint>) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version).set_link_token_mint(ctx)
     }
 
     /// Adds a billing token configuration.
@@ -422,4 +443,6 @@ pub enum FeeQuoterError {
     InvalidTokenTransferFeeDestBytesOverhead,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
+    #[msg("Proposed owner is the default pubkey")]
+    DefaultOwnerProposal,
 }

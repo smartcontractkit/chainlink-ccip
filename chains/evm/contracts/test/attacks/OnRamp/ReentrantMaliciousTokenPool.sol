@@ -5,7 +5,8 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {FacadeClient} from "./FacadeClient.sol";
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract ReentrantMaliciousTokenPool is TokenPool {
   address private immutable i_facade;
@@ -24,7 +25,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
   /// @dev Calls into Facade to reenter Router exactly 1 time
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external override returns (Pool.LockOrBurnOutV1 memory) {
+  ) public override returns (Pool.LockOrBurnOutV1 memory) {
     if (s_attacked) {
       return
         Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
@@ -34,13 +35,18 @@ contract ReentrantMaliciousTokenPool is TokenPool {
 
     // solhint-disable-next-line check-send-result
     FacadeClient(i_facade).send(lockOrBurnIn.amount);
-    emit Burned(msg.sender, lockOrBurnIn.amount);
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
     return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) external pure override returns (Pool.ReleaseOrMintOutV1 memory) {
-    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
+  ) public pure override returns (Pool.ReleaseOrMintOutV1 memory) {
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }
 }

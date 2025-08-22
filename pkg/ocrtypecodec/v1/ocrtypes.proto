@@ -15,6 +15,7 @@ message CommitObservation {
   ChainFeeObservation chain_fee_obs = 3;
   DiscoveryObservation discovery_obs = 4;
   map<uint64, int32> f_chain = 5; // chainSelector to f
+  uint64 onchain_price_ocr_seq_num = 6; // the ocr sequence number of the last report with prices seen onchain
 }
 
 message CommitOutcome {
@@ -38,7 +39,8 @@ message ExecObservation {
 message ExecOutcome {
   string plugin_state = 1;
   repeated CommitData commit_reports = 2;
-  ExecutePluginReport execute_plugin_report = 3;
+  ExecutePluginReport execute_plugin_report = 3; // DEPRECATED: Use execute_plugin_reports instead
+  repeated ExecutePluginReport execute_plugin_reports = 4;
 }
 
 message MerkleRootQuery {
@@ -220,6 +222,7 @@ message RampMessageHeader {
   uint64 nonce = 5;
   bytes msg_hash = 6;
   bytes on_ramp = 7; // address
+  string tx_hash = 8;
 }
 
 message RampTokenAmount {

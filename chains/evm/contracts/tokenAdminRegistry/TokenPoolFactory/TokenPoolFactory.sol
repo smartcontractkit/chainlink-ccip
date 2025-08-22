@@ -2,15 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
-import {IOwnable} from "@chainlink/shared/interfaces/IOwnable.sol";
-import {ITypeAndVersion} from "@chainlink/shared/interfaces/ITypeAndVersion.sol";
+import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {RegistryModuleOwnerCustom} from "../RegistryModuleOwnerCustom.sol";
 import {FactoryBurnMintERC20} from "./FactoryBurnMintERC20.sol";
 
-import {Create2} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
+import {Create2} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
 /// @notice A contract for deploying new tokens and token pools, and configuring them with the token admin registry
 /// @dev At the end of the transaction, the ownership transfer process will begin, but the user must accept the
@@ -115,8 +115,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     address token = Create2.deploy(0, salt, tokenInitCode);
 
     // Deploy the token pool
-    address pool =
-      _createTokenPool(token, localTokenDecimals, remoteTokenPools, tokenPoolInitCode, salt, PoolType.BURN_MINT);
+    address pool = _createTokenPool(token, localTokenDecimals, remoteTokenPools, tokenPoolInitCode, salt);
 
     // Grant the mint and burn roles to the pool for the token
     FactoryBurnMintERC20(token).grantMintAndBurnRoles(pool);
@@ -147,15 +146,14 @@ contract TokenPoolFactory is ITypeAndVersion {
     uint8 localTokenDecimals,
     RemoteTokenPoolInfo[] calldata remoteTokenPools,
     bytes calldata tokenPoolInitCode,
-    bytes32 salt,
-    PoolType poolType
+    bytes32 salt
   ) external returns (address poolAddress) {
     // Ensure a unique deployment between senders even if the same input parameter is used to prevent
     // DOS/front running attacks
     salt = keccak256(abi.encodePacked(salt, msg.sender));
 
     // create the token pool and return the address
-    return _createTokenPool(token, localTokenDecimals, remoteTokenPools, tokenPoolInitCode, salt, poolType);
+    return _createTokenPool(token, localTokenDecimals, remoteTokenPools, tokenPoolInitCode, salt);
   }
 
   // ================================================================
@@ -173,8 +171,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     uint8 localTokenDecimals,
     RemoteTokenPoolInfo[] calldata remoteTokenPools,
     bytes calldata tokenPoolInitCode,
-    bytes32 salt,
-    PoolType poolType
+    bytes32 salt
   ) private returns (address) {
     // Create an array of chain updates to apply to the token pool
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](remoteTokenPools.length);
@@ -203,8 +200,7 @@ contract TokenPoolFactory is ITypeAndVersion {
         bytes32 remotePoolInitcodeHash = _generatePoolInitcodeHash(
           remoteTokenPool.remotePoolInitCode,
           remoteTokenPool.remoteChainConfig,
-          abi.decode(remoteTokenPool.remoteTokenAddress, (address)),
-          remoteTokenPool.poolType
+          abi.decode(remoteTokenPool.remoteTokenAddress, (address))
         );
 
         // Abi encode the computed remote address so it can be used as bytes in the chain update
@@ -225,14 +221,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     }
 
     // Construct the initArgs for the token pool using the immutable contracts for CCIP on the local chain
-    bytes memory tokenPoolInitArgs;
-    if (poolType == PoolType.BURN_MINT) {
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, new address[](0), i_rmnProxy, i_ccipRouter);
-    } else if (poolType == PoolType.LOCK_RELEASE) {
-      // Lock/Release pools have an additional boolean constructor parameter that must be accounted for, acceptLiquidity,
-      // which is set to true by default in this case. Users wishing to set it to false must deploy the pool manually.
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, new address[](0), i_rmnProxy, true, i_ccipRouter);
-    }
+    bytes memory tokenPoolInitArgs = abi.encode(token, localTokenDecimals, new address[](0), i_rmnProxy, i_ccipRouter);
 
     // Construct the deployment code from the initCode and the initArgs and then deploy
     address poolAddress = Create2.deploy(0, salt, abi.encodePacked(tokenPoolInitCode, tokenPoolInitArgs));
@@ -253,45 +242,25 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @param initCode The init code of the pool
   /// @param remoteChainConfig The remote chain config for the pool
   /// @param remoteTokenAddress The address of the remote token
-  /// @param poolType The type of pool to deploy
   /// @return bytes32 hash of the init code to be used in the deterministic address calculation
   function _generatePoolInitcodeHash(
     bytes memory initCode,
     RemoteChainConfig memory remoteChainConfig,
-    address remoteTokenAddress,
-    PoolType poolType
+    address remoteTokenAddress
   ) private pure returns (bytes32) {
-    if (poolType == PoolType.BURN_MINT) {
-      return keccak256(
-        abi.encodePacked(
-          initCode,
-          // constructor(address token, uint8 localTokenDecimals, address[] allowlist, address rmnProxy, address router)
-          abi.encode(
-            remoteTokenAddress,
-            remoteChainConfig.remoteTokenDecimals,
-            new address[](0),
-            remoteChainConfig.remoteRMNProxy,
-            remoteChainConfig.remoteRouter
-          )
+    return keccak256(
+      abi.encodePacked(
+        initCode,
+        // constructor(address token, uint8 localTokenDecimals, address[] allowlist, address rmnProxy, address router)
+        abi.encode(
+          remoteTokenAddress,
+          remoteChainConfig.remoteTokenDecimals,
+          new address[](0),
+          remoteChainConfig.remoteRMNProxy,
+          remoteChainConfig.remoteRouter
         )
-      );
-    } else {
-      // if poolType is PoolType.LOCK_RELEASE, but may be expanded in future versions
-      return keccak256(
-        abi.encodePacked(
-          initCode,
-          // constructor(address token, uint8 localTokenDecimals, address[] allowList, address rmnProxy, bool acceptLiquidity, address router)
-          abi.encode(
-            remoteTokenAddress,
-            remoteChainConfig.remoteTokenDecimals,
-            new address[](0),
-            remoteChainConfig.remoteRMNProxy,
-            true,
-            remoteChainConfig.remoteRouter
-          )
-        )
-      );
-    }
+      )
+    );
   }
 
   /// @notice Sets the token pool address in the token admin registry for a newly deployed token pool.

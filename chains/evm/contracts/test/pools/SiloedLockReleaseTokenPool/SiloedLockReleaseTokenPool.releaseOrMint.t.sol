@@ -5,13 +5,23 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC20.sol";
+import {IERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC20.sol";
 
 contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolSetup {
+  function setUp() public override {
+    super.setUp();
+
+    IERC20(address(s_token)).approve(address(s_lockBox), type(uint256).max);
+
+    s_lockBox.deposit(address(s_token), 10e18);
+    s_lockBox.deposit(address(s_token), 10e18);
+  }
+
   function test_ReleaseOrMint_SiloedChain() public {
     uint256 amount = 10e18;
 
     deal(address(s_token), address(s_siloedLockReleaseTokenPool), amount);
+
     vm.startPrank(s_allowedOnRamp);
 
     // Lock funds so that they can be released without underflowing the internal accounting
@@ -30,13 +40,13 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     vm.startPrank(s_allowedOffRamp);
 
     vm.expectEmit();
-    emit IERC20.Transfer(address(s_siloedLockReleaseTokenPool), OWNER, amount);
+    emit IERC20.Transfer(address(s_lockBox), OWNER, amount);
 
     s_siloedLockReleaseTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SILOED_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_siloedDestPoolAddress),
@@ -71,13 +81,13 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     vm.startPrank(s_allowedOffRamp);
 
     vm.expectEmit();
-    emit IERC20.Transfer(address(s_siloedLockReleaseTokenPool), OWNER, amount);
+    emit IERC20.Transfer(address(s_lockBox), OWNER, amount);
 
     s_siloedLockReleaseTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_siloedDestPoolAddress),
@@ -109,7 +119,7 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: releaseAmount,
+        sourceDenominatedAmount: releaseAmount,
         localToken: address(s_token),
         remoteChainSelector: SILOED_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_siloedDestPoolAddress),
@@ -137,7 +147,7 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: releaseAmount,
+        sourceDenominatedAmount: releaseAmount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_siloedDestPoolAddress),

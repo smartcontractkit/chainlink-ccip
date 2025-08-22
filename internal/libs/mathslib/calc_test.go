@@ -4,7 +4,19 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/stretchr/testify/assert"
+
+	sel "github.com/smartcontractkit/chain-selectors"
+)
+
+var (
+	SolChainSelector = ccipocr3.ChainSelector(sel.SOLANA_DEVNET.Selector)
+	EvmChainSelector = ccipocr3.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	AptChainSelector = ccipocr3.ChainSelector(sel.APTOS_TESTNET.Selector)
 )
 
 func TestDeviates(t *testing.T) {
@@ -105,26 +117,106 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 		name           string
 		sourceGasPrice *big.Int
 		usdPerFeeCoin  *big.Int
+		chainSelector  ccipocr3.ChainSelector
 		exp            *big.Int
 	}{
 		{
-			name:           "base case",
-			sourceGasPrice: big.NewInt(2e18),
-			usdPerFeeCoin:  big.NewInt(3e18),
-			exp:            big.NewInt(6e18),
+			name:           "evm base case",
+			sourceGasPrice: big.NewInt(1e9),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(2000), big.NewInt(1e18)), // $2000/Eth
+			chainSelector:  EvmChainSelector,
+			exp:            big.NewInt(2000e9),
 		},
 		{
-			name:           "small numbers",
-			sourceGasPrice: big.NewInt(1000),
-			usdPerFeeCoin:  big.NewInt(2000),
-			exp:            big.NewInt(0), // What do we do in these cases? Charge the user 0?
+			name:           "evm high fee case",
+			sourceGasPrice: big.NewInt(2e18),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(4000), big.NewInt(1e18)),
+			chainSelector:  EvmChainSelector,
+			exp:            new(big.Int).Mul(big.NewInt(8000), big.NewInt(1e18)),
+		},
+		{
+			name:           "evm low fee case",
+			sourceGasPrice: big.NewInt(1e3),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1000), big.NewInt(1e18)),
+			chainSelector:  EvmChainSelector,
+			exp:            big.NewInt(1000e3),
+		},
+		{
+			name:           "sol base fee case",
+			sourceGasPrice: big.NewInt(2000),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(150e9), big.NewInt(1e18)), // $150/Eth
+			chainSelector:  SolChainSelector,
+			exp:            big.NewInt(3e8),
+		},
+		{
+			name:           "sol high fee case",
+			sourceGasPrice: big.NewInt(400000),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(300e9), big.NewInt(1e18)),
+			chainSelector:  SolChainSelector,
+			exp:            big.NewInt(12e10),
+		},
+		{
+			name:           "sol low fee case",
+			sourceGasPrice: big.NewInt(10),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1e18)),
+			chainSelector:  SolChainSelector,
+			exp:            big.NewInt(10000),
+		},
+		{
+			name:           "sol 0 fee case",
+			sourceGasPrice: big.NewInt(0),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(150e9), big.NewInt(1e18)),
+			chainSelector:  SolChainSelector,
+			exp:            big.NewInt(0),
+		},
+		{
+			name:           "apt base fee case",
+			sourceGasPrice: big.NewInt(100),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(5), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
+			chainSelector:  AptChainSelector,
+			exp:            big.NewInt(100 * 5 * 1e10), // gasprice * USD per APT * (USD / APT)
+		},
+		{
+			name:           "apt high fee case",
+			sourceGasPrice: big.NewInt(100000),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(20), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
+			chainSelector:  AptChainSelector,
+			exp:            big.NewInt(100000 * 20 * 1e10), // gasprice * USD per APT * (USD / APT)
+		},
+		{
+			name:           "apt low fee case",
+			sourceGasPrice: big.NewInt(100),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
+			chainSelector:  AptChainSelector,
+			exp:            big.NewInt(100 * 1 * 1e10), // gasprice * USD per APT * (USD / APT)
+		},
+		{
+			name:           "apt 0 fee case",
+			sourceGasPrice: big.NewInt(0),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
+			chainSelector:  AptChainSelector,
+			exp:            big.NewInt(0 * 1 * 1e10), // gasprice * USD per APT * (USD / APT)
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res := CalculateUsdPerUnitGas(tc.sourceGasPrice, tc.usdPerFeeCoin)
-			assert.Zero(t, tc.exp.Cmp(res))
+			res, err := CalculateUsdPerUnitGas(tc.chainSelector, tc.sourceGasPrice, tc.usdPerFeeCoin)
+			t.Log(res.String())
+			require.NoError(t, err)
+			require.Zero(t, tc.exp.Cmp(res))
 		})
 	}
+}
+
+func MustBigIntSetString(s string, zeroSuffixSize int) *big.Int {
+	// append zeroes to the string
+	for i := 0; i < zeroSuffixSize; i++ {
+		s += "0"
+	}
+	bi, ok := new(big.Int).SetString(s, 10)
+	if !ok {
+		panic("failed to parse big int")
+	}
+	return bi
 }

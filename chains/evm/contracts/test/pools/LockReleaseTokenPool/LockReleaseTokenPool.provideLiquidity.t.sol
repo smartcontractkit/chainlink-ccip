@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
-
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
 
@@ -34,14 +32,5 @@ contract LockReleaseTokenPool_provideLiquidity is LockReleaseTokenPoolSetup {
     vm.assume(amount > 0);
     vm.expectRevert("ERC20: insufficient allowance");
     s_lockReleaseTokenPool.provideLiquidity(amount);
-  }
-
-  function test_RevertWhen_LiquidityNotAccepted() public {
-    s_lockReleaseTokenPool = new LockReleaseTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), false, address(s_sourceRouter)
-    );
-
-    vm.expectRevert(LockReleaseTokenPool.LiquidityNotAccepted.selector);
-    s_lockReleaseTokenPool.provideLiquidity(1);
   }
 }

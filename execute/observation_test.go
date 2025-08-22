@@ -6,14 +6,19 @@ import (
 	"testing"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
@@ -22,7 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	codec_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/ocrtypecodec/v1"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func Test_Observation_CacheUpdate(t *testing.T) {
@@ -48,7 +52,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 	}
 
 	outcome := exectypes.Outcome{
-		Report: cciptypes.ExecutePluginReport{
+		Reports: []cciptypes.ExecutePluginReport{{
 			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
 				{
 					SourceChainSelector: 1,
@@ -67,7 +71,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 					},
 				},
 			},
-		},
+		}},
 	}
 
 	// No state, report only generated in Filter state so cache is not updated.
@@ -127,11 +131,17 @@ func Test_getMessagesObservation(t *testing.T) {
 	oneByte := make([]byte, 1)
 
 	// Helper functions
-	createCommitData := func(srcChain cciptypes.ChainSelector, from, to cciptypes.SeqNum) exectypes.CommitData {
+	createCommitData := func(
+		srcChain cciptypes.ChainSelector,
+		from,
+		to cciptypes.SeqNum,
+		executedMessages ...cciptypes.SeqNum,
+	) exectypes.CommitData {
 		return exectypes.CommitData{
 			SourceChain:         srcChain,
 			SequenceNumberRange: cciptypes.NewSeqNumRange(from, to),
 			Timestamp:           timestamp,
+			ExecutedMessages:    executedMessages,
 		}
 	}
 
@@ -432,6 +442,46 @@ func Test_getMessagesObservation(t *testing.T) {
 			expectedError: false,
 		},
 		{
+			name: "executed messages are skipped but hashed",
+			commitData: []exectypes.CommitData{
+				createCommitData(src1, 1, 3, 1, 2), // 1 and 2 are already executed
+			},
+			setupMocks: func(ccipReader *readerpkg_mock.MockCCIPReader,
+				estimateProvider *ccipocr3.MockEstimateProvider,
+				inflightCache *cache.InflightMessageCache,
+				codec *codec_mock.MockExecCodec,
+			) {
+				// Any small size that fits within the max observation size
+				codec.EXPECT().EncodeObservation(mock.Anything).Return(oneByte, nil).Maybe()
+				messages := createMessages(src1, dest, 1, 3)
+
+				ccipReader.On("MsgsBetweenSeqNums", ctx, src1, cciptypes.NewSeqNumRange(1, 3)).
+					Return(messages, nil)
+			},
+			expectedObs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					src1: {
+						// 1 and 2 are pseudo deleted because they are already executed
+						1: NewMessage(1, 1, 0, 0),
+						2: NewMessage(2, 2, 0, 0),
+						3: NewMessage(3, 3, int(src1), int(dest)),
+					},
+				},
+				CommitReports: exectypes.CommitObservations{
+					src1: []exectypes.CommitData{
+						createCommitData(src1, 1, 3, 1, 2), // 1 and 2 are already executed
+					},
+				},
+				Hashes: exectypes.MessageHashes{
+					src1: createHashesMap(1, 3),
+				},
+				TokenData: exectypes.TokenDataObservations{
+					src1: createTokenData(1, 3),
+				},
+			},
+			expectedError: false,
+		},
+		{
 			name: "encoding size exceeded mid report",
 			commitData: []exectypes.CommitData{
 				createCommitData(src1, 1, 3),
@@ -591,6 +641,7 @@ func Test_getMessagesObservation(t *testing.T) {
 			estimateProvider := ccipocr3.NewMockEstimateProvider(t)
 			inflightCache := cache.NewInflightMessageCache(inflightCacheTTL)
 			codec := codec_mock.NewMockExecCodec(t)
+			homeChain := reader.NewMockHomeChain(t)
 			tokenDataObserver := observer.NoopTokenDataObserver{}
 
 			plugin := &Plugin{
@@ -601,10 +652,17 @@ func Test_getMessagesObservation(t *testing.T) {
 				estimateProvider:     estimateProvider,
 				inflightMessageCache: inflightCache,
 				tokenDataObserver:    &tokenDataObserver,
+				homeChain:            homeChain,
 				offchainCfg: pluginconfig.ExecuteOffchainConfig{
 					BatchGasLimit: uint64(batchGasLimit),
 				},
+				oracleIDToP2pID: map[commontypes.OracleID]types.PeerID{
+					commontypes.OracleID(0): {12},
+				},
 			}
+
+			homeChain.EXPECT().GetSupportedChainsForPeer(types.PeerID{12}).
+				Return(mapset.NewSet(src1, src2), nil).Maybe()
 
 			tt.setupMocks(ccipReader, estimateProvider, inflightCache, codec)
 

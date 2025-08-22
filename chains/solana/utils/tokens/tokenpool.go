@@ -9,17 +9,19 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
 
 type TokenPool struct {
 	// token details
-	Program        solana.PublicKey
-	Mint           solana.PublicKey
-	FeeTokenConfig solana.PublicKey
+	Program               solana.PublicKey
+	Mint                  solana.PublicKey
+	FeeTokenConfig        solana.PublicKey
+	MintAuthorityMultisig solana.PublicKey
 
 	// admin registry PDA
 	AdminRegistryPDA solana.PublicKey
@@ -28,6 +30,8 @@ type TokenPool struct {
 	PoolProgram, PoolConfig, PoolSigner, PoolTokenAccount solana.PublicKey
 	PoolLookupTable                                       solana.PublicKey
 	WritableIndexes                                       []uint8
+
+	GlobalConfig solana.PublicKey // Global Config PDA of the Token Pool
 
 	AdditionalAccounts solana.PublicKeySlice
 
@@ -43,6 +47,9 @@ type TokenPool struct {
 	// CCIP CPI signers
 	RouterSigner  solana.PublicKey
 	OfframpSigner solana.PublicKey
+
+	// Token Extensions
+	WithTokenExtensions bool
 }
 
 func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
@@ -50,7 +57,7 @@ func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 		tp.PoolLookupTable,  // 0
 		tp.AdminRegistryPDA, // 1
 		tp.PoolProgram,      // 2
-		tp.PoolConfig,       // 3 - writable
+		tp.PoolConfig,       // 3
 		tp.PoolTokenAccount, // 4 - writable
 		tp.PoolSigner,       // 5
 		tp.Program,          // 6
@@ -96,20 +103,27 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 	if err != nil {
 		return TokenPool{}, err
 	}
+	globalConfigPDA, err := TokenPoolGlobalConfigPDA(poolProgram)
+	if err != nil {
+		return TokenPool{}, err
+	}
 
 	p := TokenPool{
-		Program:          tokenProgram,
-		Mint:             mint,
-		FeeTokenConfig:   tokenConfigPda,
-		AdminRegistryPDA: tokenAdminRegistryPDA,
-		PoolProgram:      poolProgram,
-		PoolLookupTable:  solana.PublicKey{},
-		WritableIndexes:  []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
-		User:             map[solana.PublicKey]solana.PublicKey{},
-		Chain:            map[uint64]solana.PublicKey{},
-		Billing:          map[uint64]solana.PublicKey{},
-		RouterSigner:     routerSignerPDA,
-		OfframpSigner:    offrampSignerPDA,
+		Program:               tokenProgram,
+		Mint:                  mint,
+		MintAuthorityMultisig: solana.PublicKey{}, // this will be set later, if needed
+		FeeTokenConfig:        tokenConfigPda,
+		AdminRegistryPDA:      tokenAdminRegistryPDA,
+		PoolProgram:           poolProgram,
+		PoolLookupTable:       solana.PublicKey{},
+		WritableIndexes:       []uint8{4, 7}, // see ToTokenPoolEntries for writable indexes.
+		User:                  map[solana.PublicKey]solana.PublicKey{},
+		Chain:                 map[uint64]solana.PublicKey{},
+		Billing:               map[uint64]solana.PublicKey{},
+		RouterSigner:          routerSignerPDA,
+		OfframpSigner:         offrampSignerPDA,
+		WithTokenExtensions:   false, // default to false, can be set later if needed
+		GlobalConfig:          globalConfigPDA,
 	}
 	p.Chain[config.EvmChainSelector] = evmChainPDA
 	p.Chain[config.SvmChainSelector] = svmChainPDA
@@ -153,6 +167,11 @@ func TokenPoolChainConfigPDA(chainSelector uint64, mint, programID solana.Public
 	return solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), chainSelectorLE, mint.Bytes()}, programID)
 }
 
+func TokenPoolGlobalConfigPDA(programID solana.PublicKey) (solana.PublicKey, error) {
+	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("config")}, programID)
+	return addr, err
+}
+
 type EventBurnLock struct {
 	Discriminator [8]byte
 	Sender        solana.PublicKey
@@ -184,6 +203,11 @@ type EventRemotePoolsAppended struct {
 	PoolAddresses         []test_token_pool.RemoteAddress
 	PreviousPoolAddresses []test_token_pool.RemoteAddress
 	Mint                  solana.PublicKey
+}
+
+type EventRemoteChainCctpConfigEdited struct {
+	Discriminator [8]byte
+	Config        cctp_token_pool.CctpChain
 }
 
 type EventRateLimitConfigured struct {

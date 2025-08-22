@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,23 +27,11 @@ var (
 
 // Extended version of a ContractReader.
 type Extended interface {
-	// Unbind is included for compatibility with ContractReader
-	Unbind(ctx context.Context, bindings []types.BoundContract) error
-	// HealthReport is included for compatibility with ContractReader
-	HealthReport() map[string]error
+	// ContractReaderFacade is the base interface that this extended interface builds upon.
+	ContractReaderFacade
 
-	Bind(ctx context.Context, bindings []types.BoundContract) error
-
+	// GetBindings returns current bindings for a given contract reader.
 	GetBindings(contractName string) []ExtendedBoundContract
-
-	// QueryKey is from the base contract reader interface.
-	QueryKey(
-		ctx context.Context,
-		contract types.BoundContract,
-		filter query.KeyFilter,
-		limitAndSort query.LimitAndSort,
-		sequenceDataType any,
-	) ([]types.Sequence, error)
 
 	// ExtendedQueryKey performs automatic binding from contractName to the first bound contract.
 	// An error is generated if there are more than one bound contract for the contractName.
@@ -54,14 +43,6 @@ type Extended interface {
 		sequenceDataType any,
 	) ([]types.Sequence, error)
 
-	// GetLatestValue is from the base contract reader interface.
-	GetLatestValue(
-		ctx context.Context,
-		readIdentifier string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params, returnVal any,
-	) error
-
 	// ExtendedGetLatestValue performs automatic binding from contractName to the first bound contract, and
 	// constructs a read identifier for a given method name. An error is generated if there are more than one
 	// bound contract for the contractName.
@@ -71,12 +52,6 @@ type Extended interface {
 		confidenceLevel primitives.ConfidenceLevel,
 		params, returnVal any,
 	) error
-
-	// BatchGetLatestValues is from the base contract reader interface.
-	BatchGetLatestValues(
-		ctx context.Context,
-		request types.BatchGetLatestValuesRequest,
-	) (types.BatchGetLatestValuesResult, error)
 
 	// ExtendedBatchGetLatestValues performs automatic binding from contractNames to bound contracts,
 	// and constructs a BatchGetLatestValuesRequest with the resolved bindings.
@@ -279,7 +254,6 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 	if len(validBindings) == 0 {
 		return nil
 	}
-
 	err := e.reader.Bind(ctx, validBindings)
 	if err != nil {
 		return fmt.Errorf("failed to call ContractReader.Bind: %w", err)
@@ -329,7 +303,8 @@ func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
 
 	for _, boundContracts := range e.contractBindingsByName {
 		for _, boundContract := range boundContracts {
-			if boundContract.Binding.String() == b.String() {
+			// Ignore case when comparing addresses
+			if strings.EqualFold(boundContract.Binding.String(), b.String()) {
 				return true
 			}
 		}
@@ -357,3 +332,21 @@ func (e *extendedContractReader) HealthReport() map[string]error {
 
 // Interface compliance check
 var _ Extended = (*extendedContractReader)(nil)
+
+// ExtractTxHash extracts the transaction hash from a ContractReader cursor.
+// The expected format is "BlockNumber-LogIndex-TxHash".
+func ExtractTxHash(cursor string) (string, error) {
+	parts := strings.SplitN(cursor, "-", 3)
+
+	if len(parts) < 3 {
+		return "", fmt.Errorf("invalid cursor format: '%s'. Expected format 'BlockNumber-LogIndex-TxHash'", cursor)
+	}
+
+	txHash := parts[2]
+
+	if len(txHash) == 0 {
+		return "", fmt.Errorf("transaction hash is empty in cursor: '%s'", cursor)
+	}
+
+	return txHash, nil
+}

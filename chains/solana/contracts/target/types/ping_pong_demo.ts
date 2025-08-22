@@ -1,5 +1,5 @@
 export type PingPongDemo = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "ping_pong_demo",
   "instructions": [
     {
@@ -120,6 +120,25 @@ export type PingPongDemo = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "setCounterpart",
@@ -630,7 +649,7 @@ export type PingPongDemo = {
 };
 
 export const IDL: PingPongDemo = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "ping_pong_demo",
   "instructions": [
     {
@@ -751,6 +770,25 @@ export const IDL: PingPongDemo = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "typeVersion",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "returns": "string"
     },
     {
       "name": "setCounterpart",

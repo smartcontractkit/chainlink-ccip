@@ -7,9 +7,10 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func (p *Processor) ValidateObservation(
@@ -47,9 +48,12 @@ func (p *Processor) ValidateObservation(
 		return fmt.Errorf("validate OffRampNextSeqNums: %w", err)
 	}
 
-	if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain, obs.RMNRemoteConfig); err != nil {
-		p.lggr.Errorw("validate RMNRemoteConfig failed", "err", err, "cfg", obs.RMNRemoteConfig)
-		return fmt.Errorf("validate RMNRemoteConfig: %w", err)
+	// Don't need to validate RMNRemoteConfig if RMN is disabled.
+	if p.offchainCfg.RMNEnabled {
+		if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain, obs.RMNRemoteConfig); err != nil {
+			p.lggr.Errorw("validate RMNRemoteConfig failed", "err", err, "cfg", obs.RMNRemoteConfig)
+			return fmt.Errorf("validate RMNRemoteConfig: %w", err)
+		}
 	}
 
 	return nil

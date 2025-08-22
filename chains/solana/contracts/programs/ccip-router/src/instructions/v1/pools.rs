@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked, state::Mint};
 use ccip_common::v1::MIN_TOKEN_POOL_ACCOUNTS;
+use solana_program::program::get_return_data;
 use solana_program::{instruction::Instruction, program::invoke_signed};
-use solana_program::{program::get_return_data, program_pack::Pack};
+use spl_token_2022::extension::StateWithExtensions;
 
 use crate::CcipRouterError;
 
@@ -47,7 +48,10 @@ pub fn transfer_token<'info>(
     signer: &AccountInfo<'info>,
     seeds: &[&[u8]],
 ) -> std::result::Result<(), ProgramError> {
-    let mint_data = Mint::unpack(*mint.try_borrow_data()?)?;
+    let data = mint.try_borrow_data()?;
+    let state = StateWithExtensions::<Mint>::unpack(&data)?;
+    let mint_data = state.base;
+
     let mut transfer_ix = transfer_checked(
         &spl_token_2022::ID, // SDK requires spl-token or spl-token-2022 (cannot handle arbitrary token program)
         &from.key(),

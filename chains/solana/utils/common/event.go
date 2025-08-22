@@ -8,7 +8,9 @@ import (
 
 	bin "github.com/gagliardetto/binary"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 )
 
 func IsEvent(event string, data []byte) bool {
@@ -59,16 +61,31 @@ func ParseMultipleEvents[T any](logs []string, event string, shouldPrint bool) (
 				return nil, err
 			}
 			if IsEvent(event, data) {
-				var obj T
-				if err := bin.UnmarshalBorsh(&obj, data); err != nil {
-					return nil, err
-				}
+				// if the event is `EventCommitReportAccepted`, we need to handle it separately
+				switch event {
+				case consts.EventNameCommitReportAccepted:
+					e := EventCommitReportAccepted{}
+					derr := decodeCommitReportAcceptedEvent(data, &e)
+					if derr != nil {
+						return nil, derr
+					}
+					if shouldPrint {
+						fmt.Printf("%s: %+v\n", event, e)
+					}
+					results = append(results, any(e).(T))
 
-				if shouldPrint {
-					fmt.Printf("%s: %+v\n", event, obj)
-				}
+				default:
+					var obj T
+					if err = bin.UnmarshalBorsh(&obj, data); err != nil {
+						return nil, err
+					}
 
-				results = append(results, obj)
+					if shouldPrint {
+						fmt.Printf("%s: %+v\n", event, obj)
+					}
+
+					results = append(results, obj)
+				}
 			}
 		}
 	}
@@ -96,36 +113,39 @@ func ParseEventCommitReportAccepted(logs []string, event string, obj *EventCommi
 				return err
 			}
 			if IsEvent(event, data) {
-				decoder := bin.NewBorshDecoder(data)
-
-				// Deserialize `Discriminator`:
-				err = decoder.Decode(&obj.Discriminator)
-				if err != nil {
-					return err
-				}
-
-				// Deserialize `Report` (optional):
-				{
-					ok, dErr := decoder.ReadBool()
-					if dErr != nil {
-						return dErr
-					}
-					if ok {
-						dErr = decoder.Decode(&obj.Report)
-						if dErr != nil {
-							return dErr
-						}
-					}
-				}
-				// Deserialize `PriceUpdates`:
-				err = decoder.Decode(&obj.PriceUpdates)
-				if err != nil {
-					return err
-				}
-
-				return nil
+				return decodeCommitReportAcceptedEvent(data, obj)
 			}
 		}
 	}
 	return NewEventNotFoundError(event)
+}
+
+func decodeCommitReportAcceptedEvent(data []byte, obj *EventCommitReportAccepted) error {
+	decoder := bin.NewBorshDecoder(data)
+
+	// Deserialize `Discriminator`:
+	err := decoder.Decode(&obj.Discriminator)
+	if err != nil {
+		return err
+	}
+
+	// Deserialize `Report` (optional):
+	{
+		ok, dErr := decoder.ReadBool()
+		if dErr != nil {
+			return dErr
+		}
+		if ok {
+			dErr = decoder.Decode(&obj.Report)
+			if dErr != nil {
+				return dErr
+			}
+		}
+	}
+	// Deserialize `PriceUpdates`:
+	err = decoder.Decode(&obj.PriceUpdates)
+	if err != nil {
+		return err
+	}
+	return nil
 }

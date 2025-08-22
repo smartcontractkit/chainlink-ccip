@@ -4,34 +4,36 @@
   "rules": {
     "compiler-version": ["off", "^0.8.0"],
     "const-name-snakecase": "off",
-    "constructor-syntax": "error",
     "var-name-mixedcase": "off",
     "func-named-parameters": "off",
     "immutable-vars-naming": "off",
     "no-inline-assembly": "off",
     "contract-name-capwords": "off",
+    "use-natspec": "off",
+    "gas-indexed-events": "off",
+    "function-max-lines": "off",
+    "gas-strict-inequalities": "off",
+    "gas-increment-by-one": "off",
+    "gas-calldata-parameters": "off",
+    "gas-small-strings": "off",
+    "not-rely-on-time": "off",
+    "no-empty-blocks": "off",
+
     "one-contract-per-file": "off",
     "avoid-low-level-calls": "off",
     "reentrancy": "off",
     "func-name-mixedcase": "off",
+    "import-path-check": "off",
+    "gas-custom-errors": "off",
+
     "no-unused-import": "error",
-    "gas-struct-packing": "warn",
-    "interface-starts-with-i": "warn",
     "func-visibility": [
       "error",
       {
         "ignoreConstructors": true
       }
     ],
-    "not-rely-on-time": "off",
-    "no-empty-blocks": "off",
     "quotes": ["error", "double"],
-    "reason-string": [
-      "warn",
-      {
-        "maxLength": 64
-      }
-    ],
     "chainlink-solidity/prefix-internal-functions-with-underscore": "warn",
     "chainlink-solidity/prefix-private-functions-with-underscore": "warn",
     "chainlink-solidity/prefix-storage-variables-with-s-underscore": "warn",

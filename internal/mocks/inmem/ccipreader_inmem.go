@@ -10,9 +10,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
@@ -195,7 +196,7 @@ func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
 
 func (r InMemoryCCIPReader) DiscoverContracts(
 	ctx context.Context,
-	allChains []cciptypes.ChainSelector) (reader.ContractAddresses, error) {
+	supportedChains, allChains []cciptypes.ChainSelector) (reader.ContractAddresses, error) {
 	return nil, nil
 }
 

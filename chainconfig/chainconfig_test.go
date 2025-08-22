@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestChainConfig_Validate(t *testing.T) {
@@ -21,27 +21,56 @@ func TestChainConfig_Validate(t *testing.T) {
 		{
 			"valid",
 			fields{
-				GasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(1)},
-				DAGasPriceDeviationPPB:  cciptypes.BigInt{Int: big.NewInt(1)},
-				OptimisticConfirmations: 1,
+				GasPriceDeviationPPB:   cciptypes.BigInt{Int: big.NewInt(1)},
+				DAGasPriceDeviationPPB: cciptypes.BigInt{Int: big.NewInt(1)},
 			},
 			false,
 		},
 		{
-			"invalid, gas price deviation not set",
+			"invalid, gas price deviation is nil",
 			fields{
-				GasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(0)},
-				DAGasPriceDeviationPPB:  cciptypes.BigInt{Int: big.NewInt(1)},
-				OptimisticConfirmations: 1,
+				GasPriceDeviationPPB:   cciptypes.BigInt{},
+				DAGasPriceDeviationPPB: cciptypes.BigInt{Int: big.NewInt(1)},
 			},
 			true,
 		},
 		{
-			"invalid, optimistic confirmations not set",
+			"invalid, da gas price deviation is nil",
 			fields{
-				GasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(1)},
-				DAGasPriceDeviationPPB:  cciptypes.BigInt{Int: big.NewInt(1)},
-				OptimisticConfirmations: 0,
+				GasPriceDeviationPPB:   cciptypes.BigInt{Int: big.NewInt(1)},
+				DAGasPriceDeviationPPB: cciptypes.BigInt{},
+			},
+			true,
+		},
+		{
+			"invalid, gas price deviation not set",
+			fields{
+				GasPriceDeviationPPB:   cciptypes.BigInt{Int: big.NewInt(0)},
+				DAGasPriceDeviationPPB: cciptypes.BigInt{Int: big.NewInt(1)},
+			},
+			true,
+		},
+		{
+			"invalid, gas price deviation is negative",
+			fields{
+				GasPriceDeviationPPB:   cciptypes.BigInt{Int: big.NewInt(-1)},
+				DAGasPriceDeviationPPB: cciptypes.BigInt{Int: big.NewInt(1)},
+			},
+			true,
+		},
+		{
+			"invalid, data-availability gas price deviation not set",
+			fields{
+				GasPriceDeviationPPB:   cciptypes.BigInt{Int: big.NewInt(1)},
+				DAGasPriceDeviationPPB: cciptypes.BigInt{Int: big.NewInt(0)},
+			},
+			true,
+		},
+		{
+			"invalid, data-availability gas price deviation is negative",
+			fields{
+				GasPriceDeviationPPB:   cciptypes.BigInt{Int: big.NewInt(1)},
+				DAGasPriceDeviationPPB: cciptypes.BigInt{Int: big.NewInt(-1)},
 			},
 			true,
 		},

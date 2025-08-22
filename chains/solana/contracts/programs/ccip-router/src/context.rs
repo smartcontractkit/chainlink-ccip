@@ -5,7 +5,7 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use ccip_common::seed;
 
 use crate::program::CcipRouter;
-use crate::state::{Config, Nonce};
+use crate::state::Config;
 use crate::{CcipRouterError, DestChain, DestChainConfig, SVM2AnyMessage};
 
 /// Static space allocated to any account: must always be added to space calculations.
@@ -15,7 +15,6 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 /// version numbers than this will be rejected.
 pub const MAX_CONFIG_V: u8 = 1;
 const MAX_CHAINSTATE_V: u8 = 1;
-const MAX_NONCE_V: u8 = 1;
 
 pub const fn valid_version(v: u8, max_version: u8) -> bool {
     !uninitialized(v) && v <= max_version
@@ -66,6 +65,12 @@ pub struct WithdrawBilledFunds<'info> {
 
     #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct Empty<'info> {
+    // This is unused, but Anchor requires that there is at least one account in the context
+    pub clock: Sysvar<'info, Clock>,
 }
 
 #[derive(Accounts)]
@@ -272,7 +277,7 @@ pub struct CcipSend<'info> {
         bump,
         constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
@@ -280,17 +285,16 @@ pub struct CcipSend<'info> {
         bump,
         constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub dest_chain_state: Account<'info, DestChain>,
+    pub dest_chain_state: Box<Account<'info, DestChain>>,
 
+    /// CHECK this represents the PDA where the message counters are stored. As it may be initialized or not,
+    /// and it may be in it's v1 or v2 form, it is an UncheckedAccount and the code handles all cases manually.
     #[account(
-        init_if_needed,
+        mut,
         seeds = [seed::NONCE, destination_chain_selector.to_le_bytes().as_ref(), authority.key().as_ref()],
         bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + Nonce::INIT_SPACE,
-        constraint = uninitialized(nonce.version) || valid_version(nonce.version, MAX_NONCE_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub nonce: Account<'info, Nonce>,
+    pub nonce: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -427,6 +431,7 @@ pub struct CcipSend<'info> {
     // pool signer
     // token program
     // token mint
+    // fee token config
     // ccip_router_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program]
     // ...additional accounts for pool config
     // ] x N tokens
@@ -502,4 +507,14 @@ pub struct GetFee<'info> {
     // remaining_accounts:
     // - First all BillingTokenConfigWrapper accounts (one per token transferred)
     // - Then all PerChainPerTokenConfig accounts (one per token transferred)
+}
+
+#[derive(Accounts)]
+pub struct ViewConfigOnly<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
 }
