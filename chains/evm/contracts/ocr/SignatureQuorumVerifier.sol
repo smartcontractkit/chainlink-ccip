@@ -143,16 +143,23 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   }
 
   /// @notice Revokes a signature configuration for a given configDigest.
-  /// @param configDigest The config digest to revoke.
-  function revokeConfigDigest(
-    bytes32 configDigest
+  /// @param configDigests The config digests to revoke.
+  /// @dev Reverts revoking a config digest means that any messages signed with that config digest will no longer
+  /// be valid. If there are any such messages, they will have to be resigned with a new config digest to be valid again.
+  function revokeConfigDigests(
+    bytes32[] calldata configDigests
   ) external onlyOwner {
-    if (!s_activeConfigDigests.remove(configDigest)) {
-      revert InvalidConfigDigest(configDigest);
+    for (uint256 i = 0; i < configDigests.length; ++i) {
+      bytes32 configDigest = configDigests[i];
+
+      // This check also removes the digest from the set of active config digests.
+      if (!s_activeConfigDigests.remove(configDigest)) {
+        revert InvalidConfigDigest(configDigest);
+      }
+
+      delete s_signatureConfig[configDigest];
+
+      emit ConfigRevoked(configDigest);
     }
-
-    delete s_signatureConfig[configDigest];
-
-    emit ConfigRevoked(configDigest);
   }
 }
