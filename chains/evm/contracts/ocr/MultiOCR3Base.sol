@@ -43,7 +43,6 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
   error NonUniqueSignatures();
   error OracleCannotBeZeroAddress();
   error StaticConfigCannotBeChanged(uint8 ocrPluginType);
-  error InsufficientGasToCompleteTx(bytes4 err);
 
   /// @dev Packing these fields used on the hot path in a ConfigInfo variable reduces the retrieval of all
   /// of them to a minimum number of SLOADs.
