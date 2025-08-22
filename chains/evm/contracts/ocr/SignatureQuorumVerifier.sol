@@ -130,10 +130,10 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
       SignatureConfigConfig storage configForDigest = s_signatureConfig[signatureConfig.configDigest];
 
       // Add new signers.
-      for (uint256 singerIndex = 0; singerIndex < signatureConfig.signers.length; ++singerIndex) {
-        if (signatureConfig.signers[singerIndex] == address(0)) revert OracleCannotBeZeroAddress();
+      for (uint256 signerIndex = 0; signerIndex < signatureConfig.signers.length; ++signerIndex) {
+        if (signatureConfig.signers[signerIndex] == address(0)) revert OracleCannotBeZeroAddress();
 
-        configForDigest.signers.add(signatureConfig.signers[singerIndex]);
+        configForDigest.signers.add(signatureConfig.signers[signerIndex]);
       }
 
       configForDigest.F = signatureConfig.F;
