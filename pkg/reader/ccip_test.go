@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -17,20 +16,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-
-	commonccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
-
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/types"
-	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	commonccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
+	writermocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/types"
+	readermocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 var (
@@ -39,97 +36,6 @@ var (
 	chainC = cciptypes.ChainSelector(3)
 	chainD = cciptypes.ChainSelector(4)
 )
-
-func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
-	sourceCRs := make(map[cciptypes.ChainSelector]*reader_mocks.MockContractReaderFacade)
-	for _, chain := range []cciptypes.ChainSelector{chainA, chainB} {
-		sourceCRs[chain] = reader_mocks.NewMockContractReaderFacade(t)
-		sourceCRs[chain].EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	}
-
-	destCR := reader_mocks.NewMockContractReaderFacade(t)
-	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	destCR.EXPECT().HealthReport().Return(nil)
-	destCR.EXPECT().BatchGetLatestValues(
-		mock.Anything,
-		mock.Anything,
-	).RunAndReturn(func(
-		ctx context.Context,
-		request types.BatchGetLatestValuesRequest,
-	) (types.BatchGetLatestValuesResult, error) {
-		results := make(types.BatchGetLatestValuesResult, 0)
-		for contractName, batch := range request {
-			for _, readReq := range batch {
-				res := types.BatchReadResult{
-					ReadName: readReq.ReadName,
-				}
-				params := readReq.Params.(map[string]any)
-				sourceChain := params["sourceChainSelector"].(cciptypes.ChainSelector)
-				v := readReq.ReturnVal.(*cciptypes.SourceChainConfig)
-
-				fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
-					"0x%d000000000000000000000000000000000000000", sourceChain),
-				)
-				require.NoError(t, err)
-				v.OnRamp = cciptypes.UnknownAddress(fromString)
-				v.IsEnabled = true
-				v.Router = fromString
-				res.SetResult(v, nil)
-				results[contractName] = append(results[contractName], res)
-			}
-		}
-		return results, nil
-	})
-
-	cw := writer_mocks.NewMockContractWriter(t)
-	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
-	contractWriters[chainA] = cw
-	contractWriters[chainB] = cw
-	contractWriters[chainC] = cw
-
-	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	offrampAddress := []byte{0x3}
-	chainAccessors := createMockedChainAccessors(t, chainA, chainB, chainC)
-	mockExpectChainAccessorSyncCall(chainAccessors[chainC], consts.ContractNameOffRamp, offrampAddress, nil)
-	ccipReader, err := newCCIPChainReaderInternal(
-		t.Context(),
-		logger.Test(t),
-		chainAccessors,
-		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			chainA: sourceCRs[chainA],
-			chainB: sourceCRs[chainB],
-			chainC: destCR,
-		}, contractWriters, chainC, offrampAddress, mockAddrCodec,
-	)
-	require.NoError(t, err)
-
-	// Add cleanup to ensure resources are released
-	t.Cleanup(func() {
-		err := ccipReader.Close()
-		if err != nil {
-			t.Logf("Error closing ccipReader: %v", err)
-		}
-	})
-
-	addrStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, 111_111)
-	require.NoError(t, err)
-
-	require.NoError(t, ccipReader.contractReaders[chainA].Bind(
-		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x1"}}))
-	require.NoError(t, ccipReader.contractReaders[chainB].Bind(
-		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x2"}}))
-	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
-		context.Background(), []types.BoundContract{{Name: "OffRamp",
-			Address: addrStr}}))
-
-	ctx := context.Background()
-	cfgs, err := ccipReader.getOffRampSourceChainsConfig(
-		ctx, logger.Test(t), []cciptypes.ChainSelector{chainA, chainB}, false)
-	assert.NoError(t, err)
-	assert.Len(t, cfgs, 2)
-	assert.Equal(t, "0x1000000000000000000000000000000000000000", cfgs[chainA].OnRamp.String())
-	assert.Equal(t, "0x2000000000000000000000000000000000000000", cfgs[chainB].OnRamp.String())
-}
 
 func TestCCIPChainReader_GetContractAddress(t *testing.T) {
 	ab := addressbook.NewBook()
@@ -158,11 +64,11 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	offRamp := []byte{0x4}
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	destExtended := reader_mocks.NewMockExtended(t)
-	source1Extended := reader_mocks.NewMockExtended(t)
-	source2Extended := reader_mocks.NewMockExtended(t)
+	destExtended := readermocks.NewMockExtended(t)
+	source1Extended := readermocks.NewMockExtended(t)
+	source2Extended := readermocks.NewMockExtended(t)
 
-	cw := writer_mocks.NewMockContractWriter(t)
+	cw := writermocks.NewMockContractWriter(t)
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	contractWriters[destChain] = cw
 	contractWriters[sourceChain1] = cw
@@ -221,11 +127,11 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 
 	destNonceMgr := []byte{0x3}
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	destExtended := reader_mocks.NewMockExtended(t)
-	source1Extended := reader_mocks.NewMockExtended(t)
-	source2Extended := reader_mocks.NewMockExtended(t)
+	destExtended := readermocks.NewMockExtended(t)
+	source1Extended := readermocks.NewMockExtended(t)
+	source2Extended := readermocks.NewMockExtended(t)
 
-	cw := writer_mocks.NewMockContractWriter(t)
+	cw := writermocks.NewMockContractWriter(t)
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	contractWriters[destChain] = cw
 	contractWriters[sourceChain1] = cw
@@ -279,11 +185,11 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 	destNonceMgr := []byte{0x3}
 	offRamp := []byte{0x4}
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	destExtended := reader_mocks.NewMockExtended(t)
+	destExtended := readermocks.NewMockExtended(t)
 	// only support source2, source1 unsupported.
-	source2Extended := reader_mocks.NewMockExtended(t)
+	source2Extended := readermocks.NewMockExtended(t)
 
-	cw := writer_mocks.NewMockContractWriter(t)
+	cw := writermocks.NewMockContractWriter(t)
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	contractWriters[destChain] = cw
 	contractWriters[sourceChain2] = cw
@@ -337,11 +243,11 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 
 	expectedErr := errors.New("some error")
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	destExtended := reader_mocks.NewMockExtended(t)
-	source1Extended := reader_mocks.NewMockExtended(t)
-	source2Extended := reader_mocks.NewMockExtended(t)
+	destExtended := readermocks.NewMockExtended(t)
+	source1Extended := readermocks.NewMockExtended(t)
+	source2Extended := readermocks.NewMockExtended(t)
 
-	cw := writer_mocks.NewMockContractWriter(t)
+	cw := writermocks.NewMockContractWriter(t)
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	contractWriters[destChain] = cw
 	contractWriters[sourceChain1] = cw
@@ -419,19 +325,19 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRMNRemote, destChain, destRMNRemote)
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameNonceManager, destChain, destNonceMgr)
 
-	mockReaders := make(map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
-	mockReaders[destChain] = reader_mocks.NewMockExtended(t)
+	mockReaders := make(map[cciptypes.ChainSelector]*readermocks.MockExtended)
+	mockReaders[destChain] = readermocks.NewMockExtended(t)
 
 	// Setup cache mock and configurations
 	mockCache := new(mockConfigCache)
 	// Destination chain config
-	destChainConfig := ChainConfigSnapshot{
-		Offramp: OfframpConfig{
-			StaticConfig: offRampStaticChainConfig{
+	destChainConfig := cciptypes.ChainConfigSnapshot{
+		Offramp: cciptypes.OfframpConfig{
+			StaticConfig: cciptypes.OffRampStaticChainConfig{
 				NonceManager: destNonceMgr,
 				RmnRemote:    destRMNRemote,
 			},
-			DynamicConfig: offRampDynamicChainConfig{
+			DynamicConfig: cciptypes.OffRampDynamicChainConfig{
 				FeeQuoter: destFeeQuoter,
 			},
 		},
@@ -439,9 +345,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	// Set up cache expectations for destination chain and source chains
 	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(destChainConfig, nil).Once()
 	mockCache.On("GetChainConfig", mock.Anything, sourceChain[0]).Return(
-		ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
+		cciptypes.ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
 	mockCache.On("GetChainConfig", mock.Anything, sourceChain[1]).Return(
-		ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
+		cciptypes.ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
 	mockCache.On(
 		"GetOfframpSourceChainConfigs",
 		mock.Anything,
@@ -530,19 +436,19 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameNonceManager, destChain, destNonceMgr)
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRouter, destChain, destRouter[0])
 
-	mockReaders := make(map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
-	mockReaders[destChain] = reader_mocks.NewMockExtended(t)
+	mockReaders := make(map[cciptypes.ChainSelector]*readermocks.MockExtended)
+	mockReaders[destChain] = readermocks.NewMockExtended(t)
 
 	// Setup cache mock and configurations
 	mockCache := new(mockConfigCache)
 	// Destination chain config
-	destChainConfig := ChainConfigSnapshot{
-		Offramp: OfframpConfig{
-			StaticConfig: offRampStaticChainConfig{
+	destChainConfig := cciptypes.ChainConfigSnapshot{
+		Offramp: cciptypes.OfframpConfig{
+			StaticConfig: cciptypes.OffRampStaticChainConfig{
 				NonceManager: destNonceMgr,
 				RmnRemote:    destRMNRemote,
 			},
-			DynamicConfig: offRampDynamicChainConfig{
+			DynamicConfig: cciptypes.OffRampDynamicChainConfig{
 				FeeQuoter: destFeeQuoter,
 			},
 		},
@@ -558,16 +464,16 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	// Set up source chain expectations with proper OnRamp configs
 	for i, chain := range sourceChain {
 		// Create mock reader for source chain
-		mockReaders[chain] = reader_mocks.NewMockExtended(t)
+		mockReaders[chain] = readermocks.NewMockExtended(t)
 
-		srcChainConfig := ChainConfigSnapshot{
-			OnRamp: OnRampConfig{
-				DynamicConfig: getOnRampDynamicConfigResponse{
-					DynamicConfig: onRampDynamicConfig{
+		srcChainConfig := cciptypes.ChainConfigSnapshot{
+			OnRamp: cciptypes.OnRampConfig{
+				DynamicConfig: cciptypes.GetOnRampDynamicConfigResponse{
+					DynamicConfig: cciptypes.OnRampDynamicConfig{
 						FeeQuoter: srcFeeQuoters[i],
 					},
 				},
-				DestChainConfig: onRampDestChainConfig{
+				DestChainConfig: cciptypes.OnRampDestChainConfig{
 					Router: srcRouters[i],
 				},
 			},
@@ -603,17 +509,17 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 
 	// Setup cache mock and configuration
 	mockCache := new(mockConfigCache)
-	chainConfig := ChainConfigSnapshot{
-		Offramp: OfframpConfig{
+	chainConfig := cciptypes.ChainConfigSnapshot{
+		Offramp: cciptypes.OfframpConfig{
 			// We can leave the configs empty since we just need GetChainConfig to succeed
-			StaticConfig:  offRampStaticChainConfig{},
-			DynamicConfig: offRampDynamicChainConfig{},
+			StaticConfig:  cciptypes.OffRampStaticChainConfig{},
+			DynamicConfig: cciptypes.OffRampDynamicChainConfig{},
 		},
 	}
 	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(chainConfig, nil)
 
 	// Setup mock cache to return an error
-	destExtended := reader_mocks.NewMockExtended(t)
+	destExtended := readermocks.NewMockExtended(t)
 	getLatestValueErr := errors.New("some error")
 	mockCache.On("GetOfframpSourceChainConfigs", mock.Anything, destChain,
 		[]cciptypes.ChainSelector{sourceChain1, sourceChain2}).
@@ -627,8 +533,8 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 			// these won't be used in this test, but are needed because
 			// we determine the source chain selectors to query from the chains
 			// that we have readers for.
-			sourceChain1: reader_mocks.NewMockExtended(t),
-			sourceChain2: reader_mocks.NewMockExtended(t),
+			sourceChain1: readermocks.NewMockExtended(t),
+			sourceChain2: readermocks.NewMockExtended(t),
 		},
 		lggr:         logger.Test(t),
 		configPoller: mockCache,
@@ -654,18 +560,18 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	// mock the call to get the static config - failure
 	getLatestValueErr := errors.New("some error")
 	mockCache := new(mockConfigCache)
-	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(ChainConfigSnapshot{}, getLatestValueErr)
+	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(cciptypes.ChainConfigSnapshot{}, getLatestValueErr)
 
 	// create the reader with cache
 	ccipChainReader := &ccipChainReader{
 		destChain: destChain,
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-			destChain: reader_mocks.NewMockExtended(t),
+			destChain: readermocks.NewMockExtended(t),
 			// these won't be used in this test, but are needed because
 			// we determine the source chain selectors to query from the chains
 			// that we have readers for.
-			sourceChain1: reader_mocks.NewMockExtended(t),
-			sourceChain2: reader_mocks.NewMockExtended(t),
+			sourceChain1: readermocks.NewMockExtended(t),
+			sourceChain2: readermocks.NewMockExtended(t),
 		},
 		lggr:         logger.Test(t),
 		configPoller: mockCache,
@@ -679,30 +585,12 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	mockCache.AssertExpectations(t)
 }
 
-// withReturnValueOverridden is a helper function to override the return value of a mocked out
-// ExtendedGetLatestValue call.
-func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx context.Context,
-	contractName,
-	methodName string,
-	confidenceLevel primitives.ConfidenceLevel,
-	params,
-	returnVal interface{}) {
-	return func(ctx context.Context,
-		contractName,
-		methodName string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params,
-		returnVal interface{}) {
-		mapper(returnVal)
-	}
-}
-
 func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup expected values
 	offrampAddress := []byte{0x3}
-	expectedConfig := feeQuoterStaticConfig{
+	expectedConfig := cciptypes.FeeQuoterStaticConfig{
 		MaxFeeJuelsPerMsg:  cciptypes.NewBigIntFromInt64(10),
 		LinkToken:          []byte{0x3, 0x4},
 		StalenessThreshold: 12,
@@ -710,8 +598,8 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 
 	// Setup cache with the expected config
 	mockCache := new(mockConfigCache)
-	chainConfig := ChainConfigSnapshot{
-		FeeQuoter: FeeQuoterConfig{
+	chainConfig := cciptypes.ChainConfigSnapshot{
+		FeeQuoter: cciptypes.FeeQuoterConfig{
 			StaticConfig: expectedConfig,
 		},
 	}
@@ -740,48 +628,30 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 
 func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	tokenAddr := []byte{0x3, 0x4}
-	destCR := reader_mocks.NewMockContractReaderFacade(t)
-	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	destCR.EXPECT().HealthReport().Return(nil)
-	destCR.EXPECT().GetLatestValue(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Run(func(
-		ctx context.Context,
-		readIdentifier string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params interface{},
-		returnVal interface{},
-	) {
-		givenTokenAddr := params.(map[string]any)["token"].([]byte)
-		if bytes.Equal(tokenAddr, givenTokenAddr) {
-			price := returnVal.(*cciptypes.TimestampedUnixBig)
-			price.Value = big.NewInt(145)
-		}
-	}).Return(nil)
-
 	offrampAddress := []byte{0x3}
-	feeQuoterAddress := []byte{0x4}
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 
-	cw := writer_mocks.NewMockContractWriter(t)
+	cw := writermocks.NewMockContractWriter(t)
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	contractWriters[chainA] = cw
 	contractWriters[chainB] = cw
 	contractWriters[chainC] = cw
 
 	chainAccessors := createMockedChainAccessors(t, chainA, chainB, chainC)
+	expectedPrice := cciptypes.TimestampedUnixBig{
+		Value:     big.NewInt(145),
+		Timestamp: uint32(time.Now().Unix()),
+	}
 	mockExpectChainAccessorSyncCall(chainAccessors[chainC], consts.ContractNameOffRamp, offrampAddress, nil)
+	mockExpectChainAccessorGetTokenPriceUSD(chainAccessors[chainC], tokenAddr, expectedPrice)
+
 	ccipReader, err := newCCIPChainReaderInternal(
 		t.Context(),
 		logger.Test(t),
 		chainAccessors,
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			chainC: destCR,
+			chainC: readermocks.NewMockContractReaderFacade(t),
 		}, contractWriters, chainC, offrampAddress, mockAddrCodec,
 	)
 	require.NoError(t, err)
@@ -794,12 +664,6 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		}
 	})
 
-	feeQuoterAddressStr, err := mockAddrCodec.AddressBytesToString(feeQuoterAddress, 111_111)
-	require.NoError(t, err)
-	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
-		context.Background(), []types.BoundContract{{Name: "FeeQuoter",
-			Address: feeQuoterAddressStr}}))
-
 	ctx := context.Background()
 	price, err := ccipReader.getFeeQuoterTokenPriceUSD(ctx, []byte{0x3, 0x4})
 	assert.NoError(t, err)
@@ -807,15 +671,15 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 }
 
 func TestCCIPFeeComponents_HappyPath(t *testing.T) {
-	cw := writer_mocks.NewMockContractWriter(t)
+	cw := writermocks.NewMockContractWriter(t)
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	contractWriters[chainA] = cw
 	contractWriters[chainB] = cw
 	contractWriters[chainC] = cw
 
-	sourceCRs := make(map[cciptypes.ChainSelector]*reader_mocks.MockContractReaderFacade)
+	sourceCRs := make(map[cciptypes.ChainSelector]*readermocks.MockContractReaderFacade)
 	for _, chain := range []cciptypes.ChainSelector{chainA, chainB, chainC} {
-		sourceCRs[chain] = reader_mocks.NewMockContractReaderFacade(t)
+		sourceCRs[chain] = readermocks.NewMockContractReaderFacade(t)
 	}
 
 	expectedFeeComponents := cciptypes.ChainFeeComponents{
@@ -876,9 +740,9 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 
 	// Setup mock cache with the fee quoter static config
 	mockCache := new(mockConfigCache)
-	chainConfig := ChainConfigSnapshot{
-		FeeQuoter: FeeQuoterConfig{
-			StaticConfig: feeQuoterStaticConfig{
+	chainConfig := cciptypes.ChainConfigSnapshot{
+		FeeQuoter: cciptypes.FeeQuoterConfig{
+			StaticConfig: cciptypes.FeeQuoterStaticConfig{
 				MaxFeeJuelsPerMsg:  cciptypes.NewBigIntFromInt64(10),
 				LinkToken:          tokenAddr,
 				StalenessThreshold: 12,
@@ -888,20 +752,15 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	mockCache.On("GetChainConfig", mock.Anything, chainC).Return(chainConfig, nil)
 
 	// Setup contract reader for getting token price
-	destCR := reader_mocks.NewMockExtended(t)
+	destCR := readermocks.NewMockExtended(t)
 
-	// mock the call to get the token price
-	destCR.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameFeeQuoter,
-		consts.MethodNameFeeQuoterGetTokenPrice,
-		primitives.Unconfirmed,
-		map[string]interface{}{"token": tokenAddr},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		price := returnVal.(*cciptypes.TimestampedUnixBig)
-		price.Value = big.NewInt(145)
-	}))
+	// Mock accessors
+	chainAccessors := createMockedChainAccessors(t, chainC)
+	expectedPrice := cciptypes.TimestampedUnixBig{
+		Value:     big.NewInt(145),
+		Timestamp: uint32(time.Now().Unix()),
+	}
+	mockExpectChainAccessorGetTokenPriceUSD(chainAccessors[chainC], tokenAddr, expectedPrice)
 
 	// Setup ccipReader with both cache and contract readers
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
@@ -912,6 +771,7 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 		destChain:      chainC,
 		configPoller:   mockCache,
 		offrampAddress: offrampAddressStr,
+		accessors:      chainAccessors,
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
 			chainC: destCR,
 		},
@@ -929,13 +789,13 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		name              string
 		cursedSubjectsSet mapset.Set[[16]byte]
 		destChainSelector cciptypes.ChainSelector
-		expCurseInfo      CurseInfo
+		expCurseInfo      cciptypes.CurseInfo
 	}{
 		{
 			name:              "no cursed subjects",
 			cursedSubjectsSet: mapset.NewSet[[16]byte](),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{},
 				CursedDestination:  false,
 				GlobalCurse:        false,
@@ -947,10 +807,10 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
 				chainSelectorToBytes16(chainA), // dest
-				GlobalCurseSubject,
+				cciptypes.GlobalCurseSubject,
 			),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
 					chainC: true,
@@ -967,7 +827,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				chainSelectorToBytes16(chainA), // dest
 			),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
 					chainC: true,
@@ -981,10 +841,10 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
-				GlobalCurseSubject,
+				cciptypes.GlobalCurseSubject,
 			),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
 					chainC: true,
@@ -1000,7 +860,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				chainSelectorToBytes16(chainC),
 			),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
 					chainC: true,
@@ -1014,10 +874,10 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainC),
 				chainSelectorToBytes16(chainA), // dest
-				GlobalCurseSubject,
+				cciptypes.GlobalCurseSubject,
 			),
 			destChainSelector: chainA,
-			expCurseInfo: CurseInfo{
+			expCurseInfo: cciptypes.CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainC: true,
 				},
@@ -1166,8 +1026,8 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			destReader := reader_mocks.NewMockContractReaderFacade(t)
-			cw := writer_mocks.NewMockContractWriter(t)
+			destReader := readermocks.NewMockContractReaderFacade(t)
+			cw := writermocks.NewMockContractWriter(t)
 			contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 			contractWriters[chainB] = cw
 			chainAccessors := createMockedChainAccessors(t, chainB)
@@ -1212,13 +1072,13 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 	mockCache := new(mockConfigCache)
 
 	// Destination chain config with a delay
-	destChainConfig := ChainConfigSnapshot{
-		Offramp: OfframpConfig{
-			StaticConfig: offRampStaticChainConfig{
+	destChainConfig := cciptypes.ChainConfigSnapshot{
+		Offramp: cciptypes.OfframpConfig{
+			StaticConfig: cciptypes.OffRampStaticChainConfig{
 				NonceManager: []byte{0x3},
 				RmnRemote:    []byte{0x4},
 			},
-			DynamicConfig: offRampDynamicChainConfig{
+			DynamicConfig: cciptypes.OffRampDynamicChainConfig{
 				FeeQuoter: []byte{0x5},
 			},
 		},
@@ -1242,14 +1102,14 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 
 	// Set up source chain expectations with delays
 	for _, chain := range sourceChains {
-		srcChainConfig := ChainConfigSnapshot{
-			OnRamp: OnRampConfig{
-				DynamicConfig: getOnRampDynamicConfigResponse{
-					DynamicConfig: onRampDynamicConfig{
+		srcChainConfig := cciptypes.ChainConfigSnapshot{
+			OnRamp: cciptypes.OnRampConfig{
+				DynamicConfig: cciptypes.GetOnRampDynamicConfigResponse{
+					DynamicConfig: cciptypes.OnRampDynamicConfig{
 						FeeQuoter: []byte{0x7},
 					},
 				},
-				DestChainConfig: onRampDestChainConfig{
+				DestChainConfig: cciptypes.OnRampDestChainConfig{
 					Router: []byte{0x9},
 				},
 			},
@@ -1262,16 +1122,16 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 	}
 
 	// Setup contract readers
-	mockReaders := make(map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
+	mockReaders := make(map[cciptypes.ChainSelector]*readermocks.MockExtended)
 	contractReaders := make(map[cciptypes.ChainSelector]contractreader.Extended)
 
 	// Setup dest chain reader
-	mockReaders[destChain] = reader_mocks.NewMockExtended(t)
+	mockReaders[destChain] = readermocks.NewMockExtended(t)
 	contractReaders[destChain] = mockReaders[destChain]
 
 	// Setup source chain readers
 	for _, chain := range sourceChains {
-		mockReaders[chain] = reader_mocks.NewMockExtended(t)
+		mockReaders[chain] = readermocks.NewMockExtended(t)
 		contractReaders[chain] = mockReaders[chain]
 	}
 
@@ -1359,13 +1219,13 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 	t.Run("happy path - gets prices for all chains", func(t *testing.T) {
 		// Setup mock cache with configs containing wrapped native addresses
 		mockCache := new(mockConfigCache)
-		sourceChain1Config := ChainConfigSnapshot{
-			Router: RouterConfig{
+		sourceChain1Config := cciptypes.ChainConfigSnapshot{
+			Router: cciptypes.RouterConfig{
 				WrappedNativeAddress: wrappedNative1,
 			},
 		}
-		sourceChain2Config := ChainConfigSnapshot{
-			Router: RouterConfig{
+		sourceChain2Config := cciptypes.ChainConfigSnapshot{
+			Router: cciptypes.RouterConfig{
 				WrappedNativeAddress: wrappedNative2,
 			},
 		}
@@ -1374,7 +1234,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 		mockCache.On("GetChainConfig", mock.Anything, sourceChain2).Return(sourceChain2Config, nil)
 		mockCache.On("Start", mock.Anything).Return(nil)
 
-		cw := writer_mocks.NewMockContractWriter(t)
+		cw := writermocks.NewMockContractWriter(t)
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[sourceChain1] = cw
 		contractWriters[sourceChain2] = cw
@@ -1397,8 +1257,8 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			logger.Test(t),
 			chainAccessors,
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-				sourceChain1: reader_mocks.NewMockContractReaderFacade(t),
-				sourceChain2: reader_mocks.NewMockContractReaderFacade(t),
+				sourceChain1: readermocks.NewMockContractReaderFacade(t),
+				sourceChain2: readermocks.NewMockContractReaderFacade(t),
 			},
 			contractWriters,
 			destChain,
@@ -1418,15 +1278,16 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 	t.Run("handles missing chain configs", func(t *testing.T) {
 		mockCache := new(mockConfigCache)
-		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(ChainConfigSnapshot{}, fmt.Errorf("not found"))
-		mockCache.On("GetChainConfig", mock.Anything, sourceChain2).Return(ChainConfigSnapshot{
-			Router: RouterConfig{
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(cciptypes.ChainConfigSnapshot{},
+			fmt.Errorf("not found"))
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain2).Return(cciptypes.ChainConfigSnapshot{
+			Router: cciptypes.RouterConfig{
 				WrappedNativeAddress: wrappedNative2,
 			},
 		}, nil)
 		mockCache.On("Start", mock.Anything).Return(nil)
 
-		cw := writer_mocks.NewMockContractWriter(t)
+		cw := writermocks.NewMockContractWriter(t)
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[sourceChain1] = cw
 		contractWriters[sourceChain2] = cw
@@ -1444,8 +1305,8 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			logger.Test(t),
 			chainAccessors,
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-				sourceChain1: reader_mocks.NewMockContractReaderFacade(t),
-				sourceChain2: reader_mocks.NewMockContractReaderFacade(t),
+				sourceChain1: readermocks.NewMockContractReaderFacade(t),
+				sourceChain2: readermocks.NewMockContractReaderFacade(t),
 			},
 			contractWriters,
 			destChain,
@@ -1464,15 +1325,15 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 	t.Run("handles price fetch error", func(t *testing.T) {
 		mockCache := new(mockConfigCache)
-		sourceConfig := ChainConfigSnapshot{
-			Router: RouterConfig{
+		sourceConfig := cciptypes.ChainConfigSnapshot{
+			Router: cciptypes.RouterConfig{
 				WrappedNativeAddress: wrappedNative1,
 			},
 		}
 		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(sourceConfig, nil)
 		mockCache.On("Start", mock.Anything).Return(nil)
 
-		cw := writer_mocks.NewMockContractWriter(t)
+		cw := writermocks.NewMockContractWriter(t)
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[sourceChain1] = cw
 
@@ -1487,7 +1348,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			logger.Test(t),
 			chainAccessors,
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-				sourceChain1: reader_mocks.NewMockContractReaderFacade(t),
+				sourceChain1: readermocks.NewMockContractReaderFacade(t),
 			},
 			contractWriters,
 			destChain,
@@ -1526,12 +1387,12 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 		// Verify OnRamp dynamic config request
 		require.Equal(t, consts.MethodNameOnRampGetDynamicConfig, onRampRequests[0].ReadName)
 		require.Empty(t, onRampRequests[0].Params)
-		require.IsType(t, &getOnRampDynamicConfigResponse{}, onRampRequests[0].ReturnVal)
+		require.IsType(t, &cciptypes.GetOnRampDynamicConfigResponse{}, onRampRequests[0].ReturnVal)
 
 		// Verify OnRamp dest chain config request
 		require.Equal(t, consts.MethodNameOnRampGetDestChainConfig, onRampRequests[1].ReadName)
 		require.Equal(t, map[string]any{"destChainSelector": destChain}, onRampRequests[1].Params)
-		require.IsType(t, &onRampDestChainConfig{}, onRampRequests[1].ReturnVal)
+		require.IsType(t, &cciptypes.OnRampDestChainConfig{}, onRampRequests[1].ReturnVal)
 
 		// Verify Router requests
 		routerRequests := requests[consts.ContractNameRouter]
@@ -1560,12 +1421,12 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 		// Check OffRamp commit config request
 		require.Equal(t, consts.MethodNameOffRampLatestConfigDetails, offRampRequests[0].ReadName)
 		require.Equal(t, map[string]any{"ocrPluginType": consts.PluginTypeCommit}, offRampRequests[0].Params)
-		require.IsType(t, &OCRConfigResponse{}, offRampRequests[0].ReturnVal)
+		require.IsType(t, &cciptypes.OCRConfigResponse{}, offRampRequests[0].ReturnVal)
 
 		// Check OffRamp execute config request
 		require.Equal(t, consts.MethodNameOffRampLatestConfigDetails, offRampRequests[1].ReadName)
 		require.Equal(t, map[string]any{"ocrPluginType": consts.PluginTypeExecute}, offRampRequests[1].Params)
-		require.IsType(t, &OCRConfigResponse{}, offRampRequests[1].ReturnVal)
+		require.IsType(t, &cciptypes.OCRConfigResponse{}, offRampRequests[1].ReturnVal)
 
 		// Verify RMN requests
 		rmnProxyRequests := requests[consts.ContractNameRMNProxy]
@@ -1579,7 +1440,7 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 		require.Len(t, feeQuoterRequests, 1)
 		require.Equal(t, consts.MethodNameFeeQuoterGetStaticConfig, feeQuoterRequests[0].ReadName)
 		require.Empty(t, feeQuoterRequests[0].Params)
-		require.IsType(t, &feeQuoterStaticConfig{}, feeQuoterRequests[0].ReturnVal)
+		require.IsType(t, &cciptypes.FeeQuoterStaticConfig{}, feeQuoterRequests[0].ReturnVal)
 	})
 }
 
@@ -1595,7 +1456,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		selectors := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
 
-		cw := writer_mocks.NewMockContractWriter(t)
+		cw := writermocks.NewMockContractWriter(t)
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[chainB] = cw
 		offRampAddress := []byte{0x3}
@@ -1611,7 +1472,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			logger.Test(t),
 			chainAccessors,
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-				chainB: reader_mocks.NewMockContractReaderFacade(t),
+				chainB: readermocks.NewMockContractReaderFacade(t),
 			},
 			contractWriters,
 			chainB,
@@ -1635,7 +1496,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 	})
 
 	t.Run("empty selectors", func(t *testing.T) {
-		mockReader := reader_mocks.NewMockExtended(t)
+		mockReader := readermocks.NewMockExtended(t)
 		ccipReader := &ccipChainReader{
 			lggr:      lggr,
 			destChain: destChain,
@@ -1653,7 +1514,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 	t.Run("batch call error", func(t *testing.T) {
 		selectors := []cciptypes.ChainSelector{sourceChain1}
 
-		cw := writer_mocks.NewMockContractWriter(t)
+		cw := writermocks.NewMockContractWriter(t)
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[destChain] = cw
 		offRampAddress := []byte{0x3}
@@ -1667,7 +1528,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			logger.Test(t),
 			chainAccessors,
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-				destChain: reader_mocks.NewMockContractReaderFacade(t),
+				destChain: readermocks.NewMockContractReaderFacade(t),
 			},
 			contractWriters,
 			destChain,
@@ -1686,7 +1547,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 	t.Run("partial success - one result empty", func(t *testing.T) {
 		selectors := []cciptypes.ChainSelector{sourceChain1, sourceChain3}
 
-		cw := writer_mocks.NewMockContractWriter(t)
+		cw := writermocks.NewMockContractWriter(t)
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[destChain] = cw
 		offRampAddress := []byte{0x3}
@@ -1702,7 +1563,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			logger.Test(t),
 			chainAccessors,
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-				destChain: reader_mocks.NewMockContractReaderFacade(t),
+				destChain: readermocks.NewMockContractReaderFacade(t),
 			},
 			contractWriters,
 			destChain,
@@ -1727,7 +1588,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		// Request two selectors, but mock response only has one result
 		selectors := []cciptypes.ChainSelector{sourceChain1, sourceChain2}
 
-		cw := writer_mocks.NewMockContractWriter(t)
+		cw := writermocks.NewMockContractWriter(t)
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[destChain] = cw
 		offRampAddress := []byte{0x3}
@@ -1742,7 +1603,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			logger.Test(t),
 			chainAccessors,
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-				destChain: reader_mocks.NewMockContractReaderFacade(t),
+				destChain: readermocks.NewMockContractReaderFacade(t),
 			},
 			contractWriters,
 			destChain,
@@ -1767,7 +1628,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 	t.Run("missing fee quoter result in batch response", func(t *testing.T) {
 		selectors := []cciptypes.ChainSelector{sourceChain1}
 
-		cw := writer_mocks.NewMockContractWriter(t)
+		cw := writermocks.NewMockContractWriter(t)
 		contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 		contractWriters[destChain] = cw
 		offRampAddress := []byte{0x3}
@@ -1783,7 +1644,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			logger.Test(t),
 			chainAccessors,
 			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-				destChain: reader_mocks.NewMockContractReaderFacade(t),
+				destChain: readermocks.NewMockContractReaderFacade(t),
 			},
 			contractWriters,
 			destChain,
@@ -1893,9 +1754,9 @@ type mockConfigCache struct {
 
 func (m *mockConfigCache) GetChainConfig(
 	ctx context.Context,
-	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
+	chainSel cciptypes.ChainSelector) (cciptypes.ChainConfigSnapshot, error) {
 	args := m.Called(ctx, chainSel)
-	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
+	return args.Get(0).(cciptypes.ChainConfigSnapshot), args.Error(1)
 }
 
 func (m *mockConfigCache) GetOfframpSourceChainConfigs(
