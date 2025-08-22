@@ -3,9 +3,6 @@ pragma solidity ^0.8.24;
 import {Router} from "../Router.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {OffRamp} from "../offRamp/OffRamp.sol";
-
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Script} from "forge-std/Script.sol";
 // solhint-disable-next-line no-console
 import {console2 as console} from "forge-std/console2.sol";
@@ -17,13 +14,17 @@ import {console2 as console} from "forge-std/console2.sol";
 /// local debugging and testing with existing deployed contracts.
 /// @dev Usage: "forge script scripts/CCIPManualExecutionScript.s.sol:CCIPManualExecutionScript -vvvv"
 contract CCIPManualExecutionScript is Script {
-  using SafeERC20 for IERC20;
-
   error ManualExecutionFailed();
   error ManualExecutionNotAllowed();
+  error InvalidRouter();
+  error InvalidSourceChainSelector();
+  error InvalidSequenceNumber();
+  error InvalidManualExecutionData();
 
-  string public chainIdentifier; // The Chain to use (Ex: "ETHEREUM" as defined in the .env)
-  uint64 sourceChainSelector; // The CCIP chain selector the message originated from
+  string public rpcUrl;
+  address public router;
+
+  uint64 public sourceChainSelector; // The CCIP chain selector the message originated from
 
   // Define the sequence number of the message to be manually executed. The sequence number can be found
   // on the CCIP-Explorer page for the given message.
@@ -40,7 +41,13 @@ contract CCIPManualExecutionScript is Script {
   bytes public manualExecutionData;
 
   function run() public {
-    vm.createSelectFork(string.concat(chainIdentifier, "_RPC_URL"));
+    if (router == address(0)) revert InvalidRouter();
+    if (sourceChainSelector == 0) revert InvalidSourceChainSelector();
+    if (sequenceNumber == 0) revert InvalidSequenceNumber();
+    if (manualExecutionData.length == 0) revert InvalidManualExecutionData();
+
+    vm.createSelectFork(rpcUrl);
+
 
     // Acquire the private key from the .env file and derive address
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -49,7 +56,6 @@ contract CCIPManualExecutionScript is Script {
     console.log("Sender: %s", sender);
     console.log("Starting Script...");
 
-    address router = vm.envAddress(string.concat(chainIdentifier, "_ROUTER"));
     address offRamp;
     Router.OffRamp[] memory offRamps = Router(router).getOffRamps();
 
