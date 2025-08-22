@@ -13,8 +13,8 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   /// @param configDigest configDigest of this configuration.
   /// @param signers ith element is address ith oracle uses to sign a report.
   /// @param F maximum number of faulty/dishonest singers the protocol can tolerate while still working correctly.
-  event ConfigSet(bytes32 configDigest, address[] signers, uint8 F);
-  event ConfigRevoked(bytes32 configDigest);
+  event ConfigSet(bytes32 indexed configDigest, address[] signers, uint8 F);
+  event ConfigRevoked(bytes32 indexed configDigest);
 
   error InvalidConfig();
   error InvalidConfigDigest(bytes32 configDigest);
@@ -111,31 +111,35 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   }
 
   /// @notice Sets a new signature configuration for a given configDigest.
-  /// @param signatureConfig The configuration to set, containing the configDigest, F value, and signers.
+  /// @param signatureConfigs The configuration to set, containing the configDigest, F value, and signers.
   /// @dev Reverts if the configDigest already exists, this function cannot override an existing configuration.
-  function setSignatureConfig(
-    SignatureConfigArgs calldata signatureConfig
+  function setSignatureConfigs(
+    SignatureConfigArgs[] calldata signatureConfigs
   ) external onlyOwner {
-    if (signatureConfig.F == 0) revert InvalidConfig();
+    for (uint256 i = 0; i < signatureConfigs.length; ++i) {
+      SignatureConfigArgs memory signatureConfig = signatureConfigs[i];
 
-    // If the configDigest already exists, we cannot modify it as there might be signed transactions that rely on this
-    // exact signer set.
-    if (s_activeConfigDigests.contains(signatureConfig.configDigest)) {
-      revert ConfigDigestAlreadyExists(signatureConfig.configDigest);
+      if (signatureConfig.F == 0) revert InvalidConfig();
+
+      // If the configDigest already exists, we cannot modify it as there might be signed transactions that rely on this
+      // exact signer set.
+      if (s_activeConfigDigests.contains(signatureConfig.configDigest)) {
+        revert ConfigDigestAlreadyExists(signatureConfig.configDigest);
+      }
+
+      SignatureConfigConfig storage configForDigest = s_signatureConfig[signatureConfig.configDigest];
+
+      // Add new signers.
+      for (uint256 singerIndex = 0; singerIndex < signatureConfig.signers.length; ++singerIndex) {
+        if (signatureConfig.signers[singerIndex] == address(0)) revert OracleCannotBeZeroAddress();
+
+        configForDigest.signers.add(signatureConfig.signers[singerIndex]);
+      }
+
+      configForDigest.F = signatureConfig.F;
+
+      emit ConfigSet(signatureConfig.configDigest, signatureConfig.signers, signatureConfig.F);
     }
-
-    SignatureConfigConfig storage configForDigest = s_signatureConfig[signatureConfig.configDigest];
-
-    // Add new signers.
-    for (uint256 i = 0; i < signatureConfig.signers.length; ++i) {
-      if (signatureConfig.signers[i] == address(0)) revert OracleCannotBeZeroAddress();
-
-      configForDigest.signers.add(signatureConfig.signers[i]);
-    }
-
-    configForDigest.F = signatureConfig.F;
-
-    emit ConfigSet(signatureConfig.configDigest, signatureConfig.signers, signatureConfig.F);
   }
 
   /// @notice Revokes a signature configuration for a given configDigest.
