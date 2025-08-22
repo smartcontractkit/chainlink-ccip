@@ -1,16 +1,26 @@
 package chainaccessor
 
 import (
+	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/stretchr/testify/assert"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/types"
+	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
 var (
@@ -280,4 +290,94 @@ func TestCCIPChainReader_CreateExecutedMessagesKeyFilter(t *testing.T) {
 			assert.Equal(t, tt.expectedCount, count)
 		})
 	}
+}
+
+func TestDefaultAccessor_GetSourceChainsConfig(t *testing.T) {
+	ctx := context.Background()
+	destChain := cciptypes.ChainSelector(3)
+	sourceChainA := cciptypes.ChainSelector(1)
+	sourceChainB := cciptypes.ChainSelector(2)
+	sourceChains := []cciptypes.ChainSelector{sourceChainA, sourceChainB}
+
+	// Create mocked extended reader for destination chain
+	mockExtendedReader := reader_mocks.NewMockExtended(t)
+
+	// Mock ExtendedBatchGetLatestValues to return source chain configurations
+	mockExtendedReader.EXPECT().ExtendedBatchGetLatestValues(
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).RunAndReturn(func(
+		ctx context.Context,
+		request contractreader.ExtendedBatchGetLatestValuesRequest,
+		allowStale bool,
+	) (types.BatchGetLatestValuesResult, []string, error) {
+		results := make(types.BatchGetLatestValuesResult, 0)
+		for contractName, batch := range request {
+			var contractResults []types.BatchReadResult
+			for _, readReq := range batch {
+				res := types.BatchReadResult{
+					ReadName: readReq.ReadName,
+				}
+
+				// Handle source chain config requests
+				if readReq.ReadName == consts.MethodNameGetSourceChainConfig {
+					params := readReq.Params.(map[string]any)
+					sourceChain := params["sourceChainSelector"].(cciptypes.ChainSelector)
+					v := readReq.ReturnVal.(*cciptypes.SourceChainConfig)
+
+					fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
+						"0x%d000000000000000000000000000000000000000", sourceChain),
+					)
+					require.NoError(t, err)
+					v.OnRamp = cciptypes.UnknownAddress(fromString)
+					v.IsEnabled = true
+					v.Router = fromString
+					res.SetResult(v, nil)
+				}
+				contractResults = append(contractResults, res)
+			}
+			contractKey := types.BoundContract{Name: contractName, Address: "0x123"}
+			results[contractKey] = contractResults
+		}
+		return results, nil, nil
+	})
+
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
+	mockContractWriter := writer_mocks.NewMockContractWriter(t)
+	accessor, err := NewDefaultAccessor(
+		logger.Test(t),
+		destChain,
+		mockExtendedReader,
+		mockContractWriter,
+		mockAddrCodec,
+	)
+	require.NoError(t, err)
+
+	// Get source chain configs
+	_, sourceChainConfigs, err := accessor.GetAllConfigsLegacy(ctx, destChain, sourceChains)
+	assert.NoError(t, err)
+	assert.Len(t, sourceChainConfigs, 2)
+
+	// Verify source chain A configuration
+	assert.Contains(t, sourceChainConfigs, sourceChainA)
+	cfgA := sourceChainConfigs[sourceChainA]
+	assert.Equal(t, "0x1000000000000000000000000000000000000000", cfgA.OnRamp.String())
+	assert.True(t, cfgA.IsEnabled)
+
+	// Verify router address for chain A
+	expectedRouterA, err := cciptypes.NewBytesFromString("0x1000000000000000000000000000000000000000")
+	require.NoError(t, err)
+	assert.Equal(t, []byte(expectedRouterA), cfgA.Router)
+
+	// Verify source chain B configuration
+	assert.Contains(t, sourceChainConfigs, sourceChainB)
+	cfgB := sourceChainConfigs[sourceChainB]
+	assert.Equal(t, "0x2000000000000000000000000000000000000000", cfgB.OnRamp.String())
+	assert.True(t, cfgB.IsEnabled)
+
+	// Verify router address for chain B (compare as bytes directly since it's raw bytes)
+	expectedRouterB, err := cciptypes.NewBytesFromString("0x2000000000000000000000000000000000000000")
+	require.NoError(t, err)
+	assert.Equal(t, []byte(expectedRouterB), cfgB.Router)
 }
