@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 import {Router} from "../Router.sol";
 import {Client} from "../libraries/Client.sol";
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Script} from "forge-std/Script.sol";
 
 // solhint-disable-next-line no-console
@@ -20,10 +20,13 @@ contract CCIPSendTestScript is Script {
   using SafeERC20 for IERC20;
 
   error ChainNotSupported(uint64 destChainSelector);
+  error InvalidRPCURL();
+  error InvalidRouter();
+  error InvalidDestChainSelector();
+  error InvalidRecipient();
 
   // For the script to run successfully, please define the following constants below
   // [REQUIRED]
-  string public chainIdentifier; // The Chain to use (Ex: "ETHEREUM" as defined in the .env)
   uint64 public destChainSelector; // The CCIP-Specific chain selector to send the message to
   uint256 public numTokens; // The number of tokens to be sent
 
@@ -31,12 +34,20 @@ contract CCIPSendTestScript is Script {
   bytes public data; // Define the message data to be passed to the recipient if it is NOT an EOA
   bytes public extraArgs; // If any extraArgs are needed, define below. Due to different chains families having different extraArgs formats, they should be passed as raw bytes, and encoded separately.
 
+  address public router;
+  string public rpcUrl;
+
+
   address public feeToken; // The token to pay CCIP Message Fees in, address(0) for native.
 
   function run() public {
-    vm.createSelectFork(string.concat(chainIdentifier, "_RPC_URL"));
+    if (router == address(0)) revert InvalidRouter();
+    if (destChainSelector == 0) revert InvalidDestChainSelector();
+    if (recipient.length == 0) revert InvalidRecipient();
 
     // Acquire the private key from the .env file and derive address
+    vm.createSelectFork(rpcUrl);
+
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address sender = vm.rememberKey(privateKey);
 
@@ -47,13 +58,10 @@ contract CCIPSendTestScript is Script {
 
     Client.EVM2AnyMessage memory message;
 
-    // Get the router using the chain identifier Ex: "ETHEREUM" -> "ETHEREUM_ROUTER"
-    address router = vm.envAddress(string.concat(chainIdentifier, "_ROUTER"));
-
     // Scoping to prevent a "stack-too-deep" error.
     {
-      bool isSupported = Router(router).isChainSupported(destChainSelector);
-      if (!isSupported) revert ChainNotSupported(destChainSelector);
+      // bool isSupported = Router(router).isChainSupported(destChainSelector);
+      // if (!isSupported) revert ChainNotSupported(destChainSelector);
 
       address[] memory tokenAddresses = new address[](numTokens);
       uint256[] memory tokenAmounts = new uint256[](numTokens);
@@ -67,19 +75,23 @@ contract CCIPSendTestScript is Script {
       console.log("Approving Send Tokens...");
 
       Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](numTokens);
-      for (uint256 i = 0; i < tokens.length; ++i) {
+      for (uint256 i = 0; i < tokens.length; i++) {
         if (tokenAddresses[i] != address(0)) {
           // Since the sender may be an EOA with an existing approval, the allowance is checked first.
-          uint256 allowance = IERC20(tokens[i].token).allowance(sender, router);
+          uint256 allowance = IERC20(tokenAddresses[i]).allowance(sender, router);
 
           // If the existing allowance is insufficient, increase it to allow sending through CCIP.
-          if (allowance < tokens[i].amount) {
+          if (allowance < tokenAmounts[i]) {
             console.log("Approving %i tokens to Router for %s", tokenAmounts[i], tokenAddresses[i]);
-            IERC20(tokens[i].token).safeIncreaseAllowance(router, tokenAmounts[i]);
+
+            // For reasons unknown, the safeApprove/safeIncreaseAllowance function does not work.
+            IERC20(tokenAddresses[i]).approve(router, tokenAmounts[i]);
           }
 
           // Once approval is granted, copy into the EVM Token Amount Array to be included in the message-proper.
           tokens[i] = Client.EVMTokenAmount({token: tokenAddresses[i], amount: tokenAmounts[i]});
+          console.log("Token %i: %s", i, tokenAddresses[i]);
+          console.log("Token Amount %i: %s", i, tokenAmounts[i]);
         }
       }
       console.log("--- Tokens Approved ---");
