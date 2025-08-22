@@ -23,47 +23,8 @@ var (
 
 // ContractAddresses is a map of contract names across all chain selectors and their address.
 // Currently only one contract per chain per name is supported.
+// Deprecated: Use cciptypes.ContractAddresses instead.
 type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
-
-// ChainConfigSnapshot represents the complete configuration state of the chain
-type ChainConfigSnapshot struct {
-	Offramp   OfframpConfig
-	RMNProxy  RMNProxyConfig
-	RMNRemote RMNRemoteConfig
-	FeeQuoter FeeQuoterConfig
-	OnRamp    OnRampConfig
-	Router    RouterConfig
-	CurseInfo CurseInfo
-}
-
-type OnRampConfig struct {
-	DynamicConfig   getOnRampDynamicConfigResponse
-	DestChainConfig onRampDestChainConfig
-}
-
-type FeeQuoterConfig struct {
-	StaticConfig feeQuoterStaticConfig
-}
-
-type RMNRemoteConfig struct {
-	DigestHeader    rmnDigestHeader
-	VersionedConfig versionedConfig
-}
-
-type OfframpConfig struct {
-	CommitLatestOCRConfig OCRConfigResponse
-	ExecLatestOCRConfig   OCRConfigResponse
-	StaticConfig          offRampStaticChainConfig
-	DynamicConfig         offRampDynamicChainConfig
-}
-
-type RMNProxyConfig struct {
-	RemoteAddress []byte
-}
-
-type RouterConfig struct {
-	WrappedNativeAddress cciptypes.Bytes
-}
 
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
@@ -150,6 +111,7 @@ func NewCCIPChainReader(
 }
 
 // NewCCIPReaderWithExtendedContractReaders can be used when you want to directly provide contractreader.Extended
+// Deprecated: This should only be used in tests if absolutely necessary. Use NewCCIPChainReader instead.
 func NewCCIPReaderWithExtendedContractReaders(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -175,7 +137,7 @@ func NewCCIPReaderWithExtendedContractReaders(
 		panic(fmt.Errorf("failed to create CCIP reader: %w", err))
 	}
 	for ch, extendedCr := range extendedContractReaders {
-		cr.WithExtendedContractReader(ch, extendedCr)
+		cr.WithExtendedContractReaderTESTONLY(ch, extendedCr)
 	}
 
 	return cr
@@ -263,7 +225,7 @@ type CCIPReader interface {
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
-	GetRmnCurseInfo(ctx context.Context) (CurseInfo, error)
+	GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error)
 
 	// DiscoverContracts will discover as many addresses as possible based on which addresses are already known.
 	// Initially only the offramp address is known so in the first round the oracles that support the destination chain
