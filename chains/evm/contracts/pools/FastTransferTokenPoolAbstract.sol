@@ -655,7 +655,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes memory destinationPool,
     bytes calldata receiver
   ) internal {
-    // Note: For the fillId computation during request emission, we use the local chain selector (i_localChainSelector) 
+    // Note: For the fillId computation during request emission, we use the local chain selector (i_localChainSelector)
     // as the sourceChainSelector since this is where the request originates. When the message is settled on the
     // destination chain, the same sourceChainSelector (this chain's selector) will be used. This consistency is
     // critical for security as it ensures that the fillId computed during fastFill() validation matches the fillId
