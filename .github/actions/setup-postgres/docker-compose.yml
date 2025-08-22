@@ -4,7 +4,7 @@ services:
     ports:
       - "5432:5432"
     container_name: cl_pg
-    image: postgres:17-alpine
+    image: postgres:16-alpine
     command: postgres ${POSTGRES_OPTIONS}
     env_file:
       - .env
