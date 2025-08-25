@@ -376,8 +376,9 @@ library Internal {
     bytes data; // arbitrary data payload supplied by the message sender.
     address receiver; // receiver address on the destination chain.
     uint32 gasLimit; // user supplied maximum gas amount available for dest chain execution.
-    // TODO make a list for gas reasons
-    TokenTransfer tokenAmounts; // array of tokens and amounts to transfer.
+    // array of tokens and amounts to transfer. Only allows either 0 or 1 token transfer, but for gas reasons we keep it
+    // as an array.
+    TokenTransfer[] tokenAmounts;
   }
 
   struct TokenTransfer {
