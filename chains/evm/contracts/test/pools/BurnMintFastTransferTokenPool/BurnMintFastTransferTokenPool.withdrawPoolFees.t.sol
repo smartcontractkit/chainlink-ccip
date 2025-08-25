@@ -36,7 +36,8 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     uint256 poolFeeAmount = (TRANSFER_AMOUNT * poolFeeBps) / 10_000;
     uint256 amountToFill = TRANSFER_AMOUNT - (TRANSFER_AMOUNT * (fillerFeeBps + poolFeeBps)) / 10_000;
 
-    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId =
+      s_pool.computeFillId(MESSAGE_ID, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     // Get initial pool balance
     uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
@@ -110,7 +111,8 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
     uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
 
     // First fast fill round
-    bytes32 fillId1 = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId1 =
+      s_pool.computeFillId(MESSAGE_ID, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
     vm.prank(s_filler);
     s_pool.fastFill(fillId1, MESSAGE_ID, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
 
@@ -121,7 +123,8 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
 
     // Second fast fill round with different parameters
     bytes32 messageId2 = bytes32("messageId2");
-    bytes32 fillId2 = s_pool.computeFillId(messageId2, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId2 =
+      s_pool.computeFillId(messageId2, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
     vm.prank(s_filler);
     s_pool.fastFill(fillId2, messageId2, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);
 
@@ -206,7 +209,8 @@ contract BurnMintFastTransferTokenPool_withdrawPoolFees_Test is BurnMintFastTran
 
   function _accumulatePoolFees(uint16 fillerFeeBps, uint16 poolFeeBps) internal {
     uint256 amountToFill = TRANSFER_AMOUNT - (TRANSFER_AMOUNT * (fillerFeeBps + poolFeeBps)) / 10_000;
-    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId =
+      s_pool.computeFillId(MESSAGE_ID, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     vm.prank(s_filler);
     s_pool.fastFill(fillId, MESSAGE_ID, DEST_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, RECEIVER);

@@ -22,8 +22,13 @@ contract BurnMintFastTransferTokenPool_ccipReceive is BurnMintFastTransferTokenP
     Client.Any2EVMMessage memory message = _createCcipMessage();
 
     uint256 fastTransferFee = (TRANSFER_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000;
-    bytes32 fillId =
-      s_pool.computeFillId(message.messageId, TRANSFER_AMOUNT - fastTransferFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId = s_pool.computeFillId(
+      message.messageId,
+      message.sourceChainSelector,
+      TRANSFER_AMOUNT - fastTransferFee,
+      SOURCE_DECIMALS,
+      abi.encode(RECEIVER)
+    );
 
     // Expect inbound rate limit consumption (mint amount consumed)
     vm.expectEmit();
