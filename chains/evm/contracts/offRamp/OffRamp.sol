@@ -68,6 +68,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error CommitOnRampMismatch(bytes reportOnRamp, bytes configOnRamp);
   error InvalidOnRampUpdate(uint64 sourceChainSelector);
   error RootBlessingMismatch(uint64 sourceChainSelector, bytes32 merkleRoot, bool isBlessed);
+  error InsufficientGasToCompleteTx(bytes4 err);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
