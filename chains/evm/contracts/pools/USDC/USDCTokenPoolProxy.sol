@@ -29,6 +29,7 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 /// On/OffRamp
 ///     ↓
 /// USDCPoolProxy
+///     ├──→ LegacyCCTPV1Pool → CCTPV1
 ///     ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
 ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
@@ -44,7 +45,7 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
   event PoolAddressesUpdated(PoolAddresses pools);
 
   struct PoolAddresses {
-    address legacyCctpV1Pool; // This is a v1 token pool that did not utilize a message transmitter proxy.
+    address legacyCctpV1Pool; // A v1 token pool that did not utilize a message transmitter proxy.
     address cctpV1Pool;
     address cctpV2Pool;
     address lockReleasePool;
@@ -131,33 +132,26 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     // sourcePoolData that is 64 bytes long, indicating an inflight message originating from a previous version of
     // the USDC Token pool.
     if (releaseOrMintIn.sourcePoolData.length == 64) {
-      // Before this proxy was migrated, the token pool it replaced may or may not have utilized a message
-      // transmitter proxy. If the legacy pool did not utilize a message transmitter proxy, then the destinationCaller will be
-      // the legacy pool, and the message needs to be routed to the legacy pool. If the legacy pool being replaced did
-      // support a message transmitter proxy, then the message can be routed to the appropriate V1 Pool with only
-      // a small amount of additional modification. The below check is necessary to determine which pool to route
-      // to based on the destinationCaller.
+      // There are two possible scenarios for the legacy inflight messages:
+      // 1. The legacy pool did not utilize a message transmitter proxy.
+      // 2. The legacy pool utilized a message transmitter proxy, but the format of the sourcePoolTokenData was as described
+      // in the comments above.
 
-      // Note: While it does add additional complexity to the code, it allows for this contract
-      // to be deployed on any chain and upgrade directly to this version of the USDC Token Pool, without modification
-      // or the need to perform the intermediate step of migrating to a pool that utilizes a message transmitter proxy.
+      // In the first scenario, only the message's destinationCaller, I.E the legacy pool, can execute the mint, and so
+      // the message needs to be routed to the legacy pool. In the second scenario, the destinationCaller will be the
+      // message transmitter proxy, and the message needs to be routed to the appropriate V1-compatible pool.
 
-      // Note: Supporting this branch will require this proxy to be set as an offRamp in the router, which is a design
-      // decision that is not ideal, but allows for a direct upgrade from the first version of the USDC Token Pool to
-      // this version.
+      // The below check is necessary to determine which scenario is present.
       if (_checkForLegacyInflightMessages(releaseOrMintIn)) {
+        // Note: Supporting this branch will require this proxy to be set as an offRamp in the router, which is a design
+        // decision that is not ideal, but allows for a direct upgrade from the first version of the USDC Token Pool to
+        // this version.
         return USDCTokenPool(pools.legacyCctpV1Pool).releaseOrMint(releaseOrMintIn);
       } else {
         // Since the new pool and the inflight message should utilize the same version of CCTP, and would have the same
         // destinationCaller (the message transmitter proxy), we can route the message to the v1 pool, but we first
-        // need to turn the source pool data into the new format so that the abi-decoding will succeed. Once there is
+        // need to turn the source pool data into the new format, otherwise abi-decoding will revert. Once there is
         // confidence that no more messages are inflight, these branches can be safely removed.
-
-        // While adding some complexity to the code, this is preferable than having to maintain support for the legacy token
-        // pool. Since that legacy pool has an Only-OffRamp check, this proxy would have to be set as an offRamp in the
-        // router, which is a design decision that is not ideal and presents additional security risks. This mechanism
-        // instead allows for the legacy pool to be removed, and the proxy to be updated to only have to utilize the new
-        // version of the USDC Token Pool.
         Pool.ReleaseOrMintInV1 memory legacyReleaseOrMintIn = _generateNewReleaseOrMintIn(releaseOrMintIn);
 
         // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
@@ -246,8 +240,11 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
   function _checkForLegacyInflightMessages(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) internal view virtual returns (bool) {
-    // If the legacy pool without a proxy is not set, then there are no legacy inflight messages.
-    if (s_pools.legacyCctpV1Pool == address(0)) {
+    // Cache the legacy pool address to avoid multiple SLOADs.
+    address legacyPool = s_pools.legacyCctpV1Pool;
+
+    // If the legacy pool without a proxy is not set, then there is no need to check the destinationCaller.
+    if (legacyPool == address(0)) {
       return false;
     }
 
@@ -263,7 +260,7 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     }
     address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
 
-    return destinationCaller == s_pools.legacyCctpV1Pool;
+    return destinationCaller == legacyPool;
   }
 
   /// @notice Converts a legacy sourcePoolData struct into a new format that can be used to release or mint USDC on the
@@ -278,13 +275,15 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     // individually, which would be more gas intensive, as only the sourcePoolData field is going to be modified.
     newReleaseOrMintIn = releaseOrMintIn;
 
-    // Get the local domain identifier and the transmitter proxy address from the previous pool.
+    // Get the local domain identifier and the transmitter proxy address from the previous pool. The local
+    // domain identifier is not present in the original data, so it must be acquired dynamically, and simplifies this
+    // contract by not having to store it in the state.
     uint32 localDomain = USDCTokenPool(s_pools.cctpV1Pool).i_localDomainIdentifier();
     bytes32 allowedCaller =
       bytes32(uint256(uint160(address(USDCTokenPool(s_pools.cctpV1Pool).i_messageTransmitterProxy()))));
 
     // Decode the legacy sourcePoolData to get the nonce and sourceDomain. The original sourcePoolData was a struct
-    // with two fields, a uint64 and a uint32. We can decode it into two variables, directly, nonce and sourceDomain.
+    // with two fields, a uint64 and a uint32. We can decode it into two variables directly, nonce and sourceDomain.
     (uint64 nonce, uint32 sourceDomain) = abi.decode(releaseOrMintIn.sourcePoolData, (uint64, uint32));
 
     // Create the new payload out of the legacy sourcePoolData.
