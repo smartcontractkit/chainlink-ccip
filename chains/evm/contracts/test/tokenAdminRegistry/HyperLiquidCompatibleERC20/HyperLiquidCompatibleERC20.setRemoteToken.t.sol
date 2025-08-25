@@ -5,34 +5,41 @@ import {HyperLiquidCompatibleERC20} from "../../../tokenAdminRegistry/TokenPoolF
 import {HyperLiquidCompatibleERC20Setup} from "./HyperLiquidCompatibleERC20Setup.t.sol";
 
 contract HyperLiquidCompatibleERC20_setRemoteToken is HyperLiquidCompatibleERC20Setup {
-  function test_setRemoteToken_Success() public {
-    address testRemoteToken = makeAddr("testRemoteToken");
+  function testFuzz_setRemoteToken_Success(
+    uint64 remoteTokenId
+  ) public {
+    vm.assume(remoteTokenId != 0);
+
     uint8 testDecimals = 6;
 
+    address systemAddressInt = address((uint160(0x20) << 152) | uint160(remoteTokenId));
+
     vm.expectEmit();
-    emit HyperLiquidCompatibleERC20.RemoteTokenSet(testRemoteToken, testDecimals);
-    s_hyperLiquidToken.setRemoteToken(testRemoteToken, testDecimals);
+    emit HyperLiquidCompatibleERC20.RemoteTokenSet(remoteTokenId, systemAddressInt, testDecimals);
+    s_hyperLiquidToken.setRemoteToken(remoteTokenId, testDecimals);
 
     // Note: Since these are internal variables, we can't directly test them
     // but we can verify the function doesn't revert and emits the correct event
   }
 
   function test_setRemoteToken_Success_ZeroDecimals() public {
-    address testRemoteToken = makeAddr("testRemoteToken");
     uint8 testDecimals = 0;
+    uint64 remoteTokenId = 1;
+    address systemAddressInt = address((uint160(0x20) << 152) | uint160(remoteTokenId));
 
     vm.expectEmit();
-    emit HyperLiquidCompatibleERC20.RemoteTokenSet(testRemoteToken, testDecimals);
-    s_hyperLiquidToken.setRemoteToken(testRemoteToken, testDecimals);
+    emit HyperLiquidCompatibleERC20.RemoteTokenSet(remoteTokenId, systemAddressInt, testDecimals);
+    s_hyperLiquidToken.setRemoteToken(remoteTokenId, testDecimals);
   }
 
   function test_setRemoteToken_Success_MaxDecimals() public {
-    address testRemoteToken = makeAddr("testRemoteToken");
     uint8 testDecimals = 255;
+    uint64 remoteTokenId = 1;
+    address systemAddressInt = address((uint160(0x20) << 152) | uint160(remoteTokenId));
 
     vm.expectEmit();
-    emit HyperLiquidCompatibleERC20.RemoteTokenSet(testRemoteToken, testDecimals);
-    s_hyperLiquidToken.setRemoteToken(testRemoteToken, testDecimals);
+    emit HyperLiquidCompatibleERC20.RemoteTokenSet(remoteTokenId, systemAddressInt, testDecimals);
+    s_hyperLiquidToken.setRemoteToken(remoteTokenId, testDecimals);
   }
 
   // Reverts
@@ -41,6 +48,6 @@ contract HyperLiquidCompatibleERC20_setRemoteToken is HyperLiquidCompatibleERC20
     uint8 testDecimals = 18;
 
     vm.expectRevert(abi.encodeWithSelector(HyperLiquidCompatibleERC20.ZeroAddressNotAllowed.selector));
-    s_hyperLiquidToken.setRemoteToken(address(0), testDecimals);
+    s_hyperLiquidToken.setRemoteToken(0, testDecimals);
   }
 }

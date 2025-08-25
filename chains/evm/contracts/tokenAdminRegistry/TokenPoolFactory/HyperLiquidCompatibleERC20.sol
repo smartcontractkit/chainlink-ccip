@@ -10,18 +10,19 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
   error ZeroAddressNotAllowed();
 
   event HyperEVMLinkerSet(address indexed hyperEVMLinker);
-  event RemoteTokenSet(address indexed remoteToken, uint8 indexed remoteTokenDecimals);
+  event RemoteTokenSet(uint64 indexed remoteTokenId, address indexed remoteToken, uint8 indexed remoteTokenDecimals);
 
   // In order to bridge to HyperCore, factory-deployed contracts must store the address of a finalizer linker at
   // storage slot keccak256("HyperCore deployer")
   bytes32 internal constant HYPER_EVM_LINKER_SLOT = 0x8c306a6a12fff1951878e8621be6674add1102cd359dd968efbbe797629ef84f;
 
-  address public constant SPOT_BALANCE_PRECOMPILE = 0x0000000000000000000000000000000000000800;
+  address internal constant SPOT_BALANCE_PRECOMPILE_ADDRESS = 0x0000000000000000000000000000000000000801;
 
-  /// @dev The address of the remote token and its associated number of decimals may not be known
-  /// at deployment time, and must be set later after the remote token is deployed.
-  address internal s_remoteToken;
-  uint8 internal s_remoteTokenDecimals;
+  /// @dev The address of the HyperCore token and its associated number of decimals may not be known
+  /// at deployment time, and must be set later after the HyperCore token is deployed.
+  uint64 internal s_hypercoreTokenSpotId;
+  address internal s_hypercoreTokenSystemAddress;
+  uint8 internal s_hypercoreTokenDecimals;
 
   struct SpotBalance {
     uint64 total;
@@ -55,18 +56,20 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
   }
 
   /// @notice Sets the remote token and decimals.
-  /// @param remoteToken The address of the remote token.
+  /// @param hipTokenId The id of the remote token.
   /// @param remoteTokenDecimals The decimals of the remote token.
   /// @dev While the zero address is not allowed, it is allowed for the remote token to have zero decimals.
-  function setRemoteToken(address remoteToken, uint8 remoteTokenDecimals) external onlyOwner {
-    if (remoteToken == address(0)) {
+  function setRemoteToken(uint64 hipTokenId, uint8 remoteTokenDecimals) external onlyOwner {
+    if (hipTokenId == 0) {
       revert ZeroAddressNotAllowed();
     }
 
-    s_remoteToken = remoteToken;
-    s_remoteTokenDecimals = remoteTokenDecimals;
+    s_hypercoreTokenSpotId = hipTokenId;
+    s_hypercoreTokenDecimals = remoteTokenDecimals;
 
-    emit RemoteTokenSet(remoteToken, remoteTokenDecimals);
+    s_hypercoreTokenSystemAddress = address((uint160(0x20) << 152) | uint160(hipTokenId));
+
+    emit RemoteTokenSet(hipTokenId, s_hypercoreTokenSystemAddress, remoteTokenDecimals);
   }
 
   /// @notice Gets the hyperEVMLinker address.
@@ -78,11 +81,21 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
     }
     return hyperEVMLinker;
   }
-
+  /**
+   * @notice Overrides the standard ERC20 transfer hook to add a balance check before bridging tokens to HyperCore.
+   * @dev This internal hook intercepts transfers to the `hypercoreTokenSystemAddress`. Before allowing the transfer,
+   * it performs a `staticcall` to the `SPOT_BALANCE_PRECOMPILE_ADDRESS` to fetch the system address's current
+   * spot balance on HyperCore. It then compares this remote balance (normalized to local decimals) with the transfer
+   * amount. This check prevents users from losing funds by ensuring the bridge destination on HyperCore has
+   * sufficient liquidity before the HyperEVM-side transfer occurs. The function reverts if the transfer amount
+   * exceeds the available spot balance or if the precompile call fails.
+   * @param to The recipient address of the token transfer.
+   * @param amount The amount of tokens being transferred.
+   */
   function _beforeTokenTransfer(address, address to, uint256 amount) internal virtual override {
-    if (to == SPOT_BALANCE_PRECOMPILE) {
+    if (to == s_hypercoreTokenSystemAddress && s_hypercoreTokenSystemAddress != address(0)) {
       (bool success, bytes memory result) =
-        SPOT_BALANCE_PRECOMPILE.staticcall(abi.encode(getHyperEVMLinker(), s_remoteToken));
+        SPOT_BALANCE_PRECOMPILE_ADDRESS.staticcall(abi.encode(to, s_hypercoreTokenSpotId));
 
       if (!success) {
         revert HyperEVMTransferFailed();
@@ -90,7 +103,7 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
 
       SpotBalance memory spotBalance = abi.decode(result, (SpotBalance));
 
-      uint256 remoteAmountNormalizedLocalDecimals = _calculateLocalAmount(spotBalance.total, s_remoteTokenDecimals);
+      uint256 remoteAmountNormalizedLocalDecimals = _calculateLocalAmount(spotBalance.total, s_hypercoreTokenDecimals);
 
       if (amount > remoteAmountNormalizedLocalDecimals) {
         revert InsufficientSpotBalance();

@@ -5,7 +5,13 @@ import {HyperLiquidCompatibleERC20} from "../../../tokenAdminRegistry/TokenPoolF
 import {HyperLiquidCompatibleERC20Setup} from "./HyperLiquidCompatibleERC20Setup.t.sol";
 
 contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatibleERC20Setup {
-  address public constant SPOT_BALANCE_PRECOMPILE = 0x0000000000000000000000000000000000000800;
+  address public constant SPOT_BALANCE_PRECOMPILE = 0x0000000000000000000000000000000000000801;
+
+  struct SpotBalance {
+    uint64 total;
+    uint64 hold;
+    uint64 entryNtl;
+  }
 
   function test_beforeTokenTransfer_Success_NonSpotBalancePrecompile() public {
     address recipient = makeAddr("recipient");
@@ -27,12 +33,14 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
       SpotBalance({total: uint64(101e6), hold: uint64(500e6), entryNtl: uint64(200e6)});
 
     // Mock the staticcall to return success and the mock balance
-    vm.mockCall(SPOT_BALANCE_PRECOMPILE, abi.encode(s_hyperEVMLinker, s_remoteToken), abi.encode(mockSpotBalance));
+    vm.mockCall(
+      SPOT_BALANCE_PRECOMPILE, abi.encode(s_hypercoreTokenSystemAddress, s_remoteTokenId), abi.encode(mockSpotBalance)
+    );
 
     // Transfer to spot balance precompile should succeed with sufficient balance
-    s_hyperLiquidToken.transfer(SPOT_BALANCE_PRECOMPILE, amount);
+    s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, amount);
 
-    assertEq(s_hyperLiquidToken.balanceOf(SPOT_BALANCE_PRECOMPILE), amount);
+    assertEq(s_hyperLiquidToken.balanceOf(s_hypercoreTokenSystemAddress), amount);
   }
 
   function test_beforeTokenTransfer_Success_SpotBalancePrecompile_ExactBalance() public {
@@ -42,12 +50,14 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
     SpotBalance memory mockSpotBalance =
       SpotBalance({total: uint64(100e6), hold: uint64(500e6), entryNtl: uint64(200e6)});
 
-    vm.mockCall(SPOT_BALANCE_PRECOMPILE, abi.encode(s_hyperEVMLinker, s_remoteToken), abi.encode(mockSpotBalance));
+    vm.mockCall(
+      SPOT_BALANCE_PRECOMPILE, abi.encode(s_hypercoreTokenSystemAddress, s_remoteTokenId), abi.encode(mockSpotBalance)
+    );
 
     // Transfer to spot balance precompile should succeed with exact balance
-    s_hyperLiquidToken.transfer(SPOT_BALANCE_PRECOMPILE, amount);
+    s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, amount);
 
-    assertEq(s_hyperLiquidToken.balanceOf(SPOT_BALANCE_PRECOMPILE), amount);
+    assertEq(s_hyperLiquidToken.balanceOf(s_hypercoreTokenSystemAddress), amount);
   }
 
   // Reverts
@@ -56,10 +66,10 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
     uint256 amount = 100e18;
 
     // Mock the staticcall to fail
-    vm.mockCallRevert(SPOT_BALANCE_PRECOMPILE, abi.encode(s_hyperEVMLinker, s_remoteToken), "Mock failure");
+    vm.mockCallRevert(SPOT_BALANCE_PRECOMPILE, bytes(""), "Mock failure");
 
     vm.expectRevert(abi.encodeWithSelector(HyperLiquidCompatibleERC20.HyperEVMTransferFailed.selector));
-    s_hyperLiquidToken.transfer(SPOT_BALANCE_PRECOMPILE, amount);
+    s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, amount);
   }
 
   function test_beforeTokenTransfer_RevertWhen_InsufficientSpotBalance() public {
@@ -69,10 +79,12 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
     SpotBalance memory mockSpotBalance =
       SpotBalance({total: uint64(1000e6), hold: uint64(500e6), entryNtl: uint64(200e6)});
 
-    vm.mockCall(SPOT_BALANCE_PRECOMPILE, abi.encode(s_hyperEVMLinker, s_remoteToken), abi.encode(mockSpotBalance));
+    vm.mockCall(
+      SPOT_BALANCE_PRECOMPILE, abi.encode(s_hypercoreTokenSystemAddress, s_remoteTokenId), abi.encode(mockSpotBalance)
+    );
 
     vm.expectRevert(abi.encodeWithSelector(HyperLiquidCompatibleERC20.InsufficientSpotBalance.selector));
-    s_hyperLiquidToken.transfer(SPOT_BALANCE_PRECOMPILE, amount);
+    s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, amount);
   }
 
   function test_beforeTokenTransfer_RevertWhen_ZeroSpotBalance() public {
@@ -81,10 +93,12 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
     // Mock the spot balance precompile to return zero balance
     SpotBalance memory mockSpotBalance = SpotBalance({total: uint64(0), hold: uint64(0), entryNtl: uint64(0)});
 
-    vm.mockCall(SPOT_BALANCE_PRECOMPILE, abi.encode(s_hyperEVMLinker, s_remoteToken), abi.encode(mockSpotBalance));
+    vm.mockCall(
+      SPOT_BALANCE_PRECOMPILE, abi.encode(s_hypercoreTokenSystemAddress, s_remoteTokenId), abi.encode(mockSpotBalance)
+    );
 
     vm.expectRevert(abi.encodeWithSelector(HyperLiquidCompatibleERC20.InsufficientSpotBalance.selector));
-    s_hyperLiquidToken.transfer(SPOT_BALANCE_PRECOMPILE, amount);
+    s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, amount);
   }
 
   // Edge cases
@@ -93,12 +107,14 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
     SpotBalance memory mockSpotBalance =
       SpotBalance({total: uint64(1000e6), hold: uint64(500e6), entryNtl: uint64(200e6)});
 
-    vm.mockCall(SPOT_BALANCE_PRECOMPILE, abi.encode(s_hyperEVMLinker, s_remoteToken), abi.encode(mockSpotBalance));
+    vm.mockCall(
+      SPOT_BALANCE_PRECOMPILE, abi.encode(s_hypercoreTokenSystemAddress, s_remoteTokenId), abi.encode(mockSpotBalance)
+    );
 
     // Transfer zero amount should succeed
-    s_hyperLiquidToken.transfer(SPOT_BALANCE_PRECOMPILE, 0);
+    s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, 0);
 
-    assertEq(s_hyperLiquidToken.balanceOf(SPOT_BALANCE_PRECOMPILE), 0);
+    assertEq(s_hyperLiquidToken.balanceOf(s_hypercoreTokenSystemAddress), 0);
   }
 
   function test_beforeTokenTransfer_EdgeCase_TransferOneWei() public {
@@ -106,18 +122,13 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
     SpotBalance memory mockSpotBalance =
       SpotBalance({total: uint64(1000e6), hold: uint64(500e6), entryNtl: uint64(200e6)});
 
-    vm.mockCall(SPOT_BALANCE_PRECOMPILE, abi.encode(s_hyperEVMLinker, s_remoteToken), abi.encode(mockSpotBalance));
+    vm.mockCall(
+      SPOT_BALANCE_PRECOMPILE, abi.encode(s_hypercoreTokenSystemAddress, s_remoteTokenId), abi.encode(mockSpotBalance)
+    );
 
     // Transfer one wei should succeed
-    s_hyperLiquidToken.transfer(SPOT_BALANCE_PRECOMPILE, 1);
+    s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, 1);
 
-    assertEq(s_hyperLiquidToken.balanceOf(SPOT_BALANCE_PRECOMPILE), 1);
-  }
-
-  // Helper struct for testing
-  struct SpotBalance {
-    uint64 total;
-    uint64 hold;
-    uint64 entryNtl;
+    assertEq(s_hyperLiquidToken.balanceOf(s_hypercoreTokenSystemAddress), 1);
   }
 }

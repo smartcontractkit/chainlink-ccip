@@ -13,7 +13,7 @@ contract HyperLiquidCompatibleERC20_getHyperEVMLinker is HyperLiquidCompatibleER
     s_testToken = new MockHyperLiquidCompatibleERC20("TEST TOKEN", "TEST", 18, 1e27, 0, OWNER);
   }
 
-  function test_getHyperEVMLinker_ReturnsZeroAddress_WhenNotSet() public {
+  function test_getHyperEVMLinker_ReturnsZeroAddress_WhenNotSet() public view {
     address hyperEVMLinker = s_testToken.getHyperEVMLinker();
     assertEq(hyperEVMLinker, address(0));
   }

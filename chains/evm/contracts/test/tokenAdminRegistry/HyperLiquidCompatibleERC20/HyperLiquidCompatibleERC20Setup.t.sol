@@ -9,7 +9,8 @@ contract HyperLiquidCompatibleERC20Setup is BaseTest {
 
   address internal s_mockPool = makeAddr("s_mockPool");
   address internal s_hyperEVMLinker = makeAddr("s_hyperEVMLinker");
-  address internal s_remoteToken = makeAddr("s_remoteToken");
+  uint64 internal s_remoteTokenId = 325;
+  address internal s_hypercoreTokenSystemAddress = address((uint160(0x20) << 152) | uint160(s_remoteTokenId));
 
   function setUp() public virtual override {
     BaseTest.setUp();
@@ -24,6 +25,6 @@ contract HyperLiquidCompatibleERC20Setup is BaseTest {
 
     // The Hypercore system stores balance in a uint64, meaning that 18 decimals may be too large to fit and we
     // should simulate 6 decimals for the remote token.
-    s_hyperLiquidToken.setRemoteToken(s_remoteToken, 6);
+    s_hyperLiquidToken.setRemoteToken(s_remoteTokenId, 6);
   }
 }
