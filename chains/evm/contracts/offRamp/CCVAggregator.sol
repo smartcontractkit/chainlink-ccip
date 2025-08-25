@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
 import {ICCVOffRampV1} from "../interfaces/ICCVOffRampV1.sol";
-import "../interfaces/IPoolV2.sol";
+import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
@@ -78,6 +78,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @dev Same as SourceChainConfig but with source chain selector so that an array of these
   /// can be passed in the constructor and the applySourceChainConfigUpdates function.
+  // solhint-disable-next-line gas-struct-packing
   struct SourceChainConfigArgs {
     IRouter router; // ────────────╮  Local router to use for messages coming from this source chain.
     uint64 sourceChainSelector; // │  Source chain selector of the config to update.
