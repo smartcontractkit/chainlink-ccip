@@ -53,7 +53,7 @@ lint: ensure_go_version ensure_golangcilint
 lint-fix: ensure_go_version ensure_golangcilint
 	golangci-lint run -c .golangci.yml --fix
 
-lint-safebigint: ensure_go_version
+lint-safebigint:
 	@echo "Running safebigint linter..."
 	@if command -v safebigint >/dev/null 2>&1; then \
 		safebigint ./... || echo "safebigint found issues. Review the output above."; \
@@ -62,7 +62,7 @@ lint-safebigint: ensure_go_version
 		exit 1; \
 	fi
 
-lint-goboundcheck: ensure_go_version
+lint-goboundcheck:
 	@echo "Running goboundcheck linter..."
 	@if command -v goboundcheck >/dev/null 2>&1; then \
 		goboundcheck ./... || echo "goboundcheck found issues or encountered errors. Review the output above."; \
