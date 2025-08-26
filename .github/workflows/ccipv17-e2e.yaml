@@ -1,4 +1,4 @@
-name: End-to-end CCIPv2 Test
+name: End-to-end CCIPv1.7 Test
 
 on:
   push:

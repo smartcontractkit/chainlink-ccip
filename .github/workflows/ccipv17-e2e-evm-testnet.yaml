@@ -1,4 +1,4 @@
-name: End-to-end CCIPv2 Test (EVM Testnets)
+name: End-to-end CCIPv1.7 Test (EVM Testnets)
 
 on:
   workflow_dispatch:

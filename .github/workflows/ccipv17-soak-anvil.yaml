@@ -1,4 +1,4 @@
-name: CCIPv2 Soak Test
+name: CCIPv1.7 Soak Test
 
 on:
   workflow_dispatch:
