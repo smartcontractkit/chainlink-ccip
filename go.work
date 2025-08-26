@@ -3,6 +3,8 @@ go 1.24.2
 use (
 	./chains/evm
 	./chains/solana
+	./chains/solana/gobindings
+	./cmd/carpenter
 	./ocr3
 	./protocol
 )

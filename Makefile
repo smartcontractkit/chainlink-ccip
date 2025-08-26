@@ -19,7 +19,7 @@ BUF_BIN := $(shell go env GOPATH)/bin/buf
 COMPARE_AGAINST_BRANCH := main
 
 .PHONY: gomods
-gomods: ## Install gomods
+gomods: ensure_go_version ## Install gomods
 	go install github.com/jmank88/gomods@v0.1.5
 
 .PHONY: gomodtidy
@@ -27,7 +27,7 @@ gomodtidy: gomods ## Run go mod tidy on all modules.
 	gomods tidy
 
 build: ensure_go_version
-	go build -v ./...
+	go list -f '{{.Dir}}/...' -m | xargs go build -v
 
 # If you have a different version of protoc installed, you can use the following command to generate the protobuf files
 # make generate PROTOC_BIN=/path/to/protoc
@@ -40,7 +40,7 @@ generate-mocks: ensure_go_version
 # If you have a different version of protoc installed, you can use the following command to generate the protobuf files
 # make proto-generate PROTOC_BIN=/path/to/protoc
 proto-generate: ensure_go_version ensure_protoc_28_0
-	$(PROTOC_BIN) --go_out=./ocr3/pkg/ocrtypecodec/v1/ocrtypecodecpb ./ocr3/pkg/ocrtypecodec/v1/ocrtypes.proto
+	$(PROTOC_BIN) -I ocr3 --go_out=./ocr3/pkg/ocrtypecodec/v1/ocrtypecodecpb ./ocr3/pkg/ocrtypecodec/v1/ocrtypes.proto
 
 proto-lint: ensure_go_version ensure_buf_version
 	$(BUF_BIN) lint
@@ -56,10 +56,10 @@ test:
 		`go list ./... | grep -Ev 'chainlink-ccip/ocr3/internal/mocks|chainlink-ccip/ocr3/mocks|chainlink-ccip/ocr3/pkg/ocrtypecodec/v1/ocrtypecodecpb|chainlink-ccip/chains'`
 
 lint: ensure_go_version ensure_golangcilint
-	golangci-lint run -c .golangci.yml ./chains/... ./ocr3/... ./protocol/...
+	go list -f '{{.Dir}}/...' -m | xargs  golangci-lint run -c .golangci.yml
 
 lint-fix: ensure_go_version ensure_golangcilint
-	golangci-lint run -c .golangci.yml --fix ./chains/... ./ocr3/... ./protocol/...
+	go list -f '{{.Dir}}/...' -m |  golangci-lint run -c .golangci.yml --fix
 
 lint-safebigint: ensure_go_version
 	@echo "Running safebigint linter..."

@@ -28,10 +28,9 @@ jobs:
       - name: Install protoc
         run: make install-protoc
       - name: Re-Generate files
-        run: |
-          make generate
+        run: make generate
       - name: Tidy
-        run: go mod tidy
+        run: make gomodtidy
       - name: ensure no changes
         run: |
           set -e

@@ -7,12 +7,11 @@
 package ocrtypecodecpb
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -1688,10 +1687,10 @@ type CommitData struct {
 	Timestamp           *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	BlockNum            uint64                 `protobuf:"varint,4,opt,name=block_num,json=blockNum,proto3" json:"block_num,omitempty"`
 	MerkleRoot          []byte                 `protobuf:"bytes,5,opt,name=merkle_root,json=merkleRoot,proto3" json:"merkle_root,omitempty"` // Should be 32bytes
-	SequenceNumberRange *SeqNumRange `protobuf:"bytes,6,opt,name=sequence_number_range,json=sequenceNumberRange,proto3" json:"sequence_number_range,omitempty"`
-	ExecutedMessages    []uint64     `protobuf:"varint,7,rep,packed,name=executed_messages,json=executedMessages,proto3" json:"executed_messages,omitempty"`
-	Messages            []*Message   `protobuf:"bytes,8,rep,name=messages,proto3" json:"messages,omitempty"`
-	Hashes              [][]byte     `protobuf:"bytes,9,rep,name=hashes,proto3" json:"hashes,omitempty"` // Each bytes should be 32bytes
+	SequenceNumberRange *SeqNumRange           `protobuf:"bytes,6,opt,name=sequence_number_range,json=sequenceNumberRange,proto3" json:"sequence_number_range,omitempty"`
+	ExecutedMessages    []uint64               `protobuf:"varint,7,rep,packed,name=executed_messages,json=executedMessages,proto3" json:"executed_messages,omitempty"`
+	Messages            []*Message             `protobuf:"bytes,8,rep,name=messages,proto3" json:"messages,omitempty"`
+	Hashes              [][]byte               `protobuf:"bytes,9,rep,name=hashes,proto3" json:"hashes,omitempty"` // Each bytes should be 32bytes
 	// Deprecated: Marked as deprecated in pkg/ocrtypecodec/v1/ocrtypes.proto.
 	CostlyMessages   [][]byte            `protobuf:"bytes,10,rep,name=costly_messages,json=costlyMessages,proto3" json:"costly_messages,omitempty"` // DEPRECATED: Message IDs of costly messages
 	MessageTokenData []*MessageTokenData `protobuf:"bytes,11,rep,name=message_token_data,json=messageTokenData,proto3" json:"message_token_data,omitempty"`
