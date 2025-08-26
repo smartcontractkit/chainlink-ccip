@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Client} from "../../../libraries/Client.sol";
-import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
+import {Client} from "../../libraries/Client.sol";
+import {CCVProxy} from "../../onRamp/CCVProxy.sol";
 
 /// @notice Test wrapper for CCVProxy to expose internal functions for testing
-contract CCVProxyTestWrapper is CCVProxy {
+contract CCVProxyTestHelper is CCVProxy {
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig

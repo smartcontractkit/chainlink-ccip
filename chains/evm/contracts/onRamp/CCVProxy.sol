@@ -338,16 +338,12 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     return (requiredCCV, optionalCCV, optionalThreshold);
   }
 
-  /// @notice Parses and validates extra arguments, applying defaults from destination chain configuration
-  /// @dev This function handles two encoding formats to maintain backward compatibility:
-  /// 1. 4-byte tag + ABI-encoded EVMExtraArgsV3 struct
-  /// 2. Legacy format: Raw bytes used directly as executor arguments
-  /// The function ensures all messages have the required CCVs and executors needed for processing,
-  /// even when users don't explicitly specify them. This prevents messages from becoming unexecutable
-  /// due to missing required components.
-  /// @param destChainConfig Configuration for the destination chain including default values
-  /// @param extraArgs User-provided extra arguments in either V3 or legacy format
-  /// @return resolvedArgs Complete EVMExtraArgsV3 struct with all defaults applied
+  /// @notice Parses and validates extra arguments, applying defaults from destination chain configuration.
+  /// The function ensures all messages have the required CCVs and executor needed for processing,
+  /// even when users don't explicitly specify them.
+  /// @param destChainConfig Configuration for the destination chain including default values.
+  /// @param extraArgs User-provided extra arguments in either V3 or legacy format.
+  /// @return resolvedArgs Complete EVMExtraArgsV3 struct with all defaults applied.
   function _parseExtraArgsWithDefaults(
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
@@ -363,28 +359,26 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         }
       }
 
-      // Ensure every message has at least one CCV for verification - prevents messages from being unverifiable
-      // when users don't specify any CCVs, default CCV is chosen
+      // When users don't specify any CCVs, default CCV is chosen.
       if (resolvedArgs.requiredCCV.length + resolvedArgs.optionalCCV.length == 0) {
         resolvedArgs.requiredCCV = new Client.CCV[](1);
         resolvedArgs.requiredCCV[0] = Client.CCV({ccvAddress: destChainConfig.defaultCCV, args: ""});
       }
     } else {
-      // Legacy compatibility: older clients send old extraArgs, they are assumed to be for the default CCV
-      // and the default executor. This means any default CCV/executor has to be able to process all prior extraArgs.
+      // If old extraArgs are supplied, they are assumed to be for the default CCV and the default executor.
+      // This means any default CCV/executor has to be able to process all prior extraArgs.
       resolvedArgs.executorArgs = extraArgs;
 
       resolvedArgs.requiredCCV = new Client.CCV[](1);
       resolvedArgs.requiredCCV[0] = Client.CCV({ccvAddress: destChainConfig.defaultCCV, args: extraArgs});
     }
 
-    // Not supplying an executor means the default is chosen.
+    // When users don't specify an executor, default executor is chosen.
     if (resolvedArgs.executor == address(0)) {
       resolvedArgs.executor = destChainConfig.defaultExecutor;
     }
 
-    // Enforce chain-level security requirements: some destination chains mandate specific CCVs for all messages.
-    // Prepending ensures this requirement is always met regardless of user preferences.
+    // Ensure that the required CCV for destination chain is always included.
     if (destChainConfig.requiredCCV != address(0)) {
       Client.CCV[] memory newRequiredCCVs = new Client.CCV[](resolvedArgs.requiredCCV.length + 1);
       newRequiredCCVs[0] = Client.CCV({ccvAddress: destChainConfig.requiredCCV, args: ""});
@@ -456,7 +450,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       }
 
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
-      // The router can be zero to pause the destination chain
+      // The router can be zero to pause the destination chain.
       destChainConfig.router = destChainConfigArg.router;
       destChainConfig.defaultCCV = destChainConfigArg.defaultCCV;
       destChainConfig.requiredCCV = destChainConfigArg.requiredCCV;

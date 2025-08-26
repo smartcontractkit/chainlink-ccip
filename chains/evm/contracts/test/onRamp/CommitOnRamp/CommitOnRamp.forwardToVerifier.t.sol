@@ -6,35 +6,23 @@ import {BaseOnRamp} from "../../../onRamp/BaseOnRamp.sol";
 import {CommitOnRamp} from "../../../onRamp/CommitOnRamp.sol";
 import {CommitOnRampSetup} from "./CommitOnRampSetup.t.sol";
 
-contract CommitOnRamp_forwardToVerifier_Test is CommitOnRampSetup {
+contract CommitOnRamp_forwardToVerifier is CommitOnRampSetup {
   function setUp() public override {
     super.setUp();
+    vm.stopPrank();
   }
 
   function test_forwardToVerifier() public {
     Internal.EVM2AnyVerifierMessage memory message =
       _createEVM2AnyVerifierMessage(DEST_CHAIN_SELECTOR, msg.sender, "test data", msg.sender, s_sourceFeeToken, 1000);
 
-    bytes memory rawMessage = abi.encode(message);
     uint256 verifierIndex = 0;
 
-    // Mock the fee quoter response
-    vm.mockCall(
-      address(s_feeQuoter),
-      abi.encodeWithSelector(
-        s_feeQuoter.processMessageArgs.selector, DEST_CHAIN_SELECTOR, s_sourceFeeToken, 1000, "", abi.encode(msg.sender)
-      ),
-      abi.encode(0, false, "", "")
-    );
-    vm.mockCall(
-      address(s_nonceManager),
-      abi.encodeWithSelector(s_nonceManager.getIncrementedOutboundNonce.selector, DEST_CHAIN_SELECTOR, msg.sender),
-      abi.encode(1)
-    );
+    // Set up mocks for ordered execution
+    _setupForwardToVerifierMocks(false, DEST_CHAIN_SELECTOR, s_sourceFeeToken, 1000, msg.sender, 1);
 
-    vm.stopPrank();
     vm.prank(s_ccvProxy);
-    bytes memory result = s_commitOnRamp.forwardToVerifier(rawMessage, verifierIndex);
+    bytes memory result = s_commitOnRamp.forwardToVerifier(abi.encode(message), verifierIndex);
 
     uint64 nonce = abi.decode(result, (uint64));
     assertEq(nonce, 1);
@@ -44,40 +32,30 @@ contract CommitOnRamp_forwardToVerifier_Test is CommitOnRampSetup {
     Internal.EVM2AnyVerifierMessage memory message =
       _createEVM2AnyVerifierMessage(DEST_CHAIN_SELECTOR, msg.sender, "test data", msg.sender, s_sourceFeeToken, 1000);
 
-    bytes memory rawMessage = abi.encode(message);
     uint256 verifierIndex = 0;
 
-    // Mock the fee quoter response with out of order execution true
-    vm.mockCall(
-      address(s_feeQuoter),
-      abi.encodeWithSelector(
-        s_feeQuoter.processMessageArgs.selector, DEST_CHAIN_SELECTOR, s_sourceFeeToken, 1000, "", abi.encode(msg.sender)
-      ),
-      abi.encode(0, true, "", "")
-    );
+    // Set up mocks for out-of-order execution
+    _setupForwardToVerifierMocks(true, DEST_CHAIN_SELECTOR, s_sourceFeeToken, 1000, msg.sender, 0);
 
-    vm.stopPrank();
     vm.prank(s_ccvProxy);
-    bytes memory result = s_commitOnRamp.forwardToVerifier(rawMessage, verifierIndex);
+    bytes memory result = s_commitOnRamp.forwardToVerifier(abi.encode(message), verifierIndex);
 
     uint64 nonce = abi.decode(result, (uint64));
     assertEq(nonce, 0); // Should return 0 for out of order execution
   }
 
-  function test_forwardToVerifier_RevertWhen_CalledByNons_ccvProxy() public {
+  function test_forwardToVerifier_RevertWhen_MustBeCalledByCCVProxy() public {
     Internal.EVM2AnyVerifierMessage memory message =
       _createEVM2AnyVerifierMessage(DEST_CHAIN_SELECTOR, msg.sender, "test data", msg.sender, s_sourceFeeToken, 1000);
 
-    bytes memory rawMessage = abi.encode(message);
     uint256 verifierIndex = 0;
 
-    vm.stopPrank();
     vm.prank(STRANGER);
     vm.expectRevert(BaseOnRamp.MustBeCalledByCCVProxy.selector);
-    s_commitOnRamp.forwardToVerifier(rawMessage, verifierIndex);
+    s_commitOnRamp.forwardToVerifier(abi.encode(message), verifierIndex);
   }
 
-  function test_forwardToVerifier_RevertWhen_s_ccvProxyNotSet() public {
+  function test_forwardToVerifier_RevertWhen_MustBeCalledByCCVProxy_CCVProxyNotSet() public {
     CommitOnRamp commitOnRampWithoutCCVProxy = new CommitOnRamp(
       address(s_mockRMNRemote),
       address(s_nonceManager),
@@ -91,12 +69,10 @@ contract CommitOnRamp_forwardToVerifier_Test is CommitOnRampSetup {
     Internal.EVM2AnyVerifierMessage memory message =
       _createEVM2AnyVerifierMessage(DEST_CHAIN_SELECTOR, msg.sender, "test data", msg.sender, s_sourceFeeToken, 1000);
 
-    bytes memory rawMessage = abi.encode(message);
     uint256 verifierIndex = 0;
 
-    vm.stopPrank();
     vm.prank(s_ccvProxy);
     vm.expectRevert(BaseOnRamp.MustBeCalledByCCVProxy.selector);
-    commitOnRampWithoutCCVProxy.forwardToVerifier(rawMessage, verifierIndex);
+    commitOnRampWithoutCCVProxy.forwardToVerifier(abi.encode(message), verifierIndex);
   }
 }

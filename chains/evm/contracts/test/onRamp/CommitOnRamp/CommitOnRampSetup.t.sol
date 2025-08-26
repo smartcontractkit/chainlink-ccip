@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {NonceManager} from "../../../NonceManager.sol";
-import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {BaseOnRamp} from "../../../onRamp/BaseOnRamp.sol";
 import {CommitOnRamp} from "../../../onRamp/CommitOnRamp.sol";
@@ -30,10 +29,9 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
       })
     );
 
-    // Set up destination chain configuration
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = BaseOnRamp.DestChainConfigArgs({
-      ccvProxy: s_ccvProxy, // CCVProxy address
+      ccvProxy: s_ccvProxy,
       destChainSelector: DEST_CHAIN_SELECTOR,
       allowlistEnabled: false
     });
@@ -77,5 +75,68 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
       Internal.Receipt({issuer: address(0), feeTokenAmount: 0, destGasLimit: 0, destBytesOverhead: 0, extraArgs: ""});
 
     return message;
+  }
+
+  /// @notice Helper function to mock fee quoter response for forwardToVerifier tests
+  /// @param isOutOfOrderExecution Whether the message should be processed out of order
+  /// @param destChainSelector The destination chain selector
+  /// @param feeToken The fee token address
+  /// @param feeTokenAmount The fee token amount
+  /// @param extraArgs The extra arguments
+  /// @param receiver The receiver address
+  function _mockFeeQuoterResponse(
+    bool isOutOfOrderExecution,
+    uint64 destChainSelector,
+    address feeToken,
+    uint256 feeTokenAmount,
+    bytes memory extraArgs,
+    address receiver
+  ) internal {
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(
+        s_feeQuoter.processMessageArgs.selector,
+        destChainSelector,
+        feeToken,
+        feeTokenAmount,
+        extraArgs,
+        abi.encode(receiver)
+      ),
+      abi.encode(0, isOutOfOrderExecution, "", "")
+    );
+  }
+
+  /// @notice Helper function to mock nonce manager response for forwardToVerifier tests
+  /// @param destChainSelector The destination chain selector
+  /// @param sender The sender address
+  /// @param nonce The nonce to return
+  function _mockNonceManagerResponse(uint64 destChainSelector, address sender, uint64 nonce) internal {
+    vm.mockCall(
+      address(s_nonceManager),
+      abi.encodeWithSelector(s_nonceManager.getIncrementedOutboundNonce.selector, destChainSelector, sender),
+      abi.encode(nonce)
+    );
+  }
+
+  /// @notice Helper function to set up common mocks for forwardToVerifier tests
+  /// @param isOutOfOrderExecution Whether the message should be processed out of order
+  /// @param destChainSelector The destination chain selector
+  /// @param feeToken The fee token address
+  /// @param feeTokenAmount The fee token amount
+  /// @param receiver The receiver address
+  /// @param nonce The nonce to return (only used for ordered execution)
+  function _setupForwardToVerifierMocks(
+    bool isOutOfOrderExecution,
+    uint64 destChainSelector,
+    address feeToken,
+    uint256 feeTokenAmount,
+    address receiver,
+    uint64 nonce
+  ) internal {
+    _mockFeeQuoterResponse(isOutOfOrderExecution, destChainSelector, feeToken, feeTokenAmount, "", receiver);
+
+    if (!isOutOfOrderExecution) {
+      _mockNonceManagerResponse(destChainSelector, receiver, nonce);
+    }
   }
 }
