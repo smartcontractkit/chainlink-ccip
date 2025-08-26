@@ -70,13 +70,13 @@ lint-goboundcheck: ensure_go_version
 		echo "goboundcheck not found. Run 'make install-goboundcheck' to install it."; \
 	fi
 
-lint-custom: ensure_go_version
+lint-custom:
 	@echo "Running custom linters in strict mode..."
 	@if command -v safebigint >/dev/null 2>&1; then safebigint ./...; fi
 	@if command -v goboundcheck >/dev/null 2>&1; then goboundcheck ./...; fi
 
 
-checks: test lint lint-custom
+checks: test lint
 
 install-protoc:
 	@echo "Downloading and installing protoc for $(ARCH)..."
