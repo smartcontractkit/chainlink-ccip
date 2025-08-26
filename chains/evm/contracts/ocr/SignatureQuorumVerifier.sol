@@ -34,7 +34,7 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   }
 
   struct SignatureConfigConfig {
-    uint8 F; //  maximum number of faulty/dishonest oracles the system can tolerate.
+    uint8 F; //  Maximum number of faulty/dishonest oracles the system can tolerate.
     EnumerableSet.AddressSet signers;
   }
 
@@ -119,7 +119,10 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     for (uint256 i = 0; i < signatureConfigs.length; ++i) {
       SignatureConfigArgs memory signatureConfig = signatureConfigs[i];
 
-      if (signatureConfig.F == 0) revert InvalidConfig();
+      if (
+        signatureConfig.F == 0 || signatureConfig.F > signatureConfig.signers.length
+          || signatureConfig.configDigest == ""
+      ) revert InvalidConfig();
 
       // If the configDigest already exists, we cannot modify it as there might be signed transactions that rely on this
       // exact signer set.
@@ -133,7 +136,9 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
       for (uint256 signerIndex = 0; signerIndex < signatureConfig.signers.length; ++signerIndex) {
         if (signatureConfig.signers[signerIndex] == address(0)) revert OracleCannotBeZeroAddress();
 
-        configForDigest.signers.add(signatureConfig.signers[signerIndex]);
+        if (!configForDigest.signers.add(signatureConfig.signers[signerIndex])) {
+          revert InvalidConfig();
+        }
       }
 
       configForDigest.F = signatureConfig.F;
