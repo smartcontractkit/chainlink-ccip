@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/changeset"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
@@ -73,11 +73,11 @@ func applyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainCon
 		}
 	}
 
-	return changeset.NewOutputBuilder().
+	return changesets.NewOutputBuilder().
 		WithReports(report.ExecutionReports).
 		WithDataStore(ds).
 		WithWriteOutputs(report.Output.Writes).
-		Build(changeset.MCMSParams{
+		Build(changesets.MCMSParams{
 			Description: fmt.Sprintf("Initial confiuration of 1.7.0 contracts on %s", chain),
 			// TODO: Populate these with correct values later
 			OverridePreviousRoot: false,

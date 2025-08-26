@@ -90,8 +90,9 @@ func NewWrite[ARGS any, C any](
 					OperationMetadata: mcms_types.OperationMetadata{
 						ContractType: string(contractType),
 					},
-					To:   input.Address.Hex(),
-					Data: tx.Data(),
+					To:               input.Address.Hex(),
+					Data:             tx.Data(),
+					AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
 				},
 			}, err
 		},

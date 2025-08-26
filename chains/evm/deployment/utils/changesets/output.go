@@ -1,10 +1,10 @@
-package changeset
+package changesets
 
 import (
 	"errors"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/optypes/call"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -22,13 +22,22 @@ type OutputBuilder struct {
 
 // MCMSParams holds configuration for building an MCMS proposal.
 type MCMSParams struct {
-	Description          string
+	// Description is a human-readable description of the proposal.
+	Description string
+	// OverridePreviousRoot indicates whether to override the root of the MCMS contract.
 	OverridePreviousRoot bool
-	ValidUntil           uint32
-	TimelockDelay        mcms_types.Duration
-	TimelockAction       mcms_types.TimelockAction
-	TimelockAddresses    map[mcms_types.ChainSelector]string
-	ChainMetadata        map[mcms_types.ChainSelector]mcms_types.ChainMetadata
+	// ValidUntil is a unix timestamp indicating when the proposal expires.
+	// Root can't be set or executed after this time.
+	ValidUntil uint32
+	// TimelockDelay is the amount of time each operation in the proposal must wait before it can be executed.
+	TimelockDelay mcms_types.Duration
+	// TimelockAction is the action to perform on the timelock contract (schedule, bypass, or cancel).
+	TimelockAction mcms_types.TimelockAction
+	// TimelockAddresses is a map of chain selectors to timelock contract addresses.
+	TimelockAddresses map[mcms_types.ChainSelector]string
+	// ChainMetadata is optional metadata to include for each chain in the proposal.
+	// Includes MCM address & starting op count.
+	ChainMetadata map[mcms_types.ChainSelector]mcms_types.ChainMetadata
 }
 
 // NewOutputBuilder creates a new OutputBuilder.
@@ -64,6 +73,7 @@ func (b *OutputBuilder) Build(params MCMSParams) (deployment.ChangesetOutput, er
 		return b.changesetOutput, nil
 	}
 	proposal, err := mcms.NewTimelockProposalBuilder().
+		SetVersion("v1").
 		SetDescription(params.Description).
 		SetOverridePreviousRoot(params.OverridePreviousRoot).
 		SetValidUntil(params.ValidUntil).
