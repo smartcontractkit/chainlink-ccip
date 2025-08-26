@@ -1,7 +1,0 @@
-# Build dev image
-docker-dev:
-    docker build -f Dockerfile.dev -t indexer:dev .
-
-# Build prod image
-docker:
-    docker build -f Dockerfile -t indexer:latest .

@@ -50,6 +50,11 @@ Enter `Nix` shell
 nix develop
 ```
 
+Build all the local services (Indexer, Fakes, JD)
+```
+build-all-docker-dev
+```
+
 ### Start the environment
 ```
 ccip u

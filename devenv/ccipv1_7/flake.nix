@@ -13,21 +13,21 @@
     {
       devShells = forEachSystem ({ pkgs }: {
         default = pkgs.mkShell {
-            shellHook = ''
-              # install the CLI
-              echo "Building CCIPv17 CLI"
-              go install cmd/ccip.go
-              # Load .envrc file if it exists
-              [ -f .envrc ] && source .envrc && echo "Loaded .envrc file" || echo "No .envrc file found, skipping"
-              # Set MinIO alias if minio-client is available and alias doesn't exist
-              if command -v mc >/dev/null 2>&1; then
-                if ! mc alias list | grep -q "minio"; then
-                  echo "Setting up MinIO client alias..."
-                  mc alias set minio http://localhost:9000 mYrAnD0mAcc3ssK3y2024 s3cR3tK3yL0ngEn0ughF0rMinI0Testing2024!
-                  echo "MinIO alias 'minio' configured successfully"
-                fi
-              fi
-            '';
+        shellHook = ''
+          # install the CLI
+          echo "Building CCIPv17 CLI"
+          go install cmd/ccip.go
+          # Load .envrc file if it exists
+          [ -f .envrc ] && source .envrc && echo "Loaded .envrc file" || echo "No .envrc file found, skipping"
+          # Set MinIO alias if minio-client is available and alias doesn't exist
+          if command -v mc >/dev/null 2>&1; then
+            if ! mc alias list | grep -q "minio"; then
+              echo "Setting up MinIO client alias..."
+              mc alias set minio http://localhost:9000 mYrAnD0mAcc3ssK3y2024 s3cR3tK3yL0ngEn0ughF0rMinI0Testing2024!
+              echo "MinIO alias 'minio' configured successfully"
+            fi
+          fi
+          '';
           packages = [
           pkgs.air
           pkgs.postgresql_16

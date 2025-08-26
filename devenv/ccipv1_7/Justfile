@@ -30,3 +30,16 @@ pre-commit:
 # Builds and installs new version of CLI locally
 cli:
     go install cmd/ccip.go
+
+# Build all the services (hot-reload dev mode)
+build-all-docker-dev:
+    cd fakes && docker build -t ccip-fakes:latest . || cd -
+    cd indexer && docker build -f Dockerfile.dev -t indexer:dev . || cd -
+
+# Build Indexer dev image
+build-indexer-docker-dev:
+    cd indexer && docker build -f Dockerfile.dev -t indexer:dev . || cd -
+
+# Build Indexer production image
+build-indexer-docker-prod:
+    cd indexer && docker build -f Dockerfile -t indexer:dev . || cd -
