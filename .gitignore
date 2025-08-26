@@ -29,3 +29,6 @@ vendor/
 
 # Ignore personal settings
 **/.claude/settings.local.json
+
+go.work
+go.work.sum

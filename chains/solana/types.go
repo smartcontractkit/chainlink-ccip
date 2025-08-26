@@ -1,6 +1,6 @@
 package solana
 
-import "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+import "github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/types/ccipocr3"
 
 // These types are needed as special call args for the CCIP contract transmitter on
 // Solana. These call args are passed to the ChainWriter and are used to derive additional

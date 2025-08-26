@@ -1,0 +1,622 @@
+package execute
+
+import (
+	"context"
+	"encoding/binary"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/chainconfig"
+	exectypes2 "github.com/smartcontractkit/chainlink-ccip/ocr3/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/execute/metrics"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/execute/report"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/execute/tokendata/observer"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/internal"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/internal/libs/slicelib"
+	testhelpers2 "github.com/smartcontractkit/chainlink-ccip/ocr3/internal/libs/testhelpers"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/internal/libs/testhelpers/rand"
+	mocks2 "github.com/smartcontractkit/chainlink-ccip/ocr3/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/internal/mocks/inmem"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/mocks/chainlink_common/ccipocr3"
+	contractreader2 "github.com/smartcontractkit/chainlink-ccip/ocr3/mocks/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/contractreader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/reader"
+	pluginconfig2 "github.com/smartcontractkit/chainlink-ccip/ocr3/pluginconfig"
+)
+
+type IntTest struct {
+	t *testing.T
+
+	lggr  logger.Logger
+	donID uint32
+
+	srcSelectors []cciptypes.ChainSelector
+	dstSelector  cciptypes.ChainSelector
+
+	msgHasher           cciptypes.MessageHasher
+	ccipReader          *inmem.InMemoryCCIPReader
+	usdcServer          *ConfigurableAttestationServer
+	lbtcServer          *ConfigurableAttestationServer
+	tokenObserverConfig []pluginconfig2.TokenDataObserverConfig
+	tokenChainReader    map[cciptypes.ChainSelector]contractreader.Extended
+	offChainCfg         pluginconfig2.ExecuteOffchainConfig
+}
+
+func SetupSimpleTest(t *testing.T,
+	lggr logger.Logger,
+	srcSelectors []cciptypes.ChainSelector,
+	dstSelector cciptypes.ChainSelector,
+) *IntTest {
+	donID := uint32(1)
+
+	messagesMap := make(map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata)
+
+	for _, src := range srcSelectors {
+		messagesMap[src] = []inmem.MessagesWithMetadata{}
+
+	}
+	msgHasher := mocks2.NewMessageHasher()
+	ccipReader := inmem.InMemoryCCIPReader{
+		UnfinalizedReports: []cciptypes.CommitPluginReportWithMeta{},
+		Messages:           messagesMap,
+		Dest:               dstSelector,
+	}
+
+	return &IntTest{
+		t:                   t,
+		lggr:                lggr,
+		donID:               donID,
+		msgHasher:           msgHasher,
+		srcSelectors:        srcSelectors,
+		dstSelector:         dstSelector,
+		ccipReader:          &ccipReader,
+		tokenObserverConfig: []pluginconfig2.TokenDataObserverConfig{},
+		tokenChainReader:    map[cciptypes.ChainSelector]contractreader.Extended{},
+		offChainCfg: pluginconfig2.ExecuteOffchainConfig{
+			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+			BatchGasLimit:             100000000,
+			MaxCommitReportsToFetch:   10,
+		},
+	}
+}
+
+func (it *IntTest) WithOffChainConfig(cfg pluginconfig2.ExecuteOffchainConfig) {
+	it.offChainCfg = cfg
+}
+
+func (it *IntTest) WithMessages(
+	messages []inmem.MessagesWithMetadata,
+	crBlockNumber uint64,
+	crTimestamp time.Time,
+	numReports int,
+	srcSelector cciptypes.ChainSelector) {
+	mapped := slicelib.Map(messages,
+		func(m inmem.MessagesWithMetadata) cciptypes.Message {
+			return m.Message
+		},
+	)
+	totalMessages := len(mapped)
+	messagesPerReport := totalMessages / numReports
+
+	for i := 0; i < numReports; i++ {
+		startIndex := i * messagesPerReport
+		endIndex := startIndex + messagesPerReport
+		if i == numReports-1 {
+			endIndex = totalMessages // Ensure the last report includes any remaining messages
+		}
+
+		msgs := mapped[startIndex:endIndex]
+		hashes := make([]cciptypes.Bytes32, len(msgs))
+		for i, m := range msgs {
+			hash, err := it.msgHasher.Hash(context.Background(), m)
+			require.NoError(it.t, err, "failed to hash message")
+			hashes[i] = hash
+		}
+		reportData := exectypes2.CommitData{
+			SourceChain: srcSelector,
+			SequenceNumberRange: cciptypes.NewSeqNumRange(
+				mapped[startIndex].Header.SequenceNumber,
+				mapped[endIndex-1].Header.SequenceNumber,
+			),
+			Messages:         msgs,
+			Hashes:           hashes,
+			MessageTokenData: make([]exectypes2.MessageTokenData, len(msgs)),
+			Timestamp:        crTimestamp,
+		}
+
+		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))
+		require.NoError(it.t, err, "failed to construct merkle tree")
+
+		it.ccipReader.UnfinalizedReports = append(it.ccipReader.UnfinalizedReports, cciptypes.CommitPluginReportWithMeta{
+			Report: cciptypes.CommitPluginReport{
+				BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+					{
+						ChainSel:     reportData.SourceChain,
+						SeqNumsRange: reportData.SequenceNumberRange,
+						MerkleRoot:   tree.Root(),
+					},
+				},
+			},
+			BlockNum:  crBlockNumber,
+			Timestamp: crTimestamp,
+		})
+	}
+
+	it.ccipReader.Messages[srcSelector] = append(
+		it.ccipReader.Messages[srcSelector],
+		messages...,
+	)
+}
+
+func (it *IntTest) WithUSDC(
+	sourcePoolAddress string,
+	attestations map[string]string,
+	events []*readerpkg.MessageSentEvent,
+	srcSelector cciptypes.ChainSelector,
+) {
+	it.usdcServer = newConfigurableAttestationServer(attestations)
+	it.tokenObserverConfig = append(it.tokenObserverConfig, pluginconfig2.TokenDataObserverConfig{
+		Type:    "usdc-cctp",
+		Version: "1",
+		USDCCCTPObserverConfig: &pluginconfig2.USDCCCTPObserverConfig{
+			AttestationConfig: pluginconfig2.AttestationConfig{
+				AttestationAPI:         it.usdcServer.server.URL,
+				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
+				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+			},
+			AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
+			Tokens: map[cciptypes.ChainSelector]pluginconfig2.USDCCCTPTokenConfig{
+				srcSelector: {
+					SourcePoolAddress:            sourcePoolAddress,
+					SourceMessageTransmitterAddr: sourcePoolAddress,
+				},
+			},
+		},
+	})
+
+	usdcEvents := make([]types.Sequence, len(events))
+	for i, e := range events {
+		usdcEvents[i] = types.Sequence{Data: e}
+	}
+
+	r := contractreader2.NewMockExtended(it.t)
+	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
+	r.EXPECT().ExtendedQueryKey(
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(usdcEvents, nil).Maybe()
+
+	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.Extended{
+		srcSelector:    r,
+		it.dstSelector: r,
+	}
+}
+
+func (it *IntTest) WithLBTC(
+	sourcePoolAddress string,
+	attestations map[string]string,
+	srcSelector cciptypes.ChainSelector,
+) {
+	it.lbtcServer = newConfigurableAttestationServer(attestations)
+	it.tokenObserverConfig = append(it.tokenObserverConfig, pluginconfig2.TokenDataObserverConfig{
+		Type:    "lbtc",
+		Version: "1",
+		LBTCObserverConfig: &pluginconfig2.LBTCObserverConfig{
+			AttestationConfig: pluginconfig2.AttestationConfig{
+				AttestationAPI:         it.lbtcServer.server.URL,
+				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
+				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+			},
+			SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
+				srcSelector: sourcePoolAddress,
+			},
+			AttestationAPIBatchSize: 1,
+		},
+	})
+}
+
+func (it *IntTest) Start() *testhelpers2.OCR3Runner[[]byte] {
+	chainConfigInfos := []reader.ChainConfigInfo{
+		{
+			ChainSelector: it.dstSelector,
+			ChainConfig: reader.HomeChainConfigMapper{
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
+			},
+		},
+	}
+	// Add config for all srcSelectors
+	for _, src := range it.srcSelectors {
+		chainConfigInfos = append(chainConfigInfos, reader.ChainConfigInfo{
+			ChainSelector: src,
+			ChainConfig: reader.HomeChainConfigMapper{
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
+			},
+		})
+	}
+
+	homeChain := setupHomeChainPoller(it.t, it.lggr, chainConfigInfos)
+	ctx := it.t.Context()
+	err := homeChain.Start(ctx)
+	require.NoError(it.t, err, "failed to start home chain poller")
+	mockAddrCodec := internal.NewMockAddressCodecHex(it.t)
+	tkObs, err := observer.NewConfigBasedCompositeObservers(
+		ctx,
+		it.lggr,
+		it.dstSelector,
+		it.tokenObserverConfig,
+		testhelpers2.TokenDataEncoderInstance,
+		it.tokenChainReader,
+		mockAddrCodec,
+	)
+	require.NoError(it.t, err)
+
+	ep := ccipocr3.NewMockEstimateProvider(it.t)
+	ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
+	ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
+
+	oracleIDToP2pID := testhelpers2.CreateOracleIDToP2pID(1, 2, 3)
+	nodesSetup := []nodeSetup{
+		it.newNode(it.offChainCfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(it.offChainCfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(it.offChainCfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+	}
+
+	require.NoError(it.t, homeChain.Close())
+
+	nodes := make([]ocr3types.ReportingPlugin[[]byte], 0, len(nodesSetup))
+	for _, n := range nodesSetup {
+		nodes = append(nodes, n.node)
+	}
+
+	nodeIDs := make([]commontypes.OracleID, 0, len(nodesSetup))
+	for _, n := range nodesSetup {
+		nodeIDs = append(nodeIDs, n.node.reportingCfg.OracleID)
+	}
+
+	return testhelpers2.NewOCR3Runner(nodes, nodeIDs, nil)
+}
+
+func (it *IntTest) Close() {
+	if it.usdcServer != nil {
+		it.usdcServer.Close()
+	}
+	if it.lbtcServer != nil {
+		it.lbtcServer.Close()
+	}
+}
+
+func (it *IntTest) newNode(
+	cfg pluginconfig2.ExecuteOffchainConfig,
+	homeChain reader.HomeChain,
+	ep cciptypes.EstimateProvider,
+	tokenDataObserver observer.TokenDataObserver,
+	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
+	id int,
+	N int,
+	configDigest [32]byte,
+	mockCodec *ccipocr3.MockAddressCodec,
+) nodeSetup {
+	reportCodec := mocks2.NewExecutePluginJSONReportCodec()
+	rCfg := ocr3types.ReportingPluginConfig{
+		N:            N,
+		OracleID:     commontypes.OracleID(id),
+		ConfigDigest: configDigest,
+	}
+
+	it.ccipReader.ConfigDigest = configDigest
+	node1 := NewPlugin(
+		it.donID,
+		rCfg,
+		cfg,
+		it.dstSelector,
+		oracleIDToP2pID,
+		it.ccipReader,
+		reportCodec,
+		it.msgHasher,
+		homeChain,
+		tokenDataObserver,
+		ep,
+		it.lggr,
+		&metrics.Noop{},
+		mockCodec,
+	)
+
+	// FIXME: Test should not rely on the specific type of the plugin but rather than that on
+	// the interface type
+	p := node1.(*TrackedPlugin)
+	pp := p.ReportingPlugin.(*Plugin)
+
+	return nodeSetup{
+		node:        pp,
+		reportCodec: reportCodec,
+		msgHasher:   it.msgHasher,
+	}
+}
+
+func mustEncodeChainConfig(cc chainconfig.ChainConfig) []byte {
+	encoded, err := chainconfig.EncodeChainConfig(cc)
+	if err != nil {
+		panic(err)
+	}
+	return encoded
+}
+
+type ConfigurableAttestationServer struct {
+	responses map[string]string
+	server    *httptest.Server
+}
+
+func newConfigurableAttestationServer(responses map[string]string) *ConfigurableAttestationServer {
+	c := &ConfigurableAttestationServer{
+		responses: responses,
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			for url, response := range c.responses {
+				if strings.Contains(r.RequestURI, url) {
+					_, err := w.Write([]byte(response))
+					if err != nil {
+						panic(err)
+					}
+					return
+				}
+			}
+		}
+		if r.Method == http.MethodPost {
+			var request map[string]interface{}
+			bodyRaw, err := io.ReadAll(r.Body)
+			if err != nil {
+				panic(err)
+			}
+			err = json.Unmarshal(bodyRaw, &request)
+			if err != nil {
+				panic(err)
+			}
+			payloadHashesUntyped := request["messageHash"].([]interface{})
+			if len(payloadHashesUntyped) == 0 {
+				w.WriteHeader(http.StatusBadRequest)
+			}
+			payloadHashes := make([]string, len(payloadHashesUntyped))
+			for i, hash := range payloadHashesUntyped {
+				payloadHashes[i] = hash.(string)
+			}
+			attestationResponse := attestationBatchByMessageHashes(payloadHashes, c.responses)
+			responseBytes, err := json.Marshal(attestationResponse)
+			if err != nil {
+				panic(err)
+			}
+			_, err = w.Write(responseBytes)
+			if err != nil {
+				panic(err)
+			}
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	c.server = server
+	return c
+}
+
+func attestationBatchByMessageHashes(payloadHashes []string, responses map[string]string) map[string]interface{} {
+	attestations := make([]interface{}, 0, len(responses))
+	for payloadHash, attestationRaw := range responses {
+		if slices.Contains(payloadHashes, payloadHash) {
+			var attestation map[string]interface{}
+			err := json.Unmarshal([]byte(attestationRaw), &attestation)
+			if err != nil {
+				panic(err)
+			}
+			attestations = append(attestations, attestation)
+		}
+	}
+	attestationResponse := make(map[string]interface{})
+	attestationResponse["attestations"] = attestations
+	return attestationResponse
+}
+
+func (c *ConfigurableAttestationServer) AddResponse(key, response string) {
+	c.responses[key] = response
+}
+
+func (c *ConfigurableAttestationServer) Close() {
+	c.server.Close()
+}
+
+func newMessageSentEvent(
+	sourceDomain uint32,
+	destDomain uint32,
+	nonce uint64,
+	payload []byte,
+) *readerpkg.MessageSentEvent {
+	var buf []byte
+	buf = binary.BigEndian.AppendUint32(buf, readerpkg.CCTPMessageVersion)
+	buf = binary.BigEndian.AppendUint32(buf, sourceDomain)
+	buf = binary.BigEndian.AppendUint32(buf, destDomain)
+	buf = binary.BigEndian.AppendUint64(buf, nonce)
+
+	senderBytes := [12]byte{}
+	buf = append(buf, senderBytes[:]...)
+	buf = append(buf, payload...)
+
+	return &readerpkg.MessageSentEvent{Arg0: buf}
+}
+
+type msgOption func(*cciptypes.Message)
+
+func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
+	return func(m *cciptypes.Message) {
+		m.TokenAmounts = tokenAmounts
+	}
+}
+
+func makeMsgWithMetadata(
+	seqNum cciptypes.SeqNum,
+	src, dest cciptypes.ChainSelector,
+	executed bool,
+	opts ...msgOption,
+) inmem.MessagesWithMetadata {
+	msg := cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			SourceChainSelector: src,
+			SequenceNumber:      seqNum,
+			MessageID:           rand.RandomBytes32(),
+		},
+		FeeValueJuels: cciptypes.NewBigIntFromInt64(100),
+	}
+
+	for _, opt := range opts {
+		opt(&msg)
+	}
+
+	return inmem.MessagesWithMetadata{
+		Message:     msg,
+		Destination: dest,
+		Executed:    executed,
+	}
+}
+
+type nodeSetup struct {
+	node        *Plugin
+	reportCodec cciptypes.ExecutePluginCodec
+	msgHasher   cciptypes.MessageHasher
+}
+
+func setupHomeChainPoller(
+	t *testing.T,
+	lggr logger.Logger,
+	chainConfigInfos []reader.ChainConfigInfo,
+) reader.HomeChain {
+	const ccipConfigAddress = "0xCCIPConfigFakeAddress"
+
+	homeChainReader := contractreader2.NewMockContractReaderFacade(t)
+	var firstCall = true
+	homeChainReader.On(
+		"GetLatestValue",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.MatchedBy(func(input map[string]interface{}) bool {
+			_, pageIndexExists := input["pageIndex"]
+			_, pageSizeExists := input["pageSize"]
+			return pageIndexExists && pageSizeExists
+		}),
+		mock.Anything,
+	).Run(
+		func(args mock.Arguments) {
+			arg := args.Get(4).(*[]reader.ChainConfigInfo)
+			if firstCall {
+				*arg = chainConfigInfos
+				firstCall = false
+			} else {
+				*arg = []reader.ChainConfigInfo{} // return empty for other pages
+			}
+		}).Return(nil)
+
+	homeChain := reader.NewHomeChainConfigPoller(
+		homeChainReader,
+		lggr,
+		// to prevent linting error because of logging after finishing tests, we close the poller after each test, having
+		// lower polling interval make it catch up faster
+		time.Minute,
+		types.BoundContract{
+			Address: ccipConfigAddress,
+			Name:    consts.ContractNameCCIPConfig,
+		},
+	)
+
+	return homeChain
+}
+
+func extractSequenceNumbers(messages []cciptypes.Message) []cciptypes.SeqNum {
+	sequenceNumbers := slicelib.Map(messages, func(m cciptypes.Message) cciptypes.SeqNum {
+		return m.Header.SequenceNumber
+	})
+	return sequenceNumbers
+}
+
+func emptyMessagesForRange(start, end uint64) []cciptypes.Message {
+	messages := make([]cciptypes.Message, end-start+1)
+	for i := start; i <= end; i++ {
+		messages[i-start] = cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				MessageID:      cciptypes.Bytes32{byte(i)},
+				SequenceNumber: cciptypes.SeqNum(i),
+			},
+		}
+	}
+	return messages
+}
+
+func emptyMessagesMapForRange(start, end uint64) map[cciptypes.SeqNum]cciptypes.Message {
+	messages := make(map[cciptypes.SeqNum]cciptypes.Message)
+	for i := start; i <= end; i++ {
+		messages[cciptypes.SeqNum(i)] = cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				MessageID:      cciptypes.Bytes32{byte(i)},
+				SequenceNumber: cciptypes.SeqNum(i),
+			},
+		}
+	}
+	return messages
+}
+
+func emptyMessagesMapForRanges(ranges []cciptypes.SeqNumRange) map[cciptypes.SeqNum]cciptypes.Message {
+	messages := make(map[cciptypes.SeqNum]cciptypes.Message)
+	for _, r := range ranges {
+		for i := r.Start(); i <= r.End(); i++ {
+			messages[i] = cciptypes.Message{
+				Header: cciptypes.RampMessageHeader{
+					MessageID:      cciptypes.Bytes32{byte(i)},
+					SequenceNumber: i,
+				},
+			}
+		}
+	}
+	return messages
+}
+
+func NewMessage(
+	msgID int,
+	seqNum int,
+	sourceChainSelector int,
+	destChainSelector int) cciptypes.Message {
+	return cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			MessageID:           cciptypes.Bytes32{byte(msgID)},
+			SourceChainSelector: cciptypes.ChainSelector(sourceChainSelector),
+			DestChainSelector:   cciptypes.ChainSelector(destChainSelector),
+			SequenceNumber:      cciptypes.SeqNum(seqNum),
+		},
+	}
+}
