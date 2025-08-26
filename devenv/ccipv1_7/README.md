@@ -32,25 +32,20 @@ Every command should be run inside [Nix](https://github.com/DeterminateSystems/n
 Enter `Nix` shell and build all the Docker images initially
 ```
 nix develop
-just build-all-docker-dev
+just build-docker-dev
 ```
 
-### Start the environment (local chains)
+Enter `ccip` shell and follow auto-completion hints
 ```
-ccip u
-```
-
-### Remove the environment
-```
-ccip d
+ccip sh
 ```
 
 ## Run the environment (testnets)
 Test key address is `0xE1395cc1ECc9f7B0B19FeECE841E3eC6805186A5`, the private key can be found in 1Password `Eng Shared Vault -> CCIPv1.7 Test Environments`
 
-Create `.envrc` and put it there `export PRIVATE_KEY="..."`
+Create `.envrc` and put the key there `export PRIVATE_KEY="..."` and select the network config
 ```
-ccip -c env.toml,env-fuji-fantom.toml u
+up env.toml,env-fuji-fantom.toml
 ```
 
 ### Check balances (src)
@@ -63,25 +58,14 @@ cast balance 0xE1395cc1ECc9f7B0B19FeECE841E3eC6805186A5 --ether --rpc-url=wss://
 cast balance 0xE1395cc1ECc9f7B0B19FeECE841E3eC6805186A5 --ether --rpc-url=wss://rpcs.cldev.sh/fantom/testnet
 ```
 
-## Observability stack
-
-### Spin up the stack
-```bash
-ccip obs u
-```
-
-### Remove the stack
-```bash
-ccip obs d
-```
-
-### Restart the stack (removing all data)
-```bash
-ccip obs r
-```
-
 ## Debugging Storage (MinIO) (inside Nix shell)
 You can find storage provider configuration [here](env.toml) - `[storage_provider]`
+
+## Install
+Set `MinIO` alias for easier commands
+```
+just minio-alias
+```
 
 ### Copy to MinIO
 ```bash

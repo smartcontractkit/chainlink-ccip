@@ -37,7 +37,7 @@ var reconfigureCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to clean Docker resources: %w", err)
 		}
-		_, err = ccipv17.NewEnvironment(true, "")
+		_, err = ccipv17.NewEnvironment()
 		return err
 	},
 }
@@ -46,12 +46,18 @@ var upCmd = &cobra.Command{
 	Use:     "up",
 	Aliases: []string{"u"},
 	Short:   "Spin up the development environment",
+	Args:    cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		configFile, _ := rootCmd.Flags().GetString("config")
+		var configFile string
+		if len(args) > 0 {
+			configFile = args[0]
+		} else {
+			configFile = "env.toml"
+		}
 		framework.L.Info().Str("Config", configFile).Msg("Creating development environment")
 		_ = os.Setenv("CTF_CONFIGS", configFile)
 		_ = os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
-		_, err := ccipv17.NewEnvironment(true, "")
+		_, err := ccipv17.NewEnvironment()
 		if err != nil {
 			return err
 		}
@@ -64,16 +70,11 @@ var downCmd = &cobra.Command{
 	Aliases: []string{"d"},
 	Short:   "Tear down the development environment",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		remote, _ := rootCmd.Flags().GetBool("remote")
-		// namespace, _ := rootCmd.Flags().GetString("namespace")
-		if !remote {
-			framework.L.Info().Msg("Tearing down the development environment")
-			err := framework.RemoveTestContainers()
-			if err != nil {
-				return fmt.Errorf("failed to clean Docker resources: %w", err)
-			}
+		framework.L.Info().Msg("Tearing down the development environment")
+		err := framework.RemoveTestContainers()
+		if err != nil {
+			return fmt.Errorf("failed to clean Docker resources: %w", err)
 		}
-		// TODO: add CRIB SDK integration
 		return nil
 	},
 }
@@ -203,7 +204,6 @@ var indexerDBShell = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringP("config", "c", "env.toml", "Configuration file for the environment")
 	rootCmd.PersistentFlags().StringP("blockscout_url", "u", "http://host.docker.internal:8545", "EVM RPC node URL")
 
 	bsCmd.AddCommand(bsUpCmd)
@@ -223,6 +223,10 @@ func init() {
 }
 
 func main() {
+	if len(os.Args) == 2 && (os.Args[1] == "shell" || os.Args[1] == "sh") {
+		StartShell()
+		return
+	}
 	if err := rootCmd.Execute(); err != nil {
 		ccipv17.Plog.Err(err).Send()
 		os.Exit(1)

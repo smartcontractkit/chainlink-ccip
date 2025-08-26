@@ -82,3 +82,7 @@ build-jd-docker:
         rm -rf job-distributor/
     fi
     echo "Done!"
+
+# Sets MinIO alias for easier use of 'mc' CLI
+minio-alias:
+   mc alias set minio http://localhost:9000 mYrAnD0mAcc3ssK3y2024 s3cR3tK3yL0ngEn0ughF0rMinI0Testing2024!

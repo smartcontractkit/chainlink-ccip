@@ -38,7 +38,9 @@ jobs:
           go-version: '1.24.4'
           cache: true
       - name: Run CCIPv2 environment
-        run: go run cmd/ccip.go -c env-ci.toml u
+        run: |
+          cd cmd/ccip && go install . && cd -
+          ccip u env-ci.toml
 
 defaults:
   run:

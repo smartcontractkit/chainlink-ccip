@@ -35,7 +35,9 @@ jobs:
       - name: Run Observability Stack
         run: go run cmd/ccip.go obs u
       - name: Run CCIPv2 environment
-        run: go run cmd/ccip.go -c env-ci.toml u
+        run: |
+          cd cmd/ccip && go install . && cd -
+          ccip u env-ci.toml
       - name: Run Soak Test
         working-directory: example/ccipv1_7/tests
         run: go test -timeout 2h -v -run TestSoak

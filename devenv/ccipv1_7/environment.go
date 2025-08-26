@@ -24,8 +24,18 @@ type Cfg struct {
 	NodeSets        []*ns.Input            `toml:"nodesets"         validate:"required"`
 }
 
-// localEnvironment internal function describing your Docker environment orchestration.
-func localEnvironment() (*Cfg, error) {
+// verifyEnvironment internal function describing how to verify your environment is working.
+func verifyEnvironment(in *Cfg) error {
+	if !in.CCIPv17.Verify {
+		return nil
+	}
+	Plog.Info().Msg("Verifying environment")
+	// CCIPv17 verification, check that example transfer works
+	return nil
+}
+
+// NewEnvironment creates a new datafeeds environment either locally in Docker or remotely in K8s.
+func NewEnvironment() (*Cfg, error) {
 	if err := framework.DefaultNetwork(nil); err != nil {
 		return nil, err
 	}
@@ -73,19 +83,4 @@ func localEnvironment() (*Cfg, error) {
 	track.Record("[changeset] deployed product contracts")
 	track.Print()
 	return in, Store[Cfg](in)
-}
-
-// verifyEnvironment internal function describing how to verify your environment is working.
-func verifyEnvironment(in *Cfg) error {
-	if !in.CCIPv17.Verify {
-		return nil
-	}
-	Plog.Info().Msg("Verifying environment")
-	// CCIPv17 verification, check that example transfer works
-	return nil
-}
-
-// NewEnvironment creates a new datafeeds environment either locally in Docker or remotely in K8s.
-func NewEnvironment(local bool, namespace string) (*Cfg, error) {
-	return localEnvironment()
 }
