@@ -5,8 +5,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/operations/call"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/operations/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/optypes/call"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/optypes/deployment"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )

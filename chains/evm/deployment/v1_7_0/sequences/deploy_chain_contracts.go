@@ -6,8 +6,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/operations/call"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/operations/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/optypes/call"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/optypes/deployment"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
@@ -57,13 +57,17 @@ type FeeQuoterV2Params struct {
 	WETHPremiumMultiplierWeiPerEth uint64
 }
 
+type ContractParams struct {
+	RMNRemote     RMNRemoteParams
+	CCVAggregator CCVAggregatorParams
+	CommitOnRamp  CommitOnRampParams
+	CCVProxy      CCVProxyParams
+	FeeQuoterV2   FeeQuoterV2Params
+}
+
 type DeployChainContractsInput struct {
-	ExistingAddresses   map[cldf_deployment.ContractType]datastore.AddressRef
-	RMNRemoteParams     RMNRemoteParams
-	CCVAggregatorParams CCVAggregatorParams
-	CommitOnRampParams  CommitOnRampParams
-	CCVProxyParams      CCVProxyParams
-	FeeQuoterV2Params   FeeQuoterV2Params
+	ExistingAddresses []datastore.AddressRef
+	ContractParams    ContractParams
 }
 
 type DeployChainContractsOutput struct {
@@ -114,7 +118,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
-				LegacyRMN:          input.RMNRemoteParams.LegacyRMN,
+				LegacyRMN:          input.ContractParams.RMNRemote.LegacyRMN,
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -162,8 +166,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 			Args: fee_quoter_v2.ConstructorArgs{
 				StaticConfig: fee_quoter_v2.StaticConfig{
-					MaxFeeJuelsPerMsg:            input.FeeQuoterV2Params.MaxFeeJuelsPerMsg,
-					TokenPriceStalenessThreshold: input.FeeQuoterV2Params.TokenPriceStalenessThreshold,
+					MaxFeeJuelsPerMsg:            input.ContractParams.FeeQuoterV2.MaxFeeJuelsPerMsg,
+					TokenPriceStalenessThreshold: input.ContractParams.FeeQuoterV2.TokenPriceStalenessThreshold,
 					LinkToken:                    common.HexToAddress(linkRef.Address),
 				},
 				PriceUpdaters: []common.Address{
@@ -174,11 +178,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				PremiumMultiplierWeiPerEthArgs: []fee_quoter_v2.PremiumMultiplierWeiPerEthArgs{
 					{
 						Token:                      common.HexToAddress(linkRef.Address),
-						PremiumMultiplierWeiPerEth: input.FeeQuoterV2Params.LINKPremiumMultiplierWeiPerEth,
+						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoterV2.LINKPremiumMultiplierWeiPerEth,
 					},
 					{
 						Token:                      common.HexToAddress(wethRef.Address),
-						PremiumMultiplierWeiPerEth: input.FeeQuoterV2Params.WETHPremiumMultiplierWeiPerEth,
+						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoterV2.WETHPremiumMultiplierWeiPerEth,
 					},
 				},
 				FeeTokens: []common.Address{
@@ -202,7 +206,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			Args: ccv_aggregator.ConstructorArgs{
 				LocalChainSelector:   chain.Selector,
 				RmnRemote:            common.HexToAddress(rmnProxyRef.Address),
-				GasForCallExactCheck: input.CCVAggregatorParams.GasForCallExactCheck,
+				GasForCallExactCheck: input.ContractParams.CCVAggregator.GasForCallExactCheck,
 				TokenAdminRegistry:   common.HexToAddress(tokenAdminRegistryRef.Address),
 			},
 		}, input.ExistingAddresses)
@@ -222,7 +226,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				},
 				DynamicConfig: ccv_proxy.DynamicConfig{
 					FeeQuoter:     common.HexToAddress(feeQuoterV2Ref.Address),
-					FeeAggregator: input.CCVProxyParams.FeeAggregator,
+					FeeAggregator: input.ContractParams.CCVProxy.FeeAggregator,
 				},
 			},
 		}, input.ExistingAddresses)
@@ -248,8 +252,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				NonceManager: common.HexToAddress(nonceManagerRef.Address),
 				DynamicConfig: commit_onramp.DynamicConfig{
 					FeeQuoter:      common.HexToAddress(feeQuoterV2Ref.Address),
-					FeeAggregator:  input.CommitOnRampParams.FeeAggregator,
-					AllowlistAdmin: input.CommitOnRampParams.AllowlistAdmin,
+					FeeAggregator:  input.ContractParams.CommitOnRamp.FeeAggregator,
+					AllowlistAdmin: input.ContractParams.CommitOnRamp.AllowlistAdmin,
 				},
 			},
 		}, input.ExistingAddresses)
@@ -299,10 +303,12 @@ func maybeDeployContract[ARGS any](
 	contractType cldf_deployment.ContractType,
 	chain evm.Chain,
 	input deployment.Input[ARGS],
-	existingAddresses map[cldf_deployment.ContractType]datastore.AddressRef,
+	existingAddresses []datastore.AddressRef,
 ) (datastore.AddressRef, error) {
-	if ref, exists := existingAddresses[contractType]; exists {
-		return ref, nil
+	for _, ref := range existingAddresses {
+		if ref.Type == datastore.ContractType(contractType) {
+			return ref, nil
+		}
 	}
 	report, err := cldf_ops.ExecuteOperation(b, op, chain, input)
 	if err != nil {
