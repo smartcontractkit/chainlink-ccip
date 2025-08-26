@@ -45,7 +45,7 @@ CCVProxy_parseExtraArgsWithDefaults:test_parseExtraArgsWithDefaults_WithGenericE
 CCVProxy_parseExtraArgsWithDefaults:test_parseExtraArgsWithDefaults_WithGenericExtraArgsV3Tag_NoRequiredCCVInConfig() (gas: 28984)
 CCVProxy_parseExtraArgsWithDefaults:test_parseExtraArgsWithDefaults_WithLegacyExtraArgs() (gas: 25197)
 CommitOnRamp_forwardToVerifier_Test:test_forwardToVerifier() (gas: 46262)
-CommitOnRamp_forwardToVerifier_Test:test_forwardToVerifier_WithOutOfOrderExecution() (gas: 42101)
+CommitOnRamp_forwardToVerifier_Test:test_forwardToVerifier_WithOutOfOrderExecution() (gas: 42079)
 DefensiveExampleTest:test_HappyPath() (gas: 204120)
 DefensiveExampleTest:test_Recovery() (gas: 429488)
 DonIDClaimerTest:test_ClaimMultipleDONIds() (gas: 46084)

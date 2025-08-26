@@ -11,13 +11,13 @@ import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
 contract CommitOnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
   address internal constant ALLOWLIST_ADMIN = 0x1234567890123456789012345678901234567890;
-  address internal ccvProxy;
+  address internal s_ccvProxy;
   CommitOnRamp internal s_commitOnRamp;
   NonceManager internal s_nonceManager;
 
   function setUp() public virtual override {
     super.setUp();
-    ccvProxy = makeAddr("CCVProxy");
+    s_ccvProxy = makeAddr("CCVProxy");
     s_nonceManager = NonceManager(makeAddr("NonceManager"));
 
     s_commitOnRamp = new CommitOnRamp(
@@ -33,7 +33,7 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
     // Set up destination chain configuration
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = BaseOnRamp.DestChainConfigArgs({
-      ccvProxy: ccvProxy, // CCVProxy address
+      ccvProxy: s_ccvProxy, // CCVProxy address
       destChainSelector: DEST_CHAIN_SELECTOR,
       allowlistEnabled: false
     });

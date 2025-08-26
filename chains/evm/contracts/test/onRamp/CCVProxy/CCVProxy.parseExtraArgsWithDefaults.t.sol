@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
-
 import {CCVProxySetup} from "./CCVProxySetup.t.sol";
 import {CCVProxyTestWrapper} from "./CCVProxyTestWrapper.sol";
 
