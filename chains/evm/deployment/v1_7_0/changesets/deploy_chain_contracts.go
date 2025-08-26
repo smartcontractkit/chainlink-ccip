@@ -2,7 +2,9 @@ package changesets
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/changeset"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
@@ -19,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 var DeployChainContracts = cldf_deployment.CreateChangeSet(applyDeployChainContracts, verifyDeployChainContracts)
@@ -70,12 +73,18 @@ func applyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainCon
 		}
 	}
 
-	// TODO: Just execute all the transactions for now (we will want to enable MCMS eventually)
-	for range report.Output.Txs {
-	}
-
-	return cldf_deployment.ChangesetOutput{
-		Reports:   report.ExecutionReports,
-		DataStore: ds,
-	}, nil
+	return changeset.NewOutputBuilder().
+		WithReports(report.ExecutionReports).
+		WithDataStore(ds).
+		WithWriteOutputs(report.Output.Writes).
+		Build(changeset.MCMSParams{
+			Description: fmt.Sprintf("Initial confiuration of 1.7.0 contracts on %s", chain),
+			// TODO: Populate these with correct values later
+			OverridePreviousRoot: false,
+			ValidUntil:           2756219818,
+			TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			TimelockAddresses:    nil,
+			ChainMetadata:        nil,
+		})
 }

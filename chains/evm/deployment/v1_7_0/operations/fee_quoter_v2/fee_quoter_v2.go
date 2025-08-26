@@ -1,6 +1,8 @@
 package fee_quoter_v2
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -59,6 +61,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.7.0"),
 	"Deploys the FeeQuoterV2 contract",
 	ContractType,
+	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := fee_quoter_v2.DeployFeeQuoterV2(
@@ -83,7 +86,10 @@ var ApplyAuthorizedCallerUpdates = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Updates authorized price updaters on the FeeQuoterV2 contract",
 	ContractType,
+	fee_quoter_v2.FeeQuoterV2ABI,
 	fee_quoter_v2.NewFeeQuoterV2,
+	call.OnlyOwner,
+	func(AuthorizedCallerArgs) error { return nil },
 	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return feeQuoterV2.ApplyAuthorizedCallerUpdates(opts, args)
 	},
@@ -94,7 +100,10 @@ var ApplyDestChainConfigUpdates = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Applies updates to destination chain configurations on the FeeQuoterV2",
 	ContractType,
+	fee_quoter_v2.FeeQuoterV2ABI,
 	fee_quoter_v2.NewFeeQuoterV2,
+	call.OnlyOwner,
+	func([]DestChainConfigArgs) error { return nil },
 	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return feeQuoterV2.ApplyDestChainConfigUpdates(opts, transformDestChainConfigArgs(args))
 	},
@@ -105,7 +114,10 @@ var ApplyFeeTokensUpdates = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Applies updates to the fee tokens supported by the FeeQuoterV2",
 	ContractType,
+	fee_quoter_v2.FeeQuoterV2ABI,
 	fee_quoter_v2.NewFeeQuoterV2,
+	call.OnlyOwner,
+	func(ApplyFeeTokensUpdatesArgs) error { return nil },
 	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args ApplyFeeTokensUpdatesArgs) (*types.Transaction, error) {
 		return feeQuoterV2.ApplyFeeTokensUpdates(opts, args.FeeTokensToRemove, args.FeeTokensToAdd)
 	},
@@ -116,7 +128,10 @@ var ApplyPremiumMultiplierWeiPerEthUpdates = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Applies updates to the premium multiplier (in wei per ETH) for various tokens on the FeeQuoterV2",
 	ContractType,
+	fee_quoter_v2.FeeQuoterV2ABI,
 	fee_quoter_v2.NewFeeQuoterV2,
+	call.OnlyOwner,
+	func([]PremiumMultiplierWeiPerEthArgs) error { return nil },
 	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args []PremiumMultiplierWeiPerEthArgs) (*types.Transaction, error) {
 		return feeQuoterV2.ApplyPremiumMultiplierWeiPerEthUpdates(opts, args)
 	},
@@ -127,7 +142,10 @@ var ApplyTokenTransferFeeConfigUpdates = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Applies updates to the token transfer fee configurations on the FeeQuoterV2",
 	ContractType,
+	fee_quoter_v2.FeeQuoterV2ABI,
 	fee_quoter_v2.NewFeeQuoterV2,
+	call.OnlyOwner,
+	func(ApplyTokenTransferFeeConfigUpdatesArgs) error { return nil },
 	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesArgs) (*types.Transaction, error) {
 		return feeQuoterV2.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
 	},
@@ -138,7 +156,16 @@ var UpdatePrices = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Updates token prices on the FeeQuoterV2",
 	ContractType,
+	fee_quoter_v2.FeeQuoterV2ABI,
 	fee_quoter_v2.NewFeeQuoterV2,
+	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.CallOpts) ([]common.Address, error) {
+		priceUpdaters, err := feeQuoterV2.GetAllAuthorizedCallers(opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get authorized callers from FeeQuoterV2 (%s): %w", feeQuoterV2.Address(), err)
+		}
+		return priceUpdaters, nil
+	},
+	func(InternalPriceUpdates) error { return nil },
 	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args InternalPriceUpdates) (*types.Transaction, error) {
 		return feeQuoterV2.UpdatePrices(opts, args)
 	},
@@ -149,7 +176,10 @@ var UpdateTokenPriceFeeds = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Updates the token price feeds on the FeeQuoterV2",
 	ContractType,
+	fee_quoter_v2.FeeQuoterV2ABI,
 	fee_quoter_v2.NewFeeQuoterV2,
+	call.OnlyOwner,
+	func([]TokenPriceFeedUpdate) error { return nil },
 	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args []TokenPriceFeedUpdate) (*types.Transaction, error) {
 		return feeQuoterV2.UpdateTokenPriceFeeds(opts, args)
 	},

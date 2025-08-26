@@ -25,7 +25,6 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcm_types "github.com/smartcontractkit/mcms/types"
 )
 
 const (
@@ -72,7 +71,7 @@ type DeployChainContractsInput struct {
 
 type DeployChainContractsOutput struct {
 	Addresses []datastore.AddressRef
-	Txs       []mcm_types.Transaction
+	Writes    []call.WriteOutput
 }
 
 var DeployChainContracts = cldf_ops.NewSequence(
@@ -81,7 +80,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	"Deploys all required contracts for CCIP 1.7.0 to a chain",
 	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output DeployChainContractsOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0, NUM_CONTRACTS)
-		txs := make([]mcm_types.Transaction, 0, NUM_TXS)
+		writes := make([]call.WriteOutput, 0, NUM_TXS)
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
 
@@ -137,7 +136,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		if err != nil {
 			return DeployChainContractsOutput{}, err
 		}
-		txs = append(txs, setRMNReport.Output)
+		writes = append(writes, setRMNReport.Output)
 
 		// Deploy Router
 		routerRef, err := maybeDeployContract(b, router.Deploy, router.ContractType, chain, deployment.Input[router.ConstructorArgs]{
@@ -288,11 +287,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		if err != nil {
 			return DeployChainContractsOutput{}, fmt.Errorf("failed to add CommitOnRamp and CommitOffRamp as AuthorizedCallers to NonceManager: %w", err)
 		}
-		txs = append(txs, applyAuthorizedCallerUpdatesReport.Output)
+		writes = append(writes, applyAuthorizedCallerUpdatesReport.Output)
 
 		return DeployChainContractsOutput{
 			Addresses: addresses,
-			Txs:       txs,
+			Writes:    writes,
 		}, nil
 	},
 )

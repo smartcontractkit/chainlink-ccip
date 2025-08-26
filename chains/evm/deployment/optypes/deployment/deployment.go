@@ -38,6 +38,7 @@ func New[ARGS any](
 	version *semver.Version,
 	description string,
 	contractType deployment.ContractType,
+	validate func(input ARGS) error,
 	deployers VMDeployers[ARGS],
 ) *operations.Operation[Input[ARGS], datastore.AddressRef, evm.Chain] {
 	return operations.NewOperation(
@@ -45,6 +46,11 @@ func New[ARGS any](
 		version,
 		description,
 		func(b operations.Bundle, chain evm.Chain, input Input[ARGS]) (datastore.AddressRef, error) {
+			if validate != nil {
+				if err := validate(input.Args); err != nil {
+					return datastore.AddressRef{}, fmt.Errorf("invalid constructor args for %s: %w", name, err)
+				}
+			}
 			if input.ChainSelector != chain.Selector {
 				return datastore.AddressRef{}, fmt.Errorf("mismatch between inputted chain selector and selector defined within dependencies: %d != %d", input.ChainSelector, chain.Selector)
 			}

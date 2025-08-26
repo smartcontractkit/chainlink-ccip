@@ -37,6 +37,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.7.0"),
 	"Deploys the CCVProxy contract",
 	ContractType,
+	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := ccv_proxy.DeployCCVProxy(opts, backend, args.StaticConfig, args.DynamicConfig)
@@ -51,7 +52,10 @@ var SetDestChainConfig = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Sets the dynamic configuration on the CCVProxy",
 	ContractType,
+	ccv_proxy.CCVProxyABI,
 	ccv_proxy.NewCCVProxy,
+	call.OnlyOwner,
+	func(SetDynamicConfigArgs) error { return nil },
 	func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
 		return ccvProxy.SetDynamicConfig(opts, args.DynamicConfig)
 	},
@@ -62,7 +66,10 @@ var ApplyDestChainConfigUpdates = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Applies updates to destination chain configuration on the CCVProxy",
 	ContractType,
+	ccv_proxy.CCVProxyABI,
 	ccv_proxy.NewCCVProxy,
+	call.OnlyOwner,
+	func([]DestChainConfigArgs) error { return nil },
 	func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return ccvProxy.ApplyDestChainConfigUpdates(opts, args)
 	},
@@ -73,7 +80,10 @@ var WithdrawFeeTokens = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Withdraws fee tokens from the CCVProxy",
 	ContractType,
+	ccv_proxy.CCVProxyABI,
 	ccv_proxy.NewCCVProxy,
+	call.OnlyOwner,
+	func(WithdrawFeeTokensArgs) error { return nil },
 	func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return ccvProxy.WithdrawFeeTokens(opts, args.FeeTokens)
 	},

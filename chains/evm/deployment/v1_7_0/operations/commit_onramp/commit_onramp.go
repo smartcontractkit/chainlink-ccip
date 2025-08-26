@@ -38,6 +38,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.7.0"),
 	"Deploys the CommitOnRamp contract",
 	ContractType,
+	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := commit_onramp.DeployCommitOnRamp(opts, backend, args.RMNRemote, args.NonceManager, args.DynamicConfig)
@@ -52,7 +53,10 @@ var SetDynamicConfig = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Sets the dynamic configuration on the CommitOnRamp",
 	ContractType,
+	commit_onramp.CommitOnRampABI,
 	commit_onramp.NewCommitOnRamp,
+	call.OnlyOwner,
+	func(SetDynamicConfigArgs) error { return nil },
 	func(commitOnRamp *commit_onramp.CommitOnRamp, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
 		return commitOnRamp.SetDynamicConfig(opts, args.DynamicConfig)
 	},
@@ -63,7 +67,10 @@ var ApplyDestChainConfigUpdates = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Applies updates to destination chain configurations on the CommitOnRamp",
 	ContractType,
+	commit_onramp.CommitOnRampABI,
 	commit_onramp.NewCommitOnRamp,
+	call.OnlyOwner,
+	func([]DestChainConfigArgs) error { return nil },
 	func(commitOnRamp *commit_onramp.CommitOnRamp, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return commitOnRamp.ApplyDestChainConfigUpdates(opts, args)
 	},
@@ -74,7 +81,10 @@ var ApplyAllowlistUpdates = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Applies updates to the allowlist (those authorized to send messages) on the CommitOnRamp",
 	ContractType,
+	commit_onramp.CommitOnRampABI,
 	commit_onramp.NewCommitOnRamp,
+	call.OnlyOwner,
+	func([]AllowlistConfigArgs) error { return nil },
 	func(commitOnRamp *commit_onramp.CommitOnRamp, opts *bind.TransactOpts, args []AllowlistConfigArgs) (*types.Transaction, error) {
 		return commitOnRamp.ApplyAllowlistUpdates(opts, args)
 	},
@@ -85,7 +95,10 @@ var WithdrawFeeTokens = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Withdraws fee tokens from the CommitOnRamp",
 	ContractType,
+	commit_onramp.CommitOnRampABI,
 	commit_onramp.NewCommitOnRamp,
+	call.OnlyOwner,
+	func(WithdrawFeeTokensArgs) error { return nil },
 	func(commitOnRamp *commit_onramp.CommitOnRamp, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return commitOnRamp.WithdrawFeeTokens(opts, args.FeeTokens)
 	},

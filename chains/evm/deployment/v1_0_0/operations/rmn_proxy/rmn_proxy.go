@@ -26,6 +26,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.0.0"),
 	"Deploys the RMNProxy contract",
 	ContractType,
+	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := rmn_proxy_contract.DeployRMNProxy(opts, backend, args.RMN)
@@ -40,7 +41,10 @@ var SetRMN = call.NewWrite(
 	semver.MustParse("1.0.0"),
 	"Sets the RMN address on the RMNProxy",
 	ContractType,
+	rmn_proxy_contract.RMNProxyABI,
 	rmn_proxy_contract.NewRMNProxy,
+	call.OnlyOwner,
+	func(SetRMNArgs) error { return nil },
 	func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.TransactOpts, args SetRMNArgs) (*types.Transaction, error) {
 		return rmnProxy.SetARM(opts, args.RMN)
 	},

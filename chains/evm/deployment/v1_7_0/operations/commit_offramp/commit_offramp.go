@@ -24,6 +24,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.7.0"),
 	"Deploys the SignatureQuorumVerifier contract",
 	ContractType,
+	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := commit_offramp.DeployCommitOffRamp(opts, backend, args.NonceManager)
@@ -38,7 +39,10 @@ var SetSignatureConfig = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Sets the signature configuration on the CommitOffRamp",
 	ContractType,
+	commit_offramp.CommitOffRampABI,
 	commit_offramp.NewCommitOffRamp,
+	call.OnlyOwner,
+	func(SignatureConfigArgs) error { return nil },
 	func(commitOffRamp *commit_offramp.CommitOffRamp, opts *bind.TransactOpts, args SignatureConfigArgs) (*types.Transaction, error) {
 		return commitOffRamp.SetSignatureConfig(opts, args)
 	},

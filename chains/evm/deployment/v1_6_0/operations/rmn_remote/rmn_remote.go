@@ -27,6 +27,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.6.0"),
 	"Deploys the RMNRemote contract",
 	ContractType,
+	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := rmn_remote.DeployRMNRemote(opts, backend, args.LocalChainSelector, args.LegacyRMN)
@@ -41,7 +42,10 @@ var Curse = call.NewWrite(
 	semver.MustParse("1.6.0"),
 	"Applies a curse to an RMNRemote contract",
 	ContractType,
+	rmn_remote.RMNRemoteABI,
 	rmn_remote.NewRMNRemote,
+	call.OnlyOwner,
+	func(CurseArgs) error { return nil },
 	func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
 		return rmnRemote.Curse(opts, args.Subject)
 	},
@@ -52,7 +56,10 @@ var Uncurse = call.NewWrite(
 	semver.MustParse("1.6.0"),
 	"Uncurses an existing curse on an RMNRemote contract",
 	ContractType,
+	rmn_remote.RMNRemoteABI,
 	rmn_remote.NewRMNRemote,
+	call.OnlyOwner,
+	func(CurseArgs) error { return nil },
 	func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
 		return rmnRemote.Uncurse(opts, args.Subject)
 	},

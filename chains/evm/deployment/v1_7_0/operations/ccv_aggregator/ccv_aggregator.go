@@ -22,6 +22,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.7.0"),
 	"Deploys the CCVAggregator contract",
 	ContractType,
+	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := ccv_aggregator.DeployCCVAggregator(opts, backend, args)
@@ -36,7 +37,10 @@ var ApplySourceChainConfigUpdates = call.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Applies updates to source chain configurations on the CCVAggregator",
 	ContractType,
+	ccv_aggregator.CCVAggregatorABI,
 	ccv_aggregator.NewCCVAggregator,
+	call.OnlyOwner,
+	func([]SourceChainConfigArgs) error { return nil },
 	func(ccvAggregator *ccv_aggregator.CCVAggregator, opts *bind.TransactOpts, args []SourceChainConfigArgs) (*types.Transaction, error) {
 		return ccvAggregator.ApplySourceChainConfigUpdates(opts, args)
 	},

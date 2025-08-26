@@ -26,6 +26,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.6.0"),
 	"Deploys the NonceManager contract",
 	ContractType,
+	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := nonce_manager.DeployNonceManager(opts, backend, args.AuthorizedCallers)
@@ -40,7 +41,10 @@ var ApplyAuthorizedCallerUpdates = call.NewWrite(
 	semver.MustParse("1.6.0"),
 	"Applies updates to the list of authorized callers on the NonceManager",
 	ContractType,
+	nonce_manager.NonceManagerABI,
 	nonce_manager.NewNonceManager,
+	call.OnlyOwner,
+	func(AuthorizedCallerArgs) error { return nil },
 	func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return nonceManager.ApplyAuthorizedCallerUpdates(opts, args)
 	},
@@ -51,7 +55,10 @@ var ApplyPreviousRampUpdates = call.NewWrite(
 	semver.MustParse("1.6.0"),
 	"Applies updates to the list of previous ramps on the NonceManager",
 	ContractType,
+	nonce_manager.NonceManagerABI,
 	nonce_manager.NewNonceManager,
+	call.OnlyOwner,
+	func([]PreviousRampsArgs) error { return nil },
 	func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args []PreviousRampsArgs) (*types.Transaction, error) {
 		return nonceManager.ApplyPreviousRampsUpdates(opts, args)
 	},
