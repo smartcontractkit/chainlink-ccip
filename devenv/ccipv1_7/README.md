@@ -26,36 +26,16 @@
 - MinIO storage
 - Indexer example service + PostgreSQL
 
-## Prerequisites
-
-
-If you don't have access to JD image check out `JobDistributor` [repository](https://github.com/smartcontractkit/job-distributor) and build the image
-```
-docker build -t job-distributor:0.12.7 -f e2e/Dockerfile.e2e .
-```
-
-Change `[jd.image]` in `env.toml`
-```
-[jd]
-  csa_encryption_key = "1a3f7e9d2c5b8a0f4e6d9c2b7a1e5f3d8c0b9a8d7f6e5c4b3a2d1e0f9a8b7c1a"
-  image = "job-distributor:0.12.7"
-```
-
+## Install
 Every command should be run inside [Nix](https://github.com/DeterminateSystems/nix-installer) shell, please follow the [link](https://github.com/DeterminateSystems/nix-installer) and install it.
 
-## Run the environment (local chains)
-
-Enter `Nix` shell
+Enter `Nix` shell and build all the Docker images initially
 ```
 nix develop
+just build-all-docker-dev
 ```
 
-Build all the local services (Indexer, Fakes, JD)
-```
-build-all-docker-dev
-```
-
-### Start the environment
+### Start the environment (local chains)
 ```
 ccip u
 ```

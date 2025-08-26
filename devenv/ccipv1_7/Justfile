@@ -1,3 +1,7 @@
+# Default: show available recipes
+default:
+    just --list
+
 # Run go mod tidy
 tidy:
     go mod tidy
@@ -32,16 +36,24 @@ cli:
     go install cmd/ccip.go
 
 # Build all the services (hot-reload dev mode)
-build-all-docker-dev:
-    cd fakes && docker build -t ccip-fakes:latest . || cd -
-    cd indexer && docker build -f Dockerfile.dev -t indexer:dev . || cd -
+build-docker-dev:
+    @just build-fakes-docker
+    @just build-indexer-docker-dev
+    @just build-jd-docker
 
-build-all-docker-prod:
-    cd fakes && docker build -t ccip-fakes:latest . || cd -
-    cd indexer && docker build -f Dockerfile -t indexer . || cd -
+# Remove all the dev images
+clean-docker-dev:
+    docker rmi indexer:dev indexer:latest ccip-fakes:local job-distributor:local >/dev/null 2>&1 || true
+    rm -rf job-distributor/
 
+# Build all the services for production
+build-docker-prod:
+    @just build-fakes-docker
+    @just build-indexer-docker-prod
+
+# Build fakes image
 build-fakes-docker:
-    cd fakes && docker build -t ccip-fakes:latest . || cd -
+    cd fakes && docker build -t ccip-fakes:local . || cd -
 
 # Build Indexer dev image
 build-indexer-docker-dev:
@@ -50,3 +62,23 @@ build-indexer-docker-dev:
 # Build Indexer production image
 build-indexer-docker-prod:
     cd indexer && docker build -f Dockerfile -t indexer:dev . || cd -
+
+# Clone and build job-distributor Docker image
+build-jd-docker:
+    #!/usr/bin/env bash
+    set -e
+    REPO_URL="https://github.com/smartcontractkit/job-distributor"
+    REPO_DIR="job-distributor/"
+    IMAGE_NAME="job-distributor:local"
+    DOCKERFILE="e2e/Dockerfile.e2e"
+    if docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+        echo "Docker image $IMAGE_NAME already exists, skipping build..."
+    else
+        echo "Cloning repository..."
+        git clone "$REPO_URL" "$REPO_DIR"
+        echo "Building Docker image..."
+        cd "$REPO_DIR" && docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" .
+        cd ..
+        rm -rf job-distributor/
+    fi
+    echo "Done!"

@@ -48,3 +48,4 @@ pods.tmp.yml
 # devbox dependencies cache
 .devbox/
 dctl
+job-distributor/
