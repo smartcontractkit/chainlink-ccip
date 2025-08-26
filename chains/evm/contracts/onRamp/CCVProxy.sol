@@ -338,6 +338,16 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     return (requiredCCV, optionalCCV, optionalThreshold);
   }
 
+  /// @notice Parses and validates extra arguments, applying defaults from destination chain configuration
+  /// @dev This function handles two encoding formats to maintain backward compatibility:
+  /// 1. 4-byte tag + ABI-encoded EVMExtraArgsV3 struct
+  /// 2. Legacy format: Raw bytes used directly as executor arguments
+  /// The function ensures all messages have the required CCVs and executors needed for processing,
+  /// even when users don't explicitly specify them. This prevents messages from becoming unexecutable
+  /// due to missing required components.
+  /// @param destChainConfig Configuration for the destination chain including default values
+  /// @param extraArgs User-provided extra arguments in either V3 or legacy format
+  /// @return resolvedArgs Complete EVMExtraArgsV3 struct with all defaults applied
   function _parseExtraArgsWithDefaults(
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
@@ -346,21 +356,22 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       resolvedArgs = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV3));
 
       if (resolvedArgs.optionalCCV.length != 0) {
-        // Requiring more CCVs than are supplied would make a transaction unexecutable forever.
-        // If a user specified an optional CCV, the threshold must be non-zero.
+        // Prevent impossible execution scenarios: if threshold >= array length, no combination of optional CCVs
+        // could ever satisfy the requirement. Zero threshold defeats the purpose of having optional CCVs.
         if (resolvedArgs.optionalCCV.length <= resolvedArgs.optionalThreshold || resolvedArgs.optionalThreshold == 0) {
           revert InvalidOptionalCCVThreshold();
         }
       }
 
-      // Not supplying a CCV means the default is chosen.
+      // Ensure every message has at least one CCV for verification - prevents messages from being unverifiable
+      // when users don't specify any CCVs, default CCV is chosen
       if (resolvedArgs.requiredCCV.length + resolvedArgs.optionalCCV.length == 0) {
         resolvedArgs.requiredCCV = new Client.CCV[](1);
         resolvedArgs.requiredCCV[0] = Client.CCV({ccvAddress: destChainConfig.defaultCCV, args: ""});
       }
     } else {
-      // If old extraArgs are supplied, they are assumed to be for the default CCV and the default executor. This
-      // means any default CCV/executor has to be able to process all prior extraArgs.
+      // Legacy compatibility: older clients send old extraArgs, they are assumed to be for the default CCV
+      // and the default executor. This means any default CCV/executor has to be able to process all prior extraArgs.
       resolvedArgs.executorArgs = extraArgs;
 
       resolvedArgs.requiredCCV = new Client.CCV[](1);
@@ -372,7 +383,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       resolvedArgs.executor = destChainConfig.defaultExecutor;
     }
 
-    // If a required CCV is configured for the destination chain, prepend it to the required CCV array
+    // Enforce chain-level security requirements: some destination chains mandate specific CCVs for all messages.
+    // Prepending ensures this requirement is always met regardless of user preferences.
     if (destChainConfig.requiredCCV != address(0)) {
       Client.CCV[] memory newRequiredCCVs = new Client.CCV[](resolvedArgs.requiredCCV.length + 1);
       newRequiredCCVs[0] = Client.CCV({ccvAddress: destChainConfig.requiredCCV, args: ""});

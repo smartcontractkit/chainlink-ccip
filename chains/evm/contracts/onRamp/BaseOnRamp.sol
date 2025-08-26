@@ -29,7 +29,7 @@ abstract contract BaseOnRamp is ICCVOnRamp, ITypeAndVersion {
 
   struct DestChainConfig {
     bool allowlistEnabled; // ─╮ True if the allowlist is enabled.
-    address ccvProxy; // ──────╯ Local CCVProxy address  that is allowed to send messages to the destination chain.
+    address ccvProxy; // ──────╯ Local CCVProxy that is allowed to forward messages to this contract.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
 
@@ -62,7 +62,7 @@ abstract contract BaseOnRamp is ICCVOnRamp, ITypeAndVersion {
   /// @notice get ChainConfig configured for the DestinationChainSelector.
   /// @param destChainSelector The destination chain selector.
   /// @return allowlistEnabled boolean indicator to specify if allowlist check is enabled.
-  /// @return ccvProxy address of the ccvProxy.
+  /// @return ccvProxy address of the local ccvProxy.
   /// @return allowedSendersList list of addresses that are allowed to send messages to the destination chain.
   function getDestChainConfig(
     uint64 destChainSelector
