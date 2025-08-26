@@ -1,4 +1,4 @@
-# Indexer service boilerplate
+# Indexer Service Boilerplate
 Build dev image (hot-reload)
 ```
 just docker-dev

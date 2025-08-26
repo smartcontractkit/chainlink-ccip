@@ -46,7 +46,7 @@ jobs:
               exit 1
               ;;
           esac
-          PRIVATE_KEY=${PRIVATE_KEY} go run cmd/ccip.go -c env.toml,env-fuji.toml u
+          PRIVATE_KEY=${PRIVATE_KEY} go run cmd/ccip.go -c env-ci.toml,env-fuji.toml u
 
 defaults:
   run:

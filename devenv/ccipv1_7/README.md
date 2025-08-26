@@ -45,6 +45,11 @@ Every command should be run inside [Nix](https://github.com/DeterminateSystems/n
 
 ## Run the environment (local chains)
 
+Enter `Nix` shell
+```
+nix develop
+```
+
 ### Start the environment
 ```
 ccip u
@@ -119,5 +124,5 @@ We are using [Justfile](https://github.com/casey/just) for devs task
 just fmt && just lint
 ```
 
-### Creating your own components
+### Creating Components
 See the [guide](services/README.md)

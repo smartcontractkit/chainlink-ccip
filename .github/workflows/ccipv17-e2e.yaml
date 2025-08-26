@@ -2,8 +2,6 @@ name: End-to-end CCIPv2 Test
 
 on:
   push:
-    paths:
-      - 'devenv/ccipv1_7'
 
 jobs:
   e2e:
@@ -40,7 +38,7 @@ jobs:
           go-version: '1.24.4'
           cache: true
       - name: Run CCIPv2 environment
-        run: go run cmd/ccip.go -c env.toml u
+        run: go run cmd/ccip.go -c env-ci.toml u
 
 defaults:
   run:
