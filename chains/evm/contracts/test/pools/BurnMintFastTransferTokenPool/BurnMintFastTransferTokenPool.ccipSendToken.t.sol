@@ -35,8 +35,9 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
     uint256 balanceBefore = s_token.balanceOf(OWNER);
     uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
 
-    bytes32 expectedFillId =
-      s_pool.computeFillId(MESSAGE_ID, expectedAmountNetFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 expectedFillId = s_pool.computeFillId(
+      MESSAGE_ID, SOURCE_CHAIN_SELECTOR, expectedAmountNetFee, SOURCE_DECIMALS, abi.encode(RECEIVER)
+    );
 
     vm.expectEmit();
     emit IERC20.Transfer(OWNER, address(s_pool), TRANSFER_AMOUNT);
@@ -85,8 +86,9 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
     uint256 expectedAmountNetFee = TRANSFER_AMOUNT - quote.fastTransferFee;
     uint256 expectedFillerFee = quote.fastTransferFee; // All fee goes to filler in basic tests
     uint256 expectedPoolFee = 0; // No pool fee in basic tests
-    bytes32 expectedFillId =
-      s_pool.computeFillId(MESSAGE_ID, expectedAmountNetFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 expectedFillId = s_pool.computeFillId(
+      MESSAGE_ID, SOURCE_CHAIN_SELECTOR, expectedAmountNetFee, SOURCE_DECIMALS, abi.encode(RECEIVER)
+    );
 
     vm.expectEmit();
     emit IFastTransferPool.FastTransferRequested({
