@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/docker/docker/api/types/container"
@@ -14,10 +16,9 @@ import (
 )
 
 const (
-	DefaultName = "example-service"
-	// TODO: insert real image here
-	DefaultImage    = "f4hrenh9it/df-fakes:latest"
-	DefaultHTTPPort = 8331
+	DefaultName     = "indexer"
+	DefaultImage    = "indexer:dev"
+	DefaultHTTPPort = 8100
 
 	DefaultDBImage            = "postgres:16-alpine"
 	DefaultDBConnectionString = "postgresql://indexer:indexer@localhost:6432/indexer?sslmode=disable"
@@ -28,13 +29,14 @@ type DBInput struct {
 }
 
 type IndexerInput struct {
-	Image         string         `toml:"image"`
-	Port          int            `toml:"port"`
-	DB            *DBInput       `toml:"db"`
-	ExposedPorts  []string       `toml:"exposed_ports"`
-	ContainerName string         `toml:"container_name"`
-	UseCache      bool           `toml:"use_cache"`
-	Out           *IndexerOutput `toml:"-"`
+	Image          string         `toml:"image"`
+	Port           int            `toml:"port"`
+	SourceCodePath string         `toml:"source_code_path"`
+	DB             *DBInput       `toml:"db"`
+	ExposedPorts   []string       `toml:"exposed_ports"`
+	ContainerName  string         `toml:"container_name"`
+	UseCache       bool           `toml:"use_cache"`
+	Out            *IndexerOutput `toml:"-"`
 }
 
 type IndexerOutput struct {
@@ -95,7 +97,6 @@ func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
 	}
 
 	/* Service */
-
 	req := testcontainers.ContainerRequest{
 		Image:    in.Image,
 		Name:     in.ContainerName,
@@ -105,15 +106,40 @@ func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
 			framework.DefaultNetworkName: {in.ContainerName},
 		},
 		// add more internal ports here with /tcp suffix, ex.: 9222/tcp
-		ExposedPorts: []string{"9111/tcp"},
+		ExposedPorts: []string{"8100/tcp"},
 		HostConfigModifier: func(h *container.HostConfig) {
 			h.PortBindings = nat.PortMap{
 				// add more internal/external pairs here, ex.: 9222/tcp as a key and HostPort is the exposed port (no /tcp prefix!)
-				"9111/tcp": []nat.PortBinding{
+				"8100/tcp": []nat.PortBinding{
 					{HostPort: strconv.Itoa(in.Port)},
 				},
 			}
 		},
+	}
+
+	if in.SourceCodePath != "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		p := filepath.Join(filepath.Dir(wd), in.SourceCodePath)
+		req.Mounts = testcontainers.Mounts(
+			testcontainers.BindMount(
+				p,
+				"/app",
+			),
+			testcontainers.VolumeMount(
+				"go-mod-cache",
+				"/go/pkg/mod",
+			),
+			testcontainers.VolumeMount(
+				"go-build-cache",
+				"/root/.cache/go-build",
+			),
+		)
+		framework.L.Info().
+			Str("Service", in.ContainerName).
+			Str("Source", p).Msg("Using source code path, hot-reload mode")
 	}
 
 	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

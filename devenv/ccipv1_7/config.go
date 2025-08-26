@@ -28,8 +28,6 @@ const (
 	DefaultConfigDir = "."
 	// EnvVarTestConfigs is the environment variable name to read config paths from, ex.: CTF_CONFIGS=env.toml,overrides.toml.
 	EnvVarTestConfigs = "CTF_CONFIGS"
-	// DefaultOverridesFilePath is the default overrides.toml file path.
-	DefaultOverridesFilePath = "overrides.toml"
 )
 
 var L = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.InfoLevel)
@@ -43,10 +41,6 @@ func Load[T any]() (*T, error) {
 		L.Info().Str("Path", path).Msg("Loading configuration input")
 		data, err := os.ReadFile(filepath.Join(DefaultConfigDir, path)) //nolint:gosec
 		if err != nil {
-			if path == DefaultOverridesFilePath {
-				L.Info().Str("Path", path).Msg("Overrides file not found or empty")
-				continue
-			}
 			return nil, fmt.Errorf("error reading config file %s: %w", path, err)
 		}
 		if L.GetLevel() == zerolog.TraceLevel {

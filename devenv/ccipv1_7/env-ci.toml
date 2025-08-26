@@ -69,9 +69,8 @@
 # this is an example config of a new ccip service that can be integrated, see "services/indexer.go" and read README in that dir
 # since the prodct is in early stages we run dev images by default, with hot-reload
 [indexer]
-  image = "indexer:dev"
+  image = "indexer:latest"
   port = 8100
-  source_code_path = "ccipv1_7/indexer"
   [indexer.db]
     image = "postgres:16-alpine"
 

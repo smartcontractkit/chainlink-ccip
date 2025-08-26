@@ -1,4 +1,4 @@
-## How to add new services
+## How to add new services to your local environment
 
 1. Create a new file `services/service.go`
 2. Define [Input](indexer.go) and [Output](indexer.go) structs, implement `NewX(*Input) (*Output, error)`
@@ -34,3 +34,9 @@
 - Embed components that are required only by your service (for example PostgreSQL). Expose only params that make sense for tests/users, otherwise use default constants.
 - Keep it simple: if your component is mostly static and rarely change follow steps 1-3 to integrate it. If your component requires configurability go through steps 3-5, add `TOML` config and potentially implement CLI commands in our common [CLI](../cmd/ccip.go).
   Document both `TOML` and `CLI` commands so other developers can use it.
+
+## How to make a service hot-reloadable
+
+See an example [indexer](../indexer/README.md) boilerplate.
+
+Since the product is in early stage we run all the services in dev mode with automatic reload.

@@ -29,6 +29,7 @@
               fi
             '';
           packages = [
+          pkgs.air
           pkgs.postgresql_16
           pkgs.llvmPackages.libcxxClang
           pkgs.clang

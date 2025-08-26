@@ -203,7 +203,7 @@ var indexerDBShell = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringP("config", "c", "env.toml,overrides.toml", "Configuration file for the environment")
+	rootCmd.PersistentFlags().StringP("config", "c", "env.toml", "Configuration file for the environment")
 	rootCmd.PersistentFlags().StringP("blockscout_url", "u", "http://host.docker.internal:8545", "EVM RPC node URL")
 
 	bsCmd.AddCommand(bsUpCmd)
