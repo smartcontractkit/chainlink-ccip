@@ -50,6 +50,14 @@ type ProgramData struct {
 	Address  solana.PublicKey
 }
 
+func TestRunPDASigner(t *testing.T) {
+	tokenMint := solana.MustPublicKeyFromBase58("")
+	tokenPoolProgram := solana.MustPublicKeyFromBase58("")
+	pdaSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, tokenPoolProgram)
+	// print PDA signer
+	fmt.Println("PDA Signer:", pdaSigner.String())
+}
+
 // TestBaseTokenPoolHappyPath does basic happy path checks on the lock/release and burn/mint example pools
 // more detailed token pool tests are handled by the test-token-pool which is used in the tokenpool_test.go and ccip_router_test.go
 func TestBaseTokenPoolHappyPath(t *testing.T) {
