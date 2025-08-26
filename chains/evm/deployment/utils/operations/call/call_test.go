@@ -215,12 +215,14 @@ func TestWrite(t *testing.T) {
 				operations.NewMemoryReporter(),
 			)
 
+			var confirmed bool
 			chain := evm.Chain{
 				Selector: validChainSel,
 				DeployerKey: &bind.TransactOpts{
 					From: test.deployerAddress,
 				},
 				Confirm: func(tx *types.Transaction) (uint64, error) {
+					confirmed = true
 					return 1, nil
 				},
 			}
@@ -232,8 +234,10 @@ func TestWrite(t *testing.T) {
 			} else {
 				require.NoError(t, err, "Unexpected ExecuteOperation error")
 				if test.deployerAddress == OwnerAddress {
+					require.True(t, confirmed, "Expected transaction to be confirmed when called by owner")
 					require.True(t, report.Output.Executed, "Expected Executed to be true when called by owner")
 				} else {
+					require.False(t, confirmed, "Expected transaction to not be confirmed when not called by owner")
 					require.False(t, report.Output.Executed, "Expected Executed to be false when not called by owner")
 				}
 				require.Equal(t, validChainSel, report.Output.ChainSelector, "Unexpected ChainSelector in output")

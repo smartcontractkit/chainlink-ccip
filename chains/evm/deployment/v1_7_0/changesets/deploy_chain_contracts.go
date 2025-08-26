@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
@@ -56,10 +58,22 @@ func applyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainCon
 		datastore.AddressRefByType(datastore.ContractType(fee_quoter_v2.ContractType)),
 		datastore.AddressRefByType(datastore.ContractType(nonce_manager.ContractType)),
 	)
+	// TODO: Having to convert from datastore.AddressRef to deployment.AddressRef is not ideal,
+	// but datastore.AddressRef can't be serialized into reports right now (unexported fields).
+	// Could raise with CLD team or create some common utility for this.
+	addresses := make([]deployment.AddressRef, 0, len(existing))
+	for _, addr := range existing {
+		addresses = append(addresses, deployment.AddressRef{
+			ChainSelector: addr.ChainSelector,
+			Type:          cldf_deployment.ContractType(addr.Type),
+			Version:       addr.Version.String(),
+			Address:       addr.Address,
+		})
+	}
 	chain := e.BlockChains.EVMChains()[cfg.ChainSelector]
 
 	report, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployChainContracts, chain, sequences.DeployChainContractsInput{
-		ExistingAddresses: existing,
+		ExistingAddresses: addresses,
 		ContractParams:    cfg.Params,
 	})
 	if err != nil {
@@ -68,7 +82,12 @@ func applyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainCon
 
 	ds := datastore.NewMemoryDataStore()
 	for _, r := range report.Output.Addresses {
-		if err := ds.Addresses().Add(r); err != nil {
+		if err := ds.Addresses().Add(datastore.AddressRef{
+			ChainSelector: r.ChainSelector,
+			Type:          datastore.ContractType(r.Type),
+			Version:       semver.MustParse(r.Version),
+			Address:       r.Address,
+		}); err != nil {
 			return cldf_deployment.ChangesetOutput{Reports: report.ExecutionReports}, fmt.Errorf("failed to add %s %s to datastore: %w", r.Type, r.Version, err)
 		}
 	}

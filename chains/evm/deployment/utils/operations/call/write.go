@@ -17,11 +17,11 @@ import (
 // WriteOutput is the output of a write operation.
 type WriteOutput struct {
 	// ChainSelector is the selector of the target chain
-	ChainSelector uint64
+	ChainSelector uint64 `json:"chainSelector"`
 	// Tx is the prepared transaction (in MCMS format)
-	Tx mcms_types.Transaction
+	Tx mcms_types.Transaction `json:"tx"`
 	// Executed indicates whether the transaction was executed (signed and sent) or not
-	Executed bool
+	Executed bool `json:"executed"`
 }
 
 // NewWrite creates a new write operation.
