@@ -94,17 +94,19 @@ jobs:
   custom-linters:
     name: Custom linters (Go 1.23.x)
     runs-on: ubuntu-latest
-    needs: build-lint-test
+    #needs: build-lint-test
+    env:
+      GOTOOLCHAIN: local     # do not auto-download 1.24 toolchain
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Go 1.23.x
+      - name: Setup Go 1.23.12
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23.x'
+          go-version: '1.23.12'
 
       - name: Display Go version
         run: go version
