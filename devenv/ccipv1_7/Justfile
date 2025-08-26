@@ -36,6 +36,13 @@ build-all-docker-dev:
     cd fakes && docker build -t ccip-fakes:latest . || cd -
     cd indexer && docker build -f Dockerfile.dev -t indexer:dev . || cd -
 
+build-all-docker-prod:
+    cd fakes && docker build -t ccip-fakes:latest . || cd -
+    cd indexer && docker build -f Dockerfile -t indexer . || cd -
+
+build-fakes-docker:
+    cd fakes && docker build -t ccip-fakes:latest . || cd -
+
 # Build Indexer dev image
 build-indexer-docker-dev:
     cd indexer && docker build -f Dockerfile.dev -t indexer:dev . || cd -
