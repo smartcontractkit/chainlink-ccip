@@ -111,8 +111,8 @@ jobs:
       - name: Display Go version
         run: go version
 
-      - name: Install custom linters (safebigint, goboundcheck)
-        run: make install-custom-linters
+      - name: Install custom linters (goboundcheck)
+        run: make install-goboundcheck
 
-      - name: Run custom linters in compat mode
-        run: make lint-custom
+      - name: Run custom linters that needs Go 1.23.12
+        run: make lint-goboundcheck
