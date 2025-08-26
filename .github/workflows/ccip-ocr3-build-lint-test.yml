@@ -111,8 +111,16 @@ jobs:
       - name: Display Go version
         run: go version
 
+      - name: Downgrade go.mod just for this job
+        run: |
+          sed -i '/^toolchain /d' go.mod || true
+          go mod edit -go=1.23
+
       - name: Install custom linters (goboundcheck)
         run: make install-goboundcheck
 
       - name: Run custom linters that needs Go 1.23.12
+        env:
+          GOTOOLCHAIN: local
+          GOWORK: off
         run: make lint-goboundcheck
