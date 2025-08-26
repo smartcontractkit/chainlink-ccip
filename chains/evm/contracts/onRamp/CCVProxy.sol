@@ -343,7 +343,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     bytes calldata extraArgs
   ) internal pure returns (Client.EVMExtraArgsV3 memory resolvedArgs) {
     if (bytes4(extraArgs[0:4]) == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
-      resolvedArgs = abi.decode(extraArgs, (Client.EVMExtraArgsV3));
+      resolvedArgs = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV3));
 
       if (resolvedArgs.optionalCCV.length != 0) {
         // Requiring more CCVs than are supplied would make a transaction unexecutable forever.
@@ -372,9 +372,16 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       resolvedArgs.executor = destChainConfig.defaultExecutor;
     }
 
-    // Add the required CCV, if set.
+    // If a required CCV is configured for the destination chain, prepend it to the required CCV array
     if (destChainConfig.requiredCCV != address(0)) {
-      // TODO set required CCV
+      Client.CCV[] memory newRequiredCCVs = new Client.CCV[](resolvedArgs.requiredCCV.length + 1);
+      newRequiredCCVs[0] = Client.CCV({ccvAddress: destChainConfig.requiredCCV, args: ""});
+
+      for (uint256 i = 0; i < resolvedArgs.requiredCCV.length; ++i) {
+        newRequiredCCVs[i + 1] = resolvedArgs.requiredCCV[i];
+      }
+
+      resolvedArgs.requiredCCV = newRequiredCCVs;
     }
 
     return resolvedArgs;
