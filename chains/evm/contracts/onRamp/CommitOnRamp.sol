@@ -23,7 +23,7 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
     address nonceManager; // Nonce manager address.
   }
 
-  /// @dev Struct that contains the dynamic configuration
+  /// @dev Struct that contains the dynamic configuration.
   // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
     address feeQuoter; // FeeQuoter address.
@@ -51,13 +51,19 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
     _setDynamicConfig(dynamicConfig);
   }
 
-  // TODO access control
+  /// @notice Forwards a message from CCV proxy to this verifier for processing and returns verifier-specific data.
+  /// @dev This function is called by the CCV proxy to delegate message verification to this specific verifier.
+  /// It performs critical validation to ensure message integrity and proper sequencing.
+  /// @param rawMessage The encoded message containing all necessary data for verification.
+  /// @param verifierIndex Index of this verifier in the message's verifier receipts array.
+  /// @return Verifier-specific encoded data (nonce in case of commit onramp).
   function forwardToVerifier(bytes calldata rawMessage, uint256 verifierIndex) external returns (bytes memory) {
     Internal.EVM2AnyVerifierMessage memory message = abi.decode(rawMessage, (Internal.EVM2AnyVerifierMessage));
 
     _assertNotCursed(message.header.destChainSelector);
     _assertSenderIsAllowed(message.header.destChainSelector, message.sender);
 
+    // Process message arguments to determine execution mode.
     (, bool isOutOfOrderExecution,,) = IFeeQuoterV2(s_dynamicConfig.feeQuoter).processMessageArgs(
       message.header.destChainSelector,
       message.feeToken,
@@ -68,7 +74,6 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
 
     uint64 nonce = 0;
     if (!isOutOfOrderExecution) {
-      // If the message is not out of order execution, we need to increment the nonce.
       nonce =
         INonceManager(i_nonceManager).getIncrementedOutboundNonce(message.header.destChainSelector, message.sender);
     }
