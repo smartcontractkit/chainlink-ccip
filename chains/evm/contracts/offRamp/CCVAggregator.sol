@@ -30,7 +30,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes err);
   error OptionalCCVQuorumNotReached(uint256 wanted, uint256 got);
-  error InvalidOptionalThreshold(uint256 optionalCCVsLength, uint256 optionalThreshold);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
@@ -424,13 +423,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     // If the receiver is a contract
     if (receiver.code.length != 0) {
       // And the contract implements the IAny2EVMMessageReceiverV2 interface
-      if (!receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
+      if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
         (requiredCCV, optionalCCVs, optionalThreshold) =
           IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
-
-        if (optionalThreshold > optionalCCVs.length) {
-          revert InvalidOptionalThreshold(optionalCCVs.length, optionalThreshold);
-        }
 
         // If the user specified empty required and optional CCVs, we fall back to the default CCVs.
         // If they did specify something, we use what they specified.
@@ -438,9 +433,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
           return (requiredCCV, optionalCCVs, optionalThreshold);
         }
       }
-
-      return (sourceConfig.defaultCCV, new address[](0), 0);
     }
+    return (sourceConfig.defaultCCV, new address[](0), 0);
   }
 
   function _getCCVsFromPool(
