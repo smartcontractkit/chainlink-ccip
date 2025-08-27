@@ -60,7 +60,7 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
   /// @dev this can be overridden to specify different CCVs per source chain. The current implementation means the
   /// default CCV is used.
   function getCCVs(
-    uint64 
+    uint64
   )
     external
     view

@@ -91,8 +91,8 @@ func TestDeployChainContracts(t *testing.T) {
 							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
 						},
 						CommitOffRamp: sequences.CommitOffRampParams{
-							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
-								ConfigDigest: [32]byte{},
+							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{{
+								ConfigDigest: [32]byte{0x01},
 								F:            1,
 								Signers: []common.Address{
 									common.HexToAddress("0x02"),
@@ -100,7 +100,7 @@ func TestDeployChainContracts(t *testing.T) {
 									common.HexToAddress("0x04"),
 									common.HexToAddress("0x05"),
 								},
-							},
+							}},
 						},
 					},
 				},

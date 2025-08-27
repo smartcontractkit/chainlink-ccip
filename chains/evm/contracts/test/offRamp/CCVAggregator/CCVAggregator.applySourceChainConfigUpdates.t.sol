@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
-import { CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
+import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {

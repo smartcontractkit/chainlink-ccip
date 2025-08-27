@@ -284,7 +284,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, commitOffRampRef)
 
 		// Set signature config on the CommitOffRamp
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfig, chain, call.Input[commit_offramp.SignatureConfigArgs]{
+		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfigs, chain, call.Input[commit_offramp.SignatureConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(commitOffRampRef.Address),
 			Args:          input.ContractParams.CommitOffRamp.SignatureConfigArgs,
