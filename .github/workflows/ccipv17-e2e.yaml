@@ -1,0 +1,47 @@
+name: End-to-end CCIPv1.7 Test
+
+on:
+  push:
+
+jobs:
+  e2e:
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu24.04-16cores-64GB
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure aws credentials (public)
+        uses: aws-actions/configure-aws-credentials@ececac1a45f3b08a01d2dd070d28d111c5fe6722 # v4.1.0
+        with:
+          role-to-assume: ${{ secrets.PRIVATE_AWS_ROLE_PROD }}
+          role-duration-seconds: 3600
+          aws-region: us-east-1
+      - name: Login to ecr (public)
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        with:
+          registry-type: public
+      - name: Configure aws credentials (private)
+        uses: aws-actions/configure-aws-credentials@ececac1a45f3b08a01d2dd070d28d111c5fe6722 # v4.1.0
+        with:
+          role-to-assume: ${{ secrets.PRIVATE_AWS_ROLE_PROD }}
+          role-duration-seconds: 3600
+          aws-region: us-west-2
+      - name: Login to ecr (private)
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        with:
+          registries: "${{ secrets.AWS_ACCOUNT_NUMBER_PROD }}"
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.4'
+          cache: true
+      - name: Run CCIPv2 environment
+        run: |
+          cd cmd/ccip && go install . && cd -
+          ccip u env-ci.toml
+
+defaults:
+  run:
+    working-directory: devenv/ccipv1_7
