@@ -72,6 +72,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   struct SourceChainConfig {
     IRouter router; // ─╮ Local router to use for messages coming from this source chain.
     bool isEnabled; // ─╯ Flag whether the source chain is enabled or not.
+    bytes onRamp; // OnRamp address on the source chain.
     address[] defaultCCV; // Default CCV to use for messages from this source chain.
     address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
   }
@@ -127,6 +128,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
 
   // STATE
+  // TODO different exec state mapping
   /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
   /// state only taking up 2 bits of the uint256, packing 128 states into a single slot.
   /// Message state is tracked to ensure message can only be executed successfully once.
@@ -264,6 +266,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
           revert InvalidNumberOfTokens(report.message.tokenAmounts.length);
         }
 
+        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
+        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
+        // that do not support the V2 interface.
         requiredPoolCCVs = _getCCVsFromPool(
           report.message.tokenAmounts[0].destTokenAddress,
           report.message.header.sourceChainSelector,
@@ -437,6 +442,14 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     return (sourceConfig.defaultCCV, new address[](0), 0);
   }
 
+  /// @notice Retrieves the required CCVs from a pool. If the pool does not specify any CCVs, we fall back to the
+  /// default CCVs.
+  /// @dev The params passed into getRequiredCCVs could influence the CCVs returned.
+  /// @param localToken The local token address.
+  /// @param sourceChainSelector The source chain selector.
+  /// @param amount The amount of the token to be released/minted.
+  /// @param extraData The extra data for the pool.
+  /// @return requiredCCV The required CCVs.
   function _getCCVsFromPool(
     address localToken,
     uint64 sourceChainSelector,
@@ -445,11 +458,15 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   ) internal view returns (address[] memory requiredCCV) {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
 
-    if (!pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      return new address[](0);
+    if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
+      requiredCCV = IPoolV2(pool).getRequiredCCVs(localToken, sourceChainSelector, amount, extraData);
     }
-
-    return IPoolV2(pool).getRequiredCCVs(localToken, sourceChainSelector, amount, extraData);
+    // If the pool does not specify any CCVs, or the pool does not support the V2 interface, we fall back to the
+    // default CCVs.
+    if (requiredCCV.length == 0) {
+      requiredCCV = s_sourceChainConfigs[sourceChainSelector].defaultCCV;
+    }
+    return requiredCCV;
   }
 
   /// @notice Try executing a message.
@@ -693,15 +710,15 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
       // TODO check replay protection if onRamp changes
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
-      bytes memory newOnRamp = sourceConfigUpdate.onRamp;
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time.
-      if (newOnRamp.length == 0 || keccak256(newOnRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
+      if (sourceConfigUpdate.onRamp.length == 0 || keccak256(sourceConfigUpdate.onRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
         revert ZeroAddressNotAllowed();
       }
 
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
+      currentConfig.onRamp = sourceConfigUpdate.onRamp;
       currentConfig.defaultCCV = sourceConfigUpdate.defaultCCV;
       currentConfig.laneMandatedCCVs = sourceConfigUpdate.laneMandatedCCVs;
 

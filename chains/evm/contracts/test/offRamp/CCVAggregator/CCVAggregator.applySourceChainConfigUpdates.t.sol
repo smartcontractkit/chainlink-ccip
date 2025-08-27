@@ -7,31 +7,7 @@ import {CCVAggregatorHelper, CCVAggregatorSetup} from "./CCVAggregatorSetup.t.so
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
-  function test_applySourceChainConfigUpdates_Success_SingleChain() public {
-    uint64 newChain = SOURCE_CHAIN_SELECTOR + 1;
-    address newCCV = makeAddr("newCCV");
-
-    CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
-    configs[0] = CCVAggregator.SourceChainConfigArgs({
-      router: s_sourceRouter,
-      sourceChainSelector: newChain,
-      isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp")),
-      defaultCCV: new address[](1),
-      laneMandatedCCVs: new address[](0)
-    });
-    configs[0].defaultCCV[0] = newCCV;
-
-    s_agg.applySourceChainConfigUpdates(configs);
-
-    CCVAggregator.SourceChainConfig memory config = s_agg.getSourceChainConfig(newChain);
-    assertEq(address(config.router), address(s_sourceRouter));
-    assertEq(config.isEnabled, true);
-    assertEq(config.defaultCCV.length, 1);
-    assertEq(config.defaultCCV[0], newCCV);
-  }
-
-  function test_applySourceChainConfigUpdates_Success_MultipleChains() public {
+  function test_applySourceChainConfigUpdates_multipleChains() public {
     uint64 chain1 = SOURCE_CHAIN_SELECTOR + 1;
     uint64 chain2 = SOURCE_CHAIN_SELECTOR + 2;
 
@@ -52,23 +28,50 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
       isEnabled: false,
       onRamp: abi.encode(makeAddr("onRamp2")),
       defaultCCV: new address[](1),
-      laneMandatedCCVs: new address[](0)
+      laneMandatedCCVs: new address[](2)
     });
     configs[1].defaultCCV[0] = makeAddr("ccv2");
+    configs[1].laneMandatedCCVs[0] = makeAddr("mandatedCCV1");
+    configs[1].laneMandatedCCVs[1] = makeAddr("mandatedCCV2");
+
+    vm.expectEmit();
+    emit CCVAggregator.SourceChainConfigSet(
+      chain1,
+      CCVAggregator.SourceChainConfig({
+        router: configs[0].router,
+        isEnabled: configs[0].isEnabled,
+        onRamp: configs[0].onRamp,
+        defaultCCV: configs[0].defaultCCV,
+        laneMandatedCCVs: configs[0].laneMandatedCCVs
+      })
+    );
 
     s_agg.applySourceChainConfigUpdates(configs);
 
     CCVAggregator.SourceChainConfig memory config1 = s_agg.getSourceChainConfig(chain1);
     CCVAggregator.SourceChainConfig memory config2 = s_agg.getSourceChainConfig(chain2);
 
-    assertEq(config1.isEnabled, true);
-    assertEq(config2.isEnabled, false);
-    assertEq(config1.defaultCCV[0], makeAddr("ccv1"));
-    assertEq(config2.defaultCCV[0], makeAddr("ccv2"));
+    assertEq(address(config1.router), address(configs[0].router));
+    assertEq(address(config2.router), address(configs[1].router));
+
+    assertEq(config1.isEnabled, configs[0].isEnabled);
+    assertEq(config2.isEnabled, configs[1].isEnabled);
+
+    assertEq(chain1, configs[0].sourceChainSelector);
+    assertEq(chain2, configs[1].sourceChainSelector);
+    assertEq(config1.onRamp, configs[0].onRamp);
+    assertEq(config2.onRamp, configs[1].onRamp);
+
+    assertEq(config1.defaultCCV[0], configs[0].defaultCCV[0]);
+    assertEq(config2.defaultCCV[0], configs[1].defaultCCV[0]);
+
+    assertEq(config1.laneMandatedCCVs.length, 0);
+    assertEq(config2.laneMandatedCCVs.length, 2);
+    assertEq(config2.laneMandatedCCVs[0], configs[1].laneMandatedCCVs[0]);
+    assertEq(config2.laneMandatedCCVs[1], configs[1].laneMandatedCCVs[1]);
   }
 
-  function test_applySourceChainConfigUpdates_Success_UpdateExistingChain() public {
-    // Update existing chain configuration
+  function test_applySourceChainConfigUpdates_updateExistingChain() public {
     CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
     configs[0] = CCVAggregator.SourceChainConfigArgs({
       router: s_sourceRouter,
@@ -153,52 +156,10 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
     s_agg.applySourceChainConfigUpdates(configs);
   }
 
-  function test_applySourceChainConfigUpdates_EmitsSourceChainConfigSet() public {
-    uint64 newChain = SOURCE_CHAIN_SELECTOR + 1;
-    address newCCV = makeAddr("newCCV");
-
-    CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
-    configs[0] = CCVAggregator.SourceChainConfigArgs({
-      router: s_sourceRouter,
-      sourceChainSelector: newChain,
-      isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp")),
-      defaultCCV: new address[](1),
-      laneMandatedCCVs: new address[](0)
-    });
-    configs[0].defaultCCV[0] = newCCV;
-
-    vm.expectEmit();
-    emit CCVAggregator.SourceChainConfigSet(
-      newChain,
-      CCVAggregator.SourceChainConfig({
-        router: s_sourceRouter,
-        isEnabled: true,
-        defaultCCV: configs[0].defaultCCV,
-        laneMandatedCCVs: new address[](0)
-      })
-    );
-
-    s_agg.applySourceChainConfigUpdates(configs);
-  }
-
   function test_applySourceChainConfigUpdates_OnlyCallableByOwner() public {
-    uint64 newChain = SOURCE_CHAIN_SELECTOR + 1;
-
-    CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
-    configs[0] = CCVAggregator.SourceChainConfigArgs({
-      router: s_sourceRouter,
-      sourceChainSelector: newChain,
-      isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp")),
-      defaultCCV: new address[](1),
-      laneMandatedCCVs: new address[](0)
-    });
-    configs[0].defaultCCV[0] = makeAddr("ccv");
-
     vm.stopPrank();
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
 
-    s_agg.applySourceChainConfigUpdates(configs);
+    s_agg.applySourceChainConfigUpdates(new CCVAggregator.SourceChainConfigArgs[](0));
   }
 }
