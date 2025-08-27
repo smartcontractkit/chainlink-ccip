@@ -20,7 +20,7 @@ abstract contract BaseOnRamp is ICCVOnRamp, ITypeAndVersion {
   error InvalidDestChainConfig(uint64 destChainSelector);
   error InvalidAllowListRequest(uint64 destChainSelector);
   error SenderNotAllowed(address sender);
-  error MustBeCalledByVerifierAggregator();
+  error MustBeCalledByCCVProxy();
 
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
   event DestChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
@@ -28,15 +28,15 @@ abstract contract BaseOnRamp is ICCVOnRamp, ITypeAndVersion {
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
 
   struct DestChainConfig {
-    bool allowlistEnabled; // ──────╮ True if the allowlist is enabled.
-    address verifierAggregator; // ─╯ Local router address  that is allowed to send messages to the destination chain.
+    bool allowlistEnabled; // ─╮ True if the allowlist is enabled.
+    address ccvProxy; // ──────╯ Local CCVProxy that is allowed to forward messages to this contract.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
 
   struct DestChainConfigArgs {
-    address verifierAggregator; // ─╮ CCVProxy address that is allowed to forward messages to this contract.
-    uint64 destChainSelector; //    │ Destination chain selector.
-    bool allowlistEnabled; // ──────╯ True if the allowlist is enabled.
+    address ccvProxy; // ────────╮ CCVProxy address that is allowed to forward messages to this contract.
+    uint64 destChainSelector; // │ Destination chain selector.
+    bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
   }
 
   /// @dev Struct to hold the allowlist configuration args per dest chain.
@@ -62,16 +62,16 @@ abstract contract BaseOnRamp is ICCVOnRamp, ITypeAndVersion {
   /// @notice get ChainConfig configured for the DestinationChainSelector.
   /// @param destChainSelector The destination chain selector.
   /// @return allowlistEnabled boolean indicator to specify if allowlist check is enabled.
-  /// @return verifierAggregator address of the verifierAggregator.
+  /// @return ccvProxy address of the local ccvProxy.
   /// @return allowedSendersList list of addresses that are allowed to send messages to the destination chain.
   function getDestChainConfig(
     uint64 destChainSelector
-  ) external view returns (bool allowlistEnabled, address verifierAggregator, address[] memory allowedSendersList) {
+  ) external view returns (bool allowlistEnabled, address ccvProxy, address[] memory allowedSendersList) {
     DestChainConfig storage config = _getDestChainConfig(destChainSelector);
     allowlistEnabled = config.allowlistEnabled;
-    verifierAggregator = config.verifierAggregator;
+    ccvProxy = config.ccvProxy;
     allowedSendersList = config.allowedSendersList.values();
-    return (allowlistEnabled, verifierAggregator, allowedSendersList);
+    return (allowlistEnabled, ccvProxy, allowedSendersList);
   }
 
   function _getDestChainConfig(
@@ -95,12 +95,10 @@ abstract contract BaseOnRamp is ICCVOnRamp, ITypeAndVersion {
 
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain
-      destChainConfig.verifierAggregator = destChainConfigArg.verifierAggregator;
+      destChainConfig.ccvProxy = destChainConfigArg.ccvProxy;
       destChainConfig.allowlistEnabled = destChainConfigArg.allowlistEnabled;
 
-      emit DestChainConfigSet(
-        destChainSelector, destChainConfigArg.verifierAggregator, destChainConfig.allowlistEnabled
-      );
+      emit DestChainConfigSet(destChainSelector, destChainConfigArg.ccvProxy, destChainConfig.allowlistEnabled);
     }
   }
 
@@ -108,7 +106,7 @@ abstract contract BaseOnRamp is ICCVOnRamp, ITypeAndVersion {
     DestChainConfig storage destChainConfig = _getDestChainConfig(destChainSelector);
 
     // VerifierAggregator address may be zero intentionally to pause, which should stop all messages.
-    if (msg.sender != destChainConfig.verifierAggregator) revert MustBeCalledByVerifierAggregator();
+    if (msg.sender != destChainConfig.ccvProxy) revert MustBeCalledByCCVProxy();
 
     if (destChainConfig.allowlistEnabled) {
       if (!destChainConfig.allowedSendersList.contains(sender)) {

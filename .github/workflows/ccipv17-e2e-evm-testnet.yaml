@@ -1,0 +1,55 @@
+name: End-to-end CCIPv1.7 Test (EVM Testnets)
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: 'Network to use'
+        required: true
+        default: eth_fuji
+        type: string
+
+jobs:
+  e2e-testnet:
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu24.04-16cores-64GB
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: ${{ secrets.PUBLIC_AWS_ECR_ROLE }}
+          aws-region: us-east-1
+      - name: Authenticate to ECR Public
+        id: login-ecr-public
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        with:
+          registry-type: public
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.4'
+          cache: true
+      - name: Run CCIPv2 environment
+        env:
+          ETH_FUJI_PRIVATE_KEY: ${{ secrets.ETH_FUJI_PRIVATE_KEY }}
+        run: |
+          case "${{ inputs.network }}" in
+            eth_fuji)
+              PRIVATE_KEY=$ETH_FUJI_PRIVATE_KEY
+              ;;
+            *)
+              echo "Unknown network: ${{ inputs.network }}"
+              exit 1
+              ;;
+          esac
+          cd cmd/ccip && go install . && cd -
+          PRIVATE_KEY=${PRIVATE_KEY} ccip env-ci.toml,env-fuji.toml
+
+
+defaults:
+  run:
+    working-directory: devenv/ccipv1_7

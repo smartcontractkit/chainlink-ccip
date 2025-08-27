@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 // Observation collects data across two phases which happen in separate rounds.
@@ -130,11 +129,11 @@ func (p *Plugin) Observation(
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
 
-func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (reader.CurseInfo, error) {
+func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (cciptypes.CurseInfo, error) {
 	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx)
 	if err != nil {
 		lggr.Errorw("get rmn curse info: rmn read error", "err", err)
-		return reader.CurseInfo{}, fmt.Errorf("get rmn curse info: rmn read error: %w", err)
+		return cciptypes.CurseInfo{}, fmt.Errorf("get rmn curse info: rmn read error: %w", err)
 	}
 
 	return curseInfo, nil

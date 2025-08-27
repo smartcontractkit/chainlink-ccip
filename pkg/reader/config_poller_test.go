@@ -37,9 +37,9 @@ func setupBasicCache(t *testing.T) (*configPoller, *reader_mocks.MockExtended) {
 
 // Helper to setup a standard mock response for chain configuration
 func setupMockResponse(reader *reader_mocks.MockExtended) types.BatchGetLatestValuesResult {
-	mockConfig := OCRConfigResponse{
-		OCRConfig: OCRConfig{
-			ConfigInfo: ConfigInfo{F: 1, N: 4},
+	mockConfig := cciptypes.OCRConfigResponse{
+		OCRConfig: cciptypes.OCRConfig{
+			ConfigInfo: cciptypes.ConfigInfo{F: 1, N: 4},
 		},
 	}
 
@@ -48,9 +48,9 @@ func setupMockResponse(reader *reader_mocks.MockExtended) types.BatchGetLatestVa
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 	result2.SetResult(&mockConfig, nil)
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-	result3.SetResult(&offRampStaticChainConfig{}, nil)
+	result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-	result4.SetResult(&offRampDynamicChainConfig{}, nil)
+	result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -70,9 +70,9 @@ func setupMockResponse(reader *reader_mocks.MockExtended) types.BatchGetLatestVa
 // Helper to setup a batch response containing both chain config and source chain configs
 func setupBatchMockResponse(reader *reader_mocks.MockExtended) {
 	// Chain config part
-	mockConfig := OCRConfigResponse{
-		OCRConfig: OCRConfig{
-			ConfigInfo: ConfigInfo{F: 1, N: 4},
+	mockConfig := cciptypes.OCRConfigResponse{
+		OCRConfig: cciptypes.OCRConfig{
+			ConfigInfo: cciptypes.ConfigInfo{F: 1, N: 4},
 		},
 	}
 
@@ -81,9 +81,9 @@ func setupBatchMockResponse(reader *reader_mocks.MockExtended) {
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 	result2.SetResult(&mockConfig, nil)
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-	result3.SetResult(&offRampStaticChainConfig{}, nil)
+	result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-	result4.SetResult(&offRampDynamicChainConfig{}, nil)
+	result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 	// Source chain config part
 	resultB := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
@@ -175,9 +175,9 @@ func setupSecondChain(ctx context.Context, t *testing.T, cache *configPoller) *r
 // Helper to setup refresh expectations
 func setupRefreshExpectations(reader *reader_mocks.MockExtended) {
 	// Setup with updated values to verify refresh happened
-	mockConfig := OCRConfigResponse{
-		OCRConfig: OCRConfig{
-			ConfigInfo: ConfigInfo{F: 2, N: 6}, // Different from initial
+	mockConfig := cciptypes.OCRConfigResponse{
+		OCRConfig: cciptypes.OCRConfig{
+			ConfigInfo: cciptypes.ConfigInfo{F: 2, N: 6}, // Different from initial
 		},
 	}
 
@@ -186,9 +186,9 @@ func setupRefreshExpectations(reader *reader_mocks.MockExtended) {
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 	result2.SetResult(&mockConfig, nil)
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-	result3.SetResult(&offRampStaticChainConfig{}, nil)
+	result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-	result4.SetResult(&offRampDynamicChainConfig{}, nil)
+	result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -251,7 +251,7 @@ func TestConfigPoller_BatchRefresh(t *testing.T) {
 	// Verify both chain config and source configs were updated in a single call
 	chainConfig, err := cache.GetChainConfig(ctx, chainA)
 	require.NoError(t, err)
-	assert.NotEqual(t, ChainConfigSnapshot{}, chainConfig)
+	assert.NotEqual(t, cciptypes.ChainConfigSnapshot{}, chainConfig)
 
 	sourceConfigs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 	require.NoError(t, err)
@@ -276,9 +276,9 @@ func TestConfigPoller_RefreshAllKnownChains(t *testing.T) {
 	secondReader.ExpectedCalls = nil
 
 	// Create a standard mock response for any request
-	mockConfig := OCRConfigResponse{
-		OCRConfig: OCRConfig{
-			ConfigInfo: ConfigInfo{F: 1, N: 4},
+	mockConfig := cciptypes.OCRConfigResponse{
+		OCRConfig: cciptypes.OCRConfig{
+			ConfigInfo: cciptypes.ConfigInfo{F: 1, N: 4},
 		},
 	}
 
@@ -287,9 +287,9 @@ func TestConfigPoller_RefreshAllKnownChains(t *testing.T) {
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 	result2.SetResult(&mockConfig, nil)
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-	result3.SetResult(&offRampStaticChainConfig{}, nil)
+	result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-	result4.SetResult(&offRampDynamicChainConfig{}, nil)
+	result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 	standardResponse := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -411,7 +411,7 @@ func TestConfigPoller_BackgroundErrorHandling(t *testing.T) {
 	// This can be done by checking that initial data is still available
 	config, err := cache.GetChainConfig(ctx, chainA)
 	require.NoError(t, err)
-	assert.NotEqual(t, ChainConfigSnapshot{}, config)
+	assert.NotEqual(t, cciptypes.ChainConfigSnapshot{}, config)
 }
 
 func TestConfigPoller_ConcurrentWithBackground(t *testing.T) {
@@ -448,7 +448,7 @@ func TestConfigPoller_ConcurrentWithBackground(t *testing.T) {
 	// Verify the read was fast (non-blocking) despite ongoing refresh
 	require.NoError(t, err)
 	assert.Less(t, elapsed, 100*time.Millisecond, "Read should not be blocked by background refresh")
-	assert.NotEqual(t, ChainConfigSnapshot{}, config)
+	assert.NotEqual(t, cciptypes.ChainConfigSnapshot{}, config)
 }
 
 func TestConfigCache_GetChainConfig_CacheHit(t *testing.T) {
@@ -456,14 +456,14 @@ func TestConfigCache_GetChainConfig_CacheHit(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup mock for initial fetch
-	mockCommitOCRConfig := OCRConfigResponse{
-		OCRConfig: OCRConfig{
-			ConfigInfo: ConfigInfo{F: 1, N: 4},
+	mockCommitOCRConfig := cciptypes.OCRConfigResponse{
+		OCRConfig: cciptypes.OCRConfig{
+			ConfigInfo: cciptypes.ConfigInfo{F: 1, N: 4},
 		},
 	}
-	mockExecOCRConfig := OCRConfigResponse{
-		OCRConfig: OCRConfig{
-			ConfigInfo: ConfigInfo{F: 2, N: 6},
+	mockExecOCRConfig := cciptypes.OCRConfigResponse{
+		OCRConfig: cciptypes.OCRConfig{
+			ConfigInfo: cciptypes.ConfigInfo{F: 2, N: 6},
 		},
 	}
 
@@ -473,9 +473,9 @@ func TestConfigCache_GetChainConfig_CacheHit(t *testing.T) {
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 	result2.SetResult(&mockExecOCRConfig, nil)
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-	result3.SetResult(&offRampStaticChainConfig{}, nil)
+	result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-	result4.SetResult(&offRampDynamicChainConfig{}, nil)
+	result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -510,9 +510,9 @@ func TestConfigCache_GetChainConfig_CacheUpdate(t *testing.T) {
 
 	// Setup mock responses for two different fetches
 	setupMockBatchResponse := func(f uint8, n uint8) types.BatchGetLatestValuesResult {
-		mockConfig := OCRConfigResponse{
-			OCRConfig: OCRConfig{
-				ConfigInfo: ConfigInfo{F: f, N: n},
+		mockConfig := cciptypes.OCRConfigResponse{
+			OCRConfig: cciptypes.OCRConfig{
+				ConfigInfo: cciptypes.ConfigInfo{F: f, N: n},
 			},
 		}
 
@@ -521,9 +521,9 @@ func TestConfigCache_GetChainConfig_CacheUpdate(t *testing.T) {
 		result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 		result2.SetResult(&mockConfig, nil)
 		result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-		result3.SetResult(&offRampStaticChainConfig{}, nil)
+		result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 		result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-		result4.SetResult(&offRampDynamicChainConfig{}, nil)
+		result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 		return types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -597,9 +597,9 @@ func TestConfigCache_ErrorWithCachedData(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup initial successful fetch
-	mockConfig := OCRConfigResponse{
-		OCRConfig: OCRConfig{
-			ConfigInfo: ConfigInfo{F: 1, N: 4},
+	mockConfig := cciptypes.OCRConfigResponse{
+		OCRConfig: cciptypes.OCRConfig{
+			ConfigInfo: cciptypes.ConfigInfo{F: 1, N: 4},
 		},
 	}
 
@@ -608,9 +608,9 @@ func TestConfigCache_ErrorWithCachedData(t *testing.T) {
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 	result2.SetResult(&mockConfig, nil)
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-	result3.SetResult(&offRampStaticChainConfig{}, nil)
+	result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-	result4.SetResult(&offRampDynamicChainConfig{}, nil)
+	result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -649,9 +649,9 @@ func TestConfigCache_RefreshChainConfig(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup mock response
-	mockConfig := OCRConfigResponse{
-		OCRConfig: OCRConfig{
-			ConfigInfo: ConfigInfo{F: 1, N: 4},
+	mockConfig := cciptypes.OCRConfigResponse{
+		OCRConfig: cciptypes.OCRConfig{
+			ConfigInfo: cciptypes.ConfigInfo{F: 1, N: 4},
 		},
 	}
 
@@ -660,9 +660,9 @@ func TestConfigCache_RefreshChainConfig(t *testing.T) {
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 	result2.SetResult(&mockConfig, nil)
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-	result3.SetResult(&offRampStaticChainConfig{}, nil)
+	result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-	result4.SetResult(&offRampDynamicChainConfig{}, nil)
+	result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -689,9 +689,9 @@ func TestConfigCache_ConcurrentAccess(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup mock response
-	mockConfig := OCRConfigResponse{
-		OCRConfig: OCRConfig{
-			ConfigInfo: ConfigInfo{F: 1, N: 4},
+	mockConfig := cciptypes.OCRConfigResponse{
+		OCRConfig: cciptypes.OCRConfig{
+			ConfigInfo: cciptypes.ConfigInfo{F: 1, N: 4},
 		},
 	}
 
@@ -700,9 +700,9 @@ func TestConfigCache_ConcurrentAccess(t *testing.T) {
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 	result2.SetResult(&mockConfig, nil)
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-	result3.SetResult(&offRampStaticChainConfig{}, nil)
+	result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-	result4.SetResult(&offRampDynamicChainConfig{}, nil)
+	result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -817,9 +817,9 @@ func TestConfigCache_GetChainConfig_SkippedContracts(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup mock response with skipped contracts
-	mockConfig := OCRConfigResponse{
-		OCRConfig: OCRConfig{
-			ConfigInfo: ConfigInfo{F: 1, N: 4},
+	mockConfig := cciptypes.OCRConfigResponse{
+		OCRConfig: cciptypes.OCRConfig{
+			ConfigInfo: cciptypes.ConfigInfo{F: 1, N: 4},
 		},
 	}
 
@@ -828,9 +828,9 @@ func TestConfigCache_GetChainConfig_SkippedContracts(t *testing.T) {
 	result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 	result2.SetResult(&mockConfig, nil)
 	result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-	result3.SetResult(&offRampStaticChainConfig{}, nil)
+	result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-	result4.SetResult(&offRampDynamicChainConfig{}, nil)
+	result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -868,14 +868,14 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 				rmnProxyResult.SetResult(&[]byte{1, 2, 3}, nil)
 
 				rmnDigestResult := &types.BatchReadResult{ReadName: consts.MethodNameGetReportDigestHeader}
-				rmnDigestResult.SetResult(&rmnDigestHeader{}, nil)
+				rmnDigestResult.SetResult(&cciptypes.RMNDigestHeader{}, nil)
 				rmnConfigResult := &types.BatchReadResult{ReadName: consts.MethodNameGetVersionedConfig}
-				rmnConfigResult.SetResult(&versionedConfig{}, nil)
+				rmnConfigResult.SetResult(&cciptypes.VersionedConfig{}, nil)
 				rmnCurseResult := &types.BatchReadResult{ReadName: consts.MethodNameGetCursedSubjects}
-				rmnCurseResult.SetResult(&RMNCurseResponse{}, nil)
+				rmnCurseResult.SetResult(&cciptypes.RMNCurseResponse{}, nil)
 
 				feeQuoterResult := &types.BatchReadResult{ReadName: consts.MethodNameFeeQuoterGetStaticConfig}
-				feeQuoterResult.SetResult(&feeQuoterStaticConfig{}, nil)
+				feeQuoterResult.SetResult(&cciptypes.FeeQuoterStaticConfig{}, nil)
 
 				return types.BatchGetLatestValuesResult{
 					types.BoundContract{Name: consts.ContractNameOffRamp}:   {},
@@ -893,25 +893,25 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 				result1 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 				result1.SetResult("invalid type", nil)
 				result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
-				result2.SetResult(&OCRConfigResponse{}, nil)
+				result2.SetResult(&cciptypes.OCRConfigResponse{}, nil)
 				result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-				result3.SetResult(&offRampStaticChainConfig{}, nil)
+				result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 				result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-				result4.SetResult(&offRampDynamicChainConfig{}, nil)
+				result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 				// Setup valid responses for other contracts
 				rmnProxyResult := &types.BatchReadResult{ReadName: consts.MethodNameGetARM}
 				rmnProxyResult.SetResult(&[]byte{1, 2, 3}, nil)
 
 				rmnDigestResult := &types.BatchReadResult{ReadName: consts.MethodNameGetReportDigestHeader}
-				rmnDigestResult.SetResult(&rmnDigestHeader{}, nil)
+				rmnDigestResult.SetResult(&cciptypes.RMNDigestHeader{}, nil)
 				rmnConfigResult := &types.BatchReadResult{ReadName: consts.MethodNameGetVersionedConfig}
-				rmnConfigResult.SetResult(&versionedConfig{}, nil)
+				rmnConfigResult.SetResult(&cciptypes.VersionedConfig{}, nil)
 				rmnCurseResult := &types.BatchReadResult{ReadName: consts.MethodNameGetCursedSubjects}
-				rmnCurseResult.SetResult(&RMNCurseResponse{}, nil)
+				rmnCurseResult.SetResult(&cciptypes.RMNCurseResponse{}, nil)
 
 				feeQuoterResult := &types.BatchReadResult{ReadName: consts.MethodNameFeeQuoterGetStaticConfig}
-				feeQuoterResult.SetResult(&feeQuoterStaticConfig{}, nil)
+				feeQuoterResult.SetResult(&cciptypes.FeeQuoterStaticConfig{}, nil)
 
 				return types.BatchGetLatestValuesResult{
 					types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -962,9 +962,9 @@ func TestConfigCache_MultipleChains(t *testing.T) {
 
 	// Setup mock response for both chains
 	setupMockResponse := func(f uint8) types.BatchGetLatestValuesResult {
-		mockConfig := OCRConfigResponse{
-			OCRConfig: OCRConfig{
-				ConfigInfo: ConfigInfo{F: f, N: 4},
+		mockConfig := cciptypes.OCRConfigResponse{
+			OCRConfig: cciptypes.OCRConfig{
+				ConfigInfo: cciptypes.ConfigInfo{F: f, N: 4},
 			},
 		}
 
@@ -973,9 +973,9 @@ func TestConfigCache_MultipleChains(t *testing.T) {
 		result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 		result2.SetResult(&mockConfig, nil)
 		result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-		result3.SetResult(&offRampStaticChainConfig{}, nil)
+		result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 		result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-		result4.SetResult(&offRampDynamicChainConfig{}, nil)
+		result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 		return types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameOffRamp}: {
@@ -1048,9 +1048,9 @@ func TestConfigCache_BackgroundRefreshPeriod(t *testing.T) {
 			cache := newConfigPoller(logger.Test(t), reader, tc.refreshPeriod)
 			ctx := t.Context()
 
-			mockConfig := OCRConfigResponse{
-				OCRConfig: OCRConfig{
-					ConfigInfo: ConfigInfo{F: 1, N: 4},
+			mockConfig := cciptypes.OCRConfigResponse{
+				OCRConfig: cciptypes.OCRConfig{
+					ConfigInfo: cciptypes.ConfigInfo{F: 1, N: 4},
 				},
 			}
 
@@ -1059,9 +1059,9 @@ func TestConfigCache_BackgroundRefreshPeriod(t *testing.T) {
 			result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 			result2.SetResult(&mockConfig, nil)
 			result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
-			result3.SetResult(&offRampStaticChainConfig{}, nil)
+			result3.SetResult(&cciptypes.OffRampStaticChainConfig{}, nil)
 			result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
-			result4.SetResult(&offRampDynamicChainConfig{}, nil)
+			result4.SetResult(&cciptypes.OffRampDynamicChainConfig{}, nil)
 
 			responses := types.BatchGetLatestValuesResult{
 				types.BoundContract{Name: consts.ContractNameOffRamp}: {

@@ -13,6 +13,7 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip OnRampWithMessageTransformer onramp_with_message_transformer latest
 //go:generate go run generation/generate/wrap.go ccip OffRampWithMessageTransformer offramp_with_message_transformer latest
 //go:generate go run generation/generate/wrap.go ccip FeeQuoter fee_quoter latest
+//go:generate go run generation/generate/wrap.go ccip FeeQuoterV2 fee_quoter_v2 latest
 //go:generate go run generation/generate/wrap.go ccip NonceManager nonce_manager latest
 //go:generate go run generation/generate/wrap.go ccip TokenAdminRegistry token_admin_registry latest
 //go:generate go run generation/generate/wrap.go ccip TokenPoolFactory token_pool_factory latest
