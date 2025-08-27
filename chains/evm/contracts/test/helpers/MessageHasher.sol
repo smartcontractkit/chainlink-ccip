@@ -82,6 +82,7 @@ contract MessageHasher {
     return Client._argsToBytes(extraArgs);
   }
 
+
   function decodeEVMExtraArgsV1(
     uint256 gasLimit
   ) public pure returns (Client.EVMExtraArgsV1 memory) {
@@ -106,6 +107,12 @@ contract MessageHasher {
     Client.SVMExtraArgsV1 memory extraArgs
   ) public pure returns (bytes memory) {
     return Client._svmArgsToBytes(extraArgs);
+  }
+
+  function encodeSUIExtraArgsV1(
+    Client.SuiExtraArgsV1 memory extraArgs
+  ) public pure returns (bytes memory) {
+    return Client._suiArgsToBytes(extraArgs); 
   }
 
   /// @notice used offchain to decode an encoded SVMExtraArgsV1 struct.
