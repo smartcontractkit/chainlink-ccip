@@ -96,7 +96,7 @@ install-safebigint:
 	go install github.com/winder/safebigint/cmd/safebigint@latest
 
 install-goboundcheck:
-	go install github.com/asoliman92/goboundcheck/cmd/goboundcheck@latest
+	go install github.com/asoliman92/goboundcheck/cmd/goboundcheck@da140a2
 
 install-custom-linters: install-safebigint install-goboundcheck
 
