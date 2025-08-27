@@ -1,15 +1,26 @@
 package ccipv1_7
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 )
@@ -56,14 +67,78 @@ type EAFake struct {
 
 type ConfigPhase int
 
-func configureContracts(in *Cfg, c *ethclient.Client, auth *bind.TransactOpts, cl []*clclient.ChainlinkClient, rootAddr string, transmitters []common.Address) error {
+func configureSrcContracts(in *Cfg, c *ethclient.Client, auth *bind.TransactOpts, cl []*clclient.ChainlinkClient, rootAddr string, transmitters []common.Address) error {
 	Plog.Info().Msg("Deploying LINK token contract")
-	cldfEnv, err := LoadCLDFEnvironment(in)
+	lggr, err := logger.New()
 	if err != nil {
 		return err
 	}
-	_ = cldfEnv
-	// CCIPv17 specific contracts
+
+	srcChainID := in.Blockchains[0].Out.ChainID
+	//dstChainID := in.Blockchains[1].Out.ChainID
+	srcRPCWSURL := in.Blockchains[0].Out.Nodes[0].ExternalWSUrl
+	srcRPCHTTPURL := in.Blockchains[0].Out.Nodes[0].ExternalHTTPUrl
+	//dstRPCWSURL := in.Blockchains[1].Out.Nodes[0].ExternalWSUrl
+	//dstRPCHTTPURL := in.Blockchains[1].Out.Nodes[0].ExternalHTTPUrl
+
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		lggr,
+		operations.NewMemoryReporter(),
+	)
+
+	srcChainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(srcChainID, chainsel.FamilyEVM)
+	if err != nil {
+		return err
+	}
+	L.Warn().Str("HTTP", srcRPCHTTPURL).Str("WS", srcRPCWSURL).Send()
+
+	srcChainProvider, err := cldf_evm_provider.NewRPCChainProvider(
+		srcChainDetails.ChainSelector,
+		cldf_evm_provider.RPCChainProviderConfig{
+			DeployerTransactorGen: cldf_evm_provider.TransactorFromRaw(
+				getNetworkPrivateKey(),
+			),
+			RPCs: []deployment.RPC{
+				{
+					Name:               "default",
+					WSURL:              srcRPCWSURL,
+					HTTPURL:            srcRPCHTTPURL,
+					PreferredURLScheme: deployment.URLSchemePreferenceHTTP,
+				},
+			},
+			ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(30),
+		},
+	).Initialize(context.Background())
+	if err != nil {
+		return err
+	}
+
+	chains := cldf_chain.NewBlockChainsFromSlice(
+		[]cldf_chain.BlockChain{srcChainProvider},
+	)
+
+	e := deployment.Environment{
+		GetContext:       func() context.Context { return context.Background() },
+		Logger:           lggr,
+		OperationsBundle: bundle,
+		BlockChains:      chains,
+		DataStore:        datastore.NewMemoryDataStore().Seal(),
+	}
+
+	out, err := changesets.DeployChainContracts.Apply(e, changesets.DeployChainContractsCfg{
+		ChainSelector: srcChainDetails.ChainSelector,
+		Params: sequences.ContractParams{
+			RMNRemote: sequences.RMNRemoteParams{},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	addresses, err := out.DataStore.Addresses().Fetch()
+	spew.Dump(addresses)
+
 	return nil
 }
 
@@ -247,11 +322,11 @@ func DefaultProductConfiguration(in *Cfg, phase ConfigPhase) error {
 				return fmt.Errorf("failed to fund CL nodes on dst chain: %w", err)
 			}
 		}
-		err = configureContracts(in, clientSrc, authSrc, nodeClients, rootAddr, transmittersSrc)
+		err = configureSrcContracts(in, clientSrc, authSrc, nodeClients, rootAddr, transmittersSrc)
 		if err != nil {
 			return fmt.Errorf("could not configure contracts (src chain): %w", err)
 		}
-		err = configureContracts(in, clientDst, authDst, nodeClients, rootAddr, transmittersDst)
+		err = configureSrcContracts(in, clientDst, authDst, nodeClients, rootAddr, transmittersDst)
 		if err != nil {
 			return fmt.Errorf("could not configure contracts (dst chain): %w", err)
 		}

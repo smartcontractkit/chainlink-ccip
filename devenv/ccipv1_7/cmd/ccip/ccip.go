@@ -26,9 +26,15 @@ var rootCmd = &cobra.Command{
 var reconfigureCmd = &cobra.Command{
 	Use:     "reconfigure",
 	Aliases: []string{"r"},
+	Args:    cobra.RangeArgs(0, 1),
 	Short:   "Reconfigure development environment, remove apps and apply new configuration",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		configFile, _ := rootCmd.Flags().GetString("config")
+		var configFile string
+		if len(args) > 0 {
+			configFile = args[0]
+		} else {
+			configFile = "env.toml"
+		}
 		framework.L.Info().Str("Config", configFile).Msg("Reconfiguring development environment")
 		_ = os.Setenv("CTF_CONFIGS", configFile)
 		_ = os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")

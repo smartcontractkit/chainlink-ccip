@@ -15,8 +15,9 @@
         default = pkgs.mkShell {
         shellHook = ''
           echo "Installing CCIPv17 CLI"
-          cd cmd/ccip && go install -ldflags="-X main.Version=1.0.0" .
-          cd -
+          pushd cmd/ccip > /dev/null
+          go install -ldflags="-X main.Version=1.0.0" .
+          popd > /dev/null
           [ -f .envrc ] && source .envrc && echo "Loaded .envrc file"
           echo "📚 Run 'ccip' to check the CLI docs"
           echo "💻 Run 'ccip sh' to use an interactive mode"
