@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
-import {CCVAggregatorHelper, CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
+import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
 
 contract CCVAggregator_getAllSourceChainConfigs is CCVAggregatorSetup {
   function test_getAllSourceChainConfigs_ReturnsSingleChain() public {

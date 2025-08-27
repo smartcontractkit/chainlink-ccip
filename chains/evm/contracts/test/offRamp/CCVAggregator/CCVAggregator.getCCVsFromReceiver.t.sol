@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
-import {CCVAggregatorHelper, CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
+import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
 
 contract CCVAggregator_getCCVsFromReceiver is CCVAggregatorSetup {
   address internal s_userRequiredCCV;

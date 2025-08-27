@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IRMNRemote} from "../../../interfaces/IRMNRemote.sol";
-import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
