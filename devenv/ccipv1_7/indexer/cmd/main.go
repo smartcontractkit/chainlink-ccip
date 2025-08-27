@@ -25,6 +25,6 @@ func main() {
 		fmt.Fprintf(w, "Indexer is running!\n")
 	})
 
-	l.Info().Msgf("Listening on port %s", ":8100")
+	l.Info().Msgf("Indexer is running on port %s", ":8100")
 	log.Fatal().Err(http.ListenAndServe(":8100", nil)).Send()
 }
