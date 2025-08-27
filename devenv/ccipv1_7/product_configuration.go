@@ -3,6 +3,7 @@ package ccipv1_7
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"os"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -91,7 +93,7 @@ func configureSrcContracts(in *Cfg, c *ethclient.Client, auth *bind.TransactOpts
 	if err != nil {
 		return err
 	}
-	L.Warn().Str("HTTP", srcRPCHTTPURL).Str("WS", srcRPCWSURL).Send()
+	L.Warn().Any("Selector", srcChainDetails.ChainSelector).Msg("Chain selector")
 
 	srcChainProvider, err := cldf_evm_provider.NewRPCChainProvider(
 		srcChainDetails.ChainSelector,
@@ -107,7 +109,7 @@ func configureSrcContracts(in *Cfg, c *ethclient.Client, auth *bind.TransactOpts
 					PreferredURLScheme: deployment.URLSchemePreferenceHTTP,
 				},
 			},
-			ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(30),
+			ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1 * time.Minute),
 		},
 	).Initialize(context.Background())
 	if err != nil {
@@ -129,7 +131,32 @@ func configureSrcContracts(in *Cfg, c *ethclient.Client, auth *bind.TransactOpts
 	out, err := changesets.DeployChainContracts.Apply(e, changesets.DeployChainContractsCfg{
 		ChainSelector: srcChainDetails.ChainSelector,
 		Params: sequences.ContractParams{
-			RMNRemote: sequences.RMNRemoteParams{},
+			RMNRemote:     sequences.RMNRemoteParams{},
+			CCVAggregator: sequences.CCVAggregatorParams{},
+			CommitOnRamp: sequences.CommitOnRampParams{
+				FeeAggregator: common.HexToAddress("0x01"),
+			},
+			CCVProxy: sequences.CCVProxyParams{
+				FeeAggregator: common.HexToAddress("0x01"),
+			},
+			FeeQuoter: sequences.FeeQuoterParams{
+				MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
+				TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
+				LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
+				WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
+			},
+			CommitOffRamp: sequences.CommitOffRampParams{
+				SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
+					ConfigDigest: [32]byte{},
+					F:            1,
+					Signers: []common.Address{
+						common.HexToAddress("0x02"),
+						common.HexToAddress("0x03"),
+						common.HexToAddress("0x04"),
+						common.HexToAddress("0x05"),
+					},
+				},
+			},
 		},
 	})
 	if err != nil {
