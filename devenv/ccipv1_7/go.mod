@@ -117,7 +117,7 @@ require (
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
@@ -246,6 +246,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
+
+// https://www.mend.io/vulnerability-database/CVE-2025-30204?utm_source=JetBrains
+exclude github.com/golang-jwt/jwt/v4 v4.5.1
 
 replace github.com/ebitengine/purego v0.8.2 => github.com/ebitengine/purego v0.8.4
 
