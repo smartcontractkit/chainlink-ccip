@@ -73,8 +73,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   struct SourceChainConfig {
     IRouter router; // ─╮ Local router to use for messages coming from this source chain.
     bool isEnabled; // ─╯ Flag whether the source chain is enabled or not.
-    address defaultCCV; // Default CCV to use for messages from this source chain.
-    address requiredCCV; // Required CCV to use for all messages from this source chain.
+    address[] defaultCCV; // Default CCV to use for messages from this source chain.
+    address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
   }
 
   /// @dev Same as SourceChainConfig but with source chain selector so that an array of these
@@ -85,8 +85,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector; // │  Source chain selector of the config to update.
     bool isEnabled; // ────────────╯  Flag whether the source chain is enabled or not.
     bytes onRamp; // OnRamp address on the source chain.
-    address defaultCCV; // Default CCV to use for messages from this source chain.
-    address requiredCCV; // Required CCV to use for all messages from this source chain.
+    address[] defaultCCV; // Default CCV to use for messages from this source chain.
+    address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
   }
 
   struct AggregatedReport {
@@ -313,13 +313,15 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver,
     address[] calldata ccvs,
-    address[] memory tokenPoolCCVs
-  ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndex) {
+    address[] memory tokenRequiredCCVs
+  ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndexes) {
     (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
       _getCCVsFromReceiver(sourceChainSelector, receiver);
+    address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
 
     ccvsToQuery = new address[](ccvs.length);
-    dataIndex = new uint256[](ccvs.length);
+    dataIndexes = new uint256[](ccvs.length);
+    bool[] memory ccvAlreadyIncluded = new bool[](ccvs.length);
     uint256 numCCVsToQuery = 0;
 
     for (uint256 i = 0; i < requiredCCV.length; ++i) {
@@ -327,8 +329,12 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       for (uint256 j = 0; j < ccvs.length; ++j) {
         if (ccvs[j] == requiredCCV[i]) {
           found = true;
+          // If the CCV is already included, we skip it.
+          if (ccvAlreadyIncluded[j]) break;
+
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndex[numCCVsToQuery] = j;
+          dataIndexes[numCCVsToQuery] = j;
+          ccvAlreadyIncluded[j] = true;
           numCCVsToQuery++;
           break;
         }
@@ -338,19 +344,43 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       }
     }
 
-    for (uint256 i = 0; i < tokenPoolCCVs.length; ++i) {
+    for (uint256 i = 0; i < tokenRequiredCCVs.length; ++i) {
       bool found = false;
       for (uint256 j = 0; j < ccvs.length; ++j) {
-        if (ccvs[j] == tokenPoolCCVs[i]) {
+        if (ccvs[j] == tokenRequiredCCVs[i]) {
           found = true;
+          // If the CCV is already included, we skip it.
+          if (ccvAlreadyIncluded[j]) break;
+
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndex[numCCVsToQuery] = j;
+          dataIndexes[numCCVsToQuery] = j;
+          ccvAlreadyIncluded[j] = true;
           numCCVsToQuery++;
           break;
         }
       }
       if (!found) {
-        revert RequiredCCVMissing(tokenPoolCCVs[i], true);
+        revert RequiredCCVMissing(tokenRequiredCCVs[i], true);
+      }
+    }
+
+    for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
+      bool found = false;
+      for (uint256 j = 0; j < ccvs.length; ++j) {
+        if (ccvs[j] == laneMandatedCCVs[i]) {
+          found = true;
+          // If the CCV is already included, we skip it.
+          if (ccvAlreadyIncluded[j]) break;
+
+          ccvsToQuery[numCCVsToQuery] = ccvs[j];
+          dataIndexes[numCCVsToQuery] = j;
+          ccvAlreadyIncluded[j] = true;
+          numCCVsToQuery++;
+          break;
+        }
+      }
+      if (!found) {
+        revert RequiredCCVMissing(laneMandatedCCVs[i], true);
       }
     }
 
@@ -359,8 +389,12 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       for (uint256 j = 0; j < ccvs.length && optionalCCVsToFind > 0; ++j) {
         if (ccvs[j] == optionalCCVs[i]) {
           optionalCCVsToFind--;
+          // If the CCV is already included, we skip it.
+          if (ccvAlreadyIncluded[j]) break;
+
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndex[numCCVsToQuery] = j;
+          dataIndexes[numCCVsToQuery] = j;
+          ccvAlreadyIncluded[j] = true;
           numCCVsToQuery++;
           break;
         }
@@ -375,10 +409,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       // Resize the array to the actual number of CCVs found.
       assembly {
         mstore(ccvsToQuery, numCCVsToQuery)
-        mstore(dataIndex, numCCVsToQuery)
+        mstore(dataIndexes, numCCVsToQuery)
       }
     }
-    return (ccvsToQuery, dataIndex);
+    return (ccvsToQuery, dataIndexes);
   }
 
   function _getCCVsFromReceiver(
@@ -398,36 +432,14 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
           revert InvalidOptionalThreshold(optionalCCVs.length, optionalThreshold);
         }
 
-        // If the user specified empty required and optional CCVs, we fall back to the default and required CCVs.
-        // If they did specify something, we use what they specified plus the required CCV.
+        // If the user specified empty required and optional CCVs, we fall back to the default CCVs.
+        // If they did specify something, we use what they specified.
         if (requiredCCV.length != 0 || optionalThreshold != 0) {
-          if (sourceConfig.requiredCCV == address(0)) {
-            address[] memory newRequiredCCV = new address[](requiredCCV.length);
-            requiredCCV[0] = sourceConfig.requiredCCV;
-
-            for (uint256 i = 0; i < requiredCCV.length; ++i) {
-              newRequiredCCV[i + 1] = requiredCCV[i];
-            }
-
-            return (newRequiredCCV, optionalCCVs, optionalThreshold);
-          }
-
           return (requiredCCV, optionalCCVs, optionalThreshold);
         }
       }
 
-      if (sourceConfig.requiredCCV == address(0)) {
-        requiredCCV = new address[](1);
-        requiredCCV[0] = sourceConfig.defaultCCV;
-
-        return (requiredCCV, new address[](0), 0);
-      }
-
-      requiredCCV = new address[](2);
-      requiredCCV[0] = sourceConfig.requiredCCV;
-      requiredCCV[1] = sourceConfig.defaultCCV;
-
-      return (requiredCCV, new address[](0), 0);
+      return (sourceConfig.defaultCCV, new address[](0), 0);
     }
   }
 
@@ -681,7 +693,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         revert ZeroChainSelectorNotAllowed();
       }
 
-      if (address(sourceConfigUpdate.router) == address(0) || sourceConfigUpdate.defaultCCV == address(0)) {
+      if (address(sourceConfigUpdate.router) == address(0) || sourceConfigUpdate.defaultCCV.length == 0) {
         revert ZeroAddressNotAllowed();
       }
 
@@ -697,7 +709,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
       currentConfig.defaultCCV = sourceConfigUpdate.defaultCCV;
-      currentConfig.requiredCCV = sourceConfigUpdate.requiredCCV;
+      currentConfig.laneMandatedCCVs = sourceConfigUpdate.laneMandatedCCVs;
 
       // We don't need to check the return value, as inserting the item twice has no effect.
       s_sourceChainSelectors.add(sourceChainSelector);
