@@ -82,6 +82,7 @@ contract MessageHasher {
     return Client._argsToBytes(extraArgs);
   }
 
+
   function decodeEVMExtraArgsV1(
     uint256 gasLimit
   ) public pure returns (Client.EVMExtraArgsV1 memory) {
@@ -108,6 +109,12 @@ contract MessageHasher {
     return Client._svmArgsToBytes(extraArgs);
   }
 
+  function encodeSUIExtraArgsV1(
+    Client.SuiExtraArgsV1 memory extraArgs
+  ) public pure returns (bytes memory) {
+    return Client._suiArgsToBytes(extraArgs); 
+  }
+
   /// @notice used offchain to decode an encoded SVMExtraArgsV1 struct.
   /// @dev The unrolled version fails due to differences in encoding when the accounts[] array
   /// is empty or not.
@@ -132,4 +139,25 @@ contract MessageHasher {
       extraArgs.accounts
     );
   }
+
+  /// @notice Used offchain to decode an encoded SuiExtraArgsV1 struct.
+function decodeSuiExtraArgsStruct(
+  Client.SuiExtraArgsV1 memory extraArgs
+)
+  public
+  pure
+  returns (
+    uint256 gasLimit,
+    bool allowOutOfOrderExecution,
+    bytes32 tokenReceiver,
+    bytes32[] memory receiverObjectIds
+  )
+{
+  return (
+    extraArgs.gasLimit,
+    extraArgs.allowOutOfOrderExecution,
+    extraArgs.tokenReceiver,
+    extraArgs.receiverObjectIds
+  );
+}
 }
