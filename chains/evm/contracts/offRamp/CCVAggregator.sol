@@ -4,25 +4,24 @@ pragma solidity ^0.8.24;
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
 import {ICCVOffRampV1} from "../interfaces/ICCVOffRampV1.sol";
-import {IPoolV2} from "../interfaces/IPoolV2.sol";
-import {Client} from "../libraries/Client.sol";
-import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
-import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
-import {EnumerableSet} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
-
 import {IPoolV1} from "../interfaces/IPool.sol";
+import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
 
+import {Client} from "../libraries/Client.sol";
+import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
-
 import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
+
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   using ERC165CheckerReverting for address;
@@ -31,6 +30,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes err);
   error OptionalCCVQuorumNotReached(uint256 wanted, uint256 got);
+  error InvalidOptionalThreshold(uint256 optionalCCVsLength, uint256 optionalThreshold);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
@@ -38,7 +38,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
-  error InvalidProofLength(uint256 expected, uint256 got);
+  error InvalidCCVDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
@@ -47,6 +47,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error InvalidVerifierSelector(bytes4 selector);
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV, bool isPoolCCV);
+  error InvalidNumberOfTokens(uint256 numTokens);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -234,6 +235,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     if (report.message.header.destChainSelector != i_chainSelector) {
       revert InvalidMessageDestChainSelector(report.message.header.destChainSelector);
     }
+    if (report.ccvs.length != report.ccvData.length) {
+      revert InvalidCCVDataLength(report.ccvs.length, report.ccvData.length);
+    }
 
     /////// Original state checks ///////
 
@@ -257,6 +261,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     {
       address[] memory requiredPoolCCVs = new address[](0);
       if (report.message.tokenAmounts.length > 0) {
+        if (report.message.tokenAmounts.length != 1) {
+          revert InvalidNumberOfTokens(report.message.tokenAmounts.length);
+        }
+
         requiredPoolCCVs = _getCCVsFromPool(
           report.message.tokenAmounts[0].destTokenAddress,
           report.message.header.sourceChainSelector,
@@ -265,14 +273,19 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         );
       }
 
-      address[] memory ccvsToQuery = _ensureCCVQuorumIsReached(
+      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) = _ensureCCVQuorumIsReached(
         report.message.header.sourceChainSelector, report.message.receiver, report.ccvs, requiredPoolCCVs
       );
 
       // TODO real hash
       bytes32 messageHash = keccak256(abi.encode(report.message));
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        ICCVOffRampV1(ccvsToQuery[i]).validateReport(report.message, messageHash, report.ccvData[i], originalState);
+        ICCVOffRampV1(ccvsToQuery[i]).validateReport({
+          message: report.message,
+          messageHash: messageHash,
+          ccvData: report.ccvData[ccvDataIndex[i]],
+          originalState: originalState
+        });
       }
     }
 
@@ -301,11 +314,12 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     address receiver,
     address[] calldata ccvs,
     address[] memory tokenPoolCCVs
-  ) internal view returns (address[] memory ccvsToQuery) {
+  ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndex) {
     (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
       _getCCVsFromReceiver(sourceChainSelector, receiver);
 
     ccvsToQuery = new address[](ccvs.length);
+    dataIndex = new uint256[](ccvs.length);
     uint256 numCCVsToQuery = 0;
 
     for (uint256 i = 0; i < requiredCCV.length; ++i) {
@@ -314,6 +328,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         if (ccvs[j] == requiredCCV[i]) {
           found = true;
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
+          dataIndex[numCCVsToQuery] = j;
           numCCVsToQuery++;
           break;
         }
@@ -329,6 +344,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         if (ccvs[j] == tokenPoolCCVs[i]) {
           found = true;
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
+          dataIndex[numCCVsToQuery] = j;
           numCCVsToQuery++;
           break;
         }
@@ -344,6 +360,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         if (ccvs[j] == optionalCCVs[i]) {
           optionalCCVsToFind--;
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
+          dataIndex[numCCVsToQuery] = j;
           numCCVsToQuery++;
           break;
         }
@@ -358,19 +375,47 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       // Resize the array to the actual number of CCVs found.
       assembly {
         mstore(ccvsToQuery, numCCVsToQuery)
+        mstore(dataIndex, numCCVsToQuery)
       }
     }
-    return ccvsToQuery;
+    return (ccvsToQuery, dataIndex);
   }
 
   function _getCCVsFromReceiver(
     uint64 sourceChainSelector,
     address receiver
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    // If the receiver is not a contract, or it doesn't support the required interface, we return the default.
-    if (receiver.code.length == 0 || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId))
-    {
-      SourceChainConfig memory sourceConfig = s_sourceChainConfigs[sourceChainSelector];
+    SourceChainConfig memory sourceConfig = s_sourceChainConfigs[sourceChainSelector];
+
+    // If the receiver is a contract
+    if (receiver.code.length != 0) {
+      // And the contract implements the IAny2EVMMessageReceiverV2 interface
+      if (!receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
+        (requiredCCV, optionalCCVs, optionalThreshold) =
+          IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
+
+        if (optionalThreshold > optionalCCVs.length) {
+          revert InvalidOptionalThreshold(optionalCCVs.length, optionalThreshold);
+        }
+
+        // If the user specified empty required and optional CCVs, we fall back to the default and required CCVs.
+        // If they did specify something, we use what they specified plus the required CCV.
+        if (requiredCCV.length != 0 || optionalThreshold != 0) {
+          if (sourceConfig.requiredCCV == address(0)) {
+            address[] memory newRequiredCCV = new address[](requiredCCV.length);
+            requiredCCV[0] = sourceConfig.requiredCCV;
+
+            for (uint256 i = 0; i < requiredCCV.length; ++i) {
+              newRequiredCCV[i + 1] = requiredCCV[i];
+            }
+
+            return (newRequiredCCV, optionalCCVs, optionalThreshold);
+          }
+
+          return (requiredCCV, optionalCCVs, optionalThreshold);
+        }
+      }
+
       if (sourceConfig.requiredCCV == address(0)) {
         requiredCCV = new address[](1);
         requiredCCV[0] = sourceConfig.defaultCCV;
@@ -379,14 +424,11 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       }
 
       requiredCCV = new address[](2);
-      requiredCCV[0] = sourceConfig.defaultCCV;
-      requiredCCV[1] = sourceConfig.requiredCCV;
+      requiredCCV[0] = sourceConfig.requiredCCV;
+      requiredCCV[1] = sourceConfig.defaultCCV;
 
       return (requiredCCV, new address[](0), 0);
     }
-
-    // If it does, we return the required CCVs from the receiver.
-    return IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
   }
 
   function _getCCVsFromPool(
