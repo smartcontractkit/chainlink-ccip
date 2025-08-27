@@ -226,6 +226,14 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       });
     }
 
+    // TODO: Handle the fee returned here
+    // Currently only used for validations
+    ICCVOnRamp(resolvedExtraArgs.executor).getFee(
+      destChainSelector,
+      message,
+      abi.encode(resolvedExtraArgs)
+    );
+
     // TODO
 
     // 4. lockOrBurn
