@@ -24,60 +24,8 @@ const (
 	fromAddressString = "" // From address.
 )
 
-const configTOML = `
-[EVM]
-ChainID = '11155111'
-AutoCreateKey = true
-BlockBackfillDepth = 10
-BlockBackfillSkip = false
-FinalityDepth = 50
-SafeDepth = 0
-FinalityTagEnabled = true
-LinkContractAddress = '0x779877A7B0D9E8603169DdbD7836e478b4624789'
-LogBackfillBatchSize = 1000
-LogPollInterval = '15s'
-LogKeepBlocksDepth = 100000
-LogPrunePageSize = 10000
-BackupLogPollerBlockDelay = 100
-MinIncomingConfirmations = 3
-MinContractPayment = '0.1 link'
-NonceAutoSync = true
-NoNewHeadsThreshold = '3m0s'
-LogBroadcasterEnabled = true
-RPCDefaultBatchSize = 250
-RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
-NoNewFinalizedHeadsThreshold = '0s'
-
-[EVM.HeadTracker]
-HistoryDepth = 100
-MaxBufferSize = 3
-SamplingInterval = '1s'
-MaxAllowedFinalityDepth = 10000
-FinalityTagBypass = false
-PersistenceEnabled = true
-
-[EVM.NodePool]
-PollFailureThreshold = 2
-PollInterval = '3s'
-SelectionMode = 'HighestHead'
-SyncThreshold = 5
-LeaseDuration = '0s'
-NodeIsSyncingEnabled = false
-FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
-NewHeadsPollInterval = '0s'
-VerifyChainID = true
-
-[[EVM.Nodes]]
-Name = 'rpc-primary'
-HTTPURL = ''
-WSURL = ''
-SendOnly = false
-Order = 100
-IsLoadBalancedRPC = false
-`
+// Should be the effective defaults you'll see in a CL node for a single chain.
+const configTOML = ``
 
 func main() {
 	ctx := context.Background()
