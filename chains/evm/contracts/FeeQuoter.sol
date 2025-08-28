@@ -201,7 +201,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
 
   /// @dev The token transfer fee config that can be set by the owner or fee admin.
-  mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) private
+  mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) internal
     s_tokenTransferFeeConfig;
 
   /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to
@@ -508,7 +508,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     bytes4 interfaceId
   ) public pure override returns (bool) {
     return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IFeeQuoter).interfaceId
-      || interfaceId == type(ITypeAndVersion).interfaceId || interfaceId == type(IERC165).interfaceId;
+      || interfaceId == type(IERC165).interfaceId;
   }
 
   /// @inheritdoc IReceiver
@@ -1044,7 +1044,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         }
       } else {
         // The messaging accounts needed for CCIP receiver on SVM are:
-        // message receiver, offramp PDA signer,
+        // message receiver, offRamp PDA signer,
         // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.
         svmExpandedDataLength +=
           ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE);

@@ -92,7 +92,12 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     allowlist[0] = allowlistedSender;
 
     BurnMintFastTransferTokenPool poolWithAllowlist = new BurnMintFastTransferTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, allowlist, address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token,
+      DEFAULT_TOKEN_DECIMALS,
+      allowlist,
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      SOURCE_CHAIN_SELECTOR
     );
     s_token.grantMintAndBurnRoles(address(poolWithAllowlist));
     // Setup chain and lane config for the new pool
@@ -121,7 +126,12 @@ contract BurnMintFastTransferTokenPool_validateSendRequest is BurnMintFastTransf
     allowlist[0] = OWNER; // Only OWNER is allowed
 
     BurnMintFastTransferTokenPool poolWithAllowlist = new BurnMintFastTransferTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, allowlist, address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token,
+      DEFAULT_TOKEN_DECIMALS,
+      allowlist,
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      SOURCE_CHAIN_SELECTOR
     );
 
     // Setup chain and lane config for the new pool
