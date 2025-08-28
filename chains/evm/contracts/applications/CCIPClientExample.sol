@@ -19,7 +19,7 @@ import {IERC20} from
 // @dev If the client is upgradeable you have significantly more flexibility and
 // can avoid storage based options like the below contract uses. However it's
 // worth carefully considering how the trust assumptions of your client dapp will
-// change if you introduce upgradeability. An immutable dapp building on top of CCIP
+// change if you introduce upgradability. An immutable dapp building on top of CCIP
 // like the example below will inherit the trust properties of CCIP (i.e. the oracle network).
 // @dev The receiver's are encoded offchain and passed as direct arguments to permit supporting
 // new chain family receivers (e.g. a Solana encoded receiver address) without upgrading.
