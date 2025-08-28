@@ -210,7 +210,6 @@ var indexerDBShell = &cobra.Command{
 	},
 }
 
-// In your Cobra command
 var printAddresses = &cobra.Command{
 	Use:   "addresses",
 	Short: "Pretty-print all on-chain contract addresses data",
