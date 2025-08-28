@@ -1,0 +1,167 @@
+package main
+
+import (
+	"context"
+	"time"
+
+	"go.uber.org/zap/zapcore"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+	"github.com/smartcontractkit/chainlink-evm/pkg/client"
+	evmConfig "github.com/smartcontractkit/chainlink-evm/pkg/config"
+	"github.com/smartcontractkit/chainlink-evm/pkg/txm"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/internal/chains/evm/config"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/internal/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/internal/chains/evm/multinode"
+	evmTxm "github.com/smartcontractkit/chainlink-modsec/libmodsec/internal/chains/evm/txm"
+	"github.com/smartcontractkit/chainlink-modsec/libmodsec/internal/runner/db"
+)
+
+const (
+	dbURL             = "postgresql://postgres:@localhost:5432/postgres?sslmode=disable"
+	privateKeyString  = "" // Private key without 0x prefix.
+	fromAddressString = "" // From address.
+)
+
+const configTOML = `
+[EVM]
+ChainID = '11155111'
+AutoCreateKey = true
+BlockBackfillDepth = 10
+BlockBackfillSkip = false
+FinalityDepth = 50
+SafeDepth = 0
+FinalityTagEnabled = true
+LinkContractAddress = '0x779877A7B0D9E8603169DdbD7836e478b4624789'
+LogBackfillBatchSize = 1000
+LogPollInterval = '15s'
+LogKeepBlocksDepth = 100000
+LogPrunePageSize = 10000
+BackupLogPollerBlockDelay = 100
+MinIncomingConfirmations = 3
+MinContractPayment = '0.1 link'
+NonceAutoSync = true
+NoNewHeadsThreshold = '3m0s'
+LogBroadcasterEnabled = true
+RPCDefaultBatchSize = 250
+RPCBlockQueryDelay = 1
+FinalizedBlockOffset = 0
+NoNewFinalizedHeadsThreshold = '0s'
+
+[EVM.HeadTracker]
+HistoryDepth = 100
+MaxBufferSize = 3
+SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = false
+PersistenceEnabled = true
+
+[EVM.NodePool]
+PollFailureThreshold = 2
+PollInterval = '3s'
+SelectionMode = 'HighestHead'
+SyncThreshold = 5
+LeaseDuration = '0s'
+NodeIsSyncingEnabled = false
+FinalizedBlockPollInterval = '5s'
+EnforceRepeatableRead = false
+DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
+VerifyChainID = true
+
+[[EVM.Nodes]]
+Name = 'rpc-primary'
+HTTPURL = ''
+WSURL = ''
+SendOnly = false
+Order = 100
+IsLoadBalancedRPC = false
+`
+
+func main() {
+	ctx := context.Background()
+
+	// Init Logger.
+	lggrCfg := logger.Config{Level: zapcore.InfoLevel}
+	lggr, _ := lggrCfg.New()
+
+	// Open database.
+	db, err := db.CreateDB(ctx, lggr, dbURL)
+	if err != nil {
+		lggr.Fatal("Error creating database", err)
+		return
+	}
+
+	// Create EVM chain config.
+	evmConfig, err := config.CreateNewEVMChainFromTOML(lggr, configTOML)
+	if err != nil {
+		lggr.Fatal("Error creating EVM chain config", err)
+		return
+	}
+
+	// Create MultiNode.
+	multiNode, err := multinode.NewMultiNode(ctx, lggr, evmConfig)
+	if err != nil {
+		lggr.Fatal("Error creating MultiNode", err)
+		return
+	}
+
+	// Start Mailbox Monitor + LogPoller
+	mailMon := mailbox.NewMonitor("1", lggr)
+	mailMon.Start(ctx)
+	lp := logpoller.NewLogPoller(ctx, evmConfig, lggr, db, multiNode, mailMon)
+	lp.Start(ctx)
+
+	// Create TXM
+	txm, err := createTXM(lggr, multiNode, evmConfig)
+	if err != nil {
+		lggr.Fatal("Error creating TXM", err)
+		return
+	}
+	txm.Start(ctx)
+	lggr.Info("TXM started")
+
+	// Wait 10 seconds, so you can see that LogPoller and HeadTracker are working in the background.
+	time.Sleep(10 * time.Second)
+
+	// Get latest block from log poller.
+	block, err := lp.LatestBlock(ctx)
+	if err != nil {
+		lggr.Fatal("Error getting latest block", err)
+	}
+
+	lggr.Info("Latest block from LogPoller", "block", block)
+}
+
+func createTXM(lggr logger.Logger, multiNode client.Client, evmConfig *evmConfig.ChainScoped) (*txm.Txm, error) {
+	// Init Gas Estimator.
+	estimator, err := evmTxm.InitGasEstimator(lggr, multiNode, evmConfig.EVM().ChainID(), evmTxm.GetGasConfig())
+	if err != nil {
+		lggr.Fatal("Error during estimator init", err)
+		return nil, err
+	}
+
+	// Init Dummy Keystore
+	keystore := txm.NewKeystore(evmConfig.EVM().ChainID())
+	if err := keystore.Add(privateKeyString); err != nil {
+		lggr.Fatal("Error adding key to keystore", err)
+		return nil, err
+	}
+
+	// Init TXMv2
+	txmConfig := txm.Config{
+		EIP1559:             true,
+		BlockTime:           12 * time.Second,
+		RetryBlockThreshold: 3,
+		EmptyTxLimitDefault: evmTxm.GetGasConfig().LimitDefaultF,
+	}
+
+	txm, err := evmTxm.NewEvmTxmV2(lggr, evmConfig.EVM().ChainID(), multiNode, fromAddressString, evmTxm.GetGasConfig(), estimator, txmConfig, keystore)
+	if err != nil {
+		lggr.Fatal("Error during txm init", err)
+		return nil, err
+	}
+
+	return txm, nil
+}
