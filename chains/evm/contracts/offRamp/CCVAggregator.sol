@@ -3,8 +3,9 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
-import {ICCVOffRamp} from "../interfaces/ICCVOffRamp.sol";
+import {ICCVOffRampV1} from "../interfaces/ICCVOffRampV1.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
+import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
@@ -28,7 +29,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes err);
-  error NoCCVQuorumReached();
+  error OptionalCCVQuorumNotReached(uint256 wanted, uint256 got);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
@@ -36,7 +37,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
-  error InvalidProofLength(uint256 expected, uint256 got);
+  error InvalidCCVDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
@@ -44,6 +45,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
   error InvalidVerifierSelector(bytes4 selector);
   error ReentrancyGuardReentrantCall();
+  error RequiredCCVMissing(address requiredCCV, bool isPoolCCV);
+  error InvalidNumberOfTokens(uint256 numTokens);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -65,22 +68,25 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     address tokenAdminRegistry; // Token admin registry address
   }
 
-  // TODO actually set this config
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
   struct SourceChainConfig {
     IRouter router; // ─╮ Local router to use for messages coming from this source chain.
     bool isEnabled; // ─╯ Flag whether the source chain is enabled or not.
-    address defaultCCV; // Default CCV to use for messages from this source chain.
-    address requiredCCV; // Required CCV to use for all messages from this source chain.
+    bytes onRamp; // OnRamp address on the source chain.
+    address[] defaultCCV; // Default CCV to use for messages from this source chain.
+    address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
   }
 
   /// @dev Same as SourceChainConfig but with source chain selector so that an array of these
   /// can be passed in the constructor and the applySourceChainConfigUpdates function.
+  // solhint-disable-next-line gas-struct-packing
   struct SourceChainConfigArgs {
     IRouter router; // ────────────╮  Local router to use for messages coming from this source chain.
     uint64 sourceChainSelector; // │  Source chain selector of the config to update.
     bool isEnabled; // ────────────╯  Flag whether the source chain is enabled or not.
     bytes onRamp; // OnRamp address on the source chain.
+    address[] defaultCCV; // Default CCV to use for messages from this source chain.
+    address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
   }
 
   struct AggregatedReport {
@@ -122,6 +128,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
 
   // STATE
+  // TODO different exec state mapping
   /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
   /// state only taking up 2 bits of the uint256, packing 128 states into a single slot.
   /// Message state is tracked to ensure message can only be executed successfully once.
@@ -229,6 +236,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     if (report.message.header.destChainSelector != i_chainSelector) {
       revert InvalidMessageDestChainSelector(report.message.header.destChainSelector);
     }
+    if (report.ccvs.length != report.ccvData.length) {
+      revert InvalidCCVDataLength(report.ccvs.length, report.ccvData.length);
+    }
 
     /////// Original state checks ///////
 
@@ -249,20 +259,37 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     /////// SECURITY CRITICAL CHECKS ///////
 
-    _ensureCCVQuorumIsReached(
-      report.message.header.sourceChainSelector,
-      report.message.receiver,
-      report.message.tokenAmounts.destTokenAddress, // TODO fix
-      report.ccvs
-    );
-
     {
-      bytes memory encodedMessage = abi.encode(report.message);
+      address[] memory requiredPoolCCVs = new address[](0);
+      if (report.message.tokenAmounts.length > 0) {
+        if (report.message.tokenAmounts.length != 1) {
+          revert InvalidNumberOfTokens(report.message.tokenAmounts.length);
+        }
+
+        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
+        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
+        // that do not support the V2 interface.
+        requiredPoolCCVs = _getCCVsFromPool(
+          report.message.tokenAmounts[0].destTokenAddress,
+          report.message.header.sourceChainSelector,
+          report.message.tokenAmounts[0].amount,
+          report.message.tokenAmounts[0].extraData
+        );
+      }
+
+      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) = _ensureCCVQuorumIsReached(
+        report.message.header.sourceChainSelector, report.message.receiver, report.ccvs, requiredPoolCCVs
+      );
+
       // TODO real hash
-      bytes32 messageHash = keccak256(encodedMessage);
-      // TODO iterate over receiver CCVs not report.
-      for (uint256 i = 0; i < report.ccvs.length; ++i) {
-        ICCVOffRamp(report.ccvs[i]).validateReport(encodedMessage, messageHash, report.ccvData[i], originalState);
+      bytes32 messageHash = keccak256(abi.encode(report.message));
+      for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
+        ICCVOffRampV1(ccvsToQuery[i]).validateReport({
+          message: report.message,
+          messageHash: messageHash,
+          ccvData: report.ccvData[ccvDataIndex[i]],
+          originalState: originalState
+        });
       }
     }
 
@@ -289,22 +316,75 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   function _ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,
     address receiver,
-    address tokenPool,
-    address[] calldata ccvs
-  ) internal view {
+    address[] calldata ccvs,
+    address[] memory tokenRequiredCCVs
+  ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndexes) {
     (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
-      _getCCVsFromReceiverAndPool(sourceChainSelector, receiver, tokenPool);
+      _getCCVsFromReceiver(sourceChainSelector, receiver);
+    address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
+
+    ccvsToQuery = new address[](ccvs.length);
+    dataIndexes = new uint256[](ccvs.length);
+    bool[] memory ccvAlreadyIncluded = new bool[](ccvs.length);
+    uint256 numCCVsToQuery = 0;
 
     for (uint256 i = 0; i < requiredCCV.length; ++i) {
       bool found = false;
       for (uint256 j = 0; j < ccvs.length; ++j) {
         if (ccvs[j] == requiredCCV[i]) {
           found = true;
+          // If the CCV is already included, we skip it.
+          if (ccvAlreadyIncluded[j]) break;
+
+          ccvsToQuery[numCCVsToQuery] = ccvs[j];
+          dataIndexes[numCCVsToQuery] = j;
+          ccvAlreadyIncluded[j] = true;
+          numCCVsToQuery++;
           break;
         }
       }
       if (!found) {
-        revert NoCCVQuorumReached(); // TODO better error message
+        revert RequiredCCVMissing(requiredCCV[i], false);
+      }
+    }
+
+    for (uint256 i = 0; i < tokenRequiredCCVs.length; ++i) {
+      bool found = false;
+      for (uint256 j = 0; j < ccvs.length; ++j) {
+        if (ccvs[j] == tokenRequiredCCVs[i]) {
+          found = true;
+          // If the CCV is already included, we skip it.
+          if (ccvAlreadyIncluded[j]) break;
+
+          ccvsToQuery[numCCVsToQuery] = ccvs[j];
+          dataIndexes[numCCVsToQuery] = j;
+          ccvAlreadyIncluded[j] = true;
+          numCCVsToQuery++;
+          break;
+        }
+      }
+      if (!found) {
+        revert RequiredCCVMissing(tokenRequiredCCVs[i], true);
+      }
+    }
+
+    for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
+      bool found = false;
+      for (uint256 j = 0; j < ccvs.length; ++j) {
+        if (ccvs[j] == laneMandatedCCVs[i]) {
+          found = true;
+          // If the CCV is already included, we skip it.
+          if (ccvAlreadyIncluded[j]) break;
+
+          ccvsToQuery[numCCVsToQuery] = ccvs[j];
+          dataIndexes[numCCVsToQuery] = j;
+          ccvAlreadyIncluded[j] = true;
+          numCCVsToQuery++;
+          break;
+        }
+      }
+      if (!found) {
+        revert RequiredCCVMissing(laneMandatedCCVs[i], true);
       }
     }
 
@@ -312,43 +392,83 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     for (uint256 i = 0; i < optionalCCVs.length; ++i) {
       for (uint256 j = 0; j < ccvs.length && optionalCCVsToFind > 0; ++j) {
         if (ccvs[j] == optionalCCVs[i]) {
+          // If the optional CCV is already included, we still count it towards the threshold, but we skip adding it
+          // again. This means that if a pool would specify a CCV that is also specified as optional by the receiver,
+          // it would count towards the threshold as it's still being queried.
           optionalCCVsToFind--;
+          if (ccvAlreadyIncluded[j]) break;
+
+          ccvsToQuery[numCCVsToQuery] = ccvs[j];
+          dataIndexes[numCCVsToQuery] = j;
+          ccvAlreadyIncluded[j] = true;
+          numCCVsToQuery++;
           break;
         }
       }
     }
 
     if (optionalCCVsToFind > 0) {
-      revert NoCCVQuorumReached(); // TODO better error message
+      revert OptionalCCVQuorumNotReached(optionalThreshold, optionalThreshold - optionalCCVsToFind);
     }
+
+    if (numCCVsToQuery != ccvsToQuery.length) {
+      // Resize the array to the actual number of CCVs found.
+      assembly {
+        mstore(ccvsToQuery, numCCVsToQuery)
+        mstore(dataIndexes, numCCVsToQuery)
+      }
+    }
+    return (ccvsToQuery, dataIndexes);
   }
 
-  // TODO check pool as well.
-  function _getCCVsFromReceiverAndPool(
+  function _getCCVsFromReceiver(
     uint64 sourceChainSelector,
-    address receiver,
-    address // poolAddress
+    address receiver
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    // If the receiver is not a contract, or it doesn't support the required interface, we return the default.
-    if (receiver.code.length == 0 || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId))
-    {
-      SourceChainConfig memory sourceConfig = s_sourceChainConfigs[sourceChainSelector];
-      if (sourceConfig.requiredCCV == address(0)) {
-        requiredCCV = new address[](1);
-        requiredCCV[0] = sourceConfig.defaultCCV;
+    SourceChainConfig memory sourceConfig = s_sourceChainConfigs[sourceChainSelector];
 
-        return (requiredCCV, new address[](0), 0);
+    // If the receiver is a contract
+    if (receiver.code.length != 0) {
+      // And the contract implements the IAny2EVMMessageReceiverV2 interface.
+      if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
+        (requiredCCV, optionalCCVs, optionalThreshold) =
+          IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
+
+        // If the user specified empty required and optional CCVs, we fall back to the default CCVs.
+        // If they did specify something, we use what they specified.
+        if (requiredCCV.length != 0 || optionalThreshold != 0) {
+          return (requiredCCV, optionalCCVs, optionalThreshold);
+        }
       }
-
-      requiredCCV = new address[](2);
-      requiredCCV[0] = sourceConfig.defaultCCV;
-      requiredCCV[1] = sourceConfig.requiredCCV;
-
-      return (requiredCCV, new address[](0), 0);
     }
+    return (sourceConfig.defaultCCV, new address[](0), 0);
+  }
 
-    // If it does, we return the required CCVs from the receiver.
-    return IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
+  /// @notice Retrieves the required CCVs from a pool. If the pool does not specify any CCVs, we fall back to the
+  /// default CCVs.
+  /// @dev The params passed into getRequiredCCVs could influence the CCVs returned.
+  /// @param localToken The local token address.
+  /// @param sourceChainSelector The source chain selector.
+  /// @param amount The amount of the token to be released/minted.
+  /// @param extraData The extra data for the pool.
+  /// @return requiredCCV The required CCVs.
+  function _getCCVsFromPool(
+    address localToken,
+    uint64 sourceChainSelector,
+    uint256 amount,
+    bytes memory extraData
+  ) internal view returns (address[] memory requiredCCV) {
+    address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
+
+    if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
+      requiredCCV = IPoolV2(pool).getRequiredCCVs(localToken, sourceChainSelector, amount, extraData);
+    }
+    // If the pool does not specify any CCVs, or the pool does not support the V2 interface, we fall back to the
+    // default CCVs.
+    if (requiredCCV.length == 0) {
+      requiredCCV = s_sourceChainConfigs[sourceChainSelector].defaultCCV;
+    }
+    return requiredCCV;
   }
 
   /// @notice Try executing a message.
@@ -405,12 +525,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
-    bool hasToken = message.tokenAmounts.destTokenAddress != address(0);
-
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](hasToken ? 1 : 0);
-    if (hasToken) {
-      destTokenAmounts[0] = _releaseOrMintSingleToken(
-        message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenAmounts.length);
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      destTokenAmounts[i] = _releaseOrMintSingleToken(
+        message.tokenAmounts[i], message.sender, message.receiver, message.header.sourceChainSelector
       );
     }
 
@@ -588,21 +706,23 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         revert ZeroChainSelectorNotAllowed();
       }
 
-      if (address(sourceConfigUpdate.router) == address(0)) {
+      if (address(sourceConfigUpdate.router) == address(0) || sourceConfigUpdate.defaultCCV.length == 0) {
         revert ZeroAddressNotAllowed();
       }
 
       // TODO check replay protection if onRamp changes
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
-      bytes memory newOnRamp = sourceConfigUpdate.onRamp;
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time.
-      if (newOnRamp.length == 0 || keccak256(newOnRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
+      if (sourceConfigUpdate.onRamp.length == 0 || keccak256(sourceConfigUpdate.onRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
         revert ZeroAddressNotAllowed();
       }
 
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
+      currentConfig.onRamp = sourceConfigUpdate.onRamp;
+      currentConfig.defaultCCV = sourceConfigUpdate.defaultCCV;
+      currentConfig.laneMandatedCCVs = sourceConfigUpdate.laneMandatedCCVs;
 
       // We don't need to check the return value, as inserting the item twice has no effect.
       s_sourceChainSelectors.add(sourceChainSelector);
