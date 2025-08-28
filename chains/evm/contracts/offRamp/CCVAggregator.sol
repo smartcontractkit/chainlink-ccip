@@ -97,7 +97,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     /// will be ignored. If there is no token transfer, no additional token CCVs are required. If the receiver is an EOA
     /// or a contract that does not support the IAny2EVMMessageReceiver2 interface, the default and required CCVs are
     /// used.
-    /// @dev Must be the same length and proofs.
+    /// @dev Must be the same length as ccvData.
     address[] ccvs;
     /// @notice This data is specific to the CCV implementation and is used to verify the message.
     bytes[] ccvData;
@@ -128,12 +128,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
 
   // STATE
-  // TODO different exec state mapping
-  /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
-  /// state only taking up 2 bits of the uint256, packing 128 states into a single slot.
+
   /// Message state is tracked to ensure message can only be executed successfully once.
-  mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
-    s_executionStates;
+  mapping(bytes32 execStateKey => Internal.MessageExecutionState state) internal s_executionStates;
 
   constructor(
     StaticConfig memory staticConfig
@@ -157,58 +154,24 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   // │                           Execution                          │
   // ================================================================
 
-  // The size of the execution state in bits.
-  uint256 private constant MESSAGE_EXECUTION_STATE_BIT_WIDTH = 2;
-  // The mask for the execution state bits.
-  uint256 private constant MESSAGE_EXECUTION_STATE_MASK = (1 << MESSAGE_EXECUTION_STATE_BIT_WIDTH) - 1;
-
-  /// @notice Returns the current execution state of a message based on its sequenceNumber.
-  /// @param sourceChainSelector The source chain to get the execution state for.
-  /// @param sequenceNumber The sequence number of the message to get the execution state for.
+  /// @notice Returns the current execution state of a message.
   /// @return executionState The current execution state of the message.
-  /// @dev We use the literal number 128 because using a constant increased gas usage.
   function getExecutionState(
     uint64 sourceChainSelector,
-    uint64 sequenceNumber
+    uint64 sequenceNumber,
+    bytes memory sender,
+    address receiver
   ) public view returns (Internal.MessageExecutionState) {
-    return Internal.MessageExecutionState(
-      (
-        _getSequenceNumberBitmap(sourceChainSelector, sequenceNumber)
-          >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH)
-      ) & MESSAGE_EXECUTION_STATE_MASK
-    );
+    return s_executionStates[_calculateExecutionStateKey(sourceChainSelector, sequenceNumber, sender, receiver)];
   }
 
-  /// @notice Sets a new execution state for a given sequence number. It will overwrite any existing state.
-  /// @param sourceChainSelector The source chain to set the execution state for.
-  /// @param sequenceNumber The sequence number for which the state will be saved.
-  /// @param newState The new value the state will be in after this function is called.
-  /// @dev We use the literal number 128 because using a constant increased gas usage.
-  function _setExecutionState(
+  function _calculateExecutionStateKey(
     uint64 sourceChainSelector,
     uint64 sequenceNumber,
-    Internal.MessageExecutionState newState
-  ) internal {
-    uint256 offset = (sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH;
-    uint256 bitmap = _getSequenceNumberBitmap(sourceChainSelector, sequenceNumber);
-    // To unset any potential existing state we zero the bits of the section the state occupies,
-    // then we do an AND operation to blank out any existing state for the section.
-    bitmap &= ~(MESSAGE_EXECUTION_STATE_MASK << offset);
-    // Set the new state.
-    bitmap |= uint256(newState) << offset;
-
-    s_executionStates[sourceChainSelector][sequenceNumber / 128] = bitmap;
-  }
-
-  /// @param sourceChainSelector remote source chain selector to get sequence number bitmap for.
-  /// @param sequenceNumber sequence number to get bitmap for.
-  /// @return bitmap Bitmap of the given sequence number for the provided source chain selector. One bitmap represents
-  /// 128 sequence numbers.
-  function _getSequenceNumberBitmap(
-    uint64 sourceChainSelector,
-    uint64 sequenceNumber
-  ) internal view returns (uint256 bitmap) {
-    return s_executionStates[sourceChainSelector][sequenceNumber / 128];
+    bytes memory sender,
+    address receiver
+  ) internal pure returns (bytes32) {
+    return keccak256(abi.encode(sourceChainSelector, sequenceNumber, sender, receiver));
   }
 
   /// @notice Executes a report, executing each message in order.
@@ -225,7 +188,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     Internal.Any2EVMMessage memory message = _beforeExecuteSingleMessage(report.message);
 
-    uint64 sourceChainSelector = report.message.header.sourceChainSelector;
+    uint64 sourceChainSelector = message.header.sourceChainSelector;
 
     if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
       revert CursedByRMN(sourceChainSelector);
@@ -233,17 +196,18 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     if (!s_sourceChainConfigs[sourceChainSelector].isEnabled) {
       revert SourceChainNotEnabled(sourceChainSelector);
     }
-    if (report.message.header.destChainSelector != i_chainSelector) {
-      revert InvalidMessageDestChainSelector(report.message.header.destChainSelector);
+    if (message.header.destChainSelector != i_chainSelector) {
+      revert InvalidMessageDestChainSelector(message.header.destChainSelector);
     }
     if (report.ccvs.length != report.ccvData.length) {
       revert InvalidCCVDataLength(report.ccvs.length, report.ccvData.length);
     }
 
     /////// Original state checks ///////
+    bytes32 executionStateKey =
+      _calculateExecutionStateKey(sourceChainSelector, message.header.sequenceNumber, message.sender, message.receiver);
 
-    Internal.MessageExecutionState originalState =
-      getExecutionState(sourceChainSelector, report.message.header.sequenceNumber);
+    Internal.MessageExecutionState originalState = s_executionStates[executionStateKey];
 
     // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
     // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
@@ -261,31 +225,30 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     {
       address[] memory requiredPoolCCVs = new address[](0);
-      if (report.message.tokenAmounts.length > 0) {
-        if (report.message.tokenAmounts.length != 1) {
-          revert InvalidNumberOfTokens(report.message.tokenAmounts.length);
+      if (message.tokenAmounts.length > 0) {
+        if (message.tokenAmounts.length != 1) {
+          revert InvalidNumberOfTokens(message.tokenAmounts.length);
         }
 
         // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
         // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
         // that do not support the V2 interface.
         requiredPoolCCVs = _getCCVsFromPool(
-          report.message.tokenAmounts[0].destTokenAddress,
-          report.message.header.sourceChainSelector,
-          report.message.tokenAmounts[0].amount,
-          report.message.tokenAmounts[0].extraData
+          message.tokenAmounts[0].destTokenAddress,
+          message.header.sourceChainSelector,
+          message.tokenAmounts[0].amount,
+          message.tokenAmounts[0].extraData
         );
       }
 
-      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) = _ensureCCVQuorumIsReached(
-        report.message.header.sourceChainSelector, report.message.receiver, report.ccvs, requiredPoolCCVs
-      );
+      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
+        _ensureCCVQuorumIsReached(message.header.sourceChainSelector, message.receiver, report.ccvs, requiredPoolCCVs);
 
       // TODO real hash
-      bytes32 messageHash = keccak256(abi.encode(report.message));
+      bytes32 messageHash = keccak256(abi.encode(message));
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         ICCVOffRampV1(ccvsToQuery[i]).validateReport({
-          message: report.message,
+          message: message,
           messageHash: messageHash,
           ccvData: report.ccvData[ccvDataIndex[i]],
           originalState: originalState
@@ -295,9 +258,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     /////// Execution ///////
 
-    _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
+    s_executionStates[executionStateKey] = Internal.MessageExecutionState.IN_PROGRESS;
     (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message);
-    _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
+    s_executionStates[executionStateKey] = newState;
 
     // The only valid prior states are UNTOUCHED and FAILURE (checked above).
     // The only valid post states are FAILURE and SUCCESS (checked below).
@@ -313,6 +276,12 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     s_reentrancyGuardEntered = false;
   }
 
+  /// @notice Ensures that the provided CCVs meet the quorum required by the receiver, pool and lane.
+  /// @param sourceChainSelector The source chain selector of the message.
+  /// @param receiver The receiver of the message.
+  /// @param ccvs The CCVs that provided data for the message.
+  /// @param tokenRequiredCCVs The CCVs required by the pool of the token being transferred. If no token is being
+  /// transferred, this array is empty.
   function _ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,
     address receiver,
@@ -464,7 +433,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       requiredCCV = IPoolV2(pool).getRequiredCCVs(localToken, sourceChainSelector, amount, extraData);
     }
     // If the pool does not specify any CCVs, or the pool does not support the V2 interface, we fall back to the
-    // default CCVs.
+    // default CCVs. If this wasn't done, any pool not specifying CCVs would allow any arbitrary CCV to mint infinite
+    // tokens by fabricating messages. Since CCVs are permissionless, this would mean anyone would be able to mint.
     if (requiredCCV.length == 0) {
       requiredCCV = s_sourceChainConfigs[sourceChainSelector].defaultCCV;
     }
@@ -700,23 +670,21 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   ) external onlyOwner {
     for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
       SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
-      uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
 
-      if (sourceChainSelector == 0) {
+      if (sourceConfigUpdate.sourceChainSelector == 0) {
         revert ZeroChainSelectorNotAllowed();
       }
-
       if (address(sourceConfigUpdate.router) == address(0) || sourceConfigUpdate.defaultCCV.length == 0) {
         revert ZeroAddressNotAllowed();
       }
-
-      // TODO check replay protection if onRamp changes
-      SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time.
       if (sourceConfigUpdate.onRamp.length == 0 || keccak256(sourceConfigUpdate.onRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
         revert ZeroAddressNotAllowed();
       }
+
+      // TODO check replay protection if onRamp changes
+      SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceConfigUpdate.sourceChainSelector];
 
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
@@ -725,9 +693,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       currentConfig.laneMandatedCCVs = sourceConfigUpdate.laneMandatedCCVs;
 
       // We don't need to check the return value, as inserting the item twice has no effect.
-      s_sourceChainSelectors.add(sourceChainSelector);
+      s_sourceChainSelectors.add(sourceConfigUpdate.sourceChainSelector);
 
-      emit SourceChainConfigSet(sourceChainSelector, currentConfig);
+      emit SourceChainConfigSet(sourceConfigUpdate.sourceChainSelector, currentConfig);
     }
   }
 }

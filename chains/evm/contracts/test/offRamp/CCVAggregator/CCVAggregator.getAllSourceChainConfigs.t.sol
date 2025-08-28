@@ -5,7 +5,7 @@ import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
 
 contract CCVAggregator_getAllSourceChainConfigs is CCVAggregatorSetup {
-  function test_getAllSourceChainConfigs_ReturnsSingleChain() public {
+  function test_getAllSourceChainConfigs_ReturnsSingleChain() public view {
     (uint64[] memory selectors, CCVAggregator.SourceChainConfig[] memory configs) = s_agg.getAllSourceChainConfigs();
 
     assertEq(selectors.length, 1);
