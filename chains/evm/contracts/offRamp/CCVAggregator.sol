@@ -392,8 +392,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     for (uint256 i = 0; i < optionalCCVs.length; ++i) {
       for (uint256 j = 0; j < ccvs.length && optionalCCVsToFind > 0; ++j) {
         if (ccvs[j] == optionalCCVs[i]) {
+          // If the optional CCV is already included, we still count it towards the threshold, but we skip adding it
+          // again. This means that if a pool would specify a CCV that is also specified as optional by the receiver,
+          // it would count towards the threshold as it's still being queried.
           optionalCCVsToFind--;
-          // If the CCV is already included, we skip it.
           if (ccvAlreadyIncluded[j]) break;
 
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
@@ -427,7 +429,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     // If the receiver is a contract
     if (receiver.code.length != 0) {
-      // And the contract implements the IAny2EVMMessageReceiverV2 interface
+      // And the contract implements the IAny2EVMMessageReceiverV2 interface.
       if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
         (requiredCCV, optionalCCVs, optionalThreshold) =
           IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);

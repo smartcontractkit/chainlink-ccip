@@ -20,10 +20,10 @@ contract CCVAggregator_constructor is BaseTest {
     CCVAggregator aggregator = new CCVAggregator(config);
 
     CCVAggregator.StaticConfig memory returnedConfig = aggregator.getStaticConfig();
-    assertEq(returnedConfig.localChainSelector, DEST_CHAIN_SELECTOR);
-    assertEq(returnedConfig.gasForCallExactCheck, 5000);
-    assertEq(address(returnedConfig.rmnRemote), address(s_mockRMNRemote));
-    assertEq(returnedConfig.tokenAdminRegistry, address(0x123));
+    assertEq(returnedConfig.localChainSelector, config.localChainSelector);
+    assertEq(returnedConfig.gasForCallExactCheck, config.gasForCallExactCheck);
+    assertEq(address(returnedConfig.rmnRemote), address(config.rmnRemote));
+    assertEq(returnedConfig.tokenAdminRegistry, config.tokenAdminRegistry);
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_RMNRemote() public {
