@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -21,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"go.uber.org/zap"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -34,16 +34,20 @@ const (
 var Plog = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.DebugLevel).With().Fields(map[string]any{"component": "ccipv1_7"}).Logger()
 
 type CCIPv17 struct {
-	EAFake                        *EAFake       `toml:"ea_fake"`
-	Jobs                          *Jobs         `toml:"jobs"`
-	GasSettings                   *GasSettings  `toml:"gas_settings"`
-	LinkContractAddress           string        `toml:"link_contract_address"`
-	CLNodesFundingETH             float64       `toml:"cl_nodes_funding_eth"`
-	CLNodesFundingLink            float64       `toml:"cl_nodes_funding_link"`
-	ChainFinalityDepth            int64         `toml:"chain_finality_depth"`
-	VerificationTimeout           time.Duration `toml:"verification_timeout"`
-	ContractsConfigurationTimeout time.Duration `toml:"contracts_configuration_timeout"`
-	Verify                        bool          `toml:"verify"`
+	EAFake              *EAFake       `toml:"ea_fake"`
+	Jobs                *Jobs         `toml:"jobs"`
+	LinkContractAddress string        `toml:"link_contract_address"`
+	CLNodesFundingETH   float64       `toml:"cl_nodes_funding_eth"`
+	CLNodesFundingLink  float64       `toml:"cl_nodes_funding_link"`
+	ChainFinalityDepth  int64         `toml:"chain_finality_depth"`
+	VerificationTimeout time.Duration `toml:"verification_timeout"`
+	Verify              bool          `toml:"verify"`
+
+	// Contracts (CLDF)
+	Addresses []datastore.AddressRef
+
+	// These are the settings for CLDF missing functionality we cover with ETHClient, we should remove them later
+	GasSettings *GasSettings `toml:"gas_settings"`
 }
 
 type DeployedContracts struct {
@@ -106,7 +110,10 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input) ([]uint64, *deployment
 
 	blockchains := cldf_chain.NewBlockChainsFromSlice(providers)
 
-	lggr, err := logger.New()
+	lggr, err := logger.NewWith(func(config *zap.Config) {
+		config.Development = true
+		config.Encoding = "console"
+	})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -122,23 +129,21 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input) ([]uint64, *deployment
 		Logger:           lggr,
 		OperationsBundle: bundle,
 		BlockChains:      blockchains,
-		// check what are the planned options, files support, JSON, TOML (James Kong)
-		DataStore: datastore.NewMemoryDataStore().Seal(),
+		DataStore:        datastore.NewMemoryDataStore().Seal(),
 	}
 	return selectors, &e, nil
 }
 
-func deployContractsForSelector(e *deployment.Environment, selector uint64) error {
-	L.Info().Msg("Configuring per-chain contracts bundle")
+func deployContractsForSelector(in *Cfg, e *deployment.Environment, selector uint64) error {
+	L.Info().Uint64("Selector", selector).Msg("Configuring per-chain contracts bundle")
 	out, err := changesets.DeployChainContracts.Apply(*e, changesets.DeployChainContractsCfg{
 		ChainSelector: selector,
 		Params: sequences.ContractParams{
-			// Router is missing
+			// TODO: Router contract implementation is missing
 			RMNRemote:     sequences.RMNRemoteParams{},
 			CCVAggregator: sequences.CCVAggregatorParams{},
 			CommitOnRamp: sequences.CommitOnRampParams{
-				// arbitrary address, not needed in devenv?
-				// or we mock it, have another changeset but keep this changeset in tests
+				// TODO: add mocked contract here
 				FeeAggregator: common.HexToAddress("0x01"),
 			},
 			CCVProxy: sequences.CCVProxyParams{
@@ -172,7 +177,7 @@ func deployContractsForSelector(e *deployment.Environment, selector uint64) erro
 	}
 
 	addresses, err := out.DataStore.Addresses().Fetch()
-	spew.Dump(addresses)
+	in.CCIPv17.Addresses = append(in.CCIPv17.Addresses, addresses...)
 	return nil
 }
 
@@ -213,13 +218,10 @@ func setupFakes(fakeServiceURL string) error {
 }
 
 // DefaultProductConfiguration is default product configuration that includes:
-// - Deploying required prerequisites (LINK token, shared contracts)
-// - Applying product-specific changesets
-// - Creating cldf.Environment, connecting to components, see *Cfg fields
-// - Generating CL nodes configs
-// All the data can be added *Cfg struct like and is synced between local machine and remote environment
-// so later both local and remote tests can use it.
+// - CL nodes config generation
+// - On-chain part deployment using CLDF
 func DefaultProductConfiguration(in *Cfg, phase ConfigPhase) error {
+	Plog.Info().Msg("Generating CL nodes config")
 	pkey := getNetworkPrivateKey()
 	if pkey == "" {
 		return fmt.Errorf("PRIVATE_KEY environment variable not set")
@@ -310,7 +312,8 @@ func DefaultProductConfiguration(in *Cfg, phase ConfigPhase) error {
 		for _, nodeSpec := range in.NodeSets[0].NodeSpecs {
 			nodeSpec.Node.TestConfigOverrides = netConfig
 		}
-		Plog.Info().Msg("Nodes network configuration is finished")
+		Plog.Info().Msg("Nodes network configuration is generated")
+		return nil
 	case ConfigureProductContractsJobs:
 
 		//* Funding all CL nodes with ETH *//
@@ -365,11 +368,11 @@ func DefaultProductConfiguration(in *Cfg, phase ConfigPhase) error {
 		if err != nil {
 			return fmt.Errorf("creating CLDF operations environment: %w", err)
 		}
-		L.Info().Any("Selectors", selectors).Msg("Deploying for selectors")
+		L.Info().Any("Selectors", selectors).Msg("Deploying for chain selectors")
 		for _, sel := range selectors {
-			err = deployContractsForSelector(e, sel)
+			err = deployContractsForSelector(in, e, sel)
 			if err != nil {
-				return fmt.Errorf("could not configure contracts for selector %d: %w", sel, err)
+				return fmt.Errorf("could not configure contracts for chain selector %d: %w", sel, err)
 			}
 		}
 		if err := configureJobs(in, nodeClients); err != nil {
@@ -386,7 +389,7 @@ func DefaultProductConfiguration(in *Cfg, phase ConfigPhase) error {
 		if err := verifyEnvironment(in); err != nil {
 			return err
 		}
-		// store contract addresses or use CLD address book here
+		return nil
 	}
 	return nil
 }

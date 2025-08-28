@@ -16,31 +16,31 @@ import (
 )
 
 const (
-	DefaultIndexerName     = "indexer"
-	DefaultIndexerDBName   = "indexer-db"
-	DefaultIndexerImage    = "indexer:dev"
-	DefaultIndexerHTTPPort = 8102
+	DefaultVerifierName   = "verifier"
+	DefaultVerifierDBName = "verifier-db"
+	DefaultVerifierImage  = "verifier:dev"
+	DefaultVerifierPort   = 8100
 
-	DefaultIndexerDBImage            = "postgres:16-alpine"
-	DefaultIndexerDBConnectionString = "postgresql://indexer:indexer@localhost:6432/indexer?sslmode=disable"
+	DefaultVerifierDBImage            = "postgres:16-alpine"
+	DefaultVerifierDBConnectionString = "postgresql://verifier:verifier@localhost:8432/aggregator?sslmode=disable"
 )
 
-type DBInput struct {
+type VerifierDBInput struct {
 	Image string `toml:"image"`
 }
 
-type IndexerInput struct {
-	Image          string         `toml:"image"`
-	Port           int            `toml:"port"`
-	SourceCodePath string         `toml:"source_code_path"`
-	DB             *DBInput       `toml:"db"`
-	ExposedPorts   []string       `toml:"exposed_ports"`
-	ContainerName  string         `toml:"container_name"`
-	UseCache       bool           `toml:"use_cache"`
-	Out            *IndexerOutput `toml:"-"`
+type VerifierInput struct {
+	Image          string          `toml:"image"`
+	Port           int             `toml:"port"`
+	SourceCodePath string          `toml:"source_code_path"`
+	DB             *DBInput        `toml:"db"`
+	ExposedPorts   []string        `toml:"exposed_ports"`
+	ContainerName  string          `toml:"container_name"`
+	UseCache       bool            `toml:"use_cache"`
+	Out            *VerifierOutput `toml:"out"`
 }
 
-type IndexerOutput struct {
+type VerifierOutput struct {
 	UseCache           bool   `toml:"use_cache"`
 	ContainerName      string `toml:"container_name"`
 	ExternalHTTPURL    string `toml:"http_url"`
@@ -49,31 +49,30 @@ type IndexerOutput struct {
 	DBConnectionString string `toml:"db_connection_string"`
 }
 
-func defaults(in *IndexerInput) {
+func verifierDefaults(in *VerifierInput) {
 	if in.Image == "" {
-		in.Image = DefaultIndexerImage
+		in.Image = DefaultVerifierImage
 	}
 	if in.Port == 0 {
-		in.Port = DefaultIndexerHTTPPort
+		in.Port = DefaultVerifierPort
 	}
 	if in.ContainerName == "" {
-		in.ContainerName = DefaultIndexerName
+		in.ContainerName = DefaultVerifierName
 	}
 	if in.DB == nil {
 		in.DB = &DBInput{
-			Image: DefaultIndexerDBImage,
+			Image: DefaultVerifierDBImage,
 		}
 	}
 }
 
-// NewIndexer creates and starts a new Service container using testcontainers
-func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
+func NewVerifier(in *VerifierInput) (*VerifierOutput, error) {
 	if in.Out != nil && in.Out.UseCache {
 		return in.Out, nil
 	}
 	ctx := context.Background()
 
-	defaults(in)
+	verifierDefaults(in)
 
 	/* Database */
 
@@ -85,19 +84,19 @@ func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
 
 	_, err = postgres.Run(ctx,
 		in.DB.Image,
-		testcontainers.WithName(DefaultIndexerDBName),
+		testcontainers.WithName(DefaultVerifierDBName),
 		testcontainers.WithExposedPorts("5432/tcp"),
 		testcontainers.WithHostConfigModifier(func(h *container.HostConfig) {
 			h.PortBindings = nat.PortMap{
 				"5432/tcp": []nat.PortBinding{
-					{HostPort: "6432"},
+					{HostPort: "8432"},
 				},
 			}
 		}),
 		testcontainers.WithLabels(framework.DefaultTCLabels()),
-		postgres.WithDatabase("indexer"),
-		postgres.WithUsername("indexer"),
-		postgres.WithPassword("indexer"),
+		postgres.WithDatabase("verifier"),
+		postgres.WithUsername("verifier"),
+		postgres.WithPassword("verifier"),
 		postgres.WithInitScripts(filepath.Join(p, "init.sql")),
 	)
 	if err != nil {
@@ -162,10 +161,10 @@ func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
 		return nil, fmt.Errorf("failed to get container host: %w", err)
 	}
 
-	return &IndexerOutput{
+	return &VerifierOutput{
 		ContainerName:      in.ContainerName,
 		ExternalHTTPURL:    fmt.Sprintf("http://%s:%d", host, in.Port),
 		InternalHTTPURL:    fmt.Sprintf("http://%s:%d", in.ContainerName, in.Port),
-		DBConnectionString: DefaultIndexerDBConnectionString,
+		DBConnectionString: DefaultVerifierDBConnectionString,
 	}, nil
 }

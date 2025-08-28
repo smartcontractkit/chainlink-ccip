@@ -35,33 +35,32 @@ pre-commit:
 cli:
     go install cmd/ccip.go
 
-# Build all the services (hot-reload dev mode)
-build-docker-dev:
-    @just build-fakes-docker
-    @just build-indexer-docker-dev
-    @just build-jd-docker
 
 # Remove all the dev images
 clean-docker-dev:
-    docker rmi indexer:dev indexer:latest ccip-fakes:local job-distributor:local >/dev/null 2>&1 || true
+    @just ../../services/verifier/clean-dev
+    @just ../../services/executor/clean-dev
+    @just ../../services/indexer/clean-dev
+    @just ../../services/aggregator/clean-dev
+    docker rmi ccip-fakes:local job-distributor:local >/dev/null 2>&1 || true
     rm -rf job-distributor/
+
+# Build all the services (hot-reload dev mode)
+build-docker-dev:
+    @just fakes/build
+    @just ../../services/verifier/build-dev
+    @just ../../services/executor/build-dev
+    @just ../../services/indexer/build-dev
+    @just ../../services/aggregator/build-dev
+    @just build-jd-docker
 
 # Build all the services for production
 build-docker-prod:
-    @just build-fakes-docker
-    @just build-indexer-docker-prod
-
-# Build fakes image
-build-fakes-docker:
-    cd fakes && docker build -t ccip-fakes:local . || cd -
-
-# Build Indexer dev image
-build-indexer-docker-dev:
-    cd indexer && docker build -f Dockerfile.dev -t indexer:dev . || cd -
-
-# Build Indexer production image
-build-indexer-docker-prod:
-    cd indexer && docker build -f Dockerfile -t indexer:dev . || cd -
+    @just fakes/build
+    @just ../../services/verifier/build
+    @just ../../services/executor/build
+    @just ../../services/indexer/build
+    @just ../../services/aggregator/build
 
 # Clone and build job-distributor Docker image
 build-jd-docker:
@@ -86,3 +85,7 @@ build-jd-docker:
 # Sets MinIO alias for easier use of 'mc' CLI
 minio-alias:
    mc alias set minio http://localhost:9000 mYrAnD0mAcc3ssK3y2024 s3cR3tK3yL0ngEn0ughF0rMinI0Testing2024!
+
+# Rebuild CLI
+rebuild-cli:
+    pushd cmd/ccip > /dev/null && go install -ldflags="-X main.Version=1.0.0" . && popd > /dev/null

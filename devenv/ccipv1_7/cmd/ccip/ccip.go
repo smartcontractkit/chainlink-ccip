@@ -199,7 +199,7 @@ var indexerDBShell = &cobra.Command{
 		}
 		psqlArgs := []string{
 			"psql",
-			services.DefaultDBConnectionString,
+			services.DefaultIndexerDBConnectionString,
 		}
 		if len(args) > 0 {
 			psqlArgs = append(psqlArgs, args...)
@@ -212,19 +212,24 @@ var indexerDBShell = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringP("blockscout_url", "u", "http://host.docker.internal:8545", "EVM RPC node URL")
 
+	// Blockscout, on-chain debug
 	bsCmd.AddCommand(bsUpCmd)
 	bsCmd.AddCommand(bsDownCmd)
 	bsCmd.AddCommand(bsRestartCmd)
 	rootCmd.AddCommand(bsCmd)
 
+	// observability
 	obsCmd.AddCommand(obsRestartCmd)
 	obsCmd.AddCommand(obsUpCmd)
 	obsCmd.AddCommand(obsDownCmd)
 	rootCmd.AddCommand(obsCmd)
 
+	// main env commands
 	rootCmd.AddCommand(upCmd)
 	rootCmd.AddCommand(reconfigureCmd)
 	rootCmd.AddCommand(downCmd)
+
+	// utility
 	rootCmd.AddCommand(indexerDBShell)
 }
 
