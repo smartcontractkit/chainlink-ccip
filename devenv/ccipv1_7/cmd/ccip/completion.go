@@ -22,6 +22,10 @@ func getCommands() []prompt.Suggest {
 
 func getSubCommands(parent string) []prompt.Suggest {
 	switch parent {
+	case "addresses":
+		return []prompt.Suggest{
+			{Text: "addresses", Description: "Print all smart-contract addresses data (CLDF)"},
+		}
 	case "bs":
 		return []prompt.Suggest{
 			{Text: "up", Description: "Spin up Blockscout"},

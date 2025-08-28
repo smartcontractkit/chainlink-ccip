@@ -32,6 +32,7 @@ Every command should be run inside [Nix](https://github.com/DeterminateSystems/n
 Enter `Nix` shell and build all the Docker images initially
 ```
 nix develop
+just clean-docker-dev # needed in case you have old JD image
 just build-docker-dev
 ```
 
@@ -46,45 +47,6 @@ Test key address is `0xE1395cc1ECc9f7B0B19FeECE841E3eC6805186A5`, the private ke
 Create `.envrc` and put the key there `export PRIVATE_KEY="..."` and select the network config
 ```
 up env.toml,env-fuji-fantom.toml
-```
-
-### Check balances (src)
-```bash
-cast balance 0xE1395cc1ECc9f7B0B19FeECE841E3eC6805186A5 --ether --rpc-url=wss://rpcs.cldev.sh/avalanche/fuji
-```
-
-### Check balances (dst)
-```bash
-cast balance 0xE1395cc1ECc9f7B0B19FeECE841E3eC6805186A5 --ether --rpc-url=wss://rpcs.cldev.sh/fantom/testnet
-```
-
-## Debugging Storage (MinIO) (inside Nix shell)
-You can find storage provider configuration [here](env.toml) - `[storage_provider]`
-
-## Install
-Set `MinIO` alias for easier commands
-```
-just minio-alias
-```
-
-### Copy to MinIO
-```bash
-mc cp env.toml minio/test/env.toml
-```
-
-### Copy from MinIO
-```bash
-mc cp minio/test/env.toml env.toml
-```
-
-### List all the files on MinIO
-```bash
-mc ls minio/test
-```
-
-### Remove files
-```bash
-mc rm minio/test/env.toml
 ```
 
 ### Developing the environment

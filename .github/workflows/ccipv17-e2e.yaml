@@ -1,7 +1,8 @@
 name: End-to-end CCIPv1.7 Test
 
 on:
-  push:
+  # TODO: we need all the ECRs to be available before we turn it on
+  workflow_dispatch:
 
 jobs:
   e2e:

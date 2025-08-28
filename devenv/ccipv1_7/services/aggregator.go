@@ -16,30 +16,30 @@ import (
 )
 
 const (
-	DefaultIndexerName     = "indexer"
-	DefaultIndexerDBName   = "indexer-db"
-	DefaultIndexerImage    = "indexer:dev"
-	DefaultIndexerHTTPPort = 8102
+	DefaultAggregatorName   = "aggregator"
+	DefaultAggregatorDBName = "aggregator-db"
+	DefaultAggregatorImage  = "aggregator:dev"
+	DefaultAggregatorPort   = 8103
 
-	DefaultIndexerDBImage            = "postgres:16-alpine"
-	DefaultIndexerDBConnectionString = "postgresql://indexer:indexer@localhost:6432/indexer?sslmode=disable"
+	DefaultAggregatorDBImage            = "postgres:16-alpine"
+	DefaultAggregatorDBConnectionString = "postgresql://aggregator:aggregator@localhost:7432/aggregator?sslmode=disable"
 )
 
-type DBInput struct {
+type AggregatorDBInput struct {
 	Image string `toml:"image"`
 }
 
-type IndexerInput struct {
-	Image          string         `toml:"image"`
-	Port           int            `toml:"port"`
-	SourceCodePath string         `toml:"source_code_path"`
-	DB             *DBInput       `toml:"db"`
-	ContainerName  string         `toml:"container_name"`
-	UseCache       bool           `toml:"use_cache"`
-	Out            *IndexerOutput `toml:"-"`
+type AggregatorInput struct {
+	Image          string            `toml:"image"`
+	Port           int               `toml:"port"`
+	SourceCodePath string            `toml:"source_code_path"`
+	DB             *DBInput          `toml:"db"`
+	ContainerName  string            `toml:"container_name"`
+	UseCache       bool              `toml:"use_cache"`
+	Out            *AggregatorOutput `toml:"-"`
 }
 
-type IndexerOutput struct {
+type AggregatorOutput struct {
 	UseCache           bool   `toml:"use_cache"`
 	ContainerName      string `toml:"container_name"`
 	ExternalHTTPURL    string `toml:"http_url"`
@@ -48,31 +48,30 @@ type IndexerOutput struct {
 	DBConnectionString string `toml:"db_connection_string"`
 }
 
-func defaults(in *IndexerInput) {
+func aggregatorDefaults(in *AggregatorInput) {
 	if in.Image == "" {
-		in.Image = DefaultIndexerImage
+		in.Image = DefaultAggregatorImage
 	}
 	if in.Port == 0 {
-		in.Port = DefaultIndexerHTTPPort
+		in.Port = DefaultAggregatorPort
 	}
 	if in.ContainerName == "" {
-		in.ContainerName = DefaultIndexerName
+		in.ContainerName = DefaultAggregatorName
 	}
 	if in.DB == nil {
 		in.DB = &DBInput{
-			Image: DefaultIndexerDBImage,
+			Image: DefaultAggregatorDBImage,
 		}
 	}
 }
 
-// NewIndexer creates and starts a new Service container using testcontainers
-func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
+func NewAggregator(in *AggregatorInput) (*AggregatorOutput, error) {
 	if in.Out != nil && in.Out.UseCache {
 		return in.Out, nil
 	}
 	ctx := context.Background()
 
-	defaults(in)
+	aggregatorDefaults(in)
 
 	/* Database */
 
@@ -84,19 +83,19 @@ func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
 
 	_, err = postgres.Run(ctx,
 		in.DB.Image,
-		testcontainers.WithName(DefaultIndexerDBName),
+		testcontainers.WithName(DefaultAggregatorDBName),
 		testcontainers.WithExposedPorts("5432/tcp"),
 		testcontainers.WithHostConfigModifier(func(h *container.HostConfig) {
 			h.PortBindings = nat.PortMap{
 				"5432/tcp": []nat.PortBinding{
-					{HostPort: "6432"},
+					{HostPort: "7432"},
 				},
 			}
 		}),
 		testcontainers.WithLabels(framework.DefaultTCLabels()),
-		postgres.WithDatabase("indexer"),
-		postgres.WithUsername("indexer"),
-		postgres.WithPassword("indexer"),
+		postgres.WithDatabase("aggregator"),
+		postgres.WithUsername("aggregator"),
+		postgres.WithPassword("aggregator"),
 		postgres.WithInitScripts(filepath.Join(p, "init.sql")),
 	)
 	if err != nil {
@@ -161,10 +160,10 @@ func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
 		return nil, fmt.Errorf("failed to get container host: %w", err)
 	}
 
-	return &IndexerOutput{
+	return &AggregatorOutput{
 		ContainerName:      in.ContainerName,
 		ExternalHTTPURL:    fmt.Sprintf("http://%s:%d", host, in.Port),
 		InternalHTTPURL:    fmt.Sprintf("http://%s:%d", in.ContainerName, in.Port),
-		DBConnectionString: DefaultIndexerDBConnectionString,
+		DBConnectionString: DefaultAggregatorDBConnectionString,
 	}, nil
 }

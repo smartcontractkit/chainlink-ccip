@@ -1,0 +1,11 @@
+build:
+    docker build -f Dockerfile -t verifier:latest .
+
+build-dev:
+    docker build -f Dockerfile.dev -t verifier:dev .
+
+clean:
+    docker rmi verifier:latest
+
+clean-dev:
+    docker rmi verifier:dev
