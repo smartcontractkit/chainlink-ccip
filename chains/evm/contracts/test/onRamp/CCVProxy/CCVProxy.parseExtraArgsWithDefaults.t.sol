@@ -51,7 +51,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     });
   }
 
-  function test_parseExtraArgsWithDefaults_WithGenericExtraArgsV3Tag() public {
+  function test_parseExtraArgsWithDefaults_WithGenericExtraArgsV3Tag() public view {
     CCVProxy.DestChainConfig memory destChainConfig = s_defaultDestChainConfig;
 
     Client.CCV[] memory requiredCCVs = new Client.CCV[](1);
@@ -95,7 +95,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     assertEq(result.tokenArgs, extraArgs.tokenArgs);
   }
 
-  function test_parseExtraArgsWithDefaults_WithGenericExtraArgsV3Tag_NoRequiredCCVInConfig() public {
+  function test_parseExtraArgsWithDefaults_WithGenericExtraArgsV3Tag_NoRequiredCCVInConfig() public view {
     CCVProxy.DestChainConfig memory destChainConfig = s_defaultDestChainConfig;
     destChainConfig.requiredCCV = address(0); // Override: No required CCV in config
 
@@ -122,7 +122,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     assertEq(result.requiredCCV[0].args, "test args");
   }
 
-  function test_parseExtraArgsWithDefaults_WithGenericExtraArgsV3Tag_NoCCVsSpecified() public {
+  function test_parseExtraArgsWithDefaults_WithGenericExtraArgsV3Tag_NoCCVsSpecified() public view {
     CCVProxy.DestChainConfig memory destChainConfig = s_defaultDestChainConfig;
 
     Client.EVMExtraArgsV3 memory extraArgs = Client.EVMExtraArgsV3({
@@ -146,7 +146,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     assertEq(result.executor, destChainConfig.defaultExecutor);
   }
 
-  function test_parseExtraArgsWithDefaults_WithLegacyExtraArgs() public {
+  function test_parseExtraArgsWithDefaults_WithLegacyExtraArgs() public view {
     CCVProxy.DestChainConfig memory destChainConfig = s_defaultDestChainConfig;
 
     bytes memory oldExtraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 1000}));
