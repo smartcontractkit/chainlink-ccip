@@ -7,18 +7,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/nonce_manager"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -43,21 +31,7 @@ func verifyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainCo
 }
 
 func applyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainContractsCfg) (cldf_deployment.ChangesetOutput, error) {
-	existing := e.DataStore.Addresses().Filter(
-		datastore.AddressRefByChainSelector(cfg.ChainSelector),
-		datastore.AddressRefByType(datastore.ContractType(link.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(weth.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(router.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(token_admin_registry.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(rmn_proxy.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(rmn_remote.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(ccv_aggregator.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(ccv_proxy.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(commit_onramp.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(commit_offramp.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(fee_quoter_v2.ContractType)),
-		datastore.AddressRefByType(datastore.ContractType(nonce_manager.ContractType)),
-	)
+	existing := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(cfg.ChainSelector))
 	// TODO: Having to convert from datastore.AddressRef to deployment.AddressRef is not ideal,
 	// but datastore.AddressRef can't be serialized into reports right now (unexported fields).
 	// Could raise with CLD team or create some common utility for this.
@@ -73,6 +47,7 @@ func applyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainCon
 	chain := e.BlockChains.EVMChains()[cfg.ChainSelector]
 
 	report, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployChainContracts, chain, sequences.DeployChainContractsInput{
+		ChainSelector:     cfg.ChainSelector,
 		ExistingAddresses: addresses,
 		ContractParams:    cfg.Params,
 	})

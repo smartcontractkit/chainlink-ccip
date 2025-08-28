@@ -74,6 +74,7 @@ func TestDeployChainContracts(t *testing.T) {
 				sequences.DeployChainContracts,
 				evmChain,
 				sequences.DeployChainContractsInput{
+					ChainSelector:     5009297550715157269,
 					ExistingAddresses: test.existingAddresses,
 					ContractParams: sequences.ContractParams{
 						RMNRemote:     sequences.RMNRemoteParams{},

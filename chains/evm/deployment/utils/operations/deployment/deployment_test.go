@@ -73,6 +73,7 @@ func TestDeploy(t *testing.T) {
 				semver.MustParse("1.0.0"),
 				"Test deployment operation",
 				TestContractType,
+				"", // ABI not needed for test
 				func(input int) error {
 					if input%2 != 0 {
 						return fmt.Errorf("input must be even")
@@ -81,7 +82,10 @@ func TestDeploy(t *testing.T) {
 				},
 				deployment.VMDeployers[int]{
 					DeployEVM: func(auth *bind.TransactOpts, client bind.ContractBackend, args int) (common.Address, *types.Transaction, error) {
-						return address, nil, nil
+						return address, types.NewTx(&types.LegacyTx{
+							To:   &address,
+							Data: []byte{0xDE, 0xAD, 0xBE, 0xEF},
+						}), nil
 					},
 					DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args int) (common.Address, error) {
 						return address, nil
