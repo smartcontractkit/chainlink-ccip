@@ -161,15 +161,16 @@ func deployContractsForSelector(in *Cfg, e *deployment.Environment, selector uin
 			},
 			CommitOffRamp: sequences.CommitOffRampParams{
 				SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
-					// OCR3 or something else?
-					ConfigDigest: [32]byte{},
-					F:            1,
-					Signers: []common.Address{
-						// CL nodes which run verifier
-						common.HexToAddress("0x02"),
-						common.HexToAddress("0x03"),
-						common.HexToAddress("0x04"),
-						common.HexToAddress("0x05"),
+					{
+						// OCR3 or something else?
+						ConfigDigest: [32]byte{0x01},
+						F:            1,
+						Signers: []common.Address{
+							common.HexToAddress("0x02"),
+							common.HexToAddress("0x03"),
+							common.HexToAddress("0x04"),
+							common.HexToAddress("0x05"),
+						},
 					},
 				},
 			},

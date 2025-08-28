@@ -20,6 +20,8 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.38.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.38.0
+	go.uber.org/zap v1.27.0
+	golang.org/x/sync v0.16.0
 )
 
 require (
@@ -30,7 +32,6 @@ require (
 	github.com/DataDog/zstd v1.5.6 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
 	github.com/XSAM/otelsql v0.37.0 // indirect
 	github.com/aptos-labs/aptos-go-sdk v1.6.3-0.20250331001805-0680b714db6d // indirect
@@ -279,12 +280,10 @@ require (
 	go.opentelemetry.io/proto/otlp v1.7.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.3.1 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/arch v0.11.0 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
 	golang.org/x/net v0.42.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/term v0.33.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
@@ -303,7 +302,10 @@ require (
 // https://www.mend.io/vulnerability-database/CVE-2025-30204?utm_source=JetBrains
 exclude github.com/golang-jwt/jwt/v4 v4.5.1
 
-replace github.com/smartcontractkit/chainlink-ccip => ../../
+replace (
+	github.com/smartcontractkit/chainlink-ccip => ../../
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => ../../chains/evm/deployment
+)
 
 replace github.com/ebitengine/purego v0.8.2 => github.com/ebitengine/purego v0.8.4
 
