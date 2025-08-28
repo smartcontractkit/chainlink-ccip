@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -218,12 +217,7 @@ var printAddresses = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to load environment output: %w", err)
 		}
-		d, err := json.MarshalIndent(in.CCIPv17.Addresses, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal output: %w", err)
-		}
-		fmt.Println(string(d))
-		return nil
+		return ccipv17.PrintCLDFAddresses(in)
 	},
 }
 

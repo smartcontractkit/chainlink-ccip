@@ -13,7 +13,6 @@ func getCommands() []prompt.Suggest {
 		{Text: "up", Description: "Spin up the development environment"},
 		{Text: "down", Description: "Tear down the development environment"},
 		{Text: "reconfigure", Description: "Reconfigure development environment"},
-		{Text: "reload-cli", Description: "Reload CLI"},
 		{Text: "bs", Description: "Manage the Blockscout EVM block explorer"},
 		{Text: "obs", Description: "Manage the observability stack"},
 		{Text: "indexer-db", Description: "Inspect Indexer Database"},
@@ -23,6 +22,10 @@ func getCommands() []prompt.Suggest {
 
 func getSubCommands(parent string) []prompt.Suggest {
 	switch parent {
+	case "addresses":
+		return []prompt.Suggest{
+			{Text: "addresses", Description: "Print all smart-contract addresses data (CLDF)"},
+		}
 	case "bs":
 		return []prompt.Suggest{
 			{Text: "up", Description: "Spin up Blockscout"},

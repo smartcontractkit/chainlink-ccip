@@ -125,5 +125,8 @@ func NewEnvironment() (*Cfg, error) {
 	}
 	track.Record("[changeset] deployed product contracts")
 	track.Print()
+	if err := PrintCLDFAddresses(in); err != nil {
+		return nil, err
+	}
 	return in, Store[Cfg](in)
 }
