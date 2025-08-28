@@ -41,7 +41,7 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
         router: configs[0].router,
         isEnabled: configs[0].isEnabled,
         onRamp: configs[0].onRamp,
-        defaultCCV: configs[0].defaultCCV,
+        defaultCCVs: configs[0].defaultCCV,
         laneMandatedCCVs: configs[0].laneMandatedCCVs
       })
     );
@@ -62,8 +62,8 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
     assertEq(config1.onRamp, configs[0].onRamp);
     assertEq(config2.onRamp, configs[1].onRamp);
 
-    assertEq(config1.defaultCCV[0], configs[0].defaultCCV[0]);
-    assertEq(config2.defaultCCV[0], configs[1].defaultCCV[0]);
+    assertEq(config1.defaultCCVs[0], configs[0].defaultCCV[0]);
+    assertEq(config2.defaultCCVs[0], configs[1].defaultCCV[0]);
 
     assertEq(config1.laneMandatedCCVs.length, 0);
     assertEq(config2.laneMandatedCCVs.length, 2);
@@ -89,7 +89,7 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
 
     CCVAggregator.SourceChainConfig memory config = s_agg.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
     assertEq(config.isEnabled, false);
-    assertEq(config.defaultCCV.length, 2);
+    assertEq(config.defaultCCVs.length, 2);
     assertEq(config.laneMandatedCCVs.length, 1);
   }
 

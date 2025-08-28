@@ -73,8 +73,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     IRouter router; // ─╮ Local router to use for messages coming from this source chain.
     bool isEnabled; // ─╯ Flag whether the source chain is enabled or not.
     bytes onRamp; // OnRamp address on the source chain.
-    address[] defaultCCV; // Default CCV to use for messages from this source chain.
-    address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
+    address[] defaultCCVs; // Default CCVs to use for messages from this source chain.
+    address[] laneMandatedCCVs; // Required CCVs to use for all messages from this source chain.
   }
 
   /// @dev Same as SourceChainConfig but with source chain selector so that an array of these
@@ -410,7 +410,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         }
       }
     }
-    return (sourceConfig.defaultCCV, new address[](0), 0);
+    return (sourceConfig.defaultCCVs, new address[](0), 0);
   }
 
   /// @notice Retrieves the required CCVs from a pool. If the pool does not specify any CCVs, we fall back to the
@@ -436,7 +436,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     // default CCVs. If this wasn't done, any pool not specifying CCVs would allow any arbitrary CCV to mint infinite
     // tokens by fabricating messages. Since CCVs are permissionless, this would mean anyone would be able to mint.
     if (requiredCCV.length == 0) {
-      requiredCCV = s_sourceChainConfigs[sourceChainSelector].defaultCCV;
+      requiredCCV = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
     }
     return requiredCCV;
   }
@@ -448,40 +448,23 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   function _trialExecute(
     Internal.Any2EVMMessage memory message
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-    (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeCall(this.executeSingleMessage, (message)),
-      address(this),
-      gasleft(),
-      i_gasForCallExactCheck,
-      Internal.MAX_RET_BYTES
-    );
-
-    if (!success) {
+    try this.executeSingleMessage(message) {}
+    catch (bytes memory err) {
       if (msg.sender == Internal.GAS_ESTIMATION_SENDER) {
         if (
-          CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(returnData)
-            || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(returnData)
-            || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(returnData)
+          CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(err)
+            || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(err)
+            || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(err)
         ) {
-          revert InsufficientGasToCompleteTx(bytes4(returnData));
+          revert InsufficientGasToCompleteTx(bytes4(err));
         }
       }
       // return the message execution state as FAILURE and the revert data.
       // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES.
-      return (Internal.MessageExecutionState.FAILURE, returnData);
+      return (Internal.MessageExecutionState.FAILURE, err);
     }
-
     // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
     return (Internal.MessageExecutionState.SUCCESS, "");
-  }
-
-  /// @notice hook for applying custom logic to the input message before executeSingleMessage()
-  /// @param message initial message
-  /// @return transformedMessage modified message
-  function _beforeExecuteSingleMessage(
-    Internal.Any2EVMMessage memory message
-  ) internal virtual returns (Internal.Any2EVMMessage memory transformedMessage) {
-    return message;
   }
 
   /// @notice Executes a single message.
@@ -689,7 +672,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
       currentConfig.onRamp = sourceConfigUpdate.onRamp;
-      currentConfig.defaultCCV = sourceConfigUpdate.defaultCCV;
+      currentConfig.defaultCCVs = sourceConfigUpdate.defaultCCV;
       currentConfig.laneMandatedCCVs = sourceConfigUpdate.laneMandatedCCVs;
 
       // We don't need to check the return value, as inserting the item twice has no effect.
@@ -697,5 +680,14 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
       emit SourceChainConfigSet(sourceConfigUpdate.sourceChainSelector, currentConfig);
     }
+  }
+
+  /// @notice hook for applying custom logic to the input message before executeSingleMessage()
+  /// @param message initial message
+  /// @return transformedMessage modified message
+  function _beforeExecuteSingleMessage(
+    Internal.Any2EVMMessage memory message
+  ) internal virtual returns (Internal.Any2EVMMessage memory transformedMessage) {
+    return message;
   }
 }

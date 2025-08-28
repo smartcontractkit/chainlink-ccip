@@ -10,8 +10,8 @@ contract CCVAggregator_getSourceChainConfig is CCVAggregatorSetup {
 
     assertEq(address(config.router), address(s_sourceRouter));
     assertEq(config.isEnabled, true);
-    assertEq(config.defaultCCV.length, 1);
-    assertEq(config.defaultCCV[0], s_defaultCCV);
+    assertEq(config.defaultCCVs.length, 1);
+    assertEq(config.defaultCCVs[0], s_defaultCCV);
     assertEq(config.laneMandatedCCVs.length, 0);
   }
 }
