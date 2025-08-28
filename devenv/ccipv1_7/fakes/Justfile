@@ -1,20 +1,5 @@
-# Build the fake server
-build TAG:
-    # Build and tag the image
-    docker build --platform linux/amd64 -t ccipv1_7-fakes:{{TAG}} .
-    docker tag ccipv1_7-fakes:{{TAG}} localhost:5000/ccipv1_7-fakes:{{TAG}}
-    docker tag ccipv1_7-fakes:{{TAG}} 795953128386.dkr.ecr.us-west-2.amazonaws.com/ccipv1_7-fakes:{{TAG}}
-
-# Run the fake server
 run:
-    docker run --rm -it -p 9111:9111 ccipv1_7-fakes
+    docker run --rm -it -p 9111:9111 ccip-fakes
 
-# Publish the updated image
-publish TAG:
-    aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 795953128386.dkr.ecr.us-west-2.amazonaws.com
-    docker tag ccipv1_7-fakes:{{TAG}} 795953128386.dkr.ecr.us-west-2.amazonaws.com/ccipv1_7-fakes:{{TAG}}
-    docker push 795953128386.dkr.ecr.us-west-2.amazonaws.com/ccipv1_7-fakes:{{TAG}}
-
-# Publish image to kind cluster
-publish-kind TAG:
-    kind load docker-image ccipv1_7-fakes:{{TAG}} --name=dctl
+build:
+    docker build -t ccip-fakes:local .
