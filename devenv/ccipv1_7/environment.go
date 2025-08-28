@@ -58,15 +58,20 @@ func NewEnvironment() (*Cfg, error) {
 			return nil
 		})
 	}
-	s3Out, err := s3provider.NewMinioFactory().NewFrom(in.StorageProvider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage provider: %w", err)
-	}
-	_ = s3Out
-	_, err = fake.NewDockerFakeDataProvider(in.FakeServer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create fake data provider: %w", err)
-	}
+	eg.Go(func() error {
+		_, err := s3provider.NewMinioFactory().NewFrom(in.StorageProvider)
+		if err != nil {
+			return fmt.Errorf("failed to create storage provider: %w", err)
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		_, err = fake.NewDockerFakeDataProvider(in.FakeServer)
+		if err != nil {
+			return fmt.Errorf("failed to create fake data provider: %w", err)
+		}
+		return nil
+	})
 	eg.Go(func() error {
 		_, err = services.NewVerifier(in.Verifier)
 		if err != nil {

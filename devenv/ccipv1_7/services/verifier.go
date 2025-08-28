@@ -34,7 +34,6 @@ type VerifierInput struct {
 	Port           int             `toml:"port"`
 	SourceCodePath string          `toml:"source_code_path"`
 	DB             *DBInput        `toml:"db"`
-	ExposedPorts   []string        `toml:"exposed_ports"`
 	ContainerName  string          `toml:"container_name"`
 	UseCache       bool            `toml:"use_cache"`
 	Out            *VerifierOutput `toml:"out"`

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -209,6 +210,24 @@ var indexerDBShell = &cobra.Command{
 	},
 }
 
+// In your Cobra command
+var printAddresses = &cobra.Command{
+	Use:   "addresses",
+	Short: "Pretty-print all on-chain contract addresses data",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		in, err := ccipv17.LoadOutput[ccipv17.Cfg]("env-out.toml")
+		if err != nil {
+			return fmt.Errorf("failed to load environment output: %w", err)
+		}
+		d, err := json.MarshalIndent(in.CCIPv17.Addresses, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal output: %w", err)
+		}
+		fmt.Println(string(d))
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringP("blockscout_url", "u", "http://host.docker.internal:8545", "EVM RPC node URL")
 
@@ -231,6 +250,7 @@ func init() {
 
 	// utility
 	rootCmd.AddCommand(indexerDBShell)
+	rootCmd.AddCommand(printAddresses)
 }
 
 func main() {

@@ -31,11 +31,6 @@ lint:
 pre-commit:
     pre-commit install
 
-# Builds and installs new version of CLI locally
-cli:
-    go install cmd/ccip.go
-
-
 # Remove all the dev images
 clean-docker-dev:
     @just ../../services/verifier/clean-dev
@@ -87,5 +82,5 @@ minio-alias:
    mc alias set minio http://localhost:9000 mYrAnD0mAcc3ssK3y2024 s3cR3tK3yL0ngEn0ughF0rMinI0Testing2024!
 
 # Rebuild CLI
-rebuild-cli:
+cli:
     pushd cmd/ccip > /dev/null && go install -ldflags="-X main.Version=1.0.0" . && popd > /dev/null

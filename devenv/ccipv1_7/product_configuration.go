@@ -2,9 +2,11 @@ package ccipv1_7
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -21,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -44,7 +47,8 @@ type CCIPv17 struct {
 	Verify              bool          `toml:"verify"`
 
 	// Contracts (CLDF)
-	Addresses []datastore.AddressRef
+	AddressesMu *sync.Mutex `toml:"-"`
+	Addresses   []string    `toml:"addresses"`
 
 	// These are the settings for CLDF missing functionality we cover with ETHClient, we should remove them later
 	GasSettings *GasSettings `toml:"gas_settings"`
@@ -118,24 +122,23 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input) ([]uint64, *deployment
 		return nil, nil, err
 	}
 
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		lggr,
-		operations.NewMemoryReporter(),
-	)
-
 	e := deployment.Environment{
-		GetContext:       func() context.Context { return context.Background() },
-		Logger:           lggr,
-		OperationsBundle: bundle,
-		BlockChains:      blockchains,
-		DataStore:        datastore.NewMemoryDataStore().Seal(),
+		GetContext:  func() context.Context { return context.Background() },
+		Logger:      lggr,
+		BlockChains: blockchains,
+		DataStore:   datastore.NewMemoryDataStore().Seal(),
 	}
 	return selectors, &e, nil
 }
 
 func deployContractsForSelector(in *Cfg, e *deployment.Environment, selector uint64) error {
 	L.Info().Uint64("Selector", selector).Msg("Configuring per-chain contracts bundle")
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
 	out, err := changesets.DeployChainContracts.Apply(*e, changesets.DeployChainContractsCfg{
 		ChainSelector: selector,
 		Params: sequences.ContractParams{
@@ -177,7 +180,13 @@ func deployContractsForSelector(in *Cfg, e *deployment.Environment, selector uin
 	}
 
 	addresses, err := out.DataStore.Addresses().Fetch()
-	in.CCIPv17.Addresses = append(in.CCIPv17.Addresses, addresses...)
+	in.CCIPv17.AddressesMu.Lock()
+	defer in.CCIPv17.AddressesMu.Unlock()
+	a, err := json.Marshal(addresses)
+	if err != nil {
+		return err
+	}
+	in.CCIPv17.Addresses = append(in.CCIPv17.Addresses, string(a))
 	return nil
 }
 
@@ -369,11 +378,19 @@ func DefaultProductConfiguration(in *Cfg, phase ConfigPhase) error {
 			return fmt.Errorf("creating CLDF operations environment: %w", err)
 		}
 		L.Info().Any("Selectors", selectors).Msg("Deploying for chain selectors")
+		eg := &errgroup.Group{}
+		in.CCIPv17.AddressesMu = &sync.Mutex{}
 		for _, sel := range selectors {
-			err = deployContractsForSelector(in, e, sel)
-			if err != nil {
-				return fmt.Errorf("could not configure contracts for chain selector %d: %w", sel, err)
-			}
+			eg.Go(func() error {
+				err = deployContractsForSelector(in, e, sel)
+				if err != nil {
+					return fmt.Errorf("could not configure contracts for chain selector %d: %w", sel, err)
+				}
+				return nil
+			})
+		}
+		if err := eg.Wait(); err != nil {
+			return err
 		}
 		if err := configureJobs(in, nodeClients); err != nil {
 			return fmt.Errorf("could not configure jobs: %w", err)
