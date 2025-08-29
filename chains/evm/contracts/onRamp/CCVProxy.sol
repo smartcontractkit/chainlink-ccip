@@ -270,7 +270,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     return newMessage.header.messageId;
   }
 
-  // TODO check for duplicates
   function _deduplicateCCVs(
     address[] memory poolRequiredCCV,
     Client.CCV[] memory requiredCCV,
@@ -286,6 +285,16 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     for (uint256 poolCCVIndex = 0; poolCCVIndex < poolRequiredCCV.length; ++poolCCVIndex) {
       address poolCCV = poolRequiredCCV[poolCCVIndex];
+
+      bool alreadyQueued = false;
+      for (uint256 k = 0; k < toBeAddedIndex; ++k) {
+        if (toBeAdded[k].ccvAddress == poolCCV) {
+          alreadyQueued = true;
+          break;
+        }
+      }
+      if (alreadyQueued) continue;
+
       bool found = false;
       for (uint256 reqCCVIndex = 0; reqCCVIndex < requiredCCV.length; ++reqCCVIndex) {
         if (poolCCV == requiredCCV[reqCCVIndex].ccvAddress) {
@@ -299,9 +308,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         // If not found, it has to be added to the required CCV list.
         toBeAdded[toBeAddedIndex++].ccvAddress = poolCCV;
 
-        // If the pool CCV is not in the optional CCVs, we remove it and lower the optional threshold since
+        // If the pool CCV is in the optional CCVs, we remove it and lower the optional threshold since
         // it is now required.
-        for (uint256 optCCVIndex = 0; optCCVIndex < optionalCCV.length; ++optCCVIndex) {
+        for (uint256 optCCVIndex = 0; optCCVIndex < optionalCCV.length;) {
           if (poolCCV == optionalCCV[optCCVIndex].ccvAddress) {
             // Copy the extraArgs for the CCV to the CCV now in the required CCV list.
             toBeAdded[toBeAddedIndex - 1].args = optionalCCV[optCCVIndex].args;
@@ -313,11 +322,17 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
               mstore(optionalCCV, sub(mload(optionalCCV), 1))
             }
 
-            // Lower the optional threshold since we removed a CCV.
+            // Decrement the threshold to maintain the security guarantee.
+            // If user specified "2 of [A,B,C]", they want AT LEAST 2 verifiers total.
+            // If B becomes required (always executes), we still need 1 more from [A,C].
+            // This preserves the minimum verification count the user requested.
             if (optionalThreshold > 0) {
               optionalThreshold--;
             }
+            // Don't increment optCCVIndex since we moved an element to this position
             break;
+          } else {
+            optCCVIndex++;
           }
         }
       }
