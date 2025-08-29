@@ -18,4 +18,18 @@ contract CCVProxyTestHelper is CCVProxy {
   ) external pure returns (Client.EVMExtraArgsV3 memory) {
     return _parseExtraArgsWithDefaults(destChainConfig, extraArgs);
   }
+
+  /// @notice Exposes the internal _deduplicateCCVs function for testing
+  function deduplicateCCVs(
+    address[] memory poolRequiredCCV,
+    Client.CCV[] memory requiredCCV,
+    Client.CCV[] memory optionalCCV,
+    uint8 optionalThreshold
+  )
+    external
+    pure
+    returns (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold)
+  {
+    return _deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
+  }
 }
