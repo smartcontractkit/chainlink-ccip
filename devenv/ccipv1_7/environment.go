@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/devenv/ccipv17/services"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -15,13 +16,16 @@ import (
 )
 
 type Cfg struct {
-	Indexer         *services.IndexerInput `toml:"indexer" validate:"required"`
-	CCIPv17         *CCIPv17               `toml:"ccipv17" validate:"required"`
-	StorageProvider *s3provider.Input      `toml:"storage_provider" validate:"required"`
-	FakeServer      *fake.Input            `toml:"fake_server"      validate:"required"`
-	JD              *jd.Input              `toml:"jd"`
-	Blockchains     []*blockchain.Input    `toml:"blockchains"      validate:"required"`
-	NodeSets        []*ns.Input            `toml:"nodesets"         validate:"required"`
+	CCIPv17         *CCIPv17                  `toml:"ccipv17" validate:"required"`
+	StorageProvider *s3provider.Input         `toml:"storage_provider" validate:"required"`
+	FakeServer      *fake.Input               `toml:"fake_server"      validate:"required"`
+	JD              *jd.Input                 `toml:"jd"`
+	Blockchains     []*blockchain.Input       `toml:"blockchains"      validate:"required"`
+	NodeSets        []*ns.Input               `toml:"nodesets"         validate:"required"`
+	Verifier        *services.VerifierInput   `toml:"verifier" validate:"required"`
+	Executor        *services.ExecutorInput   `toml:"executor" validate:"required"`
+	Indexer         *services.IndexerInput    `toml:"indexer" validate:"required"`
+	Aggregator      *services.AggregatorInput `toml:"aggregator" validate:"required"`
 }
 
 // verifyEnvironment internal function describing how to verify your environment is working.
@@ -44,28 +48,67 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 	track := NewTimeTracker(Plog)
+	eg := &errgroup.Group{}
 	for _, b := range in.Blockchains {
-		_, err = blockchain.NewBlockchainNetwork(b)
+		eg.Go(func() error {
+			_, err = blockchain.NewBlockchainNetwork(b)
+			if err != nil {
+				return fmt.Errorf("failed to create blockchain network: %w", err)
+			}
+			return nil
+		})
+	}
+	eg.Go(func() error {
+		_, err := s3provider.NewMinioFactory().NewFrom(in.StorageProvider)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create blockchain network: %w", err)
+			return fmt.Errorf("failed to create storage provider: %w", err)
 		}
-	}
-	s3Out, err := s3provider.NewMinioFactory().NewFrom(in.StorageProvider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage provider: %w", err)
-	}
-	_ = s3Out
-	_, err = fake.NewDockerFakeDataProvider(in.FakeServer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create fake data provider: %w", err)
-	}
-	_, err = services.NewIndexer(in.Indexer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create an example service: %w", err)
-	}
-	_, err = jd.NewJD(in.JD)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create job distributor: %w", err)
+		return nil
+	})
+	eg.Go(func() error {
+		_, err = fake.NewDockerFakeDataProvider(in.FakeServer)
+		if err != nil {
+			return fmt.Errorf("failed to create fake data provider: %w", err)
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		_, err = services.NewVerifier(in.Verifier)
+		if err != nil {
+			return fmt.Errorf("failed to create verifier service: %w", err)
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		_, err = services.NewExecutor(in.Executor)
+		if err != nil {
+			return fmt.Errorf("failed to create executor service: %w", err)
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		_, err = services.NewIndexer(in.Indexer)
+		if err != nil {
+			return fmt.Errorf("failed to create indexer service: %w", err)
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		_, err = services.NewAggregator(in.Aggregator)
+		if err != nil {
+			return fmt.Errorf("failed to create aggregator service: %w", err)
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		_, err = jd.NewJD(in.JD)
+		if err != nil {
+			return fmt.Errorf("failed to create job distributor: %w", err)
+		}
+		return nil
+	})
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
 	track.Record("[infra] deploying blockchains")
 	if err := DefaultProductConfiguration(in, ConfigureNodesNetwork); err != nil {
@@ -82,5 +125,8 @@ func NewEnvironment() (*Cfg, error) {
 	}
 	track.Record("[changeset] deployed product contracts")
 	track.Print()
+	if err := PrintCLDFAddresses(in); err != nil {
+		return nil, err
+	}
 	return in, Store[Cfg](in)
 }

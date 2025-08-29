@@ -10,8 +10,7 @@ import (
 )
 
 func main() {
-	// just an example service to demo automatic reload with Air
-	lvlStr := os.Getenv("INDEXER_LOG_LEVEL")
+	lvlStr := os.Getenv("EXECUTOR_LOG_LEVEL")
 	if lvlStr == "" {
 		lvlStr = "info"
 	}
@@ -22,9 +21,9 @@ func main() {
 	l := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(lvl)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Indexer is running!\n")
+		fmt.Fprintf(w, "Executor is running!\n")
 	})
 
-	l.Info().Msgf("Listening on port %s", ":8100")
+	l.Info().Msgf("Executor is running on port %s", ":8100")
 	log.Fatal().Err(http.ListenAndServe(":8100", nil)).Send()
 }
