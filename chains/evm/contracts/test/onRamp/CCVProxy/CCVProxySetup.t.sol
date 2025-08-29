@@ -13,8 +13,6 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
   bytes32 internal s_metadataHash;
 
   CCVProxy internal s_ccvProxy;
-  MockCCVOnRamp internal s_mockCCVOne;
-  MockExecutor internal s_mockExecutor;
 
   function setUp() public virtual override {
     super.setUp();
@@ -31,18 +29,6 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
-    s_mockCCVOne = new MockCCVOnRamp();
-
-    CCVProxy.DestChainConfigArgs[] memory destChainConfigs = new CCVProxy.DestChainConfigArgs[](1);
-    destChainConfigs[0] = CCVProxy.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      router: s_sourceRouter,
-      defaultCCV: address(s_mockCCVOne),
-      requiredCCV: address(0),
-      defaultExecutor: address(s_mockExecutor)
-    });
-
-    s_ccvProxy.applyDestChainConfigUpdates(destChainConfigs);
   }
 
   function _evmMessageToEvent(

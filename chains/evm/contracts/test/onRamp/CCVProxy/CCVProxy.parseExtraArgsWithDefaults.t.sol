@@ -3,22 +3,16 @@ pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
-
 import {CCVProxyTestHelper} from "../../helpers/CCVProxyTestHelper.sol";
 import {CCVProxySetup} from "./CCVProxySetup.t.sol";
 
 contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
   CCVProxyTestHelper internal s_ccvProxyTestHelper;
-  address internal constant REQUIRED_CCV = address(0x1111);
-  address internal constant DEFAULT_CCV = address(0x2222);
-  address internal constant DEFAULT_EXECUTOR = address(0x3333);
 
-  address internal s_userRequiredCCV1;
-  address internal s_userExecutor;
-  address internal s_optionalCCV1;
-  address internal s_optionalCCV2;
-
-  CCVProxy.DestChainConfig internal s_defaultDestChainConfig;
+  address[] internal s_defaultCCVs;
+  address[] internal s_laneMandatedCCVs;
+  address internal s_defaultExecutor;
+  CCVProxy.DestChainConfig internal s_destChainConfig;
 
   function setUp() public override {
     super.setUp();
@@ -35,176 +29,254 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
       })
     );
 
-    // Initialize common test addresses
-    s_userRequiredCCV1 = makeAddr("userRequiredCCV1");
-    s_userExecutor = makeAddr("userExecutor");
-    s_optionalCCV1 = makeAddr("optionalCCV1");
-    s_optionalCCV2 = makeAddr("optionalCCV2");
+    // Initialize default test configuration
+    s_defaultCCVs = new address[](2);
+    s_defaultCCVs[0] = makeAddr("defaultCCV1");
+    s_defaultCCVs[1] = makeAddr("defaultCCV2");
 
-    // Initialize common test configuration
-    s_defaultDestChainConfig = CCVProxy.DestChainConfig({
+    s_laneMandatedCCVs = new address[](1);
+    s_laneMandatedCCVs[0] = makeAddr("mandatedCCV1");
+
+    s_defaultExecutor = makeAddr("defaultExecutor");
+
+    s_destChainConfig = CCVProxy.DestChainConfig({
       router: s_sourceRouter,
-      sequenceNumber: 1,
-      requiredCCV: REQUIRED_CCV,
-      defaultCCV: DEFAULT_CCV,
-      defaultExecutor: DEFAULT_EXECUTOR
+      sequenceNumber: 0,
+      defaultExecutor: s_defaultExecutor,
+      laneMandatedCCVs: s_laneMandatedCCVs,
+      defaultCCVs: s_defaultCCVs
     });
   }
 
-  function test_parseExtraArgsWithDefaults_WithGenericExtraArgsV3Tag() public {
-    CCVProxy.DestChainConfig memory destChainConfig = s_defaultDestChainConfig;
+  function test_parseExtraArgsWithDefaults_V3WithUserProvidedCCVs() public {
+    Client.CCV[] memory userRequiredCCVs = new Client.CCV[](1);
+    userRequiredCCVs[0] = Client.CCV({ccvAddress: makeAddr("userCCV1"), args: "userArgs"});
 
-    Client.CCV[] memory requiredCCVs = new Client.CCV[](1);
-    requiredCCVs[0] = Client.CCV({ccvAddress: s_userRequiredCCV1, args: "test args"});
-
-    Client.CCV[] memory optionalCCVs = new Client.CCV[](2);
-    optionalCCVs[0] = Client.CCV({ccvAddress: s_optionalCCV1, args: "optional1"});
-    optionalCCVs[1] = Client.CCV({ccvAddress: s_optionalCCV2, args: "optional2"});
-
-    Client.EVMExtraArgsV3 memory extraArgs = Client.EVMExtraArgsV3({
-      requiredCCV: requiredCCVs,
-      optionalCCV: optionalCCVs,
-      optionalThreshold: 1,
-      finalityConfig: 10,
-      executor: s_userExecutor,
-      executorArgs: "executor args",
-      tokenArgs: "token args"
-    });
-
-    bytes memory encodedExtraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgs));
-
-    Client.EVMExtraArgsV3 memory result =
-      s_ccvProxyTestHelper.parseExtraArgsWithDefaults(destChainConfig, encodedExtraArgs);
-
-    assertEq(result.requiredCCV.length, 1 + extraArgs.requiredCCV.length); // 1 from DestChainConfig.requiredCCV + 1 from extraArgs
-    assertEq(result.requiredCCV[0].ccvAddress, destChainConfig.requiredCCV); // Required CCV from config should be first
-    assertEq(result.requiredCCV[0].args, ""); // Required CCV from config should have empty args
-    assertEq(result.requiredCCV[1].ccvAddress, s_userRequiredCCV1); // Original required CCV should be second
-    assertEq(result.requiredCCV[1].args, "test args");
-
-    assertEq(result.optionalCCV.length, extraArgs.optionalCCV.length);
-    assertEq(result.optionalCCV[0].ccvAddress, s_optionalCCV1);
-    assertEq(result.optionalCCV[0].args, "optional1");
-    assertEq(result.optionalCCV[1].ccvAddress, s_optionalCCV2);
-    assertEq(result.optionalCCV[1].args, "optional2");
-
-    assertEq(result.optionalThreshold, extraArgs.optionalThreshold);
-    assertEq(result.finalityConfig, extraArgs.finalityConfig);
-    assertEq(result.executor, extraArgs.executor);
-    assertEq(result.executorArgs, extraArgs.executorArgs);
-    assertEq(result.tokenArgs, extraArgs.tokenArgs);
-  }
-
-  function test_parseExtraArgsWithDefaults_WithGenericExtraArgsV3Tag_NoRequiredCCVInConfig() public {
-    CCVProxy.DestChainConfig memory destChainConfig = s_defaultDestChainConfig;
-    destChainConfig.requiredCCV = address(0); // Override: No required CCV in config
-
-    Client.CCV[] memory requiredCCVs = new Client.CCV[](1);
-    requiredCCVs[0] = Client.CCV({ccvAddress: s_userRequiredCCV1, args: "test args"});
-
-    Client.EVMExtraArgsV3 memory extraArgs = Client.EVMExtraArgsV3({
-      requiredCCV: requiredCCVs,
+    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
+      requiredCCV: userRequiredCCVs,
       optionalCCV: new Client.CCV[](0),
       optionalThreshold: 0,
-      finalityConfig: 10,
-      executor: s_userExecutor,
-      executorArgs: "executor args",
-      tokenArgs: "token args"
+      finalityConfig: 0,
+      executor: makeAddr("userExecutor"),
+      executorArgs: "execArgs",
+      tokenArgs: "tokenArgs"
     });
 
-    bytes memory encodedExtraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgs));
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    Client.EVMExtraArgsV3 memory result =
-      s_ccvProxyTestHelper.parseExtraArgsWithDefaults(destChainConfig, encodedExtraArgs);
+    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
 
-    assertEq(result.requiredCCV.length, extraArgs.requiredCCV.length);
-    assertEq(result.requiredCCV[0].ccvAddress, s_userRequiredCCV1);
-    assertEq(result.requiredCCV[0].args, "test args");
+    // User-provided CCVs should be used, plus mandated CCVs
+    assertEq(2, result.requiredCCV.length);
+    assertEq(s_laneMandatedCCVs[0], result.requiredCCV[0].ccvAddress);
+    assertEq("", result.requiredCCV[0].args);
+    assertEq(makeAddr("userCCV1"), result.requiredCCV[1].ccvAddress);
+    assertEq("userArgs", result.requiredCCV[1].args);
+    assertEq(makeAddr("userExecutor"), result.executor);
   }
 
-  function test_parseExtraArgsWithDefaults_WithGenericExtraArgsV3Tag_NoCCVsSpecified() public {
-    CCVProxy.DestChainConfig memory destChainConfig = s_defaultDestChainConfig;
-
-    Client.EVMExtraArgsV3 memory extraArgs = Client.EVMExtraArgsV3({
-      requiredCCV: new Client.CCV[](0),
+  function test_parseExtraArgsWithDefaults_V3WithEmptyRequiredCCVs() public view {
+    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
+      requiredCCV: new Client.CCV[](0), // Empty required CCVs
       optionalCCV: new Client.CCV[](0),
       optionalThreshold: 0,
-      finalityConfig: 10,
-      executor: address(0),
+      finalityConfig: 0,
+      executor: address(0), // No executor specified
       executorArgs: "",
       tokenArgs: ""
     });
 
-    bytes memory encodedExtraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgs));
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+
+    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+
+    // Default CCVs should be applied plus mandated CCVs
+    assertEq(3, result.requiredCCV.length); // 1 mandated + 2 defaults
+    assertEq(s_laneMandatedCCVs[0], result.requiredCCV[0].ccvAddress);
+    assertEq("", result.requiredCCV[0].args);
+    assertEq(s_defaultCCVs[0], result.requiredCCV[1].ccvAddress);
+    assertEq("", result.requiredCCV[1].args);
+    assertEq(s_defaultCCVs[1], result.requiredCCV[2].ccvAddress);
+    assertEq("", result.requiredCCV[2].args);
+
+    // Default executor should be applied
+    assertEq(s_defaultExecutor, result.executor);
+  }
+
+  function test_parseExtraArgsWithDefaults_V1ExtraArgs() public view {
+    // Use EVMExtraArgsV1 format
+    Client.EVMExtraArgsV1 memory v1Args = Client.EVMExtraArgsV1({gasLimit: 200_000});
+
+    bytes memory legacyExtraArgs = Client._argsToBytes(v1Args);
 
     Client.EVMExtraArgsV3 memory result =
-      s_ccvProxyTestHelper.parseExtraArgsWithDefaults(destChainConfig, encodedExtraArgs);
+      s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, legacyExtraArgs);
 
-    assertEq(result.requiredCCV.length, 2); // 1 from DestChainConfig.requiredCCV + 1 from DestChainConfig.defaultCCV
-    assertEq(result.requiredCCV[0].ccvAddress, destChainConfig.requiredCCV);
-    assertEq(result.requiredCCV[1].ccvAddress, destChainConfig.defaultCCV);
-    assertEq(result.executor, destChainConfig.defaultExecutor);
+    // Default CCVs should be used with V1 args passed to each CCV
+    assertEq(3, result.requiredCCV.length); // 1 mandated + 2 defaults
+    assertEq(s_laneMandatedCCVs[0], result.requiredCCV[0].ccvAddress);
+    assertEq("", result.requiredCCV[0].args); // Mandated CCVs always have empty args
+    assertEq(s_defaultCCVs[0], result.requiredCCV[1].ccvAddress);
+    assertEq(legacyExtraArgs, result.requiredCCV[1].args);
+    assertEq(s_defaultCCVs[1], result.requiredCCV[2].ccvAddress);
+    assertEq(legacyExtraArgs, result.requiredCCV[2].args);
+
+    // V1 args should be set as executor args
+    assertEq(legacyExtraArgs, result.executorArgs);
+    assertEq(s_defaultExecutor, result.executor);
   }
 
-  function test_parseExtraArgsWithDefaults_WithLegacyExtraArgs() public {
-    CCVProxy.DestChainConfig memory destChainConfig = s_defaultDestChainConfig;
+  function test_parseExtraArgsWithDefaults_V2ExtraArgs() public view {
+    // Use GenericExtraArgsV2 format
+    Client.GenericExtraArgsV2 memory v2Args =
+      Client.GenericExtraArgsV2({gasLimit: 300_000, allowOutOfOrderExecution: true});
 
-    bytes memory oldExtraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 1000}));
+    bytes memory legacyExtraArgs = Client._argsToBytes(v2Args);
 
-    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(destChainConfig, oldExtraArgs);
+    Client.EVMExtraArgsV3 memory result =
+      s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, legacyExtraArgs);
 
-    assertEq(result.requiredCCV.length, 2); // 1 from DestChainConfig.requiredCCV + 1 from DestChainConfig.defaultCCV
-    assertEq(result.requiredCCV[0].ccvAddress, destChainConfig.requiredCCV);
-    assertEq(result.requiredCCV[1].ccvAddress, destChainConfig.defaultCCV);
-    assertEq(result.requiredCCV[1].args, oldExtraArgs);
-    assertEq(result.executorArgs, oldExtraArgs);
-    assertEq(result.executor, destChainConfig.defaultExecutor); // Default executor
+    // Default CCVs should be used with V2 args passed to each CCV
+    assertEq(3, result.requiredCCV.length); // 1 mandated + 2 defaults
+    assertEq(s_laneMandatedCCVs[0], result.requiredCCV[0].ccvAddress);
+    assertEq("", result.requiredCCV[0].args); // Mandated CCVs always have empty args
+    assertEq(s_defaultCCVs[0], result.requiredCCV[1].ccvAddress);
+    assertEq(legacyExtraArgs, result.requiredCCV[1].args);
+    assertEq(s_defaultCCVs[1], result.requiredCCV[2].ccvAddress);
+    assertEq(legacyExtraArgs, result.requiredCCV[2].args);
+
+    // V2 args should be set as executor args
+    assertEq(legacyExtraArgs, result.executorArgs);
+    assertEq(s_defaultExecutor, result.executor);
   }
 
-  function test_parseExtraArgsWithDefaults_RevertWhen_InvalidOptionalCCVThreshold() public {
-    CCVProxy.DestChainConfig memory destChainConfig = s_defaultDestChainConfig;
-    destChainConfig.requiredCCV = address(0); // Override: No required CCV for this test
+  function test_parseExtraArgsWithDefaults_WithLaneMandatedCCVsDuplicates() public {
+    // Modify lane mandated CCVs to include a duplicate
+    s_laneMandatedCCVs = new address[](2);
+    s_laneMandatedCCVs[0] = makeAddr("mandatedCCV1");
+    s_laneMandatedCCVs[1] = makeAddr("userCCV1"); // Will be duplicate with user CCV
 
+    s_destChainConfig.laneMandatedCCVs = s_laneMandatedCCVs;
+
+    Client.CCV[] memory userRequiredCCVs = new Client.CCV[](1);
+    userRequiredCCVs[0] = Client.CCV({ccvAddress: makeAddr("userCCV1"), args: "userArgs"});
+
+    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
+      requiredCCV: userRequiredCCVs,
+      optionalCCV: new Client.CCV[](0),
+      optionalThreshold: 0,
+      finalityConfig: 0,
+      executor: address(0),
+      executorArgs: "",
+      tokenArgs: ""
+    });
+
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+
+    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+
+    // Should have 2 CCVs (mandatedCCV1 + userCCV1, no duplicate)
+    assertEq(2, result.requiredCCV.length);
+    assertEq(makeAddr("mandatedCCV1"), result.requiredCCV[0].ccvAddress);
+    assertEq("", result.requiredCCV[0].args); // Mandated CCVs have empty args
+    assertEq(makeAddr("userCCV1"), result.requiredCCV[1].ccvAddress);
+    assertEq("userArgs", result.requiredCCV[1].args); // User args preserved
+  }
+
+  function test_parseExtraArgsWithDefaults_WithOptionalCCVs() public {
+    // Clear lane mandated CCVs and default CCVs for this test
+    s_destChainConfig.laneMandatedCCVs = new address[](0);
+    s_destChainConfig.defaultCCVs = new address[](0);
+
+    Client.CCV[] memory requiredCCVs = new Client.CCV[](1);
+    requiredCCVs[0] = Client.CCV({ccvAddress: makeAddr("requiredCCV"), args: ""});
+
+    Client.CCV[] memory optionalCCVs = new Client.CCV[](3);
+    optionalCCVs[0] = Client.CCV({ccvAddress: makeAddr("optionalCCV1"), args: "opt1"});
+    optionalCCVs[1] = Client.CCV({ccvAddress: makeAddr("optionalCCV2"), args: "opt2"});
+    optionalCCVs[2] = Client.CCV({ccvAddress: makeAddr("optionalCCV3"), args: "opt3"});
+
+    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
+      requiredCCV: requiredCCVs,
+      optionalCCV: optionalCCVs,
+      optionalThreshold: 2, // 2 out of 3 required
+      finalityConfig: 0,
+      executor: address(0),
+      executorArgs: "",
+      tokenArgs: ""
+    });
+
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+
+    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+
+    assertEq(1, result.requiredCCV.length);
+    assertEq(3, result.optionalCCV.length);
+    assertEq(2, result.optionalThreshold);
+  }
+
+  // Reverts
+
+  function test_parseExtraArgsWithDefaults_RevertWhen_InvalidOptionalThreshold_TooHigh() public {
     Client.CCV[] memory optionalCCVs = new Client.CCV[](2);
-    optionalCCVs[0] = Client.CCV({ccvAddress: s_optionalCCV1, args: "optional1"});
-    optionalCCVs[1] = Client.CCV({ccvAddress: s_optionalCCV2, args: "optional2"});
+    optionalCCVs[0] = Client.CCV({ccvAddress: makeAddr("optionalCCV1"), args: ""});
+    optionalCCVs[1] = Client.CCV({ccvAddress: makeAddr("optionalCCV2"), args: ""});
 
-    Client.EVMExtraArgsV3 memory extraArgs = Client.EVMExtraArgsV3({
+    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
       requiredCCV: new Client.CCV[](0),
       optionalCCV: optionalCCVs,
-      optionalThreshold: uint8(optionalCCVs.length), // Invalid: threshold >= optionalCCV.length
-      finalityConfig: 10,
+      optionalThreshold: 3, // Threshold > array length
+      finalityConfig: 0,
       executor: address(0),
       executorArgs: "",
       tokenArgs: ""
     });
 
-    bytes memory encodedExtraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgs));
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
     vm.expectRevert(CCVProxy.InvalidOptionalCCVThreshold.selector);
-    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(destChainConfig, encodedExtraArgs);
+    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
   }
 
-  function test_parseExtraArgsWithDefaults_RevertWhen_ZeroOptionalThreshold() public {
-    CCVProxy.DestChainConfig memory destChainConfig = s_defaultDestChainConfig;
-    destChainConfig.requiredCCV = address(0); // Override: No required CCV for this test
+  function test_parseExtraArgsWithDefaults_RevertWhen_InvalidOptionalThreshold_Zero() public {
+    Client.CCV[] memory optionalCCVs = new Client.CCV[](2);
+    optionalCCVs[0] = Client.CCV({ccvAddress: makeAddr("optionalCCV1"), args: ""});
+    optionalCCVs[1] = Client.CCV({ccvAddress: makeAddr("optionalCCV2"), args: ""});
 
-    Client.CCV[] memory optionalCCVs = new Client.CCV[](1);
-    optionalCCVs[0] = Client.CCV({ccvAddress: s_optionalCCV1, args: "optional1"});
-
-    Client.EVMExtraArgsV3 memory extraArgs = Client.EVMExtraArgsV3({
+    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
       requiredCCV: new Client.CCV[](0),
       optionalCCV: optionalCCVs,
-      optionalThreshold: 0, // Invalid: zero threshold
-      finalityConfig: 10,
+      optionalThreshold: 0, // Zero threshold with optional CCVs
+      finalityConfig: 0,
       executor: address(0),
       executorArgs: "",
       tokenArgs: ""
     });
 
-    bytes memory encodedExtraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgs));
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
     vm.expectRevert(CCVProxy.InvalidOptionalCCVThreshold.selector);
-    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(destChainConfig, encodedExtraArgs);
+    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+  }
+
+  function test_parseExtraArgsWithDefaults_RevertWhen_InvalidOptionalThreshold_EqualLength() public {
+    Client.CCV[] memory optionalCCVs = new Client.CCV[](2);
+    optionalCCVs[0] = Client.CCV({ccvAddress: makeAddr("optionalCCV1"), args: ""});
+    optionalCCVs[1] = Client.CCV({ccvAddress: makeAddr("optionalCCV2"), args: ""});
+
+    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
+      requiredCCV: new Client.CCV[](0),
+      optionalCCV: optionalCCVs,
+      optionalThreshold: 2, // Threshold == array length (all required, defeats purpose)
+      finalityConfig: 0,
+      executor: address(0),
+      executorArgs: "",
+      tokenArgs: ""
+    });
+
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+
+    vm.expectRevert(CCVProxy.InvalidOptionalCCVThreshold.selector);
+    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
   }
 }
