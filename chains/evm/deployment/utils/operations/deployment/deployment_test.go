@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -20,6 +21,20 @@ import (
 )
 
 var TestContractType = cldf_deployment.ContractType("TestContract")
+
+// Implements rpc.DataError from go-ethereum/rpc
+// Enables ABI decoding of revert reasons
+type rpcError struct {
+	Data interface{}
+}
+
+func (e *rpcError) Error() string {
+	return ""
+}
+
+func (e *rpcError) ErrorData() interface{} {
+	return e.Data
+}
 
 func TestDeploy(t *testing.T) {
 	address := common.HexToAddress("0x01")
@@ -39,6 +54,14 @@ func TestDeploy(t *testing.T) {
 				Args:          3,
 			},
 			expectedErr: "invalid constructor args for test-deployment: input must be even",
+		},
+		{
+			desc: "revert from contract",
+			input: deployment.Input[int]{
+				ChainSelector: validChainSel,
+				Args:          10,
+			},
+			expectedErr: "due to error -`InvalidValue` args [1]: 6072742c0000000000000000000000000000000000000000000000000000000000000001",
 		},
 		{
 			desc: "mismatched chain selector",
@@ -68,11 +91,18 @@ func TestDeploy(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
+			contractABI := `[{
+				"inputs": [{"name": "value", "type": "uint256"}],
+				"name": "InvalidValue",
+				"type": "error"
+			}]`
+
 			op := deployment.New(
 				"test-deployment",
 				semver.MustParse("1.0.0"),
 				"Test deployment operation",
 				TestContractType,
+				contractABI,
 				func(input int) error {
 					if input%2 != 0 {
 						return fmt.Errorf("input must be even")
@@ -81,7 +111,20 @@ func TestDeploy(t *testing.T) {
 				},
 				deployment.VMDeployers[int]{
 					DeployEVM: func(auth *bind.TransactOpts, client bind.ContractBackend, args int) (common.Address, *types.Transaction, error) {
-						return address, nil, nil
+						// Not caught by operation validation, revert reason should be surfaced
+						if args == 10 {
+							return address, &types.Transaction{}, &rpcError{
+								Data: common.Bytes2Hex(append(
+									crypto.Keccak256([]byte("InvalidValue(uint256)"))[:4],
+									common.LeftPadBytes([]byte{1}, 32)...,
+								)),
+							}
+						}
+
+						return address, types.NewTx(&types.LegacyTx{
+							To:   &address,
+							Data: []byte{0xDE, 0xAD, 0xBE, 0xEF},
+						}), nil
 					},
 					DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args int) (common.Address, error) {
 						return address, nil
@@ -111,7 +154,7 @@ func TestDeploy(t *testing.T) {
 			report, err := operations.ExecuteOperation(bundle, op, chain, test.input)
 			if test.expectedErr != "" {
 				require.Error(t, err, "Expected ExecuteOperation error but got none")
-				require.Contains(t, test.expectedErr, err.Error())
+				require.Contains(t, err.Error(), test.expectedErr)
 			} else {
 				require.NoError(t, err, "Unexpected ExecuteOperation error")
 				if test.isZkSyncVM {

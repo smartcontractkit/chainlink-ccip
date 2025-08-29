@@ -16,12 +16,13 @@ import (
 )
 
 const (
-	DefaultName     = "indexer"
-	DefaultImage    = "indexer:dev"
-	DefaultHTTPPort = 8100
+	DefaultIndexerName     = "indexer"
+	DefaultIndexerDBName   = "indexer-db"
+	DefaultIndexerImage    = "indexer:dev"
+	DefaultIndexerHTTPPort = 8102
 
-	DefaultDBImage            = "postgres:16-alpine"
-	DefaultDBConnectionString = "postgresql://indexer:indexer@localhost:6432/indexer?sslmode=disable"
+	DefaultIndexerDBImage            = "postgres:16-alpine"
+	DefaultIndexerDBConnectionString = "postgresql://indexer:indexer@localhost:6432/indexer?sslmode=disable"
 )
 
 type DBInput struct {
@@ -33,7 +34,6 @@ type IndexerInput struct {
 	Port           int            `toml:"port"`
 	SourceCodePath string         `toml:"source_code_path"`
 	DB             *DBInput       `toml:"db"`
-	ExposedPorts   []string       `toml:"exposed_ports"`
 	ContainerName  string         `toml:"container_name"`
 	UseCache       bool           `toml:"use_cache"`
 	Out            *IndexerOutput `toml:"-"`
@@ -50,17 +50,17 @@ type IndexerOutput struct {
 
 func defaults(in *IndexerInput) {
 	if in.Image == "" {
-		in.Image = DefaultImage
+		in.Image = DefaultIndexerImage
 	}
 	if in.Port == 0 {
-		in.Port = DefaultHTTPPort
+		in.Port = DefaultIndexerHTTPPort
 	}
 	if in.ContainerName == "" {
-		in.ContainerName = DefaultName
+		in.ContainerName = DefaultIndexerName
 	}
 	if in.DB == nil {
 		in.DB = &DBInput{
-			Image: DefaultDBImage,
+			Image: DefaultIndexerDBImage,
 		}
 	}
 }
@@ -76,8 +76,15 @@ func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
 
 	/* Database */
 
-	_, err := postgres.Run(ctx,
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	p := filepath.Join(filepath.Dir(wd), in.SourceCodePath)
+
+	_, err = postgres.Run(ctx,
 		in.DB.Image,
+		testcontainers.WithName(DefaultIndexerDBName),
 		testcontainers.WithExposedPorts("5432/tcp"),
 		testcontainers.WithHostConfigModifier(func(h *container.HostConfig) {
 			h.PortBindings = nat.PortMap{
@@ -90,7 +97,7 @@ func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
 		postgres.WithDatabase("indexer"),
 		postgres.WithUsername("indexer"),
 		postgres.WithPassword("indexer"),
-		postgres.WithInitScripts("services/init.sql"),
+		postgres.WithInitScripts(filepath.Join(p, "init.sql")),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database: %w", err)
@@ -158,6 +165,6 @@ func NewIndexer(in *IndexerInput) (*IndexerOutput, error) {
 		ContainerName:      in.ContainerName,
 		ExternalHTTPURL:    fmt.Sprintf("http://%s:%d", host, in.Port),
 		InternalHTTPURL:    fmt.Sprintf("http://%s:%d", in.ContainerName, in.Port),
-		DBConnectionString: DefaultDBConnectionString,
+		DBConnectionString: DefaultIndexerDBConnectionString,
 	}, nil
 }

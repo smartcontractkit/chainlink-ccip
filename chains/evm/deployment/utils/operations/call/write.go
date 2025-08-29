@@ -69,18 +69,19 @@ func NewWrite[ARGS any, C any](
 				opts = chain.DeployerKey
 				executed = true // Won't be returned if execution fails, so we can update it here
 			}
-			tx, err := callContract(contract, opts, input.Args)
-			if err != nil {
-				return WriteOutput{}, fmt.Errorf("failed to prepare %s tx against %s on %s", name, input.Address, chain)
-			}
-			b.Logger.Debugw(fmt.Sprintf("Prepared %s tx against %s on %s", name, input.Address, chain), "args", input.Args)
+			tx, callErr := callContract(contract, opts, input.Args)
 			if executed {
 				// If the call has actually been sent, we need check the call error and confirm the transaction.
-				_, err := deployment.ConfirmIfNoErrorWithABI(chain, tx, contractABI, err)
-				if err != nil {
-					return WriteOutput{}, fmt.Errorf("failed to confirm %s tx against %s on %s: %w", name, input.Address, chain, err)
+				_, confirmErr := deployment.ConfirmIfNoErrorWithABI(chain, tx, contractABI, callErr)
+				if confirmErr != nil {
+					return WriteOutput{}, fmt.Errorf("failed to confirm %s tx against %s on %s with args %+v: %w", name, input.Address, chain, input.Args, confirmErr)
 				}
-				b.Logger.Debugw(fmt.Sprintf("Confirmed %s tx against %s on %s", name, input.Address, chain), "hash", tx.Hash().Hex())
+				b.Logger.Debugw(fmt.Sprintf("Confirmed %s tx against %s on %s", name, input.Address, chain), "hash", tx.Hash().Hex(), "args", input.Args)
+			} else if callErr != nil {
+				// If we didn't execute the transaction, but there was an error preparing it, return the error.
+				return WriteOutput{}, fmt.Errorf("failed to prepare %s tx against %s on %s with args %+v: %w", name, input.Address, chain, input.Args, callErr)
+			} else {
+				b.Logger.Debugw(fmt.Sprintf("Prepared %s tx against %s on %s", name, input.Address, chain), "args", input.Args)
 			}
 
 			return WriteOutput{
@@ -94,7 +95,7 @@ func NewWrite[ARGS any, C any](
 					Data:             tx.Data(),
 					AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
 				},
-			}, err
+			}, nil
 		},
 	)
 }

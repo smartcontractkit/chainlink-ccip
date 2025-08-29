@@ -1,9 +1,12 @@
 package ccipv1_7
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
 /*
@@ -56,4 +59,20 @@ func (t *TimeTracker) Print() {
 	t.logger.Debug().
 		Str("Duration", total.String()).
 		Msg("Total environment boot up time")
+}
+
+func PrintCLDFAddresses(in *Cfg) error {
+	for _, addr := range in.CCIPv17.Addresses {
+		var refs []datastore.AddressRef
+		if err := json.Unmarshal([]byte(addr), &refs); err != nil {
+			return fmt.Errorf("failed to unmarshal addresses: %w", err)
+		}
+		fmt.Printf("%-30s %-30s %-40s %-30s\n", "Selector", "Type", "Address", "Version")
+		fmt.Println("--------------------------------------------------------------------------------------------------------------")
+
+		for _, ref := range refs {
+			fmt.Printf("%-30d %-30s %-40s %-30s\n", ref.ChainSelector, ref.Type, ref.Address, ref.Version)
+		}
+	}
+	return nil
 }

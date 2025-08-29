@@ -1,15 +1,16 @@
-# Indexer Service Boilerplate
+# Aggregator Service
 Build dev image (hot-reload)
 ```
-just docker-dev
+just build-dev
 ```
 Build production image
 ```
-just docker
+just build
 ```
 
 See [devenv](../services/indexer.go) wrapper and [environment](../environment.go) integration, run it with
 ```
+cd devenv/ccipv1_7
 ccip u
 ```
 
