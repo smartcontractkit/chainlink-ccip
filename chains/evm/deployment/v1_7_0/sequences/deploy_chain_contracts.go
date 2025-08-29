@@ -69,6 +69,7 @@ type ContractParams struct {
 }
 
 type DeployChainContractsInput struct {
+	ChainSelector     uint64 // Only exists to differentiate sequence runs on different chains
 	ExistingAddresses []deployment.AddressRef
 	ContractParams    ContractParams
 }

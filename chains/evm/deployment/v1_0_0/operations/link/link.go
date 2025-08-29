@@ -19,6 +19,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.0.0"),
 	"Deploys the LINK token contract",
 	ContractType,
+	link_token.LinkTokenABI,
 	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
