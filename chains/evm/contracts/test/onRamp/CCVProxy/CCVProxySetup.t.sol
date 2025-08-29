@@ -29,6 +29,18 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
+    address[] memory laneMandatedCCVs = new address[](1);
+    laneMandatedCCVs[0] = address(new MockCCVOnRamp());
+    CCVProxy.DestChainConfigArgs[] memory destChainConfigs = new CCVProxy.DestChainConfigArgs[](1);
+    destChainConfigs[0] = CCVProxy.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      laneMandatedCCVs: laneMandatedCCVs,
+      defaultCCVs: new address[](0),
+      defaultExecutor: address(new MockExecutor())
+    });
+
+    s_ccvProxy.applyDestChainConfigUpdates(destChainConfigs);
   }
 
   function _evmMessageToEvent(
