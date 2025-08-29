@@ -32,6 +32,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       })
     );
     s_mockCCVOne = new MockCCVOnRamp();
+    s_mockExecutor = new MockExecutor();
 
     CCVProxy.DestChainConfigArgs[] memory destChainConfigs = new CCVProxy.DestChainConfigArgs[](1);
     destChainConfigs[0] = CCVProxy.DestChainConfigArgs({

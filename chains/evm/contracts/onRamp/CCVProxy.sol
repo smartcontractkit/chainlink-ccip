@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICCVOnRamp} from "../interfaces/ICCVOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
+import {IExecutorOnRamp} from "../interfaces/IExecutorOnRamp.sol";
 import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
@@ -225,6 +226,10 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         extraArgs: verifier.args
       });
     }
+
+    // TODO: Handle the fee returned
+    // Currently only used for validations
+    IExecutorOnRamp(resolvedExtraArgs.executor).getFee(destChainSelector, message, abi.encode(resolvedExtraArgs));
 
     // TODO
 
