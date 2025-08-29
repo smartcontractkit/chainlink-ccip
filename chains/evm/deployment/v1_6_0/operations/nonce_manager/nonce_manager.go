@@ -26,6 +26,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.6.0"),
 	"Deploys the NonceManager contract",
 	ContractType,
+	nonce_manager.NonceManagerABI,
 	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {

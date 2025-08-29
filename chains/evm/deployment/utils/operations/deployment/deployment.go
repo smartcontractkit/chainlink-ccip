@@ -50,6 +50,7 @@ func New[ARGS any](
 	version *semver.Version,
 	description string,
 	contractType deployment.ContractType,
+	contractABI string,
 	validate func(input ARGS) error,
 	deployers VMDeployers[ARGS],
 ) *operations.Operation[Input[ARGS], AddressRef, evm.Chain] {
@@ -67,15 +68,15 @@ func New[ARGS any](
 				return AddressRef{}, fmt.Errorf("mismatch between inputted chain selector and selector defined within dependencies: %d != %d", input.ChainSelector, chain.Selector)
 			}
 			var (
-				addr common.Address
-				tx   *types.Transaction
-				err  error
+				addr      common.Address
+				tx        *types.Transaction
+				deployErr error
 			)
 			if chain.IsZkSyncVM {
 				if deployers.DeployZksyncVM == nil {
 					return AddressRef{}, fmt.Errorf("no ZkSyncVM deployer defined for %s %s", contractType, version)
 				}
-				addr, err = deployers.DeployZksyncVM(
+				addr, deployErr = deployers.DeployZksyncVM(
 					nil,
 					chain.ClientZkSyncVM,
 					chain.DeployerKeyZkSyncVM,
@@ -83,21 +84,23 @@ func New[ARGS any](
 					input.Args,
 				)
 			} else {
-				addr, tx, err = deployers.DeployEVM(
+				addr, tx, deployErr = deployers.DeployEVM(
 					chain.DeployerKey,
 					chain.Client,
 					input.Args,
 				)
 			}
-			if err != nil {
-				return AddressRef{}, fmt.Errorf("failed to deploy %s %s to %s: %w", contractType, version, chain, err)
-			}
-			// Non-ZkSyncVM chains require manual confirmation of the deployment transaction.
 			if !chain.IsZkSyncVM {
-				_, err := chain.Confirm(tx)
-				if err != nil {
-					return AddressRef{}, fmt.Errorf("failed to confirm deployment of %s %s to %s: %w", contractType, version, chain, err)
+				// Non-ZkSyncVM chains require manual confirmation of the deployment transaction.
+				// We attempt to decode any errors with the provided ABI.
+				_, confirmErr := deployment.ConfirmIfNoErrorWithABI(chain, tx, contractABI, deployErr)
+				if confirmErr != nil {
+					return AddressRef{}, fmt.Errorf("failed to deploy %s %s to %s with args %+v: %w", contractType, version, chain, input.Args, confirmErr)
 				}
+				b.Logger.Debugw(fmt.Sprintf("Confirmed %s tx on %s", name, chain), "hash", tx.Hash().Hex())
+			} else if deployErr != nil {
+				// For ZkSyncVM chains, if an error is returned from initial deployment, we return it here.
+				return AddressRef{}, fmt.Errorf("failed to deploy %s %s to %s with args %+v: %w", contractType, version, chain, input.Args, deployErr)
 			}
 			b.Logger.Debugw(fmt.Sprintf("Deployed %s %s to %s", contractType, version, chain), "args", input.Args)
 
@@ -106,7 +109,7 @@ func New[ARGS any](
 				ChainSelector: input.ChainSelector,
 				Type:          contractType,
 				Version:       version.String(),
-			}, err
+			}, nil
 		},
 	)
 }
