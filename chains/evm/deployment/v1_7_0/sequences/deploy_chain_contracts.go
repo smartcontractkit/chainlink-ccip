@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -77,12 +78,13 @@ type ContractParams struct {
 }
 
 type DeployChainContractsInput struct {
-	ExistingAddresses []deployment.AddressRef
+	ChainSelector     uint64 // Only exists to differentiate sequence runs on different chains
+	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
 }
 
 type DeployChainContractsOutput struct {
-	Addresses []deployment.AddressRef
+	Addresses []datastore.AddressRef
 	Writes    []call.WriteOutput
 }
 
@@ -91,7 +93,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	semver.MustParse("1.7.0"),
 	"Deploys all required contracts for CCIP 1.7.0 to a chain",
 	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output DeployChainContractsOutput, err error) {
-		addresses := make([]deployment.AddressRef, 0, NUM_CONTRACTS)
+		addresses := make([]datastore.AddressRef, 0, NUM_CONTRACTS)
 		writes := make([]call.WriteOutput, 0, NUM_TXS)
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
@@ -344,20 +346,20 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 func maybeDeployContract[ARGS any](
 	b operations.Bundle,
-	op *operations.Operation[deployment.Input[ARGS], deployment.AddressRef, evm.Chain],
+	op *operations.Operation[deployment.Input[ARGS], datastore.AddressRef, evm.Chain],
 	contractType cldf_deployment.ContractType,
 	chain evm.Chain,
 	input deployment.Input[ARGS],
-	existingAddresses []deployment.AddressRef,
-) (deployment.AddressRef, error) {
+	existingAddresses []datastore.AddressRef,
+) (datastore.AddressRef, error) {
 	for _, ref := range existingAddresses {
-		if ref.Type == contractType {
+		if ref.Type == datastore.ContractType(contractType) {
 			return ref, nil
 		}
 	}
 	report, err := cldf_ops.ExecuteOperation(b, op, chain, input)
 	if err != nil {
-		return deployment.AddressRef{}, fmt.Errorf("failed to deploy %s %s: %w", contractType, op.Def().Version, err)
+		return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s %s: %w", contractType, op.Def().Version, err)
 	}
 	return report.Output, nil
 }

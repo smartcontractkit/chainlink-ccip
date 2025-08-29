@@ -19,6 +19,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.5.0"),
 	"Deploys the TokenAdminRegistry contract",
 	ContractType,
+	token_admin_registry.TokenAdminRegistryABI,
 	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
