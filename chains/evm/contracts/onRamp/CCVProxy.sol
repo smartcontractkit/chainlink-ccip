@@ -75,9 +75,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     // The last used sequence number. This is zero in the case where no messages have yet been sent.
     // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
     uint64 sequenceNumber; // ──╯
-    address requiredCCV;
-    address defaultCCV;
     address defaultExecutor;
+    address[] laneMandatedCCVs;
+    address[] defaultCCVs;
   }
 
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these can be passed in the
@@ -86,8 +86,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector.
     IRouter router; //           Source router address.
-    address defaultCCV;
-    address requiredCCV;
+    address[] defaultCCVs;
+    address[] laneMandatedCCVs;
     address defaultExecutor;
   }
 
