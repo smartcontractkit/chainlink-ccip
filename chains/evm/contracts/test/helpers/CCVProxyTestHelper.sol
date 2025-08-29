@@ -4,18 +4,32 @@ pragma solidity ^0.8.24;
 import {Client} from "../../libraries/Client.sol";
 import {CCVProxy} from "../../onRamp/CCVProxy.sol";
 
-/// @notice Test wrapper for CCVProxy to expose internal functions for testing
+/// @notice Test wrapper for CCVProxy to expose internal functions for testing.
 contract CCVProxyTestHelper is CCVProxy {
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig
   ) CCVProxy(staticConfig, dynamicConfig) {}
 
-  /// @notice Exposes the internal _parseExtraArgsWithDefaults function for testing
+  /// @notice Exposes the internal _parseExtraArgsWithDefaults function for testing.
   function parseExtraArgsWithDefaults(
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
   ) external pure returns (Client.EVMExtraArgsV3 memory) {
     return _parseExtraArgsWithDefaults(destChainConfig, extraArgs);
+  }
+
+  /// @notice Exposes the internal _deduplicateCCVs function for testing.
+  function deduplicateCCVs(
+    address[] memory poolRequiredCCV,
+    Client.CCV[] memory requiredCCV,
+    Client.CCV[] memory optionalCCV,
+    uint8 optionalThreshold
+  )
+    external
+    pure
+    returns (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold)
+  {
+    return _deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
   }
 }

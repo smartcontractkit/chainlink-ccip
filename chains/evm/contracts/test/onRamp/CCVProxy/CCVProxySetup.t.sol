@@ -13,8 +13,6 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
   bytes32 internal s_metadataHash;
 
   CCVProxy internal s_ccvProxy;
-  MockCCVOnRamp internal s_mockCCVOne;
-  MockExecutor internal s_mockExecutor;
 
   function setUp() public virtual override {
     super.setUp();
@@ -31,20 +29,26 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
-    s_mockCCVOne = new MockCCVOnRamp();
-
-    CCVProxy.DestChainConfigArgs[] memory destChainConfigs = new CCVProxy.DestChainConfigArgs[](1);
-    destChainConfigs[0] = CCVProxy.DestChainConfigArgs({
+    address[] memory laneMandatedCCVs = new address[](1);
+    laneMandatedCCVs[0] = address(new MockCCVOnRamp());
+    CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = CCVProxy.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
-      defaultCCV: address(s_mockCCVOne),
-      requiredCCV: address(0),
-      defaultExecutor: address(s_mockExecutor)
+      laneMandatedCCVs: laneMandatedCCVs,
+      defaultCCVs: new address[](0),
+      defaultExecutor: address(new MockExecutor())
     });
 
-    s_ccvProxy.applyDestChainConfigUpdates(destChainConfigs);
+    s_ccvProxy.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    // Calculate the metadata hash the same way the contract does
+    s_metadataHash = keccak256(
+      abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_ccvProxy))
+    );
   }
 
+  // TODO make this work for other cases as well
   function _evmMessageToEvent(
     Client.EVM2AnyMessage memory message,
     uint64 destChainSelector,
@@ -53,13 +57,13 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     uint256 feeValueJuels,
     address originalSender,
     bytes32 metadataHash
-  ) internal pure returns (Internal.EVM2AnyVerifierMessage memory) {
+  ) internal returns (Internal.EVM2AnyVerifierMessage memory) {
     // TODO
     //    if (message.tokenAmounts.length > 0) {
     //      tokenTransfer =
     //        Internal.EVM2AnyTokenTransfer({token: message.tokenAmounts[0].token, amount: message.tokenAmounts[0].amount});
     //    }
-
+    CCVProxy.DestChainConfig memory destChainConfig = s_ccvProxy.getDestChainConfig(DEST_CHAIN_SELECTOR);
     Internal.EVM2AnyVerifierMessage memory messageEvent = Internal.EVM2AnyVerifierMessage({
       header: Internal.Header({
         messageId: "",
@@ -74,7 +78,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       feeTokenAmount: feeTokenAmount,
       feeValueJuels: feeValueJuels,
       tokenTransfer: new Internal.EVMTokenTransfer[](message.tokenAmounts.length),
-      verifierReceipts: new Internal.Receipt[](0),
+      verifierReceipts: new Internal.Receipt[](destChainConfig.laneMandatedCCVs.length),
       executorReceipt: Internal.Receipt({
         issuer: address(0),
         feeTokenAmount: 0,
@@ -84,6 +88,15 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       })
     });
 
+    for (uint256 i = 0; i < messageEvent.verifierReceipts.length; i++) {
+      messageEvent.verifierReceipts[i] = Internal.Receipt({
+        issuer: destChainConfig.laneMandatedCCVs[i],
+        feeTokenAmount: 0,
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        extraArgs: ""
+      });
+    }
     messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
     return messageEvent;
   }

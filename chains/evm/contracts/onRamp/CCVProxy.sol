@@ -75,9 +75,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     // The last used sequence number. This is zero in the case where no messages have yet been sent.
     // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
     uint64 sequenceNumber; // ──╯
-    address requiredCCV;
-    address defaultCCV;
-    address defaultExecutor;
+    address defaultExecutor; // Default executor to use for messages to this destination chain.
+    address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
+    address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
   }
 
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these can be passed in the
@@ -86,8 +86,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector.
     IRouter router; //           Source router address.
-    address defaultCCV;
-    address requiredCCV;
+    address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
+    address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address defaultExecutor;
   }
 
@@ -147,7 +147,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     if (s_dynamicConfig.reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_dynamicConfig.reentrancyGuardEntered = true;
 
-    DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
 
     // NOTE: assumes the message has already been validated through the getFee call.
     // Validate originalSender is set and allowed. Not validated in `getFee` since it is not user-driven.
@@ -203,7 +203,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     });
 
     // 3. getFee on all verifiers & executor
-
     for (uint256 i = 0; i < requiredCCVsCount; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
       newMessage.verifierReceipts[i] = Internal.Receipt({
@@ -225,11 +224,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         extraArgs: verifier.args
       });
     }
-
     // TODO
 
     // 4. lockOrBurn
-
     if (message.tokenAmounts.length != 0) {
       if (message.tokenAmounts.length != 1) {
         revert CanOnlySendOneTokenPerMessage();
@@ -241,8 +238,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     }
 
     // 5. calculate msg ID
-
-    // Hash only after all fields have been set, but before it's sent to the verifiers.
     newMessage.header.messageId = Internal._hash(
       newMessage,
       // Metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different lanes
@@ -251,7 +246,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     );
 
     // 6. call each verifier
-
     bytes memory encodedMessage = abi.encode(newMessage);
     bytes[] memory receiptBlobs = new bytes[](newMessage.verifierReceipts.length);
 
@@ -270,7 +264,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     return newMessage.header.messageId;
   }
 
-  // TODO check for duplicates
   function _deduplicateCCVs(
     address[] memory poolRequiredCCV,
     Client.CCV[] memory requiredCCV,
@@ -286,6 +279,16 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     for (uint256 poolCCVIndex = 0; poolCCVIndex < poolRequiredCCV.length; ++poolCCVIndex) {
       address poolCCV = poolRequiredCCV[poolCCVIndex];
+
+      bool alreadyQueued = false;
+      for (uint256 k = 0; k < toBeAddedIndex; ++k) {
+        if (toBeAdded[k].ccvAddress == poolCCV) {
+          alreadyQueued = true;
+          break;
+        }
+      }
+      if (alreadyQueued) continue;
+
       bool found = false;
       for (uint256 reqCCVIndex = 0; reqCCVIndex < requiredCCV.length; ++reqCCVIndex) {
         if (poolCCV == requiredCCV[reqCCVIndex].ccvAddress) {
@@ -299,9 +302,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         // If not found, it has to be added to the required CCV list.
         toBeAdded[toBeAddedIndex++].ccvAddress = poolCCV;
 
-        // If the pool CCV is not in the optional CCVs, we remove it and lower the optional threshold since
+        // If the pool CCV is in the optional CCVs, we remove it and lower the optional threshold since
         // it is now required.
-        for (uint256 optCCVIndex = 0; optCCVIndex < optionalCCV.length; ++optCCVIndex) {
+        for (uint256 optCCVIndex = 0; optCCVIndex < optionalCCV.length;) {
           if (poolCCV == optionalCCV[optCCVIndex].ccvAddress) {
             // Copy the extraArgs for the CCV to the CCV now in the required CCV list.
             toBeAdded[toBeAddedIndex - 1].args = optionalCCV[optCCVIndex].args;
@@ -313,11 +316,17 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
               mstore(optionalCCV, sub(mload(optionalCCV), 1))
             }
 
-            // Lower the optional threshold since we removed a CCV.
+            // Decrement the threshold to maintain the security guarantee.
+            // If user specified "2 of [A,B,C]", they want AT LEAST 2 verifiers total.
+            // If B becomes required (always executes), we still need 1 more from [A,C].
+            // This preserves the minimum verification count the user requested.
             if (optionalThreshold > 0) {
               optionalThreshold--;
             }
+            // Don't increment optCCVIndex since we moved an element to this position
             break;
+          } else {
+            optCCVIndex++;
           }
         }
       }
@@ -348,7 +357,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
   ) internal pure returns (Client.EVMExtraArgsV3 memory resolvedArgs) {
-    if (bytes4(extraArgs[0:4]) == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
+    if (extraArgs.length >= 4 && bytes4(extraArgs[0:4]) == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV3));
 
       if (resolvedArgs.optionalCCV.length != 0) {
@@ -359,18 +368,24 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         }
       }
 
-      // When users don't specify any CCVs, default CCV is chosen.
-      if (resolvedArgs.requiredCCV.length + resolvedArgs.optionalCCV.length == 0) {
-        resolvedArgs.requiredCCV = new Client.CCV[](1);
-        resolvedArgs.requiredCCV[0] = Client.CCV({ccvAddress: destChainConfig.defaultCCV, args: ""});
+      // When users don't specify any required CCVs, default CCVs are chosen.
+      if (resolvedArgs.requiredCCV.length == 0 && destChainConfig.defaultCCVs.length > 0) {
+        resolvedArgs.requiredCCV = new Client.CCV[](destChainConfig.defaultCCVs.length);
+        for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
+          resolvedArgs.requiredCCV[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
+        }
       }
     } else {
       // If old extraArgs are supplied, they are assumed to be for the default CCV and the default executor.
       // This means any default CCV/executor has to be able to process all prior extraArgs.
       resolvedArgs.executorArgs = extraArgs;
 
-      resolvedArgs.requiredCCV = new Client.CCV[](1);
-      resolvedArgs.requiredCCV[0] = Client.CCV({ccvAddress: destChainConfig.defaultCCV, args: extraArgs});
+      if (destChainConfig.defaultCCVs.length > 0) {
+        resolvedArgs.requiredCCV = new Client.CCV[](destChainConfig.defaultCCVs.length);
+        for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
+          resolvedArgs.requiredCCV[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: extraArgs});
+        }
+      }
     }
 
     // When users don't specify an executor, default executor is chosen.
@@ -378,16 +393,48 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       resolvedArgs.executor = destChainConfig.defaultExecutor;
     }
 
-    // Ensure that the required CCV for destination chain is always included.
-    if (destChainConfig.requiredCCV != address(0)) {
-      Client.CCV[] memory newRequiredCCVs = new Client.CCV[](resolvedArgs.requiredCCV.length + 1);
-      newRequiredCCVs[0] = Client.CCV({ccvAddress: destChainConfig.requiredCCV, args: ""});
-
-      for (uint256 i = 0; i < resolvedArgs.requiredCCV.length; ++i) {
-        newRequiredCCVs[i + 1] = resolvedArgs.requiredCCV[i];
+    // Ensure that the lane mandated CCVs for destination chain are always included.
+    if (destChainConfig.laneMandatedCCVs.length > 0) {
+      // Check for duplicates and merge mandated CCVs
+      uint256 additionalCount = 0;
+      for (uint256 i = 0; i < destChainConfig.laneMandatedCCVs.length; ++i) {
+        bool exists = false;
+        for (uint256 j = 0; j < resolvedArgs.requiredCCV.length; ++j) {
+          if (resolvedArgs.requiredCCV[j].ccvAddress == destChainConfig.laneMandatedCCVs[i]) {
+            exists = true;
+            break;
+          }
+        }
+        if (!exists) {
+          ++additionalCount;
+        }
       }
 
-      resolvedArgs.requiredCCV = newRequiredCCVs;
+      if (additionalCount > 0) {
+        Client.CCV[] memory newRequired = new Client.CCV[](resolvedArgs.requiredCCV.length + additionalCount);
+        uint256 idx = 0;
+
+        // Add mandated CCVs first (with empty args)
+        for (uint256 i = 0; i < destChainConfig.laneMandatedCCVs.length; ++i) {
+          bool exists = false;
+          for (uint256 j = 0; j < resolvedArgs.requiredCCV.length; ++j) {
+            if (resolvedArgs.requiredCCV[j].ccvAddress == destChainConfig.laneMandatedCCVs[i]) {
+              exists = true;
+              break;
+            }
+          }
+          if (!exists) {
+            newRequired[idx++] = Client.CCV({ccvAddress: destChainConfig.laneMandatedCCVs[i], args: ""});
+          }
+        }
+
+        // Copy existing required CCVs
+        for (uint256 i = 0; i < resolvedArgs.requiredCCV.length; ++i) {
+          newRequired[idx++] = resolvedArgs.requiredCCV[i];
+        }
+
+        resolvedArgs.requiredCCV = newRequired;
+      }
     }
 
     return resolvedArgs;
@@ -452,8 +499,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain.
       destChainConfig.router = destChainConfigArg.router;
-      destChainConfig.defaultCCV = destChainConfigArg.defaultCCV;
-      destChainConfig.requiredCCV = destChainConfigArg.requiredCCV;
+      destChainConfig.defaultCCVs = destChainConfigArg.defaultCCVs;
+      destChainConfig.laneMandatedCCVs = destChainConfigArg.laneMandatedCCVs;
       destChainConfig.defaultExecutor = destChainConfigArg.defaultExecutor;
 
       emit DestChainConfigSet(destChainSelector, destChainConfig.sequenceNumber, destChainConfigArg.router);
@@ -462,15 +509,11 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
   /// @notice get ChainConfig configured for the DestinationChainSelector.
   /// @param destChainSelector The destination chain selector.
-  /// @return sequenceNumber The last used sequence number.
-  /// @return router address of the router.
+  /// @return destChainConfig The destination chain configuration.
   function getDestChainConfig(
     uint64 destChainSelector
-  ) external view returns (uint64 sequenceNumber, address router) {
-    DestChainConfig storage config = s_destChainConfigs[destChainSelector];
-    sequenceNumber = config.sequenceNumber;
-    router = address(config.router);
-    return (sequenceNumber, router);
+  ) external view returns (DestChainConfig memory destChainConfig) {
+    return s_destChainConfigs[destChainSelector];
   }
 
   // ================================================================
