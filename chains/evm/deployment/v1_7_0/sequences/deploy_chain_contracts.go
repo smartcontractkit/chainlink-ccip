@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -27,7 +28,7 @@ import (
 )
 
 const (
-	NUM_CONTRACTS = 12
+	NUM_CONTRACTS = 13
 	NUM_TXS       = 3
 )
 
@@ -59,13 +60,20 @@ type FeeQuoterParams struct {
 	WETHPremiumMultiplierWeiPerEth uint64
 }
 
+type ExecutorOnRampParams struct {
+	FeeAggregator         common.Address
+	MaxPossibleCCVsPerMsg uint8
+	MaxRequiredCCVsPerMsg uint8
+}
+
 type ContractParams struct {
-	RMNRemote     RMNRemoteParams
-	CCVAggregator CCVAggregatorParams
-	CommitOnRamp  CommitOnRampParams
-	CommitOffRamp CommitOffRampParams
-	CCVProxy      CCVProxyParams
-	FeeQuoter     FeeQuoterParams
+	RMNRemote      RMNRemoteParams
+	CCVAggregator  CCVAggregatorParams
+	CommitOnRamp   CommitOnRampParams
+	CommitOffRamp  CommitOffRampParams
+	CCVProxy       CCVProxyParams
+	FeeQuoter      FeeQuoterParams
+	ExecutorOnRamp ExecutorOnRampParams
 }
 
 type DeployChainContractsInput struct {
@@ -270,6 +278,23 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy CommitOnRamp: %w", err)
 		}
 		addresses = append(addresses, commitOnRampRef)
+
+		// Deploy ExecutorOnRamp
+		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, executor_onramp.ContractType, chain, deployment.Input[executor_onramp.ConstructorArgs]{
+			ChainSelector: chain.Selector,
+			Args: executor_onramp.ConstructorArgs{
+				DynamicConfig: executor_onramp.DynamicConfig{
+					FeeQuoter:             common.HexToAddress(feeQuoterRef.Address),
+					FeeAggregator:         input.ContractParams.ExecutorOnRamp.FeeAggregator,
+					MaxPossibleCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxPossibleCCVsPerMsg,
+					MaxRequiredCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxRequiredCCVsPerMsg,
+				},
+			},
+		}, input.ExistingAddresses)
+		if err != nil {
+			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy ExecutorOnRamp: %w", err)
+		}
+		addresses = append(addresses, executorOnRampRef)
 
 		// Deploy CommitOffRamp
 		commitOffRampRef, err := maybeDeployContract(b, commit_offramp.Deploy, commit_offramp.ContractType, chain, deployment.Input[commit_offramp.ConstructorArgs]{

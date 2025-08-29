@@ -78,6 +78,11 @@ func TestDeployChainContracts(t *testing.T) {
 					ContractParams: sequences.ContractParams{
 						RMNRemote:     sequences.RMNRemoteParams{},
 						CCVAggregator: sequences.CCVAggregatorParams{},
+						ExecutorOnRamp: sequences.ExecutorOnRampParams{
+							FeeAggregator:         common.HexToAddress("0x01"),
+							MaxPossibleCCVsPerMsg: 10,
+							MaxRequiredCCVsPerMsg: 5,
+						},
 						CommitOnRamp: sequences.CommitOnRampParams{
 							FeeAggregator: common.HexToAddress("0x01"),
 						},
@@ -106,7 +111,7 @@ func TestDeployChainContracts(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
-			require.Len(t, report.Output.Addresses, 12, "Expected 12 addresses in output")
+			require.Len(t, report.Output.Addresses, sequences.NUM_CONTRACTS)
 			require.Len(t, report.Output.Writes, 3, "Expected 3 writes in output")
 			for _, write := range report.Output.Writes {
 				// Contracts are deployed & still owned by deployer, so all writes should be executed

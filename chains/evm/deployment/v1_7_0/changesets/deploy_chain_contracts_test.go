@@ -115,6 +115,11 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 		Params: sequences.ContractParams{
 			RMNRemote:     sequences.RMNRemoteParams{},
 			CCVAggregator: sequences.CCVAggregatorParams{},
+			ExecutorOnRamp: sequences.ExecutorOnRampParams{
+				FeeAggregator:         common.HexToAddress("0x01"),
+				MaxPossibleCCVsPerMsg: 10,
+				MaxRequiredCCVsPerMsg: 5,
+			},
 			CommitOnRamp: sequences.CommitOnRampParams{
 				FeeAggregator: common.HexToAddress("0x01"),
 			},
@@ -145,5 +150,5 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 	addresses, err := out.DataStore.Addresses().Fetch()
 	require.NoError(t, err, "Failed to fetch addresses from datastore")
-	require.Len(t, addresses, 12, "Expected 12 addresses in datastore")
+	require.Len(t, addresses, sequences.NUM_CONTRACTS)
 }
