@@ -185,7 +185,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     Internal.EVM2AnyVerifierMessage memory newMessage = Internal.EVM2AnyVerifierMessage({
       header: Internal.Header({
         // Should be generated after the message is complete.
-        messageId: bytes32(0),
+        messageId: "",
         sourceChainSelector: i_localChainSelector,
         destChainSelector: destChainSelector,
         // We need the next available sequence number so we increment before we use the value.
@@ -203,87 +203,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     });
 
     // 3. getFee on all verifiers & executor
-    _populateVerifierReceipts(newMessage, resolvedExtraArgs, requiredCCVsCount);
-
-    // TODO
-
-    // 4. lockOrBurn
-    _handleTokenTransfer(
-      newMessage, message, destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs, poolReceipt
-    );
-
-    // 5. calculate msg ID
-    _generateMessageId(newMessage, destChainSelector);
-
-    // 6. call each verifier
-    bytes[] memory receiptBlobs = _callVerifiers(newMessage);
-
-    // 7. emit event
-
-    emit CCIPMessageSent(destChainSelector, newMessage.header.sequenceNumber, newMessage, receiptBlobs);
-
-    s_dynamicConfig.reentrancyGuardEntered = false;
-
-    return newMessage.header.messageId;
-  }
-
-  /// @dev Call all verifiers and return receipt blobs.
-  function _callVerifiers(
-    Internal.EVM2AnyVerifierMessage memory newMessage
-  ) internal returns (bytes[] memory) {
-    bytes memory encodedMessage = abi.encode(newMessage);
-    bytes[] memory receiptBlobs = new bytes[](newMessage.verifierReceipts.length);
-
-    for (uint256 i = 0; i < newMessage.verifierReceipts.length; ++i) {
-      address verifier = newMessage.verifierReceipts[i].issuer;
-
-      ICCVOnRamp(verifier).forwardToVerifier(encodedMessage, i);
-    }
-
-    return receiptBlobs;
-  }
-
-  /// @dev Generate message ID.
-  function _generateMessageId(
-    Internal.EVM2AnyVerifierMessage memory newMessage,
-    uint64 destChainSelector
-  ) internal view {
-    // Hash only after all fields have been set, but before it's sent to the verifiers.
-    newMessage.header.messageId = Internal._hash(
-      newMessage,
-      // Metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different lanes
-      // will have a distinct hash.
-      keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_localChainSelector, destChainSelector, address(this)))
-    );
-  }
-
-  /// @dev Handle token transfer.
-  function _handleTokenTransfer(
-    Internal.EVM2AnyVerifierMessage memory newMessage,
-    Client.EVM2AnyMessage calldata message,
-    uint64 destChainSelector,
-    bytes memory tokenReceiver,
-    address originalSender,
-    Client.EVMExtraArgsV3 memory resolvedExtraArgs,
-    Internal.Receipt memory poolReceipt
-  ) internal {
-    if (message.tokenAmounts.length != 0) {
-      if (message.tokenAmounts.length != 1) {
-        revert CanOnlySendOneTokenPerMessage();
-      }
-      newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
-        message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
-      );
-      newMessage.tokenTransfer[0].receipt = poolReceipt;
-    }
-  }
-
-  /// @dev Populate verifier receipts for required and optional CCVs.
-  function _populateVerifierReceipts(
-    Internal.EVM2AnyVerifierMessage memory newMessage,
-    Client.EVMExtraArgsV3 memory resolvedExtraArgs,
-    uint256 requiredCCVsCount
-  ) internal pure {
     for (uint256 i = 0; i < requiredCCVsCount; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
       newMessage.verifierReceipts[i] = Internal.Receipt({
@@ -305,6 +224,44 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         extraArgs: verifier.args
       });
     }
+    // TODO
+
+    // 4. lockOrBurn
+    if (message.tokenAmounts.length != 0) {
+      if (message.tokenAmounts.length != 1) {
+        revert CanOnlySendOneTokenPerMessage();
+      }
+      newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
+        message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
+      );
+      newMessage.tokenTransfer[0].receipt = poolReceipt;
+    }
+
+    // 5. calculate msg ID
+    newMessage.header.messageId = Internal._hash(
+      newMessage,
+      // Metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different lanes
+      // will have a distinct hash.
+      keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_localChainSelector, destChainSelector, address(this)))
+    );
+
+    // 6. call each verifier
+    bytes memory encodedMessage = abi.encode(newMessage);
+    bytes[] memory receiptBlobs = new bytes[](newMessage.verifierReceipts.length);
+
+    for (uint256 i = 0; i < newMessage.verifierReceipts.length; ++i) {
+      address verifier = newMessage.verifierReceipts[i].issuer;
+
+      ICCVOnRamp(verifier).forwardToVerifier(encodedMessage, i);
+    }
+
+    // 7. emit event
+
+    emit CCIPMessageSent(destChainSelector, newMessage.header.sequenceNumber, newMessage, receiptBlobs);
+
+    s_dynamicConfig.reentrancyGuardEntered = false;
+
+    return newMessage.header.messageId;
   }
 
   function _deduplicateCCVs(
@@ -552,15 +509,11 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
   /// @notice get ChainConfig configured for the DestinationChainSelector.
   /// @param destChainSelector The destination chain selector.
-  /// @return sequenceNumber The last used sequence number.
-  /// @return router address of the router.
+  /// @return destChainConfig The destination chain configuration.
   function getDestChainConfig(
     uint64 destChainSelector
-  ) external view returns (uint64 sequenceNumber, address router) {
-    DestChainConfig storage config = s_destChainConfigs[destChainSelector];
-    sequenceNumber = config.sequenceNumber;
-    router = address(config.router);
-    return (sequenceNumber, router);
+  ) external view returns (DestChainConfig memory destChainConfig) {
+    return s_destChainConfigs[destChainSelector];
   }
 
   // ================================================================
