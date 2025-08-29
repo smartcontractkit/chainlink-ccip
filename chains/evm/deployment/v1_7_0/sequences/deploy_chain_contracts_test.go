@@ -7,7 +7,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
@@ -15,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 )
@@ -22,24 +22,24 @@ import (
 func TestDeployChainContracts_Idempotency(t *testing.T) {
 	tests := []struct {
 		desc              string
-		existingAddresses []deployment.AddressRef
+		existingAddresses []datastore.AddressRef
 	}{
 		{
 			desc: "full deployment",
 		},
 		{
 			desc: "partial deployment",
-			existingAddresses: []deployment.AddressRef{
+			existingAddresses: []datastore.AddressRef{
 				{
 					ChainSelector: 5009297550715157269,
-					Type:          link.ContractType,
-					Version:       semver.MustParse("1.0.0").String(),
+					Type:          datastore.ContractType(link.ContractType),
+					Version:       semver.MustParse("1.0.0"),
 					Address:       common.HexToAddress("0x01").Hex(),
 				},
 				{
 					ChainSelector: 5009297550715157269,
-					Type:          weth.ContractType,
-					Version:       semver.MustParse("1.0.0").String(),
+					Type:          datastore.ContractType(weth.ContractType),
+					Version:       semver.MustParse("1.0.0"),
 					Address:       common.HexToAddress("0x02").Hex(),
 				},
 			},

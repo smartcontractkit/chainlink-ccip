@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
@@ -164,8 +165,8 @@ func TestDeploy(t *testing.T) {
 				}
 				require.Equal(t, validChainSel, report.Output.ChainSelector, "Unexpected ChainSelector in output")
 				require.Equal(t, address.Hex(), report.Output.Address, "Unexpected address in output")
-				require.Equal(t, TestContractType, report.Output.Type, "Unexpected contract type in output")
-				require.Equal(t, semver.MustParse("1.0.0").String(), report.Output.Version, "Unexpected version in output")
+				require.Equal(t, datastore.ContractType(TestContractType), report.Output.Type, "Unexpected contract type in output")
+				require.Equal(t, semver.MustParse("1.0.0"), report.Output.Version, "Unexpected version in output")
 			}
 		})
 	}
