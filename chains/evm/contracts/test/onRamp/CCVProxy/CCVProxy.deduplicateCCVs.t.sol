@@ -32,7 +32,7 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
   }
 
   function test_deduplicateCCVs_MovesOptionalToRequiredAndDecrementsThreshold() public view {
-    // Setup pool CCV that exists in optional CCVs
+    // Setup pool CCV that exists in optional CCVs.
     address[] memory poolRequiredCCV = new address[](1);
     poolRequiredCCV[0] = OPTIONAL_CCV1; // This CCV is in optional list
 
@@ -48,24 +48,24 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
       s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
 
-    // Should have moved OPTIONAL_CCV1 from optional to required
+    // Should have moved OPTIONAL_CCV1 from optional to required.
     assertEq(newRequiredCCVs.length, 2);
     assertEq(newRequiredCCVs[0].ccvAddress, OPTIONAL_CCV1);
-    assertEq(newRequiredCCVs[0].args, "optional1"); // Should preserve args
+    assertEq(newRequiredCCVs[0].args, optionalCCV[0].args); // Should preserve args.
     assertEq(newRequiredCCVs[1].ccvAddress, REQUIRED_CCV1);
-    assertEq(newRequiredCCVs[1].args, "required1");
+    assertEq(newRequiredCCVs[1].args, requiredCCV[0].args);
 
-    // Optional should have one less CCV
+    // Optional should have one less CCV.
     assertEq(newOptionalCCVs.length, 1);
     assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV2);
-    assertEq(newOptionalCCVs[0].args, "optional2");
+    assertEq(newOptionalCCVs[0].args, optionalCCV[1].args);
 
-    // Threshold should be decremented to maintain minimum verification count
+    // Threshold should be decremented to maintain minimum verification count.
     assertEq(newOptionalThreshold, 1);
   }
 
   function test_deduplicateCCVs_SkipsDuplicatesInPoolRequiredCCV() public view {
-    // Setup pool CCVs with duplicates
+    // Setup pool CCVs with duplicates.
     address[] memory poolRequiredCCV = new address[](3);
     poolRequiredCCV[0] = POOL_CCV1;
     poolRequiredCCV[1] = POOL_CCV1; // Duplicate
@@ -78,8 +78,8 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
       s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
 
-    // Should only add unique pool CCVs
-    assertEq(newRequiredCCVs.length, poolRequiredCCV.length - 1); // One duplicate removed
+    // Should only add unique pool CCVs.
+    assertEq(newRequiredCCVs.length, poolRequiredCCV.length - 1); // One duplicate removed.
     assertEq(newOptionalCCVs.length, 0);
     assertEq(newOptionalThreshold, 0);
     assertEq(newRequiredCCVs[0].ccvAddress, POOL_CCV1);
@@ -87,7 +87,7 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
   }
 
   function test_deduplicateCCVs_MovesAllOptionalToRequired() public view {
-    // Setup scenario where all optional CCVs are moved to required
+    // Setup scenario where all optional CCVs are moved to required.
     address[] memory poolRequiredCCV = new address[](2);
     poolRequiredCCV[0] = OPTIONAL_CCV1;
     poolRequiredCCV[1] = OPTIONAL_CCV2;
@@ -97,22 +97,21 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     optionalCCV[0] = Client.CCV({ccvAddress: OPTIONAL_CCV1, args: "optional1"});
     optionalCCV[1] = Client.CCV({ccvAddress: OPTIONAL_CCV2, args: "optional2"});
 
-    uint8 optionalThreshold = 2; // This will become 0 after moving both optionals to required
-
+    uint8 optionalThreshold = 2; // This will become 0 after moving both optionals to required.
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
       s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
 
-    // All optionals should be moved to required
+    // All optionals should be moved to required.
     assertEq(newRequiredCCVs.length, 2);
     assertEq(newRequiredCCVs[0].ccvAddress, OPTIONAL_CCV1);
-    assertEq(newRequiredCCVs[0].args, "optional1");
+    assertEq(newRequiredCCVs[0].args, optionalCCV[0].args);
     assertEq(newRequiredCCVs[1].ccvAddress, OPTIONAL_CCV2);
-    assertEq(newRequiredCCVs[1].args, "optional2");
+    assertEq(newRequiredCCVs[1].args, optionalCCV[1].args);
 
-    // Optional array should be empty
+    // Optional array should be empty.
     assertEq(newOptionalCCVs.length, 0);
 
-    // Threshold should be 0 (decremented for each moved CCV)
+    // Threshold should be 0 (decremented for each moved CCV).
     assertEq(newOptionalThreshold, 0);
   }
 
@@ -131,14 +130,14 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
       s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
 
-    // Should return original arrays unchanged
+    // Should return original arrays unchanged.
     assertEq(newRequiredCCVs.length, 1);
     assertEq(newRequiredCCVs[0].ccvAddress, REQUIRED_CCV1);
-    assertEq(newRequiredCCVs[0].args, "required1");
+    assertEq(newRequiredCCVs[0].args, requiredCCV[0].args);
 
     assertEq(newOptionalCCVs.length, 1);
     assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV1);
-    assertEq(newOptionalCCVs[0].args, "optional1");
+    assertEq(newOptionalCCVs[0].args, optionalCCV[0].args);
 
     assertEq(newOptionalThreshold, 1);
   }
@@ -157,14 +156,14 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
       s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
 
-    // Should return original arrays unchanged
+    // Should return original arrays unchanged.
     assertEq(newRequiredCCVs.length, 1);
     assertEq(newRequiredCCVs[0].ccvAddress, REQUIRED_CCV1);
-    assertEq(newRequiredCCVs[0].args, "required1");
+    assertEq(newRequiredCCVs[0].args, requiredCCV[0].args);
 
     assertEq(newOptionalCCVs.length, 1);
     assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV1);
-    assertEq(newOptionalCCVs[0].args, "optional1");
+    assertEq(newOptionalCCVs[0].args, optionalCCV[0].args);
 
     assertEq(newOptionalThreshold, 1);
   }

@@ -56,7 +56,7 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
 
     bytes32 messageId1 = s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
-    // Second call should use sequence number 2
+    // Second call should use sequence number 2.
     vm.expectEmit(false, false, false, false);
     emit CCVProxy.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -75,10 +75,10 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
 
     bytes32 messageId2 = s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
-    // Verify sequence numbers are different
+    // Verify sequence numbers are different.
     assertTrue(messageId1 != messageId2);
 
-    // Verify the sequence number in storage has been incremented
+    // Verify the sequence number in storage has been incremented.
     (uint64 sequenceNumber,) = s_ccvProxy.getDestChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(sequenceNumber, 2);
   }
