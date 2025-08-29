@@ -49,14 +49,14 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
       s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
 
     // Should have moved OPTIONAL_CCV1 from optional to required.
-    assertEq(newRequiredCCVs.length, 2);
+    assertEq(newRequiredCCVs.length, requiredCCV.length + optionalCCV.length - 1);
     assertEq(newRequiredCCVs[0].ccvAddress, OPTIONAL_CCV1);
     assertEq(newRequiredCCVs[0].args, optionalCCV[0].args); // Should preserve args.
     assertEq(newRequiredCCVs[1].ccvAddress, REQUIRED_CCV1);
     assertEq(newRequiredCCVs[1].args, requiredCCV[0].args);
 
     // Optional should have one less CCV.
-    assertEq(newOptionalCCVs.length, 1);
+    assertEq(newOptionalCCVs.length, optionalCCV.length - 1);
     assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV2);
     assertEq(newOptionalCCVs[0].args, optionalCCV[1].args);
 
@@ -80,8 +80,8 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
 
     // Should only add unique pool CCVs.
     assertEq(newRequiredCCVs.length, poolRequiredCCV.length - 1); // One duplicate removed.
-    assertEq(newOptionalCCVs.length, 0);
-    assertEq(newOptionalThreshold, 0);
+    assertEq(newOptionalCCVs.length, optionalCCV.length);
+    assertEq(newOptionalThreshold, optionalThreshold);
     assertEq(newRequiredCCVs[0].ccvAddress, POOL_CCV1);
     assertEq(newRequiredCCVs[1].ccvAddress, POOL_CCV2);
   }
@@ -102,17 +102,17 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
       s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
 
     // All optionals should be moved to required.
-    assertEq(newRequiredCCVs.length, 2);
+    assertEq(newRequiredCCVs.length, poolRequiredCCV.length);
     assertEq(newRequiredCCVs[0].ccvAddress, OPTIONAL_CCV1);
     assertEq(newRequiredCCVs[0].args, optionalCCV[0].args);
     assertEq(newRequiredCCVs[1].ccvAddress, OPTIONAL_CCV2);
     assertEq(newRequiredCCVs[1].args, optionalCCV[1].args);
 
     // Optional array should be empty.
-    assertEq(newOptionalCCVs.length, 0);
+    assertEq(newOptionalCCVs.length, optionalCCV.length - poolRequiredCCV.length);
 
     // Threshold should be 0 (decremented for each moved CCV).
-    assertEq(newOptionalThreshold, 0);
+    assertEq(newOptionalThreshold, optionalThreshold - optionalCCV.length);
   }
 
   function test_deduplicateCCVs_NoChangesWhenPoolCCVAlreadyInRequired() public view {
@@ -131,15 +131,15 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
       s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
 
     // Should return original arrays unchanged.
-    assertEq(newRequiredCCVs.length, 1);
+    assertEq(newRequiredCCVs.length, requiredCCV.length);
     assertEq(newRequiredCCVs[0].ccvAddress, REQUIRED_CCV1);
     assertEq(newRequiredCCVs[0].args, requiredCCV[0].args);
 
-    assertEq(newOptionalCCVs.length, 1);
+    assertEq(newOptionalCCVs.length, optionalCCV.length);
     assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV1);
     assertEq(newOptionalCCVs[0].args, optionalCCV[0].args);
 
-    assertEq(newOptionalThreshold, 1);
+    assertEq(newOptionalThreshold, optionalThreshold);
   }
 
   function test_deduplicateCCVs_EmptyPoolRequiredCCV() public view {
@@ -157,14 +157,14 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
       s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
 
     // Should return original arrays unchanged.
-    assertEq(newRequiredCCVs.length, 1);
+    assertEq(newRequiredCCVs.length, requiredCCV.length);
     assertEq(newRequiredCCVs[0].ccvAddress, REQUIRED_CCV1);
     assertEq(newRequiredCCVs[0].args, requiredCCV[0].args);
 
-    assertEq(newOptionalCCVs.length, 1);
+    assertEq(newOptionalCCVs.length, optionalCCV.length);
     assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV1);
     assertEq(newOptionalCCVs[0].args, optionalCCV[0].args);
 
-    assertEq(newOptionalThreshold, 1);
+    assertEq(newOptionalThreshold, optionalThreshold);
   }
 }
