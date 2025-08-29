@@ -91,7 +91,7 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
     assertEq(finalConfig.sequenceNumber, seqNum);
   }
 
-  function test_RevertsWhen_forwardFromRouter_RouterMustSetOriginalSender() public {
+  function test_forwardFromRouter_RevertWhen_RouterMustSetOriginalSender() public {
     vm.expectRevert(CCVProxy.RouterMustSetOriginalSender.selector);
     s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 1e17, address(0));
   }
