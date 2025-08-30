@@ -102,4 +102,12 @@ contract BaseTest is Test {
       destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
   }
+
+  function _arrayOf(
+    address addr
+  ) internal pure returns (address[] memory) {
+    address[] memory arr = new address[](1);
+    arr[0] = addr;
+    return arr;
+  }
 }

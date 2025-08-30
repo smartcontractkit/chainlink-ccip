@@ -5,7 +5,7 @@ import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
 
 contract CCVAggregator_getAllSourceChainConfigs is CCVAggregatorSetup {
-  function test_getAllSourceChainConfigs_ReturnsSingleChain() public {
+  function test_getAllSourceChainConfigs_ReturnsSingleChain() public view {
     (uint64[] memory selectors, CCVAggregator.SourceChainConfig[] memory configs) = s_agg.getAllSourceChainConfigs();
 
     assertEq(selectors.length, 1);
@@ -14,8 +14,8 @@ contract CCVAggregator_getAllSourceChainConfigs is CCVAggregatorSetup {
     assertEq(selectors[0], SOURCE_CHAIN_SELECTOR);
     assertEq(address(configs[0].router), address(s_sourceRouter));
     assertEq(configs[0].isEnabled, true);
-    assertEq(configs[0].defaultCCV.length, 1);
-    assertEq(configs[0].defaultCCV[0], s_defaultCCV);
+    assertEq(configs[0].defaultCCVs.length, 1);
+    assertEq(configs[0].defaultCCVs[0], s_defaultCCV);
   }
 
   function test_getAllSourceChainConfigs_ReturnsMultipleChains() public {
@@ -42,10 +42,10 @@ contract CCVAggregator_getAllSourceChainConfigs is CCVAggregatorSetup {
 
     // Check first chain
     assertEq(selectors[0], SOURCE_CHAIN_SELECTOR);
-    assertEq(chainConfigs[0].defaultCCV[0], s_defaultCCV);
+    assertEq(chainConfigs[0].defaultCCVs[0], s_defaultCCV);
 
     // Check second chain
     assertEq(selectors[1], chain2);
-    assertEq(chainConfigs[1].defaultCCV[0], makeAddr("ccv2"));
+    assertEq(chainConfigs[1].defaultCCVs[0], makeAddr("ccv2"));
   }
 }
