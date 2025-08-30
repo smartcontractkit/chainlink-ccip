@@ -3,36 +3,36 @@ filename: "{{.InterfaceName | snakecase}}.go"
 dir: mocks/{{ replaceAll .InterfaceDirRelative "internal" "internal_" }}
 resolve-type-alias: false
 packages:
-    github.com/smartcontractkit/chainlink-ccip/commit/merkleroot:
+    github.com/smartcontractkit/chainlink-ccip/ocr3/commit/merkleroot:
         interfaces:
             Observer:
-    github.com/smartcontractkit/chainlink-ccip/internal/reader:
+    github.com/smartcontractkit/chainlink-ccip/ocr3/internal/reader:
         interfaces:
             HomeChain:
-    github.com/smartcontractkit/chainlink-ccip/internal/plugincommon:
+    github.com/smartcontractkit/chainlink-ccip/ocr3/internal/plugincommon:
         interfaces:
             ChainSupport:
             PluginProcessor:
-    github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
+    github.com/smartcontractkit/chainlink-ccip/ocr3/commit/merkleroot/rmn:
         interfaces:
             Controller:
             Stream:
-    github.com/smartcontractkit/chainlink-ccip/pkg/reader:
+    github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/reader:
         interfaces:
             CCIPReader:
             PriceReader:
             RMNHome:
-    github.com/smartcontractkit/chainlink-ccip/execute/internal/cache:
+    github.com/smartcontractkit/chainlink-ccip/ocr3/execute/internal/cache:
         interfaces:
             TimeProvider:
-    github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1:
+    github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/ocrtypecodec/v1:
         interfaces:
             ExecCodec:
-    github.com/smartcontractkit/chainlink-ccip/pkg/contractreader:
+    github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/contractreader:
         interfaces:
             Extended:
             ContractReaderFacade:
-    github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3:
+    github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/types/ccipocr3:
         interfaces:
             ExecutePluginCodec:
             EstimateProvider:
@@ -42,10 +42,10 @@ packages:
         interfaces:
             ContractWriter:
                 config:
-                    dir: mocks/chainlink_common/types/
+                    dir: ocr3/mocks/chainlink_common/types/
     github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3:
         config:
-            dir: mocks/chainlink_common/ccipocr3/
+            dir: ocr3/mocks/chainlink_common/ccipocr3/
         interfaces:
             ExecutePluginCodec:
             EstimateProvider:
@@ -56,7 +56,7 @@ packages:
         interfaces:
             PeerGroupFactory:
                 config:
-                    dir: mocks/libocr_networking/
+                    dir: ocr3/mocks/libocr_networking/
             PeerGroup:
                 config:
-                    dir: mocks/libocr_networking/
+                    dir: ocr3/mocks/libocr_networking/
