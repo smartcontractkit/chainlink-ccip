@@ -62,9 +62,7 @@ type FeeQuoterParams struct {
 }
 
 type ExecutorOnRampParams struct {
-	FeeAggregator         common.Address
-	MaxPossibleCCVsPerMsg uint8
-	MaxRequiredCCVsPerMsg uint8
+	MaxCCVsPerMsg uint8
 }
 
 type ContractParams struct {
@@ -286,10 +284,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 			Args: executor_onramp.ConstructorArgs{
 				DynamicConfig: executor_onramp.DynamicConfig{
-					FeeQuoter:             common.HexToAddress(feeQuoterRef.Address),
-					FeeAggregator:         input.ContractParams.ExecutorOnRamp.FeeAggregator,
-					MaxPossibleCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxPossibleCCVsPerMsg,
-					MaxRequiredCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxRequiredCCVsPerMsg,
+					MaxCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxCCVsPerMsg,
 				},
 			},
 		}, input.ExistingAddresses)

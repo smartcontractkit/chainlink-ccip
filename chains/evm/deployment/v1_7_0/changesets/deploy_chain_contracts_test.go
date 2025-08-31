@@ -156,9 +156,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 					RMNRemote:     sequences.RMNRemoteParams{},
 					CCVAggregator: sequences.CCVAggregatorParams{},
 					ExecutorOnRamp: sequences.ExecutorOnRampParams{
-						FeeAggregator:         common.HexToAddress("0x01"),
-						MaxPossibleCCVsPerMsg: 10,
-						MaxRequiredCCVsPerMsg: 5,
+						MaxCCVsPerMsg: 10,
 					},
 					CommitOnRamp: sequences.CommitOnRampParams{
 						FeeAggregator: common.HexToAddress("0x01"),

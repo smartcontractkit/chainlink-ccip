@@ -229,7 +229,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     // TODO: Handle the fee returned
     // Currently only used for validations
-    IExecutorOnRamp(resolvedExtraArgs.executor).getFee(destChainSelector, message, abi.encode(resolvedExtraArgs));
+    _getExecutorFee(resolvedExtraArgs, message, destChainSelector);
 
     // TODO
 
@@ -396,6 +396,20 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     }
 
     return resolvedArgs;
+  }
+
+  function _getExecutorFee(
+    Client.EVMExtraArgsV3 memory resolvedExtraArgs,
+    Client.EVM2AnyMessage memory message,
+    uint64 destChainSelector
+  ) internal view returns (uint256) {
+    return IExecutorOnRamp(resolvedExtraArgs.executor).getFee(
+      destChainSelector,
+      message,
+      resolvedExtraArgs.requiredCCV,
+      resolvedExtraArgs.optionalCCV,
+      resolvedExtraArgs.executorArgs
+    );
   }
 
   // ================================================================

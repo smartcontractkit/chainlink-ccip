@@ -80,9 +80,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 						RMNRemote:     sequences.RMNRemoteParams{},
 						CCVAggregator: sequences.CCVAggregatorParams{},
 						ExecutorOnRamp: sequences.ExecutorOnRampParams{
-							FeeAggregator:         common.HexToAddress("0x01"),
-							MaxPossibleCCVsPerMsg: 10,
-							MaxRequiredCCVsPerMsg: 5,
+							MaxCCVsPerMsg: 10,
 						},
 						CommitOnRamp: sequences.CommitOnRampParams{
 							FeeAggregator: common.HexToAddress("0x01"),
@@ -178,9 +176,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 					RMNRemote:     sequences.RMNRemoteParams{},
 					CCVAggregator: sequences.CCVAggregatorParams{},
 					ExecutorOnRamp: sequences.ExecutorOnRampParams{
-						FeeAggregator:         common.HexToAddress("0x01"),
-						MaxPossibleCCVsPerMsg: 10,
-						MaxRequiredCCVsPerMsg: 5,
+						MaxCCVsPerMsg: 10,
 					},
 					CommitOnRamp: sequences.CommitOnRampParams{
 						FeeAggregator: common.HexToAddress("0x01"),
@@ -277,9 +273,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 						RMNRemote:     sequences.RMNRemoteParams{},
 						CCVAggregator: sequences.CCVAggregatorParams{},
 						ExecutorOnRamp: sequences.ExecutorOnRampParams{
-							FeeAggregator:         common.HexToAddress("0x01"),
-							MaxPossibleCCVsPerMsg: 10,
-							MaxRequiredCCVsPerMsg: 5,
+							MaxCCVsPerMsg: 10,
 						},
 						CommitOnRamp: sequences.CommitOnRampParams{
 							FeeAggregator: common.HexToAddress("0x01"),

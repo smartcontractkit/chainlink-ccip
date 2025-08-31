@@ -4,45 +4,37 @@ pragma solidity ^0.8.24;
 import {IExecutorOnRamp} from "../interfaces/IExecutorOnRamp.sol";
 
 import {Client} from "../libraries/Client.sol";
-
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-/// @notice The ExecutorOnRamp configures executor fees, destination support, and CCV limits.
+/// @notice The ExecutorOnRamp configures the supported destination chains and CCV limits for an executor.
 contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
 
-  error ExceedsMaxPossibleCCVs(uint256 provided, uint256 max);
-  error ExceedsMaxRequiredCCVs(uint256 provided, uint256 max);
+  error ExceedsMaxCCVs(uint256 provided, uint256 max);
   error InvalidCCV(address ccv);
-  error InvalidConfig();
   error InvalidDestChain(uint64 destChainSelector);
-  error InvalidExtraArgsVersion(bytes4 provided);
+  error InvalidMaxPossibleCCVsPerMsg(uint256 maxPossibleCCVsPerMsg);
 
+  event AllowlistUpdated(bool enabled);
+  event CCVAdded(address indexed ccv);
+  event CCVRemoved(address indexed ccv);
   event ConfigSet(DynamicConfig dynamicConfig);
   event DestChainAdded(uint64 indexed destChainSelector);
   event DestChainRemoved(uint64 indexed destChainSelector);
-  event CCVAdded(address indexed ccv);
-  event CCVRemoved(address indexed ccv);
 
   /// @dev Struct that defines the dynamic configuration.
   // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
-    // Address that quotes a fee for each message
-    address feeQuoter;
-    // Address that receives fees, regardless of who calls withdraw
-    address feeAggregator;
-    // Max(required ccvs + optional ccvs)
-    // Limits the number of ccvs that the executor needs to search for results from
-    uint8 maxPossibleCCVsPerMsg;
-    // Max(required ccvs + optional ccv threshold)
-    // Limits the number of ccvs that the executor needs to submit on-chain
-    uint8 maxRequiredCCVsPerMsg;
+    // Max(required ccvs + optional ccvs).
+    // Limits the number of ccvs that the executor needs to search for results from.
+    uint8 maxCCVsPerMsg;
   }
 
-  /// @notice Whether or not the CCV allow list is enabled.
+  /// @notice Whether or not the CCV allowlist is enabled.
   bool public s_allowlistEnabled;
   /// @notice The set of CCVs that the executor supports.
   /// @dev Addresses correspond to the CCVOnRamp for each CCV.
@@ -82,10 +74,9 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) internal {
-    if (
-      dynamicConfig.feeQuoter == address(0) || dynamicConfig.feeAggregator == address(0)
-        || dynamicConfig.maxRequiredCCVsPerMsg > dynamicConfig.maxPossibleCCVsPerMsg
-    ) revert InvalidConfig();
+    if (dynamicConfig.maxCCVsPerMsg == 0) {
+      revert InvalidMaxPossibleCCVsPerMsg(dynamicConfig.maxCCVsPerMsg);
+    }
 
     s_dynamicConfig = dynamicConfig;
 
@@ -129,14 +120,9 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
   }
 
   /// @notice Returns the list of CCVs that the executor supports.
-  /// @return ccvs The list of verifier addresses.
+  /// @return ccvs The list of ccv addresses.
   function getAllowedCCVs() external view returns (address[] memory) {
-    uint256 length = s_allowedCCVs.length();
-    address[] memory verifiers = new address[](length);
-    for (uint256 i = 0; i < length; ++i) {
-      verifiers[i] = s_allowedCCVs.at(i);
-    }
-    return verifiers;
+    return s_allowedCCVs.values();
   }
 
   /// @notice Updates CCV allowlist contents and enablement status.
@@ -165,6 +151,7 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
     }
 
     s_allowlistEnabled = allowlistEnabled;
+    emit AllowlistUpdated(allowlistEnabled);
   }
 
   // ================================================================
@@ -175,51 +162,42 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
 
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   /// @param destChainSelector The destination chain selector.
-  /// @param extraArgs The extra arguments for the message execution.
+  /// @param requiredCCVs The CCVs that are required to execute the message.
+  /// @param optionalCCVs The CCVs that can optionally be used to execute the message
   /// @return fee The fee required to execute the message.
   function getFee(
     uint64 destChainSelector,
-    Client.EVM2AnyMessage memory, // message
-    bytes calldata extraArgs
+    Client.EVM2AnyMessage calldata, // message
+    Client.CCV[] calldata requiredCCVs,
+    Client.CCV[] calldata optionalCCVs,
+    bytes calldata // extraArgs
   ) external view returns (uint256) {
     if (!s_allowedDestChains.contains(destChainSelector)) {
       revert InvalidDestChain(destChainSelector);
     }
 
-    if (bytes4(extraArgs[0:4]) != Client.GENERIC_EXTRA_ARGS_V3_TAG) {
-      revert InvalidExtraArgsVersion(bytes4(extraArgs[0:4]));
-    }
-
-    Client.EVMExtraArgsV3 memory resolvedArgs = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV3));
-
     if (s_allowlistEnabled) {
-      for (uint256 i = 0; i < resolvedArgs.requiredCCV.length; i++) {
-        address ccvAddress = resolvedArgs.requiredCCV[i].ccvAddress;
+      for (uint256 i = 0; i < requiredCCVs.length; i++) {
+        address ccvAddress = requiredCCVs[i].ccvAddress;
         if (!s_allowedCCVs.contains(ccvAddress)) {
           revert InvalidCCV(ccvAddress);
         }
       }
 
-      // TODO: Should we instead just check until we reach the optionalThreshold?
-      for (uint256 i = 0; i < resolvedArgs.optionalCCV.length; i++) {
-        address ccvAddress = resolvedArgs.optionalCCV[i].ccvAddress;
+      for (uint256 i = 0; i < optionalCCVs.length; i++) {
+        address ccvAddress = optionalCCVs[i].ccvAddress;
         if (!s_allowedCCVs.contains(ccvAddress)) {
           revert InvalidCCV(ccvAddress);
         }
       }
     }
 
-    uint256 possibleVerifiers = resolvedArgs.requiredCCV.length + resolvedArgs.optionalCCV.length;
-    if (possibleVerifiers > s_dynamicConfig.maxPossibleCCVsPerMsg) {
-      revert ExceedsMaxPossibleCCVs(possibleVerifiers, s_dynamicConfig.maxPossibleCCVsPerMsg);
+    uint256 possibleCCVs = requiredCCVs.length + optionalCCVs.length;
+    if (possibleCCVs > s_dynamicConfig.maxCCVsPerMsg) {
+      revert ExceedsMaxCCVs(possibleCCVs, s_dynamicConfig.maxCCVsPerMsg);
     }
 
-    uint256 requiredVerifiers = resolvedArgs.requiredCCV.length + resolvedArgs.optionalThreshold;
-    if (requiredVerifiers > s_dynamicConfig.maxRequiredCCVsPerMsg) {
-      revert ExceedsMaxRequiredCCVs(requiredVerifiers, s_dynamicConfig.maxRequiredCCVsPerMsg);
-    }
-
-    // TODO: get execution fee using extraArgs, for now we just return 0
+    // TODO: get execution fee, for now we just return 0
     return 0;
   }
 }
