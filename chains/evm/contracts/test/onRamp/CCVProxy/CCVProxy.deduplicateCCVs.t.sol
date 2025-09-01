@@ -49,7 +49,7 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
       s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
 
     // Should have moved OPTIONAL_CCV1 from optional to required.
-    assertEq(newRequiredCCVs.length, requiredCCV.length + optionalCCV.length - 1);
+    assertEq(newRequiredCCVs.length, requiredCCV.length + 1);
     assertEq(newRequiredCCVs[0].ccvAddress, OPTIONAL_CCV1);
     assertEq(newRequiredCCVs[0].args, optionalCCV[0].args); // Should preserve args.
     assertEq(newRequiredCCVs[1].ccvAddress, REQUIRED_CCV1);
