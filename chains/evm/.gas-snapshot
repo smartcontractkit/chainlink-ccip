@@ -118,6 +118,7 @@ ExecutorOnRamp_applyDestChainUpdates:test_applyDestChainUpdates_AddExistingChain
 ExecutorOnRamp_applyDestChainUpdates:test_applyDestChainUpdates_AddNewChain() (gas: 71411)
 ExecutorOnRamp_applyDestChainUpdates:test_applyDestChainUpdates_RemoveExistingChain() (gas: 21820)
 ExecutorOnRamp_applyDestChainUpdates:test_applyDestChainUpdates_RemoveNonexistentChain() (gas: 22606)
+ExecutorOnRamp_getFee:test_getFee() (gas: 21404)
 ExecutorOnRamp_setDynamicConfig:test_setDynamicConfig() (gas: 19945)
 FactoryBurnMintERC20_approve:test_Approve() (gas: 56417)
 FactoryBurnMintERC20_burn:test_BasicBurn() (gas: 174145)
