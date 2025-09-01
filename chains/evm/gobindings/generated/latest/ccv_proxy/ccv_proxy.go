@@ -5,7 +5,6 @@ package ccv_proxy
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1317,26 +1315,6 @@ type GetDestChainConfig struct {
 	Router         common.Address
 }
 
-func (_CCVProxy *CCVProxy) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _CCVProxy.abi.Events["CCIPMessageSent"].ID:
-		return _CCVProxy.ParseCCIPMessageSent(log)
-	case _CCVProxy.abi.Events["ConfigSet"].ID:
-		return _CCVProxy.ParseConfigSet(log)
-	case _CCVProxy.abi.Events["DestChainConfigSet"].ID:
-		return _CCVProxy.ParseDestChainConfigSet(log)
-	case _CCVProxy.abi.Events["FeeTokenWithdrawn"].ID:
-		return _CCVProxy.ParseFeeTokenWithdrawn(log)
-	case _CCVProxy.abi.Events["OwnershipTransferRequested"].ID:
-		return _CCVProxy.ParseOwnershipTransferRequested(log)
-	case _CCVProxy.abi.Events["OwnershipTransferred"].ID:
-		return _CCVProxy.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (CCVProxyCCIPMessageSent) Topic() common.Hash {
 	return common.HexToHash("0xa816f7e08da08b1aa0143155f28f728327e40df7f707f612cb3566ab91229820")
 }
@@ -1433,8 +1411,6 @@ type CCVProxyInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *CCVProxyOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*CCVProxyOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

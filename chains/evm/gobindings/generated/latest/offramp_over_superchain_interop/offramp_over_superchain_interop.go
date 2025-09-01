@@ -5,7 +5,6 @@ package offramp_over_superchain_interop
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -2726,46 +2724,6 @@ func (_OffRampOverSuperchainInterop *OffRampOverSuperchainInteropFilterer) Parse
 	return event, nil
 }
 
-func (_OffRampOverSuperchainInterop *OffRampOverSuperchainInterop) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _OffRampOverSuperchainInterop.abi.Events["AlreadyAttempted"].ID:
-		return _OffRampOverSuperchainInterop.ParseAlreadyAttempted(log)
-	case _OffRampOverSuperchainInterop.abi.Events["ChainSelectorToChainIdConfigRemoved"].ID:
-		return _OffRampOverSuperchainInterop.ParseChainSelectorToChainIdConfigRemoved(log)
-	case _OffRampOverSuperchainInterop.abi.Events["ChainSelectorToChainIdConfigUpdated"].ID:
-		return _OffRampOverSuperchainInterop.ParseChainSelectorToChainIdConfigUpdated(log)
-	case _OffRampOverSuperchainInterop.abi.Events["CommitReportAccepted"].ID:
-		return _OffRampOverSuperchainInterop.ParseCommitReportAccepted(log)
-	case _OffRampOverSuperchainInterop.abi.Events["ConfigSet"].ID:
-		return _OffRampOverSuperchainInterop.ParseConfigSet(log)
-	case _OffRampOverSuperchainInterop.abi.Events["DynamicConfigSet"].ID:
-		return _OffRampOverSuperchainInterop.ParseDynamicConfigSet(log)
-	case _OffRampOverSuperchainInterop.abi.Events["ExecutionStateChanged"].ID:
-		return _OffRampOverSuperchainInterop.ParseExecutionStateChanged(log)
-	case _OffRampOverSuperchainInterop.abi.Events["OwnershipTransferRequested"].ID:
-		return _OffRampOverSuperchainInterop.ParseOwnershipTransferRequested(log)
-	case _OffRampOverSuperchainInterop.abi.Events["OwnershipTransferred"].ID:
-		return _OffRampOverSuperchainInterop.ParseOwnershipTransferred(log)
-	case _OffRampOverSuperchainInterop.abi.Events["RootRemoved"].ID:
-		return _OffRampOverSuperchainInterop.ParseRootRemoved(log)
-	case _OffRampOverSuperchainInterop.abi.Events["SkippedAlreadyExecutedMessage"].ID:
-		return _OffRampOverSuperchainInterop.ParseSkippedAlreadyExecutedMessage(log)
-	case _OffRampOverSuperchainInterop.abi.Events["SkippedReportExecution"].ID:
-		return _OffRampOverSuperchainInterop.ParseSkippedReportExecution(log)
-	case _OffRampOverSuperchainInterop.abi.Events["SourceChainConfigSet"].ID:
-		return _OffRampOverSuperchainInterop.ParseSourceChainConfigSet(log)
-	case _OffRampOverSuperchainInterop.abi.Events["SourceChainSelectorAdded"].ID:
-		return _OffRampOverSuperchainInterop.ParseSourceChainSelectorAdded(log)
-	case _OffRampOverSuperchainInterop.abi.Events["StaticConfigSet"].ID:
-		return _OffRampOverSuperchainInterop.ParseStaticConfigSet(log)
-	case _OffRampOverSuperchainInterop.abi.Events["Transmitted"].ID:
-		return _OffRampOverSuperchainInterop.ParseTransmitted(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (OffRampOverSuperchainInteropAlreadyAttempted) Topic() common.Hash {
 	return common.HexToHash("0x3ef2a99c550a751d4b0b261268f05a803dfb049ab43616a1ffb388f61fe65120")
 }
@@ -2976,8 +2934,6 @@ type OffRampOverSuperchainInteropInterface interface {
 	WatchTransmitted(opts *bind.WatchOpts, sink chan<- *OffRampOverSuperchainInteropTransmitted, ocrPluginType []uint8) (event.Subscription, error)
 
 	ParseTransmitted(log types.Log) (*OffRampOverSuperchainInteropTransmitted, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }
