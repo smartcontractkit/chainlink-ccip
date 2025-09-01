@@ -1,8 +1,6 @@
 module github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment
 
-go 1.24.4
-
-toolchain go1.24.5
+go 1.25
 
 replace (
 	// Taken from CLDF go.mod: https://github.com/smartcontractkit/chainlink-deployments-framework/blob/main/go.mod
@@ -10,12 +8,16 @@ replace (
 
 	// Make sure we're working with the latest chainlink-ccip
 	github.com/smartcontractkit/chainlink-ccip => ../../../
+
+	// Make sure we're working with the latest generated/latest
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest => ../gobindings/generated/latest
 )
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.15.7
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250320090719-315440f5b0a7
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest v0.0.0-20250320090719-315440f5b0a7
 	github.com/smartcontractkit/chainlink-common v0.9.1-0.20250815142532-64e0a7965958
 	github.com/smartcontractkit/chainlink-deployments-framework v0.37.1
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3
