@@ -203,6 +203,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     });
 
     // 3. getFee on all verifiers & executor
+
     for (uint256 i = 0; i < requiredCCVsCount; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
       newMessage.verifierReceipts[i] = Internal.Receipt({
@@ -227,6 +228,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     // TODO
 
     // 4. lockOrBurn
+
     if (message.tokenAmounts.length != 0) {
       if (message.tokenAmounts.length != 1) {
         revert CanOnlySendOneTokenPerMessage();
@@ -238,6 +240,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     }
 
     // 5. calculate msg ID
+
+    // Hash only after all fields have been set, but before it's sent to the verifiers.
     newMessage.header.messageId = Internal._hash(
       newMessage,
       // Metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different lanes
@@ -246,6 +250,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     );
 
     // 6. call each verifier
+
     bytes memory encodedMessage = abi.encode(newMessage);
     bytes[] memory receiptBlobs = new bytes[](newMessage.verifierReceipts.length);
 
