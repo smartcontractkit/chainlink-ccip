@@ -5,7 +5,6 @@ package ccip_reader_tester
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -819,20 +817,6 @@ func (_CCIPReaderTester *CCIPReaderTesterFilterer) ParseExecutionStateChanged(lo
 	return event, nil
 }
 
-func (_CCIPReaderTester *CCIPReaderTester) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _CCIPReaderTester.abi.Events["CCIPMessageSent"].ID:
-		return _CCIPReaderTester.ParseCCIPMessageSent(log)
-	case _CCIPReaderTester.abi.Events["CommitReportAccepted"].ID:
-		return _CCIPReaderTester.ParseCommitReportAccepted(log)
-	case _CCIPReaderTester.abi.Events["ExecutionStateChanged"].ID:
-		return _CCIPReaderTester.ParseExecutionStateChanged(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (CCIPReaderTesterCCIPMessageSent) Topic() common.Hash {
 	return common.HexToHash("0x192442a2b2adb6a7948f097023cb6b57d29d3a7a5dd33e6666d33c39cc456f32")
 }
@@ -889,8 +873,6 @@ type CCIPReaderTesterInterface interface {
 	WatchExecutionStateChanged(opts *bind.WatchOpts, sink chan<- *CCIPReaderTesterExecutionStateChanged, sourceChainSelector []uint64, sequenceNumber []uint64, messageId [][32]byte) (event.Subscription, error)
 
 	ParseExecutionStateChanged(log types.Log) (*CCIPReaderTesterExecutionStateChanged, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

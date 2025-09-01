@@ -5,7 +5,6 @@ package log_message_data_receiver
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -357,16 +355,6 @@ func (_LogMessageDataReceiver *LogMessageDataReceiverFilterer) ParseMessageRecei
 	return event, nil
 }
 
-func (_LogMessageDataReceiver *LogMessageDataReceiver) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _LogMessageDataReceiver.abi.Events["MessageReceived"].ID:
-		return _LogMessageDataReceiver.ParseMessageReceived(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (LogMessageDataReceiverMessageReceived) Topic() common.Hash {
 	return common.HexToHash("0x4b3be2c5d6fcecc68e42c0268adeed4f145b0b4a6cbd5960dcdd39867bef682f")
 }
@@ -387,8 +375,6 @@ type LogMessageDataReceiverInterface interface {
 	WatchMessageReceived(opts *bind.WatchOpts, sink chan<- *LogMessageDataReceiverMessageReceived) (event.Subscription, error)
 
 	ParseMessageReceived(log types.Log) (*LogMessageDataReceiverMessageReceived, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

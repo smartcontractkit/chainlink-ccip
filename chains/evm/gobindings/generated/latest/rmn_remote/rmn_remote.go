@@ -5,7 +5,6 @@ package rmn_remote
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1149,24 +1147,6 @@ type GetVersionedConfig struct {
 	Config  RMNRemoteConfig
 }
 
-func (_RMNRemote *RMNRemote) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _RMNRemote.abi.Events["ConfigSet"].ID:
-		return _RMNRemote.ParseConfigSet(log)
-	case _RMNRemote.abi.Events["Cursed"].ID:
-		return _RMNRemote.ParseCursed(log)
-	case _RMNRemote.abi.Events["OwnershipTransferRequested"].ID:
-		return _RMNRemote.ParseOwnershipTransferRequested(log)
-	case _RMNRemote.abi.Events["OwnershipTransferred"].ID:
-		return _RMNRemote.ParseOwnershipTransferred(log)
-	case _RMNRemote.abi.Events["Uncursed"].ID:
-		return _RMNRemote.ParseUncursed(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (RMNRemoteConfigSet) Topic() common.Hash {
 	return common.HexToHash("0x7f22bf988149dbe8de8fb879c6b97a4e56e68b2bd57421ce1a4e79d4ef6b496c")
 }
@@ -1257,8 +1237,6 @@ type RMNRemoteInterface interface {
 	WatchUncursed(opts *bind.WatchOpts, sink chan<- *RMNRemoteUncursed) (event.Subscription, error)
 
 	ParseUncursed(log types.Log) (*RMNRemoteUncursed, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

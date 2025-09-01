@@ -5,7 +5,6 @@ package offramp
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -2385,42 +2383,6 @@ func (_OffRamp *OffRampFilterer) ParseTransmitted(log types.Log) (*OffRampTransm
 	return event, nil
 }
 
-func (_OffRamp *OffRamp) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _OffRamp.abi.Events["AlreadyAttempted"].ID:
-		return _OffRamp.ParseAlreadyAttempted(log)
-	case _OffRamp.abi.Events["CommitReportAccepted"].ID:
-		return _OffRamp.ParseCommitReportAccepted(log)
-	case _OffRamp.abi.Events["ConfigSet"].ID:
-		return _OffRamp.ParseConfigSet(log)
-	case _OffRamp.abi.Events["DynamicConfigSet"].ID:
-		return _OffRamp.ParseDynamicConfigSet(log)
-	case _OffRamp.abi.Events["ExecutionStateChanged"].ID:
-		return _OffRamp.ParseExecutionStateChanged(log)
-	case _OffRamp.abi.Events["OwnershipTransferRequested"].ID:
-		return _OffRamp.ParseOwnershipTransferRequested(log)
-	case _OffRamp.abi.Events["OwnershipTransferred"].ID:
-		return _OffRamp.ParseOwnershipTransferred(log)
-	case _OffRamp.abi.Events["RootRemoved"].ID:
-		return _OffRamp.ParseRootRemoved(log)
-	case _OffRamp.abi.Events["SkippedAlreadyExecutedMessage"].ID:
-		return _OffRamp.ParseSkippedAlreadyExecutedMessage(log)
-	case _OffRamp.abi.Events["SkippedReportExecution"].ID:
-		return _OffRamp.ParseSkippedReportExecution(log)
-	case _OffRamp.abi.Events["SourceChainConfigSet"].ID:
-		return _OffRamp.ParseSourceChainConfigSet(log)
-	case _OffRamp.abi.Events["SourceChainSelectorAdded"].ID:
-		return _OffRamp.ParseSourceChainSelectorAdded(log)
-	case _OffRamp.abi.Events["StaticConfigSet"].ID:
-		return _OffRamp.ParseStaticConfigSet(log)
-	case _OffRamp.abi.Events["Transmitted"].ID:
-		return _OffRamp.ParseTransmitted(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (OffRampAlreadyAttempted) Topic() common.Hash {
 	return common.HexToHash("0x3ef2a99c550a751d4b0b261268f05a803dfb049ab43616a1ffb388f61fe65120")
 }
@@ -2605,8 +2567,6 @@ type OffRampInterface interface {
 	WatchTransmitted(opts *bind.WatchOpts, sink chan<- *OffRampTransmitted, ocrPluginType []uint8) (event.Subscription, error)
 
 	ParseTransmitted(log types.Log) (*OffRampTransmitted, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

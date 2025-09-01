@@ -5,7 +5,6 @@ package mock_lbtc_token_pool
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -2772,46 +2770,6 @@ func (_MockE2ELBTCTokenPool *MockE2ELBTCTokenPoolFilterer) ParseRouterUpdated(lo
 	return event, nil
 }
 
-func (_MockE2ELBTCTokenPool *MockE2ELBTCTokenPool) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _MockE2ELBTCTokenPool.abi.Events["AllowListAdd"].ID:
-		return _MockE2ELBTCTokenPool.ParseAllowListAdd(log)
-	case _MockE2ELBTCTokenPool.abi.Events["AllowListRemove"].ID:
-		return _MockE2ELBTCTokenPool.ParseAllowListRemove(log)
-	case _MockE2ELBTCTokenPool.abi.Events["ChainAdded"].ID:
-		return _MockE2ELBTCTokenPool.ParseChainAdded(log)
-	case _MockE2ELBTCTokenPool.abi.Events["ChainConfigured"].ID:
-		return _MockE2ELBTCTokenPool.ParseChainConfigured(log)
-	case _MockE2ELBTCTokenPool.abi.Events["ChainRemoved"].ID:
-		return _MockE2ELBTCTokenPool.ParseChainRemoved(log)
-	case _MockE2ELBTCTokenPool.abi.Events["ConfigChanged"].ID:
-		return _MockE2ELBTCTokenPool.ParseConfigChanged(log)
-	case _MockE2ELBTCTokenPool.abi.Events["InboundRateLimitConsumed"].ID:
-		return _MockE2ELBTCTokenPool.ParseInboundRateLimitConsumed(log)
-	case _MockE2ELBTCTokenPool.abi.Events["LockedOrBurned"].ID:
-		return _MockE2ELBTCTokenPool.ParseLockedOrBurned(log)
-	case _MockE2ELBTCTokenPool.abi.Events["OutboundRateLimitConsumed"].ID:
-		return _MockE2ELBTCTokenPool.ParseOutboundRateLimitConsumed(log)
-	case _MockE2ELBTCTokenPool.abi.Events["OwnershipTransferRequested"].ID:
-		return _MockE2ELBTCTokenPool.ParseOwnershipTransferRequested(log)
-	case _MockE2ELBTCTokenPool.abi.Events["OwnershipTransferred"].ID:
-		return _MockE2ELBTCTokenPool.ParseOwnershipTransferred(log)
-	case _MockE2ELBTCTokenPool.abi.Events["RateLimitAdminSet"].ID:
-		return _MockE2ELBTCTokenPool.ParseRateLimitAdminSet(log)
-	case _MockE2ELBTCTokenPool.abi.Events["ReleasedOrMinted"].ID:
-		return _MockE2ELBTCTokenPool.ParseReleasedOrMinted(log)
-	case _MockE2ELBTCTokenPool.abi.Events["RemotePoolAdded"].ID:
-		return _MockE2ELBTCTokenPool.ParseRemotePoolAdded(log)
-	case _MockE2ELBTCTokenPool.abi.Events["RemotePoolRemoved"].ID:
-		return _MockE2ELBTCTokenPool.ParseRemotePoolRemoved(log)
-	case _MockE2ELBTCTokenPool.abi.Events["RouterUpdated"].ID:
-		return _MockE2ELBTCTokenPool.ParseRouterUpdated(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (MockE2ELBTCTokenPoolAllowListAdd) Topic() common.Hash {
 	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
 }
@@ -3038,8 +2996,6 @@ type MockE2ELBTCTokenPoolInterface interface {
 	WatchRouterUpdated(opts *bind.WatchOpts, sink chan<- *MockE2ELBTCTokenPoolRouterUpdated) (event.Subscription, error)
 
 	ParseRouterUpdated(log types.Log) (*MockE2ELBTCTokenPoolRouterUpdated, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }
