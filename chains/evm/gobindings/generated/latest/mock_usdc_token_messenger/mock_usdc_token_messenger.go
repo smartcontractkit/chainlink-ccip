@@ -5,7 +5,6 @@ package mock_usdc_token_messenger
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -613,18 +611,6 @@ func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessengerFilterer) ParseDeposi
 	return event, nil
 }
 
-func (_MockE2EUSDCTokenMessenger *MockE2EUSDCTokenMessenger) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _MockE2EUSDCTokenMessenger.abi.Events["DepositForBurn"].ID:
-		return _MockE2EUSDCTokenMessenger.ParseDepositForBurn(log)
-	case _MockE2EUSDCTokenMessenger.abi.Events["DepositForBurn0"].ID:
-		return _MockE2EUSDCTokenMessenger.ParseDepositForBurn0(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (MockE2EUSDCTokenMessengerDepositForBurn) Topic() common.Hash {
 	return common.HexToHash("0x2fa9ca894982930190727e75500a97d8dc500233a5065e0f3126c48fbe0343c0")
 }
@@ -663,8 +649,6 @@ type MockE2EUSDCTokenMessengerInterface interface {
 	WatchDepositForBurn0(opts *bind.WatchOpts, sink chan<- *MockE2EUSDCTokenMessengerDepositForBurn0, burnToken []common.Address, depositor []common.Address, minFinalityThreshold []uint32) (event.Subscription, error)
 
 	ParseDepositForBurn0(log types.Log) (*MockE2EUSDCTokenMessengerDepositForBurn0, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

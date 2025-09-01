@@ -5,7 +5,6 @@ package report_codec
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -517,18 +515,6 @@ func (_ReportCodec *ReportCodecFilterer) ParseExecuteReportDecoded(log types.Log
 	return event, nil
 }
 
-func (_ReportCodec *ReportCodec) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _ReportCodec.abi.Events["CommitReportDecoded"].ID:
-		return _ReportCodec.ParseCommitReportDecoded(log)
-	case _ReportCodec.abi.Events["ExecuteReportDecoded"].ID:
-		return _ReportCodec.ParseExecuteReportDecoded(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (ReportCodecCommitReportDecoded) Topic() common.Hash {
 	return common.HexToHash("0x58a603662478f1f3f18b8fc8006e127dc1ef28117b04eb2d89cc22849068dcd8")
 }
@@ -557,8 +543,6 @@ type ReportCodecInterface interface {
 	WatchExecuteReportDecoded(opts *bind.WatchOpts, sink chan<- *ReportCodecExecuteReportDecoded) (event.Subscription, error)
 
 	ParseExecuteReportDecoded(log types.Log) (*ReportCodecExecuteReportDecoded, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

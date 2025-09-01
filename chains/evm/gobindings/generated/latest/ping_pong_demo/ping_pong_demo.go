@@ -5,7 +5,6 @@ package ping_pong_demo
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1150,24 +1148,6 @@ type GetCCVs struct {
 	OptionalThreshold uint8
 }
 
-func (_PingPongDemo *PingPongDemo) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _PingPongDemo.abi.Events["OutOfOrderExecutionChange"].ID:
-		return _PingPongDemo.ParseOutOfOrderExecutionChange(log)
-	case _PingPongDemo.abi.Events["OwnershipTransferRequested"].ID:
-		return _PingPongDemo.ParseOwnershipTransferRequested(log)
-	case _PingPongDemo.abi.Events["OwnershipTransferred"].ID:
-		return _PingPongDemo.ParseOwnershipTransferred(log)
-	case _PingPongDemo.abi.Events["Ping"].ID:
-		return _PingPongDemo.ParsePing(log)
-	case _PingPongDemo.abi.Events["Pong"].ID:
-		return _PingPongDemo.ParsePong(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (PingPongDemoOutOfOrderExecutionChange) Topic() common.Hash {
 	return common.HexToHash("0x05a3fef9935c9013a24c6193df2240d34fcf6b0ebf8786b85efe8401d696cdd9")
 }
@@ -1262,8 +1242,6 @@ type PingPongDemoInterface interface {
 	WatchPong(opts *bind.WatchOpts, sink chan<- *PingPongDemoPong) (event.Subscription, error)
 
 	ParsePong(log types.Log) (*PingPongDemoPong, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

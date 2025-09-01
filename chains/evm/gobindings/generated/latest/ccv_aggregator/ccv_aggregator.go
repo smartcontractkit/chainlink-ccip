@@ -5,7 +5,6 @@ package ccv_aggregator
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1081,24 +1079,6 @@ func (_CCVAggregator *CCVAggregatorFilterer) ParseStaticConfigSet(log types.Log)
 	return event, nil
 }
 
-func (_CCVAggregator *CCVAggregator) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _CCVAggregator.abi.Events["ExecutionStateChanged"].ID:
-		return _CCVAggregator.ParseExecutionStateChanged(log)
-	case _CCVAggregator.abi.Events["OwnershipTransferRequested"].ID:
-		return _CCVAggregator.ParseOwnershipTransferRequested(log)
-	case _CCVAggregator.abi.Events["OwnershipTransferred"].ID:
-		return _CCVAggregator.ParseOwnershipTransferred(log)
-	case _CCVAggregator.abi.Events["SourceChainConfigSet"].ID:
-		return _CCVAggregator.ParseSourceChainConfigSet(log)
-	case _CCVAggregator.abi.Events["StaticConfigSet"].ID:
-		return _CCVAggregator.ParseStaticConfigSet(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (CCVAggregatorExecutionStateChanged) Topic() common.Hash {
 	return common.HexToHash("0x8c324ce1367b83031769f6a813e3bb4c117aba2185789d66b98b791405be6df2")
 }
@@ -1175,8 +1155,6 @@ type CCVAggregatorInterface interface {
 	WatchStaticConfigSet(opts *bind.WatchOpts, sink chan<- *CCVAggregatorStaticConfigSet) (event.Subscription, error)
 
 	ParseStaticConfigSet(log types.Log) (*CCVAggregatorStaticConfigSet, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

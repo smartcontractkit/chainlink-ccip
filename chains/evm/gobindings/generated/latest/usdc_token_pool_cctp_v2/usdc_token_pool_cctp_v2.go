@@ -5,7 +5,6 @@ package usdc_token_pool_cctp_v2
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -3438,54 +3436,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseRouterUpdated(log 
 	return event, nil
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _USDCTokenPoolCCTPV2.abi.Events["AllowListAdd"].ID:
-		return _USDCTokenPoolCCTPV2.ParseAllowListAdd(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["AllowListRemove"].ID:
-		return _USDCTokenPoolCCTPV2.ParseAllowListRemove(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["AuthorizedCallerAdded"].ID:
-		return _USDCTokenPoolCCTPV2.ParseAuthorizedCallerAdded(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["AuthorizedCallerRemoved"].ID:
-		return _USDCTokenPoolCCTPV2.ParseAuthorizedCallerRemoved(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["ChainAdded"].ID:
-		return _USDCTokenPoolCCTPV2.ParseChainAdded(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["ChainConfigured"].ID:
-		return _USDCTokenPoolCCTPV2.ParseChainConfigured(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["ChainRemoved"].ID:
-		return _USDCTokenPoolCCTPV2.ParseChainRemoved(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["ConfigChanged"].ID:
-		return _USDCTokenPoolCCTPV2.ParseConfigChanged(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["ConfigSet"].ID:
-		return _USDCTokenPoolCCTPV2.ParseConfigSet(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["DomainsSet"].ID:
-		return _USDCTokenPoolCCTPV2.ParseDomainsSet(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["InboundRateLimitConsumed"].ID:
-		return _USDCTokenPoolCCTPV2.ParseInboundRateLimitConsumed(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["LockedOrBurned"].ID:
-		return _USDCTokenPoolCCTPV2.ParseLockedOrBurned(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["OutboundRateLimitConsumed"].ID:
-		return _USDCTokenPoolCCTPV2.ParseOutboundRateLimitConsumed(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["OwnershipTransferRequested"].ID:
-		return _USDCTokenPoolCCTPV2.ParseOwnershipTransferRequested(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["OwnershipTransferred"].ID:
-		return _USDCTokenPoolCCTPV2.ParseOwnershipTransferred(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["RateLimitAdminSet"].ID:
-		return _USDCTokenPoolCCTPV2.ParseRateLimitAdminSet(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["ReleasedOrMinted"].ID:
-		return _USDCTokenPoolCCTPV2.ParseReleasedOrMinted(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["RemotePoolAdded"].ID:
-		return _USDCTokenPoolCCTPV2.ParseRemotePoolAdded(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["RemotePoolRemoved"].ID:
-		return _USDCTokenPoolCCTPV2.ParseRemotePoolRemoved(log)
-	case _USDCTokenPoolCCTPV2.abi.Events["RouterUpdated"].ID:
-		return _USDCTokenPoolCCTPV2.ParseRouterUpdated(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (USDCTokenPoolCCTPV2AllowListAdd) Topic() common.Hash {
 	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
 }
@@ -3770,8 +3720,6 @@ type USDCTokenPoolCCTPV2Interface interface {
 	WatchRouterUpdated(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2RouterUpdated) (event.Subscription, error)
 
 	ParseRouterUpdated(log types.Log) (*USDCTokenPoolCCTPV2RouterUpdated, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }
