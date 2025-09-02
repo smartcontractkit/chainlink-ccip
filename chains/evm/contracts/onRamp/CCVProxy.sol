@@ -373,8 +373,35 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         }
       }
 
+      // Validate no duplicates within user-provided required CCVs
+      for (uint256 i = 0; i < resolvedArgs.requiredCCV.length; ++i) {
+        for (uint256 j = i + 1; j < resolvedArgs.requiredCCV.length; ++j) {
+          if (resolvedArgs.requiredCCV[i].ccvAddress == resolvedArgs.requiredCCV[j].ccvAddress) {
+            revert DuplicateCCVInUserInput(resolvedArgs.requiredCCV[i].ccvAddress);
+          }
+        }
+      }
+
+      // Validate no duplicates within user-provided optional CCVs
+      for (uint256 i = 0; i < resolvedArgs.optionalCCV.length; ++i) {
+        for (uint256 j = i + 1; j < resolvedArgs.optionalCCV.length; ++j) {
+          if (resolvedArgs.optionalCCV[i].ccvAddress == resolvedArgs.optionalCCV[j].ccvAddress) {
+            revert DuplicateCCVInUserInput(resolvedArgs.optionalCCV[i].ccvAddress);
+          }
+        }
+      }
+
+      // Validate no duplicates between required and optional CCVs
+      for (uint256 i = 0; i < resolvedArgs.requiredCCV.length; ++i) {
+        for (uint256 j = 0; j < resolvedArgs.optionalCCV.length; ++j) {
+          if (resolvedArgs.requiredCCV[i].ccvAddress == resolvedArgs.optionalCCV[j].ccvAddress) {
+            revert DuplicateCCVInUserInput(resolvedArgs.requiredCCV[i].ccvAddress);
+          }
+        }
+      }
+
       // When users don't specify any required CCVs, default CCVs are chosen.
-      if (resolvedArgs.requiredCCV.length == 0 && destChainConfig.defaultCCVs.length > 0) {
+      if (resolvedArgs.requiredCCV.length == 0) {
         resolvedArgs.requiredCCV = new Client.CCV[](destChainConfig.defaultCCVs.length);
         for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
           resolvedArgs.requiredCCV[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
@@ -384,62 +411,15 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       // If old extraArgs are supplied, they are assumed to be for the default CCV and the default executor.
       // This means any default CCV/executor has to be able to process all prior extraArgs.
       resolvedArgs.executorArgs = extraArgs;
-
-      if (destChainConfig.defaultCCVs.length > 0) {
-        resolvedArgs.requiredCCV = new Client.CCV[](destChainConfig.defaultCCVs.length);
-        for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-          resolvedArgs.requiredCCV[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: extraArgs});
-        }
+      resolvedArgs.requiredCCV = new Client.CCV[](destChainConfig.defaultCCVs.length);
+      for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
+        resolvedArgs.requiredCCV[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: extraArgs});
       }
     }
 
     // When users don't specify an executor, default executor is chosen.
     if (resolvedArgs.executor == address(0)) {
       resolvedArgs.executor = destChainConfig.defaultExecutor;
-    }
-
-    // Ensure that the lane mandated CCVs for destination chain are always included.
-    if (destChainConfig.laneMandatedCCVs.length > 0) {
-      // Check for duplicates and merge mandated CCVs
-      uint256 additionalCount = 0;
-      for (uint256 i = 0; i < destChainConfig.laneMandatedCCVs.length; ++i) {
-        bool exists = false;
-        for (uint256 j = 0; j < resolvedArgs.requiredCCV.length; ++j) {
-          if (resolvedArgs.requiredCCV[j].ccvAddress == destChainConfig.laneMandatedCCVs[i]) {
-            exists = true;
-            break;
-          }
-        }
-        if (!exists) {
-          ++additionalCount;
-        }
-      }
-
-      if (additionalCount > 0) {
-        Client.CCV[] memory newRequired = new Client.CCV[](resolvedArgs.requiredCCV.length + additionalCount);
-        uint256 idx = 0;
-
-        // Add mandated CCVs first (with empty args)
-        for (uint256 i = 0; i < destChainConfig.laneMandatedCCVs.length; ++i) {
-          bool exists = false;
-          for (uint256 j = 0; j < resolvedArgs.requiredCCV.length; ++j) {
-            if (resolvedArgs.requiredCCV[j].ccvAddress == destChainConfig.laneMandatedCCVs[i]) {
-              exists = true;
-              break;
-            }
-          }
-          if (!exists) {
-            newRequired[idx++] = Client.CCV({ccvAddress: destChainConfig.laneMandatedCCVs[i], args: ""});
-          }
-        }
-
-        // Copy existing required CCVs
-        for (uint256 i = 0; i < resolvedArgs.requiredCCV.length; ++i) {
-          newRequired[idx++] = resolvedArgs.requiredCCV[i];
-        }
-
-        resolvedArgs.requiredCCV = newRequired;
-      }
     }
 
     return resolvedArgs;
