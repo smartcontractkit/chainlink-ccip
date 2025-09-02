@@ -81,16 +81,15 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     );
 
     // Should have moved OPTIONAL_CCV1 from optional to required.
-    assertEq(newRequiredCCVs.length, requiredCCV.length + 1);
-    assertEq(newRequiredCCVs[0].ccvAddress, OPTIONAL_CCV1);
-    assertEq(newRequiredCCVs[0].args, optionalCCV[0].args); // Should preserve args.
-    assertEq(newRequiredCCVs[1].ccvAddress, REQUIRED_CCV1);
-    assertEq(newRequiredCCVs[1].args, requiredCCV[0].args);
+    Client.CCV[] memory expectedRequired = new Client.CCV[](2);
+    expectedRequired[0] = Client.CCV({ccvAddress: OPTIONAL_CCV1, args: optionalCCV[0].args});
+    expectedRequired[1] = Client.CCV({ccvAddress: REQUIRED_CCV1, args: requiredCCV[0].args});
+    _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
 
     // Optional should have one less CCV.
-    assertEq(newOptionalCCVs.length, optionalCCV.length - 1);
-    assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV2);
-    assertEq(newOptionalCCVs[0].args, optionalCCV[1].args);
+    Client.CCV[] memory expectedOptional = new Client.CCV[](1);
+    expectedOptional[0] = Client.CCV({ccvAddress: OPTIONAL_CCV2, args: optionalCCV[1].args});
+    _assertCCVArraysEqual(newOptionalCCVs, expectedOptional);
 
     // Threshold should be decremented to maintain minimum verification count.
     assertEq(newOptionalThreshold, 1);
@@ -113,11 +112,12 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     );
 
     // Should only add unique pool CCVs.
-    assertEq(newRequiredCCVs.length, poolRequiredCCV.length - 1); // One duplicate removed.
-    assertEq(newOptionalCCVs.length, optionalCCV.length);
+    Client.CCV[] memory expectedRequired = new Client.CCV[](2);
+    expectedRequired[0] = Client.CCV({ccvAddress: POOL_CCV1, args: ""});
+    expectedRequired[1] = Client.CCV({ccvAddress: POOL_CCV2, args: ""});
+    _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
+    _assertCCVArraysEqual(newOptionalCCVs, optionalCCV);
     assertEq(newOptionalThreshold, optionalThreshold);
-    assertEq(newRequiredCCVs[0].ccvAddress, POOL_CCV1);
-    assertEq(newRequiredCCVs[1].ccvAddress, POOL_CCV2);
   }
 
   function test_mergeCCVsWithPoolAndLaneMandated_MovesAllOptionalToRequired() public view {
@@ -139,17 +139,16 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     );
 
     // All optionals should be moved to required.
-    assertEq(newRequiredCCVs.length, poolRequiredCCV.length);
-    assertEq(newRequiredCCVs[0].ccvAddress, OPTIONAL_CCV1);
-    assertEq(newRequiredCCVs[0].args, optionalCCV[0].args);
-    assertEq(newRequiredCCVs[1].ccvAddress, OPTIONAL_CCV2);
-    assertEq(newRequiredCCVs[1].args, optionalCCV[1].args);
+    Client.CCV[] memory expectedRequired = new Client.CCV[](2);
+    expectedRequired[0] = Client.CCV({ccvAddress: OPTIONAL_CCV1, args: optionalCCV[0].args});
+    expectedRequired[1] = Client.CCV({ccvAddress: OPTIONAL_CCV2, args: optionalCCV[1].args});
+    _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
 
     // Optional array should be empty.
     assertEq(newOptionalCCVs.length, 0);
 
     // Threshold should be 0 (decremented for each moved CCV).
-    assertEq(newOptionalThreshold, optionalThreshold - optionalCCV.length);
+    assertEq(newOptionalThreshold, 0);
   }
 
   function test_mergeCCVsWithPoolAndLaneMandated_NoChangesWhenPoolCCVAlreadyInRequired() public view {
@@ -170,13 +169,8 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     );
 
     // Should return original arrays unchanged.
-    assertEq(newRequiredCCVs.length, requiredCCV.length);
-    assertEq(newRequiredCCVs[0].ccvAddress, REQUIRED_CCV1);
-    assertEq(newRequiredCCVs[0].args, requiredCCV[0].args);
-
-    assertEq(newOptionalCCVs.length, optionalCCV.length);
-    assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV1);
-    assertEq(newOptionalCCVs[0].args, optionalCCV[0].args);
+    _assertCCVArraysEqual(newRequiredCCVs, requiredCCV);
+    _assertCCVArraysEqual(newOptionalCCVs, optionalCCV);
 
     assertEq(newOptionalThreshold, optionalThreshold);
   }
@@ -198,13 +192,8 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     );
 
     // Should return original arrays unchanged.
-    assertEq(newRequiredCCVs.length, requiredCCV.length);
-    assertEq(newRequiredCCVs[0].ccvAddress, REQUIRED_CCV1);
-    assertEq(newRequiredCCVs[0].args, requiredCCV[0].args);
-
-    assertEq(newOptionalCCVs.length, optionalCCV.length);
-    assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV1);
-    assertEq(newOptionalCCVs[0].args, optionalCCV[0].args);
+    _assertCCVArraysEqual(newRequiredCCVs, requiredCCV);
+    _assertCCVArraysEqual(newOptionalCCVs, optionalCCV);
 
     assertEq(newOptionalThreshold, optionalThreshold);
   }
@@ -234,16 +223,16 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     );
 
     // Should add lane mandated CCVs to required and move OPTIONAL_CCV1 from optional
-    assertEq(newRequiredCCVs.length, 3); // 1 new lane mandated + 1 from optional + 1 existing
-    assertEq(newRequiredCCVs[0].ccvAddress, laneMandatedCCVs[0]);
-    assertEq(newRequiredCCVs[0].args, ""); // Lane mandated has empty args
-    assertEq(newRequiredCCVs[1].ccvAddress, OPTIONAL_CCV1);
-    assertEq(newRequiredCCVs[1].args, "optional1"); // Preserves args from optional
-    assertEq(newRequiredCCVs[2].ccvAddress, REQUIRED_CCV1);
+    Client.CCV[] memory expectedRequired = new Client.CCV[](3);
+    expectedRequired[0] = Client.CCV({ccvAddress: laneMandatedCCVs[0], args: ""});
+    expectedRequired[1] = Client.CCV({ccvAddress: OPTIONAL_CCV1, args: "optional1"});
+    expectedRequired[2] = Client.CCV({ccvAddress: REQUIRED_CCV1, args: requiredCCV[0].args});
+    _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
 
     // Optional should only have OPTIONAL_CCV2 left
-    assertEq(newOptionalCCVs.length, 1);
-    assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV2);
+    Client.CCV[] memory expectedOptional = new Client.CCV[](1);
+    expectedOptional[0] = Client.CCV({ccvAddress: OPTIONAL_CCV2, args: optionalCCV[1].args});
+    _assertCCVArraysEqual(newOptionalCCVs, expectedOptional);
 
     // Threshold should be decremented
     assertEq(newOptionalThreshold, 1);
@@ -274,15 +263,16 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     );
 
     // Should add both lane mandated and pool required CCVs
-    assertEq(newRequiredCCVs.length, 3); // 1 lane + 1 pool (from optional) + 1 existing
-    assertEq(newRequiredCCVs[0].ccvAddress, laneMandatedCCVs[0]);
-    assertEq(newRequiredCCVs[1].ccvAddress, OPTIONAL_CCV1);
-    assertEq(newRequiredCCVs[1].args, "optional1"); // Preserves args
-    assertEq(newRequiredCCVs[2].ccvAddress, REQUIRED_CCV1);
+    Client.CCV[] memory expectedRequired = new Client.CCV[](3);
+    expectedRequired[0] = Client.CCV({ccvAddress: laneMandatedCCVs[0], args: ""});
+    expectedRequired[1] = Client.CCV({ccvAddress: OPTIONAL_CCV1, args: "optional1"});
+    expectedRequired[2] = Client.CCV({ccvAddress: REQUIRED_CCV1, args: requiredCCV[0].args});
+    _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
 
     // Optional should only have OPTIONAL_CCV2 left
-    assertEq(newOptionalCCVs.length, 1);
-    assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV2);
+    Client.CCV[] memory expectedOptional = new Client.CCV[](1);
+    expectedOptional[0] = Client.CCV({ccvAddress: OPTIONAL_CCV2, args: optionalCCV[1].args});
+    _assertCCVArraysEqual(newOptionalCCVs, expectedOptional);
 
     // Threshold should be decremented
     assertEq(newOptionalThreshold, 1);

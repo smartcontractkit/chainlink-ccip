@@ -101,4 +101,33 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
     return messageEvent;
   }
+
+  // Helper function to create EVMExtraArgsV3 struct
+  function _createV3ExtraArgs(
+    Client.CCV[] memory requiredCCVs,
+    Client.CCV[] memory optionalCCVs,
+    uint8 optionalThreshold
+  ) internal pure returns (Client.EVMExtraArgsV3 memory) {
+    return Client.EVMExtraArgsV3({
+      requiredCCV: requiredCCVs,
+      optionalCCV: optionalCCVs,
+      optionalThreshold: optionalThreshold,
+      finalityConfig: 12,
+      executor: address(0), // No executor specified.
+      executorArgs: "",
+      tokenArgs: ""
+    });
+  }
+
+  // Helper function to assert that two CCV arrays are equal
+  function _assertCCVArraysEqual(Client.CCV[] memory actual, Client.CCV[] memory expected) internal pure {
+    assertEq(actual.length, expected.length, "CCV arrays have different lengths");
+
+    for (uint256 i = 0; i < actual.length; i++) {
+      assertEq(
+        actual[i].ccvAddress, expected[i].ccvAddress, string.concat("CCV address mismatch at index ", vm.toString(i))
+      );
+      assertEq(actual[i].args, expected[i].args, string.concat("CCV args mismatch at index ", vm.toString(i)));
+    }
+  }
 }

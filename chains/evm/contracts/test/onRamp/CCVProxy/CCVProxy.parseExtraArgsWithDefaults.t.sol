@@ -74,15 +74,11 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
   }
 
   function test_parseExtraArgsWithDefaults_V3WithEmptyRequiredCCVs() public view {
-    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
-      requiredCCV: new Client.CCV[](0), // Empty required CCVs.
-      optionalCCV: new Client.CCV[](0),
-      optionalThreshold: 0,
-      finalityConfig: 0,
-      executor: address(0), // No executor specified.
-      executorArgs: "",
-      tokenArgs: ""
-    });
+    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(
+      new Client.CCV[](0), // Empty required CCVs.
+      new Client.CCV[](0),
+      0
+    );
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
@@ -129,15 +125,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     userRequiredCCVs[0] = Client.CCV({ccvAddress: duplicateCCV, args: "args1"});
     userRequiredCCVs[1] = Client.CCV({ccvAddress: duplicateCCV, args: "args2"}); // Duplicate
 
-    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
-      requiredCCV: userRequiredCCVs,
-      optionalCCV: new Client.CCV[](0),
-      optionalThreshold: 0,
-      finalityConfig: 0,
-      executor: address(0),
-      executorArgs: "",
-      tokenArgs: ""
-    });
+    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(userRequiredCCVs, new Client.CCV[](0), 0);
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
@@ -153,15 +141,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     optionalCCVs[0] = Client.CCV({ccvAddress: duplicateCCV, args: "opt1"});
     optionalCCVs[1] = Client.CCV({ccvAddress: duplicateCCV, args: "opt2"}); // Duplicate
 
-    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
-      requiredCCV: new Client.CCV[](0),
-      optionalCCV: optionalCCVs,
-      optionalThreshold: 1,
-      finalityConfig: 0,
-      executor: address(0),
-      executorArgs: "",
-      tokenArgs: ""
-    });
+    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0), optionalCCVs, 1);
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
@@ -180,15 +160,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     optionalCCVs[0] = Client.CCV({ccvAddress: duplicateCCV, args: "optional"}); // Same as required
     optionalCCVs[1] = Client.CCV({ccvAddress: makeAddr("optionalCCV2"), args: "optional"}); // Need one more here to set threshold 1
 
-    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
-      requiredCCV: requiredCCVs,
-      optionalCCV: optionalCCVs,
-      optionalThreshold: 1,
-      finalityConfig: 0,
-      executor: address(0),
-      executorArgs: "",
-      tokenArgs: ""
-    });
+    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(requiredCCVs, optionalCCVs, 1);
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
@@ -211,15 +183,11 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     optionalCCVs[2] = Client.CCV({ccvAddress: makeAddr("optionalCCV3"), args: "opt3"});
 
     uint8 optionalThreshold = 2;
-    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
-      requiredCCV: requiredCCVs,
-      optionalCCV: optionalCCVs,
-      optionalThreshold: optionalThreshold, // 2 out of 3 required
-      finalityConfig: 0,
-      executor: address(0),
-      executorArgs: "",
-      tokenArgs: ""
-    });
+    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(
+      requiredCCVs,
+      optionalCCVs,
+      optionalThreshold // 2 out of 3 required
+    );
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
@@ -238,15 +206,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     assertTrue(s_destChainConfig.defaultCCVs.length > 0, "defaultCCVs must not be empty");
 
     // Test with empty user input
-    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
-      requiredCCV: new Client.CCV[](0),
-      optionalCCV: new Client.CCV[](0),
-      optionalThreshold: 0,
-      finalityConfig: 0,
-      executor: address(0),
-      executorArgs: "",
-      tokenArgs: ""
-    });
+    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0), new Client.CCV[](0), 0);
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
     Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
@@ -264,15 +224,11 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     optionalCCVs[1] = Client.CCV({ccvAddress: makeAddr("optionalCCV2"), args: ""});
 
     uint8 invalidThreshold = uint8(optionalCCVs.length + 1); // Threshold > array length
-    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
-      requiredCCV: new Client.CCV[](0),
-      optionalCCV: optionalCCVs,
-      optionalThreshold: invalidThreshold, // Threshold > array length
-      finalityConfig: 0,
-      executor: address(0),
-      executorArgs: "",
-      tokenArgs: ""
-    });
+    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(
+      new Client.CCV[](0),
+      optionalCCVs,
+      invalidThreshold // Threshold > array length
+    );
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
@@ -284,15 +240,11 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     Client.CCV[] memory optionalCCVs = new Client.CCV[](1);
     optionalCCVs[0] = Client.CCV({ccvAddress: makeAddr("optionalCCV1"), args: ""});
 
-    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
-      requiredCCV: new Client.CCV[](0),
-      optionalCCV: optionalCCVs,
-      optionalThreshold: 0, // Zero threshold with optional CCVs (invalid).
-      finalityConfig: 0,
-      executor: address(0),
-      executorArgs: "",
-      tokenArgs: ""
-    });
+    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(
+      new Client.CCV[](0),
+      optionalCCVs,
+      0 // Zero threshold with optional CCVs (invalid).
+    );
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
@@ -305,15 +257,11 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     optionalCCVs[0] = Client.CCV({ccvAddress: makeAddr("optionalCCV1"), args: ""});
     optionalCCVs[1] = Client.CCV({ccvAddress: makeAddr("optionalCCV2"), args: ""});
 
-    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
-      requiredCCV: new Client.CCV[](0),
-      optionalCCV: optionalCCVs,
-      optionalThreshold: uint8(optionalCCVs.length), // Threshold == array length (all required, defeats purpose).
-      finalityConfig: 0,
-      executor: address(0),
-      executorArgs: "",
-      tokenArgs: ""
-    });
+    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(
+      new Client.CCV[](0),
+      optionalCCVs,
+      uint8(optionalCCVs.length) // Threshold == array length (all required, defeats purpose).
+    );
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
