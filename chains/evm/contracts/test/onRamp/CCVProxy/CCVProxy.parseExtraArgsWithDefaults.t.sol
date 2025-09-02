@@ -66,12 +66,10 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
 
-    // User-provided CCVs should be used, plus lane mandated CCVs.
-    assertEq(s_laneMandatedCCVs.length + userRequiredCCVs.length, result.requiredCCV.length);
-    assertEq(s_laneMandatedCCVs[0], result.requiredCCV[0].ccvAddress);
-    assertEq("", result.requiredCCV[0].args); // Lane mandated CCVs have empty args.
-    assertEq(userRequiredCCVs[0].ccvAddress, result.requiredCCV[1].ccvAddress);
-    assertEq(userRequiredCCVs[0].args, result.requiredCCV[1].args);
+    // User-provided CCVs should be used (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
+    assertEq(userRequiredCCVs.length, result.requiredCCV.length);
+    assertEq(userRequiredCCVs[0].ccvAddress, result.requiredCCV[0].ccvAddress);
+    assertEq(userRequiredCCVs[0].args, result.requiredCCV[0].args);
     assertEq(inputArgs.executor, result.executor);
   }
 
@@ -90,14 +88,12 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
 
-    // Default CCVs should be applied plus mandated CCVs.
-    assertEq(s_laneMandatedCCVs.length + s_defaultCCVs.length, result.requiredCCV.length); // mandated + defaults
-    assertEq(s_laneMandatedCCVs[0], result.requiredCCV[0].ccvAddress);
-    assertEq("", result.requiredCCV[0].args); // Lane mandated CCVs have empty args.
-    assertEq(s_defaultCCVs[0], result.requiredCCV[1].ccvAddress);
+    // Default CCVs should be applied (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
+    assertEq(s_defaultCCVs.length, result.requiredCCV.length);
+    assertEq(s_defaultCCVs[0], result.requiredCCV[0].ccvAddress);
+    assertEq("", result.requiredCCV[0].args); // Default CCVs have empty args.
+    assertEq(s_defaultCCVs[1], result.requiredCCV[1].ccvAddress);
     assertEq("", result.requiredCCV[1].args); // Default CCVs have empty args.
-    assertEq(s_defaultCCVs[1], result.requiredCCV[2].ccvAddress);
-    assertEq("", result.requiredCCV[2].args); // Default CCVs have empty args.
 
     // Default executor should be applied.
     assertEq(s_defaultExecutor, result.executor);
@@ -114,31 +110,24 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     Client.EVMExtraArgsV3 memory result =
       s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, legacyExtraArgs);
 
-    // Default CCVs should be used with V2 args passed to each CCV.
-    assertEq(s_laneMandatedCCVs.length + s_defaultCCVs.length, result.requiredCCV.length); // mandated + defaults
-    assertEq(s_laneMandatedCCVs[0], result.requiredCCV[0].ccvAddress);
-    assertEq("", result.requiredCCV[0].args); // Mandated CCVs always have empty args.
-    assertEq(s_defaultCCVs[0], result.requiredCCV[1].ccvAddress);
+    // Default CCVs should be used with V2 args passed to each CCV (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
+    assertEq(s_defaultCCVs.length, result.requiredCCV.length);
+    assertEq(s_defaultCCVs[0], result.requiredCCV[0].ccvAddress);
+    assertEq(legacyExtraArgs, result.requiredCCV[0].args);
+    assertEq(s_defaultCCVs[1], result.requiredCCV[1].ccvAddress);
     assertEq(legacyExtraArgs, result.requiredCCV[1].args);
-    assertEq(s_defaultCCVs[1], result.requiredCCV[2].ccvAddress);
-    assertEq(legacyExtraArgs, result.requiredCCV[2].args);
 
     // V2 args should be set as executor args.
     assertEq(legacyExtraArgs, result.executorArgs);
     assertEq(s_defaultExecutor, result.executor);
   }
 
-  function test_parseExtraArgsWithDefaults_WithLaneMandatedCCVsDuplicates_PreserveUserExtraArgs() public {
-    // Modify lane mandated CCVs to include a duplicate.
-    uint256 duplicateTestSize = 2;
-    s_laneMandatedCCVs = new address[](duplicateTestSize);
-    s_laneMandatedCCVs[0] = makeAddr("mandatedCCV1");
-    s_laneMandatedCCVs[1] = makeAddr("userCCV1"); // Will be duplicate with user CCV.
-
-    s_destChainConfig.laneMandatedCCVs = s_laneMandatedCCVs;
-
-    Client.CCV[] memory userRequiredCCVs = new Client.CCV[](1);
-    userRequiredCCVs[0] = Client.CCV({ccvAddress: s_laneMandatedCCVs[1], args: "userArgs"});
+  function test_parseExtraArgsWithDefaults_NoDuplicatesAllowed_WithinRequiredCCVs() public {
+    // Create user-provided CCVs with duplicates in required list
+    address duplicateCCV = makeAddr("duplicateCCV");
+    Client.CCV[] memory userRequiredCCVs = new Client.CCV[](2);
+    userRequiredCCVs[0] = Client.CCV({ccvAddress: duplicateCCV, args: "args1"});
+    userRequiredCCVs[1] = Client.CCV({ccvAddress: duplicateCCV, args: "args2"}); // Duplicate
 
     Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
       requiredCCV: userRequiredCCVs,
@@ -152,20 +141,65 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    // Should revert due to duplicate CCVs
+    vm.expectRevert(abi.encodeWithSelector(CCVProxy.DuplicateCCVInUserInput.selector, duplicateCCV));
+    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+  }
 
-    // Should have 2 CCVs (mandatedCCV1 + userCCV1, no duplicate due to deduplication).
-    assertEq(2, result.requiredCCV.length); // After deduplication: 1 unique mandated + 1 user.
-    assertEq(s_laneMandatedCCVs[0], result.requiredCCV[0].ccvAddress);
-    assertEq("", result.requiredCCV[0].args); // 1st Mandated CCVs has empty args.
-    assertEq(s_laneMandatedCCVs[1], result.requiredCCV[1].ccvAddress);
-    assertEq(userRequiredCCVs[0].args, result.requiredCCV[1].args); // User args preserved, even with duplicate mandated CCV.
+  function test_parseExtraArgsWithDefaults_NoDuplicatesAllowed_WithinOptionalCCVs() public {
+    // Create user-provided CCVs with duplicates in optional list
+    address duplicateCCV = makeAddr("duplicateCCV");
+    Client.CCV[] memory optionalCCVs = new Client.CCV[](2);
+    optionalCCVs[0] = Client.CCV({ccvAddress: duplicateCCV, args: "opt1"});
+    optionalCCVs[1] = Client.CCV({ccvAddress: duplicateCCV, args: "opt2"}); // Duplicate
+
+    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
+      requiredCCV: new Client.CCV[](0),
+      optionalCCV: optionalCCVs,
+      optionalThreshold: 1,
+      finalityConfig: 0,
+      executor: address(0),
+      executorArgs: "",
+      tokenArgs: ""
+    });
+
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+
+    // Should revert due to duplicate CCVs
+    vm.expectRevert(abi.encodeWithSelector(CCVProxy.DuplicateCCVInUserInput.selector, duplicateCCV));
+    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+  }
+
+  function test_parseExtraArgsWithDefaults_NoDuplicatesAllowed_BetweenRequiredAndOptional() public {
+    // Create user-provided CCVs with same CCV in both required and optional
+    address duplicateCCV = makeAddr("duplicateCCV");
+    Client.CCV[] memory requiredCCVs = new Client.CCV[](1);
+    requiredCCVs[0] = Client.CCV({ccvAddress: duplicateCCV, args: "required"});
+
+    Client.CCV[] memory optionalCCVs = new Client.CCV[](2);
+    optionalCCVs[0] = Client.CCV({ccvAddress: duplicateCCV, args: "optional"}); // Same as required
+    optionalCCVs[1] = Client.CCV({ccvAddress: makeAddr("optionalCCV2"), args: "optional"}); // Need one more here to set threshold 1
+
+    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
+      requiredCCV: requiredCCVs,
+      optionalCCV: optionalCCVs,
+      optionalThreshold: 1,
+      finalityConfig: 0,
+      executor: address(0),
+      executorArgs: "",
+      tokenArgs: ""
+    });
+
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+
+    // Should revert due to duplicate CCVs between required and optional
+    vm.expectRevert(abi.encodeWithSelector(CCVProxy.DuplicateCCVInUserInput.selector, duplicateCCV));
+    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
   }
 
   function test_parseExtraArgsWithDefaults_WithOptionalCCVs() public {
-    // Clear lane mandated CCVs and default CCVs for this test.
-    s_destChainConfig.laneMandatedCCVs = new address[](0);
-    s_destChainConfig.defaultCCVs = new address[](0);
+    // Use non-empty defaultCCVs as it's an invariant
+    // The test should work with defaults but user provides their own CCVs
 
     Client.CCV[] memory requiredCCVs = new Client.CCV[](1);
     requiredCCVs[0] = Client.CCV({ccvAddress: makeAddr("requiredCCV"), args: ""});
@@ -191,9 +225,34 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
 
+    // User provided required CCVs override defaults
     assertEq(requiredCCVs.length, result.requiredCCV.length);
+    assertEq(requiredCCVs[0].ccvAddress, result.requiredCCV[0].ccvAddress);
     assertEq(optionalCCVCount, result.optionalCCV.length);
     assertEq(optionalThreshold, result.optionalThreshold);
+  }
+
+  // Additional test for defaults when no user CCVs provided
+  function test_parseExtraArgsWithDefaults_DefaultCCVsAlwaysPresent() public view {
+    // Ensure defaultCCVs.length > 0 (invariant)
+    assertTrue(s_destChainConfig.defaultCCVs.length > 0, "defaultCCVs must not be empty");
+
+    // Test with empty user input
+    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
+      requiredCCV: new Client.CCV[](0),
+      optionalCCV: new Client.CCV[](0),
+      optionalThreshold: 0,
+      finalityConfig: 0,
+      executor: address(0),
+      executorArgs: "",
+      tokenArgs: ""
+    });
+
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+
+    // Should have default CCVs
+    assertEq(s_defaultCCVs.length, result.requiredCCV.length);
   }
 
   // Reverts
@@ -222,9 +281,8 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
   }
 
   function test_parseExtraArgsWithDefaults_RevertWhen_InvalidOptionalThreshold_Zero() public {
-    Client.CCV[] memory optionalCCVs = new Client.CCV[](2);
+    Client.CCV[] memory optionalCCVs = new Client.CCV[](1);
     optionalCCVs[0] = Client.CCV({ccvAddress: makeAddr("optionalCCV1"), args: ""});
-    optionalCCVs[1] = Client.CCV({ccvAddress: makeAddr("optionalCCV2"), args: ""});
 
     Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
       requiredCCV: new Client.CCV[](0),

@@ -6,17 +6,45 @@ import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {CCVProxyTestHelper} from "../../helpers/CCVProxyTestHelper.sol";
 import {CCVProxySetup} from "./CCVProxySetup.t.sol";
 
-contract CCVProxy_deduplicateCCVs is CCVProxySetup {
+contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
   CCVProxyTestHelper internal s_ccvProxyTestHelper;
-  address internal constant POOL_CCV1 = address(0x1111);
-  address internal constant POOL_CCV2 = address(0x2222);
-  address internal constant REQUIRED_CCV1 = address(0x3333);
-  address internal constant REQUIRED_CCV2 = address(0x4444);
-  address internal constant OPTIONAL_CCV1 = address(0x5555);
-  address internal constant OPTIONAL_CCV2 = address(0x6666);
+  uint64 constant TEST_DEST_CHAIN_SELECTOR = 999999;
+  address internal POOL_CCV1;
+  address internal POOL_CCV2;
+  address internal REQUIRED_CCV1;
+  address internal REQUIRED_CCV2;
+  address internal OPTIONAL_CCV1;
+  address internal OPTIONAL_CCV2;
+
+  function _setupTestDestChainConfig(
+    address[] memory laneMandatedCCVs
+  ) internal {
+    CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = makeAddr("defaultCCV"); // Some default CCV to maintain invariant
+
+    destChainConfigArgs[0] = CCVProxy.DestChainConfigArgs({
+      destChainSelector: TEST_DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      laneMandatedCCVs: laneMandatedCCVs,
+      defaultCCVs: defaultCCVs,
+      defaultExecutor: makeAddr("defaultExecutor")
+    });
+
+    s_ccvProxyTestHelper.applyDestChainConfigUpdates(destChainConfigArgs);
+  }
 
   function setUp() public override {
     super.setUp();
+
+    // Initialize test addresses
+    POOL_CCV1 = makeAddr("POOL_CCV1");
+    POOL_CCV2 = makeAddr("POOL_CCV2");
+    REQUIRED_CCV1 = makeAddr("REQUIRED_CCV1");
+    REQUIRED_CCV2 = makeAddr("REQUIRED_CCV2");
+    OPTIONAL_CCV1 = makeAddr("OPTIONAL_CCV1");
+    OPTIONAL_CCV2 = makeAddr("OPTIONAL_CCV2");
+
     s_ccvProxyTestHelper = new CCVProxyTestHelper(
       CCVProxy.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
@@ -29,9 +57,11 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
+
+    _setupTestDestChainConfig(new address[](0));
   }
 
-  function test_deduplicateCCVs_MovesOptionalToRequiredAndDecrementsThreshold() public view {
+  function test_mergeCCVsWithPoolAndLaneMandated_MovesOptionalToRequiredAndDecrementsThreshold() public view {
     // Setup pool CCV that exists in optional CCVs.
     address[] memory poolRequiredCCV = new address[](1);
     poolRequiredCCV[0] = OPTIONAL_CCV1; // This CCV is in optional list
@@ -46,7 +76,9 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     uint8 optionalThreshold = 2;
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-      s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
+    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+      TEST_DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
+    );
 
     // Should have moved OPTIONAL_CCV1 from optional to required.
     assertEq(newRequiredCCVs.length, requiredCCV.length + 1);
@@ -64,7 +96,7 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     assertEq(newOptionalThreshold, 1);
   }
 
-  function test_deduplicateCCVs_SkipsDuplicatesInPoolRequiredCCV() public view {
+  function test_mergeCCVsWithPoolAndLaneMandated_SkipsDuplicatesInPoolRequiredCCV() public view {
     // Setup pool CCVs with duplicates.
     address[] memory poolRequiredCCV = new address[](3);
     poolRequiredCCV[0] = POOL_CCV1;
@@ -76,7 +108,9 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     uint8 optionalThreshold = 0;
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-      s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
+    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+      TEST_DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
+    );
 
     // Should only add unique pool CCVs.
     assertEq(newRequiredCCVs.length, poolRequiredCCV.length - 1); // One duplicate removed.
@@ -86,7 +120,7 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     assertEq(newRequiredCCVs[1].ccvAddress, POOL_CCV2);
   }
 
-  function test_deduplicateCCVs_MovesAllOptionalToRequired() public view {
+  function test_mergeCCVsWithPoolAndLaneMandated_MovesAllOptionalToRequired() public view {
     // Setup scenario where all optional CCVs are moved to required.
     address[] memory poolRequiredCCV = new address[](2);
     poolRequiredCCV[0] = OPTIONAL_CCV1;
@@ -98,8 +132,11 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     optionalCCV[1] = Client.CCV({ccvAddress: OPTIONAL_CCV2, args: "optional2"});
 
     uint8 optionalThreshold = 2; // This will become 0 after moving both optionals to required.
+
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-      s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
+    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+      TEST_DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
+    );
 
     // All optionals should be moved to required.
     assertEq(newRequiredCCVs.length, poolRequiredCCV.length);
@@ -109,13 +146,13 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     assertEq(newRequiredCCVs[1].args, optionalCCV[1].args);
 
     // Optional array should be empty.
-    assertEq(newOptionalCCVs.length, optionalCCV.length - poolRequiredCCV.length);
+    assertEq(newOptionalCCVs.length, 0);
 
     // Threshold should be 0 (decremented for each moved CCV).
     assertEq(newOptionalThreshold, optionalThreshold - optionalCCV.length);
   }
 
-  function test_deduplicateCCVs_NoChangesWhenPoolCCVAlreadyInRequired() public view {
+  function test_mergeCCVsWithPoolAndLaneMandated_NoChangesWhenPoolCCVAlreadyInRequired() public view {
     address[] memory poolRequiredCCV = new address[](1);
     poolRequiredCCV[0] = REQUIRED_CCV1; // Already in required
 
@@ -128,7 +165,9 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     uint8 optionalThreshold = 1;
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-      s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
+    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+      TEST_DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
+    );
 
     // Should return original arrays unchanged.
     assertEq(newRequiredCCVs.length, requiredCCV.length);
@@ -142,7 +181,7 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     assertEq(newOptionalThreshold, optionalThreshold);
   }
 
-  function test_deduplicateCCVs_EmptyPoolRequiredCCV() public view {
+  function test_mergeCCVsWithPoolAndLaneMandated_EmptyPoolRequiredCCV() public view {
     address[] memory poolRequiredCCV = new address[](0);
 
     Client.CCV[] memory requiredCCV = new Client.CCV[](1);
@@ -154,7 +193,9 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     uint8 optionalThreshold = 1;
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-      s_ccvProxyTestHelper.deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
+    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+      TEST_DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
+    );
 
     // Should return original arrays unchanged.
     assertEq(newRequiredCCVs.length, requiredCCV.length);
@@ -166,5 +207,84 @@ contract CCVProxy_deduplicateCCVs is CCVProxySetup {
     assertEq(newOptionalCCVs[0].args, optionalCCV[0].args);
 
     assertEq(newOptionalThreshold, optionalThreshold);
+  }
+
+  function test_mergeCCVsWithPoolAndLaneMandated_WithLaneMandatedCCVs() public {
+    // Setup lane mandated CCVs
+    address[] memory laneMandatedCCVs = new address[](2);
+    laneMandatedCCVs[0] = makeAddr("laneMandatedCCV1");
+    laneMandatedCCVs[1] = OPTIONAL_CCV1; // This one is in optional list
+
+    _setupTestDestChainConfig(laneMandatedCCVs);
+
+    address[] memory poolRequiredCCV = new address[](0);
+
+    Client.CCV[] memory requiredCCV = new Client.CCV[](1);
+    requiredCCV[0] = Client.CCV({ccvAddress: REQUIRED_CCV1, args: "required1"});
+
+    Client.CCV[] memory optionalCCV = new Client.CCV[](2);
+    optionalCCV[0] = Client.CCV({ccvAddress: OPTIONAL_CCV1, args: "optional1"});
+    optionalCCV[1] = Client.CCV({ccvAddress: OPTIONAL_CCV2, args: "optional2"});
+
+    uint8 optionalThreshold = 2;
+
+    (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
+    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+      TEST_DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
+    );
+
+    // Should add lane mandated CCVs to required and move OPTIONAL_CCV1 from optional
+    assertEq(newRequiredCCVs.length, 3); // 1 new lane mandated + 1 from optional + 1 existing
+    assertEq(newRequiredCCVs[0].ccvAddress, laneMandatedCCVs[0]);
+    assertEq(newRequiredCCVs[0].args, ""); // Lane mandated has empty args
+    assertEq(newRequiredCCVs[1].ccvAddress, OPTIONAL_CCV1);
+    assertEq(newRequiredCCVs[1].args, "optional1"); // Preserves args from optional
+    assertEq(newRequiredCCVs[2].ccvAddress, REQUIRED_CCV1);
+
+    // Optional should only have OPTIONAL_CCV2 left
+    assertEq(newOptionalCCVs.length, 1);
+    assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV2);
+
+    // Threshold should be decremented
+    assertEq(newOptionalThreshold, 1);
+  }
+
+  function test_mergeCCVsWithPoolAndLaneMandated_BothLaneAndPoolCCVs() public {
+    // Setup both lane mandated and pool required CCVs
+    address[] memory laneMandatedCCVs = new address[](1);
+    laneMandatedCCVs[0] = makeAddr("laneMandatedCCV1");
+
+    _setupTestDestChainConfig(laneMandatedCCVs);
+
+    address[] memory poolRequiredCCV = new address[](1);
+    poolRequiredCCV[0] = OPTIONAL_CCV1; // This one is in optional list
+
+    Client.CCV[] memory requiredCCV = new Client.CCV[](1);
+    requiredCCV[0] = Client.CCV({ccvAddress: REQUIRED_CCV1, args: "required1"});
+
+    Client.CCV[] memory optionalCCV = new Client.CCV[](2);
+    optionalCCV[0] = Client.CCV({ccvAddress: OPTIONAL_CCV1, args: "optional1"});
+    optionalCCV[1] = Client.CCV({ccvAddress: OPTIONAL_CCV2, args: "optional2"});
+
+    uint8 optionalThreshold = 2;
+
+    (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
+    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+      TEST_DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
+    );
+
+    // Should add both lane mandated and pool required CCVs
+    assertEq(newRequiredCCVs.length, 3); // 1 lane + 1 pool (from optional) + 1 existing
+    assertEq(newRequiredCCVs[0].ccvAddress, laneMandatedCCVs[0]);
+    assertEq(newRequiredCCVs[1].ccvAddress, OPTIONAL_CCV1);
+    assertEq(newRequiredCCVs[1].args, "optional1"); // Preserves args
+    assertEq(newRequiredCCVs[2].ccvAddress, REQUIRED_CCV1);
+
+    // Optional should only have OPTIONAL_CCV2 left
+    assertEq(newOptionalCCVs.length, 1);
+    assertEq(newOptionalCCVs[0].ccvAddress, OPTIONAL_CCV2);
+
+    // Threshold should be decremented
+    assertEq(newOptionalThreshold, 1);
   }
 }
