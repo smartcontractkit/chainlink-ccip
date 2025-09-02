@@ -897,7 +897,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       return Internal._validateTVMAddress(destAddress);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
-      return;
+      return Internal._validate32ByteAddress(destAddress, 0);
     }
     revert InvalidChainFamilySelector(chainFamilySelector);
   }
@@ -1027,6 +1027,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
       gasLimit = suiExtraArgsV1.gasLimit;
 
+      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
+
       uint256 receiverObjectIdsLength = suiExtraArgsV1.receiverObjectIds.length;
       // The max payload size for SUI is heavily dependent on the receiver object ids passed into extra args and the number of
       // tokens. Below, token and account overhead will count towards maxDataBytes.
@@ -1072,9 +1074,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       if (suiExpandedDataLength > uint256(destChainConfig.maxDataBytes)) {
         revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), suiExpandedDataLength);
       }
-    } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-
- } else {
+    } else {
       revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
     }
 
