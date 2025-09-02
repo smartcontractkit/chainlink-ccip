@@ -283,9 +283,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, executor_onramp.ContractType, chain, deployment.Input[executor_onramp.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: executor_onramp.ConstructorArgs{
-				DynamicConfig: executor_onramp.DynamicConfig{
-					MaxCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxCCVsPerMsg,
-				},
+				MaxCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxCCVsPerMsg,
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
