@@ -11,19 +11,6 @@ contract CCVAggregatorHelper is CCVAggregator {
     CCVAggregator.StaticConfig memory staticConfig
   ) CCVAggregator(staticConfig) {}
 
-  // Expose internal functions for testing
-  function setExecutionState(
-    uint64 sourceChainSelector,
-    uint64 sequenceNumber,
-    Internal.MessageExecutionState newState
-  ) external {
-    _setExecutionState(sourceChainSelector, sequenceNumber, newState);
-  }
-
-  function getSequenceNumberBitmap(uint64 sourceChainSelector, uint64 sequenceNumber) external view returns (uint256) {
-    return _getSequenceNumberBitmap(sourceChainSelector, sequenceNumber);
-  }
-
   function ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,
     address receiver,
