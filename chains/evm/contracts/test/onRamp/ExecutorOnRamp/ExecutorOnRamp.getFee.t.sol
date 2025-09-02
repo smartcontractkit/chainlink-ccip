@@ -50,11 +50,6 @@ contract ExecutorOnRamp_getFee is ExecutorOnRampSetup {
   }
 
   function test_getFee_RevertWhen_ExceedsMaxCCVs() public {
-    ExecutorOnRamp.DynamicConfig memory newConfig;
-    newConfig.maxCCVsPerMsg = 1;
-
-    s_executorOnRamp.setDynamicConfig(newConfig);
-
     Client.EVM2AnyMessage memory message;
     Client.CCV[] memory requiredCCVs = new Client.CCV[](1);
     requiredCCVs[0] = Client.CCV({ccvAddress: INITIAL_CCV, args: ""});
@@ -63,7 +58,7 @@ contract ExecutorOnRamp_getFee is ExecutorOnRampSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExecutorOnRamp.ExceedsMaxCCVs.selector, requiredCCVs.length + optionalCCVs.length, newConfig.maxCCVsPerMsg
+        ExecutorOnRamp.ExceedsMaxCCVs.selector, requiredCCVs.length + optionalCCVs.length, INITIAL_MAX_CCVS
       )
     );
     s_executorOnRamp.getFee(INITIAL_DEST, message, requiredCCVs, optionalCCVs, "");

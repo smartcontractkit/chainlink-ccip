@@ -19,68 +19,61 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
   error InvalidDestChain(uint64 destChainSelector);
   error InvalidMaxPossibleCCVsPerMsg(uint256 maxPossibleCCVsPerMsg);
 
-  event AllowlistUpdated(bool enabled);
+  event CCVAllowlistUpdated(bool enabled);
   event CCVAdded(address indexed ccv);
   event CCVRemoved(address indexed ccv);
-  event ConfigSet(DynamicConfig dynamicConfig);
   event DestChainAdded(uint64 indexed destChainSelector);
   event DestChainRemoved(uint64 indexed destChainSelector);
+  event MaxCCVsPerMsgSet(uint8 maxCCVsPerMsg);
 
-  /// @dev Struct that defines the dynamic configuration.
-  // solhint-disable-next-line gas-struct-packing
-  struct DynamicConfig {
-    // Max(required ccvs + optional ccvs).
-    // Limits the number of ccvs that the executor needs to search for results from.
-    uint8 maxCCVsPerMsg;
-  }
-
+  /// @notice Limits the number of CCVs that the executor needs to search for results from.
+  /// @dev Max(required CCVs + optional CCVs).
+  uint8 private s_maxCCVsPerMsg;
   /// @notice Whether or not the CCV allowlist is enabled.
-  bool public s_allowlistEnabled;
+  bool private s_ccvAllowlistEnabled;
   /// @notice The set of CCVs that the executor supports.
   /// @dev Addresses correspond to the CCVOnRamp for each CCV.
   EnumerableSet.AddressSet private s_allowedCCVs;
   /// @notice The set of destination chains that the executor supports.
   EnumerableSet.UintSet private s_allowedDestChains;
-  /// @dev The dynamic config.
-  DynamicConfig private s_dynamicConfig;
 
   string public constant typeAndVersion = "ExecutorOnRamp 1.7.0-dev";
 
   constructor(
-    DynamicConfig memory dynamicConfig
+    uint8 maxCCVsPerMsg
   ) {
-    _setDynamicConfig(dynamicConfig);
+    _setMaxCCVsPerMsg(maxCCVsPerMsg);
   }
 
   // ================================================================
   // │                           Config                             │
   // ================================================================
 
-  /// @notice Returns the dynamic config.
-  /// @return dynamicConfig The config.
-  function getDynamicConfig() external view returns (DynamicConfig memory dynamicConfig) {
-    return s_dynamicConfig;
+  /// @notice Gets the maximum number of CCVs that can be used in a single message.
+  /// @return maxCCVsPerMsg The maximum number of CCVs.
+  function getMaxCCVsPerMsg() external view returns (uint8) {
+    return s_maxCCVsPerMsg;
   }
 
-  /// @notice Sets the dynamic config.
-  /// @param dynamicConfig The config.
-  function setDynamicConfig(
-    DynamicConfig memory dynamicConfig
+  /// @notice Sets the maximum number of CCVs that can be used in a single message.
+  /// @param maxCCVsPerMsg The maximum number of CCVs.
+  function setMaxCCVsPerMsg(
+    uint8 maxCCVsPerMsg
   ) external onlyOwner {
-    _setDynamicConfig(dynamicConfig);
+    _setMaxCCVsPerMsg(maxCCVsPerMsg);
   }
 
-  /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
-  function _setDynamicConfig(
-    DynamicConfig memory dynamicConfig
+  /// @notice Internal version of setMaxCCVsPerMsg to allow for reuse in the constructor.
+  function _setMaxCCVsPerMsg(
+    uint8 maxCCVsPerMsg
   ) internal {
-    if (dynamicConfig.maxCCVsPerMsg == 0) {
-      revert InvalidMaxPossibleCCVsPerMsg(dynamicConfig.maxCCVsPerMsg);
+    if (maxCCVsPerMsg == 0) {
+      revert InvalidMaxPossibleCCVsPerMsg(maxCCVsPerMsg);
     }
 
-    s_dynamicConfig = dynamicConfig;
+    s_maxCCVsPerMsg = maxCCVsPerMsg;
 
-    emit ConfigSet(dynamicConfig);
+    emit MaxCCVsPerMsgSet(maxCCVsPerMsg);
   }
 
   /// @notice Returns the list of destination chains that the executor supports.
@@ -95,12 +88,19 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
   }
 
   /// @notice Updates the destination chains that the executor supports.
-  /// @param destChainSelectorsToAdd The destination chain selectors to add.
   /// @param destChainSelectorsToRemove The destination chain selectors to remove.
+  /// @param destChainSelectorsToAdd The destination chain selectors to add.
   function applyDestChainUpdates(
-    uint64[] calldata destChainSelectorsToAdd,
-    uint64[] calldata destChainSelectorsToRemove
+    uint64[] calldata destChainSelectorsToRemove,
+    uint64[] calldata destChainSelectorsToAdd
   ) external onlyOwner {
+    for (uint256 i = 0; i < destChainSelectorsToRemove.length; ++i) {
+      uint64 destChainSelector = destChainSelectorsToRemove[i];
+      if (s_allowedDestChains.remove(destChainSelector)) {
+        emit DestChainRemoved(destChainSelector);
+      }
+    }
+
     for (uint256 i = 0; i < destChainSelectorsToAdd.length; ++i) {
       uint64 destChainSelector = destChainSelectorsToAdd[i];
       if (destChainSelector == 0) {
@@ -110,30 +110,35 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
         emit DestChainAdded(destChainSelector);
       }
     }
+  }
 
-    for (uint256 i = 0; i < destChainSelectorsToRemove.length; ++i) {
-      uint64 destChainSelector = destChainSelectorsToRemove[i];
-      if (s_allowedDestChains.remove(destChainSelector)) {
-        emit DestChainRemoved(destChainSelector);
-      }
-    }
+  /// @notice Returns whether or not the CCV allowlist is enabled.
+  /// @return enabled The enablement status.
+  function isCCVAllowlistEnabled() external view returns (bool) {
+    return s_ccvAllowlistEnabled;
   }
 
   /// @notice Returns the list of CCVs that the executor supports.
-  /// @return ccvs The list of ccv addresses.
+  /// @return ccvs The list of CCV addresses.
   function getAllowedCCVs() external view returns (address[] memory) {
     return s_allowedCCVs.values();
   }
 
   /// @notice Updates CCV allowlist contents and enablement status.
-  /// @param ccvsToAdd The CCV addresses to add.
   /// @param ccvsToRemove The CCV addresses to remove.
-  /// @param allowlistEnabled Whether or not the allowlist is enabled.
+  /// @param ccvsToAdd The CCV addresses to add.
+  /// @param ccvAllowlistEnabled Whether or not the allowlist should be enabled.
   function applyAllowedCCVUpdates(
-    address[] calldata ccvsToAdd,
     address[] calldata ccvsToRemove,
-    bool allowlistEnabled
+    address[] calldata ccvsToAdd,
+    bool ccvAllowlistEnabled
   ) external onlyOwner {
+    for (uint256 i = 0; i < ccvsToRemove.length; ++i) {
+      if (s_allowedCCVs.remove(ccvsToRemove[i])) {
+        emit CCVRemoved(ccvsToRemove[i]);
+      }
+    }
+
     for (uint256 i = 0; i < ccvsToAdd.length; ++i) {
       address ccv = ccvsToAdd[i];
       if (ccv == address(0)) {
@@ -144,14 +149,8 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
       }
     }
 
-    for (uint256 i = 0; i < ccvsToRemove.length; ++i) {
-      if (s_allowedCCVs.remove(ccvsToRemove[i])) {
-        emit CCVRemoved(ccvsToRemove[i]);
-      }
-    }
-
-    s_allowlistEnabled = allowlistEnabled;
-    emit AllowlistUpdated(allowlistEnabled);
+    s_ccvAllowlistEnabled = ccvAllowlistEnabled;
+    emit CCVAllowlistUpdated(ccvAllowlistEnabled);
   }
 
   // ================================================================
@@ -176,7 +175,7 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
       revert InvalidDestChain(destChainSelector);
     }
 
-    if (s_allowlistEnabled) {
+    if (s_ccvAllowlistEnabled) {
       for (uint256 i = 0; i < requiredCCVs.length; i++) {
         address ccvAddress = requiredCCVs[i].ccvAddress;
         if (!s_allowedCCVs.contains(ccvAddress)) {
@@ -193,8 +192,8 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
     }
 
     uint256 possibleCCVs = requiredCCVs.length + optionalCCVs.length;
-    if (possibleCCVs > s_dynamicConfig.maxCCVsPerMsg) {
-      revert ExceedsMaxCCVs(possibleCCVs, s_dynamicConfig.maxCCVsPerMsg);
+    if (possibleCCVs > s_maxCCVsPerMsg) {
+      revert ExceedsMaxCCVs(possibleCCVs, s_maxCCVsPerMsg);
     }
 
     // TODO: get execution fee, for now we just return 0

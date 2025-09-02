@@ -15,8 +15,8 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
     vm.expectEmit();
     emit ExecutorOnRamp.CCVAdded(newCCV);
     vm.expectEmit();
-    emit ExecutorOnRamp.AllowlistUpdated(true);
-    s_executorOnRamp.applyAllowedCCVUpdates(newCCVs, new address[](0), true);
+    emit ExecutorOnRamp.CCVAllowlistUpdated(true);
+    s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), newCCVs, true);
 
     address[] memory currentCCVs = s_executorOnRamp.getAllowedCCVs();
     assertEq(currentCCVs.length, 2);
@@ -28,6 +28,7 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
       }
     }
     assertTrue(found, "New ccv should be supported");
+    assertTrue(s_executorOnRamp.isCCVAllowlistEnabled(), "CCV allowlist should be enabled");
   }
 
   function test_applyAllowedCCVUpdates_AddExistingChain() public {
@@ -35,7 +36,7 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
     newCCVs[0] = INITIAL_CCV;
 
     vm.recordLogs();
-    s_executorOnRamp.applyAllowedCCVUpdates(newCCVs, new address[](0), true);
+    s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), newCCVs, true);
     vm.assertEq(vm.getRecordedLogs().length, 1); // Only the AllowlistUpdated event
 
     address[] memory currentCCVs = s_executorOnRamp.getAllowedCCVs();
@@ -48,7 +49,7 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
 
     vm.expectEmit();
     emit ExecutorOnRamp.CCVRemoved(INITIAL_CCV);
-    s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), ccvsToRemove, true);
+    s_executorOnRamp.applyAllowedCCVUpdates(ccvsToRemove, new address[](0), true);
 
     address[] memory currentCCVs = s_executorOnRamp.getAllowedCCVs();
     assertEq(currentCCVs.length, 0);
@@ -59,7 +60,7 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
     ccvsToRemove[0] = makeAddr("nonexistentCCV");
 
     vm.recordLogs();
-    s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), ccvsToRemove, true);
+    s_executorOnRamp.applyAllowedCCVUpdates(ccvsToRemove, new address[](0), true);
     vm.assertEq(vm.getRecordedLogs().length, 1); // Only the AllowlistUpdated event
 
     address[] memory currentCCVs = s_executorOnRamp.getAllowedCCVs();
@@ -68,18 +69,16 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
 
   function test_applyAllowedCCVUpdates_DisableAllowlist() public {
     vm.expectEmit();
-    emit ExecutorOnRamp.AllowlistUpdated(false);
+    emit ExecutorOnRamp.CCVAllowlistUpdated(false);
     s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), new address[](0), false);
+
+    assertFalse(s_executorOnRamp.isCCVAllowlistEnabled(), "CCV allowlist should be disabled");
   }
 
   function test_applyAllowedCCVUpdates_RevertWhen_NotOwner() public {
-    address[] memory newCCVs = new address[](1);
-    newCCVs[0] = makeAddr("newCCV");
-
     vm.prank(makeAddr("stranger"));
-
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_executorOnRamp.applyAllowedCCVUpdates(newCCVs, new address[](0), true);
+    s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), new address[](0), true);
   }
 
   function test_applyAllowedCCVUpdates_RevertWhen_CCVInvalid() public {
@@ -87,6 +86,6 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
     newCCVs[0] = address(0);
 
     vm.expectRevert(abi.encodeWithSelector(ExecutorOnRamp.InvalidCCV.selector, address(0)));
-    s_executorOnRamp.applyAllowedCCVUpdates(newCCVs, new address[](0), true);
+    s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), newCCVs, true);
   }
 }
