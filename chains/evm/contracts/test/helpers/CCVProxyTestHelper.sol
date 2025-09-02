@@ -19,17 +19,21 @@ contract CCVProxyTestHelper is CCVProxy {
     return _parseExtraArgsWithDefaults(destChainConfig, extraArgs);
   }
 
-  /// @notice Exposes the internal _deduplicateCCVs function for testing.
-  function deduplicateCCVs(
-    address[] memory poolRequiredCCV,
+  /// @notice Exposes the internal _mergeCCVsWithPoolAndLaneMandated function for testing.
+  /// Note: This assumes the test has already set up the DestChainConfig via applyDestChainConfigUpdates
+  function mergeCCVsWithPoolAndLaneMandated(
+    uint64 destChainSelector,
+    address[] memory poolRequiredCCVs,
     Client.CCV[] memory requiredCCV,
     Client.CCV[] memory optionalCCV,
     uint8 optionalThreshold
   )
     external
-    pure
+    view
     returns (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold)
   {
-    return _deduplicateCCVs(poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold);
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    return
+      _mergeCCVsWithPoolAndLaneMandated(destChainConfig, poolRequiredCCVs, requiredCCV, optionalCCV, optionalThreshold);
   }
 }

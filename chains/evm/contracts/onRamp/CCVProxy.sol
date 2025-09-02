@@ -107,7 +107,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   DynamicConfig private s_dynamicConfig;
 
   /// @dev The destination chain specific configs.
-  mapping(uint64 destChainSelector => DestChainConfig destChainConfig) private s_destChainConfigs;
+  mapping(uint64 destChainSelector => DestChainConfig destChainConfig) public s_destChainConfigs;
 
   constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) {
     if (

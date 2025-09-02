@@ -29,14 +29,14 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
-    address[] memory laneMandatedCCVs = new address[](1);
-    laneMandatedCCVs[0] = address(new MockCCVOnRamp());
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = address(new MockCCVOnRamp());
     CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
     destChainConfigArgs[0] = CCVProxy.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
-      laneMandatedCCVs: laneMandatedCCVs,
-      defaultCCVs: new address[](0),
+      laneMandatedCCVs: new address[](0),
+      defaultCCVs: defaultCCVs,
       defaultExecutor: address(new MockExecutor())
     });
 
@@ -57,7 +57,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     uint256 feeValueJuels,
     address originalSender,
     bytes32 metadataHash
-  ) internal returns (Internal.EVM2AnyVerifierMessage memory) {
+  ) internal view returns (Internal.EVM2AnyVerifierMessage memory) {
     // TODO
     //    if (message.tokenAmounts.length > 0) {
     //      tokenTransfer =
@@ -78,7 +78,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       feeTokenAmount: feeTokenAmount,
       feeValueJuels: feeValueJuels,
       tokenTransfer: new Internal.EVMTokenTransfer[](message.tokenAmounts.length),
-      verifierReceipts: new Internal.Receipt[](destChainConfig.laneMandatedCCVs.length),
+      verifierReceipts: new Internal.Receipt[](destChainConfig.defaultCCVs.length),
       executorReceipt: Internal.Receipt({
         issuer: address(0),
         feeTokenAmount: 0,
@@ -90,11 +90,12 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
 
     for (uint256 i = 0; i < messageEvent.verifierReceipts.length; i++) {
       messageEvent.verifierReceipts[i] = Internal.Receipt({
-        issuer: destChainConfig.laneMandatedCCVs[i],
+        issuer: destChainConfig.defaultCCVs[i],
         feeTokenAmount: 0,
         destGasLimit: 0,
         destBytesOverhead: 0,
-        extraArgs: ""
+        // TODO when v3 extra args are passed in
+        extraArgs: message.extraArgs
       });
     }
     messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
