@@ -29,7 +29,7 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 /// On/OffRamp
 ///     ↓
 /// USDCPoolProxy
-///     ├──→ LegacyCCTPV1Pool → CCTPV1
+///     ├──→ LegacyCCTPV1Pool → CCTPV1 -> CCTP V1
 ///     ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
 ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     └──→ SiloedUSDCTokenPool → ERC20LockBox

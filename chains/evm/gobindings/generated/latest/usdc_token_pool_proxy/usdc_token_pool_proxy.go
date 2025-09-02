@@ -5,7 +5,6 @@ package usdc_token_pool_proxy
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -3070,50 +3068,6 @@ func (_USDCTokenPoolProxy *USDCTokenPoolProxyFilterer) ParseRouterUpdated(log ty
 	return event, nil
 }
 
-func (_USDCTokenPoolProxy *USDCTokenPoolProxy) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _USDCTokenPoolProxy.abi.Events["AllowListAdd"].ID:
-		return _USDCTokenPoolProxy.ParseAllowListAdd(log)
-	case _USDCTokenPoolProxy.abi.Events["AllowListRemove"].ID:
-		return _USDCTokenPoolProxy.ParseAllowListRemove(log)
-	case _USDCTokenPoolProxy.abi.Events["ChainAdded"].ID:
-		return _USDCTokenPoolProxy.ParseChainAdded(log)
-	case _USDCTokenPoolProxy.abi.Events["ChainConfigured"].ID:
-		return _USDCTokenPoolProxy.ParseChainConfigured(log)
-	case _USDCTokenPoolProxy.abi.Events["ChainRemoved"].ID:
-		return _USDCTokenPoolProxy.ParseChainRemoved(log)
-	case _USDCTokenPoolProxy.abi.Events["ConfigChanged"].ID:
-		return _USDCTokenPoolProxy.ParseConfigChanged(log)
-	case _USDCTokenPoolProxy.abi.Events["InboundRateLimitConsumed"].ID:
-		return _USDCTokenPoolProxy.ParseInboundRateLimitConsumed(log)
-	case _USDCTokenPoolProxy.abi.Events["LockOrBurnMechanismUpdated"].ID:
-		return _USDCTokenPoolProxy.ParseLockOrBurnMechanismUpdated(log)
-	case _USDCTokenPoolProxy.abi.Events["LockedOrBurned"].ID:
-		return _USDCTokenPoolProxy.ParseLockedOrBurned(log)
-	case _USDCTokenPoolProxy.abi.Events["OutboundRateLimitConsumed"].ID:
-		return _USDCTokenPoolProxy.ParseOutboundRateLimitConsumed(log)
-	case _USDCTokenPoolProxy.abi.Events["OwnershipTransferRequested"].ID:
-		return _USDCTokenPoolProxy.ParseOwnershipTransferRequested(log)
-	case _USDCTokenPoolProxy.abi.Events["OwnershipTransferred"].ID:
-		return _USDCTokenPoolProxy.ParseOwnershipTransferred(log)
-	case _USDCTokenPoolProxy.abi.Events["PoolAddressesUpdated"].ID:
-		return _USDCTokenPoolProxy.ParsePoolAddressesUpdated(log)
-	case _USDCTokenPoolProxy.abi.Events["RateLimitAdminSet"].ID:
-		return _USDCTokenPoolProxy.ParseRateLimitAdminSet(log)
-	case _USDCTokenPoolProxy.abi.Events["ReleasedOrMinted"].ID:
-		return _USDCTokenPoolProxy.ParseReleasedOrMinted(log)
-	case _USDCTokenPoolProxy.abi.Events["RemotePoolAdded"].ID:
-		return _USDCTokenPoolProxy.ParseRemotePoolAdded(log)
-	case _USDCTokenPoolProxy.abi.Events["RemotePoolRemoved"].ID:
-		return _USDCTokenPoolProxy.ParseRemotePoolRemoved(log)
-	case _USDCTokenPoolProxy.abi.Events["RouterUpdated"].ID:
-		return _USDCTokenPoolProxy.ParseRouterUpdated(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (USDCTokenPoolProxyAllowListAdd) Topic() common.Hash {
 	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
 }
@@ -3366,8 +3320,6 @@ type USDCTokenPoolProxyInterface interface {
 	WatchRouterUpdated(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolProxyRouterUpdated) (event.Subscription, error)
 
 	ParseRouterUpdated(log types.Log) (*USDCTokenPoolProxyRouterUpdated, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }
