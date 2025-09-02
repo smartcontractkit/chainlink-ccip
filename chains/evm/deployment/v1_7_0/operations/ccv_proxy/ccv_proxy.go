@@ -32,6 +32,8 @@ type WithdrawFeeTokensArgs struct {
 	FeeTokens []common.Address
 }
 
+type DestChainConfig = ccv_proxy.GetDestChainConfig
+
 var Deploy = deployment.New(
 	"ccv-proxy:deploy",
 	semver.MustParse("1.7.0"),
@@ -87,5 +89,16 @@ var WithdrawFeeTokens = call.NewWrite(
 	func(WithdrawFeeTokensArgs) error { return nil },
 	func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return ccvProxy.WithdrawFeeTokens(opts, args.FeeTokens)
+	},
+)
+
+var GetDestChainConfig = call.NewRead(
+	"ccv-proxy:get-dest-chain-config",
+	semver.MustParse("1.7.0"),
+	"Gets the destination chain configuration for a given destination chain selector",
+	ContractType,
+	ccv_proxy.NewCCVProxy,
+	func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.CallOpts, destChainSelector uint64) (DestChainConfig, error) {
+		return ccvProxy.GetDestChainConfig(opts, destChainSelector)
 	},
 )

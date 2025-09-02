@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
+func TestDeployChain_VerifyPreconditions(t *testing.T) {
 	lggr, err := logger.New()
 	require.NoError(t, err, "Failed to create logger")
 
@@ -52,19 +52,19 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 
 	tests := []struct {
 		desc        string
-		input       changesets.DeployChainContractsCfg
+		input       changesets.DeployChainCfg
 		expectedErr string
 	}{
 		{
 			desc: "valid input",
-			input: changesets.DeployChainContractsCfg{
+			input: changesets.DeployChainCfg{
 				ChainSelector: 5009297550715157269,
 				Params:        sequences.ContractParams{},
 			},
 		},
 		{
 			desc: "invalid chain selector",
-			input: changesets.DeployChainContractsCfg{
+			input: changesets.DeployChainCfg{
 				ChainSelector: 12345,
 				Params:        sequences.ContractParams{},
 			},
@@ -74,7 +74,7 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			err := changesets.DeployChainContracts.VerifyPreconditions(e, test.input)
+			err := changesets.DeployChain.VerifyPreconditions(e, test.input)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr, "Expected error containing %q but got none", test.expectedErr)
 			} else {
@@ -84,7 +84,7 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 	}
 }
 
-func TestDeployChainContracts_Apply(t *testing.T) {
+func TestDeployChain_Apply(t *testing.T) {
 	tests := []struct {
 		desc          string
 		makeDatastore func() *datastore.MemoryDataStore
@@ -150,7 +150,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 				DataStore:        ds.Seal(),
 			}
 
-			out, err := changesets.DeployChainContracts.Apply(e, changesets.DeployChainContractsCfg{
+			out, err := changesets.DeployChain.Apply(e, changesets.DeployChainCfg{
 				ChainSelector: 5009297550715157269,
 				Params: sequences.ContractParams{
 					RMNRemote:     sequences.RMNRemoteParams{},
@@ -183,7 +183,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 					},
 				},
 			})
-			require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+			require.NoError(t, err, "Failed to apply DeployChain changeset")
 
 			newAddrs, err := out.DataStore.Addresses().Fetch()
 			require.NoError(t, err, "Failed to fetch addresses from datastore")

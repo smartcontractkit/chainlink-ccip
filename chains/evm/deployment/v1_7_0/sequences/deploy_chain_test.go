@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeployChainContracts_Idempotency(t *testing.T) {
+func TestDeployChain_Idempotency(t *testing.T) {
 	tests := []struct {
 		desc              string
 		existingAddresses []datastore.AddressRef
@@ -71,9 +71,9 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 
 			report, err := operations.ExecuteSequence(
 				bundle,
-				sequences.DeployChainContracts,
+				sequences.DeployChain,
 				evmChain,
-				sequences.DeployChainContractsInput{
+				sequences.DeployChainInput{
 					ChainSelector:     5009297550715157269,
 					ExistingAddresses: test.existingAddresses,
 					ContractParams: sequences.ContractParams{
@@ -129,7 +129,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 	}
 }
 
-func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
+func TestDeployChain_MultipleDeployments(t *testing.T) {
 	t.Run("sequential deployments", func(t *testing.T) {
 		lggr, err := logger.New()
 		require.NoError(t, err, "Failed to create logger")
@@ -162,11 +162,11 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		evmChains := chains.EVMChains()
 
 		// Deploy to each chain sequentially using the same bundle
-		var allReports []operations.SequenceReport[sequences.DeployChainContractsInput, sequences.DeployChainContractsOutput]
+		var allReports []operations.SequenceReport[sequences.DeployChainInput, sequences.DeployChainOutput]
 		for _, selector := range chainSelectors {
 			evmChain := evmChains[selector]
 
-			input := sequences.DeployChainContractsInput{
+			input := sequences.DeployChainInput{
 				ChainSelector:     selector,
 				ExistingAddresses: nil,
 				ContractParams: sequences.ContractParams{
@@ -199,7 +199,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 				},
 			}
 
-			report, err := operations.ExecuteSequence(bundle, sequences.DeployChainContracts, evmChain, input)
+			report, err := operations.ExecuteSequence(bundle, sequences.DeployChain, evmChain, input)
 			require.NoError(t, err, "Failed to execute sequence for chain %d", selector)
 			require.NotEmpty(t, report.Output.Addresses, "Expected operation reports for chain %d", selector)
 
@@ -249,7 +249,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		// Deploy to all chains concurrently using the same bundle
 		type deployResult struct {
 			chainSelector uint64
-			report        operations.SequenceReport[sequences.DeployChainContractsInput, sequences.DeployChainContractsOutput]
+			report        operations.SequenceReport[sequences.DeployChainInput, sequences.DeployChainOutput]
 			err           error
 		}
 
@@ -260,7 +260,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 			go func(chainSel uint64) {
 				evmChain := evmChains[chainSel]
 
-				input := sequences.DeployChainContractsInput{
+				input := sequences.DeployChainInput{
 					ChainSelector:     chainSel,
 					ExistingAddresses: nil,
 					ContractParams: sequences.ContractParams{
@@ -293,7 +293,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 					},
 				}
 
-				report, execErr := operations.ExecuteSequence(bundle, sequences.DeployChainContracts, evmChain, input)
+				report, execErr := operations.ExecuteSequence(bundle, sequences.DeployChain, evmChain, input)
 				resultChan <- deployResult{chainSel, report, execErr}
 			}(selector)
 		}

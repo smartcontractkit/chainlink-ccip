@@ -12,14 +12,14 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-var DeployChainContracts = cldf_deployment.CreateChangeSet(applyDeployChainContracts, verifyDeployChainContracts)
+var DeployChain = cldf_deployment.CreateChangeSet(applyDeployChain, verifyDeployChain)
 
-type DeployChainContractsCfg struct {
+type DeployChainCfg struct {
 	ChainSelector uint64
 	Params        sequences.ContractParams
 }
 
-func verifyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainContractsCfg) error {
+func verifyDeployChain(e cldf_deployment.Environment, cfg DeployChainCfg) error {
 	// TODO: Verify inputs, environment state, etc.
 	evmChains := e.BlockChains.EVMChains()
 	if _, exists := evmChains[cfg.ChainSelector]; !exists {
@@ -28,17 +28,17 @@ func verifyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainCo
 	return nil
 }
 
-func applyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainContractsCfg) (cldf_deployment.ChangesetOutput, error) {
+func applyDeployChain(e cldf_deployment.Environment, cfg DeployChainCfg) (cldf_deployment.ChangesetOutput, error) {
 	addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(cfg.ChainSelector))
 	chain := e.BlockChains.EVMChains()[cfg.ChainSelector]
 
-	report, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployChainContracts, chain, sequences.DeployChainContractsInput{
+	report, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployChain, chain, sequences.DeployChainInput{
 		ChainSelector:     cfg.ChainSelector,
 		ExistingAddresses: addresses,
 		ContractParams:    cfg.Params,
 	})
 	if err != nil {
-		return cldf_deployment.ChangesetOutput{Reports: report.ExecutionReports}, fmt.Errorf("failed to execute DeployChainContracts sequence: %w", err)
+		return cldf_deployment.ChangesetOutput{Reports: report.ExecutionReports}, fmt.Errorf("failed to execute DeployChain sequence: %w", err)
 	}
 
 	ds := datastore.NewMemoryDataStore()
