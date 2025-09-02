@@ -5,7 +5,6 @@ package offramp_with_message_transformer
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -2419,42 +2417,6 @@ func (_OffRampWithMessageTransformer *OffRampWithMessageTransformerFilterer) Par
 	return event, nil
 }
 
-func (_OffRampWithMessageTransformer *OffRampWithMessageTransformer) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _OffRampWithMessageTransformer.abi.Events["AlreadyAttempted"].ID:
-		return _OffRampWithMessageTransformer.ParseAlreadyAttempted(log)
-	case _OffRampWithMessageTransformer.abi.Events["CommitReportAccepted"].ID:
-		return _OffRampWithMessageTransformer.ParseCommitReportAccepted(log)
-	case _OffRampWithMessageTransformer.abi.Events["ConfigSet"].ID:
-		return _OffRampWithMessageTransformer.ParseConfigSet(log)
-	case _OffRampWithMessageTransformer.abi.Events["DynamicConfigSet"].ID:
-		return _OffRampWithMessageTransformer.ParseDynamicConfigSet(log)
-	case _OffRampWithMessageTransformer.abi.Events["ExecutionStateChanged"].ID:
-		return _OffRampWithMessageTransformer.ParseExecutionStateChanged(log)
-	case _OffRampWithMessageTransformer.abi.Events["OwnershipTransferRequested"].ID:
-		return _OffRampWithMessageTransformer.ParseOwnershipTransferRequested(log)
-	case _OffRampWithMessageTransformer.abi.Events["OwnershipTransferred"].ID:
-		return _OffRampWithMessageTransformer.ParseOwnershipTransferred(log)
-	case _OffRampWithMessageTransformer.abi.Events["RootRemoved"].ID:
-		return _OffRampWithMessageTransformer.ParseRootRemoved(log)
-	case _OffRampWithMessageTransformer.abi.Events["SkippedAlreadyExecutedMessage"].ID:
-		return _OffRampWithMessageTransformer.ParseSkippedAlreadyExecutedMessage(log)
-	case _OffRampWithMessageTransformer.abi.Events["SkippedReportExecution"].ID:
-		return _OffRampWithMessageTransformer.ParseSkippedReportExecution(log)
-	case _OffRampWithMessageTransformer.abi.Events["SourceChainConfigSet"].ID:
-		return _OffRampWithMessageTransformer.ParseSourceChainConfigSet(log)
-	case _OffRampWithMessageTransformer.abi.Events["SourceChainSelectorAdded"].ID:
-		return _OffRampWithMessageTransformer.ParseSourceChainSelectorAdded(log)
-	case _OffRampWithMessageTransformer.abi.Events["StaticConfigSet"].ID:
-		return _OffRampWithMessageTransformer.ParseStaticConfigSet(log)
-	case _OffRampWithMessageTransformer.abi.Events["Transmitted"].ID:
-		return _OffRampWithMessageTransformer.ParseTransmitted(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (OffRampWithMessageTransformerAlreadyAttempted) Topic() common.Hash {
 	return common.HexToHash("0x3ef2a99c550a751d4b0b261268f05a803dfb049ab43616a1ffb388f61fe65120")
 }
@@ -2643,8 +2605,6 @@ type OffRampWithMessageTransformerInterface interface {
 	WatchTransmitted(opts *bind.WatchOpts, sink chan<- *OffRampWithMessageTransformerTransmitted, ocrPluginType []uint8) (event.Subscription, error)
 
 	ParseTransmitted(log types.Log) (*OffRampWithMessageTransformerTransmitted, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

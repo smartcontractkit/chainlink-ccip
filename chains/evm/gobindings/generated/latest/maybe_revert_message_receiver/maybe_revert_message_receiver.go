@@ -5,7 +5,6 @@ package maybe_revert_message_receiver
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -825,22 +823,6 @@ func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverFilterer) ParseValu
 	return event, nil
 }
 
-func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiver) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _MaybeRevertMessageReceiver.abi.Events["MessageReceived"].ID:
-		return _MaybeRevertMessageReceiver.ParseMessageReceived(log)
-	case _MaybeRevertMessageReceiver.abi.Events["NativeFundsWithdrawn"].ID:
-		return _MaybeRevertMessageReceiver.ParseNativeFundsWithdrawn(log)
-	case _MaybeRevertMessageReceiver.abi.Events["TokensWithdrawn"].ID:
-		return _MaybeRevertMessageReceiver.ParseTokensWithdrawn(log)
-	case _MaybeRevertMessageReceiver.abi.Events["ValueReceived"].ID:
-		return _MaybeRevertMessageReceiver.ParseValueReceived(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (MaybeRevertMessageReceiverMessageReceived) Topic() common.Hash {
 	return common.HexToHash("0x707732b700184c0ab3b799f43f03de9b3606a144cfb367f98291044e71972cdc")
 }
@@ -903,8 +885,6 @@ type MaybeRevertMessageReceiverInterface interface {
 	WatchValueReceived(opts *bind.WatchOpts, sink chan<- *MaybeRevertMessageReceiverValueReceived) (event.Subscription, error)
 
 	ParseValueReceived(log types.Log) (*MaybeRevertMessageReceiverValueReceived, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

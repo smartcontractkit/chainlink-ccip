@@ -5,7 +5,6 @@ package burn_from_mint_token_pool
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -2750,46 +2748,6 @@ func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) ParseRouterUpdated(
 	return event, nil
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPool) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _BurnFromMintTokenPool.abi.Events["AllowListAdd"].ID:
-		return _BurnFromMintTokenPool.ParseAllowListAdd(log)
-	case _BurnFromMintTokenPool.abi.Events["AllowListRemove"].ID:
-		return _BurnFromMintTokenPool.ParseAllowListRemove(log)
-	case _BurnFromMintTokenPool.abi.Events["ChainAdded"].ID:
-		return _BurnFromMintTokenPool.ParseChainAdded(log)
-	case _BurnFromMintTokenPool.abi.Events["ChainConfigured"].ID:
-		return _BurnFromMintTokenPool.ParseChainConfigured(log)
-	case _BurnFromMintTokenPool.abi.Events["ChainRemoved"].ID:
-		return _BurnFromMintTokenPool.ParseChainRemoved(log)
-	case _BurnFromMintTokenPool.abi.Events["ConfigChanged"].ID:
-		return _BurnFromMintTokenPool.ParseConfigChanged(log)
-	case _BurnFromMintTokenPool.abi.Events["InboundRateLimitConsumed"].ID:
-		return _BurnFromMintTokenPool.ParseInboundRateLimitConsumed(log)
-	case _BurnFromMintTokenPool.abi.Events["LockedOrBurned"].ID:
-		return _BurnFromMintTokenPool.ParseLockedOrBurned(log)
-	case _BurnFromMintTokenPool.abi.Events["OutboundRateLimitConsumed"].ID:
-		return _BurnFromMintTokenPool.ParseOutboundRateLimitConsumed(log)
-	case _BurnFromMintTokenPool.abi.Events["OwnershipTransferRequested"].ID:
-		return _BurnFromMintTokenPool.ParseOwnershipTransferRequested(log)
-	case _BurnFromMintTokenPool.abi.Events["OwnershipTransferred"].ID:
-		return _BurnFromMintTokenPool.ParseOwnershipTransferred(log)
-	case _BurnFromMintTokenPool.abi.Events["RateLimitAdminSet"].ID:
-		return _BurnFromMintTokenPool.ParseRateLimitAdminSet(log)
-	case _BurnFromMintTokenPool.abi.Events["ReleasedOrMinted"].ID:
-		return _BurnFromMintTokenPool.ParseReleasedOrMinted(log)
-	case _BurnFromMintTokenPool.abi.Events["RemotePoolAdded"].ID:
-		return _BurnFromMintTokenPool.ParseRemotePoolAdded(log)
-	case _BurnFromMintTokenPool.abi.Events["RemotePoolRemoved"].ID:
-		return _BurnFromMintTokenPool.ParseRemotePoolRemoved(log)
-	case _BurnFromMintTokenPool.abi.Events["RouterUpdated"].ID:
-		return _BurnFromMintTokenPool.ParseRouterUpdated(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (BurnFromMintTokenPoolAllowListAdd) Topic() common.Hash {
 	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
 }
@@ -3014,8 +2972,6 @@ type BurnFromMintTokenPoolInterface interface {
 	WatchRouterUpdated(opts *bind.WatchOpts, sink chan<- *BurnFromMintTokenPoolRouterUpdated) (event.Subscription, error)
 
 	ParseRouterUpdated(log types.Log) (*BurnFromMintTokenPoolRouterUpdated, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

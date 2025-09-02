@@ -22,6 +22,7 @@ var Deploy = deployment.New(
 	semver.MustParse("1.2.0"),
 	"Deploys the Router contract",
 	ContractType,
+	router.RouterABI,
 	func(ConstructorArgs) error { return nil },
 	deployment.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {

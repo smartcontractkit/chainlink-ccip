@@ -5,7 +5,6 @@ package multi_ocr3_helper
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -997,24 +995,6 @@ func (_MultiOCR3Helper *MultiOCR3HelperFilterer) ParseTransmitted(log types.Log)
 	return event, nil
 }
 
-func (_MultiOCR3Helper *MultiOCR3Helper) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _MultiOCR3Helper.abi.Events["AfterConfigSet"].ID:
-		return _MultiOCR3Helper.ParseAfterConfigSet(log)
-	case _MultiOCR3Helper.abi.Events["ConfigSet"].ID:
-		return _MultiOCR3Helper.ParseConfigSet(log)
-	case _MultiOCR3Helper.abi.Events["OwnershipTransferRequested"].ID:
-		return _MultiOCR3Helper.ParseOwnershipTransferRequested(log)
-	case _MultiOCR3Helper.abi.Events["OwnershipTransferred"].ID:
-		return _MultiOCR3Helper.ParseOwnershipTransferred(log)
-	case _MultiOCR3Helper.abi.Events["Transmitted"].ID:
-		return _MultiOCR3Helper.ParseTransmitted(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (MultiOCR3HelperAfterConfigSet) Topic() common.Hash {
 	return common.HexToHash("0x897ac1b2c12867721b284f3eb147bd4ab046d4eef1cf31c1d8988bfcfb962b53")
 }
@@ -1089,8 +1069,6 @@ type MultiOCR3HelperInterface interface {
 	WatchTransmitted(opts *bind.WatchOpts, sink chan<- *MultiOCR3HelperTransmitted, ocrPluginType []uint8) (event.Subscription, error)
 
 	ParseTransmitted(log types.Log) (*MultiOCR3HelperTransmitted, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }
