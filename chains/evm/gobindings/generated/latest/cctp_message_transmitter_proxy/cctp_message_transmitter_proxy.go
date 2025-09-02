@@ -5,7 +5,6 @@ package cctp_message_transmitter_proxy
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -860,22 +858,6 @@ func (_CCTPMessageTransmitterProxy *CCTPMessageTransmitterProxyFilterer) ParseOw
 	return event, nil
 }
 
-func (_CCTPMessageTransmitterProxy *CCTPMessageTransmitterProxy) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _CCTPMessageTransmitterProxy.abi.Events["AllowedCallerAdded"].ID:
-		return _CCTPMessageTransmitterProxy.ParseAllowedCallerAdded(log)
-	case _CCTPMessageTransmitterProxy.abi.Events["AllowedCallerRemoved"].ID:
-		return _CCTPMessageTransmitterProxy.ParseAllowedCallerRemoved(log)
-	case _CCTPMessageTransmitterProxy.abi.Events["OwnershipTransferRequested"].ID:
-		return _CCTPMessageTransmitterProxy.ParseOwnershipTransferRequested(log)
-	case _CCTPMessageTransmitterProxy.abi.Events["OwnershipTransferred"].ID:
-		return _CCTPMessageTransmitterProxy.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (CCTPMessageTransmitterProxyAllowedCallerAdded) Topic() common.Hash {
 	return common.HexToHash("0x663c7e9ed36d9138863ef4306bbfcf01f60e1e7ca69b370c53d3094369e2cb02")
 }
@@ -938,8 +920,6 @@ type CCTPMessageTransmitterProxyInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *CCTPMessageTransmitterProxyOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*CCTPMessageTransmitterProxyOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

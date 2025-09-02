@@ -5,7 +5,6 @@ package fast_transfer_token_pool
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -4004,60 +4002,6 @@ type GetCCVs struct {
 	OptionalThreshold uint8
 }
 
-func (_BurnMintFastTransferTokenPool *BurnMintFastTransferTokenPool) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _BurnMintFastTransferTokenPool.abi.Events["AllowListAdd"].ID:
-		return _BurnMintFastTransferTokenPool.ParseAllowListAdd(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["AllowListRemove"].ID:
-		return _BurnMintFastTransferTokenPool.ParseAllowListRemove(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["ChainAdded"].ID:
-		return _BurnMintFastTransferTokenPool.ParseChainAdded(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["ChainConfigured"].ID:
-		return _BurnMintFastTransferTokenPool.ParseChainConfigured(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["ChainRemoved"].ID:
-		return _BurnMintFastTransferTokenPool.ParseChainRemoved(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["ConfigChanged"].ID:
-		return _BurnMintFastTransferTokenPool.ParseConfigChanged(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["DestChainConfigUpdated"].ID:
-		return _BurnMintFastTransferTokenPool.ParseDestChainConfigUpdated(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["DestinationPoolUpdated"].ID:
-		return _BurnMintFastTransferTokenPool.ParseDestinationPoolUpdated(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["FastTransferFilled"].ID:
-		return _BurnMintFastTransferTokenPool.ParseFastTransferFilled(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["FastTransferRequested"].ID:
-		return _BurnMintFastTransferTokenPool.ParseFastTransferRequested(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["FastTransferSettled"].ID:
-		return _BurnMintFastTransferTokenPool.ParseFastTransferSettled(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["FillerAllowListUpdated"].ID:
-		return _BurnMintFastTransferTokenPool.ParseFillerAllowListUpdated(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["InboundRateLimitConsumed"].ID:
-		return _BurnMintFastTransferTokenPool.ParseInboundRateLimitConsumed(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["LockedOrBurned"].ID:
-		return _BurnMintFastTransferTokenPool.ParseLockedOrBurned(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["OutboundRateLimitConsumed"].ID:
-		return _BurnMintFastTransferTokenPool.ParseOutboundRateLimitConsumed(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["OwnershipTransferRequested"].ID:
-		return _BurnMintFastTransferTokenPool.ParseOwnershipTransferRequested(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["OwnershipTransferred"].ID:
-		return _BurnMintFastTransferTokenPool.ParseOwnershipTransferred(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["PoolFeeWithdrawn"].ID:
-		return _BurnMintFastTransferTokenPool.ParsePoolFeeWithdrawn(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["RateLimitAdminSet"].ID:
-		return _BurnMintFastTransferTokenPool.ParseRateLimitAdminSet(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["ReleasedOrMinted"].ID:
-		return _BurnMintFastTransferTokenPool.ParseReleasedOrMinted(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["RemotePoolAdded"].ID:
-		return _BurnMintFastTransferTokenPool.ParseRemotePoolAdded(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["RemotePoolRemoved"].ID:
-		return _BurnMintFastTransferTokenPool.ParseRemotePoolRemoved(log)
-	case _BurnMintFastTransferTokenPool.abi.Events["RouterUpdated"].ID:
-		return _BurnMintFastTransferTokenPool.ParseRouterUpdated(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (BurnMintFastTransferTokenPoolAllowListAdd) Topic() common.Hash {
 	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
 }
@@ -4382,8 +4326,6 @@ type BurnMintFastTransferTokenPoolInterface interface {
 	WatchRouterUpdated(opts *bind.WatchOpts, sink chan<- *BurnMintFastTransferTokenPoolRouterUpdated) (event.Subscription, error)
 
 	ParseRouterUpdated(log types.Log) (*BurnMintFastTransferTokenPoolRouterUpdated, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

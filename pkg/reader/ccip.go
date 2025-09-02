@@ -680,8 +680,10 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 			continue
 		}
 		// Sanity check that we have a reader for this chain
-		if _, exists := r.contractReaders[chain]; !exists {
-			lggr.Errorw("Contract reader not found for a supported chain", "chain", chain)
+		_, crExists := r.contractReaders[chain]
+		_, caExists := r.accessors[chain]
+		if !crExists && !caExists {
+			lggr.Errorw("Both Contract reader and chain accessor not found for a supported chain", "chain", chain)
 			continue
 		}
 
