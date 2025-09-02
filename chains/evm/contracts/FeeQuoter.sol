@@ -890,14 +890,14 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       // is non-zero, the address must not be 0x0.
       return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? 1 : 0);
     }
-    if (
-      chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
-        || chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
-    ) {
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS) {
       return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM) {
       return Internal._validateTVMAddress(destAddress);
+    }
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
+      return;
     }
     revert InvalidChainFamilySelector(chainFamilySelector);
   }
@@ -1026,7 +1026,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       );
 
       gasLimit = suiExtraArgsV1.gasLimit;
-      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
 
       uint256 receiverObjectIdsLength = suiExtraArgsV1.receiverObjectIds.length;
       // The max payload size for SUI is heavily dependent on the receiver object ids passed into extra args and the number of
