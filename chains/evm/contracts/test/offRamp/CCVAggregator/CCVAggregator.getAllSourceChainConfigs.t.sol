@@ -19,7 +19,7 @@ contract CCVAggregator_getAllSourceChainConfigs is CCVAggregatorSetup {
   }
 
   function test_getAllSourceChainConfigs_ReturnsMultipleChains() public {
-    // Add a second source chain
+    // Add a second source chain.
     uint64 chain2 = SOURCE_CHAIN_SELECTOR + 1;
     CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
     configs[0] = CCVAggregator.SourceChainConfigArgs({
@@ -40,11 +40,11 @@ contract CCVAggregator_getAllSourceChainConfigs is CCVAggregatorSetup {
     assertEq(selectors.length, 2);
     assertEq(chainConfigs.length, 2);
 
-    // Check first chain
+    // Check first chain.
     assertEq(selectors[0], SOURCE_CHAIN_SELECTOR);
     assertEq(chainConfigs[0].defaultCCVs[0], s_defaultCCV);
 
-    // Check second chain
+    // Check second chain.
     assertEq(selectors[1], chain2);
     assertEq(chainConfigs[1].defaultCCVs[0], makeAddr("ccv2"));
   }
