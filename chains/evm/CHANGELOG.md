@@ -1,18 +1,48 @@
 [NOTES.md](../../../chainlink/contracts/release/ccip/NOTES.md)# @chainlink/contracts-ccip
 
+## 1.6.1
+
+CCIP 1.6.1 is a minor release that focuses on token pools, adding overall pool improvements.
+
+Key improvements include:
+
+- **Rate Limit With Local Denomination** - Token pools now use local token denomination for rate limiting during `releaseOrMint`, making it easier to handle tokens with different decimals cross-chain.
+  - `ReleaseOrMintInV1.amount` has been changed to `ReleaseOrMintInV1.sourceDenominatedAmount`.
+  - Conversion to local token denomination happens inside `releaseOrMint`.
+
+### Minor Changes
+
+- [#1006](https://github.com/smartcontractkit/chainlink-ccip/pull/1006) [`4e7de54`](https://github.com/smartcontractkit/chainlink-ccip/commit/4e7de54014) - #feature Change rate limiting to use local token denomination inside `releaseOrMint`
+
+### Patch Changes
+
+- [#950](https://github.com/smartcontractkit/chainlink-ccip/pull/950) [`6d82d44`](https://github.com/smartcontractkit/chainlink-ccip/commit/6d82d44e86) - Series of TokenPool improvements:
+  - Remove `acceptLiquidity`from the LockRelease pool
+  - Add a virtual `_releaseOrMint` and `_lockOrBurn` for easy pool implementations
+  - Merge `Locked` and `Burned` event into `LockedOrBurned`, merge `Released` and `Minted` into `ReleasedOrMinted`
+  - Remove `ILiquidityContainer`
+  - When calling transferLiquidity with uint256.max as amount, it will transfer the current amount in the pool
+  - Setting 0x0 as rebalancer is now allowed in siloed pools
+  - Remove the aggregate rate limiter logic in RateLimiter
+  - Allow setting 0 as rate and/or capacity
+  - Add `OutboundRateLimitConsumed` and `InboundRateLimitConsumed` events
+  - Use OZ 5 for non-token related imports
+  - Add `RebalancerSet` event to the LockRelease pool
+
 ## 1.6.0
 
-CCIP 1.6 has a new home: [github.com/smartcontractkit/chainlink-ccip](https://github.com/smartcontractkit/chainlink-ccip)! 
+CCIP 1.6 has a new home: [github.com/smartcontractkit/chainlink-ccip](https://github.com/smartcontractkit/chainlink-ccip)!
 This is the new long-term home for not only the EVM contracts, but also SVM (Solana), Aptos and all future non-EVM chains.
 
 v1.6 is mostly an invisible release for end users, but features a full rework under the hood. Some of the features include
+
 - More gas efficient code, leading to lower fees.
 - Offchain RMN blessings.
   - The Commit DON now directly communicated with the RMN and submits pre-blessed roots.
   - Reduces gas cost of blessing significantly.
   - Reduces the number of onchain transactions, lowering the time it takes to execute a CCIP message.
 - Merged the CommitStore with the OffRamp.
-- A single OnRamp and OffRamp contract per chain instead of one per lane. 
+- A single OnRamp and OffRamp contract per chain instead of one per lane.
   - This greatly reduces the number of contracts deployed on each chain, and increases batching opportunities.
   - Faster chain expansion due to the reduced number of contracts.
   - Cross-source message execution in a single transaction.
@@ -24,8 +54,8 @@ v1.6 is mostly an invisible release for end users, but features a full rework un
 - A new way to permissionlessly onboard tokens to CCIP
   - In addition to the already existing owner() and getCCIPAdmin() functions, we introduce registering for OZ AccessControl.
   - A user that has the `DEFAULT_ADMIN_ROLE` on their token can now register their token on the TokenAdminRegistry.
-- Upgraded the Solidity compiler to 0.8.26, with most contracts now requiring ^0.8.24. 
- 
+- Upgraded the Solidity compiler to 0.8.26, with most contracts now requiring ^0.8.24.
+
 ### Minor Changes
 
 - [#804](https://github.com/smartcontractkit/chainlink-ccip/pull/804) [`875e982`](https://github.com/smartcontractkit/chainlink-ccip/commit/875e982e6437dc126710d8224dd7c792a197bea6) - #feature move contract to chainlink-ccip
@@ -143,7 +173,6 @@ v1.6 is mostly an invisible release for end users, but features a full rework un
 - [#14863](https://github.com/smartcontractkit/chainlink/pull/14863) [`84bcbe0`](https://github.com/smartcontractkit/chainlink/commit/84bcbe03ebfa3ab7f58b97897eb0c55b45191859) - Change else if to else..if..
 
 - [#15570](https://github.com/smartcontractkit/chainlink/pull/15570) [`c1341a5`](https://github.com/smartcontractkit/chainlink/commit/c1341a5081d098bce04a7564a6525a91f2beeecf) - Add getChainConfig to ccipHome
-
 
 ## 1.5.0
 

@@ -18,9 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
@@ -34,16 +35,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	readerinternal "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	mockinternalreader "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	mockreader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	s := newRoleDonTestSetup(t, 3, 7, 1)
 	const numUnderstaffedChains = 1
@@ -112,7 +112,7 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 		// Dest Chain Expectations - Makes sure only oracles that support the destination chain are reading it.
 		{
 			if oracleChains.Contains(s.destChain) {
-				deps.ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).Return(ccipreader.CurseInfo{}, nil)
+				deps.ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).Return(cciptypes.CurseInfo{}, nil)
 
 				nextSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 				for _, ch := range s.sourceChains {
@@ -161,7 +161,7 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 }
 
 func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	s := newRoleDonTestSetup(t, 4, 7, 1)
 	chainsWithMsgs := []cciptypes.ChainSelector{s.sourceChains[0], s.sourceChains[1]}
@@ -281,7 +281,7 @@ func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
 }
 
 func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	s := newRoleDonTestSetup(t, 3, 7, 1)
 	t.Logf("Running test with Role DON Setup:\n%s", s)

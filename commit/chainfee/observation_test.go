@@ -17,14 +17,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	plugincommon2 "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	reader3 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func Test_processor_Observation(t *testing.T) {
@@ -122,7 +122,7 @@ func Test_processor_Observation(t *testing.T) {
 			homeChain := reader2.NewMockHomeChain(t)
 			oracleID := commontypes.OracleID(rand.Int() % 255)
 			lggr := logger.Test(t)
-			ctx := tests.Context(t)
+			ctx := t.Context()
 
 			p := &processor{
 				lggr:            lggr,
@@ -333,7 +333,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			homeChain := reader2.NewMockHomeChain(t)
 			oracleID := commontypes.OracleID(rand.Int() % 255)
 			lggr := logger.Test(t)
-			ctx := tests.Context(t)
+			ctx := t.Context()
 
 			p := &processor{
 				lggr:            lggr,

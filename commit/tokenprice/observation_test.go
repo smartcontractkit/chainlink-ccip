@@ -15,11 +15,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -34,8 +35,8 @@ func Test_Observation(t *testing.T) {
 		tokenB: cciptypes.NewBigInt(bi200),
 	}
 	feeQuoterTokenUpdates := map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
-		tokenA: cciptypes.NewTimestampedBig(bi100.Int64(), timestamp),
-		tokenB: cciptypes.NewTimestampedBig(bi200.Int64(), timestamp),
+		tokenA: cciptypes.NewTimestampedBig(100, timestamp), // bi100 is big.NewInt(100)
+		tokenB: cciptypes.NewTimestampedBig(200, timestamp), // bi200 is big.NewInt(200)
 	}
 	oracleID := commontypes.OracleID(1)
 	lggr := logger.Test(t)
@@ -68,8 +69,8 @@ func Test_Observation(t *testing.T) {
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).Return(
 					map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
-						tokenA: cciptypes.NewTimestampedBig(bi100.Int64(), timestamp),
-						tokenB: cciptypes.NewTimestampedBig(bi200.Int64(), timestamp),
+						tokenA: cciptypes.NewTimestampedBig(100, timestamp),
+						tokenB: cciptypes.NewTimestampedBig(200, timestamp),
 					},
 					nil,
 				)
@@ -121,8 +122,8 @@ func Test_Observation(t *testing.T) {
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).Return(
 					map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{
-						tokenA: cciptypes.NewTimestampedBig(bi100.Int64(), timestamp),
-						tokenB: cciptypes.NewTimestampedBig(bi200.Int64(), timestamp),
+						tokenA: cciptypes.NewTimestampedBig(100, timestamp),
+						tokenB: cciptypes.NewTimestampedBig(200, timestamp),
 					},
 					nil,
 				)

@@ -10,8 +10,8 @@ import {OffRampOverSuperchainInterop} from "../../../offRamp/OffRampOverSupercha
 import {MockCrossL2Inbox} from "../../mocks/MockCrossL2Inbox.sol";
 import {OffRampOverSuperchainInteropSetup} from "./OffRampOverSuperchainInteropSetup.t.sol";
 
-contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInteropSetup {
-  function test_verifyMessage() public {
+contract OffRampOverSuperchainInterop_verifyReport is OffRampOverSuperchainInteropSetup {
+  function test_verifyReport() public {
     Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 1);
 
     uint256 blockNumber = 12345;
@@ -56,12 +56,16 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
     assertEq(call.msgHash, expectedLogHash);
   }
 
-  function testFuzz_verifyMessage_Success(
+  function testFuzz_verifyReport_Success(
     uint256 blockNumber,
     uint256 logIndex,
     uint256 timestamp,
     uint64 sequenceNumber
   ) public {
+    // Constrain inputs to avoid InvalidEncodingOfIdentifierInProofs
+    vm.assume(blockNumber != 0);
+    vm.assume(timestamp != 0);
+
     Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, sequenceNumber);
 
     (bytes32[] memory proofs, Identifier memory expectedIdentifier) =
@@ -104,7 +108,7 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
 
   // Reverts
 
-  function test_verifyMessage_RevertWhen_InvalidMessageCount() public {
+  function test_verifyReport_RevertWhen_InvalidMessageCount() public {
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](0);
 
     Internal.ExecutionReport memory report = Internal.ExecutionReport({
@@ -126,7 +130,7 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
     s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
   }
 
-  function test_verifyMessage_RevertWhen_InvalidSourceChainSelector() public {
+  function test_verifyReport_RevertWhen_InvalidSourceChainSelector() public {
     Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_2, 1);
 
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
@@ -150,7 +154,7 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
     s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
   }
 
-  function test_verifyMessage_RevertWhen_InvalidDestChainSelector() public {
+  function test_verifyReport_RevertWhen_InvalidDestChainSelector() public {
     uint64 invalidDestChainSelector = 99999;
 
     Internal.Any2EVMRampMessage memory message = Internal.Any2EVMRampMessage({
@@ -187,7 +191,7 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
     s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
   }
 
-  function test_verifyMessage_RevertWhen_InvalidProofsLength() public {
+  function test_verifyReport_RevertWhen_InvalidProofsLength() public {
     Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 1);
 
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
@@ -211,12 +215,16 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
     s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
   }
 
-  function test_verifyMessage_RevertWhen_InvalidSourceOnRamp() public {
+  function test_verifyReport_RevertWhen_InvalidSourceOnRamp() public {
     Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 1);
 
     address wrongOnRamp = makeAddr("wrong_onramp");
     bytes32[] memory proofs = new bytes32[](5);
     proofs[0] = bytes32(uint256(uint160(wrongOnRamp))); // Wrong onRamp
+    proofs[1] = bytes32(block.number); // blockNumber
+    proofs[2] = bytes32(uint256(1)); // logIndex (can be zero)
+    proofs[3] = bytes32(block.timestamp); // timestamp
+    proofs[4] = bytes32(CHAIN_ID_1); // chainId
 
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
     messages[0] = message;
@@ -237,7 +245,7 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
     s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
   }
 
-  function test_verifyMessage_RevertWhen_ChainIdNotConfigured() public {
+  function test_verifyReport_RevertWhen_ChainIdNotConfigured() public {
     // Add a new source chain selector without chainId mapping
     uint64 newSourceChainSelector = 9999;
     address newOnRamp = makeAddr("new_onramp");
@@ -258,6 +266,10 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
     // Identifier uses the new OnRamp
     bytes32[] memory proofs = new bytes32[](5);
     proofs[0] = bytes32(uint256(uint160(newOnRamp)));
+    proofs[1] = bytes32(block.number); // blockNumber
+    proofs[2] = bytes32(uint256(1)); // logIndex (can be zero)
+    proofs[3] = bytes32(block.timestamp); // timestamp
+    proofs[4] = bytes32(uint256(99)); // chainId (some non-zero value)
 
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
     messages[0] = message;
@@ -278,7 +290,7 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
     s_offRampOverSuperchainInterop.verifyMessage(newSourceChainSelector, report);
   }
 
-  function test_verifyMessage_RevertWhen_ChainIdMismatch() public {
+  function test_verifyReport_RevertWhen_ChainIdMismatch() public {
     Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 1);
 
     uint256 invalidChainId = 200;
@@ -305,7 +317,7 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
     s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
   }
 
-  function test_verifyMessage_RevertWhen_CrossL2InboxValidationFails() public {
+  function test_verifyReport_RevertWhen_CrossL2InboxValidationFails() public {
     Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 1);
 
     (bytes32[] memory proofs, Identifier memory expectedIdentifier) = _getValidProofsAndIdentifier(block.number, 1, 1);
@@ -328,6 +340,25 @@ contract OffRampOverSuperchainInterop_verifyMessage is OffRampOverSuperchainInte
 
     // Expect revert from MockCrossL2Inbox
     vm.expectRevert(abi.encodeWithSelector(MockCrossL2Inbox.ValidationFailed.selector, validationError));
+    s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
+  }
+
+  function test_verifyMessage_RevertWhen_ProofFlagBitsMustBeZero() public {
+    Internal.Any2EVMRampMessage memory message = _generateValidMessage(SOURCE_CHAIN_SELECTOR_1, 1);
+    (bytes32[] memory proofs,) = _getValidProofsAndIdentifier(block.number, 1, block.timestamp);
+
+    Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
+    messages[0] = message;
+
+    Internal.ExecutionReport memory report = Internal.ExecutionReport({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      messages: messages,
+      offchainTokenData: new bytes[][](1),
+      proofs: proofs,
+      proofFlagBits: 1 // This should trigger ProofFlagBitsMustBeZero
+    });
+
+    vm.expectRevert(OffRampOverSuperchainInterop.ProofFlagBitsMustBeZero.selector);
     s_offRampOverSuperchainInterop.verifyMessage(SOURCE_CHAIN_SELECTOR_1, report);
   }
 }

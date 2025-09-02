@@ -5,6 +5,7 @@ import {IGetCCIPAdmin} from "../../interfaces/IGetCCIPAdmin.sol";
 import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
+import {HyperEVMLinker} from "./HyperEVMLinker.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {ERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
@@ -20,7 +21,14 @@ import {EnumerableSet} from
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The constructor has been modified to support the deployment pattern used by a factory contract.
 /// @dev The total supply can be limited during deployment.
-contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Burnable, Ownable2StepMsgSender {
+contract FactoryBurnMintERC20 is
+  IBurnMintERC20,
+  IGetCCIPAdmin,
+  IERC165,
+  ERC20Burnable,
+  Ownable2StepMsgSender,
+  HyperEVMLinker
+{
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error SenderNotMinter(address sender);
@@ -64,12 +72,6 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
 
     // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero
     if (preMint != 0) _mint(newOwner, preMint);
-
-    // Grant the deployer the minter and burner roles. This contract is expected to be deployed by a factory
-    // contract that will transfer ownership to the correct address after deployment, so granting minting and burning
-    // privileges here saves gas by not requiring two transactions.
-    grantMintRole(newOwner);
-    grantBurnRole(newOwner);
   }
 
   /// @inheritdoc IERC165

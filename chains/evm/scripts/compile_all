@@ -10,7 +10,7 @@ echo " └───────────────────────�
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_OFFRAMP=800
 OPTIMIZE_RUNS_FEE_QUOTER=8000
-OPTIMIZE_RUNS_BURN_MINT_FAST_TRASNFER_TOKEN_POOL=8000
+OPTIMIZE_RUNS_LARGE_TOKEN_POOL=5000
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
@@ -61,16 +61,24 @@ function getOptimizations() {
       "FeeQuoter")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
         ;;
-      "BurnMintFastTransferTokenPool")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_BURN_MINT_FAST_TRASNFER_TOKEN_POOL"
+      "BurnMintFastTransferTokenPool" | "HybridLockReleaseUSDCTokenPool")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
         ;;
     esac
 
     echo "$optimize_runs_override"
 }
 
+# Mod sec
+compileContract onRamp/CCVProxy
+compileContract onRamp/CommitOnRamp
+compileContract offRamp/CCVAggregator
+compileContract offRamp/CommitOffRamp
+
+# 1.6
 compileContract offRamp/OffRamp
 compileContract FeeQuoter
+compileContract FeeQuoterV2
 compileContract onRamp/OnRamp
 compileContract applications/PingPongDemo
 compileContract applications/EtherSenderReceiver
@@ -94,11 +102,12 @@ compileContract pools/BurnWithFromMintTokenPool
 compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
 compileContract pools/USDC/USDCTokenPool
-compileContract pools/USDC/HybridLockReleaseUSDCTokenPool
 compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/BurnMintFastTransferTokenPool
-
+compileContract pools/ERC20LockBox
+compileContract pools/USDC/SiloedUSDCTokenPool
+compileContract pools/USDC/USDCTokenPoolCCTPV2
 
 # Test helpers
 compileContract test/helpers/BurnMintERC677Helper

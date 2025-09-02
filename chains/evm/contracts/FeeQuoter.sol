@@ -171,7 +171,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @dev The decimals that Keystone reports prices in.
   uint256 public constant KEYSTONE_PRICE_DECIMALS = 18;
 
-  string public constant override typeAndVersion = "FeeQuoter 1.6.1-dev";
+  string public constant override typeAndVersion = "FeeQuoter 1.6.2-dev";
 
   /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals. Multiple gas prices can
   /// be encoded into the same value. Each price takes {Internal.GAS_PRICE_BITS} bits. For example, if Optimism is the
@@ -201,7 +201,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
 
   /// @dev The token transfer fee config that can be set by the owner or fee admin.
-  mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) private
+  mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) internal
     s_tokenTransferFeeConfig;
 
   /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to
@@ -508,7 +508,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     bytes4 interfaceId
   ) public pure override returns (bool) {
     return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IFeeQuoter).interfaceId
-      || interfaceId == type(ITypeAndVersion).interfaceId || interfaceId == type(IERC165).interfaceId;
+      || interfaceId == type(IERC165).interfaceId;
   }
 
   /// @inheritdoc IReceiver
@@ -1044,7 +1044,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         }
       } else {
         // The messaging accounts needed for CCIP receiver on SVM are:
-        // message receiver, offramp PDA signer,
+        // message receiver, offRamp PDA signer,
         // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.
         svmExpandedDataLength +=
           ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE);

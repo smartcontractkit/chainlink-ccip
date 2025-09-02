@@ -30,12 +30,12 @@ contract OffRampOverSuperchainInteropHelper is OffRampOverSuperchainInterop {
     return _constructProofs(message, proofs);
   }
 
-  /// @notice Exposes the internal _verifyMessage function as public for testing
+  /// @notice Exposes the internal _verifyReport function as public for testing
   function verifyMessage(
     uint64 sourceChainSelector,
     Internal.ExecutionReport memory report
   ) public returns (uint256 timestampCommitted, bytes32[] memory hashedLeaves) {
-    return _verifyMessage(sourceChainSelector, report);
+    return _verifyReport(sourceChainSelector, report);
   }
 
   /// @notice Exposes the internal _executeSingleReport function as public for testing

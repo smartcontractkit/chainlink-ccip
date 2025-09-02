@@ -14,7 +14,7 @@ import {TokenPool} from "./TokenPool.sol";
 /// If that is expected, please make sure the token's burner/minter roles are adjustable.
 /// @dev This contract is a variant of BurnMintTokenPool that uses `burn(amount)`.
 contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
-  string public constant override typeAndVersion = "BurnMintTokenPool 1.6.1-dev";
+  string public constant override typeAndVersion = "BurnMintTokenPool 1.6.3-dev";
 
   constructor(
     IBurnMintERC20 token,

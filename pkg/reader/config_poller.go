@@ -7,9 +7,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -26,7 +27,7 @@ const (
 // ConfigPoller defines the interface for caching chain configuration data
 type ConfigPoller interface {
 	// GetChainConfig retrieves the cached configuration for a chain
-	GetChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error)
+	GetChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (cciptypes.ChainConfigSnapshot, error)
 	// GetOfframpSourceChainConfigs retrieves cached source chain configurations
 	GetOfframpSourceChainConfigs(
 		ctx context.Context,
@@ -62,7 +63,7 @@ type configPoller struct {
 type chainCache struct {
 	// Chain config specific lock and data
 	chainConfigMu      sync.RWMutex
-	chainConfigData    ChainConfigSnapshot
+	chainConfigData    cciptypes.ChainConfigSnapshot
 	chainConfigRefresh time.Time
 
 	// Source chain config specific lock and data
@@ -489,12 +490,12 @@ func (c *configPoller) getOrCreateChainCache(chainSel cciptypes.ChainSelector) *
 func (c *configPoller) GetChainConfig(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
-) (ChainConfigSnapshot, error) {
+) (cciptypes.ChainConfigSnapshot, error) {
 	// Check if we have a reader for this chain
 	reader, exists := c.reader.getContractReader(chainSel)
 	if !exists || reader == nil {
 		c.lggr.Errorw("No contract reader for chain", "chain", chainSel)
-		return ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
+		return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
 	}
 
 	chainCache := c.getOrCreateChainCache(chainSel)
@@ -523,7 +524,8 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 	sourceChains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	// Verify we have a reader for the destination chain
-	if _, exists := c.reader.getContractReader(destChain); !exists {
+	_, exists := c.reader.getContractReader(destChain)
+	if !exists {
 		c.lggr.Errorw("No contract reader for destination chain", "chain", destChain)
 		return nil, fmt.Errorf("no contract reader for destination chain %d", destChain)
 	}
@@ -600,7 +602,7 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 func (c *configPoller) refreshChainConfig(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
-) (ChainConfigSnapshot, error) {
+) (cciptypes.ChainConfigSnapshot, error) {
 	chainCache := c.getOrCreateChainCache(chainSel)
 
 	// Check if context is done and we have cached data (short read lock)
@@ -639,7 +641,7 @@ func (c *configPoller) refreshChainConfig(
 			"chain", chainSel,
 			"error", err,
 			"fetchConfigLatency", fetchConfigLatency)
-		return ChainConfigSnapshot{}, fmt.Errorf("failed to refresh cache for chain %d: %w", chainSel, err)
+		return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("failed to refresh cache for chain %d: %w", chainSel, err)
 	}
 
 	// Acquire write lock only for updating the cache
@@ -719,17 +721,17 @@ func (c *configPoller) refreshSourceChainConfigs(
 
 func (c *configPoller) fetchChainConfig(
 	ctx context.Context,
-	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
+	chainSel cciptypes.ChainSelector) (cciptypes.ChainConfigSnapshot, error) {
 
 	reader, exists := c.reader.getContractReader(chainSel)
 	if !exists {
-		return ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
+		return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
 	}
 
 	requests := c.reader.prepareBatchConfigRequests(chainSel)
 	batchResult, skipped, err := reader.ExtendedBatchGetLatestValues(ctx, requests, true)
 	if err != nil {
-		return ChainConfigSnapshot{}, fmt.Errorf("batch get latest values for chain %d: %w", chainSel, err)
+		return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("batch get latest values for chain %d: %w", chainSel, err)
 	}
 
 	if len(skipped) > 0 {

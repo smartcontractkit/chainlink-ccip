@@ -10,9 +10,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
@@ -203,8 +204,8 @@ func (r InMemoryCCIPReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.R
 	return cciptypes.RemoteConfig{}, nil
 }
 
-func (r InMemoryCCIPReader) GetRmnCurseInfo(ctx context.Context) (reader.CurseInfo, error) {
-	return reader.CurseInfo{
+func (r InMemoryCCIPReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
+	return cciptypes.CurseInfo{
 		CursedSourceChains: map[cciptypes.ChainSelector]bool{},
 		CursedDestination:  false,
 		GlobalCurse:        false,

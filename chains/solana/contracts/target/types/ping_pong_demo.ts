@@ -1,5 +1,5 @@
 export type PingPongDemo = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "ping_pong_demo",
   "instructions": [
     {
@@ -649,7 +649,7 @@ export type PingPongDemo = {
 };
 
 export const IDL: PingPongDemo = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "ping_pong_demo",
   "instructions": [
     {

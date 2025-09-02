@@ -8,8 +8,9 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func Test_validateObservedMerkleRoots(t *testing.T) {

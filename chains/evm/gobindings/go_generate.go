@@ -1,5 +1,11 @@
 package ccip
 
+// Mod sec
+//go:generate go run generation/generate/wrap.go ccip CCVProxy ccv_proxy latest
+//go:generate go run generation/generate/wrap.go ccip CommitOnRamp commit_onramp latest
+//go:generate go run generation/generate/wrap.go ccip CCVAggregator ccv_aggregator latest
+//go:generate go run generation/generate/wrap.go ccip CommitOffRamp commit_offramp latest
+
 //go:generate go run generation/generate/wrap.go ccip Router router latest
 //go:generate go run generation/generate/wrap.go ccip CCIPHome ccip_home latest
 //go:generate go run generation/generate/wrap.go ccip OnRamp onramp latest
@@ -7,6 +13,7 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip OnRampWithMessageTransformer onramp_with_message_transformer latest
 //go:generate go run generation/generate/wrap.go ccip OffRampWithMessageTransformer offramp_with_message_transformer latest
 //go:generate go run generation/generate/wrap.go ccip FeeQuoter fee_quoter latest
+//go:generate go run generation/generate/wrap.go ccip FeeQuoterV2 fee_quoter_v2 latest
 //go:generate go run generation/generate/wrap.go ccip NonceManager nonce_manager latest
 //go:generate go run generation/generate/wrap.go ccip TokenAdminRegistry token_admin_registry latest
 //go:generate go run generation/generate/wrap.go ccip TokenPoolFactory token_pool_factory latest
@@ -25,9 +32,11 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip USDCTokenPool usdc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnToAddressMintTokenPool burn_to_address_mint_token_pool latest
-//go:generate go run generation/generate/wrap.go ccip HybridLockReleaseUSDCTokenPool hybrid_lock_release_usdc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnMintFastTransferTokenPool fast_transfer_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip CCTPMessageTransmitterProxy cctp_message_transmitter_proxy latest
+//go:generate go run generation/generate/wrap.go ccip ERC20LockBox erc20_lock_box latest
+//go:generate go run generation/generate/wrap.go ccip SiloedUSDCTokenPool siloed_usdc_token_pool latest
+//go:generate go run generation/generate/wrap.go ccip USDCTokenPoolCCTPV2 usdc_token_pool_cctp_v2 latest
 
 // Helpers
 //go:generate go run generation/generate/wrap.go ccip MaybeRevertMessageReceiver maybe_revert_message_receiver latest

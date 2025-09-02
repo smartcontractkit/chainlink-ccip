@@ -83,7 +83,8 @@ contract FastTransferTokenPoolSetup is BaseTest {
       18, // localTokenDecimals
       new address[](0), // allowlist
       address(s_mockRMNRemote), // rmnProxy
-      address(s_sourceRouter) // router
+      address(s_sourceRouter), // router
+      SOURCE_CHAIN_SELECTOR // sourceChainSelector
     );
 
     s_pool.updateDestChainConfig(laneConfigArgs);

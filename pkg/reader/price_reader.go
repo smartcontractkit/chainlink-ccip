@@ -9,10 +9,11 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -301,10 +302,10 @@ func (pr *priceReader) prepareBatchRequest(
 func (pr *priceReader) normalizePrice(price *big.Int, decimals uint8) *big.Int {
 	answer := new(big.Int).Set(price)
 	if decimals < 18 {
-		return answer.Mul(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimals)), nil))
+		return new(big.Int).Mul(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimals)), nil))
 	}
 	if decimals > 18 {
-		return answer.Div(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)-18), nil))
+		return new(big.Int).Div(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)-18), nil))
 	}
 	return answer
 }
@@ -322,7 +323,7 @@ func (pr *priceReader) feedChainReader() contractreader.ContractReaderFacade {
 //	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 	tmp := big.NewInt(0).Mul(price, big.NewInt(1e18))
-	return tmp.Div(tmp, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
+	return new(big.Int).Div(tmp, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
 }
 
 // Ensure priceReader implements PriceReader

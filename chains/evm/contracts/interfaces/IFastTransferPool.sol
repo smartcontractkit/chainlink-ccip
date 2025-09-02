@@ -32,6 +32,14 @@ interface IFastTransferPool {
     uint8 sourceDecimals,
     uint256 fillerFee,
     uint256 poolFee,
+    /// @param destinationPool The destination chain pool where both the fill and settlement processes occur.
+    /// @dev Fillers must invoke `fill` on the exact `destinationPool` address specified in the event tied to a fast transfer request.
+    /// This ensures proper handling, as the active destination pool address can be updated in the token admin registry during token pool upgrades.
+    /// In such cases, inflight messages are routed to the pool address specified in the event, where settlement takes place.
+    /// To ensure accurate compensation during settlement, the fast fill must also occur at the pool address specified in the event.
+    /// @notice Observability tools or indexing components should observe the `FastTransferFilled` and `FastTransferSettled` events from the `destinationPool`
+    /// emitted in this event to monitor both fill and settlement actions for accurate status and metrics.
+    bytes destinationPool,
     bytes receiver
   );
   /// @notice Emitted when a fast transfer is filled. This means the end user has received the tokens but the slow
@@ -103,12 +111,14 @@ interface IFastTransferPool {
 
   /// @notice Helper function to generate fill ID from request parameters.
   /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
+  /// @param sourceChainSelector The chain selector where the fill request originated.
   /// @param sourceAmountNetFee The amount being filled, excluding the fast fill fee, expressed in source token decimals.
   /// @param sourceDecimals The decimals of the token on the source token.
   /// @param receiver The receiver on the destination chain. ABI encoded in the case of an EVM destination chain.
   /// @return fillId The computed fill ID.
   function computeFillId(
     bytes32 settlementId,
+    uint64 sourceChainSelector,
     uint256 sourceAmountNetFee,
     uint8 sourceDecimals,
     bytes memory receiver

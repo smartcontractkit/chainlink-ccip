@@ -68,6 +68,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error CommitOnRampMismatch(bytes reportOnRamp, bytes configOnRamp);
   error InvalidOnRampUpdate(uint64 sourceChainSelector);
   error RootBlessingMismatch(uint64 sourceChainSelector, bytes32 merkleRoot, bool isBlessed);
+  error InsufficientGasToCompleteTx(bytes4 err);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -211,7 +212,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "OffRamp 1.6.1-dev";
+    return "OffRamp 1.6.2-dev";
   }
 
   // ================================================================
@@ -393,7 +394,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     if (numMsgs == 0) revert EmptyReport(report.sourceChainSelector);
     if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
 
-    (uint256 timestampCommitted, bytes32[] memory hashedLeaves) = _verifyMessage(sourceChainSelector, report);
+    (uint256 timestampCommitted, bytes32[] memory hashedLeaves) = _verifyReport(sourceChainSelector, report);
 
     // Execute messages.
     for (uint256 i = 0; i < numMsgs; ++i) {
@@ -883,7 +884,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param report The report to verify.
   /// @return timestampCommitted The timestamp of the committed root.
   /// @return hashedLeaves The hash for every message in the report.
-  function _verifyMessage(
+  function _verifyReport(
     uint64 sourceChainSelector,
     Internal.ExecutionReport memory report
   ) internal virtual returns (uint256 timestampCommitted, bytes32[] memory hashedLeaves) {

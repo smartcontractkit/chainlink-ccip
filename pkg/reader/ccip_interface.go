@@ -10,9 +10,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var (
@@ -23,47 +23,8 @@ var (
 
 // ContractAddresses is a map of contract names across all chain selectors and their address.
 // Currently only one contract per chain per name is supported.
+// Deprecated: Use cciptypes.ContractAddresses instead.
 type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
-
-// ChainConfigSnapshot represents the complete configuration state of the chain
-type ChainConfigSnapshot struct {
-	Offramp   OfframpConfig
-	RMNProxy  RMNProxyConfig
-	RMNRemote RMNRemoteConfig
-	FeeQuoter FeeQuoterConfig
-	OnRamp    OnRampConfig
-	Router    RouterConfig
-	CurseInfo CurseInfo
-}
-
-type OnRampConfig struct {
-	DynamicConfig   getOnRampDynamicConfigResponse
-	DestChainConfig onRampDestChainConfig
-}
-
-type FeeQuoterConfig struct {
-	StaticConfig feeQuoterStaticConfig
-}
-
-type RMNRemoteConfig struct {
-	DigestHeader    rmnDigestHeader
-	VersionedConfig versionedConfig
-}
-
-type OfframpConfig struct {
-	CommitLatestOCRConfig OCRConfigResponse
-	ExecLatestOCRConfig   OCRConfigResponse
-	StaticConfig          offRampStaticChainConfig
-	DynamicConfig         offRampDynamicChainConfig
-}
-
-type RMNProxyConfig struct {
-	RemoteAddress []byte
-}
-
-type RouterConfig struct {
-	WrappedNativeAddress cciptypes.Bytes
-}
 
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
@@ -122,6 +83,7 @@ func (s StaticSourceChainConfig) check() (bool /* enabled */, error) {
 func NewCCIPChainReader(
 	ctx context.Context,
 	lggr logger.Logger,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
@@ -131,6 +93,7 @@ func NewCCIPChainReader(
 	reader, err := newCCIPChainReaderInternal(
 		ctx,
 		lggr,
+		chainAccessors,
 		contractReaders,
 		contractWriters,
 		destChain,
@@ -148,33 +111,35 @@ func NewCCIPChainReader(
 }
 
 // NewCCIPReaderWithExtendedContractReaders can be used when you want to directly provide contractreader.Extended
+// Deprecated: This should only be used in tests if absolutely necessary. Use NewCCIPChainReader instead.
 func NewCCIPReaderWithExtendedContractReaders(
 	ctx context.Context,
 	lggr logger.Logger,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	extendedContractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
 ) CCIPReader {
-	cr, err := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec)
+	cr, err := newCCIPChainReaderInternal(
+		ctx,
+		lggr,
+		chainAccessors,
+		nil,
+		contractWriters,
+		destChain,
+		offrampAddress,
+		addrCodec,
+	)
 	if err != nil {
 		// Panic here since right now this is only called from tests in core
 		panic(fmt.Errorf("failed to create CCIP reader: %w", err))
 	}
-	var cas = make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 	for ch, extendedCr := range extendedContractReaders {
-		cr.WithExtendedContractReader(ch, extendedCr)
-		cas[ch] = chainaccessor.NewDefaultAccessor(
-			lggr,
-			ch,
-			extendedCr,
-			contractWriters[ch],
-			addrCodec,
-		)
+		cr.WithExtendedContractReaderTESTONLY(ch, extendedCr)
 	}
 
-	cr.accessors = cas
 	return cr
 }
 
@@ -260,7 +225,7 @@ type CCIPReader interface {
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
-	GetRmnCurseInfo(ctx context.Context) (CurseInfo, error)
+	GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error)
 
 	// DiscoverContracts will discover as many addresses as possible based on which addresses are already known.
 	// Initially only the offramp address is known so in the first round the oracles that support the destination chain

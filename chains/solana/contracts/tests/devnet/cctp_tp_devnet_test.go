@@ -21,11 +21,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/base_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
@@ -86,13 +86,15 @@ func TestCctpTpDevnet(t *testing.T) {
 
 	remotePoolBytes, err := hex.DecodeString(devnetInfo.CCTP.Sepolia.TokenPool)
 	require.NoError(t, err)
-	remotePoolAddressBytes := [32]byte{}
-	copy(remotePoolAddressBytes[32-len(remotePoolBytes):], remotePoolBytes)
-	remotePoolAddress := solana.PublicKey(remotePoolAddressBytes)
 
 	chainSelector := devnetInfo.ChainSelectors.Sepolia
 	domain := domains[chainSelector]
-	domainDestCaller := remotePoolAddress
+
+	domainDestCallerAddress, err := hex.DecodeString(devnetInfo.CCTP.Sepolia.AllowedCaller)
+	require.NoError(t, err)
+	domainDestCallerBytes := [32]byte{}
+	copy(domainDestCallerBytes[32-len(domainDestCallerAddress):], domainDestCallerAddress)
+	domainDestCaller := solana.PublicKey(domainDestCallerBytes)
 
 	cctpPool := getCctpTokenPoolPDAs(t, cctpTpProgram, chainSelector, usdcMint)
 	messageTransmitter := getMessageTransmitterPDAs(t, cctpMtProgram, cctpTmmProgram)
@@ -139,6 +141,26 @@ func TestCctpTpDevnet(t *testing.T) {
 	var programData ProgramData
 	require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
+	t.Run("Delete chain config", func(t *testing.T) {
+		t.Skip()
+
+		ix, err := cctp_token_pool.NewDeleteChainConfigInstruction(
+			chainSelector,
+			usdcMint,
+			cctpPool.state,
+			cctpPool.chainConfig,
+			admin.PublicKey(),
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		res := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		require.NotNil(t, res)
+
+		for _, log := range res.Meta.LogMessages {
+			fmt.Println(log)
+		}
+	})
+
 	t.Run("Initialize TokenPool", func(t *testing.T) {
 		t.Skip()
 
@@ -163,22 +185,22 @@ func TestCctpTpDevnet(t *testing.T) {
 		// require.NoError(t, err)
 
 		// // set pool config
-		// ixConfigure, err := cctp_token_pool.NewInitChainRemoteConfigInstruction(
-		// 	chainSelector,
-		// 	usdcMint,
-		// 	cctp_token_pool.RemoteConfig{
-		// 		TokenAddress: cctp_token_pool.RemoteAddress{
-		// 			Address: usdcMint.Bytes(),
-		// 		},
-		// 		Decimals:      usdcDecimals,
-		// 		PoolAddresses: []cctp_token_pool.RemoteAddress{},
-		// 	},
-		// 	cctpPool.state,
-		// 	cctpPool.chainConfig,
-		// 	admin.PublicKey(),
-		// 	solana.SystemProgramID,
-		// ).ValidateAndBuild()
-		// require.NoError(t, err)
+		ixConfigure, err := cctp_token_pool.NewInitChainRemoteConfigInstruction(
+			chainSelector,
+			usdcMint,
+			cctp_token_pool.RemoteConfig{
+				TokenAddress: cctp_token_pool.RemoteAddress{
+					Address: usdcMint.Bytes(),
+				},
+				Decimals:      usdcDecimals,
+				PoolAddresses: []cctp_token_pool.RemoteAddress{},
+			},
+			cctpPool.state,
+			cctpPool.chainConfig,
+			admin.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
 
 		ixEditChainRemoteConfig, err := cctp_token_pool.NewEditChainRemoteConfigInstruction(
 			chainSelector,
@@ -213,7 +235,7 @@ func TestCctpTpDevnet(t *testing.T) {
 		ixAppend, err := cctp_token_pool.NewAppendRemotePoolAddressesInstruction(
 			chainSelector,
 			usdcMint,
-			[]cctp_token_pool.RemoteAddress{{Address: remotePoolAddress.Bytes()}},
+			[]cctp_token_pool.RemoteAddress{{Address: remotePoolBytes}},
 			cctpPool.state,
 			cctpPool.chainConfig,
 			admin.PublicKey(),
@@ -227,7 +249,7 @@ func TestCctpTpDevnet(t *testing.T) {
 		// require.Equal(t, poolTokenAccount, cctpPool.tokenAccount)
 
 		// submit tx with all instructions
-		res := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ixEditChainRemoteConfig, ixAppend, ixCctpConfigure}, admin, config.DefaultCommitment)
+		res := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ixConfigure, ixEditChainRemoteConfig, ixAppend, ixCctpConfigure}, admin, config.DefaultCommitment)
 		require.NotNil(t, res)
 
 		// 	// validate state
@@ -465,7 +487,7 @@ func TestCctpTpDevnet(t *testing.T) {
 				tpLookupTableAddr,
 				tokenAdminRegistry,
 				cctpPool.program,
-				cctpPool.state,        // 3 - writable
+				cctpPool.state,
 				cctpPool.tokenAccount, // 4 - writable
 				cctpPool.signer,       // 5 - writable (to pay for event account)
 				solana.TokenProgramID,
@@ -473,14 +495,13 @@ func TestCctpTpDevnet(t *testing.T) {
 				fqUsdcBillingTokenConfig,
 				routerSigner,
 				// -- CCTP custom entries --
-				tokenMessengerMinter.authorityPda,
-				messageTransmitter.messageTransmitter, // 11 - writable
-				tokenMessengerMinter.tokenMessenger,
-				tokenMessengerMinter.tokenMinter,
-				tokenMessengerMinter.localToken, // 14 - writable
-				messageTransmitter.program,
+				messageTransmitter.messageTransmitter, // 10 - writable
 				tokenMessengerMinter.program,
 				solana.SystemProgramID,
+				messageTransmitter.program,
+				tokenMessengerMinter.tokenMessenger,
+				tokenMessengerMinter.tokenMinter,
+				tokenMessengerMinter.localToken, // 16 - writable
 				tokenMessengerMinter.eventAuthority,
 			}
 
@@ -494,7 +515,7 @@ func TestCctpTpDevnet(t *testing.T) {
 			common.AwaitSlotChange(ctx, client)
 		})
 
-		writableIndexes := []byte{3, 4, 5, 7, 11, 14}
+		writableIndexes := []byte{4, 5, 7, 10, 16}
 
 		t.Run("Upgrade TokenAdminRegistry", func(t *testing.T) {
 			t.Skip()

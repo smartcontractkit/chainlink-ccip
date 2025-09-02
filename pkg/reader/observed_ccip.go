@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"math/big"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -11,8 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 const (
@@ -265,11 +267,11 @@ func (o *observedCCIPReader) GetRMNRemoteConfig(ctx context.Context) (cciptypes.
 	)
 }
 
-func (o *observedCCIPReader) GetRmnCurseInfo(ctx context.Context) (CurseInfo, error) {
+func (o *observedCCIPReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error) {
 	return withObservedQueryAndResult(
 		o,
 		"GetRmnCurseInfo",
-		func() (CurseInfo, error) {
+		func() (cciptypes.CurseInfo, error) {
 			return o.CCIPReader.GetRmnCurseInfo(ctx)
 		},
 		nil,
@@ -319,14 +321,16 @@ func (o *observedCCIPReader) trackChainFeeComponents(
 		}
 
 		if v.ExecutionFee != nil {
+			execFeeFloat, _ := new(big.Float).SetInt(v.ExecutionFee).Float64()
 			o.chainFeesGauge.
 				WithLabelValues(chainFamily, chainID, execCostLabel).
-				Set(float64(v.ExecutionFee.Int64()))
+				Set(execFeeFloat)
 		}
 		if v.DataAvailabilityFee != nil {
+			dataFeeFloat, _ := new(big.Float).SetInt(v.DataAvailabilityFee).Float64()
 			o.chainFeesGauge.
 				WithLabelValues(chainFamily, chainID, dataCostLabel).
-				Set(float64(v.DataAvailabilityFee.Int64()))
+				Set(dataFeeFloat)
 		}
 
 		o.lggr.Debugw(
