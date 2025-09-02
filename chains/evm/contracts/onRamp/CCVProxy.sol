@@ -498,6 +498,33 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         revert InvalidDestChainConfig(destChainSelector);
       }
 
+      // Validate no duplicates within laneMandatedCCVs
+      for (uint256 j = 0; j < destChainConfigArg.laneMandatedCCVs.length; ++j) {
+        for (uint256 k = j + 1; k < destChainConfigArg.laneMandatedCCVs.length; ++k) {
+          if (destChainConfigArg.laneMandatedCCVs[j] == destChainConfigArg.laneMandatedCCVs[k]) {
+            revert DuplicateCCVInConfig(destChainConfigArg.laneMandatedCCVs[j]);
+          }
+        }
+      }
+
+      // Validate no duplicates within defaultCCVs
+      for (uint256 j = 0; j < destChainConfigArg.defaultCCVs.length; ++j) {
+        for (uint256 k = j + 1; k < destChainConfigArg.defaultCCVs.length; ++k) {
+          if (destChainConfigArg.defaultCCVs[j] == destChainConfigArg.defaultCCVs[k]) {
+            revert DuplicateCCVInConfig(destChainConfigArg.defaultCCVs[j]);
+          }
+        }
+      }
+
+      // Validate no overlap between laneMandatedCCVs and defaultCCVs
+      for (uint256 j = 0; j < destChainConfigArg.laneMandatedCCVs.length; ++j) {
+        for (uint256 k = 0; k < destChainConfigArg.defaultCCVs.length; ++k) {
+          if (destChainConfigArg.laneMandatedCCVs[j] == destChainConfigArg.defaultCCVs[k]) {
+            revert DuplicateCCVInConfig(destChainConfigArg.laneMandatedCCVs[j]);
+          }
+        }
+      }
+
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain.
       destChainConfig.router = destChainConfigArg.router;
