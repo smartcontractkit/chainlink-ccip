@@ -91,7 +91,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
   struct AggregatedReport {
     /// @notice The message that is being executed.
-    Internal.Any2EVMMessage message; // The message is attested to by each CCV in the report.
+    bytes message; // The message is attested to by each CCV in the report.
     /// @notice CCVs that attested to the message. They must match the CCVs specified by the receiver of the message,
     /// and the pool of the token being transferred. They can be a superset, but the ones not specified by the receiver
     /// will be ignored. If there is no token transfer, no additional token CCVs are required. If the receiver is an EOA
@@ -186,18 +186,19 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     if (s_reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_reentrancyGuardEntered = true;
 
-    Internal.Any2EVMMessage memory message = _beforeExecuteSingleMessage(report.message);
+    Internal.MessageV1 memory message = _beforeExecuteSingleMessage(Internal._decodeMessageV1(report.message));
+    bytes32 messageId = keccak256(report.message);
+    Internal._validateEVMAddress(message.receiver);
+    address receiverAddress = abi.decode(message.receiver, (address));
 
-    uint64 sourceChainSelector = message.header.sourceChainSelector;
-
-    if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
-      revert CursedByRMN(sourceChainSelector);
+    if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
+      revert CursedByRMN(message.sourceChainSelector);
     }
-    if (!s_sourceChainConfigs[sourceChainSelector].isEnabled) {
-      revert SourceChainNotEnabled(sourceChainSelector);
+    if (!s_sourceChainConfigs[message.sourceChainSelector].isEnabled) {
+      revert SourceChainNotEnabled(message.sourceChainSelector);
     }
-    if (message.header.destChainSelector != i_chainSelector) {
-      revert InvalidMessageDestChainSelector(message.header.destChainSelector);
+    if (message.destChainSelector != i_chainSelector) {
+      revert InvalidMessageDestChainSelector(message.destChainSelector);
     }
     if (report.ccvs.length != report.ccvData.length) {
       revert InvalidCCVDataLength(report.ccvs.length, report.ccvData.length);
@@ -205,7 +206,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     /////// Original state checks ///////
     bytes32 executionStateKey =
-      _calculateExecutionStateKey(sourceChainSelector, message.header.sequenceNumber, message.sender, message.receiver);
+      _calculateExecutionStateKey(message.sourceChainSelector, message.sequenceNumber, message.sender, receiverAddress);
 
     Internal.MessageExecutionState originalState = s_executionStates[executionStateKey];
 
@@ -218,38 +219,37 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
           || originalState == Internal.MessageExecutionState.FAILURE
       )
     ) {
-      revert SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
+      revert SkippedAlreadyExecutedMessage(message.sourceChainSelector, message.sequenceNumber);
     }
 
     /////// SECURITY CRITICAL CHECKS ///////
 
     {
       address[] memory requiredPoolCCVs = new address[](0);
-      if (message.tokenAmounts.length > 0) {
-        if (message.tokenAmounts.length != 1) {
-          revert InvalidNumberOfTokens(message.tokenAmounts.length);
-        }
-
-        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
-        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
-        // that do not support the V2 interface.
-        requiredPoolCCVs = _getCCVsFromPool(
-          message.tokenAmounts[0].destTokenAddress,
-          message.header.sourceChainSelector,
-          message.tokenAmounts[0].amount,
-          message.tokenAmounts[0].extraData
-        );
+      if (message.tokenTransfer.length > 0) {
+        // TODO
+        //        if (message.tokenAmounts.length != 1) {
+        //          revert InvalidNumberOfTokens(message.tokenAmounts.length);
+        //        }
+        //
+        //        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
+        //        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
+        //        // that do not support the V2 interface.
+        //        requiredPoolCCVs = _getCCVsFromPool(
+        //          message.tokenAmounts[0].destTokenAddress,
+        //          message.header.sourceChainSelector,
+        //          message.tokenAmounts[0].amount,
+        //          message.tokenAmounts[0].extraData
+        //        );
       }
 
       (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
-        _ensureCCVQuorumIsReached(message.header.sourceChainSelector, message.receiver, report.ccvs, requiredPoolCCVs);
+        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiverAddress, report.ccvs, requiredPoolCCVs);
 
-      // TODO real hash
-      bytes32 messageHash = keccak256(abi.encode(message));
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         ICCVOffRampV1(ccvsToQuery[i]).validateReport({
           message: message,
-          messageHash: messageHash,
+          messageHash: messageId,
           ccvData: report.ccvData[ccvDataIndex[i]],
           originalState: originalState
         });
@@ -259,20 +259,18 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     /////// Execution ///////
 
     s_executionStates[executionStateKey] = Internal.MessageExecutionState.IN_PROGRESS;
-    (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message);
+    (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, messageId);
     s_executionStates[executionStateKey] = newState;
 
     // The only valid prior states are UNTOUCHED and FAILURE (checked above).
     // The only valid post states are FAILURE and SUCCESS (checked below).
     if (newState != Internal.MessageExecutionState.SUCCESS) {
       if (newState != Internal.MessageExecutionState.FAILURE) {
-        revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
+        revert InvalidNewState(message.sourceChainSelector, message.sequenceNumber, newState);
       }
     }
 
-    emit ExecutionStateChanged(
-      sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
-    );
+    emit ExecutionStateChanged(message.sourceChainSelector, message.sequenceNumber, messageId, newState, returnData);
     s_reentrancyGuardEntered = false;
   }
 
@@ -446,9 +444,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
   /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
-    Internal.Any2EVMMessage memory message
+    Internal.MessageV1 memory message,
+    bytes32 messageId
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-    try this.executeSingleMessage(message) {}
+    try this.executeSingleMessage(message, messageId) {}
     catch (bytes memory err) {
       if (msg.sender == Internal.GAS_ESTIMATION_SENDER) {
         if (
@@ -473,9 +472,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
   /// smart contract wallets, without an associated message.
-  function executeSingleMessage(
-    Internal.Any2EVMMessage memory message
-  ) external {
+  function executeSingleMessage(Internal.MessageV1 memory message, bytes32 messageId) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenAmounts.length);
@@ -486,8 +483,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-      messageId: message.header.messageId,
-      sourceChainSelector: message.header.sourceChainSelector,
+      messageId: messageId,
+      sourceChainSelector: message.sourceChainSelector,
       sender: message.sender,
       data: message.data,
       destTokenAmounts: destTokenAmounts
@@ -686,8 +683,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param message initial message
   /// @return transformedMessage modified message
   function _beforeExecuteSingleMessage(
-    Internal.Any2EVMMessage memory message
-  ) internal virtual returns (Internal.Any2EVMMessage memory transformedMessage) {
+    Internal.MessageV1 memory message
+  ) internal virtual returns (Internal.MessageV1 memory transformedMessage) {
     return message;
   }
 }
