@@ -19,139 +19,139 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Aggregator_WriteCommitVerification_FullMethodName = "/Aggregator/WriteCommitVerification"
-	Aggregator_ReadCommitVerification_FullMethodName  = "/Aggregator/ReadCommitVerification"
+	AggregatorService_WriteCommitVerification_FullMethodName = "/v2.aggregator.AggregatorService/WriteCommitVerification"
+	AggregatorService_ReadCommitVerification_FullMethodName  = "/v2.aggregator.AggregatorService/ReadCommitVerification"
 )
 
-// AggregatorClient is the client API for Aggregator service.
+// AggregatorServiceClient is the client API for AggregatorService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type AggregatorClient interface {
+type AggregatorServiceClient interface {
 	WriteCommitVerification(ctx context.Context, in *WriteCommitVerificationRequest, opts ...grpc.CallOption) (*WriteCommitVerificationResponse, error)
 	ReadCommitVerification(ctx context.Context, in *ReadCommitVerificationRequest, opts ...grpc.CallOption) (*ReadCommitVerificationResponse, error)
 }
 
-type aggregatorClient struct {
+type aggregatorServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewAggregatorClient(cc grpc.ClientConnInterface) AggregatorClient {
-	return &aggregatorClient{cc}
+func NewAggregatorServiceClient(cc grpc.ClientConnInterface) AggregatorServiceClient {
+	return &aggregatorServiceClient{cc}
 }
 
-func (c *aggregatorClient) WriteCommitVerification(ctx context.Context, in *WriteCommitVerificationRequest, opts ...grpc.CallOption) (*WriteCommitVerificationResponse, error) {
+func (c *aggregatorServiceClient) WriteCommitVerification(ctx context.Context, in *WriteCommitVerificationRequest, opts ...grpc.CallOption) (*WriteCommitVerificationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(WriteCommitVerificationResponse)
-	err := c.cc.Invoke(ctx, Aggregator_WriteCommitVerification_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, AggregatorService_WriteCommitVerification_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *aggregatorClient) ReadCommitVerification(ctx context.Context, in *ReadCommitVerificationRequest, opts ...grpc.CallOption) (*ReadCommitVerificationResponse, error) {
+func (c *aggregatorServiceClient) ReadCommitVerification(ctx context.Context, in *ReadCommitVerificationRequest, opts ...grpc.CallOption) (*ReadCommitVerificationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ReadCommitVerificationResponse)
-	err := c.cc.Invoke(ctx, Aggregator_ReadCommitVerification_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, AggregatorService_ReadCommitVerification_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// AggregatorServer is the server API for Aggregator service.
-// All implementations must embed UnimplementedAggregatorServer
+// AggregatorServiceServer is the server API for AggregatorService service.
+// All implementations must embed UnimplementedAggregatorServiceServer
 // for forward compatibility.
-type AggregatorServer interface {
+type AggregatorServiceServer interface {
 	WriteCommitVerification(context.Context, *WriteCommitVerificationRequest) (*WriteCommitVerificationResponse, error)
 	ReadCommitVerification(context.Context, *ReadCommitVerificationRequest) (*ReadCommitVerificationResponse, error)
-	mustEmbedUnimplementedAggregatorServer()
+	mustEmbedUnimplementedAggregatorServiceServer()
 }
 
-// UnimplementedAggregatorServer must be embedded to have
+// UnimplementedAggregatorServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedAggregatorServer struct{}
+type UnimplementedAggregatorServiceServer struct{}
 
-func (UnimplementedAggregatorServer) WriteCommitVerification(context.Context, *WriteCommitVerificationRequest) (*WriteCommitVerificationResponse, error) {
+func (UnimplementedAggregatorServiceServer) WriteCommitVerification(context.Context, *WriteCommitVerificationRequest) (*WriteCommitVerificationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteCommitVerification not implemented")
 }
-func (UnimplementedAggregatorServer) ReadCommitVerification(context.Context, *ReadCommitVerificationRequest) (*ReadCommitVerificationResponse, error) {
+func (UnimplementedAggregatorServiceServer) ReadCommitVerification(context.Context, *ReadCommitVerificationRequest) (*ReadCommitVerificationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReadCommitVerification not implemented")
 }
-func (UnimplementedAggregatorServer) mustEmbedUnimplementedAggregatorServer() {}
-func (UnimplementedAggregatorServer) testEmbeddedByValue()                    {}
+func (UnimplementedAggregatorServiceServer) mustEmbedUnimplementedAggregatorServiceServer() {}
+func (UnimplementedAggregatorServiceServer) testEmbeddedByValue()                           {}
 
-// UnsafeAggregatorServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to AggregatorServer will
+// UnsafeAggregatorServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AggregatorServiceServer will
 // result in compilation errors.
-type UnsafeAggregatorServer interface {
-	mustEmbedUnimplementedAggregatorServer()
+type UnsafeAggregatorServiceServer interface {
+	mustEmbedUnimplementedAggregatorServiceServer()
 }
 
-func RegisterAggregatorServer(s grpc.ServiceRegistrar, srv AggregatorServer) {
-	// If the following call pancis, it indicates UnimplementedAggregatorServer was
+func RegisterAggregatorServiceServer(s grpc.ServiceRegistrar, srv AggregatorServiceServer) {
+	// If the following call pancis, it indicates UnimplementedAggregatorServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&Aggregator_ServiceDesc, srv)
+	s.RegisterService(&AggregatorService_ServiceDesc, srv)
 }
 
-func _Aggregator_WriteCommitVerification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _AggregatorService_WriteCommitVerification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(WriteCommitVerificationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AggregatorServer).WriteCommitVerification(ctx, in)
+		return srv.(AggregatorServiceServer).WriteCommitVerification(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Aggregator_WriteCommitVerification_FullMethodName,
+		FullMethod: AggregatorService_WriteCommitVerification_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AggregatorServer).WriteCommitVerification(ctx, req.(*WriteCommitVerificationRequest))
+		return srv.(AggregatorServiceServer).WriteCommitVerification(ctx, req.(*WriteCommitVerificationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Aggregator_ReadCommitVerification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _AggregatorService_ReadCommitVerification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReadCommitVerificationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AggregatorServer).ReadCommitVerification(ctx, in)
+		return srv.(AggregatorServiceServer).ReadCommitVerification(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Aggregator_ReadCommitVerification_FullMethodName,
+		FullMethod: AggregatorService_ReadCommitVerification_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AggregatorServer).ReadCommitVerification(ctx, req.(*ReadCommitVerificationRequest))
+		return srv.(AggregatorServiceServer).ReadCommitVerification(ctx, req.(*ReadCommitVerificationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// Aggregator_ServiceDesc is the grpc.ServiceDesc for Aggregator service.
+// AggregatorService_ServiceDesc is the grpc.ServiceDesc for AggregatorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Aggregator_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "Aggregator",
-	HandlerType: (*AggregatorServer)(nil),
+var AggregatorService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "v2.aggregator.AggregatorService",
+	HandlerType: (*AggregatorServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "WriteCommitVerification",
-			Handler:    _Aggregator_WriteCommitVerification_Handler,
+			Handler:    _AggregatorService_WriteCommitVerification_Handler,
 		},
 		{
 			MethodName: "ReadCommitVerification",
-			Handler:    _Aggregator_ReadCommitVerification_Handler,
+			Handler:    _AggregatorService_ReadCommitVerification_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

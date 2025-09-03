@@ -1,0 +1,36 @@
+# Detect the system architecture
+ARCH := `uname -m`
+
+# Find 'protoc' download URL based on the architecture
+PROTOC_ZIP := if ARCH == 'x86_64' {
+  "protoc-32.0-linux-x86_64.zip"
+} else if ARCH == 'arm64' {
+  "protoc-32.0-osx-aarch_64.zip"
+} else {
+  error("Unsupported architecture: " +  ARCH)
+}
+PROTOC_URL := "https://github.com/protocolbuffers/protobuf/releases/download/v32.0/"+PROTOC_ZIP
+PROTOC_BIN := env('PROTOC_BIN', '/usr/local/bin/protoc')
+
+# Default: show available recipes
+default:
+    just --list
+
+# Run go mod tidy across all submodules
+tidy:
+    gomods tidy
+
+install-protoc:
+    @echo "Downloading and installing protoc for {{ARCH}}..."
+    curl -OL "{{PROTOC_URL}}"
+    sudo unzip -o "{{PROTOC_ZIP}}" -d /usr/local bin/protoc
+    sudo unzip -o "{{PROTOC_ZIP}}" -d /usr/local 'include/*'
+    rm -f "{{PROTOC_ZIP}}"
+    sudo chmod +x "{{PROTOC_BIN}}"
+    @echo "Installed protoc version:"
+    "{{PROTOC_BIN}}" --version
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.8
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+
+proto:
+	@just ./aggregator/proto

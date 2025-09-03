@@ -1,3 +1,7 @@
+# Default: show available recipes
+default:
+    just --list
+
 build:
     docker build -f Dockerfile -t aggregator:latest .
 

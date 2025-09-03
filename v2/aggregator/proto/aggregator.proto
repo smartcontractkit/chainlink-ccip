@@ -1,8 +1,10 @@
 syntax = "proto3";
 
+package v2.aggregator;
+
 option go_package = "pb/aggregator";
 
-service Aggregator {
+service AggregatorService {
   rpc WriteCommitVerification(WriteCommitVerificationRequest) returns (WriteCommitVerificationResponse);
   rpc ReadCommitVerification(ReadCommitVerificationRequest) returns (ReadCommitVerificationResponse);
 }
@@ -70,8 +72,9 @@ message WriteCommitVerificationRequest {
 }
 
 enum WriteStatus {
-  SUCCESS = 0;
-  FAILED = 1;
+  WRITE_STATUS_UNSPECIFIED = 0;
+  WRITE_STATUS_FAILED = 1;
+  WRITE_STATUS_SUCCESS = 2;
 }
 
 message WriteCommitVerificationResponse {

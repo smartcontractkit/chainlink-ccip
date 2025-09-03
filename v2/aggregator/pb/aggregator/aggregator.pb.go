@@ -24,19 +24,22 @@ const (
 type WriteStatus int32
 
 const (
-	WriteStatus_SUCCESS WriteStatus = 0
-	WriteStatus_FAILED  WriteStatus = 1
+	WriteStatus_WRITE_STATUS_UNSPECIFIED WriteStatus = 0
+	WriteStatus_WRITE_STATUS_FAILED      WriteStatus = 1
+	WriteStatus_WRITE_STATUS_SUCCESS     WriteStatus = 2
 )
 
 // Enum value maps for WriteStatus.
 var (
 	WriteStatus_name = map[int32]string{
-		0: "SUCCESS",
-		1: "FAILED",
+		0: "WRITE_STATUS_UNSPECIFIED",
+		1: "WRITE_STATUS_FAILED",
+		2: "WRITE_STATUS_SUCCESS",
 	}
 	WriteStatus_value = map[string]int32{
-		"SUCCESS": 0,
-		"FAILED":  1,
+		"WRITE_STATUS_UNSPECIFIED": 0,
+		"WRITE_STATUS_FAILED":      1,
+		"WRITE_STATUS_SUCCESS":     2,
 	}
 )
 
@@ -602,7 +605,7 @@ func (x *WriteCommitVerificationRequest) GetCommitteeId() string {
 
 type WriteCommitVerificationResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        WriteStatus            `protobuf:"varint,1,opt,name=status,proto3,enum=WriteStatus" json:"status,omitempty"`
+	Status        WriteStatus            `protobuf:"varint,1,opt,name=status,proto3,enum=v2.aggregator.WriteStatus" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -641,7 +644,7 @@ func (x *WriteCommitVerificationResponse) GetStatus() WriteStatus {
 	if x != nil {
 		return x.Status
 	}
-	return WriteStatus_SUCCESS
+	return WriteStatus_WRITE_STATUS_UNSPECIFIED
 }
 
 type ReadCommitVerificationRequest struct {
@@ -752,27 +755,27 @@ var File_proto_aggregator_proto protoreflect.FileDescriptor
 
 const file_proto_aggregator_proto_rawDesc = "" +
 	"\n" +
-	"\x16proto/aggregator.proto\"\xc2\x01\n" +
+	"\x16proto/aggregator.proto\x12\rv2.aggregator\"\xc2\x01\n" +
 	"\x14Any2AnyMessageHeader\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\fR\tmessageId\x122\n" +
 	"\x15source_chain_selector\x18\x02 \x01(\x04R\x13sourceChainSelector\x12.\n" +
 	"\x13dest_chain_selector\x18\x03 \x01(\x04R\x11destChainSelector\x12'\n" +
-	"\x0fsequence_number\x18\x04 \x01(\x04R\x0esequenceNumber\"\x9e\x04\n" +
-	"\x0eAny2AnyMessage\x12-\n" +
-	"\x06header\x18\x01 \x01(\v2\x15.Any2AnyMessageHeaderR\x06header\x12\x16\n" +
+	"\x0fsequence_number\x18\x04 \x01(\x04R\x0esequenceNumber\"\xe4\x04\n" +
+	"\x0eAny2AnyMessage\x12;\n" +
+	"\x06header\x18\x01 \x01(\v2#.v2.aggregator.Any2AnyMessageHeaderR\x06header\x12\x16\n" +
 	"\x06sender\x18\x02 \x01(\fR\x06sender\x12%\n" +
 	"\x0eonramp_address\x18\x03 \x01(\fR\ronrampAddress\x12\x12\n" +
 	"\x04data\x18\x04 \x01(\fR\x04data\x12\x1a\n" +
 	"\breceiver\x18\x05 \x01(\fR\breceiver\x12\x1b\n" +
 	"\tfee_token\x18\x06 \x01(\fR\bfeeToken\x12(\n" +
 	"\x10fee_token_amount\x18\a \x01(\fR\x0efeeTokenAmount\x12&\n" +
-	"\x0ffee_value_juels\x18\b \x01(\fR\rfeeValueJuels\x12<\n" +
-	"\x0etoken_transfer\x18\t \x01(\v2\x15.Any2AnyTokenTransferR\rtokenTransfer\x128\n" +
+	"\x0ffee_value_juels\x18\b \x01(\fR\rfeeValueJuels\x12J\n" +
+	"\x0etoken_transfer\x18\t \x01(\v2#.v2.aggregator.Any2AnyTokenTransferR\rtokenTransfer\x12F\n" +
 	"\x11verifier_receipts\x18\n" +
-	" \x03(\v2\v.AnyReceiptR\x10verifierReceipts\x126\n" +
-	"\x10executor_receipt\x18\v \x01(\v2\v.AnyReceiptR\x0fexecutorReceipt\x120\n" +
-	"\rtoken_receipt\x18\f \x01(\v2\v.AnyReceiptR\ftokenReceipt\x12\x1d\n" +
+	" \x03(\v2\x19.v2.aggregator.AnyReceiptR\x10verifierReceipts\x12D\n" +
+	"\x10executor_receipt\x18\v \x01(\v2\x19.v2.aggregator.AnyReceiptR\x0fexecutorReceipt\x12>\n" +
+	"\rtoken_receipt\x18\f \x01(\v2\x19.v2.aggregator.AnyReceiptR\ftokenReceipt\x12\x1d\n" +
 	"\n" +
 	"extra_args\x18\r \x01(\fR\textraArgs\"\xad\x01\n" +
 	"\x14Any2AnyTokenTransfer\x120\n" +
@@ -788,7 +791,7 @@ const file_proto_aggregator_proto_rawDesc = "" +
 	"\x0edest_gas_limit\x18\x03 \x01(\x04R\fdestGasLimit\x12.\n" +
 	"\x13dest_bytes_overhead\x18\x04 \x01(\rR\x11destBytesOverhead\x12\x1d\n" +
 	"\n" +
-	"extra_args\x18\x05 \x01(\fR\textraArgs\"\xb3\x03\n" +
+	"extra_args\x18\x05 \x01(\fR\textraArgs\"\xc1\x03\n" +
 	"\x18CommitVerificationRecord\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\fR\tmessageId\x12'\n" +
@@ -799,30 +802,29 @@ const file_proto_aggregator_proto_rawDesc = "" +
 	"\x15dest_verifier_address\x18\x06 \x01(\fR\x13destVerifierAddress\x12\x19\n" +
 	"\bccv_data\x18\a \x01(\fR\accvData\x12\x1b\n" +
 	"\tblob_data\x18\b \x01(\fR\bblobData\x12\x1c\n" +
-	"\ttimestamp\x18\t \x01(\rR\ttimestamp\x12)\n" +
+	"\ttimestamp\x18\t \x01(\rR\ttimestamp\x127\n" +
 	"\amessage\x18\n" +
-	" \x01(\v2\x0f.Any2AnyMessageR\amessage\"\xc3\x01\n" +
-	"\x1eWriteCommitVerificationRequest\x12W\n" +
-	"\x1acommit_verification_record\x18\x01 \x01(\v2\x19.CommitVerificationRecordR\x18commitVerificationRecord\x12%\n" +
+	" \x01(\v2\x1d.v2.aggregator.Any2AnyMessageR\amessage\"\xd1\x01\n" +
+	"\x1eWriteCommitVerificationRequest\x12e\n" +
+	"\x1acommit_verification_record\x18\x01 \x01(\v2'.v2.aggregator.CommitVerificationRecordR\x18commitVerificationRecord\x12%\n" +
 	"\x0eparticipant_id\x18\x02 \x01(\tR\rparticipantId\x12!\n" +
-	"\fcommittee_id\x18\x03 \x01(\tR\vcommitteeId\"G\n" +
-	"\x1fWriteCommitVerificationResponse\x12$\n" +
-	"\x06status\x18\x01 \x01(\x0e2\f.WriteStatusR\x06status\"\x88\x01\n" +
+	"\fcommittee_id\x18\x03 \x01(\tR\vcommitteeId\"U\n" +
+	"\x1fWriteCommitVerificationResponse\x122\n" +
+	"\x06status\x18\x01 \x01(\x0e2\x1a.v2.aggregator.WriteStatusR\x06status\"\x88\x01\n" +
 	"\x1dReadCommitVerificationRequest\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\fR\tmessageId\x12%\n" +
 	"\x0eparticipant_id\x18\x02 \x01(\tR\rparticipantId\x12!\n" +
-	"\fcommittee_id\x18\x03 \x01(\tR\vcommitteeId\"y\n" +
-	"\x1eReadCommitVerificationResponse\x12W\n" +
-	"\x1acommit_verification_record\x18\x01 \x01(\v2\x19.CommitVerificationRecordR\x18commitVerificationRecord*&\n" +
-	"\vWriteStatus\x12\v\n" +
-	"\aSUCCESS\x10\x00\x12\n" +
-	"\n" +
-	"\x06FAILED\x10\x012\xc5\x01\n" +
-	"\n" +
-	"Aggregator\x12\\\n" +
-	"\x17WriteCommitVerification\x12\x1f.WriteCommitVerificationRequest\x1a .WriteCommitVerificationResponse\x12Y\n" +
-	"\x16ReadCommitVerification\x12\x1e.ReadCommitVerificationRequest\x1a\x1f.ReadCommitVerificationResponseB\x0fZ\rpb/aggregatorb\x06proto3"
+	"\fcommittee_id\x18\x03 \x01(\tR\vcommitteeId\"\x87\x01\n" +
+	"\x1eReadCommitVerificationResponse\x12e\n" +
+	"\x1acommit_verification_record\x18\x01 \x01(\v2'.v2.aggregator.CommitVerificationRecordR\x18commitVerificationRecord*^\n" +
+	"\vWriteStatus\x12\x1c\n" +
+	"\x18WRITE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13WRITE_STATUS_FAILED\x10\x01\x12\x18\n" +
+	"\x14WRITE_STATUS_SUCCESS\x10\x022\x84\x02\n" +
+	"\x11AggregatorService\x12x\n" +
+	"\x17WriteCommitVerification\x12-.v2.aggregator.WriteCommitVerificationRequest\x1a..v2.aggregator.WriteCommitVerificationResponse\x12u\n" +
+	"\x16ReadCommitVerification\x12,.v2.aggregator.ReadCommitVerificationRequest\x1a-.v2.aggregator.ReadCommitVerificationResponseB\x0fZ\rpb/aggregatorb\x06proto3"
 
 var (
 	file_proto_aggregator_proto_rawDescOnce sync.Once
@@ -839,31 +841,31 @@ func file_proto_aggregator_proto_rawDescGZIP() []byte {
 var file_proto_aggregator_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_proto_aggregator_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_proto_aggregator_proto_goTypes = []any{
-	(WriteStatus)(0),                        // 0: WriteStatus
-	(*Any2AnyMessageHeader)(nil),            // 1: Any2AnyMessageHeader
-	(*Any2AnyMessage)(nil),                  // 2: Any2AnyMessage
-	(*Any2AnyTokenTransfer)(nil),            // 3: Any2AnyTokenTransfer
-	(*AnyReceipt)(nil),                      // 4: AnyReceipt
-	(*CommitVerificationRecord)(nil),        // 5: CommitVerificationRecord
-	(*WriteCommitVerificationRequest)(nil),  // 6: WriteCommitVerificationRequest
-	(*WriteCommitVerificationResponse)(nil), // 7: WriteCommitVerificationResponse
-	(*ReadCommitVerificationRequest)(nil),   // 8: ReadCommitVerificationRequest
-	(*ReadCommitVerificationResponse)(nil),  // 9: ReadCommitVerificationResponse
+	(WriteStatus)(0),                        // 0: v2.aggregator.WriteStatus
+	(*Any2AnyMessageHeader)(nil),            // 1: v2.aggregator.Any2AnyMessageHeader
+	(*Any2AnyMessage)(nil),                  // 2: v2.aggregator.Any2AnyMessage
+	(*Any2AnyTokenTransfer)(nil),            // 3: v2.aggregator.Any2AnyTokenTransfer
+	(*AnyReceipt)(nil),                      // 4: v2.aggregator.AnyReceipt
+	(*CommitVerificationRecord)(nil),        // 5: v2.aggregator.CommitVerificationRecord
+	(*WriteCommitVerificationRequest)(nil),  // 6: v2.aggregator.WriteCommitVerificationRequest
+	(*WriteCommitVerificationResponse)(nil), // 7: v2.aggregator.WriteCommitVerificationResponse
+	(*ReadCommitVerificationRequest)(nil),   // 8: v2.aggregator.ReadCommitVerificationRequest
+	(*ReadCommitVerificationResponse)(nil),  // 9: v2.aggregator.ReadCommitVerificationResponse
 }
 var file_proto_aggregator_proto_depIdxs = []int32{
-	1,  // 0: Any2AnyMessage.header:type_name -> Any2AnyMessageHeader
-	3,  // 1: Any2AnyMessage.token_transfer:type_name -> Any2AnyTokenTransfer
-	4,  // 2: Any2AnyMessage.verifier_receipts:type_name -> AnyReceipt
-	4,  // 3: Any2AnyMessage.executor_receipt:type_name -> AnyReceipt
-	4,  // 4: Any2AnyMessage.token_receipt:type_name -> AnyReceipt
-	2,  // 5: CommitVerificationRecord.message:type_name -> Any2AnyMessage
-	5,  // 6: WriteCommitVerificationRequest.commit_verification_record:type_name -> CommitVerificationRecord
-	0,  // 7: WriteCommitVerificationResponse.status:type_name -> WriteStatus
-	5,  // 8: ReadCommitVerificationResponse.commit_verification_record:type_name -> CommitVerificationRecord
-	6,  // 9: Aggregator.WriteCommitVerification:input_type -> WriteCommitVerificationRequest
-	8,  // 10: Aggregator.ReadCommitVerification:input_type -> ReadCommitVerificationRequest
-	7,  // 11: Aggregator.WriteCommitVerification:output_type -> WriteCommitVerificationResponse
-	9,  // 12: Aggregator.ReadCommitVerification:output_type -> ReadCommitVerificationResponse
+	1,  // 0: v2.aggregator.Any2AnyMessage.header:type_name -> v2.aggregator.Any2AnyMessageHeader
+	3,  // 1: v2.aggregator.Any2AnyMessage.token_transfer:type_name -> v2.aggregator.Any2AnyTokenTransfer
+	4,  // 2: v2.aggregator.Any2AnyMessage.verifier_receipts:type_name -> v2.aggregator.AnyReceipt
+	4,  // 3: v2.aggregator.Any2AnyMessage.executor_receipt:type_name -> v2.aggregator.AnyReceipt
+	4,  // 4: v2.aggregator.Any2AnyMessage.token_receipt:type_name -> v2.aggregator.AnyReceipt
+	2,  // 5: v2.aggregator.CommitVerificationRecord.message:type_name -> v2.aggregator.Any2AnyMessage
+	5,  // 6: v2.aggregator.WriteCommitVerificationRequest.commit_verification_record:type_name -> v2.aggregator.CommitVerificationRecord
+	0,  // 7: v2.aggregator.WriteCommitVerificationResponse.status:type_name -> v2.aggregator.WriteStatus
+	5,  // 8: v2.aggregator.ReadCommitVerificationResponse.commit_verification_record:type_name -> v2.aggregator.CommitVerificationRecord
+	6,  // 9: v2.aggregator.AggregatorService.WriteCommitVerification:input_type -> v2.aggregator.WriteCommitVerificationRequest
+	8,  // 10: v2.aggregator.AggregatorService.ReadCommitVerification:input_type -> v2.aggregator.ReadCommitVerificationRequest
+	7,  // 11: v2.aggregator.AggregatorService.WriteCommitVerification:output_type -> v2.aggregator.WriteCommitVerificationResponse
+	9,  // 12: v2.aggregator.AggregatorService.ReadCommitVerification:output_type -> v2.aggregator.ReadCommitVerificationResponse
 	11, // [11:13] is the sub-list for method output_type
 	9,  // [9:11] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
