@@ -32,7 +32,7 @@ type WithdrawFeeTokensArgs struct {
 	FeeTokens []common.Address
 }
 
-type DestChainConfig = ccv_proxy.GetDestChainConfig
+type DestChainConfig = ccv_proxy.CCVProxyDestChainConfig
 
 var Deploy = deployment.New(
 	"ccv-proxy:deploy",

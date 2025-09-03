@@ -35,10 +35,10 @@ type RemoteChainConfig struct {
 	DefaultCCVOffRamps []common.Address
 	// Any CCVs that must always be used for messages FROM this remote chain
 	LaneMandatedCCVOffRamps []common.Address
-	// The CCV that will be used for messages TO this remote chain if none are specified
-	DefaultCCVOnRamp common.Address
-	// The CCV that will always be applied to messages TO this remote chain
-	RequiredCCVOnRamp common.Address
+	// The CCVs that will be used for messages TO this remote chain if none are specified
+	DefaultCCVOnRamps []common.Address
+	// The CCVs that will always be applied to messages TO this remote chain
+	LaneMandatedCCVOnRamps []common.Address
 	// The executor that will be used for messages TO this remote chain if none is specified
 	DefaultExecutor common.Address
 	// CommitOnRampDestChainConfig configures the CommitOnRamp for this remote chain
@@ -97,8 +97,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			ccvProxyArgs = append(ccvProxyArgs, ccv_proxy.DestChainConfigArgs{
 				Router:            input.Router,
 				DestChainSelector: remoteSelector,
-				DefaultCCV:        remoteConfig.DefaultCCVOnRamp,
-				RequiredCCV:       remoteConfig.RequiredCCVOnRamp,
+				DefaultCCVs:       remoteConfig.DefaultCCVOnRamps,
+				LaneMandatedCCVs:  remoteConfig.LaneMandatedCCVOnRamps,
 				DefaultExecutor:   remoteConfig.DefaultExecutor,
 			})
 			commitOnRampDestConfigArgs = append(commitOnRampDestConfigArgs, commit_onramp.DestChainConfigArgs{

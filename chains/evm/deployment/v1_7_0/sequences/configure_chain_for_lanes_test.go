@@ -165,8 +165,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 							CCIPMessageSource:           ccipMessageSource,
 							DefaultCCVOffRamps:          []common.Address{commitOffRamp},
 							LaneMandatedCCVOffRamps:     []common.Address{commitOffRamp},
-							DefaultCCVOnRamp:            commitOnRamp,
-							RequiredCCVOnRamp:           commitOnRamp,
+							DefaultCCVOnRamps:           []common.Address{commitOnRamp},
+							LaneMandatedCCVOnRamps:      []common.Address{commitOnRamp},
 							DefaultExecutor:             defaultExecutor,
 							CommitOnRampDestChainConfig: sequences.CommitOnRampDestChainConfig{},
 							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
