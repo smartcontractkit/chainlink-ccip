@@ -10,11 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -65,9 +65,9 @@ func TestConfigureChainForLanes(t *testing.T) {
 
 			deploymentReport, err := operations.ExecuteSequence(
 				bundle,
-				sequences.DeployChain,
+				sequences.DeployChainContracts,
 				evmChain,
-				sequences.DeployChainInput{
+				sequences.DeployChainContractsInput{
 					ChainSelector: chainSelector,
 					ContractParams: sequences.ContractParams{
 						RMNRemote:     sequences.RMNRemoteParams{},
@@ -117,7 +117,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 					ccvProxy = common.HexToAddress(addr.Address)
 				case datastore.ContractType(commit_onramp.ContractType):
 					commitOnRamp = common.HexToAddress(addr.Address)
-				case datastore.ContractType(fee_quoter.ContractType):
+				case datastore.ContractType(fee_quoter_v2.ContractType):
 					feeQuoter = common.HexToAddress(addr.Address)
 				case datastore.ContractType(ccv_aggregator.ContractType):
 					ccvAggregator = common.HexToAddress(addr.Address)
@@ -127,7 +127,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			}
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
 			defaultExecutor := common.HexToAddress("0x11")
-			fqDestChainConfig := fee_quoter.DestChainConfig{
+			fqDestChainConfig := fee_quoter_v2.DestChainConfig{
 				IsEnabled:                         true,
 				MaxNumberOfTokensPerMsg:           10,
 				MaxDataBytes:                      30_000,
@@ -219,6 +219,11 @@ func TestConfigureChainForLanes(t *testing.T) {
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, r.Hex(), destChainConfig.Output.Router.Hex(), "Router in dest chain config should match Router address")
+			require.Equal(t, defaultExecutor.Hex(), destChainConfig.Output.DefaultExecutor.Hex(), "DefaultExecutor in dest chain config should match configured DefaultExecutor")
+			require.Len(t, destChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in dest chain config")
+			require.Equal(t, commitOnRamp.Hex(), destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitOnRamp address")
+			require.Len(t, destChainConfig.Output.LaneMandatedCCVs, 1, "There should be one LaneMandatedCCV in dest chain config")
+			require.Equal(t, commitOnRamp.Hex(), destChainConfig.Output.LaneMandatedCCVs[0].Hex(), "LaneMandatedCCV in dest chain config should match CommitOnRamp address")
 
 			// Check destChainConfig on CommitOnRamp
 			commitOnRampDestChainConfig, err := operations.ExecuteOperation(bundle, commit_onramp.GetDestChainConfig, evmChain, call.Input[uint64]{

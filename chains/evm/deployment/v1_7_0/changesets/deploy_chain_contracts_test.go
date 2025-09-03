@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeployChain_VerifyPreconditions(t *testing.T) {
+func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 	lggr, err := logger.New()
 	require.NoError(t, err, "Failed to create logger")
 
@@ -52,19 +52,19 @@ func TestDeployChain_VerifyPreconditions(t *testing.T) {
 
 	tests := []struct {
 		desc        string
-		input       changesets.DeployChainCfg
+		input       changesets.DeployChainContractsCfg
 		expectedErr string
 	}{
 		{
 			desc: "valid input",
-			input: changesets.DeployChainCfg{
+			input: changesets.DeployChainContractsCfg{
 				ChainSelector: 5009297550715157269,
 				Params:        sequences.ContractParams{},
 			},
 		},
 		{
 			desc: "invalid chain selector",
-			input: changesets.DeployChainCfg{
+			input: changesets.DeployChainContractsCfg{
 				ChainSelector: 12345,
 				Params:        sequences.ContractParams{},
 			},
@@ -74,7 +74,7 @@ func TestDeployChain_VerifyPreconditions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			err := changesets.DeployChain.VerifyPreconditions(e, test.input)
+			err := changesets.DeployChainContracts.VerifyPreconditions(e, test.input)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr, "Expected error containing %q but got none", test.expectedErr)
 			} else {
@@ -155,7 +155,7 @@ func TestDeployChain_Apply(t *testing.T) {
 			usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
 			require.True(t, ok, "Failed to parse USDPerWETH")
 
-			out, err := changesets.DeployChain.Apply(e, changesets.DeployChainCfg{
+			out, err := changesets.DeployChainContracts.Apply(e, changesets.DeployChainContractsCfg{
 				ChainSelector: 5009297550715157269,
 				Params: sequences.ContractParams{
 					RMNRemote:     sequences.RMNRemoteParams{},

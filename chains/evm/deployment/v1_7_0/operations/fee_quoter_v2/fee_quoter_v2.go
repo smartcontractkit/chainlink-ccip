@@ -55,7 +55,11 @@ type ApplyTokenTransferFeeConfigUpdatesArgs struct {
 	TokensToUseDefaultFeeConfigs []TokenTransferFeeConfigRemoveArgs
 }
 
-type InternalPriceUpdates = fee_quoter_v2.InternalPriceUpdates
+type TokenPriceUpdate = fee_quoter_v2.InternalTokenPriceUpdate
+
+type GasPriceUpdate = fee_quoter_v2.InternalGasPriceUpdate
+
+type PriceUpdates = fee_quoter_v2.InternalPriceUpdates
 
 var Deploy = deployment.New(
 	"fee-quoter-v2:deploy",
@@ -170,8 +174,8 @@ var UpdatePrices = call.NewWrite(
 		}
 		return false, nil
 	},
-	func(InternalPriceUpdates) error { return nil },
-	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args InternalPriceUpdates) (*types.Transaction, error) {
+	func(PriceUpdates) error { return nil },
+	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args PriceUpdates) (*types.Transaction, error) {
 		return feeQuoterV2.UpdatePrices(opts, args)
 	},
 )

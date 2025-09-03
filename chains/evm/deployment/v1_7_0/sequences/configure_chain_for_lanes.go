@@ -7,10 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -44,7 +44,7 @@ type RemoteChainConfig struct {
 	// CommitOnRampDestChainConfig configures the CommitOnRamp for this remote chain
 	CommitOnRampDestChainConfig CommitOnRampDestChainConfig
 	// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
-	FeeQuoterDestChainConfig fee_quoter.DestChainConfig
+	FeeQuoterDestChainConfig fee_quoter_v2.DestChainConfig
 }
 
 type ConfigureChainForLanesInput struct {
@@ -82,7 +82,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		ccvProxyArgs := make([]ccv_proxy.DestChainConfigArgs, 0, len(input.RemoteChains))
 		commitOnRampDestConfigArgs := make([]commit_onramp.DestChainConfigArgs, 0, len(input.RemoteChains))
 		commitOnRampAllowlistArgs := make([]commit_onramp.AllowlistConfigArgs, 0, len(input.RemoteChains))
-		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, len(input.RemoteChains))
+		feeQuoterArgs := make([]fee_quoter_v2.DestChainConfigArgs, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
 		for remoteSelector, remoteConfig := range input.RemoteChains {
@@ -111,7 +111,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				AddedAllowlistedSenders:   remoteConfig.CommitOnRampDestChainConfig.AddedAllowlistedSenders,
 				RemovedAllowlistedSenders: remoteConfig.CommitOnRampDestChainConfig.RemovedAllowlistedSenders,
 			})
-			feeQuoterArgs = append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
+			feeQuoterArgs = append(feeQuoterArgs, fee_quoter_v2.DestChainConfigArgs{
 				DestChainSelector: remoteSelector,
 				DestChainConfig:   remoteConfig.FeeQuoterDestChainConfig,
 			})
@@ -170,7 +170,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		writes = append(writes, commitOnRampAllowlistReport.Output)
 
 		// ApplyDestChainConfigUpdates on FeeQuoter
-		feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, chain, call.Input[[]fee_quoter.DestChainConfigArgs]{
+		feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter_v2.ApplyDestChainConfigUpdates, chain, call.Input[[]fee_quoter_v2.DestChainConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       input.FeeQuoter,
 			Args:          feeQuoterArgs,
