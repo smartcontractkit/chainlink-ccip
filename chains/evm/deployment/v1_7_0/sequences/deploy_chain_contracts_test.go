@@ -7,6 +7,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	sequence_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
@@ -169,7 +170,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		evmChains := chains.EVMChains()
 
 		// Deploy to each chain sequentially using the same bundle
-		var allReports []operations.SequenceReport[sequences.DeployChainContractsInput, sequences.DeployChainContractsOutput]
+		var allReports []operations.SequenceReport[sequences.DeployChainContractsInput, sequence_utils.OnChainOutput]
 		for _, selector := range chainSelectors {
 			evmChain := evmChains[selector]
 
@@ -263,7 +264,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		// Deploy to all chains concurrently using the same bundle
 		type deployResult struct {
 			chainSelector uint64
-			report        operations.SequenceReport[sequences.DeployChainContractsInput, sequences.DeployChainContractsOutput]
+			report        operations.SequenceReport[sequences.DeployChainContractsInput, sequence_utils.OnChainOutput]
 			err           error
 		}
 

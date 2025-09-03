@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
@@ -66,15 +67,11 @@ type ConfigureChainForLanesInput struct {
 	RemoteChains map[uint64]RemoteChainConfig
 }
 
-type ConfigureChainForLanesOutput struct {
-	Writes []call.WriteOutput
-}
-
 var ConfigureChainForLanes = cldf_ops.NewSequence(
 	"configure-chain-for-lanes",
 	semver.MustParse("1.7.0"),
 	"Configures an EVM chain as a source & destination for multiple remote chains",
-	func(b operations.Bundle, chain evm.Chain, input ConfigureChainForLanesInput) (output ConfigureChainForLanesOutput, err error) {
+	func(b operations.Bundle, chain evm.Chain, input ConfigureChainForLanesInput) (output sequences.OnChainOutput, err error) {
 		writes := make([]call.WriteOutput, 0, 6) // 6 = number of ExecuteOperation calls
 
 		// Create inputs for each operation
@@ -132,7 +129,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			Args:          ccvAggregatorArgs,
 		})
 		if err != nil {
-			return ConfigureChainForLanesOutput{}, fmt.Errorf("failed to apply source chain config updates to CCVAggregator(%s) on chain %s: %w", input.CCVAggregator, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config updates to CCVAggregator(%s) on chain %s: %w", input.CCVAggregator, chain, err)
 		}
 		writes = append(writes, ccvAggregatorReport.Output)
 
@@ -143,7 +140,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			Args:          ccvProxyArgs,
 		})
 		if err != nil {
-			return ConfigureChainForLanesOutput{}, fmt.Errorf("failed to apply dest chain config updates to CCVProxy(%s) on chain %s: %w", input.CCVProxy, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CCVProxy(%s) on chain %s: %w", input.CCVProxy, chain, err)
 		}
 		writes = append(writes, ccvProxyReport.Output)
 
@@ -154,7 +151,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			Args:          commitOnRampDestConfigArgs,
 		})
 		if err != nil {
-			return ConfigureChainForLanesOutput{}, fmt.Errorf("failed to apply dest chain config updates to CommitOnRamp(%s) on chain %s: %w", input.CommitOnRamp, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CommitOnRamp(%s) on chain %s: %w", input.CommitOnRamp, chain, err)
 		}
 		writes = append(writes, commitOnRampReport.Output)
 
@@ -165,7 +162,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			Args:          commitOnRampAllowlistArgs,
 		})
 		if err != nil {
-			return ConfigureChainForLanesOutput{}, fmt.Errorf("failed to apply allowlist updates to CommitOnRamp(%s) on chain %s: %w", input.CommitOnRamp, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allowlist updates to CommitOnRamp(%s) on chain %s: %w", input.CommitOnRamp, chain, err)
 		}
 		writes = append(writes, commitOnRampAllowlistReport.Output)
 
@@ -176,7 +173,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			Args:          feeQuoterArgs,
 		})
 		if err != nil {
-			return ConfigureChainForLanesOutput{}, fmt.Errorf("failed to apply dest chain config updates to FeeQuoter(%s) on chain %s: %w", input.FeeQuoter, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to FeeQuoter(%s) on chain %s: %w", input.FeeQuoter, chain, err)
 		}
 		writes = append(writes, feeQuoterReport.Output)
 
@@ -191,11 +188,11 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			},
 		})
 		if err != nil {
-			return ConfigureChainForLanesOutput{}, fmt.Errorf("failed to apply ramp updates to Router(%s) on chain %s: %w", input.Router, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply ramp updates to Router(%s) on chain %s: %w", input.Router, chain, err)
 		}
 		writes = append(writes, routerReport.Output)
 
-		return ConfigureChainForLanesOutput{
+		return sequences.OnChainOutput{
 			Writes: writes,
 		}, nil
 	},

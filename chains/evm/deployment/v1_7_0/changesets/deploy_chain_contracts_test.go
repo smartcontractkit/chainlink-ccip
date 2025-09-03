@@ -58,15 +58,15 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "valid input",
 			input: changesets.DeployChainContractsCfg{
-				ChainSelector: 5009297550715157269,
-				Params:        sequences.ContractParams{},
+				ChainSel: 5009297550715157269,
+				Params:   sequences.ContractParams{},
 			},
 		},
 		{
 			desc: "invalid chain selector",
 			input: changesets.DeployChainContractsCfg{
-				ChainSelector: 12345,
-				Params:        sequences.ContractParams{},
+				ChainSel: 12345,
+				Params:   sequences.ContractParams{},
 			},
 			expectedErr: "no EVM chain with selector 12345 found in environment",
 		},
@@ -156,7 +156,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			require.True(t, ok, "Failed to parse USDPerWETH")
 
 			out, err := changesets.DeployChainContracts.Apply(e, changesets.DeployChainContractsCfg{
-				ChainSelector: 5009297550715157269,
+				ChainSel: 5009297550715157269,
 				Params: sequences.ContractParams{
 					RMNRemote:     sequences.RMNRemoteParams{},
 					CCVAggregator: sequences.CCVAggregatorParams{},

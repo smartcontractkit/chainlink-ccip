@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
@@ -72,16 +73,11 @@ type DeployChainContractsInput struct {
 	ContractParams    ContractParams
 }
 
-type DeployChainContractsOutput struct {
-	Addresses []datastore.AddressRef
-	Writes    []call.WriteOutput
-}
-
 var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
 	semver.MustParse("1.7.0"),
 	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
-	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output DeployChainContractsOutput, err error) {
+	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0, 12) // 12 = number of maybeDeployContract calls
 		writes := make([]call.WriteOutput, 0, 4)         // 4 = number of ExecuteOperation calls
 
@@ -92,7 +88,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, wethRef)
 
@@ -101,7 +97,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, linkRef)
 
@@ -114,7 +110,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, rmnRemoteRef)
 
@@ -126,7 +122,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, rmnProxyRef)
 
@@ -142,7 +138,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		})
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		writes = append(writes, setRMNReport.Output)
 
@@ -155,7 +151,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, routerRef)
 
@@ -164,7 +160,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, tokenAdminRegistryRef)
 
@@ -203,7 +199,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, feeQuoterRef)
 
@@ -225,7 +221,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		})
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to set initial prices on FeeQuoter: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set initial prices on FeeQuoter: %w", err)
 		}
 		writes = append(writes, updatePricesReport.Output)
 
@@ -240,7 +236,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy CCVAggregator: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCVAggregator: %w", err)
 		}
 		addresses = append(addresses, ccvAggregatorRef)
 
@@ -260,7 +256,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy CCVProxy: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCVProxy: %w", err)
 		}
 		addresses = append(addresses, ccvProxyRef)
 
@@ -269,7 +265,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy NonceManager: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy NonceManager: %w", err)
 		}
 		addresses = append(addresses, nonceManagerRef)
 
@@ -287,7 +283,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy CommitOnRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOnRamp: %w", err)
 		}
 		addresses = append(addresses, commitOnRampRef)
 
@@ -299,7 +295,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy CommitOffRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOffRamp: %w", err)
 		}
 		addresses = append(addresses, commitOffRampRef)
 
@@ -310,7 +306,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			Args:          input.ContractParams.CommitOffRamp.SignatureConfigArgs,
 		})
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to set signature config on CommitOffRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitOffRamp: %w", err)
 		}
 		writes = append(writes, setSignatureConfigReport.Output)
 
@@ -326,11 +322,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		})
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to add CommitOnRamp and CommitOffRamp as AuthorizedCallers to NonceManager: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to add CommitOnRamp and CommitOffRamp as AuthorizedCallers to NonceManager: %w", err)
 		}
 		writes = append(writes, applyAuthorizedCallerUpdatesReport.Output)
 
-		return DeployChainContractsOutput{
+		return sequences.OnChainOutput{
 			Addresses: addresses,
 			Writes:    writes,
 		}, nil
