@@ -410,8 +410,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         }
       }
 
-      // When users don't specify any required CCVs, default CCVs are chosen.
-      if (resolvedArgs.requiredCCV.length == 0) {
+      // When users don't specify any CCVs, default CCVs are chosen.
+      if (resolvedArgs.requiredCCV.length + resolvedArgs.optionalCCV.length == 0) {
         resolvedArgs.requiredCCV = new Client.CCV[](destChainConfig.defaultCCVs.length);
         for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
           resolvedArgs.requiredCCV[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});

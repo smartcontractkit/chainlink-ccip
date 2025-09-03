@@ -200,6 +200,32 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     assertEq(optionalThreshold, result.optionalThreshold);
   }
 
+  function test_parseExtraArgsWithDefaults_EmptyRequiredWithOptionalCCVs_NoDefaultsApplied() public {
+    // Test case: empty required CCVs but non-empty optional CCVs
+    Client.CCV[] memory optionalCCVs = new Client.CCV[](2);
+    optionalCCVs[0] = Client.CCV({ccvAddress: makeAddr("optionalCCV1"), args: "opt1"});
+    optionalCCVs[1] = Client.CCV({ccvAddress: makeAddr("optionalCCV2"), args: "opt2"});
+
+    uint8 optionalThreshold = 1;
+    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(
+      new Client.CCV[](0), // Empty required CCVs
+      optionalCCVs,
+      optionalThreshold
+    );
+
+    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+
+    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+
+    // Required CCVs should remain empty (no defaults applied)
+    assertEq(0, result.requiredCCV.length);
+    // Optional CCVs should be preserved as provided
+    _assertCCVArraysEqual(optionalCCVs, result.optionalCCV);
+    assertEq(optionalThreshold, result.optionalThreshold);
+    // Default executor should still be applied
+    assertEq(s_defaultExecutor, result.executor);
+  }
+
   // Additional test for defaults when no user CCVs provided
   function test_parseExtraArgsWithDefaults_DefaultCCVsAlwaysPresent() public view {
     // Ensure defaultCCVs.length > 0 (invariant)
