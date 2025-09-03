@@ -107,7 +107,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   DynamicConfig private s_dynamicConfig;
 
   /// @dev The destination chain specific configs.
-  mapping(uint64 destChainSelector => DestChainConfig destChainConfig) public s_destChainConfigs;
+  mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
 
   constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) {
     if (
@@ -298,17 +298,19 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     Client.CCV[] memory toBeAdded = new Client.CCV[](totalMandatory);
     uint256 toBeAddedIndex = 0;
 
-    // Process all mandatory CCVs in a single loop
-    // Lane mandated CCVs go first, then pool required CCVs
+    // Process all mandatory CCVs in a single pass.
+    // We iterate lane-mandated first, then pool-required for determinism only; there is no protocol-level
+    // requirement on relative ordering. Duplicates across the two sources are removed below.
     for (uint256 i = 0; i < totalMandatory; ++i) {
       address mandatoryCCV = i < destChainConfig.laneMandatedCCVs.length
         ? destChainConfig.laneMandatedCCVs[i]
         : poolRequiredCCVs[i - destChainConfig.laneMandatedCCVs.length];
 
-      // Check if this CCV was already processed
+      // Skip CCVs we've already collected from a lane-mandated or pool-required
+      // to avoid adding duplicates to requiredCCV.
       bool isDuplicateInToBeAdded = false;
-      for (uint256 k = 0; k < toBeAddedIndex; ++k) {
-        if (toBeAdded[k].ccvAddress == mandatoryCCV) {
+      for (uint256 j = 0; j < toBeAddedIndex; ++j) {
+        if (toBeAdded[j].ccvAddress == mandatoryCCV) {
           isDuplicateInToBeAdded = true;
           break;
         }
@@ -354,11 +356,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     if (toBeAddedIndex > 0) {
       newRequiredCCVs = new Client.CCV[](requiredCCV.length + toBeAddedIndex);
-      // Add new mandatory CCVs first
       for (uint256 i = 0; i < toBeAddedIndex; ++i) {
         newRequiredCCVs[i] = toBeAdded[i];
       }
-      // Then copy existing required CCVs
       for (uint256 i = 0; i < requiredCCV.length; ++i) {
         newRequiredCCVs[toBeAddedIndex + i] = requiredCCV[i];
       }
