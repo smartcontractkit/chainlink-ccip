@@ -2,6 +2,7 @@ package fee_quoter
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -54,7 +55,11 @@ type ApplyTokenTransferFeeConfigUpdatesArgs struct {
 	TokensToUseDefaultFeeConfigs []TokenTransferFeeConfigRemoveArgs
 }
 
-type InternalPriceUpdates = fee_quoter.InternalPriceUpdates
+type TokenPriceUpdate = fee_quoter.InternalTokenPriceUpdate
+
+type GasPriceUpdate = fee_quoter.InternalGasPriceUpdate
+
+type PriceUpdates = fee_quoter.InternalPriceUpdates
 
 var Deploy = deployment.New(
 	"fee-quoter:deploy",
@@ -159,15 +164,18 @@ var UpdatePrices = call.NewWrite(
 	ContractType,
 	fee_quoter.FeeQuoterABI,
 	fee_quoter.NewFeeQuoter,
-	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts) ([]common.Address, error) {
+	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, caller common.Address) (bool, error) {
 		priceUpdaters, err := feeQuoter.GetAllAuthorizedCallers(opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get authorized callers from FeeQuoter (%s): %w", feeQuoter.Address(), err)
+			return false, fmt.Errorf("failed to get authorized callers from FeeQuoter (%s): %w", feeQuoter.Address(), err)
 		}
-		return priceUpdaters, nil
+		if slices.Contains(priceUpdaters, caller) {
+			return true, nil
+		}
+		return false, nil
 	},
-	func(InternalPriceUpdates) error { return nil },
-	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args InternalPriceUpdates) (*types.Transaction, error) {
+	func(PriceUpdates) error { return nil },
+	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args PriceUpdates) (*types.Transaction, error) {
 		return feeQuoter.UpdatePrices(opts, args)
 	},
 )

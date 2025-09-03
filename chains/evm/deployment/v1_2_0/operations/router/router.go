@@ -1,6 +1,8 @@
 package router
 
 import (
+	"math/big"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -26,6 +28,16 @@ type ApplyRampsUpdatesArgs struct {
 	OnRampUpdates  []OnRamp
 	OffRampRemoves []OffRamp
 	OffRampAdds    []OffRamp
+}
+
+type EVMTokenAmount = router.ClientEVMTokenAmount
+
+type EVM2AnyMessage = router.ClientEVM2AnyMessage
+
+type CCIPSendArgs struct {
+	Value             *big.Int
+	DestChainSelector uint64
+	EVM2AnyMessage    EVM2AnyMessage
 }
 
 var Deploy = deployment.New(
@@ -58,6 +70,24 @@ var ApplyRampUpdates = call.NewWrite(
 	},
 )
 
+var CCIPSend = call.NewWrite(
+	"router:ccip-send",
+	semver.MustParse("1.2.0"),
+	"Sends a CCIP message via the Router",
+	ContractType,
+	router.RouterABI,
+	router.NewRouter,
+	func(contract *router.Router, opts *bind.CallOpts, caller common.Address) (bool, error) {
+		return true, nil
+	},
+	func(args CCIPSendArgs) error { return nil },
+	func(router *router.Router, opts *bind.TransactOpts, args CCIPSendArgs) (*types.Transaction, error) {
+		opts.Value = args.Value
+		defer func() { opts.Value = nil }()
+		return router.CcipSend(opts, args.DestChainSelector, args.EVM2AnyMessage)
+	},
+)
+
 var GetOffRamps = call.NewRead(
 	"router:get-off-ramps",
 	semver.MustParse("1.2.0"),
@@ -77,5 +107,16 @@ var GetOnRamp = call.NewRead(
 	router.NewRouter,
 	func(router *router.Router, opts *bind.CallOpts, destChainSelector uint64) (common.Address, error) {
 		return router.GetOnRamp(opts, destChainSelector)
+	},
+)
+
+var GetFee = call.NewRead(
+	"router:get-fee",
+	semver.MustParse("1.2.0"),
+	"Gets the fee for a message",
+	ContractType,
+	router.NewRouter,
+	func(router *router.Router, opts *bind.CallOpts, args CCIPSendArgs) (*big.Int, error) {
+		return router.GetFee(opts, args.DestChainSelector, args.EVM2AnyMessage)
 	},
 )

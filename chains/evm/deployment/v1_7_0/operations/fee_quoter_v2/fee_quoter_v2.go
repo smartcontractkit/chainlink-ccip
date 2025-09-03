@@ -2,6 +2,7 @@ package fee_quoter_v2
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -159,12 +160,15 @@ var UpdatePrices = call.NewWrite(
 	ContractType,
 	fee_quoter_v2.FeeQuoterV2ABI,
 	fee_quoter_v2.NewFeeQuoterV2,
-	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.CallOpts) ([]common.Address, error) {
+	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.CallOpts, caller common.Address) (bool, error) {
 		priceUpdaters, err := feeQuoterV2.GetAllAuthorizedCallers(opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get authorized callers from FeeQuoterV2 (%s): %w", feeQuoterV2.Address(), err)
+			return false, fmt.Errorf("failed to get authorized callers from FeeQuoterV2 (%s): %w", feeQuoterV2.Address(), err)
 		}
-		return priceUpdaters, nil
+		if slices.Contains(priceUpdaters, caller) {
+			return true, nil
+		}
+		return false, nil
 	},
 	func(InternalPriceUpdates) error { return nil },
 	func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args InternalPriceUpdates) (*types.Transaction, error) {

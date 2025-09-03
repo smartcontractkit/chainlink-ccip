@@ -150,6 +150,11 @@ func TestDeployChain_Apply(t *testing.T) {
 				DataStore:        ds.Seal(),
 			}
 
+			usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
+			require.True(t, ok, "Failed to parse USDPerLINK")
+			usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
+			require.True(t, ok, "Failed to parse USDPerWETH")
+
 			out, err := changesets.DeployChain.Apply(e, changesets.DeployChainCfg{
 				ChainSelector: 5009297550715157269,
 				Params: sequences.ContractParams{
@@ -166,6 +171,8 @@ func TestDeployChain_Apply(t *testing.T) {
 						TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
 						LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
 						WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
+						USDPerLINK:                     usdPerLink,
+						USDPerWETH:                     usdPerWeth,
 					},
 					CommitOffRamp: sequences.CommitOffRampParams{
 						SignatureConfigArgs: commit_offramp.SignatureConfigArgs{

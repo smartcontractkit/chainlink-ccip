@@ -69,6 +69,11 @@ func TestDeployChain_Idempotency(t *testing.T) {
 			)
 			evmChain := chains.EVMChains()[5009297550715157269]
 
+			usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
+			require.True(t, ok, "Failed to parse USDPerLINK")
+			usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
+			require.True(t, ok, "Failed to parse USDPerWETH")
+
 			report, err := operations.ExecuteSequence(
 				bundle,
 				sequences.DeployChain,
@@ -90,6 +95,8 @@ func TestDeployChain_Idempotency(t *testing.T) {
 							TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
 							LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
 							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
+							USDPerLINK:                     usdPerLink,
+							USDPerWETH:                     usdPerWeth,
 						},
 						CommitOffRamp: sequences.CommitOffRampParams{
 							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{{
@@ -108,7 +115,7 @@ func TestDeployChain_Idempotency(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 			require.Len(t, report.Output.Addresses, 12, "Expected 12 addresses in output")
-			require.Len(t, report.Output.Writes, 3, "Expected 3 writes in output")
+			require.Len(t, report.Output.Writes, 4, "Expected 4 writes in output")
 			for _, write := range report.Output.Writes {
 				// Contracts are deployed & still owned by deployer, so all writes should be executed
 				require.True(t, write.Executed, "Expected all writes to be executed")
@@ -166,6 +173,11 @@ func TestDeployChain_MultipleDeployments(t *testing.T) {
 		for _, selector := range chainSelectors {
 			evmChain := evmChains[selector]
 
+			usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
+			require.True(t, ok, "Failed to parse USDPerLINK")
+			usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
+			require.True(t, ok, "Failed to parse USDPerWETH")
+
 			input := sequences.DeployChainInput{
 				ChainSelector:     selector,
 				ExistingAddresses: nil,
@@ -181,8 +193,10 @@ func TestDeployChain_MultipleDeployments(t *testing.T) {
 					FeeQuoter: sequences.FeeQuoterParams{
 						MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
 						TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
-						LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
-						WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
+						LINKPremiumMultiplierWeiPerEth: 9e17,       // 0.9 ETH
+						WETHPremiumMultiplierWeiPerEth: 1e18,       // 1.0 ETH
+						USDPerLINK:                     usdPerLink, // $15
+						USDPerWETH:                     usdPerWeth, // $2000
 					},
 					CommitOffRamp: sequences.CommitOffRampParams{
 						SignatureConfigArgs: commit_offramp.SignatureConfigArgs{{
@@ -255,6 +269,11 @@ func TestDeployChain_MultipleDeployments(t *testing.T) {
 
 		resultChan := make(chan deployResult, len(chainSelectors))
 
+		usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
+		require.True(t, ok, "Failed to parse USDPerLINK")
+		usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
+		require.True(t, ok, "Failed to parse USDPerWETH")
+
 		// Launch concurrent deployments
 		for _, selector := range chainSelectors {
 			go func(chainSel uint64) {
@@ -277,6 +296,8 @@ func TestDeployChain_MultipleDeployments(t *testing.T) {
 							TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
 							LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
 							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
+							USDPerLINK:                     usdPerLink,
+							USDPerWETH:                     usdPerWeth,
 						},
 						CommitOffRamp: sequences.CommitOffRampParams{
 							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{{

@@ -1,10 +1,12 @@
 package sequences_test
 
 import (
+	"bytes"
 	"context"
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -56,6 +58,11 @@ func TestConfigureChainForLanes(t *testing.T) {
 			)
 			evmChain := chains.EVMChains()[chainSelector]
 
+			usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
+			require.True(t, ok, "Failed to parse USDPerLINK")
+			usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
+			require.True(t, ok, "Failed to parse USDPerWETH")
+
 			deploymentReport, err := operations.ExecuteSequence(
 				bundle,
 				sequences.DeployChain,
@@ -76,6 +83,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 							TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
 							LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
 							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
+							USDPerLINK:                     usdPerLink,
+							USDPerWETH:                     usdPerWeth,
 						},
 						CommitOffRamp: sequences.CommitOffRampParams{
 							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{{
@@ -220,6 +229,79 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, ccvProxy.Hex(), commitOnRampDestChainConfig.Output.CcvProxy.Hex(), "CcvProxy in CommitOnRamp dest chain config should match CommitOnRamp address")
 			require.False(t, commitOnRampDestChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitOnRamp dest chain config should be false")
+
+			/////////////////////////////////////////
+			// Try sending CCIP message /////////////
+			/////////////////////////////////////////
+
+			// TODO: Using GenericExtraArgsV2 because FeeQuoter doesn't support EVMExtraArgsV3
+			// & FeeQuoterV2 is too big to deploy right now
+			const clientABI = `
+			[
+				{
+					"name": "encodeGenericExtraArgsV2",
+					"type": "function",
+					"inputs": [
+						{
+							"components": [
+								{
+									"name": "gasLimit",
+									"type": "uint256"
+								},
+								{
+									"name": "allowOutOfOrderExecution",
+									"type": "bool"
+								}
+							],
+							"name": "args",
+							"type": "tuple"
+						}
+					],
+					"outputs": [],
+					"stateMutability": "pure"
+				}
+			]
+			`
+
+			parsedABI, err := abi.JSON(bytes.NewReader([]byte(clientABI)))
+			require.NoError(t, err, "Failed to parse ABI")
+
+			genericExtraArgsV2 := struct {
+				GasLimit                 *big.Int
+				AllowOutOfOrderExecution bool
+			}{
+				GasLimit:                 big.NewInt(1_000_000),
+				AllowOutOfOrderExecution: true,
+			}
+			encoded, err := parsedABI.Methods["encodeGenericExtraArgsV2"].Inputs.Pack(genericExtraArgsV2)
+			require.NoError(t, err, "Failed to ABI encode GenericExtraArgsV2")
+
+			tag := []byte{0x18, 0x1d, 0xcf, 0x10} // GENERIC_EXTRA_ARGS_V2_TAG
+			ccipSendArgs := router.CCIPSendArgs{
+				DestChainSelector: remoteChainSelector,
+				EVM2AnyMessage: router.EVM2AnyMessage{
+					Receiver:     common.LeftPadBytes(evmChain.DeployerKey.From.Bytes(), 32),
+					Data:         []byte{},
+					TokenAmounts: []router.EVMTokenAmount{},
+					ExtraArgs:    append(tag, encoded...),
+				},
+			}
+
+			fee, err := operations.ExecuteOperation(bundle, router.GetFee, evmChain, call.Input[router.CCIPSendArgs]{
+				ChainSelector: evmChain.Selector,
+				Address:       r,
+				Args:          ccipSendArgs,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+
+			// Send CCIP message with value
+			ccipSendArgs.Value = fee.Output
+			_, err = operations.ExecuteOperation(bundle, router.CCIPSend, evmChain, call.Input[router.CCIPSendArgs]{
+				ChainSelector: evmChain.Selector,
+				Address:       r,
+				Args:          ccipSendArgs,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
 		})
 	}
 }

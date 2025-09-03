@@ -53,6 +53,8 @@ type FeeQuoterParams struct {
 	TokenPriceStalenessThreshold   uint32
 	LINKPremiumMultiplierWeiPerEth uint64
 	WETHPremiumMultiplierWeiPerEth uint64
+	USDPerLINK                     *big.Int
+	USDPerWETH                     *big.Int
 }
 
 type ContractParams struct {
@@ -81,7 +83,7 @@ var DeployChain = cldf_ops.NewSequence(
 	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
 	func(b operations.Bundle, chain evm.Chain, input DeployChainInput) (output DeployChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0, 12) // 12 = number of maybeDeployContract calls
-		writes := make([]call.WriteOutput, 0, 3)         // 3 = number of ExecuteOperation calls
+		writes := make([]call.WriteOutput, 0, 4)         // 4 = number of ExecuteOperation calls
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
 
@@ -205,6 +207,28 @@ var DeployChain = cldf_ops.NewSequence(
 			return DeployChainOutput{}, err
 		}
 		addresses = append(addresses, feeQuoterRef)
+
+		// Set initial prices on FeeQuoter
+		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, call.Input[fee_quoter.PriceUpdates]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(feeQuoterRef.Address),
+			Args: fee_quoter.PriceUpdates{
+				TokenPriceUpdates: []fee_quoter.TokenPriceUpdate{
+					{
+						SourceToken: common.HexToAddress(linkRef.Address),
+						UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,
+					},
+					{
+						SourceToken: common.HexToAddress(wethRef.Address),
+						UsdPerToken: input.ContractParams.FeeQuoter.USDPerWETH,
+					},
+				},
+			},
+		})
+		if err != nil {
+			return DeployChainOutput{}, fmt.Errorf("failed to set initial prices on FeeQuoter: %w", err)
+		}
+		writes = append(writes, updatePricesReport.Output)
 
 		// Deploy CCVAggregator
 		ccvAggregatorRef, err := maybeDeployContract(b, ccv_aggregator.Deploy, ccv_aggregator.ContractType, chain, deployment.Input[ccv_aggregator.ConstructorArgs]{
