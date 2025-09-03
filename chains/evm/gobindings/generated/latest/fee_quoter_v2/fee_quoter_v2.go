@@ -5,7 +5,6 @@ package fee_quoter_v2
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -2912,44 +2910,6 @@ type ProcessMessageArgs struct {
 	TokenReceiver         []byte
 }
 
-func (_FeeQuoterV2 *FeeQuoterV2) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _FeeQuoterV2.abi.Events["AuthorizedCallerAdded"].ID:
-		return _FeeQuoterV2.ParseAuthorizedCallerAdded(log)
-	case _FeeQuoterV2.abi.Events["AuthorizedCallerRemoved"].ID:
-		return _FeeQuoterV2.ParseAuthorizedCallerRemoved(log)
-	case _FeeQuoterV2.abi.Events["DestChainAdded"].ID:
-		return _FeeQuoterV2.ParseDestChainAdded(log)
-	case _FeeQuoterV2.abi.Events["DestChainConfigUpdated"].ID:
-		return _FeeQuoterV2.ParseDestChainConfigUpdated(log)
-	case _FeeQuoterV2.abi.Events["FeeTokenAdded"].ID:
-		return _FeeQuoterV2.ParseFeeTokenAdded(log)
-	case _FeeQuoterV2.abi.Events["FeeTokenRemoved"].ID:
-		return _FeeQuoterV2.ParseFeeTokenRemoved(log)
-	case _FeeQuoterV2.abi.Events["OwnershipTransferRequested"].ID:
-		return _FeeQuoterV2.ParseOwnershipTransferRequested(log)
-	case _FeeQuoterV2.abi.Events["OwnershipTransferred"].ID:
-		return _FeeQuoterV2.ParseOwnershipTransferred(log)
-	case _FeeQuoterV2.abi.Events["PremiumMultiplierWeiPerEthUpdated"].ID:
-		return _FeeQuoterV2.ParsePremiumMultiplierWeiPerEthUpdated(log)
-	case _FeeQuoterV2.abi.Events["PriceFeedPerTokenUpdated"].ID:
-		return _FeeQuoterV2.ParsePriceFeedPerTokenUpdated(log)
-	case _FeeQuoterV2.abi.Events["ReportPermissionSet"].ID:
-		return _FeeQuoterV2.ParseReportPermissionSet(log)
-	case _FeeQuoterV2.abi.Events["TokenTransferFeeConfigDeleted"].ID:
-		return _FeeQuoterV2.ParseTokenTransferFeeConfigDeleted(log)
-	case _FeeQuoterV2.abi.Events["TokenTransferFeeConfigUpdated"].ID:
-		return _FeeQuoterV2.ParseTokenTransferFeeConfigUpdated(log)
-	case _FeeQuoterV2.abi.Events["UsdPerTokenUpdated"].ID:
-		return _FeeQuoterV2.ParseUsdPerTokenUpdated(log)
-	case _FeeQuoterV2.abi.Events["UsdPerUnitGasUpdated"].ID:
-		return _FeeQuoterV2.ParseUsdPerUnitGasUpdated(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (FeeQuoterV2AuthorizedCallerAdded) Topic() common.Hash {
 	return common.HexToHash("0xeb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef")
 }
@@ -3176,8 +3136,6 @@ type FeeQuoterV2Interface interface {
 	WatchUsdPerUnitGasUpdated(opts *bind.WatchOpts, sink chan<- *FeeQuoterV2UsdPerUnitGasUpdated, destChain []uint64) (event.Subscription, error)
 
 	ParseUsdPerUnitGasUpdated(log types.Log) (*FeeQuoterV2UsdPerUnitGasUpdated, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

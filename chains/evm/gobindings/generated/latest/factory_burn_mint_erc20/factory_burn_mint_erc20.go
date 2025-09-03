@@ -5,7 +5,6 @@ package factory_burn_mint_erc20
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -2018,34 +2016,6 @@ func (_FactoryBurnMintERC20 *FactoryBurnMintERC20Filterer) ParseTransfer(log typ
 	return event, nil
 }
 
-func (_FactoryBurnMintERC20 *FactoryBurnMintERC20) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _FactoryBurnMintERC20.abi.Events["Approval"].ID:
-		return _FactoryBurnMintERC20.ParseApproval(log)
-	case _FactoryBurnMintERC20.abi.Events["BurnAccessGranted"].ID:
-		return _FactoryBurnMintERC20.ParseBurnAccessGranted(log)
-	case _FactoryBurnMintERC20.abi.Events["BurnAccessRevoked"].ID:
-		return _FactoryBurnMintERC20.ParseBurnAccessRevoked(log)
-	case _FactoryBurnMintERC20.abi.Events["CCIPAdminTransferred"].ID:
-		return _FactoryBurnMintERC20.ParseCCIPAdminTransferred(log)
-	case _FactoryBurnMintERC20.abi.Events["HyperEVMLinkerSet"].ID:
-		return _FactoryBurnMintERC20.ParseHyperEVMLinkerSet(log)
-	case _FactoryBurnMintERC20.abi.Events["MintAccessGranted"].ID:
-		return _FactoryBurnMintERC20.ParseMintAccessGranted(log)
-	case _FactoryBurnMintERC20.abi.Events["MintAccessRevoked"].ID:
-		return _FactoryBurnMintERC20.ParseMintAccessRevoked(log)
-	case _FactoryBurnMintERC20.abi.Events["OwnershipTransferRequested"].ID:
-		return _FactoryBurnMintERC20.ParseOwnershipTransferRequested(log)
-	case _FactoryBurnMintERC20.abi.Events["OwnershipTransferred"].ID:
-		return _FactoryBurnMintERC20.ParseOwnershipTransferred(log)
-	case _FactoryBurnMintERC20.abi.Events["Transfer"].ID:
-		return _FactoryBurnMintERC20.ParseTransfer(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (FactoryBurnMintERC20Approval) Topic() common.Hash {
 	return common.HexToHash("0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")
 }
@@ -2220,8 +2190,6 @@ type FactoryBurnMintERC20Interface interface {
 	WatchTransfer(opts *bind.WatchOpts, sink chan<- *FactoryBurnMintERC20Transfer, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseTransfer(log types.Log) (*FactoryBurnMintERC20Transfer, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

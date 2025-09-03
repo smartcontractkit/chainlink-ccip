@@ -5,7 +5,6 @@ package onramp_over_superchain_interop
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1958,34 +1956,6 @@ type GetDestChainConfig struct {
 	Router           common.Address
 }
 
-func (_OnRampOverSuperchainInterop *OnRampOverSuperchainInterop) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _OnRampOverSuperchainInterop.abi.Events["AllowListAdminSet"].ID:
-		return _OnRampOverSuperchainInterop.ParseAllowListAdminSet(log)
-	case _OnRampOverSuperchainInterop.abi.Events["AllowListSendersAdded"].ID:
-		return _OnRampOverSuperchainInterop.ParseAllowListSendersAdded(log)
-	case _OnRampOverSuperchainInterop.abi.Events["AllowListSendersRemoved"].ID:
-		return _OnRampOverSuperchainInterop.ParseAllowListSendersRemoved(log)
-	case _OnRampOverSuperchainInterop.abi.Events["CCIPMessageSent"].ID:
-		return _OnRampOverSuperchainInterop.ParseCCIPMessageSent(log)
-	case _OnRampOverSuperchainInterop.abi.Events["CCIPSuperchainMessageSent"].ID:
-		return _OnRampOverSuperchainInterop.ParseCCIPSuperchainMessageSent(log)
-	case _OnRampOverSuperchainInterop.abi.Events["ConfigSet"].ID:
-		return _OnRampOverSuperchainInterop.ParseConfigSet(log)
-	case _OnRampOverSuperchainInterop.abi.Events["DestChainConfigSet"].ID:
-		return _OnRampOverSuperchainInterop.ParseDestChainConfigSet(log)
-	case _OnRampOverSuperchainInterop.abi.Events["FeeTokenWithdrawn"].ID:
-		return _OnRampOverSuperchainInterop.ParseFeeTokenWithdrawn(log)
-	case _OnRampOverSuperchainInterop.abi.Events["OwnershipTransferRequested"].ID:
-		return _OnRampOverSuperchainInterop.ParseOwnershipTransferRequested(log)
-	case _OnRampOverSuperchainInterop.abi.Events["OwnershipTransferred"].ID:
-		return _OnRampOverSuperchainInterop.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (OnRampOverSuperchainInteropAllowListAdminSet) Topic() common.Hash {
 	return common.HexToHash("0xb8c9b44ae5b5e3afb195f67391d9ff50cb904f9c0fa5fd520e497a97c1aa5a1e")
 }
@@ -2134,8 +2104,6 @@ type OnRampOverSuperchainInteropInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *OnRampOverSuperchainInteropOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*OnRampOverSuperchainInteropOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

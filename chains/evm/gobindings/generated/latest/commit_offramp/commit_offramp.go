@@ -5,7 +5,6 @@ package commit_offramp
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -898,22 +896,6 @@ func (_CommitOffRamp *CommitOffRampFilterer) ParseOwnershipTransferred(log types
 	return event, nil
 }
 
-func (_CommitOffRamp *CommitOffRamp) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _CommitOffRamp.abi.Events["ConfigRevoked"].ID:
-		return _CommitOffRamp.ParseConfigRevoked(log)
-	case _CommitOffRamp.abi.Events["ConfigSet"].ID:
-		return _CommitOffRamp.ParseConfigSet(log)
-	case _CommitOffRamp.abi.Events["OwnershipTransferRequested"].ID:
-		return _CommitOffRamp.ParseOwnershipTransferRequested(log)
-	case _CommitOffRamp.abi.Events["OwnershipTransferred"].ID:
-		return _CommitOffRamp.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (CommitOffRampConfigRevoked) Topic() common.Hash {
 	return common.HexToHash("0xfdde4bfc1a9ef28a2e3dbe34a4ccc65b0ad588f6b0406e492637aeaa73342160")
 }
@@ -978,8 +960,6 @@ type CommitOffRampInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *CommitOffRampOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*CommitOffRampOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

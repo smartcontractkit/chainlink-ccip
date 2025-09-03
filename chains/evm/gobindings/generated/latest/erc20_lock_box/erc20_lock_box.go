@@ -5,7 +5,6 @@ package erc20_lock_box
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -690,20 +688,6 @@ func (_ERC20LockBox *ERC20LockBoxFilterer) ParseWithdrawal(log types.Log) (*ERC2
 	return event, nil
 }
 
-func (_ERC20LockBox *ERC20LockBox) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _ERC20LockBox.abi.Events["AllowedCallerUpdated"].ID:
-		return _ERC20LockBox.ParseAllowedCallerUpdated(log)
-	case _ERC20LockBox.abi.Events["Deposit"].ID:
-		return _ERC20LockBox.ParseDeposit(log)
-	case _ERC20LockBox.abi.Events["Withdrawal"].ID:
-		return _ERC20LockBox.ParseWithdrawal(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (ERC20LockBoxAllowedCallerUpdated) Topic() common.Hash {
 	return common.HexToHash("0xb2cc4dde7f9044ba1999f7843e2f9cd1e4ce506f8cc2e16de26ce982bf113fa6")
 }
@@ -750,8 +734,6 @@ type ERC20LockBoxInterface interface {
 	WatchWithdrawal(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxWithdrawal, token []common.Address, recipient []common.Address) (event.Subscription, error)
 
 	ParseWithdrawal(log types.Log) (*ERC20LockBoxWithdrawal, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }
