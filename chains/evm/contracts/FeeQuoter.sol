@@ -51,7 +51,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   error InvalidChainFamilySelector(bytes4 chainFamilySelector);
   error InvalidTokenReceiver();
   error TooManySuiExtraArgsReceiverObjectIds(uint256 numReceiverObjectIds, uint256 maxReceiverObjectIds);
-  error InvalidZeroGasLimit();
+  error InvalidGasLimit();
   event FeeTokenAdded(address indexed feeToken);
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
@@ -1041,10 +1041,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         if (receiverObjectIdsLength > 0) {
           revert TooManySuiExtraArgsReceiverObjectIds(receiverObjectIdsLength, 0);
         }
-      } else {
-        if (gasLimit == 0) {
-          revert InvalidZeroGasLimit();
+        if (gasLimit != 0) {
+          revert InvalidGasLimit();
         }
+      } else {
         // The messaging accounts needed for CCIP receiver on SUI are:
         // message receiver,
         // plus remaining accounts specified in Sui extraArgs. Each account is 32 bytes.
