@@ -49,9 +49,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   error UnsupportedNumberOfTokens(uint256 numberOfTokens, uint256 maxNumberOfTokensPerMsg);
   error InvalidFeeRange(uint256 minFeeUSDCents, uint256 maxFeeUSDCents);
   error InvalidChainFamilySelector(bytes4 chainFamilySelector);
-  error InvalidTokenReceiver(); 
+  error InvalidTokenReceiver();
   error TooManySuiExtraArgsReceiverObjectIds(uint256 numReceiverObjectIds, uint256 maxReceiverObjectIds);
-
+  error InvalidZeroGasLimit();
   event FeeTokenAdded(address indexed feeToken);
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
@@ -897,7 +897,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       return Internal._validateTVMAddress(destAddress);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
-      return Internal._validate32ByteAddress(destAddress, 0);
+      return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? Internal.APTOS_PRECOMPILE_SPACE : 0);
     }
     revert InvalidChainFamilySelector(chainFamilySelector);
   }
@@ -1042,6 +1042,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
           revert TooManySuiExtraArgsReceiverObjectIds(receiverObjectIdsLength, 0);
         }
       } else {
+        if (gasLimit == 0) {
+          revert InvalidZeroGasLimit();
+        }
         // The messaging accounts needed for CCIP receiver on SUI are:
         // message receiver,
         // plus remaining accounts specified in Sui extraArgs. Each account is 32 bytes.
