@@ -18,7 +18,7 @@ contract ExecutorOnRamp_applyDestChainUpdates is ExecutorOnRampSetup {
     uint64[] memory currentDestChains = s_executorOnRamp.getDestChains();
     assertEq(currentDestChains.length, 2);
     bool found = false;
-    for (uint256 i = 0; i < currentDestChains.length; i++) {
+    for (uint256 i = 0; i < currentDestChains.length; ++i) {
       if (currentDestChains[i] == 2) {
         found = true;
         break;
@@ -64,7 +64,8 @@ contract ExecutorOnRamp_applyDestChainUpdates is ExecutorOnRampSetup {
   }
 
   function test_applyDestChainUpdates_RevertWhen_NotOwner() public {
-    vm.prank(makeAddr("stranger"));
+    vm.startPrank(STRANGER);
+
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_executorOnRamp.applyDestChainUpdates(new uint64[](0), new uint64[](0));
   }

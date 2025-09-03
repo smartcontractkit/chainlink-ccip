@@ -176,14 +176,14 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
     }
 
     if (s_ccvAllowlistEnabled) {
-      for (uint256 i = 0; i < requiredCCVs.length; i++) {
+      for (uint256 i = 0; i < requiredCCVs.length; ++i) {
         address ccvAddress = requiredCCVs[i].ccvAddress;
         if (!s_allowedCCVs.contains(ccvAddress)) {
           revert InvalidCCV(ccvAddress);
         }
       }
 
-      for (uint256 i = 0; i < optionalCCVs.length; i++) {
+      for (uint256 i = 0; i < optionalCCVs.length; ++i) {
         address ccvAddress = optionalCCVs[i].ccvAddress;
         if (!s_allowedCCVs.contains(ccvAddress)) {
           revert InvalidCCV(ccvAddress);

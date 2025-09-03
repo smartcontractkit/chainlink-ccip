@@ -21,7 +21,7 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
     address[] memory currentCCVs = s_executorOnRamp.getAllowedCCVs();
     assertEq(currentCCVs.length, 2);
     bool found = false;
-    for (uint256 i = 0; i < currentCCVs.length; i++) {
+    for (uint256 i = 0; i < currentCCVs.length; ++i) {
       if (currentCCVs[i] == newCCV) {
         found = true;
         break;
@@ -36,8 +36,10 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
     newCCVs[0] = INITIAL_CCV;
 
     vm.recordLogs();
+    vm.expectEmit();
+    emit ExecutorOnRamp.CCVAllowlistUpdated(true);
     s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), newCCVs, true);
-    vm.assertEq(vm.getRecordedLogs().length, 1); // Only the AllowlistUpdated event
+    vm.assertEq(vm.getRecordedLogs().length, 2); // Only the CCVAllowlistUpdated event (+ the one we emit above for use with vm.expectEmit)
 
     address[] memory currentCCVs = s_executorOnRamp.getAllowedCCVs();
     assertEq(currentCCVs.length, 1);
@@ -60,8 +62,10 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
     ccvsToRemove[0] = makeAddr("nonexistentCCV");
 
     vm.recordLogs();
+    vm.expectEmit();
+    emit ExecutorOnRamp.CCVAllowlistUpdated(true);
     s_executorOnRamp.applyAllowedCCVUpdates(ccvsToRemove, new address[](0), true);
-    vm.assertEq(vm.getRecordedLogs().length, 1); // Only the AllowlistUpdated event
+    vm.assertEq(vm.getRecordedLogs().length, 2); // Only the CCVAllowlistUpdated event (+ the one we emit above for use with vm.expectEmit)
 
     address[] memory currentCCVs = s_executorOnRamp.getAllowedCCVs();
     assertEq(currentCCVs.length, 1);
@@ -76,7 +80,8 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
   }
 
   function test_applyAllowedCCVUpdates_RevertWhen_NotOwner() public {
-    vm.prank(makeAddr("stranger"));
+    vm.startPrank(STRANGER);
+
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), new address[](0), true);
   }

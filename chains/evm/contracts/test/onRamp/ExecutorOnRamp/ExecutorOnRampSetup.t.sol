@@ -2,16 +2,17 @@
 pragma solidity ^0.8.24;
 
 import {ExecutorOnRamp} from "../../../onRamp/ExecutorOnRamp.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 
-import {Test} from "forge-std/Test.sol";
-
-contract ExecutorOnRampSetup is Test {
+contract ExecutorOnRampSetup is BaseTest {
   ExecutorOnRamp internal s_executorOnRamp;
   address internal constant INITIAL_CCV = address(121212);
   uint64 internal constant INITIAL_DEST = 1;
   uint8 internal constant INITIAL_MAX_CCVS = 1;
 
-  function setUp() public {
+  function setUp() public override {
+    super.setUp();
+
     s_executorOnRamp = new ExecutorOnRamp(INITIAL_MAX_CCVS);
 
     address[] memory ccvs = new address[](1);

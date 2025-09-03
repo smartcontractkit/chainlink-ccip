@@ -18,7 +18,7 @@ contract ExecutorOnRamp_setMaxCCVsPerMsg is ExecutorOnRampSetup {
   }
 
   function test_setMaxCCVsPerMsg_RevertWhen_NotOwner() public {
-    vm.prank(makeAddr("stranger"));
+    vm.startPrank(STRANGER);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_executorOnRamp.setMaxCCVsPerMsg(1);
