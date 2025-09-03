@@ -6,6 +6,9 @@ defaults:
   run:
     working-directory: v2/build/devenv
 
+permissions:
+  contents: read
+
 jobs:
   devenv-tidy:
     runs-on: ubuntu-latest

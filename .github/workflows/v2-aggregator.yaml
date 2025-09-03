@@ -12,6 +12,9 @@ defaults:
   run:
     working-directory: v2/aggregator
 
+permissions:
+  contents: read
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
