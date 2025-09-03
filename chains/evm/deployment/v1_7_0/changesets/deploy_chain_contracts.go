@@ -38,7 +38,7 @@ func applyDeployChainContracts(e cldf_deployment.Environment, cfg DeployChainCon
 		ContractParams:    cfg.Params,
 	})
 	if err != nil {
-		return cldf_deployment.ChangesetOutput{Reports: report.ExecutionReports}, fmt.Errorf("failed to execute DeployChain sequence: %w", err)
+		return cldf_deployment.ChangesetOutput{Reports: report.ExecutionReports}, fmt.Errorf("failed to execute DeployChainContracts sequence: %w", err)
 	}
 
 	ds := datastore.NewMemoryDataStore()

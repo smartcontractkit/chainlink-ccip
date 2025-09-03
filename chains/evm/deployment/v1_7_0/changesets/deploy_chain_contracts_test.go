@@ -84,7 +84,7 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 	}
 }
 
-func TestDeployChain_Apply(t *testing.T) {
+func TestDeployChainContracts_Apply(t *testing.T) {
 	tests := []struct {
 		desc          string
 		makeDatastore func() *datastore.MemoryDataStore
@@ -190,7 +190,7 @@ func TestDeployChain_Apply(t *testing.T) {
 					},
 				},
 			})
-			require.NoError(t, err, "Failed to apply DeployChain changeset")
+			require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
 
 			newAddrs, err := out.DataStore.Addresses().Fetch()
 			require.NoError(t, err, "Failed to fetch addresses from datastore")

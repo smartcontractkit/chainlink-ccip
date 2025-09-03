@@ -239,8 +239,6 @@ func TestConfigureChainForLanes(t *testing.T) {
 			// Try sending CCIP message /////////////
 			/////////////////////////////////////////
 
-			// TODO: Using GenericExtraArgsV2 because FeeQuoter doesn't support EVMExtraArgsV3
-			// & FeeQuoterV2 is too big to deploy right now
 			const clientABI = `
 			[
 				{
