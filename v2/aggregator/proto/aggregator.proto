@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+option go_package = "pb/aggregator";
+
+service Aggregator {
+  rpc WriteCommitVerification(WriteCommitVerificationRequest) returns (WriteCommitVerificationResponse);
+  rpc ReadCommitVerification(ReadCommitVerificationRequest) returns (ReadCommitVerificationResponse);
+}
+
+message Any2AnyMessageHeader {
+  bytes message_id = 1;
+  uint64 source_chain_selector = 2;
+  uint64 dest_chain_selector = 3;
+  uint64 sequence_number = 4;
+}
+
+// Subject to change based on the message encoding decisions
+message Any2AnyMessage {
+    Any2AnyMessageHeader header = 1;
+    bytes sender = 2;
+    bytes onramp_address = 3;
+    bytes data = 4;
+    bytes receiver = 5;
+    bytes fee_token = 6;
+    bytes fee_token_amount = 7;
+    bytes fee_value_juels = 8;
+    Any2AnyTokenTransfer token_transfer = 9;
+    repeated AnyReceipt verifier_receipts = 10;
+    AnyReceipt executor_receipt = 11;
+    AnyReceipt token_receipt = 12;
+    bytes extra_args = 13;
+}
+
+message Any2AnyTokenTransfer {
+    bytes source_token_address = 1;
+    bytes dest_token_address = 2;
+    bytes extra_data = 3;
+    bytes amount = 4;
+}
+
+message AnyReceipt {
+    bytes issuer = 1;
+    bytes fee_token_amount = 2;
+    uint64 dest_gas_limit = 3;
+    uint32 dest_bytes_overhead = 4;
+    bytes extra_args = 5;
+}
+
+message CommitVerificationRecord {
+  bytes message_id = 1;
+  uint64 sequence_number = 2;
+  uint64 source_chain_selector = 3;
+  uint64 dest_chain_selector = 4;
+  bytes source_verifier_address = 5;
+  bytes dest_verifier_address = 6;
+  // ccv_data is the signature from the commit verifier node of the message data and the blob data
+  bytes ccv_data = 7;
+  // blob_data is the encoded nonce from the source chain
+  bytes blob_data = 8;
+  uint32 timestamp = 9;
+  Any2AnyMessage message = 10;
+}
+
+message WriteCommitVerificationRequest {
+  CommitVerificationRecord commit_verification_record = 1;
+  // This is the id of the signer. In concrete term every node operator will have their own id which identify them uniquely
+  string participant_id = 2;
+  // This is used to seperate different group of signers. As we can have multiple commit verifiers
+  string committee_id = 3;
+}
+
+enum WriteStatus {
+  SUCCESS = 0;
+  FAILED = 1;
+}
+
+message WriteCommitVerificationResponse {
+  WriteStatus status = 1;
+}
+
+message ReadCommitVerificationRequest {
+  bytes message_id = 1;
+  string participant_id = 2;
+  string committee_id = 3;
+}
+
+message ReadCommitVerificationResponse {
+  CommitVerificationRecord commit_verification_record = 1;
+}

@@ -1,0 +1,94 @@
+# Default: show available recipes
+default:
+    just --list
+
+# Run go mod tidy
+tidy:
+    go mod tidy
+
+clean:
+    rm -rf compose/ blockscout/
+
+# Remove all the chaos experiments
+rm-chaos:
+    kubectl delete networkchaos --all -A
+    kubectl delete podchaos --all -A
+    kubectl delete iochaos --all -A
+    kubectl delete timechaos --all -A
+    kubectl delete stresschaos --all -A
+    kubectl delete dnschaos --all -A
+    kubectl delete kernelchaos --all -A
+
+# Format all go files
+fmt:
+    golangci-lint fmt --config=.golangci.yaml
+
+# Run golangci-lint
+lint:
+    golangci-lint run --whole-files --output.text.path stdout --max-same-issues=0 --config=.golangci.yaml
+
+# Install pre-commit hooks
+pre-commit:
+    pre-commit install
+
+# Remove all the dev images
+clean-docker-dev:
+    @just ../../build/devenv/fakes/clean-dev
+    @just ../../verifier/clean-dev
+    @just ../../executor/clean-dev
+    @just ../../indexer/clean-dev
+    @just ../../aggregator/clean-dev
+    rm -rf job-distributor/
+
+# Build all the services (hot-reload dev mode)
+build-docker-dev:
+    @just ../../build/devenv/fakes/build-dev
+    @just ../../verifier/build-dev
+    @just ../../executor/build-dev
+    @just ../../indexer/build-dev
+    @just ../../aggregator/build-dev
+    @just build-jd-docker
+
+# Build all the services (hot-reload dev mode but with default JD image)
+build-docker-dev-ci:
+    @just ../../build/devenv/fakes/build-dev
+    @just ../../verifier/build-dev
+    @just ../../executor/build-dev
+    @just ../../indexer/build-dev
+    @just ../../aggregator/build-dev
+
+# Build all the services for production
+build-docker-prod:
+    @just fakes/build
+    @just ../../services/verifier/build
+    @just ../../services/executor/build
+    @just ../../services/indexer/build
+    @just ../../services/aggregator/build
+
+# Clone and build job-distributor Docker image
+build-jd-docker:
+    #!/usr/bin/env bash
+    set -e
+    REPO_URL="https://github.com/smartcontractkit/job-distributor"
+    REPO_DIR="job-distributor/"
+    IMAGE_NAME="job-distributor:local"
+    DOCKERFILE="e2e/Dockerfile.e2e"
+    if docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+        echo "Docker image $IMAGE_NAME already exists, skipping build..."
+    else
+        echo "Cloning repository..."
+        git clone "$REPO_URL" "$REPO_DIR"
+        echo "Building Docker image..."
+        cd "$REPO_DIR" && docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" .
+        cd ..
+        rm -rf job-distributor/
+    fi
+    echo "Done!"
+
+# Sets MinIO alias for easier use of 'mc' CLI
+minio-alias:
+   mc alias set minio http://localhost:9000 mYrAnD0mAcc3ssK3y2024 s3cR3tK3yL0ngEn0ughF0rMinI0Testing2024!
+
+# Rebuild CLI
+cli:
+    pushd cmd/ccv > /dev/null && go install -ldflags="-X main.Version=1.0.0" . && popd > /dev/null

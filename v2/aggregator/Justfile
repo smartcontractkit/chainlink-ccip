@@ -1,0 +1,35 @@
+build:
+    docker build -f Dockerfile -t aggregator:latest .
+
+build-dev:
+    docker build -f Dockerfile.dev -t aggregator:dev .
+
+clean:
+    docker rmi aggregator:latest
+
+clean-dev:
+    docker rmi aggregator:dev
+
+proto:
+    protoc --go_out=. --go-grpc_out=. ./proto/aggregator.proto
+
+proto-lint:
+    buf lint
+
+proto-check: proto
+    @git diff --name-only -- *.pb.go > /tmp/proto_diff_output; \
+    if [ -s /tmp/proto_diff_output ]; then \
+        echo "Error: Generated protobuf files are out of sync"; \
+        echo "Run 'just proto' and commit the changes"; \
+        echo "Diff:"; \
+        git diff -- *.pb.go; \
+        exit 1; \
+    else \
+        echo "Protobuf files are in sync"; \
+    fi
+
+lint: proto-lint
+    golangci-lint run --fix -c .golangci.yml
+
+test:
+    go test ./...

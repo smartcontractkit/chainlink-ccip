@@ -1,0 +1,1 @@
+1. `NewBlockChainsFromSlice` panics if chain is `nil`

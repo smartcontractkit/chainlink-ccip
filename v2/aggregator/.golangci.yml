@@ -1,0 +1,35 @@
+version: "2"
+run:
+  allow-parallel-runners: true
+linters:
+  enable:
+    - containedctx
+    - errcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - fatcontext
+    - ginkgolinter
+    - gocritic
+    - gosec
+    - loggercheck
+    - mirror
+    - misspell
+    - noctx
+    - nolintlint
+    - perfsprint
+    - revive
+    - rowserrcheck
+    - spancheck
+    - sqlclosecheck
+    - testifylint
+    - unconvert
+    - whitespace
+  settings:
+    revive:
+      rules:
+        - name: var-naming
+          disabled: true
+formatters:
+  enable:
+    - goimports

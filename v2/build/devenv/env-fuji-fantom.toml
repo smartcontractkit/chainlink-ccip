@@ -1,0 +1,45 @@
+
+[[blockchains]]
+  chain_id = "43113"
+  type = "anvil"
+
+  [blockchains.out]
+    type = "anvil"
+    use_cache = true
+
+    [[blockchains.out.nodes]]
+      http_url = "https://rpcs.cldev.sh/avalanche/fuji"
+      internal_http_url = "https://rpcs.cldev.sh/avalanche/fuji"
+      internal_ws_url = "wss://rpcs.cldev.sh/avalanche/fuji"
+      ws_url = "wss://rpcs.cldev.sh/avalanche/fuji"
+
+[[blockchains]]
+  chain_id = "4002"
+  type = "anvil"
+
+  [blockchains.out]
+    type = "anvil"
+    use_cache = true
+
+    [[blockchains.out.nodes]]
+      http_url = "https://rpcs.cldev.sh/fantom/testnet"
+      internal_http_url = "https://rpcs.cldev.sh/fantom/testnet"
+      internal_ws_url = "wss://rpcs.cldev.sh/fantom/testnet"
+      ws_url = "wss://rpcs.cldev.sh/fantom/testnet"
+
+[ccv]
+  chain_finality_depth = 5
+  cl_nodes_funding_eth = 0.001
+  cl_nodes_funding_link = 0.001
+  contracts_configuration_timeout = 60
+  link_contract_address = "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+  verification_timeout = 400
+  verify = true
+
+  [ccv.ea_fake]
+    high_value = 30000
+    low_value = 3
+
+  [ccv.gas_settings]
+    fee_cap_multiplier = 2
+    tip_cap_multiplier = 2

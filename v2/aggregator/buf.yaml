@@ -1,0 +1,14 @@
+version: v2
+lint:
+  use:
+    - STANDARD
+  except:
+    - PACKAGE_DEFINED
+    - ENUM_ZERO_VALUE_SUFFIX
+    - SERVICE_SUFFIX
+    - ENUM_VALUE_PREFIX
+breaking:
+  use:
+    - FILE
+modules:
+  - path: .
