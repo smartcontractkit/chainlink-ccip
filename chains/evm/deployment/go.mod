@@ -9,7 +9,8 @@ replace (
 	// Make sure we're working with the latest chainlink-ccip
 	github.com/smartcontractkit/chainlink-ccip => ../../../
 
-	// Make sure we're working with the latest generated/latest
+	// Make sure we're working with the latest generated/latest. All versioned `generated` folders should use their
+	// actual release version, since they won't ever change. `latest` should point to the latest commit.
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest => ../gobindings/generated/latest
 )
 

@@ -5,7 +5,6 @@ package siloed_lock_release_token_pool
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -3690,58 +3688,6 @@ func (_SiloedLockReleaseTokenPool *SiloedLockReleaseTokenPoolFilterer) ParseUnsi
 	return event, nil
 }
 
-func (_SiloedLockReleaseTokenPool *SiloedLockReleaseTokenPool) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _SiloedLockReleaseTokenPool.abi.Events["AllowListAdd"].ID:
-		return _SiloedLockReleaseTokenPool.ParseAllowListAdd(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["AllowListRemove"].ID:
-		return _SiloedLockReleaseTokenPool.ParseAllowListRemove(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["ChainAdded"].ID:
-		return _SiloedLockReleaseTokenPool.ParseChainAdded(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["ChainConfigured"].ID:
-		return _SiloedLockReleaseTokenPool.ParseChainConfigured(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["ChainRemoved"].ID:
-		return _SiloedLockReleaseTokenPool.ParseChainRemoved(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["ChainSiloed"].ID:
-		return _SiloedLockReleaseTokenPool.ParseChainSiloed(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["ChainUnsiloed"].ID:
-		return _SiloedLockReleaseTokenPool.ParseChainUnsiloed(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["ConfigChanged"].ID:
-		return _SiloedLockReleaseTokenPool.ParseConfigChanged(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["InboundRateLimitConsumed"].ID:
-		return _SiloedLockReleaseTokenPool.ParseInboundRateLimitConsumed(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["LiquidityAdded"].ID:
-		return _SiloedLockReleaseTokenPool.ParseLiquidityAdded(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["LiquidityRemoved"].ID:
-		return _SiloedLockReleaseTokenPool.ParseLiquidityRemoved(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["LockedOrBurned"].ID:
-		return _SiloedLockReleaseTokenPool.ParseLockedOrBurned(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["OutboundRateLimitConsumed"].ID:
-		return _SiloedLockReleaseTokenPool.ParseOutboundRateLimitConsumed(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["OwnershipTransferRequested"].ID:
-		return _SiloedLockReleaseTokenPool.ParseOwnershipTransferRequested(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["OwnershipTransferred"].ID:
-		return _SiloedLockReleaseTokenPool.ParseOwnershipTransferred(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["RateLimitAdminSet"].ID:
-		return _SiloedLockReleaseTokenPool.ParseRateLimitAdminSet(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["ReleasedOrMinted"].ID:
-		return _SiloedLockReleaseTokenPool.ParseReleasedOrMinted(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["RemotePoolAdded"].ID:
-		return _SiloedLockReleaseTokenPool.ParseRemotePoolAdded(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["RemotePoolRemoved"].ID:
-		return _SiloedLockReleaseTokenPool.ParseRemotePoolRemoved(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["RouterUpdated"].ID:
-		return _SiloedLockReleaseTokenPool.ParseRouterUpdated(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["SiloRebalancerSet"].ID:
-		return _SiloedLockReleaseTokenPool.ParseSiloRebalancerSet(log)
-	case _SiloedLockReleaseTokenPool.abi.Events["UnsiloedRebalancerSet"].ID:
-		return _SiloedLockReleaseTokenPool.ParseUnsiloedRebalancerSet(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (SiloedLockReleaseTokenPoolAllowListAdd) Topic() common.Hash {
 	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
 }
@@ -4050,8 +3996,6 @@ type SiloedLockReleaseTokenPoolInterface interface {
 	WatchUnsiloedRebalancerSet(opts *bind.WatchOpts, sink chan<- *SiloedLockReleaseTokenPoolUnsiloedRebalancerSet) (event.Subscription, error)
 
 	ParseUnsiloedRebalancerSet(log types.Log) (*SiloedLockReleaseTokenPoolUnsiloedRebalancerSet, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }
