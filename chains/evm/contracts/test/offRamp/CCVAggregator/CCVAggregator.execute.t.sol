@@ -17,53 +17,62 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   function setUp() public virtual override {
     super.setUp();
 
+    Internal.MessageV1 memory message = _getMessage();
+
     // Mock validateReport for default message structure.
-    CCVAggregator.AggregatedReport memory defaultReport = _getReport();
+    CCVAggregator.AggregatedReport memory defaultReport = _getReport(message);
+    bytes32 messageHash = keccak256(defaultReport.message);
+
     vm.mockCall(
       s_defaultCCV,
       abi.encodeCall(
         ICCVOffRampV1.validateReport,
-        (
-          defaultReport.message,
-          keccak256(abi.encode(defaultReport.message)),
-          defaultReport.ccvData[0],
-          Internal.MessageExecutionState.UNTOUCHED
-        )
+        (message, messageHash, defaultReport.ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
       ),
       abi.encode(true)
     );
   }
 
-  function _getReport() internal returns (CCVAggregator.AggregatedReport memory) {
-    Internal.Any2EVMMessage memory message = Internal.Any2EVMMessage({
-      header: Internal.Header({
-        messageId: keccak256("test-message-1"),
-        sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-        destChainSelector: DEST_CHAIN_SELECTOR,
-        sequenceNumber: 1
-      }),
-      sender: abi.encode(makeAddr("sender")),
-      data: "",
-      receiver: makeAddr("receiver"),
-      gasLimit: 0,
-      tokenAmounts: new Internal.TokenTransfer[](0)
+  function _getMessage() internal returns (Internal.MessageV1 memory message) {
+    return Internal.MessageV1({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      sequenceNumber: 1,
+      onRampAddress: abi.encodePacked(makeAddr("onRamp")),
+      offRampAddress: abi.encodePacked(makeAddr("offRamp")),
+      //
+      finality: 0,
+      sender: abi.encodePacked(makeAddr("sender")),
+      receiver: abi.encodePacked(makeAddr("receiver")),
+      destBlob: "",
+      tokenTransfer: new Internal.TokenTransferV1[](0),
+      data: ""
     });
+  }
 
+  function _getReport(
+    Internal.MessageV1 memory message
+  ) internal returns (CCVAggregator.AggregatedReport memory) {
     bytes[] memory ccvData = new bytes[](1);
     ccvData[0] = abi.encode("mock ccv data");
 
-    return CCVAggregator.AggregatedReport({message: message, ccvs: _arrayOf(s_defaultCCV), ccvData: ccvData});
+    return CCVAggregator.AggregatedReport({
+      message: Internal._encodeMessageV1(message),
+      ccvs: _arrayOf(s_defaultCCV),
+      ccvData: ccvData
+    });
   }
 
   function test_execute() public {
-    CCVAggregator.AggregatedReport memory report = _getReport();
+    Internal.MessageV1 memory message = _getMessage();
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
 
     // Expect execution state change event.
     vm.expectEmit();
     emit CCVAggregator.ExecutionStateChanged(
-      report.message.header.sourceChainSelector,
-      report.message.header.sequenceNumber,
-      report.message.header.messageId,
+      message.sourceChainSelector,
+      message.sequenceNumber,
+      keccak256(report.message),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -75,10 +84,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
       uint256(Internal.MessageExecutionState.SUCCESS),
       uint256(
         s_agg.getExecutionState(
-          report.message.header.sourceChainSelector,
-          report.message.header.sequenceNumber,
-          report.message.sender,
-          report.message.receiver
+          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
     );
@@ -89,14 +95,16 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     ReentrantCCV maliciousCCV = new ReentrantCCV(address(s_agg));
 
     // Update report to use malicious CCV.
-    CCVAggregator.AggregatedReport memory report = _getReport();
+    Internal.MessageV1 memory message = _getMessage();
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
+
     report.ccvs = new address[](2);
     report.ccvs[0] = address(maliciousCCV);
     report.ccvs[1] = s_defaultCCV;
     report.ccvData = new bytes[](2);
 
     _setGetCCVsReturnData(
-      report.message.receiver, report.message.header.sourceChainSelector, report.ccvs, new address[](0), 0
+      address(bytes20(message.receiver)), message.sourceChainSelector, report.ccvs, new address[](0), 0
     );
 
     vm.expectRevert(CCVAggregator.ReentrancyGuardReentrantCall.selector);
@@ -112,7 +120,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     );
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR));
-    s_agg.execute(_getReport());
+    s_agg.execute(_getReport(_getMessage()));
   }
 
   function test_execute_RevertWhen_SourceChainNotEnabled() public {
@@ -122,24 +130,26 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     );
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.SourceChainNotEnabled.selector, SOURCE_CHAIN_SELECTOR));
-    s_agg.execute(_getReport());
+    s_agg.execute(_getReport(_getMessage()));
   }
 
   function test_execute_RevertWhen_InvalidMessageDestChainSelector() public {
-    CCVAggregator.AggregatedReport memory report = _getReport();
+    Internal.MessageV1 memory message = _getMessage();
+
     // Modify message with wrong destination chain selector.
-    report.message.header.destChainSelector = DEST_CHAIN_SELECTOR + 1; // Wrong destination.
+    message.destChainSelector = DEST_CHAIN_SELECTOR + 1; // Wrong destination.
+
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        CCVAggregator.InvalidMessageDestChainSelector.selector, report.message.header.destChainSelector
-      )
+      abi.encodeWithSelector(CCVAggregator.InvalidMessageDestChainSelector.selector, message.destChainSelector)
     );
     s_agg.execute(report);
   }
 
   function test_execute_RevertWhen_InvalidCCVDataLength() public {
-    CCVAggregator.AggregatedReport memory report = _getReport();
+    Internal.MessageV1 memory message = _getMessage();
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
 
     // Modify report to have mismatched array lengths.
     report.ccvs = new address[](report.ccvs.length + 1);
@@ -152,7 +162,8 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_SkippedAlreadyExecutedMessage() public {
-    CCVAggregator.AggregatedReport memory report = _getReport();
+    Internal.MessageV1 memory message = _getMessage();
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
 
     // Execute the message successfully first time.
     s_agg.execute(report);
@@ -162,10 +173,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
       uint256(Internal.MessageExecutionState.SUCCESS),
       uint256(
         s_agg.getExecutionState(
-          report.message.header.sourceChainSelector,
-          report.message.header.sequenceNumber,
-          report.message.sender,
-          report.message.receiver
+          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
     );
@@ -173,57 +181,50 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     // Try to execute the same message again - should revert.
     vm.expectRevert(
       abi.encodeWithSelector(
-        CCVAggregator.SkippedAlreadyExecutedMessage.selector,
-        SOURCE_CHAIN_SELECTOR,
-        report.message.header.sequenceNumber
+        CCVAggregator.SkippedAlreadyExecutedMessage.selector, SOURCE_CHAIN_SELECTOR, message.sequenceNumber
       )
     );
     s_agg.execute(report);
   }
 
-  function test_execute_RevertWhen_InvalidNumberOfTokens() public {
-    CCVAggregator.AggregatedReport memory report = _getReport();
-
-    // Modify message with multiple tokens (more than 1).
-    report.message.tokenAmounts = new Internal.TokenTransfer[](2);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(CCVAggregator.InvalidNumberOfTokens.selector, report.message.tokenAmounts.length)
-    );
-    s_agg.execute(report);
-  }
-
   function test_execute_RevertWhen_RequiredCCVMissing_ReceiverCCV() public {
+    Internal.MessageV1 memory message = _getMessage();
+
     address receiver = makeAddr("receiver");
     address requiredCCV = makeAddr("requiredCCV");
+
+    message.receiver = abi.encodePacked(receiver);
 
     // Set up receiver to require a specific CCV.
     _setGetCCVsReturnData(receiver, SOURCE_CHAIN_SELECTOR, _arrayOf(requiredCCV), new address[](0), 0);
 
-    CCVAggregator.AggregatedReport memory report = _getReport();
-    report.message.receiver = receiver;
-    // Keep default CCV in report, but don't include the required CCV.
-
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, requiredCCV, false));
-    s_agg.execute(report);
+
+    // Keep default CCV in report, but don't include the required CCV.
+    s_agg.execute(_getReport(message));
   }
 
   function test_execute_RevertWhen_RequiredCCVMissing_PoolCCV() public {
     address poolRequiredCCV = makeAddr("poolRequiredCCV");
+    address sourceToken = makeAddr("sourceToken");
     address token = makeAddr("token");
     address pool = makeAddr("pool");
     uint256 tokenAmount = 100;
 
-    CCVAggregator.AggregatedReport memory report = _getReport();
+    Internal.MessageV1 memory message = _getMessage();
+
     // Modify message with token transfer.
-    Internal.TokenTransfer[] memory tokenAmounts = new Internal.TokenTransfer[](1);
-    tokenAmounts[0] = Internal.TokenTransfer({
-      sourcePoolAddress: abi.encode(pool),
-      destTokenAddress: token,
-      extraData: "",
-      amount: tokenAmount
+    Internal.TokenTransferV1[] memory tokenAmounts = new Internal.TokenTransferV1[](1);
+    tokenAmounts[0] = Internal.TokenTransferV1({
+      amount: tokenAmount,
+      sourcePoolAddress: abi.encodePacked(pool),
+      sourceTokenAddress: abi.encodePacked(sourceToken),
+      destTokenAddress: abi.encodePacked(token),
+      extraData: ""
     });
-    report.message.tokenAmounts = tokenAmounts;
+    message.tokenTransfer = tokenAmounts;
+
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
 
     // Mock token admin registry to return the pool.
     vm.mockCall(s_tokenAdminRegistry, abi.encodeCall(ITokenAdminRegistry.getPool, (token)), abi.encode(pool));
@@ -246,6 +247,8 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_RequiredCCVMissing_LaneMandatedCCV() public {
+    Internal.MessageV1 memory message = _getMessage();
+
     address laneMandatedCCV = makeAddr("laneMandatedCCV");
 
     // Configure source chain with lane mandated CCV.
@@ -261,7 +264,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     s_agg.applySourceChainConfigUpdates(sourceChainConfigArgs);
 
-    CCVAggregator.AggregatedReport memory report = _getReport();
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
     // Report doesn't include the lane mandated CCV.
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, laneMandatedCCV, true));
@@ -269,8 +272,9 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_OptionalCCVQuorumNotReached() public {
-    CCVAggregator.AggregatedReport memory report = _getReport();
-    address receiver = report.message.receiver;
+    Internal.MessageV1 memory message = _getMessage();
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
+    address receiver = address(bytes20(message.receiver));
 
     address optionalCCV2 = makeAddr("optionalCCV2");
     address[] memory optionalCCVs = new address[](2);
@@ -288,19 +292,15 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_InsufficientGasToCompleteTx() public {
-    CCVAggregator.AggregatedReport memory report = _getReport();
+    Internal.MessageV1 memory message = _getMessage();
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
+    bytes32 messageId = keccak256(report.message);
 
     // Mock validateReport to pass initial checks.
     vm.mockCall(
       s_defaultCCV,
       abi.encodeCall(
-        ICCVOffRampV1.validateReport,
-        (
-          report.message,
-          keccak256(abi.encode(report.message)),
-          report.ccvData[0],
-          Internal.MessageExecutionState.UNTOUCHED
-        )
+        ICCVOffRampV1.validateReport, (message, messageId, report.ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
       ),
       abi.encode(true)
     );
@@ -308,7 +308,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     // Mock executeSingleMessage to revert with NOT_ENOUGH_GAS_FOR_CALL_SIG.
     vm.mockCallRevert(
       address(s_agg),
-      abi.encodeCall(s_agg.executeSingleMessage, (report.message)),
+      abi.encodeCall(s_agg.executeSingleMessage, (message, messageId)),
       abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
     );
 
@@ -324,20 +324,16 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_CCVValidationFails() public {
-    CCVAggregator.AggregatedReport memory report = _getReport();
+    Internal.MessageV1 memory message = _getMessage();
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
+    bytes32 messageId = keccak256(report.message);
     bytes memory revertReason = "CCV validation failed";
 
     // Mock CCV validateReport to fail/revert.
     vm.mockCallRevert(
       s_defaultCCV,
       abi.encodeCall(
-        ICCVOffRampV1.validateReport,
-        (
-          report.message,
-          keccak256(abi.encode(report.message)),
-          report.ccvData[0],
-          Internal.MessageExecutionState.UNTOUCHED
-        )
+        ICCVOffRampV1.validateReport, (message, messageId, report.ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
       ),
       revertReason
     );
@@ -347,17 +343,20 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_ExecuteSingleMessageFails() public {
-    CCVAggregator.AggregatedReport memory report = _getReport();
+    Internal.MessageV1 memory message = _getMessage();
+    CCVAggregator.AggregatedReport memory report = _getReport(message);
+    bytes32 messageId = keccak256(report.message);
+
     bytes memory revertReason = "ExecuteSingleMessage failed";
 
     // Mock executeSingleMessage to revert.
-    vm.mockCallRevert(address(s_agg), abi.encodeCall(s_agg.executeSingleMessage, (report.message)), revertReason);
+    vm.mockCallRevert(address(s_agg), abi.encodeCall(s_agg.executeSingleMessage, (message, messageId)), revertReason);
 
     vm.expectEmit();
     emit CCVAggregator.ExecutionStateChanged(
-      report.message.header.sourceChainSelector,
-      report.message.header.sequenceNumber,
-      report.message.header.messageId,
+      message.sourceChainSelector,
+      message.sequenceNumber,
+      keccak256(report.message),
       Internal.MessageExecutionState.FAILURE,
       revertReason
     );
@@ -371,7 +370,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
       uint256(Internal.MessageExecutionState.FAILURE),
       uint256(
         s_agg.getExecutionState(
-          SOURCE_CHAIN_SELECTOR, report.message.header.sequenceNumber, report.message.sender, report.message.receiver
+          SOURCE_CHAIN_SELECTOR, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
     );
@@ -388,7 +387,7 @@ contract ReentrantCCV is ICCVOffRampV1 {
   }
 
   function validateReport(
-    Internal.Any2EVMMessage memory message,
+    Internal.MessageV1 memory message,
     bytes32, /* messageHash */
     bytes memory ccvData,
     Internal.MessageExecutionState /* originalState */
@@ -400,7 +399,9 @@ contract ReentrantCCV is ICCVOffRampV1 {
     ccvDataArray[0] = ccvData;
 
     // This should trigger the reentrancy guard.
-    i_aggregator.execute(CCVAggregator.AggregatedReport({message: message, ccvs: ccvs, ccvData: ccvDataArray}));
+    i_aggregator.execute(
+      CCVAggregator.AggregatedReport({message: Internal._encodeMessageV1(message), ccvs: ccvs, ccvData: ccvDataArray})
+    );
   }
 
   function supportsInterface(

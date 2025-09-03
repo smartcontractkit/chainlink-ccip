@@ -13,6 +13,7 @@ library Internal {
   error Invalid32ByteAddress(bytes encodedAddress);
   error InvalidTVMAddress(bytes encodedAddress);
   error InvalidDataLength();
+  error InvalidEncodingVersion(uint8 version);
 
   /// @dev We limit return data to a selector plus 4 words. This is to avoid malicious contracts from returning
   /// large amounts of data and causing repeated out-of-gas scenarios.
@@ -437,7 +438,6 @@ library Internal {
   ///   bytes data; // Arbitrary data payload supplied by the message sender
   struct MessageV1 {
     // Protocol Header
-    uint8 version; // Version, for future use and backwards compatibility.
     uint64 sourceChainSelector; // Source Chain Selector.
     uint64 destChainSelector; // Destination Chain Selector.
     uint64 sequenceNumber; // Auto-incrementing sequence number for the message.
@@ -453,7 +453,6 @@ library Internal {
   }
 
   struct TokenTransferV1 {
-    uint8 version; // Version of the token transfer.
     uint256 amount; // Number of tokens.
     // be relied upon by the destination pool to validate the source pool.
     bytes sourcePoolAddress;
@@ -478,7 +477,7 @@ library Internal {
     if (tokenTransfer.extraData.length > type(uint16).max) revert InvalidDataLength();
 
     return abi.encodePacked(
-      tokenTransfer.version,
+      uint8(1), // version
       tokenTransfer.amount,
       uint8(tokenTransfer.sourcePoolAddress.length),
       tokenTransfer.sourcePoolAddress,
@@ -502,7 +501,8 @@ library Internal {
   ) internal pure returns (TokenTransferV1 memory tokenTransfer, uint256 newOffset) {
     // version (1 byte)
     if (offset >= encoded.length) revert InvalidDataLength();
-    tokenTransfer.version = uint8(encoded[offset++]);
+    uint8 version = uint8(encoded[offset++]);
+    if (version != 1) revert InvalidEncodingVersion(version);
 
     // amount (32 bytes)
     if (offset + 32 > encoded.length) revert InvalidDataLength();
@@ -566,29 +566,31 @@ library Internal {
       encodedTokenTransfers = _encodeTokenTransferV1(message.tokenTransfer[0]);
     }
 
-    return abi.encodePacked(
-      // Protocol Header
-      message.version,
+    bytes memory header = abi.encodePacked(
+      uint8(1), // version
       message.sourceChainSelector,
       message.destChainSelector,
       message.sequenceNumber,
       uint8(message.onRampAddress.length),
       message.onRampAddress,
       uint8(message.offRampAddress.length),
-      message.offRampAddress,
-      // User controlled data
-      message.finality,
-      uint8(message.sender.length),
-      message.sender,
-      uint8(message.receiver.length),
-      message.receiver,
+      message.offRampAddress
+    );
+
+    bytes memory senderReceiver = abi.encodePacked(
+      message.finality, uint8(message.sender.length), message.sender, uint8(message.receiver.length), message.receiver
+    );
+
+    bytes memory lastPart = abi.encodePacked(
       uint16(message.destBlob.length),
       message.destBlob,
-      uint16(encodedTokenTransfers),
+      uint16(encodedTokenTransfers.length),
       encodedTokenTransfers,
       uint16(message.data.length),
       message.data
     );
+
+    return bytes.concat(header, senderReceiver, lastPart);
   }
 
   /// @notice Decodes bytes into a MessageV1 struct following the v1 protocol format.
@@ -602,9 +604,10 @@ library Internal {
     MessageV1 memory message;
     uint256 offset = 0;
 
-    // Protocol Header
-    message.version = uint8(encoded[offset++]);
+    uint8 version = uint8(encoded[offset++]);
+    if (version != 1) revert InvalidEncodingVersion(version);
 
+    // Protocol Header
     // sourceChainSelector (8 bytes, big endian)
     message.sourceChainSelector = uint64(bytes8(encoded[offset:offset + 8]));
     offset += 8;
@@ -674,7 +677,9 @@ library Internal {
       message.tokenTransfer = new TokenTransferV1[](0);
     } else {
       message.tokenTransfer = new TokenTransferV1[](1);
+      uint256 expectedEnd = offset + tokenTransferLength;
       (message.tokenTransfer[0], offset) = _decodeTokenTransferV1(encoded, offset);
+      if (offset != expectedEnd) revert InvalidDataLength();
     }
 
     // dataLength and data

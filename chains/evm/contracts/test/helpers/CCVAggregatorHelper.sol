@@ -37,19 +37,20 @@ contract CCVAggregatorHelper is CCVAggregator {
   }
 
   function trialExecute(
-    Internal.Any2EVMMessage memory message
+    Internal.MessageV1 memory message,
+    bytes32 messageId
   ) external returns (Internal.MessageExecutionState, bytes memory) {
-    return _trialExecute(message);
+    return _trialExecute(message, messageId);
   }
 
   function beforeExecuteSingleMessage(
-    Internal.Any2EVMMessage memory message
-  ) external returns (Internal.Any2EVMMessage memory) {
+    Internal.MessageV1 memory message
+  ) external returns (Internal.MessageV1 memory) {
     return _beforeExecuteSingleMessage(message);
   }
 
   function releaseOrMintSingleToken(
-    Internal.TokenTransfer memory sourceTokenAmount,
+    Internal.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector

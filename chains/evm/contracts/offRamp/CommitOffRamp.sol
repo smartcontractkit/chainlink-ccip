@@ -30,7 +30,7 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
   }
 
   function validateReport(
-    Internal.Any2EVMMessage calldata message,
+    Internal.MessageV1 calldata message,
     bytes32 messageHash,
     bytes calldata ccvData,
     Internal.MessageExecutionState originalState
@@ -50,9 +50,9 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
     if (nonce != 0) {
       if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
         // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
-        if (
-          !INonceManager(i_nonceManager).incrementInboundNonce(message.header.sourceChainSelector, nonce, message.sender)
-        ) revert InvalidNonce(nonce);
+        if (!INonceManager(i_nonceManager).incrementInboundNonce(message.sourceChainSelector, nonce, message.sender)) {
+          revert InvalidNonce(nonce);
+        }
       }
     }
   }

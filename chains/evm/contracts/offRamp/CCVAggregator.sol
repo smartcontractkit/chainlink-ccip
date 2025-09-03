@@ -188,8 +188,11 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     Internal.MessageV1 memory message = _beforeExecuteSingleMessage(Internal._decodeMessageV1(report.message));
     bytes32 messageId = keccak256(report.message);
-    Internal._validateEVMAddress(message.receiver);
-    address receiverAddress = abi.decode(message.receiver, (address));
+
+    if (message.receiver.length != 20) {
+      revert Internal.InvalidEVMAddress(message.receiver);
+    }
+    address receiverAddress = address(bytes20(message.receiver));
 
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
@@ -227,20 +230,24 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     {
       address[] memory requiredPoolCCVs = new address[](0);
       if (message.tokenTransfer.length > 0) {
-        // TODO
-        //        if (message.tokenAmounts.length != 1) {
-        //          revert InvalidNumberOfTokens(message.tokenAmounts.length);
-        //        }
-        //
-        //        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
-        //        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
-        //        // that do not support the V2 interface.
-        //        requiredPoolCCVs = _getCCVsFromPool(
-        //          message.tokenAmounts[0].destTokenAddress,
-        //          message.header.sourceChainSelector,
-        //          message.tokenAmounts[0].amount,
-        //          message.tokenAmounts[0].extraData
-        //        );
+        if (message.tokenTransfer.length != 1) {
+          revert InvalidNumberOfTokens(message.tokenTransfer.length);
+        }
+
+        if (message.tokenTransfer[0].destTokenAddress.length != 20) {
+          revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
+        }
+        address localTokenAddress = address(bytes20(message.tokenTransfer[0].destTokenAddress));
+
+        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
+        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
+        // that do not support the V2 interface.
+        requiredPoolCCVs = _getCCVsFromPool(
+          localTokenAddress,
+          message.sourceChainSelector,
+          message.tokenTransfer[0].amount,
+          message.tokenTransfer[0].extraData
+        );
       }
 
       (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
@@ -474,12 +481,12 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// smart contract wallets, without an associated message.
   function executeSingleMessage(Internal.MessageV1 memory message, bytes32 messageId) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
+    address receiver = address(bytes20(message.receiver));
 
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenAmounts.length);
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      destTokenAmounts[i] = _releaseOrMintSingleToken(
-        message.tokenAmounts[i], message.sender, message.receiver, message.header.sourceChainSelector
-      );
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
+    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
+      destTokenAmounts[i] =
+        _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, receiver, message.sourceChainSelector);
     }
 
     Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
@@ -489,6 +496,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       data: message.data,
       destTokenAmounts: destTokenAmounts
     });
+
+    // TODO gaslimit
+
+    uint256 gasLimit = 200000;
 
     // There are three cases in which we skip calling the receiver:
     // 1. If the message data is empty AND the gas limit is 0.
@@ -503,13 +514,13 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
     // which checks for sufficient gas before making the external call.
     if (
-      (message.data.length == 0 && message.gasLimit == 0) || message.receiver.code.length == 0
-        || !message.receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
+      (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
+        || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
-    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.header.sourceChainSelector]
-      .router
-      .routeMessage(any2EvmMessage, i_gasForCallExactCheck, message.gasLimit, message.receiver);
+    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
+      any2EvmMessage, i_gasForCallExactCheck, gasLimit, receiver
+    );
     // If CCIP receiver execution is not successful, revert the call including token transfers.
     if (!success) revert ReceiverError(returnData);
   }
@@ -529,12 +540,14 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param sourceChainSelector The remote source chain selector
   /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
-    Internal.TokenTransfer memory sourceTokenAmount,
+    Internal.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
-    address localToken = sourceTokenAmount.destTokenAddress;
+    Internal._validateEVMAddress(sourceTokenAmount.destTokenAddress);
+
+    address localToken = abi.decode(sourceTokenAmount.destTokenAddress, (address));
     // We check with the token admin registry if the token has a pool on this chain.
     address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
     // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
