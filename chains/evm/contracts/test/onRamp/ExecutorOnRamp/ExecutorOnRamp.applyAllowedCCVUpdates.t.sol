@@ -14,8 +14,6 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
 
     vm.expectEmit();
     emit ExecutorOnRamp.CCVAdded(newCCV);
-    vm.expectEmit();
-    emit ExecutorOnRamp.CCVAllowlistUpdated(true);
     s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), newCCVs, true);
 
     address[] memory currentCCVs = s_executorOnRamp.getAllowedCCVs();
@@ -36,10 +34,8 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
     newCCVs[0] = INITIAL_CCV;
 
     vm.recordLogs();
-    vm.expectEmit();
-    emit ExecutorOnRamp.CCVAllowlistUpdated(true);
     s_executorOnRamp.applyAllowedCCVUpdates(new address[](0), newCCVs, true);
-    vm.assertEq(vm.getRecordedLogs().length, 2); // Only the CCVAllowlistUpdated event (+ the one we emit above for use with vm.expectEmit)
+    vm.assertEq(vm.getRecordedLogs().length, 0);
 
     address[] memory currentCCVs = s_executorOnRamp.getAllowedCCVs();
     assertEq(currentCCVs.length, 1);
@@ -62,10 +58,8 @@ contract ExecutorOnRamp_applyAllowedCCVUpdates is ExecutorOnRampSetup {
     ccvsToRemove[0] = makeAddr("nonexistentCCV");
 
     vm.recordLogs();
-    vm.expectEmit();
-    emit ExecutorOnRamp.CCVAllowlistUpdated(true);
     s_executorOnRamp.applyAllowedCCVUpdates(ccvsToRemove, new address[](0), true);
-    vm.assertEq(vm.getRecordedLogs().length, 2); // Only the CCVAllowlistUpdated event (+ the one we emit above for use with vm.expectEmit)
+    vm.assertEq(vm.getRecordedLogs().length, 0);
 
     address[] memory currentCCVs = s_executorOnRamp.getAllowedCCVs();
     assertEq(currentCCVs.length, 1);

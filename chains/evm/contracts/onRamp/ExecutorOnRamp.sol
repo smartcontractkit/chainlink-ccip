@@ -149,8 +149,10 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
       }
     }
 
-    s_ccvAllowlistEnabled = ccvAllowlistEnabled;
-    emit CCVAllowlistUpdated(ccvAllowlistEnabled);
+    if (s_ccvAllowlistEnabled != ccvAllowlistEnabled) {
+      s_ccvAllowlistEnabled = ccvAllowlistEnabled;
+      emit CCVAllowlistUpdated(ccvAllowlistEnabled);
+    }
   }
 
   // ================================================================
