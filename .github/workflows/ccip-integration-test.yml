@@ -188,6 +188,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/chainlink
           go get github.com/smartcontractkit/chainlink-ccip@${{ steps.get_sha.outputs.sha }}
+          go get github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest@${{ steps.get_sha.outputs.sha }}
           make gomodtidy
       - name: Setup Postgres
         uses: ./.github/actions/setup-postgres
