@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AggregatorService_WriteCommitVerification_FullMethodName = "/v2.aggregator.AggregatorService/WriteCommitVerification"
-	AggregatorService_ReadCommitVerification_FullMethodName  = "/v2.aggregator.AggregatorService/ReadCommitVerification"
+	AggregatorService_WriteCommitVerification_FullMethodName = "/v2.aggregator.proto.AggregatorService/WriteCommitVerification"
+	AggregatorService_ReadCommitVerification_FullMethodName  = "/v2.aggregator.proto.AggregatorService/ReadCommitVerification"
 )
 
 // AggregatorServiceClient is the client API for AggregatorService service.
@@ -142,7 +142,7 @@ func _AggregatorService_ReadCommitVerification_Handler(srv interface{}, ctx cont
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var AggregatorService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "v2.aggregator.AggregatorService",
+	ServiceName: "v2.aggregator.proto.AggregatorService",
 	HandlerType: (*AggregatorServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
