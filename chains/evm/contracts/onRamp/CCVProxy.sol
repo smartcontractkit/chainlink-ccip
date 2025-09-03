@@ -390,29 +390,22 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         }
       }
 
-      // Validate no duplicates within user-provided required CCVs
-      for (uint256 i = 0; i < resolvedArgs.requiredCCV.length; ++i) {
-        for (uint256 j = i + 1; j < resolvedArgs.requiredCCV.length; ++j) {
-          if (resolvedArgs.requiredCCV[i].ccvAddress == resolvedArgs.requiredCCV[j].ccvAddress) {
-            revert DuplicateCCVInUserInput(resolvedArgs.requiredCCV[i].ccvAddress);
-          }
-        }
-      }
+      // We need to ensure no duplicate CCVs are present across required and optional lists.
+      uint256 requiredCCVLength = resolvedArgs.requiredCCV.length;
+      uint256 optionalCCVLength = resolvedArgs.optionalCCV.length;
+      uint256 totalInputCCV = requiredCCVLength + optionalCCVLength;
+      for (uint256 i = 0; i < totalInputCCV; ++i) {
+        address ccvAddressI = i < requiredCCVLength
+          ? resolvedArgs.requiredCCV[i].ccvAddress
+          : resolvedArgs.optionalCCV[i - requiredCCVLength].ccvAddress;
 
-      // Validate no duplicates within user-provided optional CCVs
-      for (uint256 i = 0; i < resolvedArgs.optionalCCV.length; ++i) {
-        for (uint256 j = i + 1; j < resolvedArgs.optionalCCV.length; ++j) {
-          if (resolvedArgs.optionalCCV[i].ccvAddress == resolvedArgs.optionalCCV[j].ccvAddress) {
-            revert DuplicateCCVInUserInput(resolvedArgs.optionalCCV[i].ccvAddress);
-          }
-        }
-      }
+        for (uint256 j = i + 1; j < totalInputCCV; ++j) {
+          address ccvAddressJ = j < requiredCCVLength
+            ? resolvedArgs.requiredCCV[j].ccvAddress
+            : resolvedArgs.optionalCCV[j - requiredCCVLength].ccvAddress;
 
-      // Validate no duplicates between required and optional CCVs
-      for (uint256 i = 0; i < resolvedArgs.requiredCCV.length; ++i) {
-        for (uint256 j = 0; j < resolvedArgs.optionalCCV.length; ++j) {
-          if (resolvedArgs.requiredCCV[i].ccvAddress == resolvedArgs.optionalCCV[j].ccvAddress) {
-            revert DuplicateCCVInUserInput(resolvedArgs.requiredCCV[i].ccvAddress);
+          if (ccvAddressI == ccvAddressJ) {
+            revert DuplicateCCVInUserInput(ccvAddressI);
           }
         }
       }
