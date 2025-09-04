@@ -159,13 +159,12 @@ func TestConfigureChainForLanes(t *testing.T) {
 				sequences.ConfigureChainForLanes,
 				evmChain,
 				sequences.ConfigureChainForLanesInput{
-					ChainSelector:  chainSelector,
-					Router:         r,
-					CCVProxy:       ccvProxy,
-					CommitOnRamp:   commitOnRamp,
-					FeeQuoter:      feeQuoter,
-					CCVAggregator:  ccvAggregator,
-					ExecutorOnRamp: executorOnRamp,
+					ChainSelector: chainSelector,
+					Router:        r,
+					CCVProxy:      ccvProxy,
+					CommitOnRamp:  commitOnRamp,
+					FeeQuoter:     feeQuoter,
+					CCVAggregator: ccvAggregator,
 					RemoteChains: map[uint64]sequences.RemoteChainConfig{
 						remoteChainSelector: {
 							AllowTrafficFrom:            true,

@@ -7,7 +7,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
@@ -123,17 +122,17 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 				RemoteChains: map[uint64]changesets.RemoteChainConfig{
 					4356164186791070119: {
 						AllowTrafficFrom: true,
-						CCIPMessageSource: changesets_utils.TypeAndVersion{
+						CCIPMessageSource: datastore.AddressRef{
 							Type:    datastore.ContractType(commit_onramp.ContractType),
 							Version: semver.MustParse("1.7.0"),
 						},
-						DefaultCCVOffRamps: []changesets_utils.TypeAndVersion{
+						DefaultCCVOffRamps: []datastore.AddressRef{
 							{Type: datastore.ContractType(commit_offramp.ContractType), Version: semver.MustParse("1.7.0")},
 						},
-						DefaultCCVOnRamps: []changesets_utils.TypeAndVersion{
+						DefaultCCVOnRamps: []datastore.AddressRef{
 							{Type: datastore.ContractType(commit_onramp.ContractType), Version: semver.MustParse("1.7.0")},
 						},
-						DefaultExecutor: changesets_utils.TypeAndVersion{
+						DefaultExecutor: datastore.AddressRef{
 							Type:    datastore.ContractType(executor_onramp.ContractType),
 							Version: semver.MustParse("1.7.0"),
 						},
