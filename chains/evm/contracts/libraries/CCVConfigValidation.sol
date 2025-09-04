@@ -1,14 +1,15 @@
-// SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
 
-/// @notice CCV config validation helper.
+/// @notice CCV config validation helpers.
 library CCVConfigValidation {
   error MustSpecifyDefaultOrRequiredCCVs();
   error DuplicateCCVNotAllowed(address ccvAddress);
   error ZeroAddressNotAllowed();
 
-  /// @notice Validates default and mandated CCV arrays for non-empty, non-zero, and deduped addresses.
-  /// Reverts with detailed custom errors when invalid.
+  /// @notice Ensures at least one CCV combined, no zero addresses, no duplicates within or across both sets.
+  /// @param defaultCCV The default CCVs.
+  /// @param laneMandatedCCVs The mandated CCVs.
   function _validateDefaultAndMandatedCCVs(
     address[] memory defaultCCV,
     address[] memory laneMandatedCCVs
