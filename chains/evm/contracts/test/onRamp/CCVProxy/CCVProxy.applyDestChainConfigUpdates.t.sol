@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
+
+import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {CCVProxySetup} from "./CCVProxySetup.t.sol";
 
@@ -83,7 +85,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultExecutor: makeAddr("executor")
     });
 
-    vm.expectRevert(CCVProxy.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(CCVConfigValidation.ZeroAddressNotAllowed.selector);
     s_ccvProxy.applyDestChainConfigUpdates(args);
   }
 
@@ -101,7 +103,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultExecutor: makeAddr("executor")
     });
 
-    vm.expectRevert(CCVProxy.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(CCVConfigValidation.ZeroAddressNotAllowed.selector);
     s_ccvProxy.applyDestChainConfigUpdates(args);
   }
 
@@ -119,7 +121,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultExecutor: makeAddr("executor")
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCVProxy.DuplicateCCVInConfig.selector, dup));
+    vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, dup));
     s_ccvProxy.applyDestChainConfigUpdates(args);
   }
 
@@ -139,7 +141,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultExecutor: makeAddr("executor")
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCVProxy.DuplicateCCVInConfig.selector, dup));
+    vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, dup));
     s_ccvProxy.applyDestChainConfigUpdates(args);
   }
 
@@ -158,7 +160,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultExecutor: makeAddr("executor")
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCVProxy.DuplicateCCVInConfig.selector, dup));
+    vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, dup));
     s_ccvProxy.applyDestChainConfigUpdates(args);
   }
 
@@ -175,7 +177,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultExecutor: makeAddr("executor")
     });
 
-    vm.expectRevert(CCVProxy.InvalidConfig.selector);
+    vm.expectRevert(CCVConfigValidation.MustSpecifyDefaultOrRequiredCCVs.selector);
     s_ccvProxy.applyDestChainConfigUpdates(args);
   }
 

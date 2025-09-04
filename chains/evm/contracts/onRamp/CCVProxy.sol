@@ -9,6 +9,7 @@ import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
+import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
@@ -41,8 +42,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   error ReentrancyGuardReentrantCall();
   error InvalidOptionalCCVThreshold();
   error DuplicateCCVInUserInput(address ccvAddress);
-  error DuplicateCCVInConfig(address ccvAddress);
-  error ZeroAddressNotAllowed();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -95,7 +94,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   // solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector.
-    IRouter router; // Local router address  that is allowed to send messages to the destination chain.
+    IRouter router; // Source router address  that is allowed to send messages to the destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address defaultExecutor;
@@ -499,35 +498,10 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         revert InvalidDestChainConfig(destChainSelector);
       }
 
-      uint256 defaultCCVsLength = destChainConfigArg.defaultCCVs.length;
-      uint256 laneMandatedCCVsLength = destChainConfigArg.laneMandatedCCVs.length;
-      uint256 totalCCVs = defaultCCVsLength + laneMandatedCCVsLength;
-
-      // We require at least one default CCV so messages without explicit CCVs still have verifiers.
-      if (defaultCCVsLength == 0) revert InvalidConfig();
-
-      // Enforce non-zero and unique CCVs to keep the verifier set unambiguous.
-      // Zero addresses would brick calls at runtime, and duplicates would distort quorum semantics (double-counting
-      // the same verifier) and hide config mistakes.
-      for (uint256 outerIndex = 0; outerIndex < totalCCVs; ++outerIndex) {
-        address currentCCVAddress = outerIndex < defaultCCVsLength
-          ? destChainConfigArg.defaultCCVs[outerIndex]
-          : destChainConfigArg.laneMandatedCCVs[outerIndex - defaultCCVsLength];
-
-        if (currentCCVAddress == address(0)) {
-          revert ZeroAddressNotAllowed();
-        }
-
-        for (uint256 innerIndex = outerIndex + 1; innerIndex < totalCCVs; ++innerIndex) {
-          address compareCCVAddress = innerIndex < defaultCCVsLength
-            ? destChainConfigArg.defaultCCVs[innerIndex]
-            : destChainConfigArg.laneMandatedCCVs[innerIndex - defaultCCVsLength];
-
-          if (currentCCVAddress == compareCCVAddress) {
-            revert DuplicateCCVInConfig(currentCCVAddress);
-          }
-        }
-      }
+      // Ensure at least one default or mandated CCV exists, and check for duplicates or zero addresses in both sets.
+      CCVConfigValidation._validateDefaultAndMandatedCCVs(
+        destChainConfigArg.defaultCCVs, destChainConfigArg.laneMandatedCCVs
+      );
 
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain.
