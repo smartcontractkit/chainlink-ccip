@@ -330,7 +330,16 @@ library Internal {
   // │                            1.7                               │
   // ================================================================
 
-  // TODO better naming
+  /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
+  /// @dev This struct is only used on the source chain and is not part of the message. It is emitted in the same event.
+  struct Receipt {
+    address issuer; // The address of the entity that issued the receipt.
+    uint64 destGasLimit; // The gas limit for the actions taken on the destination chain for this entity.
+    uint32 destBytesOverhead; // The byte overhead for the actions taken on the destination chain for this entity.
+    uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
+    bytes extraArgs; // Extra args that have been passed in on the source chain.
+  }
+
   struct EVM2AnyVerifierMessage {
     Header header; // Message header.
     address sender; // sender address on the source chain.
@@ -351,15 +360,6 @@ library Internal {
     uint64 sequenceNumber; // ──────╯ sequence number, not unique across lanes.
   }
 
-  struct Receipt {
-    address issuer;
-    uint64 destGasLimit;
-    uint32 destBytesOverhead;
-    uint256 feeTokenAmount;
-    bytes extraArgs;
-  }
-
-  // TODO better naming
   struct EVMTokenTransfer {
     address sourceTokenAddress;
     // The EVM address of the destination token.
@@ -370,32 +370,6 @@ library Internal {
     Receipt receipt;
   }
 
-  // receive
-
-  struct Any2EVMMessage {
-    Header header; // Message header.
-    bytes sender; // sender address on the source chain.
-    bytes data; // arbitrary data payload supplied by the message sender.
-    address receiver; // receiver address on the destination chain.
-    uint32 gasLimit; // user supplied maximum gas amount available for dest chain execution.
-    // array of tokens and amounts to transfer. Only allows either 0 or 1 token transfer, but for gas reasons we keep it
-    // as an array.
-    TokenTransfer[] tokenAmounts;
-  }
-
-  struct TokenTransfer {
-    // The source pool EVM address encoded to bytes. This value is trusted as it is obtained through the onRamp. It can
-    // be relied upon by the destination pool to validate the source pool.
-    bytes sourcePoolAddress;
-    address destTokenAddress; // Address of destination token
-    // Optional pool data to be transferred to the destination chain. Be default this is capped at
-    // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
-    // has to be set for the specific token.
-    bytes extraData;
-    uint256 amount; // Number of tokens.
-  }
-
-  // TODO optimize & ensure everything is included
   function _hash(EVM2AnyVerifierMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
@@ -436,21 +410,33 @@ library Internal {
   ///   bytes tokenTransfer; // Byte representation of the token transfer structure
   ///   uint16 dataLength; // Length of the user specified data payload
   ///   bytes data; // Arbitrary data payload supplied by the message sender
+  /// @dev Inefficient struct packing does not matter as this is not a storage struct, and it it would ever be written
+  /// to storage it would be in its encoded form.
   // solhint-disable-next-line gas-struct-packing
   struct MessageV1 {
     // Protocol Header
-    uint64 sourceChainSelector; // Source Chain Selector.
-    uint64 destChainSelector; // Destination Chain Selector.
-    uint64 sequenceNumber; // Auto-incrementing sequence number for the message.
-    bytes onRampAddress; // Source Chain OnRamp.
-    bytes offRampAddress; // Destination Chain OffRamp.
-    // User controlled data.
-    uint16 finality; // Configurable per-message finality value.
-    bytes sender; // Sender address.
-    bytes receiver; // Receiver address on the destination chain.
-    bytes destBlob; // Destination specific blob included in the message to prevent forgery.
-    TokenTransferV1[] tokenTransfer; // Contains either 0 or 1 token transfer structs.
-    bytes data; // Arbitrary data payload supplied by the message sender.
+    uint64 sourceChainSelector; // ─╮ Source Chain Selector.
+    uint64 destChainSelector; //    │ Destination Chain Selector.
+    //                              │ Per-lane-unique sequence number for the message. When faster-than-finality is used
+    //                              │ the guarantee that this value is unique no longer holds. After a re-org, a message
+    //                              │ could end up with a different sequence number. Messages that are older than the
+    uint64 sequenceNumber; //  ─────╯ chain finality delay should all have unique per-lane sequence numbers.
+    // Source chain onRamp, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
+    bytes onRampAddress;
+    // Destination chain offRamp, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
+    bytes offRampAddress;
+    // Configurable per-message finality value.
+    uint16 finality;
+    // Source chain sender address, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
+    bytes sender;
+    // Destination chain receiver address, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
+    bytes receiver;
+    // Destination specific blob that contains chain-family specific data.
+    bytes destBlob;
+    // Contains either 0 or 1 token transfer structs. It is encoded as an array for gas efficiency.
+    TokenTransferV1[] tokenTransfer;
+    // Arbitrary data payload supplied by the message sender.
+    bytes data;
   }
 
   struct TokenTransferV1 {
