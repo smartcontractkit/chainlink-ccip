@@ -10,6 +10,7 @@ import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
+import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
@@ -42,10 +43,16 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   error ReentrancyGuardReentrantCall();
   error InvalidOptionalCCVThreshold();
   error DuplicateCCVInUserInput(address ccvAddress);
-  error DuplicateCCVInConfig(address ccvAddress);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
-  event DestChainConfigSet(uint64 indexed destChainSelector, uint64 sequenceNumber, IRouter router);
+  event DestChainConfigSet(
+    uint64 indexed destChainSelector,
+    uint64 sequenceNumber,
+    IRouter router,
+    address[] defaultCCVs,
+    address[] laneMandatedCCVs,
+    address defaultExecutor
+  );
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPMessageSent(
@@ -88,7 +95,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   // solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector.
-    IRouter router; //           Source router address.
+    IRouter router; // Source router address  that is allowed to send messages to the destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address defaultExecutor;
@@ -504,24 +511,36 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     DestChainConfigArgs[] calldata destChainConfigArgs
   ) external onlyOwner {
     for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
-      DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
+      DestChainConfigArgs calldata destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArg.destChainSelector;
 
-      if (destChainSelector == 0) {
+      if (destChainSelector == 0 || destChainSelector == i_localChainSelector) {
         revert InvalidDestChainConfig(destChainSelector);
       }
 
-      // TODO : Validate no duplicate within and overlap in defaultCCVs
-      // and laneMandatedCCVs, maybe use same dedup logic in _parseExtraArgsWithDefaults
+      // Ensure at least one default or mandated CCV exists, and check for duplicates or zero addresses in both sets.
+      CCVConfigValidation._validateDefaultAndMandatedCCVs(
+        destChainConfigArg.defaultCCVs, destChainConfigArg.laneMandatedCCVs
+      );
 
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain.
       destChainConfig.router = destChainConfigArg.router;
       destChainConfig.defaultCCVs = destChainConfigArg.defaultCCVs;
       destChainConfig.laneMandatedCCVs = destChainConfigArg.laneMandatedCCVs;
+      // Require a default executor so messages that rely on older/defaulted args still resolve to a concrete
+      // executor. A zero executor would break backward compatibility and cause otherwise-valid traffic to revert.
+      if (destChainConfigArg.defaultExecutor == address(0)) revert InvalidConfig();
       destChainConfig.defaultExecutor = destChainConfigArg.defaultExecutor;
 
-      emit DestChainConfigSet(destChainSelector, destChainConfig.sequenceNumber, destChainConfigArg.router);
+      emit DestChainConfigSet(
+        destChainSelector,
+        destChainConfig.sequenceNumber,
+        destChainConfigArg.router,
+        destChainConfigArg.defaultCCVs,
+        destChainConfigArg.laneMandatedCCVs,
+        destChainConfigArg.defaultExecutor
+      );
     }
   }
 
