@@ -76,6 +76,7 @@ function getOptimizations() {
 # Mod sec
 compileContract onRamp/CCVProxy
 compileContract onRamp/CommitOnRamp
+compileContract onRamp/ExecutorOnRamp
 compileContract offRamp/CCVAggregator
 compileContract offRamp/CommitOffRamp
 
