@@ -8,7 +8,7 @@ on:
       - 'main'
 
 jobs:
-  codegen-verifier:
+  test-evm-deployments:
     runs-on: ubuntu-latest
     defaults:
       run:
