@@ -1,0 +1,15 @@
+{
+  "name": "TEST0904",
+  "symbol": "TEST0904",
+  "description": "Test token created on Sep 4, 2025",
+  "image": "https://d2f70xi62kby8n.cloudfront.net/tokens/ccip-bnm.webp",
+  "attributes": [],
+  "properties": {
+    "files": [
+      {
+        "uri": "https://d2f70xi62kby8n.cloudfront.net/tokens/ccip-bnm.webp",
+        "type": "image/webp"
+      }
+    ]
+  }
+}
