@@ -243,11 +243,11 @@ func (o *observedCCIPReader) GetWrappedNativeTokenPriceUSD(
 func (o *observedCCIPReader) GetChainFeePriceUpdate(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
+) map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig {
 	res, _ := withObservedQueryAndResult(
 		o,
 		"GetChainFeePriceUpdate",
-		func() (map[cciptypes.ChainSelector]cciptypes.TimestampedBig, error) {
+		func() (map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig, error) {
 			res := o.CCIPReader.GetChainFeePriceUpdate(ctx, selectors)
 			return res, nil
 		},

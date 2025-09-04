@@ -796,7 +796,7 @@ func prepareNoncesInput(
 func (l *DefaultAccessor) GetChainFeePriceUpdate(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
+) (map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
 
 	// 1. Build Batch Request
@@ -823,8 +823,7 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 	)
 
 	if err != nil {
-		lggr.Errorw("failed to batch get chain fee price updates", "err", err)
-		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
+		return nil, fmt.Errorf("batch get chain fee price updates: %w", err)
 	}
 
 	// 3. Find FeeQuoter Results
@@ -839,8 +838,7 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 	}
 
 	if !found {
-		lggr.Errorw("FeeQuoter results missing from batch response")
-		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
+		return nil, fmt.Errorf("FeeQuoter results missing from batch response")
 	}
 
 	if len(feeQuoterResults) != len(selectors) {
@@ -851,7 +849,7 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 	}
 
 	// 4. Process Results using helper
-	return l.processFeePriceUpdateResults(lggr, selectors, feeQuoterResults)
+	return l.processFeePriceUpdateResults(lggr, selectors, feeQuoterResults), nil
 }
 
 // processFeePriceUpdateResults iterates through batch results, validates them,
@@ -860,8 +858,8 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 	lggr logger.Logger,
 	selectors []cciptypes.ChainSelector,
 	results []types.BatchReadResult,
-) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
-	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig)
+) map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig {
+	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig)
 
 	for i, chain := range selectors {
 		if i >= len(results) {
@@ -901,13 +899,13 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 		}
 
 		// Add valid update to the map
-		feeUpdates[chain] = cciptypes.TimeStampedBigFromUnix(*update)
+		feeUpdates[chain] = *update
 	}
 
 	return feeUpdates
 }
 
-func (l *DefaultAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
+func (l *DefaultAccessor) GetLatestPriceSeqNr(ctx context.Context) (cciptypes.SeqNum, error) {
 	var latestSeqNr uint64
 	err := l.contractReader.ExtendedGetLatestValue(
 		ctx,
@@ -920,7 +918,7 @@ func (l *DefaultAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 	if err != nil {
 		return 0, fmt.Errorf("get latest price sequence number: %w", err)
 	}
-	return latestSeqNr, nil
+	return cciptypes.SeqNum(latestSeqNr), nil
 }
 
 func (l *DefaultAccessor) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
@@ -1057,4 +1055,30 @@ func (l *DefaultAccessor) processPriceUpdates(priceUpdates PriceUpdates) (ccipty
 	}
 
 	return updates, nil
+}
+
+func (l *DefaultAccessor) MessagesByTokenID(
+	ctx context.Context,
+	source, dest cciptypes.ChainSelector,
+	tokens map[cciptypes.MessageTokenID]cciptypes.RampTokenAmount,
+) (map[cciptypes.MessageTokenID]cciptypes.Bytes, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (l *DefaultAccessor) GetFeedPricesUSD(
+	ctx context.Context,
+	tokens []cciptypes.UnknownEncodedAddress,
+) (cciptypes.TokenPriceMap, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
+	ctx context.Context,
+	tokens []cciptypes.UnknownEncodedAddress,
+	chain cciptypes.ChainSelector,
+) (map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig, error) {
+	//TODO implement me
+	panic("implement me")
 }

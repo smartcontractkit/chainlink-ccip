@@ -258,19 +258,19 @@ func (_c *MockCCIPReader_ExecutedMessages_Call) RunAndReturn(run func(context.Co
 }
 
 // GetChainFeePriceUpdate provides a mock function with given fields: ctx, selectors
-func (_m *MockCCIPReader) GetChainFeePriceUpdate(ctx context.Context, selectors []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig {
+func (_m *MockCCIPReader) GetChainFeePriceUpdate(ctx context.Context, selectors []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig {
 	ret := _m.Called(ctx, selectors)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetChainFeePriceUpdate")
 	}
 
-	var r0 map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig); ok {
+	var r0 map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig); ok {
 		r0 = rf(ctx, selectors)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig)
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig)
 		}
 	}
 
@@ -296,12 +296,12 @@ func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) Run(run func(ctx context.C
 	return _c
 }
 
-func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) Return(_a0 map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
+func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) Return(_a0 map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
+func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }

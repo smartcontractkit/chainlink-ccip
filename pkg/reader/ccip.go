@@ -293,7 +293,8 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 	return seqNum, nil
 }
 
-// GetExpectedNextSequenceNumber implements CCIP.
+// GetExpectedNextSequenceNumber queries the next expected sequence number from the source
+// chain OnRamp
 func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
 	sourceChainSelector cciptypes.ChainSelector,
@@ -306,7 +307,7 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	}
 	expectedNextSeqNum, err := sourceChainAccessor.GetExpectedNextSequenceNumber(ctx, r.destChain)
 	if err != nil {
-		return 0, fmt.Errorf("failed to call accessor LatestMsgSeqNum, source chain: %d, dest chain: %d: %w",
+		return 0, fmt.Errorf("failed to call accessor GetExpectedNextSequenceNumber, source chain: %d, dest chain: %d: %w",
 			sourceChainSelector, r.destChain, err)
 	}
 
@@ -512,7 +513,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 // https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L263-L263
 //
 //nolint:lll
-func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
+func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	destChainAccessor, err := getChainAccessor(r.accessors, r.destChain)
 	if err != nil {
@@ -521,10 +522,15 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	}
 
 	if len(selectors) == 0 {
-		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig) // Return a new empty map
 	}
 
-	return destChainAccessor.GetChainFeePriceUpdate(ctx, selectors)
+	updates, err := destChainAccessor.GetChainFeePriceUpdate(ctx, selectors)
+	if err != nil {
+		lggr.Errorw("failed to get chain fee price updates", "chain", r.destChain, "err", err)
+		return nil
+	}
+	return updates
 }
 
 // buildSigners converts internal signer representation to RMN signer info format
@@ -1112,7 +1118,7 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 		return 0, fmt.Errorf("get latest price sequence number from accessor: %w", err)
 	}
 
-	return latestPriceSeqNum, nil
+	return uint64(latestPriceSeqNum), nil
 }
 
 func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
