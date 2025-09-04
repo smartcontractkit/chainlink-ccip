@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICCVOnRamp} from "../interfaces/ICCVOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
+import {IExecutorOnRamp} from "../interfaces/IExecutorOnRamp.sol";
 import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
@@ -235,6 +236,11 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         extraArgs: verifier.args
       });
     }
+
+    // TODO: Handle the fee returned
+    // Currently only used for validations
+    _getExecutorFee(resolvedExtraArgs, message, destChainSelector);
+
     // TODO
 
     // 4. lockOrBurn
@@ -440,6 +446,20 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     }
 
     return resolvedArgs;
+  }
+
+  function _getExecutorFee(
+    Client.EVMExtraArgsV3 memory resolvedExtraArgs,
+    Client.EVM2AnyMessage memory message,
+    uint64 destChainSelector
+  ) internal view returns (uint256) {
+    return IExecutorOnRamp(resolvedExtraArgs.executor).getFee(
+      destChainSelector,
+      message,
+      resolvedExtraArgs.requiredCCV,
+      resolvedExtraArgs.optionalCCV,
+      resolvedExtraArgs.executorArgs
+    );
   }
 
   // ================================================================
