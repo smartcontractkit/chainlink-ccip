@@ -239,6 +239,96 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
+
+  // sending a token + message to reciever 
+  function test_tokenTransferAndMsgReciever_Sui() public { 
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = s_sourceTokens[1];
+
+    s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+    
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.data = bytes("hello sui from evm");
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // mock Sui object ID
+    msg_.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 100_000,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(0xdeadbeef)), // receiver is also token recipient
+        receiverObjectIds: _makeObjectIdsForSui()
+      })
+    );
+
+    uint256 fee = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+    assertGt(fee, 0, "Expected non-zero fee");
+  }
+
+  // sending a token
+  function test_tokenTransferValidatedFee_Sui() public {
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = s_sourceTokens[1];
+
+    s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+    
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0))); // zero reciever
+    msg_.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(0xdeadbeef)), // receiver is also token recipient
+        receiverObjectIds: new bytes32[](0)
+      })
+    );
+
+    uint256 fee = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+    assertGt(fee, 0, "Expected non-zero fee");
+  }
+
+  // sending message to reciever only 
+  function test_MsgRecieverValidatedFee_Sui() public { 
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = s_sourceTokens[1];
+
+    s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+    
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.data = bytes("hello sui from evm");
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](0);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // zero reciever
+    msg_.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 100_000,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(0), // receiver is also token recipient
+        receiverObjectIds: _makeObjectIdsForSui()
+      })
+    );
+  
+    uint256 fee = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+    assertGt(fee, 0, "Expected non-zero fee");
+  }
+
   // Reverts
 
   function test_getValidatedFee_RevertWhen_DestinationChainNotEnabled() public {
