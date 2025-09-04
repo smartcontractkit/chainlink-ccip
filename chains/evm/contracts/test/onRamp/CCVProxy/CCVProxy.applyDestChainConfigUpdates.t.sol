@@ -9,10 +9,9 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
   uint64 internal constant NEW_DEST_SELECTOR = uint64(uint256(keccak256("NEW_DEST_SELECTOR")));
 
   function test_applyDestChainConfigUpdates_SetsConfigAndEmitsEvent() public {
-    IRouter router = s_sourceRouter; // any non-zero router
-    address[] memory defaultCCVs = new address[](2);
+    IRouter router = s_sourceRouter;
+    address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = makeAddr("defaultCCV1");
-    defaultCCVs[1] = makeAddr("defaultCCV2");
     address[] memory laneMandated = new address[](1);
     laneMandated[0] = makeAddr("laneCCV1");
     address defaultExecutor = makeAddr("defaultExecutor");
@@ -34,11 +33,8 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
     assertEq(address(cfg.router), address(router));
     assertEq(cfg.defaultExecutor, defaultExecutor);
     assertEq(cfg.sequenceNumber, 0);
-    assertEq(cfg.defaultCCVs.length, 2);
-    assertEq(cfg.defaultCCVs[0], defaultCCVs[0]);
-    assertEq(cfg.defaultCCVs[1], defaultCCVs[1]);
-    assertEq(cfg.laneMandatedCCVs.length, 1);
-    assertEq(cfg.laneMandatedCCVs[0], laneMandated[0]);
+    assertEq(cfg.defaultCCVs, defaultCCVs);
+    assertEq(cfg.laneMandatedCCVs, laneMandated);
   }
 
   function test_applyDestChainConfigUpdates_AllowsZeroRouterToPause() public {
@@ -53,7 +49,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultExecutor: makeAddr("executor")
     });
 
-    // Should not revert, router can be zero
+    // Should not revert, router can be zero.
     s_ccvProxy.applyDestChainConfigUpdates(args);
     CCVProxy.DestChainConfig memory cfg = s_ccvProxy.getDestChainConfig(NEW_DEST_SELECTOR + 1);
     assertEq(address(cfg.router), address(0));
@@ -77,9 +73,8 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
 
   function test_applyDestChainConfigUpdates_RevertWhen_ZeroInDefaultCCVs() public {
     CCVProxy.DestChainConfigArgs[] memory args = new CCVProxy.DestChainConfigArgs[](1);
-    address[] memory defaultCCVs = new address[](2);
-    defaultCCVs[0] = makeAddr("defaultCCV1");
-    defaultCCVs[1] = address(0); // invalid
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = address(0); // invalid
     args[0] = CCVProxy.DestChainConfigArgs({
       destChainSelector: NEW_DEST_SELECTOR + 2,
       router: s_sourceRouter,
@@ -95,7 +90,6 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
   function test_applyDestChainConfigUpdates_RevertWhen_ZeroInLaneMandatedCCVs() public {
     CCVProxy.DestChainConfigArgs[] memory args = new CCVProxy.DestChainConfigArgs[](1);
     address[] memory laneMandatedCCVs = new address[](2);
-    laneMandatedCCVs[0] = makeAddr("laneCCV1");
     laneMandatedCCVs[1] = address(0); // invalid
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = makeAddr("defaultCCV");
@@ -170,7 +164,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
 
   function test_applyDestChainConfigUpdates_RevertWhen_DefaultCCVsEmpty() public {
     CCVProxy.DestChainConfigArgs[] memory args = new CCVProxy.DestChainConfigArgs[](1);
-    // Empty defaultCCVs should revert
+    // Empty defaultCCVs should revert.
     address[] memory defaultCCVs = new address[](0);
     address[] memory lane = new address[](0);
     args[0] = CCVProxy.DestChainConfigArgs({
@@ -202,7 +196,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
   }
 
   function test_applyDestChainConfigUpdates_RevertWhen_DestIsLocalChain() public {
-    // Using SOURCE_CHAIN_SELECTOR as local chain selector from setup
+    // Using SOURCE_CHAIN_SELECTOR as local chain selector from setup.
     CCVProxy.DestChainConfigArgs[] memory args = new CCVProxy.DestChainConfigArgs[](1);
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = makeAddr("defaultCCV");

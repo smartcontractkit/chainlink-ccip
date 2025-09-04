@@ -33,7 +33,7 @@ contract CCVProxy_constructor is CCVProxySetup {
   }
 
   function test_constructor_RevertWhen_StaticConfigInvalid() public {
-    // Zero chainSelector
+    // Zero chainSelector.
     CCVProxy.StaticConfig memory s0 = CCVProxy.StaticConfig({
       chainSelector: 0,
       rmnRemote: s_mockRMNRemote,
@@ -47,7 +47,7 @@ contract CCVProxy_constructor is CCVProxySetup {
     vm.expectRevert(CCVProxy.InvalidConfig.selector);
     new CCVProxy(s0, d);
 
-    // Zero rmnRemote
+    // Zero rmnRemote.
     CCVProxy.StaticConfig memory s1 = CCVProxy.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
       rmnRemote: IRMNRemote(address(0)),
@@ -56,7 +56,7 @@ contract CCVProxy_constructor is CCVProxySetup {
     vm.expectRevert(CCVProxy.InvalidConfig.selector);
     new CCVProxy(s1, d);
 
-    // Zero tokenAdminRegistry
+    // Zero tokenAdminRegistry.
     CCVProxy.StaticConfig memory s2 = CCVProxy.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
       rmnRemote: s_mockRMNRemote,

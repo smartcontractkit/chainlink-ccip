@@ -495,21 +495,20 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       DestChainConfigArgs calldata destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArg.destChainSelector;
 
-      if (destChainSelector == 0) {
+      if (destChainSelector == 0 || destChainSelector == i_localChainSelector) {
         revert InvalidDestChainConfig(destChainSelector);
       }
 
-      if (destChainSelector == i_localChainSelector) {
-        revert InvalidDestChainConfig(destChainSelector);
-      }
-
-      // Validate no zero addresses and no duplicates within and across defaultCCVs and laneMandatedCCVs
       uint256 defaultCCVsLength = destChainConfigArg.defaultCCVs.length;
-      // We require at least one default CCV so messages without explicit CCVs still have verifiers.
-      if (defaultCCVsLength == 0) revert InvalidConfig();
       uint256 laneMandatedCCVsLength = destChainConfigArg.laneMandatedCCVs.length;
       uint256 totalCCVs = defaultCCVsLength + laneMandatedCCVsLength;
 
+      // We require at least one default CCV so messages without explicit CCVs still have verifiers.
+      if (defaultCCVsLength == 0) revert InvalidConfig();
+
+      // Enforce non-zero and unique CCVs to keep the verifier set unambiguous.
+      // Zero addresses would brick calls at runtime, and duplicates would distort quorum semantics (double-counting
+      // the same verifier) and hide config mistakes.
       for (uint256 outerIndex = 0; outerIndex < totalCCVs; ++outerIndex) {
         address currentCCVAddress = outerIndex < defaultCCVsLength
           ? destChainConfigArg.defaultCCVs[outerIndex]
@@ -535,7 +534,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       destChainConfig.router = destChainConfigArg.router;
       destChainConfig.defaultCCVs = destChainConfigArg.defaultCCVs;
       destChainConfig.laneMandatedCCVs = destChainConfigArg.laneMandatedCCVs;
-      // Default executor must be set so legacy/defaulted flows have a valid executor.
+      // Require a default executor so messages that rely on older/defaulted args still resolve to a concrete
+      // executor. A zero executor would break backward compatibility and cause otherwise-valid traffic to revert.
       if (destChainConfigArg.defaultExecutor == address(0)) revert InvalidConfig();
       destChainConfig.defaultExecutor = destChainConfigArg.defaultExecutor;
 
