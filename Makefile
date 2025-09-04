@@ -104,3 +104,11 @@ install_buf:
 
 ensure_buf_version:
 	@$(BUF_BIN) --version | grep -q '1.50.0' || (echo "Please use buf 1.50.0" && exit 1)
+
+.PHONY: gomodtidy
+gomodtidy: gomods ## Run go mod tidy on all modules.
+	gomods tidy
+
+.PHONY: gomods
+gomods: ## Install gomods
+	go install github.com/jmank88/gomods@v0.1.5

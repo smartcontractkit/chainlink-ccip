@@ -5,7 +5,6 @@ package lock_release_token_pool
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -3338,54 +3336,6 @@ func (_LockReleaseTokenPool *LockReleaseTokenPoolFilterer) ParseRouterUpdated(lo
 	return event, nil
 }
 
-func (_LockReleaseTokenPool *LockReleaseTokenPool) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _LockReleaseTokenPool.abi.Events["AllowListAdd"].ID:
-		return _LockReleaseTokenPool.ParseAllowListAdd(log)
-	case _LockReleaseTokenPool.abi.Events["AllowListRemove"].ID:
-		return _LockReleaseTokenPool.ParseAllowListRemove(log)
-	case _LockReleaseTokenPool.abi.Events["ChainAdded"].ID:
-		return _LockReleaseTokenPool.ParseChainAdded(log)
-	case _LockReleaseTokenPool.abi.Events["ChainConfigured"].ID:
-		return _LockReleaseTokenPool.ParseChainConfigured(log)
-	case _LockReleaseTokenPool.abi.Events["ChainRemoved"].ID:
-		return _LockReleaseTokenPool.ParseChainRemoved(log)
-	case _LockReleaseTokenPool.abi.Events["ConfigChanged"].ID:
-		return _LockReleaseTokenPool.ParseConfigChanged(log)
-	case _LockReleaseTokenPool.abi.Events["InboundRateLimitConsumed"].ID:
-		return _LockReleaseTokenPool.ParseInboundRateLimitConsumed(log)
-	case _LockReleaseTokenPool.abi.Events["LiquidityAdded"].ID:
-		return _LockReleaseTokenPool.ParseLiquidityAdded(log)
-	case _LockReleaseTokenPool.abi.Events["LiquidityRemoved"].ID:
-		return _LockReleaseTokenPool.ParseLiquidityRemoved(log)
-	case _LockReleaseTokenPool.abi.Events["LiquidityTransferred"].ID:
-		return _LockReleaseTokenPool.ParseLiquidityTransferred(log)
-	case _LockReleaseTokenPool.abi.Events["LockedOrBurned"].ID:
-		return _LockReleaseTokenPool.ParseLockedOrBurned(log)
-	case _LockReleaseTokenPool.abi.Events["OutboundRateLimitConsumed"].ID:
-		return _LockReleaseTokenPool.ParseOutboundRateLimitConsumed(log)
-	case _LockReleaseTokenPool.abi.Events["OwnershipTransferRequested"].ID:
-		return _LockReleaseTokenPool.ParseOwnershipTransferRequested(log)
-	case _LockReleaseTokenPool.abi.Events["OwnershipTransferred"].ID:
-		return _LockReleaseTokenPool.ParseOwnershipTransferred(log)
-	case _LockReleaseTokenPool.abi.Events["RateLimitAdminSet"].ID:
-		return _LockReleaseTokenPool.ParseRateLimitAdminSet(log)
-	case _LockReleaseTokenPool.abi.Events["RebalancerSet"].ID:
-		return _LockReleaseTokenPool.ParseRebalancerSet(log)
-	case _LockReleaseTokenPool.abi.Events["ReleasedOrMinted"].ID:
-		return _LockReleaseTokenPool.ParseReleasedOrMinted(log)
-	case _LockReleaseTokenPool.abi.Events["RemotePoolAdded"].ID:
-		return _LockReleaseTokenPool.ParseRemotePoolAdded(log)
-	case _LockReleaseTokenPool.abi.Events["RemotePoolRemoved"].ID:
-		return _LockReleaseTokenPool.ParseRemotePoolRemoved(log)
-	case _LockReleaseTokenPool.abi.Events["RouterUpdated"].ID:
-		return _LockReleaseTokenPool.ParseRouterUpdated(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (LockReleaseTokenPoolAllowListAdd) Topic() common.Hash {
 	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
 }
@@ -3660,8 +3610,6 @@ type LockReleaseTokenPoolInterface interface {
 	WatchRouterUpdated(opts *bind.WatchOpts, sink chan<- *LockReleaseTokenPoolRouterUpdated) (event.Subscription, error)
 
 	ParseRouterUpdated(log types.Log) (*LockReleaseTokenPoolRouterUpdated, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

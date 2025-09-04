@@ -5,7 +5,6 @@ package hybrid_lock_release_usdc_token_pool
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -4767,72 +4765,6 @@ func (_HybridLockReleaseUSDCTokenPool *HybridLockReleaseUSDCTokenPoolFilterer) P
 	return event, nil
 }
 
-func (_HybridLockReleaseUSDCTokenPool *HybridLockReleaseUSDCTokenPool) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["AllowListAdd"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseAllowListAdd(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["AllowListRemove"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseAllowListRemove(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["CCTPMigrationCancelled"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseCCTPMigrationCancelled(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["CCTPMigrationExecuted"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseCCTPMigrationExecuted(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["CCTPMigrationProposed"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseCCTPMigrationProposed(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["ChainAdded"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseChainAdded(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["ChainConfigured"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseChainConfigured(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["ChainRemoved"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseChainRemoved(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["CircleMigratorAddressSet"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseCircleMigratorAddressSet(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["ConfigChanged"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseConfigChanged(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["ConfigSet"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseConfigSet(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["DomainsSet"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseDomainsSet(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["InboundRateLimitConsumed"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseInboundRateLimitConsumed(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["LiquidityAdded"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseLiquidityAdded(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["LiquidityProviderSet"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseLiquidityProviderSet(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["LiquidityRemoved"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseLiquidityRemoved(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["LiquidityTransferred"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseLiquidityTransferred(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["LockReleaseDisabled"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseLockReleaseDisabled(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["LockReleaseEnabled"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseLockReleaseEnabled(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["LockedOrBurned"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseLockedOrBurned(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["OutboundRateLimitConsumed"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseOutboundRateLimitConsumed(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["OwnershipTransferRequested"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseOwnershipTransferRequested(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["OwnershipTransferred"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseOwnershipTransferred(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["RateLimitAdminSet"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseRateLimitAdminSet(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["ReleasedOrMinted"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseReleasedOrMinted(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["RemotePoolAdded"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseRemotePoolAdded(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["RemotePoolRemoved"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseRemotePoolRemoved(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["RouterUpdated"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseRouterUpdated(log)
-	case _HybridLockReleaseUSDCTokenPool.abi.Events["TokensExcludedFromBurn"].ID:
-		return _HybridLockReleaseUSDCTokenPool.ParseTokensExcludedFromBurn(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (HybridLockReleaseUSDCTokenPoolAllowListAdd) Topic() common.Hash {
 	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
 }
@@ -5229,8 +5161,6 @@ type HybridLockReleaseUSDCTokenPoolInterface interface {
 	WatchTokensExcludedFromBurn(opts *bind.WatchOpts, sink chan<- *HybridLockReleaseUSDCTokenPoolTokensExcludedFromBurn, remoteChainSelector []uint64) (event.Subscription, error)
 
 	ParseTokensExcludedFromBurn(log types.Log) (*HybridLockReleaseUSDCTokenPoolTokensExcludedFromBurn, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }
