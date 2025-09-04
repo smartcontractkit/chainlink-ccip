@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -63,6 +64,8 @@ type ConfigureChainForLanesInput struct {
 	FeeQuoter common.Address
 	// The CCVAggregator on the EVM chain being configured
 	CCVAggregator common.Address
+	// The ExecutorOnRamp on the EVM chain being configured
+	ExecutorOnRamp common.Address
 	// The configuration of each remote chain to configure
 	RemoteChains map[uint64]RemoteChainConfig
 }
@@ -72,7 +75,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 	semver.MustParse("1.7.0"),
 	"Configures an EVM chain as a source & destination for multiple remote chains",
 	func(b operations.Bundle, chain evm.Chain, input ConfigureChainForLanesInput) (output sequences.OnChainOutput, err error) {
-		writes := make([]call.WriteOutput, 0, 6) // 6 = number of ExecuteOperation calls
+		writes := make([]call.WriteOutput, 0, 7) // 7 = number of ExecuteOperation calls
 
 		// Create inputs for each operation
 		ccvAggregatorArgs := make([]ccv_aggregator.SourceChainConfigArgs, 0, len(input.RemoteChains))
@@ -82,6 +85,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		feeQuoterArgs := make([]fee_quoter_v2.DestChainConfigArgs, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
+		destChainSelectorsToAdd := make([]uint64, 0, len(input.RemoteChains))
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			ccvAggregatorArgs = append(ccvAggregatorArgs, ccv_aggregator.SourceChainConfigArgs{
 				Router:              input.Router,
@@ -120,6 +124,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				SourceChainSelector: remoteSelector,
 				OffRamp:             input.CCVAggregator,
 			})
+			destChainSelectorsToAdd = append(destChainSelectorsToAdd, remoteSelector)
 		}
 
 		// ApplySourceChainConfigUpdates on CCVAggregator
@@ -154,6 +159,19 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CommitOnRamp(%s) on chain %s: %w", input.CommitOnRamp, chain, err)
 		}
 		writes = append(writes, commitOnRampReport.Output)
+
+		// ApplyDestChainUpdates on ExecutorOnRamp
+		executorOnRampReport, err := cldf_ops.ExecuteOperation(b, executor_onramp.ApplyDestChainUpdates, chain, call.Input[executor_onramp.ApplyDestChainUpdatesArgs]{
+			ChainSelector: chain.Selector,
+			Address:       input.ExecutorOnRamp,
+			Args: executor_onramp.ApplyDestChainUpdatesArgs{
+				DestChainSelectorsToAdd: destChainSelectorsToAdd,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to ExecutorOnRamp(%s) on chain %s: %w", input.ExecutorOnRamp, chain, err)
+		}
+		writes = append(writes, executorOnRampReport.Output)
 
 		// ApplyAllowlistUpdates on CommitOnRamp
 		commitOnRampAllowlistReport, err := cldf_ops.ExecuteOperation(b, commit_onramp.ApplyAllowlistUpdates, chain, call.Input[[]commit_onramp.AllowlistConfigArgs]{

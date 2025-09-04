@@ -68,7 +68,7 @@ var ApplyDestChainUpdates = call.NewWrite(
 	call.OnlyOwner,
 	func(ApplyDestChainUpdatesArgs) error { return nil },
 	func(executorOnRamp *executor_onramp.ExecutorOnRamp, opts *bind.TransactOpts, args ApplyDestChainUpdatesArgs) (*types.Transaction, error) {
-		return executorOnRamp.ApplyDestChainUpdates(opts, args.DestChainSelectorsToAdd, args.DestChainSelectorsToRemove)
+		return executorOnRamp.ApplyDestChainUpdates(opts, args.DestChainSelectorsToRemove, args.DestChainSelectorsToAdd)
 	},
 )
 
@@ -82,6 +82,17 @@ var ApplyAllowedCCVUpdates = call.NewWrite(
 	call.OnlyOwner,
 	func(ApplyAllowedCCVUpdatesArgs) error { return nil },
 	func(executorOnRamp *executor_onramp.ExecutorOnRamp, opts *bind.TransactOpts, args ApplyAllowedCCVUpdatesArgs) (*types.Transaction, error) {
-		return executorOnRamp.ApplyAllowedCCVUpdates(opts, args.CCVsToAdd, args.CCVsToRemove, args.AllowlistEnabled)
+		return executorOnRamp.ApplyAllowedCCVUpdates(opts, args.CCVsToRemove, args.CCVsToAdd, args.AllowlistEnabled)
+	},
+)
+
+var GetDestChains = call.NewRead(
+	"executor-onramp:get-dest-chains",
+	semver.MustParse("1.7.0"),
+	"Gets the supported destination chains on the ExecutorOnRamp",
+	ContractType,
+	executor_onramp.NewExecutorOnRamp,
+	func(executorOnRamp *executor_onramp.ExecutorOnRamp, opts *bind.CallOpts, args any) ([]uint64, error) {
+		return executorOnRamp.GetDestChains(opts)
 	},
 )

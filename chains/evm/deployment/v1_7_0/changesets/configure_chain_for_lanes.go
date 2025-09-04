@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -72,6 +73,10 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		if err != nil {
 			return sequences.ConfigureChainForLanesInput{}, err
 		}
+		executorOnRampAddr, err := getSingleAddress(e, cfg.ChainSel, datastore.ContractType(executor_onramp.ContractType), semver.MustParse("1.7.0"))
+		if err != nil {
+			return sequences.ConfigureChainForLanesInput{}, err
+		}
 
 		remoteChains := make(map[uint64]sequences.RemoteChainConfig, len(cfg.RemoteChains))
 		for remoteChainSel, remoteConfig := range cfg.RemoteChains {
@@ -121,13 +126,14 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		}
 
 		return sequences.ConfigureChainForLanesInput{
-			ChainSelector: cfg.ChainSel,
-			Router:        common.HexToAddress(routerAddr),
-			CCVProxy:      common.HexToAddress(ccvProxyAddr),
-			CommitOnRamp:  common.HexToAddress(commitOnRampAddr),
-			FeeQuoter:     common.HexToAddress(feeQuoterAddr),
-			CCVAggregator: common.HexToAddress(ccvAggregatorAddr),
-			RemoteChains:  remoteChains,
+			ChainSelector:  cfg.ChainSel,
+			Router:         common.HexToAddress(routerAddr),
+			CCVProxy:       common.HexToAddress(ccvProxyAddr),
+			CommitOnRamp:   common.HexToAddress(commitOnRampAddr),
+			FeeQuoter:      common.HexToAddress(feeQuoterAddr),
+			CCVAggregator:  common.HexToAddress(ccvAggregatorAddr),
+			ExecutorOnRamp: common.HexToAddress(executorOnRampAddr),
+			RemoteChains:   remoteChains,
 		}, nil
 	},
 	ResolveDep: changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],

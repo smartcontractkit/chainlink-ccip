@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -133,7 +134,7 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 							{Type: datastore.ContractType(commit_onramp.ContractType), Version: semver.MustParse("1.7.0")},
 						},
 						DefaultExecutor: changesets_utils.TypeAndVersion{
-							Type:    datastore.ContractType(commit_onramp.ContractType), // TODO: This should be updated to ExecutorOnRamp when available
+							Type:    datastore.ContractType(executor_onramp.ContractType),
 							Version: semver.MustParse("1.7.0"),
 						},
 						CommitOnRampDestChainConfig: sequences.CommitOnRampDestChainConfig{
