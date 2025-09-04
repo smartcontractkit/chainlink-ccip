@@ -65,7 +65,7 @@ func Test_TrackingTokenReadiness(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackObservation(exectypes.Observation{TokenData: tc.observation}, tc.state)
+			reporter.TrackObservation(exectypes.Observation{TokenData: tc.observation}, tc.state, 10)
 
 			readyTokens := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
@@ -131,7 +131,7 @@ func Test_TrackingObservations(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackObservation(tc.observation, tc.state)
+			reporter.TrackObservation(tc.observation, tc.state, 10)
 
 			nonces := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
@@ -234,7 +234,7 @@ func Test_TrackingOutcomes(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackOutcome(tc.outcome, tc.state)
+			reporter.TrackOutcome(tc.outcome, tc.state, 10)
 
 			messages := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
@@ -380,9 +380,9 @@ func Test_SequenceNumbers(t *testing.T) {
 
 			switch tc.method {
 			case plugincommon.ObservationMethod:
-				reporter.TrackObservation(tc.obs, exectypes.GetCommitReports)
+				reporter.TrackObservation(tc.obs, exectypes.GetCommitReports, 10)
 			case plugincommon.OutcomeMethod:
-				reporter.TrackOutcome(tc.out, exectypes.GetCommitReports)
+				reporter.TrackOutcome(tc.out, exectypes.GetCommitReports, 10)
 			}
 
 			for sourceSelector, maxSeqNr := range tc.exp {

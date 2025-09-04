@@ -98,7 +98,7 @@ func (p *Plugin) Outcome(
 		return nil, nil
 	}
 
-	p.observer.TrackOutcome(outcome, state)
+	p.observer.TrackOutcome(outcome, state, outctx.Round)
 	lggr.Infow("generated outcome",
 		"outcomeWithoutMsgData", outcome.ToLogFormat(),
 		"numCommitReports", len(outcome.CommitReports),

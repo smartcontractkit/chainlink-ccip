@@ -89,7 +89,7 @@ func (p *Plugin) observationOld(
 		FChain:        p.ObserveFChain(lggr),
 	}
 
-	p.metricsReporter.TrackObservation(obs)
+	p.metricsReporter.TrackObservation(obs, outCtx.Round)
 
 	encoded, err := p.ocrTypeCodec.EncodeObservation(obs)
 	if err != nil {
@@ -288,7 +288,7 @@ func (p *Plugin) outcomeOld(
 		ChainFeeOutcome:   chainFeeOutcome,
 		MainOutcome:       p.getMainOutcome(outCtx, prevOutcome, tokenPriceOutcome, chainFeeOutcome),
 	}
-	p.metricsReporter.TrackOutcome(out)
+	p.metricsReporter.TrackOutcome(out, outCtx.Round)
 
 	lggr.Infow("Commit plugin finished outcome", "outcome", out)
 
