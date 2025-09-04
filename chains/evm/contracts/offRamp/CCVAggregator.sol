@@ -11,6 +11,7 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -47,8 +48,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV, bool isPoolCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
-  error MustSpecifyDefaultOrRequiredCCVs();
-  error DuplicateCCVNotAllowed(address ccv);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -678,46 +677,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         revert ZeroAddressNotAllowed();
       }
 
-      // There must always be at least one default or mandated CCV. This ensures that any receiver who does not specify
-      // CCVs will always have at least one CCV to validate the message.
-      if (configUpdate.defaultCCV.length + configUpdate.laneMandatedCCVs.length == 0) {
-        revert MustSpecifyDefaultOrRequiredCCVs();
-      }
-
-      // We check for duplicates and zero addresses in the default and mandated CCVs. We need to check for duplicates
-      // between the two sets of CCVs as well as within each set. Doing these checks here means we can assume there are
-      // no duplicates or zero addresses in the rest of the code.
-      for (uint256 defaultIndex = 0; defaultIndex < configUpdate.defaultCCV.length; ++defaultIndex) {
-        if (configUpdate.defaultCCV[defaultIndex] == address(0)) {
-          revert ZeroAddressNotAllowed();
-        }
-
-        for (uint256 mandatedIndex = 0; mandatedIndex < configUpdate.laneMandatedCCVs.length; ++mandatedIndex) {
-          if (configUpdate.laneMandatedCCVs[mandatedIndex] == configUpdate.defaultCCV[defaultIndex]) {
-            revert DuplicateCCVNotAllowed(configUpdate.defaultCCV[defaultIndex]);
-          }
-        }
-
-        for (uint256 dupCheckIndex = defaultIndex + 1; dupCheckIndex < configUpdate.defaultCCV.length; ++dupCheckIndex)
-        {
-          if (configUpdate.defaultCCV[dupCheckIndex] == configUpdate.defaultCCV[defaultIndex]) {
-            revert DuplicateCCVNotAllowed(configUpdate.defaultCCV[defaultIndex]);
-          }
-        }
-      }
-
-      for (uint256 mandatedIndex = 0; mandatedIndex < configUpdate.laneMandatedCCVs.length; ++mandatedIndex) {
-        if (configUpdate.laneMandatedCCVs[mandatedIndex] == address(0)) {
-          revert ZeroAddressNotAllowed();
-        }
-
-        for (uint256 dupCheckIndex = mandatedIndex + 1; dupCheckIndex < configUpdate.defaultCCV.length; ++dupCheckIndex)
-        {
-          if (configUpdate.defaultCCV[dupCheckIndex] == configUpdate.defaultCCV[mandatedIndex]) {
-            revert DuplicateCCVNotAllowed(configUpdate.defaultCCV[mandatedIndex]);
-          }
-        }
-      }
+      CCVConfigValidation._validateDefaultAndMandatedCCVs(configUpdate.defaultCCV, configUpdate.laneMandatedCCVs);
 
       // TODO check replay protection if onRamp changes
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[configUpdate.sourceChainSelector];

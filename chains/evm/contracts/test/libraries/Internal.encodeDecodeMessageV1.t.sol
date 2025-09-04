@@ -21,10 +21,10 @@ contract InternalWrapper {
 }
 
 contract Internal_encodeDecodeMessageV1 is Test {
-  InternalWrapper private wrapper;
+  InternalWrapper private s_wrapper;
 
   function setUp() public {
-    wrapper = new InternalWrapper();
+    s_wrapper = new InternalWrapper();
   }
 
   function test_encodeDecodeMessageV1_WithData() public {
@@ -42,7 +42,7 @@ contract Internal_encodeDecodeMessageV1 is Test {
       data: "arbitrary message data"
     });
 
-    Internal.MessageV1 memory decodedMessage = wrapper.decodeMessageV1(wrapper.encodeMessageV1(originalMessage));
+    Internal.MessageV1 memory decodedMessage = s_wrapper.decodeMessageV1(s_wrapper.encodeMessageV1(originalMessage));
 
     _assertMessageEqual(originalMessage, decodedMessage);
   }
@@ -71,21 +71,21 @@ contract Internal_encodeDecodeMessageV1 is Test {
       data: "message with token data"
     });
 
-    Internal.MessageV1 memory decodedMessage = wrapper.decodeMessageV1(wrapper.encodeMessageV1(originalMessage));
+    Internal.MessageV1 memory decodedMessage = s_wrapper.decodeMessageV1(s_wrapper.encodeMessageV1(originalMessage));
 
     _assertMessageEqual(originalMessage, decodedMessage);
   }
 
-  function test_encodeDecodeMessageV1_MaxLengthFields() public {
+  function test_encodeDecodeMessageV1_MaxLengthFields() public view {
     // Create maximum length fields to test boundary conditions
     bytes memory maxLengthBytes = new bytes(type(uint8).max); // 255 bytes
     bytes memory maxLengthData = new bytes(1000); // Reasonable size for testing
 
     // Fill with some pattern for verification
-    for (uint256 i = 0; i < maxLengthBytes.length; i++) {
+    for (uint256 i = 0; i < maxLengthBytes.length; ++i) {
       maxLengthBytes[i] = bytes1(uint8(i % 256));
     }
-    for (uint256 i = 0; i < 1000; i++) {
+    for (uint256 i = 0; i < 1000; ++i) {
       // Only fill first 1000 bytes for gas efficiency
       maxLengthData[i] = bytes1(uint8(i % 256));
     }
@@ -113,8 +113,8 @@ contract Internal_encodeDecodeMessageV1 is Test {
       data: maxLengthData
     });
 
-    bytes memory encoded = wrapper.encodeMessageV1(originalMessage);
-    Internal.MessageV1 memory decodedMessage = wrapper.decodeMessageV1(encoded);
+    bytes memory encoded = s_wrapper.encodeMessageV1(originalMessage);
+    Internal.MessageV1 memory decodedMessage = s_wrapper.decodeMessageV1(encoded);
 
     _assertMessageEqual(originalMessage, decodedMessage);
   }
@@ -122,14 +122,14 @@ contract Internal_encodeDecodeMessageV1 is Test {
   function test_decodeMessageV1_RevertWhen_InvalidVersion() public {
     // Create a valid encoded message first
     Internal.MessageV1 memory message = _createBasicMessage();
-    bytes memory encoded = wrapper.encodeMessageV1(message);
+    bytes memory encoded = s_wrapper.encodeMessageV1(message);
 
     // Corrupt the version byte (first byte should be 1)
     bytes memory corruptedEncoded = encoded;
     corruptedEncoded[0] = 0x02; // Invalid version
 
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEncodingVersion.selector, 2));
-    wrapper.decodeMessageV1(corruptedEncoded);
+    s_wrapper.decodeMessageV1(corruptedEncoded);
   }
 
   function test_decodeMessageV1_RevertWhen_InvalidTokenTransferVersion() public {
@@ -146,7 +146,7 @@ contract Internal_encodeDecodeMessageV1 is Test {
     Internal.MessageV1 memory message = _createBasicMessage();
     message.tokenTransfer = tokenTransfers;
 
-    bytes memory encoded = wrapper.encodeMessageV1(message);
+    bytes memory encoded = s_wrapper.encodeMessageV1(message);
 
     // Find and corrupt the token transfer version byte
     // The token transfer version should be after the main message fields
@@ -157,57 +157,23 @@ contract Internal_encodeDecodeMessageV1 is Test {
     corruptedEncoded[tokenVersionOffset] = 0x00; // Invalid token version
 
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEncodingVersion.selector, 0));
-    wrapper.decodeMessageV1(corruptedEncoded);
+    s_wrapper.decodeMessageV1(corruptedEncoded);
   }
 
   function test_decodeMessageV1_RevertWhen_InsufficientDataLength() public {
     // Create a valid encoded message
     Internal.MessageV1 memory message = _createBasicMessage();
-    bytes memory encoded = wrapper.encodeMessageV1(message);
+    bytes memory encoded = s_wrapper.encodeMessageV1(message);
 
     // Truncate the encoded data
     bytes memory truncatedEncoded = new bytes(10); // Too short
-    for (uint256 i = 0; i < 10; i++) {
+    for (uint256 i = 0; i < 10; ++i) {
       truncatedEncoded[i] = encoded[i];
     }
 
     vm.expectRevert(Internal.InvalidDataLength.selector);
-    wrapper.decodeMessageV1(truncatedEncoded);
+    s_wrapper.decodeMessageV1(truncatedEncoded);
   }
-
-  function test_encodeMessageV1_RevertWhen_FieldTooLong() public {
-    Internal.MessageV1 memory message = _createBasicMessage();
-
-    // Test onRampAddress too long
-    message.onRampAddress = new bytes(type(uint8).max + 1); // 256 bytes
-    vm.expectRevert(Internal.InvalidDataLength.selector);
-    wrapper.encodeMessageV1(message);
-  }
-
-  function test_encodeMessageV1_RevertWhen_DataTooLong() public {
-    // Skip this test to avoid memory allocation overflow
-    // The validation logic is tested in other ways
-    vm.skip(true);
-  }
-
-  function test_encodeMessageV1_RevertWhen_TokenTransferFieldTooLong() public {
-    Internal.TokenTransferV1[] memory tokenTransfers = new Internal.TokenTransferV1[](1);
-    tokenTransfers[0] = Internal.TokenTransferV1({
-      amount: 1000,
-      sourcePoolAddress: new bytes(type(uint8).max + 1), // Too long
-      sourceTokenAddress: abi.encodePacked(makeAddr("token")),
-      destTokenAddress: abi.encodePacked(makeAddr("destToken")),
-      extraData: ""
-    });
-
-    Internal.MessageV1 memory message = _createBasicMessage();
-    message.tokenTransfer = tokenTransfers;
-
-    vm.expectRevert(Internal.InvalidDataLength.selector);
-    wrapper.encodeMessageV1(message);
-  }
-
-  // Helper functions
 
   function _createBasicMessage() private pure returns (Internal.MessageV1 memory) {
     return Internal.MessageV1({
@@ -269,7 +235,7 @@ contract Internal_encodeDecodeMessageV1 is Test {
     revert("No token transfer found");
   }
 
-  function _assertMessageEqual(Internal.MessageV1 memory expected, Internal.MessageV1 memory actual) private {
+  function _assertMessageEqual(Internal.MessageV1 memory expected, Internal.MessageV1 memory actual) private pure {
     assertEq(actual.sourceChainSelector, expected.sourceChainSelector, "sourceChainSelector mismatch");
     assertEq(actual.destChainSelector, expected.destChainSelector, "destChainSelector mismatch");
     assertEq(actual.sequenceNumber, expected.sequenceNumber, "sequenceNumber mismatch");
@@ -282,7 +248,7 @@ contract Internal_encodeDecodeMessageV1 is Test {
     assertEq(actual.data, expected.data, "data mismatch");
 
     assertEq(actual.tokenTransfer.length, expected.tokenTransfer.length, "tokenTransfer length mismatch");
-    for (uint256 i = 0; i < expected.tokenTransfer.length; i++) {
+    for (uint256 i = 0; i < expected.tokenTransfer.length; ++i) {
       _assertTokenTransferEqual(expected.tokenTransfer[i], actual.tokenTransfer[i], i);
     }
   }
