@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Internal} from "../../libraries/Internal.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 
 import {Test} from "forge-std/Test.sol";
 
-// Helper contract to expose internal functions for testing
+// Helper contract to make the args calldata.
 contract InternalWrapper {
   function decodeMessageV1(
     bytes calldata encoded

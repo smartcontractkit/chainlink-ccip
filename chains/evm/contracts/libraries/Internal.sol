@@ -399,17 +399,18 @@ library Internal {
   ///   bytes offRampAddress;         Destination Chain OffRamp.
   ///
   /// User controlled data
-  ///   uint16 finality; // Configurable per-message finality value
-  ///   uint8 senderLength; // Length of the Sender Address in bytes
-  ///   bytes sender; // Sender address
-  ///   uint8 receiverLength; // Length of the Receiver Address in bytes
-  ///   bytes receiver; // Receiver address on the destination chain
-  ///   uint16 destBlobLength; // Length of the Destination Blob in bytes
-  ///   bytes destBlob; // Destination specific blob included in the message to prevent forgery
-  ///   uint16 tokenTransferLength; // Length of the Token Transfer structure in bytes
-  ///   bytes tokenTransfer; // Byte representation of the token transfer structure
-  ///   uint16 dataLength; // Length of the user specified data payload
-  ///   bytes data; // Arbitrary data payload supplied by the message sender
+  ///   uint16 finality;              Configurable per-message finality value.
+  ///   uint8 senderLength;           Length of the Sender Address in bytes.
+  ///   bytes sender;                 Sender address.
+  ///   uint8 receiverLength;         Length of the Receiver Address in bytes.
+  ///   bytes receiver;               Receiver address on the destination chain.
+  ///   uint16 destBlobLength;        Length of the Destination Blob in bytes.
+  ///   bytes destBlob;               Destination chain-specific blob that contains data required for execution.
+  ///   uint16 tokenTransferLength;   Length of the Token Transfer structure in bytes.
+  ///   bytes tokenTransfer;          Byte representation of the token transfer structure.
+  ///   uint16 dataLength;            Length of the user specified data payload.
+  ///   bytes data;                   Arbitrary data payload supplied by the message sender.
+  ///
   /// @dev Inefficient struct packing does not matter as this is not a storage struct, and it it would ever be written
   /// to storage it would be in its encoded form.
   // solhint-disable-next-line gas-struct-packing
@@ -443,8 +444,8 @@ library Internal {
     uint256 amount; // Number of tokens.
     // be relied upon by the destination pool to validate the source pool.
     bytes sourcePoolAddress;
-    bytes sourceTokenAddress; // Address of source token
-    bytes destTokenAddress; // Address of destination token
+    bytes sourceTokenAddress; // Address of source token.
+    bytes destTokenAddress; // Address of destination token.
     // Optional pool data to be transferred to the destination chain. Be default this is capped at
     // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
     // has to be set for the specific token.
@@ -457,14 +458,14 @@ library Internal {
   function _encodeTokenTransferV1(
     TokenTransferV1 memory tokenTransfer
   ) internal pure returns (bytes memory) {
-    // Validate field lengths fit in their respective size limits
+    // Validate field lengths fit in their respective size limits.
     if (tokenTransfer.sourcePoolAddress.length > type(uint8).max) revert InvalidDataLength();
     if (tokenTransfer.sourceTokenAddress.length > type(uint8).max) revert InvalidDataLength();
     if (tokenTransfer.destTokenAddress.length > type(uint8).max) revert InvalidDataLength();
     if (tokenTransfer.extraData.length > type(uint16).max) revert InvalidDataLength();
 
     return abi.encodePacked(
-      uint8(1), // version
+      uint8(1), // version.
       tokenTransfer.amount,
       uint8(tokenTransfer.sourcePoolAddress.length),
       tokenTransfer.sourcePoolAddress,
@@ -486,17 +487,17 @@ library Internal {
     bytes calldata encoded,
     uint256 offset
   ) internal pure returns (TokenTransferV1 memory tokenTransfer, uint256 newOffset) {
-    // version (1 byte)
+    // version (1 byte).
     if (offset >= encoded.length) revert InvalidDataLength();
     uint8 version = uint8(encoded[offset++]);
     if (version != 1) revert InvalidEncodingVersion(version);
 
-    // amount (32 bytes)
+    // amount (32 bytes).
     if (offset + 32 > encoded.length) revert InvalidDataLength();
     tokenTransfer.amount = uint256(bytes32(encoded[offset:offset + 32]));
     offset += 32;
 
-    // sourcePoolAddressLength and sourcePoolAddress
+    // sourcePoolAddressLength and sourcePoolAddress.
     if (offset >= encoded.length) revert InvalidDataLength();
     uint8 sourcePoolAddressLength = uint8(encoded[offset++]);
     if (offset + sourcePoolAddressLength > encoded.length) revert InvalidDataLength();
@@ -504,7 +505,7 @@ library Internal {
     tokenTransfer.sourcePoolAddress = encoded[offset:offset + sourcePoolAddressLength];
     offset += sourcePoolAddressLength;
 
-    // sourceTokenAddressLength and sourceTokenAddress
+    // sourceTokenAddressLength and sourceTokenAddress.
     if (offset >= encoded.length) revert InvalidDataLength();
     uint8 sourceTokenAddressLength = uint8(encoded[offset++]);
     if (offset + sourceTokenAddressLength > encoded.length) revert InvalidDataLength();
@@ -512,7 +513,7 @@ library Internal {
     tokenTransfer.sourceTokenAddress = encoded[offset:offset + sourceTokenAddressLength];
     offset += sourceTokenAddressLength;
 
-    // destTokenAddressLength and destTokenAddress
+    // destTokenAddressLength and destTokenAddress.
     if (offset >= encoded.length) revert InvalidDataLength();
     uint8 destTokenAddressLength = uint8(encoded[offset++]);
     if (offset + destTokenAddressLength > encoded.length) revert InvalidDataLength();
@@ -520,7 +521,7 @@ library Internal {
     tokenTransfer.destTokenAddress = encoded[offset:offset + destTokenAddressLength];
     offset += destTokenAddressLength;
 
-    // extraDataLength and extraData
+    // extraDataLength and extraData.
     if (offset + 2 > encoded.length) revert InvalidDataLength();
     uint16 extraDataLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
@@ -538,7 +539,7 @@ library Internal {
   function _encodeMessageV1(
     MessageV1 memory message
   ) internal pure returns (bytes memory) {
-    // Validate field lengths fit in their respective size limits
+    // Validate field lengths fit in their respective size limits.
     if (message.onRampAddress.length > type(uint8).max) revert InvalidDataLength();
     if (message.offRampAddress.length > type(uint8).max) revert InvalidDataLength();
     if (message.sender.length > type(uint8).max) revert InvalidDataLength();
@@ -547,7 +548,7 @@ library Internal {
     if (message.tokenTransfer.length > type(uint16).max) revert InvalidDataLength();
     if (message.data.length > type(uint16).max) revert InvalidDataLength();
 
-    // Encode token transfers
+    // Encode token transfers.
     bytes memory encodedTokenTransfers;
     if (message.tokenTransfer.length > 0) {
       encodedTokenTransfers = _encodeTokenTransferV1(message.tokenTransfer[0]);
@@ -556,7 +557,7 @@ library Internal {
     // Encoding has to be split into groups to avoid "Stack too deep" errors.
     return bytes.concat(
       abi.encodePacked(
-        uint8(1), // version
+        uint8(1), // version.
         message.sourceChainSelector,
         message.destChainSelector,
         message.sequenceNumber,
@@ -587,7 +588,7 @@ library Internal {
   function _decodeMessageV1(
     bytes calldata encoded
   ) internal pure returns (MessageV1 memory) {
-    if (encoded.length < 36) revert InvalidDataLength(); // Minimum size check
+    if (encoded.length < 36) revert InvalidDataLength(); // Minimum size check.
 
     MessageV1 memory message;
     uint256 offset = 0;
@@ -595,27 +596,27 @@ library Internal {
     uint8 version = uint8(encoded[offset++]);
     if (version != 1) revert InvalidEncodingVersion(version);
 
-    // Protocol Header
-    // sourceChainSelector (8 bytes, big endian)
+    // Protocol Header.
+    // sourceChainSelector (8 bytes, big endian).
     message.sourceChainSelector = uint64(bytes8(encoded[offset:offset + 8]));
     offset += 8;
 
-    // destChainSelector (8 bytes, big endian)
+    // destChainSelector (8 bytes, big endian).
     message.destChainSelector = uint64(bytes8(encoded[offset:offset + 8]));
     offset += 8;
 
-    // sequenceNumber (8 bytes, big endian)
+    // sequenceNumber (8 bytes, big endian).
     message.sequenceNumber = uint64(bytes8(encoded[offset:offset + 8]));
     offset += 8;
 
-    // onRampAddressLength and onRampAddress
+    // onRampAddressLength and onRampAddress.
     uint8 onRampAddressLength = uint8(encoded[offset++]);
     if (offset + onRampAddressLength > encoded.length) revert InvalidDataLength();
 
     message.onRampAddress = encoded[offset:offset + onRampAddressLength];
     offset += onRampAddressLength;
 
-    // offRampAddressLength and offRampAddress
+    // offRampAddressLength and offRampAddress.
     if (offset >= encoded.length) revert InvalidDataLength();
     uint8 offRampAddressLength = uint8(encoded[offset++]);
     if (offset + offRampAddressLength > encoded.length) revert InvalidDataLength();
@@ -623,14 +624,14 @@ library Internal {
     message.offRampAddress = encoded[offset:offset + offRampAddressLength];
     offset += offRampAddressLength;
 
-    // User controlled data
+    // User controlled data.
     if (offset + 2 > encoded.length) revert InvalidDataLength();
 
-    // finality (2 bytes, big endian)
+    // finality (2 bytes, big endian).
     message.finality = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
 
-    // senderLength and sender
+    // senderLength and sender.
     if (offset >= encoded.length) revert InvalidDataLength();
     uint8 senderLength = uint8(encoded[offset++]);
     if (offset + senderLength > encoded.length) revert InvalidDataLength();
@@ -638,7 +639,7 @@ library Internal {
     message.sender = encoded[offset:offset + senderLength];
     offset += senderLength;
 
-    // receiverLength and receiver
+    // receiverLength and receiver.
     if (offset >= encoded.length) revert InvalidDataLength();
     uint8 receiverLength = uint8(encoded[offset++]);
     if (offset + receiverLength > encoded.length) revert InvalidDataLength();
@@ -646,7 +647,7 @@ library Internal {
     message.receiver = encoded[offset:offset + receiverLength];
     offset += receiverLength;
 
-    // destBlobLength and destBlob
+    // destBlobLength and destBlob.
     if (offset + 2 > encoded.length) revert InvalidDataLength();
     uint16 destBlobLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
@@ -655,7 +656,7 @@ library Internal {
     message.destBlob = encoded[offset:offset + destBlobLength];
     offset += destBlobLength;
 
-    // tokenTransferLength and tokenTransfer
+    // tokenTransferLength and tokenTransfer.
     if (offset + 2 > encoded.length) revert InvalidDataLength();
     uint16 tokenTransferLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
@@ -670,7 +671,7 @@ library Internal {
       if (offset != expectedEnd) revert InvalidDataLength();
     }
 
-    // dataLength and data
+    // dataLength and data.
     if (offset + 2 > encoded.length) revert InvalidDataLength();
     uint16 dataLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
@@ -679,7 +680,7 @@ library Internal {
     message.data = encoded[offset:offset + dataLength];
     offset += dataLength;
 
-    // Ensure we've consumed all bytes
+    // Ensure we've consumed all bytes.
     if (offset != encoded.length) revert InvalidDataLength();
 
     return message;
