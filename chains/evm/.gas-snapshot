@@ -61,7 +61,7 @@ CCVConfigValidation_validateDefaultAndMandatedCCVs:test_validateDefaultAndMandat
 CCVConfigValidation_validateDefaultAndMandatedCCVs:test_validateDefaultAndMandatedCCVs_OnlyMandatedProvided() (gas: 7620)
 CCVProxy_applyDestChainConfigUpdates:test_applyDestChainConfigUpdates_AllowsZeroRouterToPause() (gas: 99745)
 CCVProxy_applyDestChainConfigUpdates:test_applyDestChainConfigUpdates_SetsConfigAndEmitsEvent() (gas: 174753)
-CCVProxy_constructor:test_constructor() (gas: 3019046)
+CCVProxy_constructor:test_constructor() (gas: 3208713)
 CCVProxy_forwardFromRouter:test_forwardFromRouter_SequenceNumberPersistsAndIncrements() (gas: 184506)
 CCVProxy_forwardFromRouter:test_forwardFromRouter_oldExtraArgs() (gas: 104178)
 CCVProxy_mergeCCVsWithPoolAndLaneMandated:test_mergeCCVsWithPoolAndLaneMandated_BothLaneAndPoolCCVs() (gas: 130809)
