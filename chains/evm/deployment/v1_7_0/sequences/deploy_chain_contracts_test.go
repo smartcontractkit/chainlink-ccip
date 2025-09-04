@@ -79,6 +79,9 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 					ContractParams: sequences.ContractParams{
 						RMNRemote:     sequences.RMNRemoteParams{},
 						CCVAggregator: sequences.CCVAggregatorParams{},
+						ExecutorOnRamp: sequences.ExecutorOnRampParams{
+							MaxCCVsPerMsg: 10,
+						},
 						CommitOnRamp: sequences.CommitOnRampParams{
 							FeeAggregator: common.HexToAddress("0x01"),
 						},
@@ -107,7 +110,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
-			require.Len(t, report.Output.Addresses, 12, "Expected 12 addresses in output")
+			require.Len(t, report.Output.Addresses, sequences.NUM_CONTRACTS)
 			require.Len(t, report.Output.Writes, 3, "Expected 3 writes in output")
 			for _, write := range report.Output.Writes {
 				// Contracts are deployed & still owned by deployer, so all writes should be executed
@@ -172,6 +175,9 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 				ContractParams: sequences.ContractParams{
 					RMNRemote:     sequences.RMNRemoteParams{},
 					CCVAggregator: sequences.CCVAggregatorParams{},
+					ExecutorOnRamp: sequences.ExecutorOnRampParams{
+						MaxCCVsPerMsg: 10,
+					},
 					CommitOnRamp: sequences.CommitOnRampParams{
 						FeeAggregator: common.HexToAddress("0x01"),
 					},
@@ -211,7 +217,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 
 		for i, report := range allReports {
 			require.NotEmpty(t, report.Output.Addresses, "Expected addresses for chain %d", chainSelectors[i])
-			require.Len(t, report.Output.Addresses, 12, "Expected 12 addresses deployed for chain %d", chainSelectors[i])
+			require.Len(t, report.Output.Addresses, sequences.NUM_CONTRACTS)
 		}
 	})
 
@@ -266,6 +272,9 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 					ContractParams: sequences.ContractParams{
 						RMNRemote:     sequences.RMNRemoteParams{},
 						CCVAggregator: sequences.CCVAggregatorParams{},
+						ExecutorOnRamp: sequences.ExecutorOnRampParams{
+							MaxCCVsPerMsg: 10,
+						},
 						CommitOnRamp: sequences.CommitOnRampParams{
 							FeeAggregator: common.HexToAddress("0x01"),
 						},
@@ -311,7 +320,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		for _, result := range results {
 			require.NoError(t, result.err, "Failed to execute sequence for chain %d", result.chainSelector)
 			require.NotEmpty(t, result.report.Output.Addresses, "Expected addresses for chain %d", result.chainSelector)
-			require.Len(t, result.report.Output.Addresses, 12, "Expected 12 addresses deployed for chain %d", result.chainSelector)
+			require.Len(t, result.report.Output.Addresses, sequences.NUM_CONTRACTS)
 		}
 	})
 }
