@@ -1522,7 +1522,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, nil)
 		chainAccessors[destChain].(*commonccipocr3.MockChainAccessor).EXPECT().
 			GetChainFeePriceUpdate(mock.Anything, selectors).
-			Return(map[cciptypes.ChainSelector]cciptypes.TimestampedBig{})
+			Return(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig{}, nil)
 		ccipReader, err := newCCIPChainReaderInternal(
 			t.Context(),
 			logger.Test(t),
@@ -1736,16 +1736,8 @@ func mockExpectChainAccessorGetChainFeePriceUpdate(
 	selectors []cciptypes.ChainSelector,
 	expectedResult map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig,
 ) {
-	// Convert TimestampedUnixBig to TimestampedBig
-	convertedResult := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig)
-	for k, v := range expectedResult {
-		convertedResult[k] = cciptypes.TimestampedBig{
-			Value:     cciptypes.NewBigInt(v.Value),
-			Timestamp: time.Unix(int64(v.Timestamp), 0),
-		}
-	}
 	chainAccessor.(*commonccipocr3.MockChainAccessor).EXPECT().
-		GetChainFeePriceUpdate(mock.Anything, selectors).Return(convertedResult)
+		GetChainFeePriceUpdate(mock.Anything, selectors).Return(expectedResult, nil)
 }
 
 type mockConfigCache struct {

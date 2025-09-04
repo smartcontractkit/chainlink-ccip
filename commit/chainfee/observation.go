@@ -127,13 +127,13 @@ func (p *processor) observeFChain(lggr logger.Logger) map[cciptypes.ChainSelecto
 }
 
 func feeUpdatesFromTimestampedBig(
-	updates map[cciptypes.ChainSelector]cciptypes.TimestampedBig,
+	updates map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig,
 ) map[cciptypes.ChainSelector]Update {
 	chainFeeUpdates := make(map[cciptypes.ChainSelector]Update, len(updates))
 	for chain, u := range updates {
 		chainFeeUpdates[chain] = Update{
-			ChainFee:  fromPackedFee(u.Value.Int),
-			Timestamp: u.Timestamp,
+			ChainFee:  fromPackedFee(u.Value),
+			Timestamp: time.Unix(int64(u.Timestamp), 0).UTC(),
 		}
 	}
 	return chainFeeUpdates

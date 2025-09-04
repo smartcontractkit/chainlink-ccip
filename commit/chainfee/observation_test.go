@@ -35,7 +35,7 @@ func Test_processor_Observation(t *testing.T) {
 		supportedChains              []ccipocr3.ChainSelector
 		chainFeeComponents           map[ccipocr3.ChainSelector]types.ChainFeeComponents
 		nativeTokenPrices            map[ccipocr3.ChainSelector]ccipocr3.BigInt
-		existingChainFeePriceUpdates map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig
+		existingChainFeePriceUpdates map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig
 		fChain                       map[ccipocr3.ChainSelector]int
 		expectedChainFeePriceUpdates map[ccipocr3.ChainSelector]Update
 
@@ -62,20 +62,20 @@ func Test_processor_Observation(t *testing.T) {
 				1: ccipocr3.NewBigIntFromInt64(1000),
 				2: ccipocr3.NewBigIntFromInt64(2000),
 			},
-			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
+			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig{
 				1: {
-					Timestamp: fourHoursAgo,
+					Timestamp: uint32(fourHoursAgo.Unix()),
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
 						ExecutionFeePriceUSD: big.NewInt(1234),
 						DataAvFeePriceUSD:    big.NewInt(4321),
-					})),
+					})).Int,
 				},
 				2: {
-					Timestamp: fourHoursAgo,
+					Timestamp: uint32(fourHoursAgo.Unix()),
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
 						ExecutionFeePriceUSD: big.NewInt(12340),
 						DataAvFeePriceUSD:    big.NewInt(43210),
-					})),
+					})).Int,
 				},
 			},
 			expectedChainFeePriceUpdates: map[ccipocr3.ChainSelector]Update{
@@ -205,7 +205,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 		supportedChains              []ccipocr3.ChainSelector
 		chainFeeComponents           map[ccipocr3.ChainSelector]types.ChainFeeComponents
 		nativeTokenPrices            map[ccipocr3.ChainSelector]ccipocr3.BigInt
-		existingChainFeePriceUpdates map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig
+		existingChainFeePriceUpdates map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig
 		fChain                       map[ccipocr3.ChainSelector]int
 		dstChain                     ccipocr3.ChainSelector
 		expUniqueChains              int
@@ -228,20 +228,20 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 				1: ccipocr3.NewBigIntFromInt64(1000),
 				2: ccipocr3.NewBigIntFromInt64(2000),
 			},
-			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
+			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig{
 				1: {
-					Timestamp: fourHoursAgo,
+					Timestamp: uint32(fourHoursAgo.Unix()),
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
 						ExecutionFeePriceUSD: big.NewInt(1234),
 						DataAvFeePriceUSD:    big.NewInt(4321),
-					})),
+					})).Int,
 				},
 				2: {
-					Timestamp: fourHoursAgo,
+					Timestamp: uint32(fourHoursAgo.Unix()),
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
 						ExecutionFeePriceUSD: big.NewInt(12340),
 						DataAvFeePriceUSD:    big.NewInt(43210),
-					})),
+					})).Int,
 				},
 			},
 			fChain: map[ccipocr3.ChainSelector]int{
@@ -268,20 +268,20 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			nativeTokenPrices: map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 				1: ccipocr3.NewBigIntFromInt64(1000),
 			},
-			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
+			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig{
 				1: {
-					Timestamp: fourHoursAgo,
+					Timestamp: uint32(fourHoursAgo.Unix()),
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
 						ExecutionFeePriceUSD: big.NewInt(1234),
 						DataAvFeePriceUSD:    big.NewInt(4321),
-					})),
+					})).Int,
 				},
 				3: {
-					Timestamp: fourHoursAgo,
+					Timestamp: uint32(fourHoursAgo.Unix()),
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
 						ExecutionFeePriceUSD: big.NewInt(1234),
 						DataAvFeePriceUSD:    big.NewInt(4321),
-					})),
+					})).Int,
 				},
 			},
 			fChain: map[ccipocr3.ChainSelector]int{
@@ -308,13 +308,13 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			nativeTokenPrices: map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 				3: ccipocr3.NewBigIntFromInt64(1000),
 			},
-			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
+			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig{
 				3: {
-					Timestamp: fourHoursAgo,
+					Timestamp: uint32(fourHoursAgo.Unix()),
 					Value: ccipocr3.NewBigInt(FeeComponentsToPackedFee(ComponentsUSDPrices{
 						ExecutionFeePriceUSD: big.NewInt(1234),
 						DataAvFeePriceUSD:    big.NewInt(4321),
-					})),
+					})).Int,
 				},
 			},
 			fChain: map[ccipocr3.ChainSelector]int{

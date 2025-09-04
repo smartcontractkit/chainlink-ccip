@@ -674,10 +674,10 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				t := time.Now().UTC().Add(-elapsed)
 				m.EXPECT().
 					GetChainFeePriceUpdate(mock.Anything, mock.Anything).
-					Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{
+					Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig{
 						sourceSolChain: {
-							Timestamp: t,
-							Value:     expectedChain1FeeOutcome.GasPrices[0].GasPrice,
+							Timestamp: uint32(t.Unix()),
+							Value:     expectedChain1FeeOutcome.GasPrices[0].GasPrice.Int,
 						},
 					})
 			},
@@ -742,7 +742,7 @@ func prepareCcipReaderMock(
 		Return(onChainPriceSeqNr, nil).Maybe()
 	ccipReader.EXPECT().
 		GetChainFeePriceUpdate(mock.Anything, mock.Anything).
-		Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{}).Maybe()
+		Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig{}).Maybe()
 	ccipReader.EXPECT().
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
