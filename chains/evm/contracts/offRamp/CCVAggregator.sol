@@ -47,6 +47,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV, bool isPoolCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
+  error MustSpecifyDefaultOrRequiredCCVs();
+  error DuplicateCCVNotAllowed(address ccv);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -662,33 +664,74 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     SourceChainConfigArgs[] calldata sourceChainConfigUpdates
   ) external onlyOwner {
     for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
-      SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
+      SourceChainConfigArgs memory configUpdate = sourceChainConfigUpdates[i];
 
-      if (sourceConfigUpdate.sourceChainSelector == 0) {
+      if (configUpdate.sourceChainSelector == 0) {
         revert ZeroChainSelectorNotAllowed();
       }
-      if (address(sourceConfigUpdate.router) == address(0) || sourceConfigUpdate.defaultCCV.length == 0) {
+      if (address(configUpdate.router) == address(0) || configUpdate.defaultCCV.length == 0) {
         revert ZeroAddressNotAllowed();
       }
 
-      // OnRamp can never be zero - if it is, then the source chain has been added for the first time.
-      if (sourceConfigUpdate.onRamp.length == 0 || keccak256(sourceConfigUpdate.onRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
+      // OnRamp can never be zero.
+      if (configUpdate.onRamp.length == 0 || keccak256(configUpdate.onRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
         revert ZeroAddressNotAllowed();
+      }
+
+      // There must always be at least one default or mandated CCV. This ensures that any receiver who does not specify
+      // CCVs will always have at least one CCV to validate the message.
+      if (configUpdate.defaultCCV.length + configUpdate.laneMandatedCCVs.length == 0) {
+        revert MustSpecifyDefaultOrRequiredCCVs();
+      }
+
+      // We check for duplicates and zero addresses in the default and mandated CCVs. We need to check for duplicates
+      // between the two sets of CCVs as well as within each set. Doing these checks here means we can assume there are
+      // no duplicates or zero addresses in the rest of the code.
+      for (uint256 defaultIndex = 0; defaultIndex < configUpdate.defaultCCV.length; ++defaultIndex) {
+        if (configUpdate.defaultCCV[defaultIndex] == address(0)) {
+          revert ZeroAddressNotAllowed();
+        }
+
+        for (uint256 mandatedIndex = 0; mandatedIndex < configUpdate.laneMandatedCCVs.length; ++mandatedIndex) {
+          if (configUpdate.laneMandatedCCVs[mandatedIndex] == configUpdate.defaultCCV[defaultIndex]) {
+            revert DuplicateCCVNotAllowed(configUpdate.defaultCCV[defaultIndex]);
+          }
+        }
+
+        for (uint256 dupCheckIndex = defaultIndex + 1; dupCheckIndex < configUpdate.defaultCCV.length; ++dupCheckIndex)
+        {
+          if (configUpdate.defaultCCV[dupCheckIndex] == configUpdate.defaultCCV[defaultIndex]) {
+            revert DuplicateCCVNotAllowed(configUpdate.defaultCCV[defaultIndex]);
+          }
+        }
+      }
+
+      for (uint256 mandatedIndex = 0; mandatedIndex < configUpdate.laneMandatedCCVs.length; ++mandatedIndex) {
+        if (configUpdate.laneMandatedCCVs[mandatedIndex] == address(0)) {
+          revert ZeroAddressNotAllowed();
+        }
+
+        for (uint256 dupCheckIndex = mandatedIndex + 1; dupCheckIndex < configUpdate.defaultCCV.length; ++dupCheckIndex)
+        {
+          if (configUpdate.defaultCCV[dupCheckIndex] == configUpdate.defaultCCV[mandatedIndex]) {
+            revert DuplicateCCVNotAllowed(configUpdate.defaultCCV[mandatedIndex]);
+          }
+        }
       }
 
       // TODO check replay protection if onRamp changes
-      SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceConfigUpdate.sourceChainSelector];
+      SourceChainConfig storage currentConfig = s_sourceChainConfigs[configUpdate.sourceChainSelector];
 
-      currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
-      currentConfig.router = sourceConfigUpdate.router;
-      currentConfig.onRamp = sourceConfigUpdate.onRamp;
-      currentConfig.defaultCCVs = sourceConfigUpdate.defaultCCV;
-      currentConfig.laneMandatedCCVs = sourceConfigUpdate.laneMandatedCCVs;
+      currentConfig.isEnabled = configUpdate.isEnabled;
+      currentConfig.router = configUpdate.router;
+      currentConfig.onRamp = configUpdate.onRamp;
+      currentConfig.defaultCCVs = configUpdate.defaultCCV;
+      currentConfig.laneMandatedCCVs = configUpdate.laneMandatedCCVs;
 
       // We don't need to check the return value, as inserting the item twice has no effect.
-      s_sourceChainSelectors.add(sourceConfigUpdate.sourceChainSelector);
+      s_sourceChainSelectors.add(configUpdate.sourceChainSelector);
 
-      emit SourceChainConfigSet(sourceConfigUpdate.sourceChainSelector, currentConfig);
+      emit SourceChainConfigSet(configUpdate.sourceChainSelector, currentConfig);
     }
   }
 
