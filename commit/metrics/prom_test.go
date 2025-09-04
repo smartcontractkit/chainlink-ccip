@@ -537,9 +537,9 @@ func Test_SequenceNumbers(t *testing.T) {
 
 			switch tc.method {
 			case plugincommon.ObservationMethod:
-				reporter.TrackObservation(tc.obs)
+				reporter.TrackObservation(tc.obs, 10)
 			case plugincommon.OutcomeMethod:
-				reporter.TrackOutcome(tc.out)
+				reporter.TrackOutcome(tc.out, 10)
 			}
 
 			for sourceSelector, maxSeqNr := range tc.exp {
