@@ -114,7 +114,7 @@ func (p *Plugin) Observation(
 		return nil, fmt.Errorf("get observation: unknown state")
 	}
 
-	p.observer.TrackObservation(observation, state)
+	p.observer.TrackObservation(observation, state, outctx.Round)
 	numCommitReports := 0
 	for _, reports := range observation.CommitReports {
 		numCommitReports += len(reports)

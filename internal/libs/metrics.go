@@ -20,3 +20,11 @@ func GetChainInfoFromSelector(selector cciptypes.ChainSelector) (chainFamily str
 
 	return chainFamily, chainID, true
 }
+
+func GetNameFromIDAndFamily(chainID string, family string) (string, error) {
+	details, err := sel.GetChainDetailsByChainIDAndFamily(chainID, family)
+	if err != nil {
+		return "", err
+	}
+	return details.ChainName, nil
+}
