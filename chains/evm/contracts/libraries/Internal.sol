@@ -436,6 +436,7 @@ library Internal {
   ///   bytes tokenTransfer; // Byte representation of the token transfer structure
   ///   uint16 dataLength; // Length of the user specified data payload
   ///   bytes data; // Arbitrary data payload supplied by the message sender
+  // solhint-disable-next-line gas-struct-packing
   struct MessageV1 {
     // Protocol Header
     uint64 sourceChainSelector; // Source Chain Selector.
@@ -566,31 +567,32 @@ library Internal {
       encodedTokenTransfers = _encodeTokenTransferV1(message.tokenTransfer[0]);
     }
 
-    bytes memory header = abi.encodePacked(
-      uint8(1), // version
-      message.sourceChainSelector,
-      message.destChainSelector,
-      message.sequenceNumber,
-      uint8(message.onRampAddress.length),
-      message.onRampAddress,
-      uint8(message.offRampAddress.length),
-      message.offRampAddress
+    // Encoding has to be split into groups to avoid "Stack too deep" errors.
+    return bytes.concat(
+      abi.encodePacked(
+        uint8(1), // version
+        message.sourceChainSelector,
+        message.destChainSelector,
+        message.sequenceNumber,
+        uint8(message.onRampAddress.length),
+        message.onRampAddress,
+        uint8(message.offRampAddress.length),
+        message.offRampAddress,
+        message.finality
+      ),
+      abi.encodePacked(
+        uint8(message.sender.length),
+        message.sender,
+        uint8(message.receiver.length),
+        message.receiver,
+        uint16(message.destBlob.length),
+        message.destBlob,
+        uint16(encodedTokenTransfers.length),
+        encodedTokenTransfers,
+        uint16(message.data.length),
+        message.data
+      )
     );
-
-    bytes memory senderReceiver = abi.encodePacked(
-      message.finality, uint8(message.sender.length), message.sender, uint8(message.receiver.length), message.receiver
-    );
-
-    bytes memory lastPart = abi.encodePacked(
-      uint16(message.destBlob.length),
-      message.destBlob,
-      uint16(encodedTokenTransfers.length),
-      encodedTokenTransfers,
-      uint16(message.data.length),
-      message.data
-    );
-
-    return bytes.concat(header, senderReceiver, lastPart);
   }
 
   /// @notice Decodes bytes into a MessageV1 struct following the v1 protocol format.
