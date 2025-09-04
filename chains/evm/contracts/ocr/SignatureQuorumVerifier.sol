@@ -10,15 +10,11 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
-  /// @param configDigest configDigest of this configuration.
   /// @param signers ith element is address ith oracle uses to sign a report.
   /// @param F maximum number of faulty/dishonest singers the protocol can tolerate while still working correctly.
-  event ConfigSet(bytes32 indexed configDigest, address[] signers, uint8 F);
-  event ConfigRevoked(bytes32 indexed configDigest);
+  event ConfigSet(address[] signers, uint8 F);
 
   error InvalidConfig();
-  error InvalidConfigDigest(bytes32 configDigest);
-  error ConfigDigestAlreadyExists(bytes32 configDigest);
   error ForkedChain(uint256 expected, uint256 actual);
   error WrongNumberOfSignatures();
   error SignaturesOutOfRegistration();
@@ -26,9 +22,7 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   error NonUniqueSignatures();
   error OracleCannotBeZeroAddress();
 
-  /// @notice Args to update an OCR Config.
   struct SignatureConfigArgs {
-    bytes32 configDigest; // The new config digest.
     uint8 F; // Maximum number of faulty/dishonest oracles.
     address[] signers; // signing address of each oracle.
   }
@@ -43,8 +37,7 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     bytes32[] ss; // S components of the signatures.
   }
 
-  mapping(bytes32 configDigest => SignatureConfigConfig config) private s_signatureConfig;
-  EnumerableSet.Bytes32Set private s_activeConfigDigests;
+  SignatureConfigConfig private s_config;
 
   uint256 internal immutable i_chainID;
 
@@ -53,23 +46,18 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   }
 
   /// @notice Validates the signatures of a given report hash.
-  /// @dev The configDigest should be included in the report hash!
   /// @param reportHash The hash of the report to validate signatures for.
-  /// @param configDigest The config digest determines the signature set to use for validation.
   /// @param signatureProof The signatures to validate, encoded as a SignatureProof struct.
-  function _validateSignatures(bytes32 reportHash, bytes32 configDigest, bytes memory signatureProof) internal view {
-    // We allow proving of older messages that might have been signed by an older set of signers. This means we need to
-    // get the set of signers for the given configDigest.
-    SignatureConfigConfig storage config = s_signatureConfig[configDigest];
+  function _validateSignatures(bytes32 reportHash, bytes memory signatureProof) internal view {
+    SignatureConfigConfig storage config = s_config;
     if (config.signers.length() == 0) {
-      revert InvalidConfigDigest(configDigest);
+      revert InvalidConfig();
     }
 
     SignatureProof memory proofs = abi.decode(signatureProof, (SignatureProof));
 
     // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
-    // This avoids a (rare) scenario where chain A forks into chain A and A', A' still has configDigest calculated
-    // from chain A and so OCR reports will be valid on both forks.
+    // This avoids a (rare) scenario where chain A forks into chain A and A', and a report signed on A is replayed on A'.
     if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
     uint256 numberOfSignatures = proofs.rs.length;
@@ -90,81 +78,37 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     }
   }
 
-  /// @notice Returns all active config digests.
-  function getActiveConfigDigests() external view returns (bytes32[] memory) {
-    return s_activeConfigDigests.values();
+  /// @notice Returns the signer sets, and F value.
+  function getSignatureConfig() external view returns (SignatureConfigArgs memory) {
+    return SignatureConfigArgs({F: s_config.F, signers: s_config.signers.values()});
   }
 
-  /// @notice Returns all active config digests and their corresponding signer sets, and F values.
-  function getAllActiveConfigs() external view returns (SignatureConfigArgs[] memory) {
-    bytes32[] memory configDigests = s_activeConfigDigests.values();
-    SignatureConfigArgs[] memory configs = new SignatureConfigArgs[](configDigests.length);
-
-    for (uint256 i = 0; i < configDigests.length; ++i) {
-      configs[i] = SignatureConfigArgs({
-        configDigest: configDigests[i],
-        F: s_signatureConfig[configDigests[i]].F,
-        signers: s_signatureConfig[configDigests[i]].signers.values()
-      });
-    }
-    return configs;
-  }
-
-  /// @notice Sets a new signature configuration for a given configDigest.
-  /// @param signatureConfigs The configuration to set, containing the configDigest, F value, and signers.
-  /// @dev Reverts if the configDigest already exists, this function cannot override an existing configuration.
-  function setSignatureConfigs(
-    SignatureConfigArgs[] calldata signatureConfigs
+  /// @notice Sets a new signature configuration.
+  /// @param signatureConfig The configuration to set, containing the F value, and signers.
+  function setSignatureConfig(
+    SignatureConfigArgs calldata signatureConfig
   ) external onlyOwner {
-    for (uint256 i = 0; i < signatureConfigs.length; ++i) {
-      SignatureConfigArgs memory signatureConfig = signatureConfigs[i];
+    if (signatureConfig.F == 0 || signatureConfig.F > signatureConfig.signers.length) revert InvalidConfig();
 
-      if (
-        signatureConfig.F == 0 || signatureConfig.F > signatureConfig.signers.length
-          || signatureConfig.configDigest == ""
-      ) revert InvalidConfig();
+    SignatureConfigConfig storage config = s_config;
 
-      // If the configDigest already exists, we cannot modify it as there might be signed transactions that rely on this
-      // exact signer set.
-      if (s_activeConfigDigests.contains(signatureConfig.configDigest)) {
-        revert ConfigDigestAlreadyExists(signatureConfig.configDigest);
-      }
-
-      SignatureConfigConfig storage configForDigest = s_signatureConfig[signatureConfig.configDigest];
-
-      // Add new signers.
-      for (uint256 signerIndex = 0; signerIndex < signatureConfig.signers.length; ++signerIndex) {
-        if (signatureConfig.signers[signerIndex] == address(0)) revert OracleCannotBeZeroAddress();
-
-        if (!configForDigest.signers.add(signatureConfig.signers[signerIndex])) {
-          revert InvalidConfig();
-        }
-      }
-
-      configForDigest.F = signatureConfig.F;
-
-      emit ConfigSet(signatureConfig.configDigest, signatureConfig.signers, signatureConfig.F);
+    // We must remove all current signers first.
+    for (uint256 i = 0; i < config.signers.length();) {
+      config.signers.remove(config.signers.at(i));
     }
-  }
 
-  /// @notice Revokes a signature configuration for a given configDigest.
-  /// @param configDigests The config digests to revoke.
-  /// @dev Reverts revoking a config digest means that any messages signed with that config digest will no longer
-  /// be valid. If there are any such messages, they will have to be resigned with a new config digest to be valid again.
-  function revokeConfigDigests(
-    bytes32[] calldata configDigests
-  ) external onlyOwner {
-    for (uint256 i = 0; i < configDigests.length; ++i) {
-      bytes32 configDigest = configDigests[i];
+    // Add new signers.
+    for (uint256 signerIndex = 0; signerIndex < signatureConfig.signers.length; ++signerIndex) {
+      if (signatureConfig.signers[signerIndex] == address(0)) revert OracleCannotBeZeroAddress();
 
-      // This check also removes the digest from the set of active config digests.
-      if (!s_activeConfigDigests.remove(configDigest)) {
-        revert InvalidConfigDigest(configDigest);
+      // This checks for duplicates.
+      if (!config.signers.add(signatureConfig.signers[signerIndex])) {
+        revert InvalidConfig();
       }
-
-      delete s_signatureConfig[configDigest];
-
-      emit ConfigRevoked(configDigest);
     }
+
+    config.F = signatureConfig.F;
+
+    emit ConfigSet(signatureConfig.signers, signatureConfig.F);
   }
 }

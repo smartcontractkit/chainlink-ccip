@@ -37,9 +37,9 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
   ) external {
     (bytes memory ccvArgs, bytes memory signatures) = abi.decode(ccvData, (bytes, bytes));
 
-    (bytes32 configDigest, uint64 nonce) = abi.decode(ccvArgs, (bytes32, uint64));
+    _validateSignatures(keccak256(bytes.concat(messageHash, ccvArgs)), signatures);
 
-    _validateSignatures(keccak256(abi.encode(messageHash, keccak256(ccvArgs))), configDigest, signatures);
+    uint64 nonce = abi.decode(ccvArgs, (uint64));
 
     // Nonce changes per state transition (these only apply for ordered messages):
     // UNTOUCHED -> FAILURE  nonce bump.

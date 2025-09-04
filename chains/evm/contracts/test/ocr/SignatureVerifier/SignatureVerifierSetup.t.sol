@@ -31,15 +31,10 @@ contract SignatureVerifierSetup is BaseTest {
 
     s_sigQuorumVerifier = new SignatureQuorumVerifierHelper();
 
-    SignatureQuorumVerifier.SignatureConfigArgs[] memory signatureConfigs =
-      new SignatureQuorumVerifier.SignatureConfigArgs[](1);
-    signatureConfigs[0] =
-      SignatureQuorumVerifier.SignatureConfigArgs({signers: s_validSigners, F: 1, configDigest: DEFAULT_CONFIG_DIGEST});
-
-    s_sigQuorumVerifier.setSignatureConfigs(signatureConfigs);
+    s_sigQuorumVerifier.setSignatureConfig(SignatureQuorumVerifier.SignatureConfigArgs({signers: s_validSigners, F: 1}));
   }
 
-  function _getSignaturesForDigest(
+  function _getSignatures(
     uint256[] memory signerKeys,
     bytes32 reportHash
   ) internal pure returns (bytes32[] memory rs, bytes32[] memory ss) {
