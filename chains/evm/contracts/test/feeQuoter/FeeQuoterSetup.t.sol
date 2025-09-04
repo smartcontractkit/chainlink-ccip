@@ -378,7 +378,7 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
       feeToken: s_sourceFeeToken,
       extraArgs: Client._suiArgsToBytes(
         Client.SuiExtraArgsV1({
-          gasLimit: GAS_LIMIT, 
+          gasLimit: GAS_LIMIT,
           allowOutOfOrderExecution: true,
           tokenReceiver: bytes32(0),
           receiverObjectIds: new bytes32[](0)
@@ -386,7 +386,6 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
       )
     });
   }
-
 
   function _generateSingleTokenMessage(
     address token,

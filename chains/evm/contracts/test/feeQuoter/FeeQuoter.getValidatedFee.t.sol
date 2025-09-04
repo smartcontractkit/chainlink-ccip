@@ -239,9 +239,8 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
-
-  // sending a token + message to reciever 
-  function test_tokenTransferAndMsgReciever_Sui() public { 
+  // sending a token + message to reciever
+  function test_tokenTransferAndMsgReciever_Sui() public {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
@@ -249,7 +248,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
-    
+
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
 
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
@@ -279,7 +278,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
-    
+
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
 
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
@@ -299,8 +298,8 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     assertGt(fee, 0, "Expected non-zero fee");
   }
 
-  // sending message to reciever only 
-  function test_MsgRecieverValidatedFee_Sui() public { 
+  // sending message to reciever only
+  function test_MsgRecieverValidatedFee_Sui() public {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
@@ -308,7 +307,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
-    
+
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
 
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
@@ -324,7 +323,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
         receiverObjectIds: _makeObjectIdsForSui()
       })
     );
-  
+
     uint256 fee = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
     assertGt(fee, 0, "Expected non-zero fee");
   }

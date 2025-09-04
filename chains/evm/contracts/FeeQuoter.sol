@@ -1052,9 +1052,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
       Client.SuiExtraArgsV1 memory suiExtraArgsV1 = _parseSuiExtraArgsFromBytes(
-        message.extraArgs,
-        destChainConfig.maxPerMsgGasLimit,
-        destChainConfig.enforceOutOfOrder
+        message.extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder
       );
 
       gasLimit = suiExtraArgsV1.gasLimit;
@@ -1088,12 +1086,14 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         revert InvalidTokenReceiver();
       }
       if (receiverObjectIdsLength > Client.SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS) {
-        revert TooManySuiExtraArgsReceiverObjectIds(receiverObjectIdsLength, Client.SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS);
+        revert TooManySuiExtraArgsReceiverObjectIds(
+          receiverObjectIdsLength, Client.SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS
+        );
       }
 
       suiExpandedDataLength += (numberOfTokens * Client.SUI_TOKEN_TRANSFER_DATA_OVERHEAD);
 
-       // The token destBytesOverhead can be very different per token so we have to take it into account as well.
+      // The token destBytesOverhead can be very different per token so we have to take it into account as well.
       for (uint256 i = 0; i < numberOfTokens; ++i) {
         uint256 destBytesOverhead =
           s_tokenTransferFeeConfig[destChainSelector][message.tokenAmounts[i].token].destBytesOverhead;
@@ -1109,7 +1109,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       if (suiExpandedDataLength > uint256(destChainConfig.maxDataBytes)) {
         revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), suiExpandedDataLength);
       }
-  } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
+    } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
       Client.SVMExtraArgsV1 memory svmExtraArgsV1 = _parseSVMExtraArgsFromBytes(
         message.extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder
       );
@@ -1228,13 +1228,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
 
       return (Client._argsToBytes(parsedExtraArgs), parsedExtraArgs.allowOutOfOrderExecution, messageReceiver);
-    } 
+    }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
-      return (
-        extraArgs,
-        true,
-        messageReceiver
-      );
+      return (extraArgs, true, messageReceiver);
     }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
       // If extraArgs passes the parsing it's valid and can be returned unchanged.

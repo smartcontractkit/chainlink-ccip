@@ -82,7 +82,6 @@ contract MessageHasher {
     return Client._argsToBytes(extraArgs);
   }
 
-
   function decodeEVMExtraArgsV1(
     uint256 gasLimit
   ) public pure returns (Client.EVMExtraArgsV1 memory) {
@@ -112,7 +111,7 @@ contract MessageHasher {
   function encodeSUIExtraArgsV1(
     Client.SuiExtraArgsV1 memory extraArgs
   ) public pure returns (bytes memory) {
-    return Client._suiArgsToBytes(extraArgs); 
+    return Client._suiArgsToBytes(extraArgs);
   }
 
   /// @notice used offchain to decode an encoded SVMExtraArgsV1 struct.
@@ -141,23 +140,14 @@ contract MessageHasher {
   }
 
   /// @notice Used offchain to decode an encoded SuiExtraArgsV1 struct.
-function decodeSuiExtraArgsStruct(
-  Client.SuiExtraArgsV1 memory extraArgs
-)
-  public
-  pure
-  returns (
-    uint256 gasLimit,
-    bool allowOutOfOrderExecution,
-    bytes32 tokenReceiver,
-    bytes32[] memory receiverObjectIds
+  function decodeSuiExtraArgsStruct(
+    Client.SuiExtraArgsV1 memory extraArgs
   )
-{
-  return (
-    extraArgs.gasLimit,
-    extraArgs.allowOutOfOrderExecution,
-    extraArgs.tokenReceiver,
-    extraArgs.receiverObjectIds
-  );
-}
+    public
+    pure
+    returns (uint256 gasLimit, bool allowOutOfOrderExecution, bytes32 tokenReceiver, bytes32[] memory receiverObjectIds)
+  {
+    return
+      (extraArgs.gasLimit, extraArgs.allowOutOfOrderExecution, extraArgs.tokenReceiver, extraArgs.receiverObjectIds);
+  }
 }
