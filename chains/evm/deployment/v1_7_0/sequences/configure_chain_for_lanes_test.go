@@ -75,6 +75,9 @@ func TestConfigureChainForLanes(t *testing.T) {
 						CommitOnRamp: sequences.CommitOnRampParams{
 							FeeAggregator: common.HexToAddress("0x01"),
 						},
+						ExecutorOnRamp: sequences.ExecutorOnRampParams{
+							MaxCCVsPerMsg: 10,
+						},
 						CCVProxy: sequences.CCVProxyParams{
 							FeeAggregator: common.HexToAddress("0x01"),
 						},
@@ -164,9 +167,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 							AllowTrafficFrom:            true,
 							CCIPMessageSource:           ccipMessageSource,
 							DefaultCCVOffRamps:          []common.Address{commitOffRamp},
-							LaneMandatedCCVOffRamps:     []common.Address{commitOffRamp},
 							DefaultCCVOnRamps:           []common.Address{commitOnRamp},
-							LaneMandatedCCVOnRamps:      []common.Address{commitOnRamp},
 							DefaultExecutor:             defaultExecutor,
 							CommitOnRampDestChainConfig: sequences.CommitOnRampDestChainConfig{},
 							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
@@ -206,8 +207,6 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, ccipMessageSource, sourceChainConfig.Output.OnRamp, "OnRamp in source chain config should match CCVProxy address")
 			require.Len(t, sourceChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in source chain config")
 			require.Equal(t, commitOffRamp.Hex(), sourceChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in source chain config should match CommitOffRamp address")
-			require.Len(t, sourceChainConfig.Output.LaneMandatedCCVs, 1, "There should be one LaneMandatedCCV in source chain config")
-			require.Equal(t, commitOffRamp.Hex(), sourceChainConfig.Output.LaneMandatedCCVs[0].Hex(), "LaneMandatedCCV in source chain config should match CommitOffRamp address")
 			require.True(t, sourceChainConfig.Output.IsEnabled, "IsEnabled in source chain config should be true")
 			require.Equal(t, r.Hex(), sourceChainConfig.Output.Router.Hex(), "Router in source chain config should match Router address")
 
@@ -222,8 +221,6 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, defaultExecutor.Hex(), destChainConfig.Output.DefaultExecutor.Hex(), "DefaultExecutor in dest chain config should match configured DefaultExecutor")
 			require.Len(t, destChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in dest chain config")
 			require.Equal(t, commitOnRamp.Hex(), destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitOnRamp address")
-			require.Len(t, destChainConfig.Output.LaneMandatedCCVs, 1, "There should be one LaneMandatedCCV in dest chain config")
-			require.Equal(t, commitOnRamp.Hex(), destChainConfig.Output.LaneMandatedCCVs[0].Hex(), "LaneMandatedCCV in dest chain config should match CommitOnRamp address")
 
 			// Check destChainConfig on CommitOnRamp
 			commitOnRampDestChainConfig, err := operations.ExecuteOperation(bundle, commit_onramp.GetDestChainConfig, evmChain, call.Input[uint64]{

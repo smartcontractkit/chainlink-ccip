@@ -84,6 +84,9 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 						CCVProxy: sequences.CCVProxyParams{
 							FeeAggregator: common.HexToAddress("0x01"),
 						},
+						ExecutorOnRamp: sequences.ExecutorOnRampParams{
+							MaxCCVsPerMsg: 10,
+						},
 						FeeQuoter: sequences.FeeQuoterParams{
 							MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
 							TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
@@ -126,13 +129,7 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 						DefaultCCVOffRamps: []changesets_utils.TypeAndVersion{
 							{Type: datastore.ContractType(commit_offramp.ContractType), Version: semver.MustParse("1.7.0")},
 						},
-						LaneMandatedCCVOffRamps: []changesets_utils.TypeAndVersion{
-							{Type: datastore.ContractType(commit_offramp.ContractType), Version: semver.MustParse("1.7.0")},
-						},
 						DefaultCCVOnRamps: []changesets_utils.TypeAndVersion{
-							{Type: datastore.ContractType(commit_onramp.ContractType), Version: semver.MustParse("1.7.0")},
-						},
-						LaneMandatedCCVOnRamps: []changesets_utils.TypeAndVersion{
 							{Type: datastore.ContractType(commit_onramp.ContractType), Version: semver.MustParse("1.7.0")},
 						},
 						DefaultExecutor: changesets_utils.TypeAndVersion{

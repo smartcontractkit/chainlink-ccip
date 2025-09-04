@@ -232,7 +232,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 
 		for i, report := range allReports {
 			require.NotEmpty(t, report.Output.Addresses, "Expected addresses for chain %d", chainSelectors[i])
-			require.Len(t, report.Output.Addresses, sequences.NUM_CONTRACTS)
+			require.Len(t, report.Output.Addresses, 13)
 		}
 	})
 
@@ -342,7 +342,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		for _, result := range results {
 			require.NoError(t, result.err, "Failed to execute sequence for chain %d", result.chainSelector)
 			require.NotEmpty(t, result.report.Output.Addresses, "Expected addresses for chain %d", result.chainSelector)
-			require.Len(t, result.report.Output.Addresses, sequences.NUM_CONTRACTS)
+			require.Len(t, result.report.Output.Addresses, 13)
 		}
 	})
 }

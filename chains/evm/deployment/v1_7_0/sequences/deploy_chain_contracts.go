@@ -84,7 +84,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	semver.MustParse("1.7.0"),
 	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
 	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
-		addresses := make([]datastore.AddressRef, 0, 12) // 12 = number of maybeDeployContract calls
+		addresses := make([]datastore.AddressRef, 0, 13) // 13 = number of maybeDeployContract calls
 		writes := make([]call.WriteOutput, 0, 4)         // 4 = number of ExecuteOperation calls
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
@@ -301,7 +301,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy ExecutorOnRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ExecutorOnRamp: %w", err)
 		}
 		addresses = append(addresses, executorOnRampRef)
 
