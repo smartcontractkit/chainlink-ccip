@@ -2,37 +2,29 @@
 pragma solidity ^0.8.4;
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-/// @notice Onchain verification of reports from the offchain reporting protocol with multiple OCR plugin support.
-contract SignatureQuorumVerifier is ITypeAndVersion, Ownable2StepMsgSender {
+contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableSet for EnumerableSet.Bytes32Set;
 
-  string public constant override typeAndVersion = "SignatureQuorumVerifier 1.7.0-dev";
-
-  /// @notice Triggers a new run of the offchain reporting protocol.
   /// @param configDigest configDigest of this configuration.
   /// @param signers ith element is address ith oracle uses to sign a report.
-  /// @param F maximum number of faulty/dishonest oracles the protocol can tolerate while still working correctly.
-  event ConfigSet(bytes32 configDigest, address[] signers, uint8 F);
+  /// @param F maximum number of faulty/dishonest singers the protocol can tolerate while still working correctly.
+  event ConfigSet(bytes32 indexed configDigest, address[] signers, uint8 F);
+  event ConfigRevoked(bytes32 indexed configDigest);
 
   error InvalidConfig();
-  error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
+  error InvalidConfigDigest(bytes32 configDigest);
+  error ConfigDigestAlreadyExists(bytes32 configDigest);
   error ForkedChain(uint256 expected, uint256 actual);
   error WrongNumberOfSignatures();
   error SignaturesOutOfRegistration();
   error UnauthorizedSigner();
   error NonUniqueSignatures();
   error OracleCannotBeZeroAddress();
-
-  struct SignatureConfigConfig {
-    bytes32 configDigest;
-    uint8 F; //  maximum number of faulty/dishonest oracles the system can tolerate.
-    uint8 n; //  number of configured signers.
-  }
 
   /// @notice Args to update an OCR Config.
   struct SignatureConfigArgs {
@@ -41,14 +33,18 @@ contract SignatureQuorumVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     address[] signers; // signing address of each oracle.
   }
 
+  struct SignatureConfigConfig {
+    uint8 F; //  Maximum number of faulty/dishonest oracles the system can tolerate.
+    EnumerableSet.AddressSet signers;
+  }
+
   struct SignatureProof {
     bytes32[] rs; // R components of the signatures.
     bytes32[] ss; // S components of the signatures.
   }
 
-  SignatureConfigConfig internal s_ocrConfig;
-
-  EnumerableSet.AddressSet internal s_signers;
+  mapping(bytes32 configDigest => SignatureConfigConfig config) private s_signatureConfig;
+  EnumerableSet.Bytes32Set private s_activeConfigDigests;
 
   uint256 internal immutable i_chainID;
 
@@ -56,96 +52,119 @@ contract SignatureQuorumVerifier is ITypeAndVersion, Ownable2StepMsgSender {
     i_chainID = block.chainid;
   }
 
-  // TODO allow older digests.
-  function _validateConfigDigest(
-    bytes32 configDigest
-  ) internal view {
-    if (s_ocrConfig.configDigest != configDigest) {
-      revert ConfigDigestMismatch(s_ocrConfig.configDigest, configDigest);
+  /// @notice Validates the signatures of a given report hash.
+  /// @dev The configDigest should be included in the report hash!
+  /// @param reportHash The hash of the report to validate signatures for.
+  /// @param configDigest The config digest determines the signature set to use for validation.
+  /// @param signatureProof The signatures to validate, encoded as a SignatureProof struct.
+  function _validateSignatures(bytes32 reportHash, bytes32 configDigest, bytes memory signatureProof) internal view {
+    // We allow proving of older messages that might have been signed by an older set of signers. This means we need to
+    // get the set of signers for the given configDigest.
+    SignatureConfigConfig storage config = s_signatureConfig[configDigest];
+    if (config.signers.length() == 0) {
+      revert InvalidConfigDigest(configDigest);
     }
-  }
 
-  function _validateOCRSignatures(
-    bytes32 messageHash,
-    bytes32 configDigest,
-    bytes32 blobHash,
-    bytes memory ocrProof
-  ) internal view {
-    _validateConfigDigest(configDigest);
-
-    SignatureProof memory report = abi.decode(ocrProof, (SignatureProof));
+    SignatureProof memory proofs = abi.decode(signatureProof, (SignatureProof));
 
     // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
     // This avoids a (rare) scenario where chain A forks into chain A and A', A' still has configDigest calculated
     // from chain A and so OCR reports will be valid on both forks.
     if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
-    if (report.rs.length != s_ocrConfig.F + 1) revert WrongNumberOfSignatures();
-    if (report.rs.length != report.ss.length) revert SignaturesOutOfRegistration();
+    uint256 numberOfSignatures = proofs.rs.length;
 
-    _verifySignatures(keccak256(abi.encode(messageHash, blobHash, configDigest)), report.rs, report.ss);
-  }
+    if (numberOfSignatures != config.F + 1) revert WrongNumberOfSignatures();
+    if (numberOfSignatures != proofs.ss.length) revert SignaturesOutOfRegistration();
 
-  /// @notice Verifies the signatures of a hashed report value for one OCR plugin type.
-  /// @param hashedReport hashed encoded packing of report + reportContext.
-  /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
-  /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries.
-  /// @dev we assume all signatures use a `v` value of 27.
-  function _verifySignatures(bytes32 hashedReport, bytes32[] memory rs, bytes32[] memory ss) internal view {
-    // Verify signatures attached to report. Using a uint256 means we can only verify up to 256 oracles.
     uint160 lastSigner = 0;
 
-    uint256 numberOfSignatures = rs.length;
     for (uint256 i; i < numberOfSignatures; ++i) {
-      // Safe from ECDSA malleability here since we check for duplicate signers.
-      address signer = ecrecover(hashedReport, 27, rs[i], ss[i]);
-
-      // Check that the signer is registered as an oracle.
-      if (!s_signers.contains(signer)) revert UnauthorizedSigner();
+      // We use ECDSA malleability to only have signatures with a `v` value of 27.
+      address signer = ecrecover(reportHash, 27, proofs.rs[i], proofs.ss[i]);
+      // Check that the signer is registered.
+      if (!config.signers.contains(signer)) revert UnauthorizedSigner();
       // This requires ordered signatures to check for duplicates. This also disallows the zero address.
       if (uint160(signer) <= lastSigner) revert NonUniqueSignatures();
+      lastSigner = uint160(signer);
     }
   }
 
-  // ================================================================
-  // │                           Config                             │
-  // ================================================================
+  /// @notice Returns all active config digests.
+  function getActiveConfigDigests() external view returns (bytes32[] memory) {
+    return s_activeConfigDigests.values();
+  }
 
-  /// @notice Sets offchain reporting protocol configuration incl. participating oracles for a single OCR plugin type.
-  /// @param ocrConfigArgs OCR config update args.
-  function setSignatureConfig(
-    SignatureConfigArgs memory ocrConfigArgs
+  /// @notice Returns all active config digests and their corresponding signer sets, and F values.
+  function getAllActiveConfigs() external view returns (SignatureConfigArgs[] memory) {
+    bytes32[] memory configDigests = s_activeConfigDigests.values();
+    SignatureConfigArgs[] memory configs = new SignatureConfigArgs[](configDigests.length);
+
+    for (uint256 i = 0; i < configDigests.length; ++i) {
+      configs[i] = SignatureConfigArgs({
+        configDigest: configDigests[i],
+        F: s_signatureConfig[configDigests[i]].F,
+        signers: s_signatureConfig[configDigests[i]].signers.values()
+      });
+    }
+    return configs;
+  }
+
+  /// @notice Sets a new signature configuration for a given configDigest.
+  /// @param signatureConfigs The configuration to set, containing the configDigest, F value, and signers.
+  /// @dev Reverts if the configDigest already exists, this function cannot override an existing configuration.
+  function setSignatureConfigs(
+    SignatureConfigArgs[] calldata signatureConfigs
   ) external onlyOwner {
-    if (ocrConfigArgs.F == 0) revert InvalidConfig();
+    for (uint256 i = 0; i < signatureConfigs.length; ++i) {
+      SignatureConfigArgs memory signatureConfig = signatureConfigs[i];
 
-    address[] memory newSigners = ocrConfigArgs.signers;
+      if (
+        signatureConfig.F == 0 || signatureConfig.F > signatureConfig.signers.length
+          || signatureConfig.configDigest == ""
+      ) revert InvalidConfig();
 
-    _clearAllSigners();
+      // If the configDigest already exists, we cannot modify it as there might be signed transactions that rely on this
+      // exact signer set.
+      if (s_activeConfigDigests.contains(signatureConfig.configDigest)) {
+        revert ConfigDigestAlreadyExists(signatureConfig.configDigest);
+      }
 
-    // Add new signers to the set of oracles.
-    for (uint256 i = 0; i < newSigners.length; ++i) {
-      if (newSigners[i] == address(0)) revert OracleCannotBeZeroAddress();
+      SignatureConfigConfig storage configForDigest = s_signatureConfig[signatureConfig.configDigest];
 
-      s_signers.add(newSigners[i]);
+      // Add new signers.
+      for (uint256 signerIndex = 0; signerIndex < signatureConfig.signers.length; ++signerIndex) {
+        if (signatureConfig.signers[signerIndex] == address(0)) revert OracleCannotBeZeroAddress();
+
+        if (!configForDigest.signers.add(signatureConfig.signers[signerIndex])) {
+          revert InvalidConfig();
+        }
+      }
+
+      configForDigest.F = signatureConfig.F;
+
+      emit ConfigSet(signatureConfig.configDigest, signatureConfig.signers, signatureConfig.F);
     }
-
-    s_ocrConfig =
-      SignatureConfigConfig({configDigest: ocrConfigArgs.configDigest, F: ocrConfigArgs.F, n: uint8(newSigners.length)});
-
-    emit ConfigSet(ocrConfigArgs.configDigest, newSigners, ocrConfigArgs.F);
   }
 
-  /// @notice Clears all the signers.
-  function _clearAllSigners() internal {
-    address[] memory signers = s_signers.values();
+  /// @notice Revokes a signature configuration for a given configDigest.
+  /// @param configDigests The config digests to revoke.
+  /// @dev Reverts revoking a config digest means that any messages signed with that config digest will no longer
+  /// be valid. If there are any such messages, they will have to be resigned with a new config digest to be valid again.
+  function revokeConfigDigests(
+    bytes32[] calldata configDigests
+  ) external onlyOwner {
+    for (uint256 i = 0; i < configDigests.length; ++i) {
+      bytes32 configDigest = configDigests[i];
 
-    for (uint256 i = 0; i < signers.length; ++i) {
-      s_signers.remove(signers[i]);
+      // This check also removes the digest from the set of active config digests.
+      if (!s_activeConfigDigests.remove(configDigest)) {
+        revert InvalidConfigDigest(configDigest);
+      }
+
+      delete s_signatureConfig[configDigest];
+
+      emit ConfigRevoked(configDigest);
     }
-  }
-
-  /// @notice Information about current offchain reporting protocol configuration.
-  function latestConfigDetails() external view returns (SignatureConfigConfig memory ocrConfig) {
-    return s_ocrConfig;
   }
 }

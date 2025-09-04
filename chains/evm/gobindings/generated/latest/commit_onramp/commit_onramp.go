@@ -5,7 +5,6 @@ package commit_onramp
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1351,28 +1349,6 @@ type GetDestChainConfig struct {
 	AllowedSendersList []common.Address
 }
 
-func (_CommitOnRamp *CommitOnRamp) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _CommitOnRamp.abi.Events["AllowListSendersAdded"].ID:
-		return _CommitOnRamp.ParseAllowListSendersAdded(log)
-	case _CommitOnRamp.abi.Events["AllowListSendersRemoved"].ID:
-		return _CommitOnRamp.ParseAllowListSendersRemoved(log)
-	case _CommitOnRamp.abi.Events["ConfigSet"].ID:
-		return _CommitOnRamp.ParseConfigSet(log)
-	case _CommitOnRamp.abi.Events["DestChainConfigSet"].ID:
-		return _CommitOnRamp.ParseDestChainConfigSet(log)
-	case _CommitOnRamp.abi.Events["FeeTokenWithdrawn"].ID:
-		return _CommitOnRamp.ParseFeeTokenWithdrawn(log)
-	case _CommitOnRamp.abi.Events["OwnershipTransferRequested"].ID:
-		return _CommitOnRamp.ParseOwnershipTransferRequested(log)
-	case _CommitOnRamp.abi.Events["OwnershipTransferred"].ID:
-		return _CommitOnRamp.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (CommitOnRampAllowListSendersAdded) Topic() common.Hash {
 	return common.HexToHash("0x330939f6eafe8bb516716892fe962ff19770570838686e6579dbc1cc51fc3281")
 }
@@ -1475,8 +1451,6 @@ type CommitOnRampInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *CommitOnRampOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*CommitOnRampOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

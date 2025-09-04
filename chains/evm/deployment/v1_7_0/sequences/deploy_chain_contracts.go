@@ -20,14 +20,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 const (
-	NUM_CONTRACTS = 12
+	NUM_CONTRACTS = 13
 	NUM_TXS       = 3
 )
 
@@ -59,22 +61,28 @@ type FeeQuoterParams struct {
 	WETHPremiumMultiplierWeiPerEth uint64
 }
 
+type ExecutorOnRampParams struct {
+	MaxCCVsPerMsg uint8
+}
+
 type ContractParams struct {
-	RMNRemote     RMNRemoteParams
-	CCVAggregator CCVAggregatorParams
-	CommitOnRamp  CommitOnRampParams
-	CommitOffRamp CommitOffRampParams
-	CCVProxy      CCVProxyParams
-	FeeQuoter     FeeQuoterParams
+	RMNRemote      RMNRemoteParams
+	CCVAggregator  CCVAggregatorParams
+	CommitOnRamp   CommitOnRampParams
+	CommitOffRamp  CommitOffRampParams
+	CCVProxy       CCVProxyParams
+	FeeQuoter      FeeQuoterParams
+	ExecutorOnRamp ExecutorOnRampParams
 }
 
 type DeployChainContractsInput struct {
-	ExistingAddresses []deployment.AddressRef
+	ChainSelector     uint64 // Only exists to differentiate sequence runs on different chains
+	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
 }
 
 type DeployChainContractsOutput struct {
-	Addresses []deployment.AddressRef
+	Addresses []datastore.AddressRef
 	Writes    []call.WriteOutput
 }
 
@@ -83,7 +91,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	semver.MustParse("1.7.0"),
 	"Deploys all required contracts for CCIP 1.7.0 to a chain",
 	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output DeployChainContractsOutput, err error) {
-		addresses := make([]deployment.AddressRef, 0, NUM_CONTRACTS)
+		addresses := make([]datastore.AddressRef, 0, NUM_CONTRACTS)
 		writes := make([]call.WriteOutput, 0, NUM_TXS)
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
@@ -271,6 +279,18 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, commitOnRampRef)
 
+		// Deploy ExecutorOnRamp
+		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, executor_onramp.ContractType, chain, deployment.Input[executor_onramp.ConstructorArgs]{
+			ChainSelector: chain.Selector,
+			Args: executor_onramp.ConstructorArgs{
+				MaxCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxCCVsPerMsg,
+			},
+		}, input.ExistingAddresses)
+		if err != nil {
+			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy ExecutorOnRamp: %w", err)
+		}
+		addresses = append(addresses, executorOnRampRef)
+
 		// Deploy CommitOffRamp
 		commitOffRampRef, err := maybeDeployContract(b, commit_offramp.Deploy, commit_offramp.ContractType, chain, deployment.Input[commit_offramp.ConstructorArgs]{
 			ChainSelector: chain.Selector,
@@ -284,7 +304,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, commitOffRampRef)
 
 		// Set signature config on the CommitOffRamp
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfig, chain, call.Input[commit_offramp.SignatureConfigArgs]{
+		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfigs, chain, call.Input[commit_offramp.SignatureConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(commitOffRampRef.Address),
 			Args:          input.ContractParams.CommitOffRamp.SignatureConfigArgs,
@@ -319,20 +339,20 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 func maybeDeployContract[ARGS any](
 	b operations.Bundle,
-	op *operations.Operation[deployment.Input[ARGS], deployment.AddressRef, evm.Chain],
+	op *operations.Operation[deployment.Input[ARGS], datastore.AddressRef, evm.Chain],
 	contractType cldf_deployment.ContractType,
 	chain evm.Chain,
 	input deployment.Input[ARGS],
-	existingAddresses []deployment.AddressRef,
-) (deployment.AddressRef, error) {
+	existingAddresses []datastore.AddressRef,
+) (datastore.AddressRef, error) {
 	for _, ref := range existingAddresses {
-		if ref.Type == contractType {
+		if ref.Type == datastore.ContractType(contractType) {
 			return ref, nil
 		}
 	}
 	report, err := cldf_ops.ExecuteOperation(b, op, chain, input)
 	if err != nil {
-		return deployment.AddressRef{}, fmt.Errorf("failed to deploy %s %s: %w", contractType, op.Def().Version, err)
+		return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s %s: %w", contractType, op.Def().Version, err)
 	}
 	return report.Output, nil
 }

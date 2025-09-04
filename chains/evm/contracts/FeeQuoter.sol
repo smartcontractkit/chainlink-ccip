@@ -507,7 +507,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     bytes4 interfaceId
   ) public pure override returns (bool) {
     return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IFeeQuoter).interfaceId
-      || interfaceId == type(ITypeAndVersion).interfaceId || interfaceId == type(IERC165).interfaceId;
+      || interfaceId == type(IERC165).interfaceId;
   }
 
   /// @inheritdoc IReceiver

@@ -5,7 +5,6 @@ package ccip_home
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1745,32 +1743,6 @@ type GetConfigDigests struct {
 	CandidateConfigDigest [32]byte
 }
 
-func (_CCIPHome *CCIPHome) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _CCIPHome.abi.Events["ActiveConfigRevoked"].ID:
-		return _CCIPHome.ParseActiveConfigRevoked(log)
-	case _CCIPHome.abi.Events["CandidateConfigRevoked"].ID:
-		return _CCIPHome.ParseCandidateConfigRevoked(log)
-	case _CCIPHome.abi.Events["CapabilityConfigurationSet"].ID:
-		return _CCIPHome.ParseCapabilityConfigurationSet(log)
-	case _CCIPHome.abi.Events["ChainConfigRemoved"].ID:
-		return _CCIPHome.ParseChainConfigRemoved(log)
-	case _CCIPHome.abi.Events["ChainConfigSet"].ID:
-		return _CCIPHome.ParseChainConfigSet(log)
-	case _CCIPHome.abi.Events["ConfigPromoted"].ID:
-		return _CCIPHome.ParseConfigPromoted(log)
-	case _CCIPHome.abi.Events["ConfigSet"].ID:
-		return _CCIPHome.ParseConfigSet(log)
-	case _CCIPHome.abi.Events["OwnershipTransferRequested"].ID:
-		return _CCIPHome.ParseOwnershipTransferRequested(log)
-	case _CCIPHome.abi.Events["OwnershipTransferred"].ID:
-		return _CCIPHome.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (CCIPHomeActiveConfigRevoked) Topic() common.Hash {
 	return common.HexToHash("0x0b31c0055e2d464bef7781994b98c4ff9ef4ae0d05f59feb6a68c42de5e201b8")
 }
@@ -1911,8 +1883,6 @@ type CCIPHomeInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *CCIPHomeOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*CCIPHomeOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

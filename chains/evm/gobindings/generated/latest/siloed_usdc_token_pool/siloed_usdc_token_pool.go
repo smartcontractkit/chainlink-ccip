@@ -5,7 +5,6 @@ package siloed_usdc_token_pool
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -4665,72 +4663,6 @@ func (_SiloedUSDCTokenPool *SiloedUSDCTokenPoolFilterer) ParseUnsiloedRebalancer
 	return event, nil
 }
 
-func (_SiloedUSDCTokenPool *SiloedUSDCTokenPool) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _SiloedUSDCTokenPool.abi.Events["AllowListAdd"].ID:
-		return _SiloedUSDCTokenPool.ParseAllowListAdd(log)
-	case _SiloedUSDCTokenPool.abi.Events["AllowListRemove"].ID:
-		return _SiloedUSDCTokenPool.ParseAllowListRemove(log)
-	case _SiloedUSDCTokenPool.abi.Events["AuthorizedCallerAdded"].ID:
-		return _SiloedUSDCTokenPool.ParseAuthorizedCallerAdded(log)
-	case _SiloedUSDCTokenPool.abi.Events["AuthorizedCallerRemoved"].ID:
-		return _SiloedUSDCTokenPool.ParseAuthorizedCallerRemoved(log)
-	case _SiloedUSDCTokenPool.abi.Events["CCTPMigrationCancelled"].ID:
-		return _SiloedUSDCTokenPool.ParseCCTPMigrationCancelled(log)
-	case _SiloedUSDCTokenPool.abi.Events["CCTPMigrationExecuted"].ID:
-		return _SiloedUSDCTokenPool.ParseCCTPMigrationExecuted(log)
-	case _SiloedUSDCTokenPool.abi.Events["CCTPMigrationProposed"].ID:
-		return _SiloedUSDCTokenPool.ParseCCTPMigrationProposed(log)
-	case _SiloedUSDCTokenPool.abi.Events["ChainAdded"].ID:
-		return _SiloedUSDCTokenPool.ParseChainAdded(log)
-	case _SiloedUSDCTokenPool.abi.Events["ChainConfigured"].ID:
-		return _SiloedUSDCTokenPool.ParseChainConfigured(log)
-	case _SiloedUSDCTokenPool.abi.Events["ChainRemoved"].ID:
-		return _SiloedUSDCTokenPool.ParseChainRemoved(log)
-	case _SiloedUSDCTokenPool.abi.Events["ChainSiloed"].ID:
-		return _SiloedUSDCTokenPool.ParseChainSiloed(log)
-	case _SiloedUSDCTokenPool.abi.Events["ChainUnsiloed"].ID:
-		return _SiloedUSDCTokenPool.ParseChainUnsiloed(log)
-	case _SiloedUSDCTokenPool.abi.Events["CircleMigratorAddressSet"].ID:
-		return _SiloedUSDCTokenPool.ParseCircleMigratorAddressSet(log)
-	case _SiloedUSDCTokenPool.abi.Events["ConfigChanged"].ID:
-		return _SiloedUSDCTokenPool.ParseConfigChanged(log)
-	case _SiloedUSDCTokenPool.abi.Events["InboundRateLimitConsumed"].ID:
-		return _SiloedUSDCTokenPool.ParseInboundRateLimitConsumed(log)
-	case _SiloedUSDCTokenPool.abi.Events["LiquidityAdded"].ID:
-		return _SiloedUSDCTokenPool.ParseLiquidityAdded(log)
-	case _SiloedUSDCTokenPool.abi.Events["LiquidityRemoved"].ID:
-		return _SiloedUSDCTokenPool.ParseLiquidityRemoved(log)
-	case _SiloedUSDCTokenPool.abi.Events["LockedOrBurned"].ID:
-		return _SiloedUSDCTokenPool.ParseLockedOrBurned(log)
-	case _SiloedUSDCTokenPool.abi.Events["OutboundRateLimitConsumed"].ID:
-		return _SiloedUSDCTokenPool.ParseOutboundRateLimitConsumed(log)
-	case _SiloedUSDCTokenPool.abi.Events["OwnershipTransferRequested"].ID:
-		return _SiloedUSDCTokenPool.ParseOwnershipTransferRequested(log)
-	case _SiloedUSDCTokenPool.abi.Events["OwnershipTransferred"].ID:
-		return _SiloedUSDCTokenPool.ParseOwnershipTransferred(log)
-	case _SiloedUSDCTokenPool.abi.Events["RateLimitAdminSet"].ID:
-		return _SiloedUSDCTokenPool.ParseRateLimitAdminSet(log)
-	case _SiloedUSDCTokenPool.abi.Events["ReleasedOrMinted"].ID:
-		return _SiloedUSDCTokenPool.ParseReleasedOrMinted(log)
-	case _SiloedUSDCTokenPool.abi.Events["RemotePoolAdded"].ID:
-		return _SiloedUSDCTokenPool.ParseRemotePoolAdded(log)
-	case _SiloedUSDCTokenPool.abi.Events["RemotePoolRemoved"].ID:
-		return _SiloedUSDCTokenPool.ParseRemotePoolRemoved(log)
-	case _SiloedUSDCTokenPool.abi.Events["RouterUpdated"].ID:
-		return _SiloedUSDCTokenPool.ParseRouterUpdated(log)
-	case _SiloedUSDCTokenPool.abi.Events["SiloRebalancerSet"].ID:
-		return _SiloedUSDCTokenPool.ParseSiloRebalancerSet(log)
-	case _SiloedUSDCTokenPool.abi.Events["TokensExcludedFromBurn"].ID:
-		return _SiloedUSDCTokenPool.ParseTokensExcludedFromBurn(log)
-	case _SiloedUSDCTokenPool.abi.Events["UnsiloedRebalancerSet"].ID:
-		return _SiloedUSDCTokenPool.ParseUnsiloedRebalancerSet(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (SiloedUSDCTokenPoolAllowListAdd) Topic() common.Hash {
 	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
 }
@@ -5127,8 +5059,6 @@ type SiloedUSDCTokenPoolInterface interface {
 	WatchUnsiloedRebalancerSet(opts *bind.WatchOpts, sink chan<- *SiloedUSDCTokenPoolUnsiloedRebalancerSet) (event.Subscription, error)
 
 	ParseUnsiloedRebalancerSet(log types.Log) (*SiloedUSDCTokenPoolUnsiloedRebalancerSet, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

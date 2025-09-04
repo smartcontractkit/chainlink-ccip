@@ -1,0 +1,11 @@
+build:
+    docker build -f Dockerfile -t executor:latest .
+
+build-dev:
+    docker build -f Dockerfile.dev -t executor:dev .
+
+clean:
+    docker rmi executor:latest
+
+clean-dev:
+    docker rmi executor:dev
