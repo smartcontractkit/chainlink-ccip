@@ -1065,20 +1065,3 @@ func (l *DefaultAccessor) MessagesByTokenID(
 	//TODO implement me
 	panic("implement me")
 }
-
-func (l *DefaultAccessor) GetFeedPricesUSD(
-	ctx context.Context,
-	tokens []cciptypes.UnknownEncodedAddress,
-) (cciptypes.TokenPriceMap, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
-	ctx context.Context,
-	tokens []cciptypes.UnknownEncodedAddress,
-	chain cciptypes.ChainSelector,
-) (map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig, error) {
-	//TODO implement me
-	panic("implement me")
-}

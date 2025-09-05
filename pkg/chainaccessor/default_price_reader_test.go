@@ -1,4 +1,4 @@
-package reader
+package chainaccessor
 
 import (
 	"context"
@@ -6,21 +6,16 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 const (
@@ -39,28 +34,28 @@ var (
 	ArbPrice   = big.NewInt(1).Mul(big.NewInt(5), big.NewInt(1e18))
 	Decimals18 = uint8(18)
 
-	ArbInfo = pluginconfig.TokenInfo{
+	ArbInfo = cciptypes.TokenInfo{
 		AggregatorAddress: ArbAggregatorAddr,
 		DeviationPPB:      cciptypes.NewBigInt(big.NewInt(1e5)),
 		Decimals:          Decimals18,
 	}
-	EthInfo = pluginconfig.TokenInfo{
+	EthInfo = cciptypes.TokenInfo{
 		AggregatorAddress: EthAggregatorAddr,
 		DeviationPPB:      cciptypes.NewBigInt(big.NewInt(1e5)),
 		Decimals:          Decimals18,
 	}
-	BtcInfo = pluginconfig.TokenInfo{
+	BtcInfo = cciptypes.TokenInfo{
 		AggregatorAddress: BtcAgregatorAddr,
 		DeviationPPB:      cciptypes.NewBigInt(big.NewInt(1e5)),
 		Decimals:          Decimals18,
 	}
 )
 
-func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
+func TestDefaultAccessor_GetFeedPricesUSD(t *testing.T) {
 	testCases := []struct {
 		name          string
 		inputTokens   []cciptypes.UnknownEncodedAddress
-		tokenInfo     map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
+		tokenInfo     map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo
 		mockPrices    map[cciptypes.UnknownEncodedAddress]*big.Int
 		want          cciptypes.TokenPriceMap
 		errorAccounts []cciptypes.UnknownEncodedAddress
@@ -68,7 +63,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 	}{
 		{
 			name: "On-chain one price",
-			tokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+			tokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 				ArbAddr: ArbInfo,
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr},
@@ -77,7 +72,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		},
 		{
 			name: "On-chain multiple prices",
-			tokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+			tokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 				ArbAddr: ArbInfo,
 				EthAddr: EthInfo,
 			},
@@ -87,7 +82,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		},
 		{
 			name: "Missing price doesn't fail, return available prices",
-			tokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+			tokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 				ArbAddr: ArbInfo,
 				EthAddr: EthInfo,
 			},
@@ -98,7 +93,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		},
 		{
 			name: "Empty input tokens list",
-			tokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+			tokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 				ArbAddr: ArbInfo,
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{},
@@ -107,7 +102,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		},
 		{
 			name: "Repeated token in input",
-			tokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+			tokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 				ArbAddr: ArbInfo,
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr, ArbAddr},
@@ -116,7 +111,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		},
 		{
 			name: "Zero price should be discarded",
-			tokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+			tokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 				ArbAddr: ArbInfo,
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr},
@@ -125,7 +120,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		},
 		{
 			name: "Multiple error accounts",
-			tokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+			tokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 				ArbAddr: ArbInfo,
 				EthAddr: EthInfo,
 				BtcAddr: BtcInfo,
@@ -138,19 +133,15 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
-		feedChain := cciptypes.ChainSelector(1)
-		tokenPricesReader := priceReader{
-			lggr: logger.Test(t),
-			chainReaders: map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-				feedChain: contractReader,
-			},
-			tokenInfo: tc.tokenInfo,
-			feedChain: feedChain,
-		}
 		t.Run(tc.name, func(t *testing.T) {
+			contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
+			accessor := &DefaultAccessor{
+				lggr:           logger.Test(t),
+				contractReader: contractReader,
+			}
+
 			ctx := context.Background()
-			result, err := tokenPricesReader.GetFeedPricesUSD(ctx, tc.inputTokens)
+			result, err := accessor.GetFeedPricesUSD(ctx, tc.inputTokens, tc.tokenInfo)
 
 			if tc.wantErr {
 				require.Error(t, err)
@@ -162,7 +153,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 	}
 }
 
-func TestPriceService_calculateUsdPer1e18TokenAmount(t *testing.T) {
+func Test_calculateUsdPer1e18TokenAmount(t *testing.T) {
 	testCases := []struct {
 		name       string
 		price      *big.Int
@@ -206,9 +197,9 @@ func createMockReader(
 	t *testing.T,
 	mockPrices map[cciptypes.UnknownEncodedAddress]*big.Int,
 	errorAccounts []cciptypes.UnknownEncodedAddress,
-	tokenInfo map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo,
-) *readermock.MockContractReaderFacade {
-	reader := readermock.NewMockContractReaderFacade(t)
+	tokenInfo map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo,
+) *readermock.MockExtended {
+	reader := readermock.NewMockExtended(t)
 
 	// Create the expected batch request and results
 	expectedRequest := make(commontypes.BatchGetLatestValuesRequest)
