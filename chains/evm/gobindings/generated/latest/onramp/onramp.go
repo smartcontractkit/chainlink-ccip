@@ -5,7 +5,6 @@ package onramp
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1770,32 +1768,6 @@ type GetDestChainConfig struct {
 	Router           common.Address
 }
 
-func (_OnRamp *OnRamp) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _OnRamp.abi.Events["AllowListAdminSet"].ID:
-		return _OnRamp.ParseAllowListAdminSet(log)
-	case _OnRamp.abi.Events["AllowListSendersAdded"].ID:
-		return _OnRamp.ParseAllowListSendersAdded(log)
-	case _OnRamp.abi.Events["AllowListSendersRemoved"].ID:
-		return _OnRamp.ParseAllowListSendersRemoved(log)
-	case _OnRamp.abi.Events["CCIPMessageSent"].ID:
-		return _OnRamp.ParseCCIPMessageSent(log)
-	case _OnRamp.abi.Events["ConfigSet"].ID:
-		return _OnRamp.ParseConfigSet(log)
-	case _OnRamp.abi.Events["DestChainConfigSet"].ID:
-		return _OnRamp.ParseDestChainConfigSet(log)
-	case _OnRamp.abi.Events["FeeTokenWithdrawn"].ID:
-		return _OnRamp.ParseFeeTokenWithdrawn(log)
-	case _OnRamp.abi.Events["OwnershipTransferRequested"].ID:
-		return _OnRamp.ParseOwnershipTransferRequested(log)
-	case _OnRamp.abi.Events["OwnershipTransferred"].ID:
-		return _OnRamp.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (OnRampAllowListAdminSet) Topic() common.Hash {
 	return common.HexToHash("0xb8c9b44ae5b5e3afb195f67391d9ff50cb904f9c0fa5fd520e497a97c1aa5a1e")
 }
@@ -1930,8 +1902,6 @@ type OnRampInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *OnRampOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*OnRampOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

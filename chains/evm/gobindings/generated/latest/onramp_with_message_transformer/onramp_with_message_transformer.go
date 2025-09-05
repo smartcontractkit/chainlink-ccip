@@ -5,7 +5,6 @@ package onramp_with_message_transformer
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1804,32 +1802,6 @@ type GetDestChainConfig struct {
 	Router           common.Address
 }
 
-func (_OnRampWithMessageTransformer *OnRampWithMessageTransformer) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _OnRampWithMessageTransformer.abi.Events["AllowListAdminSet"].ID:
-		return _OnRampWithMessageTransformer.ParseAllowListAdminSet(log)
-	case _OnRampWithMessageTransformer.abi.Events["AllowListSendersAdded"].ID:
-		return _OnRampWithMessageTransformer.ParseAllowListSendersAdded(log)
-	case _OnRampWithMessageTransformer.abi.Events["AllowListSendersRemoved"].ID:
-		return _OnRampWithMessageTransformer.ParseAllowListSendersRemoved(log)
-	case _OnRampWithMessageTransformer.abi.Events["CCIPMessageSent"].ID:
-		return _OnRampWithMessageTransformer.ParseCCIPMessageSent(log)
-	case _OnRampWithMessageTransformer.abi.Events["ConfigSet"].ID:
-		return _OnRampWithMessageTransformer.ParseConfigSet(log)
-	case _OnRampWithMessageTransformer.abi.Events["DestChainConfigSet"].ID:
-		return _OnRampWithMessageTransformer.ParseDestChainConfigSet(log)
-	case _OnRampWithMessageTransformer.abi.Events["FeeTokenWithdrawn"].ID:
-		return _OnRampWithMessageTransformer.ParseFeeTokenWithdrawn(log)
-	case _OnRampWithMessageTransformer.abi.Events["OwnershipTransferRequested"].ID:
-		return _OnRampWithMessageTransformer.ParseOwnershipTransferRequested(log)
-	case _OnRampWithMessageTransformer.abi.Events["OwnershipTransferred"].ID:
-		return _OnRampWithMessageTransformer.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (OnRampWithMessageTransformerAllowListAdminSet) Topic() common.Hash {
 	return common.HexToHash("0xb8c9b44ae5b5e3afb195f67391d9ff50cb904f9c0fa5fd520e497a97c1aa5a1e")
 }
@@ -1968,8 +1940,6 @@ type OnRampWithMessageTransformerInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *OnRampWithMessageTransformerOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*OnRampWithMessageTransformerOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

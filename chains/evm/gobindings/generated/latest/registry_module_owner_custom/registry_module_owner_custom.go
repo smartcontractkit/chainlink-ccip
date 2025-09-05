@@ -5,7 +5,6 @@ package registry_module_owner_custom
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -365,16 +363,6 @@ func (_RegistryModuleOwnerCustom *RegistryModuleOwnerCustomFilterer) ParseAdmini
 	return event, nil
 }
 
-func (_RegistryModuleOwnerCustom *RegistryModuleOwnerCustom) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _RegistryModuleOwnerCustom.abi.Events["AdministratorRegistered"].ID:
-		return _RegistryModuleOwnerCustom.ParseAdministratorRegistered(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (RegistryModuleOwnerCustomAdministratorRegistered) Topic() common.Hash {
 	return common.HexToHash("0x09590fb70af4b833346363965e043a9339e8c7d378b8a2b903c75c277faec4f9")
 }
@@ -397,8 +385,6 @@ type RegistryModuleOwnerCustomInterface interface {
 	WatchAdministratorRegistered(opts *bind.WatchOpts, sink chan<- *RegistryModuleOwnerCustomAdministratorRegistered, token []common.Address, administrator []common.Address) (event.Subscription, error)
 
 	ParseAdministratorRegistered(log types.Log) (*RegistryModuleOwnerCustomAdministratorRegistered, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

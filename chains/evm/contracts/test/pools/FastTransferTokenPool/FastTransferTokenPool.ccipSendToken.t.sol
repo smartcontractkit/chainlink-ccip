@@ -111,8 +111,9 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     uint256 expectedFastTransferFee = params.amount * params.fastFeeBpsExpected / 10_000;
     uint256 expectedFillerFee = expectedFastTransferFee; // All fee goes to filler in basic tests
     uint256 expectedPoolFee = 0; // No pool fee in basic tests
-    bytes32 fillId =
-      s_pool.computeFillId(params.mockMessageId, params.amount - expectedFastTransferFee, 18, params.receiver);
+    bytes32 fillId = s_pool.computeFillId(
+      params.mockMessageId, SOURCE_CHAIN_SELECTOR, params.amount - expectedFastTransferFee, 18, params.receiver
+    );
 
     vm.expectCall(
       address(s_sourceRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector, params.chainSelector, message)
@@ -196,7 +197,9 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     vm.expectEmit();
     emit IFastTransferPool.FastTransferRequested({
       destinationChainSelector: DEST_CHAIN_SELECTOR,
-      fillId: s_pool.computeFillId(fakeMessageId, SOURCE_AMOUNT - expectedFastTransferFee, 18, abi.encode(RECEIVER)), //expected fill id
+      fillId: s_pool.computeFillId(
+        fakeMessageId, SOURCE_CHAIN_SELECTOR, SOURCE_AMOUNT - expectedFastTransferFee, 18, abi.encode(RECEIVER)
+      ), //expected fill id
       settlementId: fakeMessageId,
       sourceAmountNetFee: SOURCE_AMOUNT - expectedFastTransferFee, // expected amount net fee
       sourceDecimals: SOURCE_DECIMALS,
@@ -233,7 +236,8 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     uint256 totalFastTransferFee = fillerFeeAmount + poolFeeAmount;
     uint256 amountNetTotalFee = SOURCE_AMOUNT - totalFastTransferFee;
 
-    bytes32 fillId = s_pool.computeFillId(params.mockMessageId, amountNetTotalFee, 18, params.receiver);
+    bytes32 fillId =
+      s_pool.computeFillId(params.mockMessageId, SOURCE_CHAIN_SELECTOR, amountNetTotalFee, 18, params.receiver);
 
     vm.expectEmit();
     emit IFastTransferPool.FastTransferRequested({
@@ -563,7 +567,11 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
   }
 
   // This test achieves higher input space coverage than setting 1 non-zero byte at random index
-  function test_ccipSendToken_ValidReceiver(uint8 receiverLength, bytes32 receiverHead, bytes32 receiverTail) public {
+  function testFuzz_ccipSendToken_ValidReceiver(
+    uint8 receiverLength,
+    bytes32 receiverHead,
+    bytes32 receiverTail
+  ) public {
     receiverLength = uint8(bound(receiverLength, 1, 64));
     // Combine the 2 halves into bytes of length 64
     bytes memory validReceiver = abi.encodePacked(receiverHead, receiverTail);
