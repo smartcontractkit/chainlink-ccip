@@ -1217,7 +1217,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     if (
       destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
-        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
       Client.GenericExtraArgsV2 memory parsedExtraArgs =
