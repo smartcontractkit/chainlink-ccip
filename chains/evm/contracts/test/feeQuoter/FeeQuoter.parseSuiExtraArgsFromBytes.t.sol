@@ -13,7 +13,7 @@ contract FeeQuoter_parseSuiExtraArgsFromBytes is FeeQuoterSetup {
   function setUp() public virtual override {
     super.setUp();
     s_destChainConfig = _generateFeeQuoterDestChainConfigArgs()[0].destChainConfig;
-    s_destChainConfig.enforceOutOfOrder = true; // Enforcing out of order execution for messages to SVM
+    s_destChainConfig.enforceOutOfOrder = true; // Enforcing out of order execution for messages to SUI
     s_destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigs = new FeeQuoter.DestChainConfigArgs[](1);
@@ -27,25 +27,17 @@ contract FeeQuoter_parseSuiExtraArgsFromBytes is FeeQuoterSetup {
   }
 
   function test_SuiExtraArgsV1() public view {
-    Client.SuiExtraArgsV1 memory inputArgs = Client.SuiExtraArgsV1({
+    Client.SuiExtraArgsV1 memory extraArgs = Client.SuiExtraArgsV1({
       gasLimit: GAS_LIMIT,
       allowOutOfOrderExecution: true,
-      tokenReceiver: bytes32(uint256(0)),
+      tokenReceiver: bytes32(uint256(123)),
       receiverObjectIds: new bytes32[](2)
     });
 
-    bytes memory inputExtraArgs = Client._suiArgsToBytes(inputArgs);
-
-    Client.SuiExtraArgsV1 memory expectedOutputArgs = Client.SuiExtraArgsV1({
-      gasLimit: GAS_LIMIT,
-      allowOutOfOrderExecution: true,
-      tokenReceiver: bytes32(uint256(0)),
-      receiverObjectIds: new bytes32[](2)
-    });
+    bytes memory inputExtraArgs = Client._suiArgsToBytes(extraArgs);
 
     vm.assertEq(
-      abi.encode(s_feeQuoter.parseSuiExtraArgsFromBytes(inputExtraArgs, s_destChainConfig)),
-      abi.encode(expectedOutputArgs)
+      abi.encode(s_feeQuoter.parseSuiExtraArgsFromBytes(inputExtraArgs, s_destChainConfig)), abi.encode(extraArgs)
     );
   }
 
@@ -57,7 +49,7 @@ contract FeeQuoter_parseSuiExtraArgsFromBytes is FeeQuoterSetup {
   }
 
   function test_RevertWhen_InvalidExtraArgsTag() public {
-    bytes memory inputExtraArgs = abi.encodeWithSelector(bytes4(0));
+    bytes memory inputExtraArgs = new bytes(4);
 
     vm.expectRevert(FeeQuoter.InvalidExtraArgsTag.selector);
     s_feeQuoter.parseSuiExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);

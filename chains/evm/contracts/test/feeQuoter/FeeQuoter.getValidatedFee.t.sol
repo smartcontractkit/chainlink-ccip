@@ -682,7 +682,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
   }
 
-  function test_getValidatedFee_RevertWhen_InvalidTokenReciever() public {
+  function test_getValidatedFee_RevertWhen_InvalidTokenRecieverSui() public {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
 
