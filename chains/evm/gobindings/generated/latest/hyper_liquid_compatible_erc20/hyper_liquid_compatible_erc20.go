@@ -5,7 +5,6 @@ package hyper_liquid_compatible_erc20
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -2175,36 +2173,6 @@ func (_HyperLiquidCompatibleERC20 *HyperLiquidCompatibleERC20Filterer) ParseTran
 	return event, nil
 }
 
-func (_HyperLiquidCompatibleERC20 *HyperLiquidCompatibleERC20) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _HyperLiquidCompatibleERC20.abi.Events["Approval"].ID:
-		return _HyperLiquidCompatibleERC20.ParseApproval(log)
-	case _HyperLiquidCompatibleERC20.abi.Events["BurnAccessGranted"].ID:
-		return _HyperLiquidCompatibleERC20.ParseBurnAccessGranted(log)
-	case _HyperLiquidCompatibleERC20.abi.Events["BurnAccessRevoked"].ID:
-		return _HyperLiquidCompatibleERC20.ParseBurnAccessRevoked(log)
-	case _HyperLiquidCompatibleERC20.abi.Events["CCIPAdminTransferred"].ID:
-		return _HyperLiquidCompatibleERC20.ParseCCIPAdminTransferred(log)
-	case _HyperLiquidCompatibleERC20.abi.Events["HyperEVMLinkerSet"].ID:
-		return _HyperLiquidCompatibleERC20.ParseHyperEVMLinkerSet(log)
-	case _HyperLiquidCompatibleERC20.abi.Events["MintAccessGranted"].ID:
-		return _HyperLiquidCompatibleERC20.ParseMintAccessGranted(log)
-	case _HyperLiquidCompatibleERC20.abi.Events["MintAccessRevoked"].ID:
-		return _HyperLiquidCompatibleERC20.ParseMintAccessRevoked(log)
-	case _HyperLiquidCompatibleERC20.abi.Events["OwnershipTransferRequested"].ID:
-		return _HyperLiquidCompatibleERC20.ParseOwnershipTransferRequested(log)
-	case _HyperLiquidCompatibleERC20.abi.Events["OwnershipTransferred"].ID:
-		return _HyperLiquidCompatibleERC20.ParseOwnershipTransferred(log)
-	case _HyperLiquidCompatibleERC20.abi.Events["RemoteTokenSet"].ID:
-		return _HyperLiquidCompatibleERC20.ParseRemoteTokenSet(log)
-	case _HyperLiquidCompatibleERC20.abi.Events["Transfer"].ID:
-		return _HyperLiquidCompatibleERC20.ParseTransfer(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (HyperLiquidCompatibleERC20Approval) Topic() common.Hash {
 	return common.HexToHash("0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")
 }
@@ -2391,8 +2359,6 @@ type HyperLiquidCompatibleERC20Interface interface {
 	WatchTransfer(opts *bind.WatchOpts, sink chan<- *HyperLiquidCompatibleERC20Transfer, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseTransfer(log types.Log) (*HyperLiquidCompatibleERC20Transfer, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }
