@@ -757,4 +757,50 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidExtraArgsData.selector));
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
   }
+
+  function test_getValidatedFee_RevertWhen_InvalidExtraArgsTagsSui() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateSingleTokenMessage(CUSTOM_TOKEN, 1);
+    msg_.data = new bytes(100);
+    msg_.receiver = abi.encode(address(0));
+    msg_.extraArgs = Client._svmArgsToBytes(
+      Client.SVMExtraArgsV1({
+        computeUnits: 0,
+        accountIsWritableBitmap: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(1)),
+        accounts: new bytes32[](0)
+      })
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidExtraArgsTag.selector));
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  }
+
+  function test_getValidatedFee_RevertWhen_EnforceOOOSui() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = true;
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // zero reciever
+    msg_.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 100000,
+        allowOutOfOrderExecution: false,
+        tokenReceiver: bytes32(uint256(0xdeadbeef)), // receiver is also token recipient
+        receiverObjectIds: new bytes32[](2)
+      })
+    );
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector));
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  }
 }
