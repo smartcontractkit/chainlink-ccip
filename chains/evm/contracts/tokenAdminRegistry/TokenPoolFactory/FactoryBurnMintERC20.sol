@@ -62,6 +62,8 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
 
     s_ccipAdmin = newOwner;
 
+    if (preMint > maxSupply_) revert MaxSupplyExceeded(preMint);
+
     // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero
     if (preMint != 0) _mint(newOwner, preMint);
   }

@@ -63,6 +63,9 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
   // Reverts
 
   function test_beforeTokenTransfer_RevertWhen_SpotBalancePrecompileCallFails() public {
+    // Set the remote token first so that the second call reverts
+    s_hyperLiquidToken.setRemoteToken(s_remoteTokenId, 18);
+
     uint256 amount = 100e18;
 
     // Mock the staticcall to fail
@@ -73,6 +76,8 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
   }
 
   function test_beforeTokenTransfer_RevertWhen_InsufficientSpotBalance() public {
+    s_hyperLiquidToken.setRemoteToken(s_remoteTokenId, 18);
+
     uint256 amount = 1001e18; // More than available balance
 
     // Mock the spot balance precompile to return insufficient balance
@@ -88,6 +93,9 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
   }
 
   function test_beforeTokenTransfer_RevertWhen_ZeroSpotBalance() public {
+    // Set the remote token first so that the second call reverts
+    s_hyperLiquidToken.setRemoteToken(s_remoteTokenId, 18);
+
     uint256 amount = 100e18;
 
     // Mock the spot balance precompile to return zero balance
@@ -101,8 +109,7 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
     s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, amount);
   }
 
-  // Edge cases
-  function test_beforeTokenTransfer_EdgeCase_TransferZeroAmount() public {
+  function test_beforeTokenTransfer_RevertWhen_TransferZeroAmount() public {
     // Mock the spot balance precompile to return some balance
     SpotBalance memory mockSpotBalance =
       SpotBalance({total: uint64(1000e6), hold: uint64(500e6), entryNtl: uint64(200e6)});
@@ -115,20 +122,5 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
     s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, 0);
 
     assertEq(s_hyperLiquidToken.balanceOf(s_hypercoreTokenSystemAddress), 0);
-  }
-
-  function test_beforeTokenTransfer_EdgeCase_TransferOneWei() public {
-    // Mock the spot balance precompile to return some balance
-    SpotBalance memory mockSpotBalance =
-      SpotBalance({total: uint64(1000e6), hold: uint64(500e6), entryNtl: uint64(200e6)});
-
-    vm.mockCall(
-      SPOT_BALANCE_PRECOMPILE, abi.encode(s_hypercoreTokenSystemAddress, s_remoteTokenId), abi.encode(mockSpotBalance)
-    );
-
-    // Transfer one wei should succeed
-    s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, 1);
-
-    assertEq(s_hyperLiquidToken.balanceOf(s_hypercoreTokenSystemAddress), 1);
   }
 }

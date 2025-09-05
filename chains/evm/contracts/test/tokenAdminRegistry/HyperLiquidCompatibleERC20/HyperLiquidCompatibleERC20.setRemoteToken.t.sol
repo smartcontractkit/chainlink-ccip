@@ -16,6 +16,7 @@ contract HyperLiquidCompatibleERC20_setRemoteToken is HyperLiquidCompatibleERC20
 
     vm.expectEmit();
     emit HyperLiquidCompatibleERC20.RemoteTokenSet(remoteTokenId, systemAddressInt, testDecimals);
+
     s_hyperLiquidToken.setRemoteToken(remoteTokenId, testDecimals);
 
     // Note: Since these are internal variables, we can't directly test them
@@ -49,5 +50,13 @@ contract HyperLiquidCompatibleERC20_setRemoteToken is HyperLiquidCompatibleERC20
 
     vm.expectRevert(abi.encodeWithSelector(HyperLiquidCompatibleERC20.ZeroAddressNotAllowed.selector));
     s_hyperLiquidToken.setRemoteToken(0, testDecimals);
+  }
+
+  function test_setRemoteToken_RevertWhen_RemoteTokenAlreadySet() public {
+    // Set the remote token first so that the second call reverts
+    s_hyperLiquidToken.setRemoteToken(s_remoteTokenId, 18);
+
+    vm.expectRevert(abi.encodeWithSelector(HyperLiquidCompatibleERC20.RemoteTokenAlreadySet.selector));
+    s_hyperLiquidToken.setRemoteToken(s_remoteTokenId, 18);
   }
 }

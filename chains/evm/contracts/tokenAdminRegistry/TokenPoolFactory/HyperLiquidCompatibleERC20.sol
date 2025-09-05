@@ -8,6 +8,7 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
   error InsufficientSpotBalance();
   error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
   error ZeroAddressNotAllowed();
+  error RemoteTokenAlreadySet();
 
   event HyperEVMLinkerSet(address indexed hyperEVMLinker);
   event RemoteTokenSet(uint64 indexed remoteTokenId, address indexed remoteToken, uint8 indexed remoteTokenDecimals);
@@ -60,6 +61,10 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
   /// @param remoteTokenDecimals The decimals of the remote token.
   /// @dev While the zero address is not allowed, it is allowed for the remote token to have zero decimals.
   function setRemoteToken(uint64 hipTokenId, uint8 remoteTokenDecimals) external onlyOwner {
+    if (s_hypercoreTokenSystemAddress != address(0)) {
+      revert RemoteTokenAlreadySet();
+    }
+
     if (hipTokenId == 0) {
       revert ZeroAddressNotAllowed();
     }
@@ -92,8 +97,9 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
    * @param to The recipient address of the token transfer.
    * @param amount The amount of tokens being transferred.
    */
+
   function _beforeTokenTransfer(address, address to, uint256 amount) internal virtual override {
-    if (to == s_hypercoreTokenSystemAddress && s_hypercoreTokenSystemAddress != address(0)) {
+    if (to == s_hypercoreTokenSystemAddress) {
       (bool success, bytes memory result) =
         SPOT_BALANCE_PRECOMPILE_ADDRESS.staticcall(abi.encode(to, s_hypercoreTokenSpotId));
 

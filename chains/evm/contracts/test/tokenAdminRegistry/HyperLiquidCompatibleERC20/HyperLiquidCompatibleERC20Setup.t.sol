@@ -22,9 +22,5 @@ contract HyperLiquidCompatibleERC20Setup is BaseTest {
 
     // Set up HyperEVM linker and remote token
     s_hyperLiquidToken.setHyperEVMLinker(s_hyperEVMLinker);
-
-    // The Hypercore system stores balance in a uint64, meaning that 18 decimals may be too large to fit and we
-    // should simulate 6 decimals for the remote token.
-    s_hyperLiquidToken.setRemoteToken(s_remoteTokenId, 6);
   }
 }
