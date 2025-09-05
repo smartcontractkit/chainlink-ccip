@@ -695,4 +695,66 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, MAX_DATA_SIZE, MAX_DATA_SIZE + 1));
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
   }
+
+  function test_getValidatedFee_RevertWhen_UnsupportedNumOfTokensSui() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](MAX_TOKENS_LENGTH + 1);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // zero reciever
+    msg_.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(0xdeadbeef)), // receiver is also token recipient
+        receiverObjectIds: new bytes32[](2)
+      })
+    );
+    vm.expectRevert(
+      abi.encodeWithSelector(FeeQuoter.UnsupportedNumberOfTokens.selector, MAX_TOKENS_LENGTH + 1, MAX_TOKENS_LENGTH)
+    );
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  }
+
+  function test_getValidatedFee_RevertWhen_GasLimitTooHighSui() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // zero reciever
+    msg_.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: MAX_GAS_LIMIT + 1,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(0xdeadbeef)), // receiver is also token recipient
+        receiverObjectIds: new bytes32[](2)
+      })
+    );
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.MessageGasLimitTooHigh.selector));
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  }
+
+  function test_getValidatedFee_RevertWhen_InvalidExtraArgsData() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // zero reciever
+    msg_.extraArgs = new bytes(0);
+
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidExtraArgsData.selector));
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  }
 }
