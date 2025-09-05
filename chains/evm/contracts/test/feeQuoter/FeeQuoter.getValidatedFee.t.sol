@@ -328,6 +328,48 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     assertGt(fee, 0, "Expected non-zero fee");
   }
 
+  function test_NonZeroGas_ReceiverAtPrecompileBoundarySui() public {
+    FeeQuoter.DestChainConfigArgs[] memory a = _generateFeeQuoterDestChainConfigArgs();
+    a[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+    s_feeQuoter.applyDestChainConfigUpdates(a);
+
+    Client.EVM2AnyMessage memory m = _generateEmptyMessage2Sui();
+    m.data = bytes("msg");
+    m.receiver = abi.encodePacked(bytes32(uint256(Internal.APTOS_PRECOMPILE_SPACE))); // boundary OK
+    m.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 1,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(0),
+        receiverObjectIds: _makeObjectIdsForSui()
+      })
+    );
+
+    // should not revert
+    uint256 fee = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, m);
+    assertGt(fee, 0, "Expected non-zero fee");
+  }
+
+  function test_NonZeroGas_ZeroReceiverObjectIdsSui() public {
+    FeeQuoter.DestChainConfigArgs[] memory a = _generateFeeQuoterDestChainConfigArgs();
+    a[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+    s_feeQuoter.applyDestChainConfigUpdates(a);
+
+    Client.EVM2AnyMessage memory m = _generateEmptyMessage2Sui();
+    m.receiver = abi.encodePacked(bytes32(uint256(Internal.APTOS_PRECOMPILE_SPACE))); // valid
+    m.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 5, // triggers address threshold path
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(0),
+        receiverObjectIds: _makeObjectIdsForSui() // lower boundary
+      })
+    );
+
+    uint256 fee = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, m);
+    assertGt(fee, 0, "Expected non-zero fee");
+  }
+
   // Reverts
 
   function test_getValidatedFee_RevertWhen_DestinationChainNotEnabled() public {
@@ -825,5 +867,32 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     );
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TooManySuiExtraArgsReceiverObjectIds.selector, 2, 0));
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  }
+
+  function test_getValidatedFee_RevertWhen_ReceiverInPrecompileSpaceSui() public {
+    FeeQuoter.DestChainConfigArgs[] memory a = _generateFeeQuoterDestChainConfigArgs();
+    a[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+    s_feeQuoter.applyDestChainConfigUpdates(a);
+
+    Client.EVM2AnyMessage memory m = _generateEmptyMessage2Sui();
+    m.data = bytes("msg");
+    m.receiver = abi.encodePacked(bytes32(uint256(Internal.APTOS_PRECOMPILE_SPACE - 1))); // in precompile space
+    m.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 1,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(0),
+        receiverObjectIds: _makeObjectIdsForSui()
+      })
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        Internal.Invalid32ByteAddress.selector,
+        abi.encodePacked(bytes32(uint256(10))) // returns `bytes`
+      )
+    );
+
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, m);
   }
 }

@@ -15,8 +15,12 @@ contract FeeQuoter_validateDestFamilyAddress is FeeQuoterSetup {
     s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_SVM, abi.encode(type(uint208).max), 0);
   }
 
+  function test_validateDestFamilyAddress_Sui() public view {
+    s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_SVM, abi.encode(type(uint208).max), 0);
+  }
+
   function test_validateDestFamilyAddress_Aptos() public view {
-    s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_APTOS, abi.encode(type(uint208).max), 0);
+    s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_SUI, abi.encode(type(uint208).max), 0);
   }
 
   // Reverts
