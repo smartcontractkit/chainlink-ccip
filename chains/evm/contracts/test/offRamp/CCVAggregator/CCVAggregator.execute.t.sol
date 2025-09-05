@@ -14,9 +14,43 @@ import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWi
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
+contract GasBoundedExecuteCaller {
+  CCVAggregator internal immutable i_aggregator;
+
+  constructor(
+    address aggregator
+  ) {
+    i_aggregator = CCVAggregator(aggregator);
+  }
+
+  function callExecute(
+    bytes memory message,
+    address[] calldata ccvs,
+    bytes[] calldata ccvData,
+    uint256 gasForCall
+  ) external {
+    address ccvAggregator = address(i_aggregator);
+    bytes memory payload = abi.encodeCall(i_aggregator.execute, (message, ccvs, ccvData));
+
+    assembly {
+      let success := call(gasForCall, ccvAggregator, 0, add(payload, 0x20), mload(payload), 0, 0)
+      if iszero(success) {
+        returndatacopy(0, 0, returndatasize())
+        revert(0, returndatasize())
+      }
+    }
+  }
+}
+
 contract CCVAggregator_execute is CCVAggregatorSetup {
+  uint256 internal constant PLENTY_OF_GAS = 1_000_000;
+
+  GasBoundedExecuteCaller internal s_gasBoundedExecuteCaller;
+
   function setUp() public virtual override {
     super.setUp();
+
+    s_gasBoundedExecuteCaller = new GasBoundedExecuteCaller(address(s_agg));
 
     MessageV1Codec.MessageV1 memory message = _getMessage();
 
@@ -73,11 +107,38 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
       ""
     );
 
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
 
     // Verify final state is SUCCESS.
     assertEq(
       uint256(Internal.MessageExecutionState.SUCCESS),
+      uint256(
+        s_agg.getExecutionState(
+          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
+        )
+      )
+    );
+  }
+
+  function test_execute_runsOutOfGasAndSetsStateToFailure() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+
+    // Expect execution state change event.
+    vm.expectEmit();
+    emit CCVAggregator.ExecutionStateChanged(
+      message.sourceChainSelector,
+      message.sequenceNumber,
+      keccak256(encodedMessage),
+      Internal.MessageExecutionState.FAILURE,
+      abi.encodeWithSelector(CCVAggregator.OutOfGas.selector)
+    );
+
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, 85_000);
+
+    // Verify final state is FAILURE.
+    assertEq(
+      uint256(Internal.MessageExecutionState.FAILURE),
       uint256(
         s_agg.getExecutionState(
           message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
@@ -102,7 +163,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     _setGetCCVsReturnData(address(bytes20(message.receiver)), message.sourceChainSelector, ccvs, new address[](0), 0);
 
     vm.expectRevert(CCVAggregator.ReentrancyGuardReentrantCall.selector);
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
   function test_execute_RevertWhen_CursedByRMN() public {
@@ -116,7 +177,8 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR));
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-    s_agg.execute(encodedMsg, ccvs, ccvData);
+
+    s_gasBoundedExecuteCaller.callExecute(encodedMsg, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
   function test_execute_RevertWhen_SourceChainNotEnabled() public {
@@ -128,7 +190,8 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.SourceChainNotEnabled.selector, SOURCE_CHAIN_SELECTOR));
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-    s_agg.execute(encodedMsg, ccvs, ccvData);
+
+    s_gasBoundedExecuteCaller.callExecute(encodedMsg, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
   function test_execute_RevertWhen_InvalidMessageDestChainSelector() public {
@@ -142,7 +205,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.expectRevert(
       abi.encodeWithSelector(CCVAggregator.InvalidMessageDestChainSelector.selector, message.destChainSelector)
     );
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
   function test_execute_RevertWhen_InvalidCCVDataLength() public {
@@ -159,7 +222,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     bytes[] memory ccvData = originalCcvData;
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.InvalidCCVDataLength.selector, ccvs.length, ccvData.length));
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
   function test_execute_RevertWhen_SkippedAlreadyExecutedMessage() public {
@@ -314,15 +377,16 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
       abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
     );
 
-    // Call from gas estimation sender to trigger the specific error handling.
-    vm.startPrank(Internal.GAS_ESTIMATION_SENDER);
+    // Call from gas estimation sender to trigger the specific error handling. Since we use a contract
+    // to set a custom gas limit, we need to etch the code into that address.
+    vm.etch(Internal.GAS_ESTIMATION_SENDER, address(s_gasBoundedExecuteCaller).code);
+
     vm.expectRevert(
       abi.encodeWithSelector(
         CCVAggregator.InsufficientGasToCompleteTx.selector, CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG
       )
     );
-    s_agg.execute(encodedMessage, ccvs, ccvData);
-    vm.stopPrank();
+    GasBoundedExecuteCaller(Internal.GAS_ESTIMATION_SENDER).callExecute(encodedMessage, ccvs, ccvData, 150_000);
   }
 
   function test_execute_RevertWhen_CCVValidationFails() public {

@@ -61,6 +61,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   );
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
 
+  // 5k for updating the state + 5k for the event and misc costs.
+  uint256 internal constant MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
+
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
@@ -267,6 +270,149 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     s_reentrancyGuardEntered = false;
   }
 
+  error OutOfGas();
+
+  /// @notice Try executing a message, and catch any errors. The goal of this function is to never revert except when
+  /// called by the Internal.GAS_ESTIMATION_SENDER address. Most errors are easy to catch, but out of gas errors can
+  /// cause issues because the outer function needs enough gas to handle them gracefully without running out of gas
+  /// itself. To solve this, we call the _callWithGasBuffer function which ensures there is a gas buffer left to update
+  /// the state after the call.
+  /// @param message The message to be executed.
+  /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
+  /// @return errData Revert data in bytes if the execution state is FAILURE. The revert data can come from the pool,
+  /// the receiver, our internal execution logic or any downstream calls from these sources.
+  function _trialExecute(
+    MessageV1Codec.MessageV1 memory message,
+    bytes32 messageId
+  ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
+    (bool success, bytes memory err, uint256 minimumGasLeft) =
+      _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId)));
+
+    if (success) {
+      // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
+      return (Internal.MessageExecutionState.SUCCESS, "");
+    }
+
+    // We want to detect if we ran out of gas inside the CallWithGasBuffer to allow for better error handling.
+    // EIP-150 means only 63/64 of the gas is forwarded to the callee. If they ran out of gas, the 1/64 is available
+    // in this function again and should not be counted towards the gas that was left inside the function.
+    // 20_000 gas is an additional buffer as the contract ran out of gas before it could do some action that would have
+    // taken it over the gas allowance. The most expensive operation that is regularly done is an SSTORE which costs
+    // 20_000 gas when setting a storage slot from zero to non-zero. This quite large buffer does mean there could be
+    // false positives.
+    bool ranOutOfGasInCall = err.length == 0 && gasleft() < minimumGasLeft + 20_000;
+
+    // We have a special gas estimator caller address that is used to cause reverts on Out Of Gas situations. Normally,
+    // the call would succeed but mark the message as failed. However, for gas estimation we want to know if the
+    // message would have succeeded or not, so we revert here to signal to the gas estimator that the gas limit was
+    // insufficient.
+    if (msg.sender == Internal.GAS_ESTIMATION_SENDER) {
+      if (
+        CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(err)
+          || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(err)
+          || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(err) || ranOutOfGasInCall
+      ) {
+        revert InsufficientGasToCompleteTx(bytes4(err));
+      }
+    }
+    // We don't compare against gasBufferToUpdateState as we know there was enough gas to perform the call, so
+    // we expect it to be spent. This reduces false positives in the out of gas detection.
+    if (ranOutOfGasInCall) {
+      err = abi.encodeWithSelector(OutOfGas.selector);
+    }
+
+    // return the message execution state as FAILURE and the revert data.
+    // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES.
+    return (Internal.MessageExecutionState.FAILURE, err);
+  }
+
+  function _callWithGasBuffer(
+    bytes memory payload
+  ) internal returns (bool success, bytes memory retData, uint256 minimumGasLeft) {
+    // allocate retData memory ahead of time
+    retData = new bytes(Internal.MAX_RET_BYTES);
+    uint16 maxReturnBytes = Internal.MAX_RET_BYTES;
+
+    uint256 gasLeft = gasleft();
+    // We add 100 gas as a buffer for the operations after the gasleft() call on the line above.
+    if (gasLeft <= MAX_GAS_BUFFER_TO_UPDATE_STATE + 100) {
+      revert InsufficientGasToCompleteTx(bytes4(uint32(gasleft())));
+    }
+
+    uint256 gasLimit = gasLeft - MAX_GAS_BUFFER_TO_UPDATE_STATE;
+
+    assembly {
+      // call and return whether we succeeded. ignore return data
+      // call(gas, addr, value, argsOffset, argsLength, retOffset, retLength)
+      success := call(gasLimit, address(), 0, add(payload, 0x20), mload(payload), 0x0, 0x0)
+
+      // limit our copy to maxReturnBytes bytes
+      let toCopy := returndatasize()
+      if gt(toCopy, maxReturnBytes) { toCopy := maxReturnBytes }
+      // Store the length of the copied bytes
+      mstore(retData, toCopy)
+      // copy the bytes from retData[0:_toCopy]
+      returndatacopy(add(retData, 0x20), 0x0, toCopy)
+    }
+    return (success, retData, gasLimit / 64 + MAX_GAS_BUFFER_TO_UPDATE_STATE);
+  }
+
+  /// @notice Executes a single message.
+  /// @param message The message that will be executed.
+  /// @dev We make this external and callable by the contract itself, in order to try/catch
+  /// its execution and enforce atomicity among successful message processing and token transfer.
+  /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
+  /// smart contract wallets, without an associated message.
+  function executeSingleMessage(MessageV1Codec.MessageV1 memory message, bytes32 messageId) external {
+    if (msg.sender != address(this)) revert CanOnlySelfCall();
+    address receiver = address(bytes20(message.receiver));
+
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
+    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
+      destTokenAmounts[i] =
+        _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, receiver, message.sourceChainSelector);
+    }
+
+    // TODO gaslimit
+    uint256 gasLimit = 200000;
+
+    // There are three cases in which we skip calling the receiver:
+    // 1. If the message data is empty AND the gas limit is 0.
+    //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
+    //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
+    //          receiver without any gas, which would revert the transaction.
+    // 2. If the receiver is not a contract.
+    // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
+    //
+    // The ordering of these checks is important, as the first check is the cheapest to execute.
+    //
+    // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
+    // which checks for sufficient gas before making the external call.
+    if (
+      (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
+        || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
+    ) return;
+
+    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: message.sourceChainSelector,
+        sender: message.sender,
+        data: message.data,
+        destTokenAmounts: destTokenAmounts
+      }),
+      i_gasForCallExactCheck,
+      gasleft() - i_gasForCallExactCheck - 10000,
+      receiver
+    );
+    // If CCIP receiver execution is not successful, revert the call including token transfers.
+    if (!success) revert ReceiverError(returnData);
+  }
+
+  // ================================================================
+  // │                            CCVs                              │
+  // ================================================================
+
   /// @notice Ensures that the provided CCVs meet the quorum required by the receiver, pool and lane.
   /// @param sourceChainSelector The source chain selector of the message.
   /// @param receiver The receiver of the message.
@@ -430,85 +576,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       requiredCCV = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
     }
     return requiredCCV;
-  }
-
-  /// @notice Try executing a message.
-  /// @param message Internal.Any2EVMMultiProofMessage memory message.
-  /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
-  /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
-  function _trialExecute(
-    MessageV1Codec.MessageV1 memory message,
-    bytes32 messageId
-  ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-    try this.executeSingleMessage(message, messageId) {}
-    catch (bytes memory err) {
-      if (msg.sender == Internal.GAS_ESTIMATION_SENDER) {
-        if (
-          CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(err)
-            || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(err)
-            || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(err)
-        ) {
-          revert InsufficientGasToCompleteTx(bytes4(err));
-        }
-      }
-      // return the message execution state as FAILURE and the revert data.
-      // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES.
-      return (Internal.MessageExecutionState.FAILURE, err);
-    }
-    // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
-    return (Internal.MessageExecutionState.SUCCESS, "");
-  }
-
-  /// @notice Executes a single message.
-  /// @param message The message that will be executed.
-  /// @dev We make this external and callable by the contract itself, in order to try/catch
-  /// its execution and enforce atomicity among successful message processing and token transfer.
-  /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
-  /// smart contract wallets, without an associated message.
-  function executeSingleMessage(MessageV1Codec.MessageV1 memory message, bytes32 messageId) external {
-    if (msg.sender != address(this)) revert CanOnlySelfCall();
-    address receiver = address(bytes20(message.receiver));
-
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
-    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
-      destTokenAmounts[i] =
-        _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, receiver, message.sourceChainSelector);
-    }
-
-    Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-      messageId: messageId,
-      sourceChainSelector: message.sourceChainSelector,
-      sender: message.sender,
-      data: message.data,
-      destTokenAmounts: destTokenAmounts
-    });
-
-    // TODO gaslimit
-
-    uint256 gasLimit = 200000;
-
-    // There are three cases in which we skip calling the receiver:
-    // 1. If the message data is empty AND the gas limit is 0.
-    //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
-    //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
-    //          receiver without any gas, which would revert the transaction.
-    // 2. If the receiver is not a contract.
-    // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
-    //
-    // The ordering of these checks is important, as the first check is the cheapest to execute.
-    //
-    // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
-    // which checks for sufficient gas before making the external call.
-    if (
-      (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
-        || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
-    ) return;
-
-    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
-      any2EvmMessage, i_gasForCallExactCheck, gasLimit, receiver
-    );
-    // If CCIP receiver execution is not successful, revert the call including token transfers.
-    if (!success) revert ReceiverError(returnData);
   }
 
   // ================================================================
