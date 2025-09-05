@@ -8,12 +8,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
@@ -21,16 +21,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-)
-
-const (
-	NUM_CONTRACTS = 13
-	NUM_TXS       = 3
 )
 
 type RMNRemoteParams struct {
@@ -59,6 +55,8 @@ type FeeQuoterParams struct {
 	TokenPriceStalenessThreshold   uint32
 	LINKPremiumMultiplierWeiPerEth uint64
 	WETHPremiumMultiplierWeiPerEth uint64
+	USDPerLINK                     *big.Int
+	USDPerWETH                     *big.Int
 }
 
 type ExecutorOnRampParams struct {
@@ -81,18 +79,13 @@ type DeployChainContractsInput struct {
 	ContractParams    ContractParams
 }
 
-type DeployChainContractsOutput struct {
-	Addresses []datastore.AddressRef
-	Writes    []call.WriteOutput
-}
-
 var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
 	semver.MustParse("1.7.0"),
-	"Deploys all required contracts for CCIP 1.7.0 to a chain",
-	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output DeployChainContractsOutput, err error) {
-		addresses := make([]datastore.AddressRef, 0, NUM_CONTRACTS)
-		writes := make([]call.WriteOutput, 0, NUM_TXS)
+	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
+	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
+		addresses := make([]datastore.AddressRef, 0, 13) // 13 = number of maybeDeployContract calls
+		writes := make([]call.WriteOutput, 0, 4)         // 4 = number of ExecuteOperation calls
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
 
@@ -101,7 +94,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, wethRef)
 
@@ -110,7 +103,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, linkRef)
 
@@ -123,7 +116,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, rmnRemoteRef)
 
@@ -135,7 +128,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, rmnProxyRef)
 
@@ -151,7 +144,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		})
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		writes = append(writes, setRMNReport.Output)
 
@@ -164,7 +157,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, routerRef)
 
@@ -173,16 +166,15 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, tokenAdminRegistryRef)
 
 		// Deploy FeeQuoter
-		// TODO: FeeQuoterV2 is too large, so we deploy the 1.6.0 version
-		feeQuoterRef, err := maybeDeployContract(b, fee_quoter.Deploy, fee_quoter.ContractType, chain, deployment.Input[fee_quoter.ConstructorArgs]{
+		feeQuoterRef, err := maybeDeployContract(b, fee_quoter_v2.Deploy, fee_quoter_v2.ContractType, chain, deployment.Input[fee_quoter_v2.ConstructorArgs]{
 			ChainSelector: chain.Selector,
-			Args: fee_quoter.ConstructorArgs{
-				StaticConfig: fee_quoter.StaticConfig{
+			Args: fee_quoter_v2.ConstructorArgs{
+				StaticConfig: fee_quoter_v2.StaticConfig{
 					MaxFeeJuelsPerMsg:            input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
 					TokenPriceStalenessThreshold: input.ContractParams.FeeQuoter.TokenPriceStalenessThreshold,
 					LinkToken:                    common.HexToAddress(linkRef.Address),
@@ -192,7 +184,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					// TODO: Add Timelock here when MCMS support is needed.
 					chain.DeployerKey.From,
 				},
-				PremiumMultiplierWeiPerEthArgs: []fee_quoter.PremiumMultiplierWeiPerEthArgs{
+				PremiumMultiplierWeiPerEthArgs: []fee_quoter_v2.PremiumMultiplierWeiPerEthArgs{
 					{
 						Token:                      common.HexToAddress(linkRef.Address),
 						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoter.LINKPremiumMultiplierWeiPerEth,
@@ -213,9 +205,31 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, err
+			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, feeQuoterRef)
+
+		// Set initial prices on FeeQuoter
+		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter_v2.UpdatePrices, chain, call.Input[fee_quoter_v2.PriceUpdates]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(feeQuoterRef.Address),
+			Args: fee_quoter_v2.PriceUpdates{
+				TokenPriceUpdates: []fee_quoter_v2.TokenPriceUpdate{
+					{
+						SourceToken: common.HexToAddress(linkRef.Address),
+						UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,
+					},
+					{
+						SourceToken: common.HexToAddress(wethRef.Address),
+						UsdPerToken: input.ContractParams.FeeQuoter.USDPerWETH,
+					},
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set initial prices on FeeQuoter: %w", err)
+		}
+		writes = append(writes, updatePricesReport.Output)
 
 		// Deploy CCVAggregator
 		ccvAggregatorRef, err := maybeDeployContract(b, ccv_aggregator.Deploy, ccv_aggregator.ContractType, chain, deployment.Input[ccv_aggregator.ConstructorArgs]{
@@ -228,7 +242,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy CCVAggregator: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCVAggregator: %w", err)
 		}
 		addresses = append(addresses, ccvAggregatorRef)
 
@@ -248,7 +262,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy CCVProxy: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCVProxy: %w", err)
 		}
 		addresses = append(addresses, ccvProxyRef)
 
@@ -257,7 +271,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy NonceManager: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy NonceManager: %w", err)
 		}
 		addresses = append(addresses, nonceManagerRef)
 
@@ -275,7 +289,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy CommitOnRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOnRamp: %w", err)
 		}
 		addresses = append(addresses, commitOnRampRef)
 
@@ -287,7 +301,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy ExecutorOnRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ExecutorOnRamp: %w", err)
 		}
 		addresses = append(addresses, executorOnRampRef)
 
@@ -299,7 +313,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to deploy CommitOffRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOffRamp: %w", err)
 		}
 		addresses = append(addresses, commitOffRampRef)
 
@@ -310,7 +324,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			Args:          input.ContractParams.CommitOffRamp.SignatureConfigArgs,
 		})
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to set signature config on CommitOffRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitOffRamp: %w", err)
 		}
 		writes = append(writes, setSignatureConfigReport.Output)
 
@@ -326,11 +340,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			},
 		})
 		if err != nil {
-			return DeployChainContractsOutput{}, fmt.Errorf("failed to add CommitOnRamp and CommitOffRamp as AuthorizedCallers to NonceManager: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to add CommitOnRamp and CommitOffRamp as AuthorizedCallers to NonceManager: %w", err)
 		}
 		writes = append(writes, applyAuthorizedCallerUpdatesReport.Output)
 
-		return DeployChainContractsOutput{
+		return sequences.OnChainOutput{
 			Addresses: addresses,
 			Writes:    writes,
 		}, nil

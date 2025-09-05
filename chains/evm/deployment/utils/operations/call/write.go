@@ -2,7 +2,6 @@ package call
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -35,7 +34,7 @@ func NewWrite[ARGS any, C any](
 	contractType deployment.ContractType,
 	contractABI string,
 	newContract func(address common.Address, backend bind.ContractBackend) (C, error),
-	allowedCallers func(contract C, opts *bind.CallOpts) ([]common.Address, error),
+	isAllowedCaller func(contract C, opts *bind.CallOpts, caller common.Address) (bool, error),
 	validate func(input ARGS) error,
 	callContract func(contract C, opts *bind.TransactOpts, input ARGS) (*eth_types.Transaction, error),
 ) *operations.Operation[Input[ARGS], WriteOutput, evm.Chain] {
@@ -56,21 +55,19 @@ func NewWrite[ARGS any, C any](
 			if err != nil {
 				return WriteOutput{}, fmt.Errorf("failed to create contract instance for %s at %s on %s: %w", name, input.Address, chain, err)
 			}
-			var callers []common.Address
-			if allowedCallers != nil {
-				callers, err = allowedCallers(contract, &bind.CallOpts{Context: b.GetContext()})
+			var allowed bool
+			if isAllowedCaller != nil {
+				allowed, err = isAllowedCaller(contract, &bind.CallOpts{Context: b.GetContext()}, chain.DeployerKey.From)
 				if err != nil {
-					return WriteOutput{}, fmt.Errorf("failed to get allowed callers for %s at %s on %s: %w", name, input.Address, chain, err)
+					return WriteOutput{}, fmt.Errorf("failed to check if %s is an allowed caller of %s against %s on %s: %w", chain.DeployerKey.From, name, input.Address, chain, err)
 				}
 			}
 			opts := deployment.SimTransactOpts()
-			var executed bool
-			if callers != nil && slices.Contains(callers, chain.DeployerKey.From) {
+			if allowed {
 				opts = chain.DeployerKey
-				executed = true // Won't be returned if execution fails, so we can update it here
 			}
 			tx, callErr := callContract(contract, opts, input.Args)
-			if executed {
+			if allowed {
 				// If the call has actually been sent, we need check the call error and confirm the transaction.
 				_, confirmErr := deployment.ConfirmIfNoErrorWithABI(chain, tx, contractABI, callErr)
 				if confirmErr != nil {
@@ -85,7 +82,7 @@ func NewWrite[ARGS any, C any](
 			}
 
 			return WriteOutput{
-				Executed:      executed,
+				Executed:      allowed,
 				ChainSelector: input.ChainSelector,
 				Tx: mcms_types.Transaction{
 					OperationMetadata: mcms_types.OperationMetadata{
@@ -105,10 +102,10 @@ type ownableContract interface {
 	Owner(opts *bind.CallOpts) (common.Address, error)
 }
 
-func OnlyOwner[C ownableContract](contract C, opts *bind.CallOpts) ([]common.Address, error) {
+func OnlyOwner[C ownableContract](contract C, opts *bind.CallOpts, caller common.Address) (bool, error) {
 	owner, err := contract.Owner(opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get owner of %s: %w", contract.Address(), err)
+		return false, fmt.Errorf("failed to get owner of %s: %w", contract.Address(), err)
 	}
-	return []common.Address{owner}, nil
+	return owner == caller, nil
 }

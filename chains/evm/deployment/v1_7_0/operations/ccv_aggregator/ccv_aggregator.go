@@ -17,6 +17,8 @@ type ConstructorArgs = ccv_aggregator.CCVAggregatorStaticConfig
 
 type SourceChainConfigArgs = ccv_aggregator.CCVAggregatorSourceChainConfigArgs
 
+type SourceChainConfig = ccv_aggregator.CCVAggregatorSourceChainConfig
+
 var Deploy = deployment.New(
 	"ccv-aggregator:deploy",
 	semver.MustParse("1.7.0"),
@@ -44,5 +46,16 @@ var ApplySourceChainConfigUpdates = call.NewWrite(
 	func([]SourceChainConfigArgs) error { return nil },
 	func(ccvAggregator *ccv_aggregator.CCVAggregator, opts *bind.TransactOpts, args []SourceChainConfigArgs) (*types.Transaction, error) {
 		return ccvAggregator.ApplySourceChainConfigUpdates(opts, args)
+	},
+)
+
+var GetSourceChainConfig = call.NewRead(
+	"ccv-aggregator:get-source-chain-config",
+	semver.MustParse("1.7.0"),
+	"Gets the source chain configuration for a given source chain selector",
+	ContractType,
+	ccv_aggregator.NewCCVAggregator,
+	func(ccvAggregator *ccv_aggregator.CCVAggregator, opts *bind.CallOpts, sourceChainSelector uint64) (SourceChainConfig, error) {
+		return ccvAggregator.GetSourceChainConfig(opts, sourceChainSelector)
 	},
 )

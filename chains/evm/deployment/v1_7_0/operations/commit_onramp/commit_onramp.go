@@ -33,6 +33,8 @@ type WithdrawFeeTokensArgs struct {
 	FeeTokens []common.Address
 }
 
+type DestChainConfig = commit_onramp.GetDestChainConfig
+
 var Deploy = deployment.New(
 	"commit-onramp:deploy",
 	semver.MustParse("1.7.0"),
@@ -102,5 +104,16 @@ var WithdrawFeeTokens = call.NewWrite(
 	func(WithdrawFeeTokensArgs) error { return nil },
 	func(commitOnRamp *commit_onramp.CommitOnRamp, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return commitOnRamp.WithdrawFeeTokens(opts, args.FeeTokens)
+	},
+)
+
+var GetDestChainConfig = call.NewRead(
+	"commit-onramp:get-dest-chain-config",
+	semver.MustParse("1.7.0"),
+	"Gets the destination chain configuration for a given destination chain selector",
+	ContractType,
+	commit_onramp.NewCommitOnRamp,
+	func(commitOnRamp *commit_onramp.CommitOnRamp, opts *bind.CallOpts, destChainSelector uint64) (DestChainConfig, error) {
+		return commitOnRamp.GetDestChainConfig(opts, destChainSelector)
 	},
 )
