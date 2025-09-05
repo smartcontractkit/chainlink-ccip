@@ -221,6 +221,22 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
+  function test_getValidatedFee_SUI() public {
+    // Update config to add a Sui chain.
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+    vm.stopPrank();
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage2Sui();
+
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+  }
+
   function test_getValidatedFee_Aptos() public {
     // Update config to add an Aptos chain
     vm.stopPrank();
