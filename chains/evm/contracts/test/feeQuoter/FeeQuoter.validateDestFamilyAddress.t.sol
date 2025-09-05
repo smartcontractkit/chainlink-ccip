@@ -64,4 +64,11 @@ contract FeeQuoter_validateDestFamilyAddress is FeeQuoterSetup {
     vm.expectRevert(abi.encodeWithSelector(Internal.Invalid32ByteAddress.selector, invalidAddress));
     s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_APTOS, invalidAddress, 0);
   }
+
+  function test_validateDestFamilyAddress_Sui_RevertWhen_Invalid32ByteAddress() public {
+    bytes memory invalidAddress = abi.encode(address(234), address(234));
+
+    vm.expectRevert(abi.encodeWithSelector(Internal.Invalid32ByteAddress.selector, invalidAddress));
+    s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_SUI, invalidAddress, 0);
+  }
 }
