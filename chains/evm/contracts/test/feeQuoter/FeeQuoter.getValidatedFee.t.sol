@@ -601,4 +601,48 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     );
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
+
+  function test_getValidatedFee_RevertWhen_TooManySuiExtraArgsAccounts() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0))); // zero reciever
+    msg_.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(0xdeadbeef)), // receiver is also token recipient
+        receiverObjectIds: new bytes32[](2)
+      })
+    );
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TooManySuiExtraArgsReceiverObjectIds.selector, 2, 0));
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  }
+
+  function test_getValidatedFee_RevertWhen_InvalidTokenReciever() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0))); // zero reciever
+    msg_.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(0), // receiver is also token recipient
+        receiverObjectIds: new bytes32[](0)
+      })
+    );
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidTokenReceiver.selector));
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  }
 }

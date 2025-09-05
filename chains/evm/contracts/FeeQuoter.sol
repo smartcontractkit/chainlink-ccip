@@ -53,7 +53,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   error TooManySVMExtraArgsAccounts(uint256 numAccounts, uint256 maxAccounts);
   error InvalidSVMExtraArgsWritableBitmap(uint64 accountIsWritableBitmap, uint256 numAccounts);
   error TooManySuiExtraArgsReceiverObjectIds(uint256 numReceiverObjectIds, uint256 maxReceiverObjectIds);
-  error InvalidGasLimit();
 
   event FeeTokenAdded(address indexed feeToken);
   event FeeTokenRemoved(address indexed feeToken);
@@ -1070,9 +1069,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         // There should not be additional accounts specified for the receiver.
         if (receiverObjectIdsLength > 0) {
           revert TooManySuiExtraArgsReceiverObjectIds(receiverObjectIdsLength, 0);
-        }
-        if (gasLimit != 0) {
-          revert InvalidGasLimit();
         }
       } else {
         // The messaging accounts needed for CCIP receiver on SUI are:
