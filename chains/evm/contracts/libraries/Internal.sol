@@ -588,7 +588,7 @@ library Internal {
   function _decodeMessageV1(
     bytes calldata encoded
   ) internal pure returns (MessageV1 memory) {
-    if (encoded.length < 36) revert InvalidDataLength(); // Minimum size check.
+    if (encoded.length < 37) revert InvalidDataLength(); // Minimum size check.
 
     MessageV1 memory message;
     uint256 offset = 0;

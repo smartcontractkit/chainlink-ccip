@@ -6,7 +6,7 @@ import {Internal} from "../../../libraries/Internal.sol";
 import {Test} from "forge-std/Test.sol";
 
 // Helper contract to make the args calldata.
-contract InternalWrapper {
+contract InternalHelper {
   function decodeMessageV1(
     bytes calldata encoded
   ) external pure returns (Internal.MessageV1 memory) {
@@ -21,10 +21,10 @@ contract InternalWrapper {
 }
 
 contract Internal_encodeDecodeMessageV1 is Test {
-  InternalWrapper private s_wrapper;
+  InternalHelper private s_wrapper;
 
   function setUp() public {
-    s_wrapper = new InternalWrapper();
+    s_wrapper = new InternalHelper();
   }
 
   function test_encodeDecodeMessageV1_WithData() public {
@@ -77,16 +77,16 @@ contract Internal_encodeDecodeMessageV1 is Test {
   }
 
   function test_encodeDecodeMessageV1_MaxLengthFields() public view {
+    uint256 testDataLength = 1000; // Reasonable size for testing
     // Create maximum length fields to test boundary conditions
     bytes memory maxLengthBytes = new bytes(type(uint8).max); // 255 bytes
-    bytes memory maxLengthData = new bytes(1000); // Reasonable size for testing
+    bytes memory maxLengthData = new bytes(testDataLength);
 
     // Fill with some pattern for verification
     for (uint256 i = 0; i < maxLengthBytes.length; ++i) {
       maxLengthBytes[i] = bytes1(uint8(i % 256));
     }
-    for (uint256 i = 0; i < 1000; ++i) {
-      // Only fill first 1000 bytes for gas efficiency
+    for (uint256 i = 0; i < testDataLength; ++i) {
       maxLengthData[i] = bytes1(uint8(i % 256));
     }
 
