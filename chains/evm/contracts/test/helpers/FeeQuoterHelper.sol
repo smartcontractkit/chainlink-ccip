@@ -89,6 +89,13 @@ contract FeeQuoterHelper is FeeQuoterV2 {
     return _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder);
   }
 
+  function parseSuiExtraArgsFromBytes(
+    bytes calldata extraArgs,
+    DestChainConfig memory destChainConfig
+  ) external pure returns (Client.SuiExtraArgsV1 memory) {
+    return _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder);
+  }
+
   function processChainFamilySelector(
     uint64 chainFamilySelector,
     bytes calldata messageReceiver,

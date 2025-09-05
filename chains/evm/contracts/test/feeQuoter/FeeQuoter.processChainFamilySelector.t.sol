@@ -10,6 +10,7 @@ contract FeeQuoter_processChainFamilySelector is FeeQuoterSetup {
   uint64 internal constant SVM_SELECTOR = SOURCE_CHAIN_SELECTOR;
   uint64 internal constant EVM_SELECTOR = DEST_CHAIN_SELECTOR;
   uint64 internal constant APTOS_SELECTOR = DEST_CHAIN_SELECTOR + 1;
+  uint64 internal constant SUI_SELECTOR = DEST_CHAIN_SELECTOR + 2;
   uint64 internal constant INVALID_SELECTOR = 99;
 
   function setUp() public virtual override {
@@ -36,11 +37,19 @@ contract FeeQuoter_processChainFamilySelector is FeeQuoterSetup {
     aptosConfig.maxPerMsgGasLimit = 3_000_000;
     aptosConfig.enforceOutOfOrder = true;
 
+    // 3. Configure an SUI chain
+    FeeQuoter.DestChainConfig memory suiConfig;
+    suiConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+    suiConfig.defaultTxGasLimit = 2_000_000;
+    suiConfig.maxPerMsgGasLimit = 3_000_000;
+    suiConfig.enforceOutOfOrder = true;
+
     // Apply both configs
-    FeeQuoter.DestChainConfigArgs[] memory configs = new FeeQuoter.DestChainConfigArgs[](3);
+    FeeQuoter.DestChainConfigArgs[] memory configs = new FeeQuoter.DestChainConfigArgs[](4);
     configs[0] = FeeQuoter.DestChainConfigArgs({destChainSelector: EVM_SELECTOR, destChainConfig: evmConfig});
     configs[1] = FeeQuoter.DestChainConfigArgs({destChainSelector: SVM_SELECTOR, destChainConfig: svmConfig});
     configs[2] = FeeQuoter.DestChainConfigArgs({destChainSelector: APTOS_SELECTOR, destChainConfig: aptosConfig});
+    configs[3] = FeeQuoter.DestChainConfigArgs({destChainSelector: SUI_SELECTOR, destChainConfig: suiConfig});
     s_feeQuoter.applyDestChainConfigUpdates(configs);
   }
 
@@ -90,6 +99,47 @@ contract FeeQuoter_processChainFamilySelector is FeeQuoterSetup {
     // The function always returns `true` for outOfOrder on SVM
     assertTrue(outOfOrder, "Out-of-order for SVM must be true");
     assertEq(tokenReceiver, abi.encode(bytes32("someReceiver")));
+  }
+
+  function test_processChainFamilySelector_Sui_WithTokenTransfer() public view {
+    // Construct an SVMExtraArgsV1 with a non-zero tokenReceiver
+    Client.SuiExtraArgsV1 memory suiArgs = Client.SuiExtraArgsV1({
+      gasLimit: 100_000,
+      allowOutOfOrderExecution: true,
+      tokenReceiver: bytes32(uint256(10)), // receiver is also token recipient
+      receiverObjectIds: new bytes32[](2)
+    });
+    bytes memory encodedSuiArgs = Client._suiArgsToBytes(suiArgs);
+
+    (bytes memory resultBytes, bool outOfOrder, bytes memory msgReciever) =
+      s_feeQuoter.processChainFamilySelector(SUI_SELECTOR, MESSAGE_RECEIVER, encodedSuiArgs);
+
+    // The function should NOT revert since tokenReceiver != 0
+    // Check that it returned the Sui-encoded bytes
+    assertEq(resultBytes, encodedSuiArgs, "Should return the same Sui-encoded bytes");
+    // The function always returns `true` for outOfOrder on Sui
+    assertTrue(outOfOrder, "Out-of-order for Sui must be true");
+    assertEq(msgReciever, MESSAGE_RECEIVER);
+  }
+
+  function test_processChainFamilySelector_Sui_NoTokenTransfer() public view {
+    // Construct an SVMExtraArgsV1 with a non-zero tokenReceiver
+    Client.SuiExtraArgsV1 memory suiArgs = Client.SuiExtraArgsV1({
+      gasLimit: 100_000,
+      allowOutOfOrderExecution: true,
+      tokenReceiver: bytes32(uint256(0)), // receiver is also token recipient
+      receiverObjectIds: new bytes32[](2)
+    });
+    bytes memory encodedSuiArgs = Client._suiArgsToBytes(suiArgs);
+
+    (bytes memory resultBytes, bool outOfOrder,) =
+      s_feeQuoter.processChainFamilySelector(SUI_SELECTOR, MESSAGE_RECEIVER, encodedSuiArgs);
+
+    // The function should NOT revert since tokenReceiver != 0
+    // Check that it returned the Sui-encoded bytes
+    assertEq(resultBytes, encodedSuiArgs, "Should return the same Sui-encoded bytes");
+    // The function always returns `true` for outOfOrder on Sui
+    assertTrue(outOfOrder, "Out-of-order for Sui must be true");
   }
 
   function test_processChainFamilySelector_SVM_NoTokenTransfer() public view {
