@@ -664,9 +664,13 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
         receiverObjectIds: new bytes32[](65)
       })
     );
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TooManySuiExtraArgsReceiverObjectIds.selector, 65, Client.SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FeeQuoter.TooManySuiExtraArgsReceiverObjectIds.selector, 65, Client.SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS
+      )
+    );
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
-  } 
+  }
 
   function test_getValidatedFee_RevertWhen_MessageTooLargeSui() public {
     uint256 dataSize = MAX_DATA_SIZE + 1;
@@ -688,7 +692,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
         receiverObjectIds: new bytes32[](2)
       })
     );
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, MAX_DATA_SIZE, MAX_DATA_SIZE+1));
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, MAX_DATA_SIZE, MAX_DATA_SIZE + 1));
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
-  } 
+  }
 }
