@@ -645,4 +645,50 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidTokenReceiver.selector));
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
   }
+
+  function test_getValidatedFee_RevertWhen_MaxSuiExtraArgsAccounts() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef)));
+    msg_.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(0xdeadbeef)), // receiver is also token recipient
+        receiverObjectIds: new bytes32[](65)
+      })
+    );
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TooManySuiExtraArgsReceiverObjectIds.selector, 65, Client.SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS));
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  } 
+
+  function test_getValidatedFee_RevertWhen_MessageTooLargeSui() public {
+    uint256 dataSize = MAX_DATA_SIZE + 1;
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
+
+    msg_.tokenAmounts = new Client.EVMTokenAmount[](0);
+    msg_.data = new bytes(dataSize);
+    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef)));
+    msg_.extraArgs = Client._suiArgsToBytes(
+      Client.SuiExtraArgsV1({
+        gasLimit: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(uint256(0xdeadbeef)), // receiver is also token recipient
+        receiverObjectIds: new bytes32[](2)
+      })
+    );
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, MAX_DATA_SIZE, MAX_DATA_SIZE+1));
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  } 
 }
