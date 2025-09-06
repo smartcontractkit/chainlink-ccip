@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-library MessageFormat {
+/// @notice Library for CCIP MessageV1 encoding/decoding operations.
+/// @dev This library handles the complete V1 message format protocol including:
+/// - MessageV1 and TokenTransferV1 struct definitions
+/// - Encoding/decoding functions with comprehensive error handling
+/// - Detailed error location tracking for debugging
+library MessageV1Codec {
   error InvalidDataLength(EncodingErrorLocation location);
   error InvalidEncodingVersion(uint8 version);
 

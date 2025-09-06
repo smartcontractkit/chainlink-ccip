@@ -1,34 +1,34 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {MessageFormat} from "../../../libraries/MessageFormat.sol";
+import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 
 import {Test} from "forge-std/Test.sol";
 
 // Helper contract to make the args calldata.
-contract MessageFormatHelper {
+contract MessageV1CodecHelper {
   function decodeMessageV1(
     bytes calldata encoded
-  ) external pure returns (MessageFormat.MessageV1 memory) {
-    return MessageFormat._decodeMessageV1(encoded);
+  ) external pure returns (MessageV1Codec.MessageV1 memory) {
+    return MessageV1Codec._decodeMessageV1(encoded);
   }
 
   function encodeMessageV1(
-    MessageFormat.MessageV1 memory message
+    MessageV1Codec.MessageV1 memory message
   ) external pure returns (bytes memory) {
-    return MessageFormat._encodeMessageV1(message);
+    return MessageV1Codec._encodeMessageV1(message);
   }
 }
 
-contract MessageFormat_encodeDecodeMessageV1 is Test {
-  MessageFormatHelper private s_messageFormatHelper;
+contract MessageV1Codec_encodeDecodeMessageV1 is Test {
+  MessageV1CodecHelper private s_messageFormatHelper;
 
   function setUp() public {
-    s_messageFormatHelper = new MessageFormatHelper();
+    s_messageFormatHelper = new MessageV1CodecHelper();
   }
 
   function test_encodeDecodeMessageV1_WithData() public {
-    MessageFormat.MessageV1 memory originalMessage = MessageFormat.MessageV1({
+    MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: 5,
       destChainSelector: 10,
       sequenceNumber: 200,
@@ -38,19 +38,19 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "destination blob data",
-      tokenTransfer: new MessageFormat.TokenTransferV1[](0),
+      tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
       data: "arbitrary message data"
     });
 
-    MessageFormat.MessageV1 memory decodedMessage =
+    MessageV1Codec.MessageV1 memory decodedMessage =
       s_messageFormatHelper.decodeMessageV1(s_messageFormatHelper.encodeMessageV1(originalMessage));
 
     _assertMessageEqual(originalMessage, decodedMessage);
   }
 
   function test_encodeDecodeMessageV1_WithTokenTransfer() public {
-    MessageFormat.TokenTransferV1[] memory tokenTransfers = new MessageFormat.TokenTransferV1[](1);
-    tokenTransfers[0] = MessageFormat.TokenTransferV1({
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](1);
+    tokenTransfers[0] = MessageV1Codec.TokenTransferV1({
       amount: 1000000,
       sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
       sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
@@ -58,7 +58,7 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
       extraData: "token extra data"
     });
 
-    MessageFormat.MessageV1 memory originalMessage = MessageFormat.MessageV1({
+    MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: 123,
       destChainSelector: 456,
       sequenceNumber: 789,
@@ -72,7 +72,7 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
       data: "message with token data"
     });
 
-    MessageFormat.MessageV1 memory decodedMessage =
+    MessageV1Codec.MessageV1 memory decodedMessage =
       s_messageFormatHelper.decodeMessageV1(s_messageFormatHelper.encodeMessageV1(originalMessage));
 
     _assertMessageEqual(originalMessage, decodedMessage);
@@ -92,8 +92,8 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
       maxLengthData[i] = bytes1(uint8(i % 256));
     }
 
-    MessageFormat.TokenTransferV1[] memory tokenTransfers = new MessageFormat.TokenTransferV1[](1);
-    tokenTransfers[0] = MessageFormat.TokenTransferV1({
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](1);
+    tokenTransfers[0] = MessageV1Codec.TokenTransferV1({
       amount: type(uint256).max,
       sourcePoolAddress: maxLengthBytes,
       sourceTokenAddress: maxLengthBytes,
@@ -101,7 +101,7 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
       extraData: maxLengthData
     });
 
-    MessageFormat.MessageV1 memory originalMessage = MessageFormat.MessageV1({
+    MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: type(uint64).max,
       destChainSelector: type(uint64).max,
       sequenceNumber: type(uint64).max,
@@ -116,28 +116,28 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
     });
 
     bytes memory encoded = s_messageFormatHelper.encodeMessageV1(originalMessage);
-    MessageFormat.MessageV1 memory decodedMessage = s_messageFormatHelper.decodeMessageV1(encoded);
+    MessageV1Codec.MessageV1 memory decodedMessage = s_messageFormatHelper.decodeMessageV1(encoded);
 
     _assertMessageEqual(originalMessage, decodedMessage);
   }
 
   function test_decodeMessageV1_RevertWhen_InvalidVersion() public {
     // Create a valid encoded message first
-    MessageFormat.MessageV1 memory message = _createBasicMessage();
+    MessageV1Codec.MessageV1 memory message = _createBasicMessage();
     bytes memory encoded = s_messageFormatHelper.encodeMessageV1(message);
 
     // Corrupt the version byte (first byte should be 1)
     bytes memory corruptedEncoded = encoded;
     corruptedEncoded[0] = 0x02; // Invalid version
 
-    vm.expectRevert(abi.encodeWithSelector(MessageFormat.InvalidEncodingVersion.selector, 2));
+    vm.expectRevert(abi.encodeWithSelector(MessageV1Codec.InvalidEncodingVersion.selector, 2));
     s_messageFormatHelper.decodeMessageV1(corruptedEncoded);
   }
 
   function test_decodeMessageV1_RevertWhen_InvalidTokenTransferVersion() public {
     // Create a message with token transfer
-    MessageFormat.TokenTransferV1[] memory tokenTransfers = new MessageFormat.TokenTransferV1[](1);
-    tokenTransfers[0] = MessageFormat.TokenTransferV1({
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](1);
+    tokenTransfers[0] = MessageV1Codec.TokenTransferV1({
       amount: 1000,
       sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
       sourceTokenAddress: abi.encodePacked(makeAddr("token")),
@@ -145,7 +145,7 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
       extraData: ""
     });
 
-    MessageFormat.MessageV1 memory message = _createBasicMessage();
+    MessageV1Codec.MessageV1 memory message = _createBasicMessage();
     message.tokenTransfer = tokenTransfers;
 
     bytes memory encoded = s_messageFormatHelper.encodeMessageV1(message);
@@ -158,13 +158,13 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
     bytes memory corruptedEncoded = encoded;
     corruptedEncoded[tokenVersionOffset] = 0x00; // Invalid token version
 
-    vm.expectRevert(abi.encodeWithSelector(MessageFormat.InvalidEncodingVersion.selector, 0));
+    vm.expectRevert(abi.encodeWithSelector(MessageV1Codec.InvalidEncodingVersion.selector, 0));
     s_messageFormatHelper.decodeMessageV1(corruptedEncoded);
   }
 
   function test_decodeMessageV1_RevertWhen_InsufficientDataLength() public {
     // Create a valid encoded message
-    MessageFormat.MessageV1 memory message = _createBasicMessage();
+    MessageV1Codec.MessageV1 memory message = _createBasicMessage();
     bytes memory encoded = s_messageFormatHelper.encodeMessageV1(message);
 
     // Truncate the encoded data
@@ -175,14 +175,14 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        MessageFormat.InvalidDataLength.selector, MessageFormat.EncodingErrorLocation.MESSAGE_MIN_SIZE
+        MessageV1Codec.InvalidDataLength.selector, MessageV1Codec.EncodingErrorLocation.MESSAGE_MIN_SIZE
       )
     );
     s_messageFormatHelper.decodeMessageV1(truncatedEncoded);
   }
 
-  function _createBasicMessage() private pure returns (MessageFormat.MessageV1 memory) {
-    return MessageFormat.MessageV1({
+  function _createBasicMessage() private pure returns (MessageV1Codec.MessageV1 memory) {
+    return MessageV1Codec.MessageV1({
       sourceChainSelector: 1,
       destChainSelector: 2,
       sequenceNumber: 100,
@@ -192,7 +192,7 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
       sender: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
       receiver: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
       destBlob: "test blob",
-      tokenTransfer: new MessageFormat.TokenTransferV1[](0),
+      tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
       data: "test data"
     });
   }
@@ -242,8 +242,8 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
   }
 
   function _assertMessageEqual(
-    MessageFormat.MessageV1 memory expected,
-    MessageFormat.MessageV1 memory actual
+    MessageV1Codec.MessageV1 memory expected,
+    MessageV1Codec.MessageV1 memory actual
   ) private pure {
     assertEq(actual.sourceChainSelector, expected.sourceChainSelector, "sourceChainSelector mismatch");
     assertEq(actual.destChainSelector, expected.destChainSelector, "destChainSelector mismatch");
@@ -263,8 +263,8 @@ contract MessageFormat_encodeDecodeMessageV1 is Test {
   }
 
   function _assertTokenTransferEqual(
-    MessageFormat.TokenTransferV1 memory expected,
-    MessageFormat.TokenTransferV1 memory actual,
+    MessageV1Codec.TokenTransferV1 memory expected,
+    MessageV1Codec.TokenTransferV1 memory actual,
     uint256 index
   ) private pure {
     string memory indexStr = vm.toString(index);

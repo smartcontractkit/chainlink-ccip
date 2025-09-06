@@ -6,7 +6,7 @@ import {INonceManager} from "../interfaces/INonceManager.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Internal} from "../libraries/Internal.sol";
-import {MessageFormat} from "../libraries/MessageFormat.sol";
+import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {SignatureQuorumVerifier} from "./components/SignatureQuorumVerifier.sol";
 
 import {IERC165} from
@@ -31,7 +31,7 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
   }
 
   function verifyMessage(
-    MessageFormat.MessageV1 calldata message,
+    MessageV1Codec.MessageV1 calldata message,
     bytes32 messageHash,
     bytes calldata ccvData,
     Internal.MessageExecutionState originalState

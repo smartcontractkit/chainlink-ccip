@@ -15,7 +15,7 @@ import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
-import {MessageFormat} from "../libraries/MessageFormat.sol";
+import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
@@ -188,7 +188,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     if (s_reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_reentrancyGuardEntered = true;
 
-    MessageFormat.MessageV1 memory message = _beforeExecuteSingleMessage(MessageFormat._decodeMessageV1(report.message));
+    MessageV1Codec.MessageV1 memory message =
+      _beforeExecuteSingleMessage(MessageV1Codec._decodeMessageV1(report.message));
     bytes32 messageId = keccak256(report.message);
 
     if (message.receiver.length != 20) {
@@ -453,7 +454,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
   /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
-    MessageFormat.MessageV1 memory message,
+    MessageV1Codec.MessageV1 memory message,
     bytes32 messageId
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
     try this.executeSingleMessage(message, messageId) {}
@@ -481,7 +482,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
   /// smart contract wallets, without an associated message.
-  function executeSingleMessage(MessageFormat.MessageV1 memory message, bytes32 messageId) external {
+  function executeSingleMessage(MessageV1Codec.MessageV1 memory message, bytes32 messageId) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     address receiver = address(bytes20(message.receiver));
 
@@ -542,7 +543,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param sourceChainSelector The remote source chain selector
   /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
-    MessageFormat.TokenTransferV1 memory sourceTokenAmount,
+    MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector
@@ -700,8 +701,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param message initial message
   /// @return transformedMessage modified message
   function _beforeExecuteSingleMessage(
-    MessageFormat.MessageV1 memory message
-  ) internal virtual returns (MessageFormat.MessageV1 memory transformedMessage) {
+    MessageV1Codec.MessageV1 memory message
+  ) internal virtual returns (MessageV1Codec.MessageV1 memory transformedMessage) {
     return message;
   }
 }
