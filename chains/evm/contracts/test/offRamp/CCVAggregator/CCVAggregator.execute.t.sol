@@ -6,6 +6,7 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
 import {Internal} from "../../../libraries/Internal.sol";
+import {MessageFormat} from "../../../libraries/MessageFormat.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
 
@@ -17,7 +18,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
 
     // Mock validateReport for default message structure.
     CCVAggregator.AggregatedReport memory defaultReport = _getReport(message);
@@ -33,8 +34,8 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     );
   }
 
-  function _getMessage() internal returns (Internal.MessageV1 memory message) {
-    return Internal.MessageV1({
+  function _getMessage() internal returns (MessageFormat.MessageV1 memory message) {
+    return MessageFormat.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: 1,
@@ -45,26 +46,26 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "",
-      tokenTransfer: new Internal.TokenTransferV1[](0),
+      tokenTransfer: new MessageFormat.TokenTransferV1[](0),
       data: ""
     });
   }
 
   function _getReport(
-    Internal.MessageV1 memory message
-  ) internal returns (CCVAggregator.AggregatedReport memory) {
+    MessageFormat.MessageV1 memory message
+  ) internal view returns (CCVAggregator.AggregatedReport memory) {
     bytes[] memory ccvData = new bytes[](1);
     ccvData[0] = abi.encode("mock ccv data");
 
     return CCVAggregator.AggregatedReport({
-      message: Internal._encodeMessageV1(message),
+      message: MessageFormat._encodeMessageV1(message),
       ccvs: _arrayOf(s_defaultCCV),
       ccvData: ccvData
     });
   }
 
   function test_execute() public {
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
     CCVAggregator.AggregatedReport memory report = _getReport(message);
 
     // Expect execution state change event.
@@ -95,7 +96,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     ReentrantCCV maliciousCCV = new ReentrantCCV(address(s_agg));
 
     // Update report to use malicious CCV.
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
     CCVAggregator.AggregatedReport memory report = _getReport(message);
 
     report.ccvs = new address[](2);
@@ -134,7 +135,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_InvalidMessageDestChainSelector() public {
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
 
     // Modify message with wrong destination chain selector.
     message.destChainSelector = DEST_CHAIN_SELECTOR + 1; // Wrong destination.
@@ -148,7 +149,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_InvalidCCVDataLength() public {
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
     CCVAggregator.AggregatedReport memory report = _getReport(message);
 
     // Modify report to have mismatched array lengths.
@@ -162,7 +163,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_SkippedAlreadyExecutedMessage() public {
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
     CCVAggregator.AggregatedReport memory report = _getReport(message);
 
     // Execute the message successfully first time.
@@ -188,7 +189,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_RequiredCCVMissing_ReceiverCCV() public {
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
 
     address receiver = makeAddr("receiver");
     address requiredCCV = makeAddr("requiredCCV");
@@ -211,11 +212,11 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     address pool = makeAddr("pool");
     uint256 tokenAmount = 100;
 
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
 
     // Modify message with token transfer.
-    Internal.TokenTransferV1[] memory tokenAmounts = new Internal.TokenTransferV1[](1);
-    tokenAmounts[0] = Internal.TokenTransferV1({
+    MessageFormat.TokenTransferV1[] memory tokenAmounts = new MessageFormat.TokenTransferV1[](1);
+    tokenAmounts[0] = MessageFormat.TokenTransferV1({
       amount: tokenAmount,
       sourcePoolAddress: abi.encodePacked(pool),
       sourceTokenAddress: abi.encodePacked(sourceToken),
@@ -247,7 +248,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_RequiredCCVMissing_LaneMandatedCCV() public {
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
 
     address laneMandatedCCV = makeAddr("laneMandatedCCV");
 
@@ -272,7 +273,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_OptionalCCVQuorumNotReached() public {
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
     CCVAggregator.AggregatedReport memory report = _getReport(message);
     address receiver = address(bytes20(message.receiver));
 
@@ -292,7 +293,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_InsufficientGasToCompleteTx() public {
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
     CCVAggregator.AggregatedReport memory report = _getReport(message);
     bytes32 messageId = keccak256(report.message);
 
@@ -324,7 +325,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_CCVValidationFails() public {
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
     CCVAggregator.AggregatedReport memory report = _getReport(message);
     bytes32 messageId = keccak256(report.message);
     bytes memory revertReason = "CCV validation failed";
@@ -343,7 +344,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_ExecuteSingleMessageFails() public {
-    Internal.MessageV1 memory message = _getMessage();
+    MessageFormat.MessageV1 memory message = _getMessage();
     CCVAggregator.AggregatedReport memory report = _getReport(message);
     bytes32 messageId = keccak256(report.message);
 
@@ -387,7 +388,7 @@ contract ReentrantCCV is ICCVOffRampV1 {
   }
 
   function validateReport(
-    Internal.MessageV1 memory message,
+    MessageFormat.MessageV1 memory message,
     bytes32, /* messageHash */
     bytes memory ccvData,
     Internal.MessageExecutionState /* originalState */
@@ -400,7 +401,11 @@ contract ReentrantCCV is ICCVOffRampV1 {
 
     // This should trigger the reentrancy guard.
     i_aggregator.execute(
-      CCVAggregator.AggregatedReport({message: Internal._encodeMessageV1(message), ccvs: ccvs, ccvData: ccvDataArray})
+      CCVAggregator.AggregatedReport({
+        message: MessageFormat._encodeMessageV1(message),
+        ccvs: ccvs,
+        ccvData: ccvDataArray
+      })
     );
   }
 

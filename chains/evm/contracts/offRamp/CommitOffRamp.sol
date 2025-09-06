@@ -6,6 +6,7 @@ import {INonceManager} from "../interfaces/INonceManager.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Internal} from "../libraries/Internal.sol";
+import {MessageFormat} from "../libraries/MessageFormat.sol";
 import {SignatureQuorumVerifier} from "../ocr/SignatureQuorumVerifier.sol";
 
 import {IERC165} from
@@ -30,7 +31,7 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
   }
 
   function validateReport(
-    Internal.MessageV1 calldata message,
+    MessageFormat.MessageV1 calldata message,
     bytes32 messageHash,
     bytes calldata ccvData,
     Internal.MessageExecutionState originalState
