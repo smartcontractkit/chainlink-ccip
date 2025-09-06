@@ -91,20 +91,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
   }
 
-  struct AggregatedReport {
-    /// @notice The message that is being executed.
-    bytes message; // The message is attested to by each CCV in the report.
-    /// @notice CCVs that attested to the message. They must match the CCVs specified by the receiver of the message,
-    /// and the pool of the token being transferred. They can be a superset, but the ones not specified by the receiver
-    /// will be ignored. If there is no token transfer, no additional token CCVs are required. If the receiver is an EOA
-    /// or a contract that does not support the IAny2EVMMessageReceiver2 interface, the default and required CCVs are
-    /// used.
-    /// @dev Must be the same length as ccvData.
-    address[] ccvs;
-    /// @notice This data is specific to the CCV implementation and is used to verify the message.
-    bytes[] ccvData;
-  }
-
   // STATIC CONFIG
   string public constant override typeAndVersion = "CCVAggregator 1.7.0-dev";
   /// @dev Hash of encoded address(0) used for empty address checks.
@@ -176,21 +162,17 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     return keccak256(abi.encode(sourceChainSelector, sequenceNumber, sender, receiver));
   }
 
-  /// @notice Executes a report, executing each message in order.
-  /// @param report The execution report containing the messages and proofs.
-  /// @dev If called from the DON, this array is always empty.
-  /// @dev If called from manual execution, this array is always same length as messages.
-  /// @dev This function can fully revert in some cases, reverting potentially valid other reports with it. The reasons
-  /// for these reverts are so severe that we prefer to revert the entire batch instead of silently failing.
-  function execute(
-    AggregatedReport calldata report
-  ) external {
+  /// @notice Executes a message from a source chain.
+  /// @param encodedMessage The message that is being executed, encoded as bytes.
+  /// @param ccvs CCVs that attested to the message. Must match the CCVs specified by the receiver and token pool.
+  /// @param ccvData CCV-specific data used to verify the message. Must be same length as ccvs array.
+  function execute(bytes calldata encodedMessage, address[] calldata ccvs, bytes[] calldata ccvData) external {
     if (s_reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_reentrancyGuardEntered = true;
 
     MessageV1Codec.MessageV1 memory message =
-      _beforeExecuteSingleMessage(MessageV1Codec._decodeMessageV1(report.message));
-    bytes32 messageId = keccak256(report.message);
+      _beforeExecuteSingleMessage(MessageV1Codec._decodeMessageV1(encodedMessage));
+    bytes32 messageId = keccak256(encodedMessage);
 
     if (message.receiver.length != 20) {
       revert Internal.InvalidEVMAddress(message.receiver);
@@ -206,11 +188,12 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     if (message.destChainSelector != i_chainSelector) {
       revert InvalidMessageDestChainSelector(message.destChainSelector);
     }
-    if (report.ccvs.length != report.ccvData.length) {
-      revert InvalidCCVDataLength(report.ccvs.length, report.ccvData.length);
+    if (ccvs.length != ccvData.length) {
+      revert InvalidCCVDataLength(ccvs.length, ccvData.length);
     }
 
     /////// Original state checks ///////
+
     bytes32 executionStateKey =
       _calculateExecutionStateKey(message.sourceChainSelector, message.sequenceNumber, message.sender, receiverAddress);
 
@@ -254,13 +237,13 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       }
 
       (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
-        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiverAddress, report.ccvs, requiredPoolCCVs);
+        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiverAddress, ccvs, requiredPoolCCVs);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
           message: message,
           messageHash: messageId,
-          ccvData: report.ccvData[ccvDataIndex[i]],
+          ccvData: ccvData[ccvDataIndex[i]],
           originalState: originalState
         });
       }
