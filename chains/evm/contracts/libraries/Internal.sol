@@ -328,7 +328,16 @@ library Internal {
   // │                            1.7                               │
   // ================================================================
 
-  // TODO better naming
+  /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
+  /// @dev This struct is only used on the source chain and is not part of the message. It is emitted in the same event.
+  struct Receipt {
+    address issuer; // The address of the entity that issued the receipt.
+    uint64 destGasLimit; // The gas limit for the actions taken on the destination chain for this entity.
+    uint32 destBytesOverhead; // The byte overhead for the actions taken on the destination chain for this entity.
+    uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
+    bytes extraArgs; // Extra args that have been passed in on the source chain.
+  }
+
   struct EVM2AnyVerifierMessage {
     Header header; // Message header.
     address sender; // sender address on the source chain.
@@ -349,15 +358,6 @@ library Internal {
     uint64 sequenceNumber; // ──────╯ sequence number, not unique across lanes.
   }
 
-  struct Receipt {
-    address issuer;
-    uint64 destGasLimit;
-    uint32 destBytesOverhead;
-    uint256 feeTokenAmount;
-    bytes extraArgs;
-  }
-
-  // TODO better naming
   struct EVMTokenTransfer {
     address sourceTokenAddress;
     // The EVM address of the destination token.
@@ -368,32 +368,6 @@ library Internal {
     Receipt receipt;
   }
 
-  // receive
-
-  struct Any2EVMMessage {
-    Header header; // Message header.
-    bytes sender; // sender address on the source chain.
-    bytes data; // arbitrary data payload supplied by the message sender.
-    address receiver; // receiver address on the destination chain.
-    uint32 gasLimit; // user supplied maximum gas amount available for dest chain execution.
-    // array of tokens and amounts to transfer. Only allows either 0 or 1 token transfer, but for gas reasons we keep it
-    // as an array.
-    TokenTransfer[] tokenAmounts;
-  }
-
-  struct TokenTransfer {
-    // The source pool EVM address encoded to bytes. This value is trusted as it is obtained through the onRamp. It can
-    // be relied upon by the destination pool to validate the source pool.
-    bytes sourcePoolAddress;
-    address destTokenAddress; // Address of destination token
-    // Optional pool data to be transferred to the destination chain. Be default this is capped at
-    // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
-    // has to be set for the specific token.
-    bytes extraData;
-    uint256 amount; // Number of tokens.
-  }
-
-  // TODO optimize & ensure everything is included
   function _hash(EVM2AnyVerifierMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
@@ -410,32 +384,4 @@ library Internal {
       )
     );
   }
-
-  //  function _evm2AnyToAny2EVMMultiProofMessage(
-  //    EVM2AnyVerifierMessage memory evm2Any,
-  //    uint32 gasLimit
-  //  ) internal pure returns (Any2EVMMultiProofMessage memory) {
-  //    Any2EVMMultiProofTokenTransfer[] memory tokenAmounts =
-  //      new Any2EVMMultiProofTokenTransfer[](evm2Any.tokenAmounts.length);
-  //
-  //    for (uint256 i = 0; i < evm2Any.tokenAmounts.length; i++) {
-  //      EVMTokenTransfer memory tokenTransfer = evm2Any.tokenAmounts[i];
-  //      tokenAmounts[i] = Any2EVMMultiProofTokenTransfer({
-  //        sourcePoolAddress: abi.encode(tokenTransfer.sourcePoolAddress),
-  //        destTokenAddress: abi.decode(tokenTransfer.destTokenAddress, (address)),
-  //        extraData: tokenTransfer.destExecData,
-  //        amount: tokenTransfer.amount
-  //      });
-  //    }
-  //
-  //    return Any2EVMMultiProofMessage({
-  //      header: evm2Any.header,
-  //      sender: abi.encode(evm2Any.sender),
-  //      data: evm2Any.data,
-  //      receiver: abi.decode(evm2Any.receiver, (address)),
-  //      gasLimit: gasLimit,
-  //      tokenAmounts: tokenAmounts,
-  //      requiredVerifiers: evm2Any.requiredVerifiers
-  //    });
-  //  }
 }

@@ -6,7 +6,8 @@ import {INonceManager} from "../interfaces/INonceManager.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Internal} from "../libraries/Internal.sol";
-import {SignatureQuorumVerifier} from "../ocr/SignatureQuorumVerifier.sol";
+import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
+import {SignatureQuorumVerifier} from "./components/SignatureQuorumVerifier.sol";
 
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
@@ -29,17 +30,18 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
     i_nonceManager = nonceManager;
   }
 
-  function validateReport(
-    Internal.Any2EVMMessage calldata message,
+  function verifyMessage(
+    MessageV1Codec.MessageV1 calldata message,
     bytes32 messageHash,
     bytes calldata ccvData,
     Internal.MessageExecutionState originalState
   ) external {
-    (bytes memory ccvArgs, bytes memory signatures) = abi.decode(ccvData, (bytes, bytes));
+    (bytes memory ccvArgs, bytes32[] memory rs, bytes32[] memory ss) =
+      abi.decode(ccvData, (bytes, bytes32[], bytes32[]));
 
-    (bytes32 configDigest, uint64 nonce) = abi.decode(ccvArgs, (bytes32, uint64));
+    _validateSignatures(keccak256(bytes.concat(messageHash, ccvArgs)), rs, ss);
 
-    _validateSignatures(keccak256(abi.encode(messageHash, keccak256(ccvArgs))), configDigest, signatures);
+    uint64 nonce = abi.decode(ccvArgs, (uint64));
 
     // Nonce changes per state transition (these only apply for ordered messages):
     // UNTOUCHED -> FAILURE  nonce bump.
@@ -50,9 +52,9 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
     if (nonce != 0) {
       if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
         // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
-        if (
-          !INonceManager(i_nonceManager).incrementInboundNonce(message.header.sourceChainSelector, nonce, message.sender)
-        ) revert InvalidNonce(nonce);
+        if (!INonceManager(i_nonceManager).incrementInboundNonce(message.sourceChainSelector, nonce, message.sender)) {
+          revert InvalidNonce(nonce);
+        }
       }
     }
   }
