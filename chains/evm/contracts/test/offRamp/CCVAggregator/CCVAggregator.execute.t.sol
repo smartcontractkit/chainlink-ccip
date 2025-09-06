@@ -27,7 +27,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.mockCall(
       s_defaultCCV,
       abi.encodeCall(
-        ICCVOffRampV1.validateReport,
+        ICCVOffRampV1.verifyMessage,
         (message, messageHash, defaultReport.ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
       ),
       abi.encode(true)
@@ -301,7 +301,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.mockCall(
       s_defaultCCV,
       abi.encodeCall(
-        ICCVOffRampV1.validateReport, (message, messageId, report.ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
+        ICCVOffRampV1.verifyMessage, (message, messageId, report.ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
       ),
       abi.encode(true)
     );
@@ -334,7 +334,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.mockCallRevert(
       s_defaultCCV,
       abi.encodeCall(
-        ICCVOffRampV1.validateReport, (message, messageId, report.ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
+        ICCVOffRampV1.verifyMessage, (message, messageId, report.ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
       ),
       revertReason
     );
@@ -387,7 +387,7 @@ contract ReentrantCCV is ICCVOffRampV1 {
     i_aggregator = CCVAggregator(aggregator);
   }
 
-  function validateReport(
+  function verifyMessage(
     MessageFormat.MessageV1 memory message,
     bytes32, /* messageHash */
     bytes memory ccvData,

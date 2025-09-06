@@ -9,7 +9,7 @@ import {IERC165} from
 
 interface ICCVOffRampV1 is IERC165 {
   /// @notice Message execution
-  function validateReport(
+  function verifyMessage(
     MessageFormat.MessageV1 memory message,
     bytes32 messageHash,
     bytes memory ccvData,

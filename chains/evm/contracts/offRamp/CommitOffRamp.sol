@@ -7,7 +7,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {Internal} from "../libraries/Internal.sol";
 import {MessageFormat} from "../libraries/MessageFormat.sol";
-import {SignatureQuorumVerifier} from "../ocr/SignatureQuorumVerifier.sol";
+import {SignatureQuorumVerifier} from "./components/SignatureQuorumVerifier.sol";
 
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
@@ -30,15 +30,16 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
     i_nonceManager = nonceManager;
   }
 
-  function validateReport(
+  function verifyMessage(
     MessageFormat.MessageV1 calldata message,
     bytes32 messageHash,
     bytes calldata ccvData,
     Internal.MessageExecutionState originalState
   ) external {
-    (bytes memory ccvArgs, bytes memory signatures) = abi.decode(ccvData, (bytes, bytes));
+    (bytes memory ccvArgs, bytes32[] memory rs, bytes32[] memory ss) =
+      abi.decode(ccvData, (bytes, bytes32[], bytes32[]));
 
-    _validateSignatures(keccak256(bytes.concat(messageHash, ccvArgs)), signatures);
+    _validateSignatures(keccak256(bytes.concat(messageHash, ccvArgs)), rs, ss);
 
     uint64 nonce = abi.decode(ccvArgs, (uint64));
 

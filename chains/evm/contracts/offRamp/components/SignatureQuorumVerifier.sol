@@ -23,18 +23,13 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   error OracleCannotBeZeroAddress();
 
   struct SignatureConfigArgs {
-    uint8 F; // Maximum number of faulty/dishonest oracles.
-    address[] signers; // signing address of each oracle.
+    uint8 threshold; // The expected number of signatures for a report.
+    address[] signers; // The signing address of each signer.
   }
 
   struct SignatureConfigConfig {
-    uint8 F; //  Maximum number of faulty/dishonest oracles the system can tolerate.
-    EnumerableSet.AddressSet signers;
-  }
-
-  struct SignatureProof {
-    bytes32[] rs; // R components of the signatures.
-    bytes32[] ss; // S components of the signatures.
+    uint8 threshold; // The expected number of signatures for a report.
+    EnumerableSet.AddressSet signers; // The signing address of each signer.
   }
 
   SignatureConfigConfig private s_config;
@@ -47,29 +42,29 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
 
   /// @notice Validates the signatures of a given report hash.
   /// @param reportHash The hash of the report to validate signatures for.
-  /// @param signatureProof The signatures to validate, encoded as a SignatureProof struct.
-  function _validateSignatures(bytes32 reportHash, bytes memory signatureProof) internal view {
+  /// @param rs The r values of the signatures.
+  /// @param ss The s values of the signatures.
+  /// @dev The v values are assumed to be 27 for all signatures, this can be achieved by using ECDSA malleability.
+  function _validateSignatures(bytes32 reportHash, bytes32[] memory rs, bytes32[] memory ss) internal view {
     SignatureConfigConfig storage config = s_config;
     if (config.signers.length() == 0) {
       revert InvalidConfig();
     }
 
-    SignatureProof memory proofs = abi.decode(signatureProof, (SignatureProof));
-
     // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
     // This avoids a (rare) scenario where chain A forks into chain A and A', and a report signed on A is replayed on A'.
     if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
-    uint256 numberOfSignatures = proofs.rs.length;
+    uint256 numberOfSignatures = rs.length;
 
-    if (numberOfSignatures != config.F + 1) revert WrongNumberOfSignatures();
-    if (numberOfSignatures != proofs.ss.length) revert SignaturesOutOfRegistration();
+    if (numberOfSignatures != config.threshold) revert WrongNumberOfSignatures();
+    if (numberOfSignatures != ss.length) revert SignaturesOutOfRegistration();
 
     uint160 lastSigner = 0;
 
     for (uint256 i; i < numberOfSignatures; ++i) {
       // We use ECDSA malleability to only have signatures with a `v` value of 27.
-      address signer = ecrecover(reportHash, 27, proofs.rs[i], proofs.ss[i]);
+      address signer = ecrecover(reportHash, 27, rs[i], ss[i]);
       // Check that the signer is registered.
       if (!config.signers.contains(signer)) revert UnauthorizedSigner();
       // This requires ordered signatures to check for duplicates. This also disallows the zero address.
@@ -80,15 +75,16 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
 
   /// @notice Returns the signer sets, and F value.
   function getSignatureConfig() external view returns (SignatureConfigArgs memory) {
-    return SignatureConfigArgs({F: s_config.F, signers: s_config.signers.values()});
+    return SignatureConfigArgs({threshold: s_config.threshold, signers: s_config.signers.values()});
   }
 
   /// @notice Sets a new signature configuration.
-  /// @param signatureConfig The configuration to set, containing the F value, and signers.
   function setSignatureConfig(
     SignatureConfigArgs calldata signatureConfig
   ) external onlyOwner {
-    if (signatureConfig.F == 0 || signatureConfig.F > signatureConfig.signers.length) revert InvalidConfig();
+    if (signatureConfig.threshold == 0 || signatureConfig.threshold > signatureConfig.signers.length) {
+      revert InvalidConfig();
+    }
 
     SignatureConfigConfig storage config = s_config;
 
@@ -107,8 +103,8 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
       }
     }
 
-    config.F = signatureConfig.F;
+    config.threshold = signatureConfig.threshold;
 
-    emit ConfigSet(signatureConfig.signers, signatureConfig.F);
+    emit ConfigSet(signatureConfig.signers, signatureConfig.threshold);
   }
 }

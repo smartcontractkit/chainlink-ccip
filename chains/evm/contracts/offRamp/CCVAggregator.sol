@@ -256,7 +256,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         _ensureCCVQuorumIsReached(message.sourceChainSelector, receiverAddress, report.ccvs, requiredPoolCCVs);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        ICCVOffRampV1(ccvsToQuery[i]).validateReport({
+        ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
           message: message,
           messageHash: messageId,
           ccvData: report.ccvData[ccvDataIndex[i]],
