@@ -823,7 +823,8 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("batch get chain fee price updates: %w", err)
+		lggr.Errorw("failed to batch get chain fee price updates", "err", err)
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig), nil // Return a new empty map
 	}
 
 	// 3. Find FeeQuoter Results
@@ -838,7 +839,8 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 	}
 
 	if !found {
-		return nil, fmt.Errorf("FeeQuoter results missing from batch response")
+		lggr.Errorw("FeeQuoter results missing from batch response")
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig), nil // Return a new empty map
 	}
 
 	if len(feeQuoterResults) != len(selectors) {

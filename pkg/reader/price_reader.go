@@ -64,8 +64,8 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 
 	accessor, err := getChainAccessor(pr.chainAccessors, chain)
 	if err != nil {
-		// Don't return an error if the chain accessor is not found, just log and return empty map
-		lggr.Debugw("chain accessor not found", "chain", chain, "err", err)
+		// Don't return an error if the chain accessor is not found, just log warning and return nil
+		lggr.Warnw("chain accessor not found", "chain", chain, "err", err)
 		return nil, nil
 	}
 
@@ -92,7 +92,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 	accessor, err := getChainAccessor(pr.chainAccessors, pr.feedChain)
 	if err != nil {
 		// Don't return an error if the chain accessor is not found, just log and return empty map
-		lggr.Debugw("chain accessor not found for feed chain", "chain", pr.feedChain, "err", err)
+		lggr.Debugw("chain accessor not found on node for feed chain", "chain", pr.feedChain, "err", err)
 		return make(ccipocr3.TokenPriceMap), nil
 	}
 
