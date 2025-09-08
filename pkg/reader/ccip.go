@@ -920,10 +920,6 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	chains []cciptypes.ChainSelector,
 	includeDisabled bool,
 ) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return nil, fmt.Errorf("validate extended reader existence: %w", err)
-	}
-
 	// Use the ConfigPoller to handle caching
 	configs, err := r.configPoller.GetOfframpSourceChainConfigs(ctx, r.destChain, chains)
 	if err != nil {
@@ -1122,10 +1118,6 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 }
 
 func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return [32]byte{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
-	}
-
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("get chain config: %w", err)
