@@ -408,7 +408,8 @@ func Test_SequenceNumbers(t *testing.T) {
 				destName, err := libs.GetNameFromIDAndFamily(reporter.chainID, reporter.chainFamily)
 				require.NoError(t, err)
 				seqNum := testutil.ToFloat64(
-					reporter.sequenceNumbers.WithLabelValues("solana", chainID, sourceFamily, sourceID, tc.method, sourceName, destName),
+					reporter.sequenceNumbers.WithLabelValues("solana", chainID, sourceFamily,
+						sourceID, tc.method, sourceName, destName),
 				)
 				require.Equal(t, float64(maxSeqNr), seqNum)
 			}

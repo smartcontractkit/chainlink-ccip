@@ -327,8 +327,7 @@ func (p *Plugin) Observation(
 		obs.TokenPriceObs, obs.ChainFeeObs = p.getPriceObservations(ctx, lggr, prevOutcome, decodedQ)
 	}
 
-	//lint:ignore SA1019 we rely on Round for OTI metrics compatibility
-	p.metricsReporter.TrackObservation(obs, outCtx.Round)
+	p.metricsReporter.TrackObservation(obs, outCtx.Round) //lint:ignore SA1019 we rely on Round for OTI metrics compatibility
 
 	encoded, err := p.ocrTypeCodec.EncodeObservation(obs)
 	if err != nil {
@@ -541,8 +540,8 @@ func (p *Plugin) Outcome(
 		ChainFeeOutcome:   chainFeeOutcome,
 		MainOutcome:       mainOutcome,
 	}
-	//lint:ignore SA1019 we rely on Round for OTI metrics compatibility
-	p.metricsReporter.TrackOutcome(out, outCtx.Round)
+
+	p.metricsReporter.TrackOutcome(out, outCtx.Round) //lint:ignore SA1019 we rely on Round for OTI metrics compatibility
 
 	lggr.Infow("Commit plugin finished outcome", "outcome", out)
 	return p.ocrTypeCodec.EncodeOutcome(out)

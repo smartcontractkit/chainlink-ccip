@@ -114,8 +114,7 @@ func (p *Plugin) Observation(
 	default:
 		return nil, fmt.Errorf("get observation: unknown state")
 	}
-	//lint:ignore SA1019 we rely on Round for OTI metrics compatibility
-	p.observer.TrackObservation(observation, state, outctx.Round)
+	p.observer.TrackObservation(observation, state, outctx.Round) //lint:ignore SA1019 we rely on Round for OTI metrics compatibility
 	numCommitReports := 0
 	for _, reports := range observation.CommitReports {
 		numCommitReports += len(reports)
