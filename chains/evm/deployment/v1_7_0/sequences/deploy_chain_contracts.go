@@ -6,8 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
@@ -85,12 +84,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
 	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0, 13) // 13 = number of maybeDeployContract calls
-		writes := make([]call.WriteOutput, 0, 4)         // 4 = number of ExecuteOperation calls
+		writes := make([]contract.WriteOutput, 0, 4)     // 4 = number of ExecuteOperation calls
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
 
 		// Deploy WETH
-		wethRef, err := maybeDeployContract(b, weth.Deploy, weth.ContractType, chain, deployment.Input[weth.ConstructorArgs]{
+		wethRef, err := maybeDeployContract(b, weth.Deploy, weth.ContractType, chain, contract.DeployInput[weth.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -99,7 +98,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, wethRef)
 
 		// Deploy LINK
-		linkRef, err := maybeDeployContract(b, link.Deploy, link.ContractType, chain, deployment.Input[link.ConstructorArgs]{
+		linkRef, err := maybeDeployContract(b, link.Deploy, link.ContractType, chain, contract.DeployInput[link.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -108,7 +107,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, linkRef)
 
 		// Deploy RMNRemote
-		rmnRemoteRef, err := maybeDeployContract(b, rmn_remote.Deploy, rmn_remote.ContractType, chain, deployment.Input[rmn_remote.ConstructorArgs]{
+		rmnRemoteRef, err := maybeDeployContract(b, rmn_remote.Deploy, rmn_remote.ContractType, chain, contract.DeployInput[rmn_remote.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
@@ -121,7 +120,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, rmnRemoteRef)
 
 		// Deploy RMNProxy
-		rmnProxyRef, err := maybeDeployContract(b, rmn_proxy.Deploy, rmn_proxy.ContractType, chain, deployment.Input[rmn_proxy.ConstructorArgs]{
+		rmnProxyRef, err := maybeDeployContract(b, rmn_proxy.Deploy, rmn_proxy.ContractType, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
 				RMN: common.HexToAddress(rmnRemoteRef.Address),
@@ -136,7 +135,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Included in case the RMNRemote got deployed but the RMNProxy already existed.
 		// In this case, we would not have set the RMNRemote in the constructor.
 		// We would need to update the RMN on the existing RMNProxy.
-		setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, call.Input[rmn_proxy.SetRMNArgs]{
+		setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract.FunctionInput[rmn_proxy.SetRMNArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(rmnProxyRef.Address),
 			Args: rmn_proxy.SetRMNArgs{
@@ -149,7 +148,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, setRMNReport.Output)
 
 		// Deploy Router
-		routerRef, err := maybeDeployContract(b, router.Deploy, router.ContractType, chain, deployment.Input[router.ConstructorArgs]{
+		routerRef, err := maybeDeployContract(b, router.Deploy, router.ContractType, chain, contract.DeployInput[router.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: router.ConstructorArgs{
 				WrappedNative: common.HexToAddress(wethRef.Address),
@@ -162,7 +161,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, routerRef)
 
 		// Deploy TokenAdminRegistry
-		tokenAdminRegistryRef, err := maybeDeployContract(b, token_admin_registry.Deploy, token_admin_registry.ContractType, chain, deployment.Input[token_admin_registry.ConstructorArgs]{
+		tokenAdminRegistryRef, err := maybeDeployContract(b, token_admin_registry.Deploy, token_admin_registry.ContractType, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -171,7 +170,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, tokenAdminRegistryRef)
 
 		// Deploy FeeQuoter
-		feeQuoterRef, err := maybeDeployContract(b, fee_quoter_v2.Deploy, fee_quoter_v2.ContractType, chain, deployment.Input[fee_quoter_v2.ConstructorArgs]{
+		feeQuoterRef, err := maybeDeployContract(b, fee_quoter_v2.Deploy, fee_quoter_v2.ContractType, chain, contract.DeployInput[fee_quoter_v2.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: fee_quoter_v2.ConstructorArgs{
 				StaticConfig: fee_quoter_v2.StaticConfig{
@@ -210,7 +209,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, feeQuoterRef)
 
 		// Set initial prices on FeeQuoter
-		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter_v2.UpdatePrices, chain, call.Input[fee_quoter_v2.PriceUpdates]{
+		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter_v2.UpdatePrices, chain, contract.FunctionInput[fee_quoter_v2.PriceUpdates]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(feeQuoterRef.Address),
 			Args: fee_quoter_v2.PriceUpdates{
@@ -232,7 +231,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, updatePricesReport.Output)
 
 		// Deploy CCVAggregator
-		ccvAggregatorRef, err := maybeDeployContract(b, ccv_aggregator.Deploy, ccv_aggregator.ContractType, chain, deployment.Input[ccv_aggregator.ConstructorArgs]{
+		ccvAggregatorRef, err := maybeDeployContract(b, ccv_aggregator.Deploy, ccv_aggregator.ContractType, chain, contract.DeployInput[ccv_aggregator.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: ccv_aggregator.ConstructorArgs{
 				LocalChainSelector:   chain.Selector,
@@ -247,7 +246,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, ccvAggregatorRef)
 
 		// Deploy CCVProxy
-		ccvProxyRef, err := maybeDeployContract(b, ccv_proxy.Deploy, ccv_proxy.ContractType, chain, deployment.Input[ccv_proxy.ConstructorArgs]{
+		ccvProxyRef, err := maybeDeployContract(b, ccv_proxy.Deploy, ccv_proxy.ContractType, chain, contract.DeployInput[ccv_proxy.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: ccv_proxy.ConstructorArgs{
 				StaticConfig: ccv_proxy.StaticConfig{
@@ -267,7 +266,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, ccvProxyRef)
 
 		// Deploy NonceManager
-		nonceManagerRef, err := maybeDeployContract(b, nonce_manager.Deploy, nonce_manager.ContractType, chain, deployment.Input[nonce_manager.ConstructorArgs]{
+		nonceManagerRef, err := maybeDeployContract(b, nonce_manager.Deploy, nonce_manager.ContractType, chain, contract.DeployInput[nonce_manager.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -276,7 +275,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, nonceManagerRef)
 
 		// Deploy CommitOnRamp
-		commitOnRampRef, err := maybeDeployContract(b, commit_onramp.Deploy, commit_onramp.ContractType, chain, deployment.Input[commit_onramp.ConstructorArgs]{
+		commitOnRampRef, err := maybeDeployContract(b, commit_onramp.Deploy, commit_onramp.ContractType, chain, contract.DeployInput[commit_onramp.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: commit_onramp.ConstructorArgs{
 				RMNRemote:    common.HexToAddress(rmnRemoteRef.Address),
@@ -294,7 +293,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, commitOnRampRef)
 
 		// Deploy ExecutorOnRamp
-		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, executor_onramp.ContractType, chain, deployment.Input[executor_onramp.ConstructorArgs]{
+		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, executor_onramp.ContractType, chain, contract.DeployInput[executor_onramp.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: executor_onramp.ConstructorArgs{
 				MaxCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxCCVsPerMsg,
@@ -306,7 +305,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, executorOnRampRef)
 
 		// Deploy CommitOffRamp
-		commitOffRampRef, err := maybeDeployContract(b, commit_offramp.Deploy, commit_offramp.ContractType, chain, deployment.Input[commit_offramp.ConstructorArgs]{
+		commitOffRampRef, err := maybeDeployContract(b, commit_offramp.Deploy, commit_offramp.ContractType, chain, contract.DeployInput[commit_offramp.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: commit_offramp.ConstructorArgs{
 				NonceManager: common.HexToAddress(nonceManagerRef.Address),
@@ -318,7 +317,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, commitOffRampRef)
 
 		// Set signature config on the CommitOffRamp
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfigs, chain, call.Input[commit_offramp.SignatureConfigArgs]{
+		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfigs, chain, contract.FunctionInput[commit_offramp.SignatureConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(commitOffRampRef.Address),
 			Args:          input.ContractParams.CommitOffRamp.SignatureConfigArgs,
@@ -329,7 +328,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, setSignatureConfigReport.Output)
 
 		// Add CommitOnRamp and CommitOffRamp as AuthorizedCallers on NonceManager
-		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, nonce_manager.ApplyAuthorizedCallerUpdates, chain, call.Input[nonce_manager.AuthorizedCallerArgs]{
+		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, nonce_manager.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[nonce_manager.AuthorizedCallerArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(nonceManagerRef.Address),
 			Args: nonce_manager.AuthorizedCallerArgs{
@@ -353,10 +352,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 func maybeDeployContract[ARGS any](
 	b operations.Bundle,
-	op *operations.Operation[deployment.Input[ARGS], datastore.AddressRef, evm.Chain],
+	op *operations.Operation[contract.DeployInput[ARGS], datastore.AddressRef, evm.Chain],
 	contractType cldf_deployment.ContractType,
 	chain evm.Chain,
-	input deployment.Input[ARGS],
+	input contract.DeployInput[ARGS],
 	existingAddresses []datastore.AddressRef,
 ) (datastore.AddressRef, error) {
 	for _, ref := range existingAddresses {

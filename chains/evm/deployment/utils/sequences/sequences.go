@@ -1,7 +1,7 @@
 package sequences
 
 import (
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
@@ -10,5 +10,5 @@ type OnChainOutput struct {
 	// Addresses are the contract addresses that the sequence deployed.
 	Addresses []datastore.AddressRef
 	// Writes are the write operations that the sequence performed.
-	Writes []call.WriteOutput
+	Writes []contract.WriteOutput
 }

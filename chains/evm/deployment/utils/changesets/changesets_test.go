@@ -8,7 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -46,7 +46,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 						Version:       semver.MustParse("1.0.0"),
 					},
 				},
-				Writes: []call.WriteOutput{
+				Writes: []contract.WriteOutput{
 					{
 						ChainSelector: 4340886533089894000,
 						Tx: mcms_types.Transaction{

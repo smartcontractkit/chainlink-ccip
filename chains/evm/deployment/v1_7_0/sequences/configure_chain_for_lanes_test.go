@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
@@ -181,7 +181,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 
 			// Check onRamps on router
-			onRampOnRouter, err := operations.ExecuteOperation(bundle, router.GetOnRamp, evmChain, call.Input[uint64]{
+			onRampOnRouter, err := operations.ExecuteOperation(bundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       r,
 				Args:          remoteChainSelector,
@@ -190,7 +190,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, ccvProxy.Hex(), onRampOnRouter.Output.Hex(), "OnRamp address on router should match CCVProxy address")
 
 			// Check offRamps on router
-			offRampsOnRouter, err := operations.ExecuteOperation(bundle, router.GetOffRamps, evmChain, call.Input[any]{
+			offRampsOnRouter, err := operations.ExecuteOperation(bundle, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
 				ChainSelector: evmChain.Selector,
 				Address:       r,
 				Args:          nil,
@@ -200,7 +200,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, ccvAggregator.Hex(), offRampsOnRouter.Output[0].OffRamp.Hex(), "OffRamp address on router should match CCVAggregator address")
 
 			// Check sourceChainConfig on CCVAggregator
-			sourceChainConfig, err := operations.ExecuteOperation(bundle, ccv_aggregator.GetSourceChainConfig, evmChain, call.Input[uint64]{
+			sourceChainConfig, err := operations.ExecuteOperation(bundle, ccv_aggregator.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       ccvAggregator,
 				Args:          remoteChainSelector,
@@ -213,7 +213,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, r.Hex(), sourceChainConfig.Output.Router.Hex(), "Router in source chain config should match Router address")
 
 			// Check destChainConfig on CCVProxy
-			destChainConfig, err := operations.ExecuteOperation(bundle, ccv_proxy.GetDestChainConfig, evmChain, call.Input[uint64]{
+			destChainConfig, err := operations.ExecuteOperation(bundle, ccv_proxy.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       ccvProxy,
 				Args:          remoteChainSelector,
@@ -225,7 +225,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, commitOnRamp.Hex(), destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitOnRamp address")
 
 			// Check destChainConfig on CommitOnRamp
-			commitOnRampDestChainConfig, err := operations.ExecuteOperation(bundle, commit_onramp.GetDestChainConfig, evmChain, call.Input[uint64]{
+			commitOnRampDestChainConfig, err := operations.ExecuteOperation(bundle, commit_onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       commitOnRamp,
 				Args:          remoteChainSelector,
@@ -235,7 +235,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.False(t, commitOnRampDestChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitOnRamp dest chain config should be false")
 
 			// Check dest chains on ExecutorOnRamp
-			executorOnRampDestChains, err := operations.ExecuteOperation(bundle, executor_onramp.GetDestChains, evmChain, call.Input[any]{
+			executorOnRampDestChains, err := operations.ExecuteOperation(bundle, executor_onramp.GetDestChains, evmChain, contract.FunctionInput[any]{
 				ChainSelector: evmChain.Selector,
 				Address:       executorOnRamp,
 				Args:          nil,
@@ -299,7 +299,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				},
 			}
 
-			fee, err := operations.ExecuteOperation(bundle, router.GetFee, evmChain, call.Input[router.CCIPSendArgs]{
+			fee, err := operations.ExecuteOperation(bundle, router.GetFee, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
 				ChainSelector: evmChain.Selector,
 				Address:       r,
 				Args:          ccipSendArgs,
@@ -308,7 +308,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 
 			// Send CCIP message with value
 			ccipSendArgs.Value = fee.Output
-			_, err = operations.ExecuteOperation(bundle, router.CCIPSend, evmChain, call.Input[router.CCIPSendArgs]{
+			_, err = operations.ExecuteOperation(bundle, router.CCIPSend, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
 				ChainSelector: evmChain.Selector,
 				Address:       r,
 				Args:          ccipSendArgs,

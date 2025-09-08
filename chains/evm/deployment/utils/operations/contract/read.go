@@ -1,4 +1,4 @@
-package call
+package contract
 
 import (
 	"fmt"
@@ -20,12 +20,12 @@ func NewRead[ARGS any, RET any, C any](
 	contractType cldf_deployment.ContractType,
 	newContract func(address common.Address, backend bind.ContractBackend) (C, error),
 	callContract func(contract C, opts *bind.CallOpts, input ARGS) (RET, error),
-) *operations.Operation[Input[ARGS], RET, cldf_evm.Chain] {
+) *operations.Operation[FunctionInput[ARGS], RET, cldf_evm.Chain] {
 	return operations.NewOperation(
 		name,
 		version,
 		description,
-		func(b operations.Bundle, chain cldf_evm.Chain, input Input[ARGS]) (RET, error) {
+		func(b operations.Bundle, chain cldf_evm.Chain, input FunctionInput[ARGS]) (RET, error) {
 			var empty RET
 			if input.ChainSelector != chain.Selector {
 				return empty, fmt.Errorf("mismatch between inputted chain selector and selector defined within dependencies: %d != %d", input.ChainSelector, chain.Selector)

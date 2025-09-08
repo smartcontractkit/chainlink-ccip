@@ -7,8 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
@@ -40,14 +39,14 @@ type CCIPSendArgs struct {
 	EVM2AnyMessage    EVM2AnyMessage
 }
 
-var Deploy = deployment.New(
+var Deploy = contract.NewDeploy(
 	"router:deploy",
 	semver.MustParse("1.2.0"),
 	"Deploys the Router contract",
 	ContractType,
 	router.RouterABI,
 	func(ConstructorArgs) error { return nil },
-	deployment.VMDeployers[ConstructorArgs]{
+	contract.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := router.DeployRouter(opts, backend, args.WrappedNative, args.RMNProxy)
 			return address, tx, err
@@ -56,21 +55,21 @@ var Deploy = deployment.New(
 	},
 )
 
-var ApplyRampUpdates = call.NewWrite(
+var ApplyRampUpdates = contract.NewWrite(
 	"router:apply-ramp-updates",
 	semver.MustParse("1.2.0"),
 	"Applies ramp updates to the Router",
 	ContractType,
 	router.RouterABI,
 	router.NewRouter,
-	call.OnlyOwner,
+	contract.OnlyOwner,
 	func(ApplyRampsUpdatesArgs) error { return nil },
 	func(router *router.Router, opts *bind.TransactOpts, args ApplyRampsUpdatesArgs) (*types.Transaction, error) {
 		return router.ApplyRampUpdates(opts, args.OnRampUpdates, args.OffRampRemoves, args.OffRampAdds)
 	},
 )
 
-var CCIPSend = call.NewWrite(
+var CCIPSend = contract.NewWrite(
 	"router:ccip-send",
 	semver.MustParse("1.2.0"),
 	"Sends a CCIP message via the Router",
@@ -88,7 +87,7 @@ var CCIPSend = call.NewWrite(
 	},
 )
 
-var GetOffRamps = call.NewRead(
+var GetOffRamps = contract.NewRead(
 	"router:get-off-ramps",
 	semver.MustParse("1.2.0"),
 	"Gets all off ramps on the router",
@@ -99,7 +98,7 @@ var GetOffRamps = call.NewRead(
 	},
 )
 
-var GetOnRamp = call.NewRead(
+var GetOnRamp = contract.NewRead(
 	"router:get-on-ramp",
 	semver.MustParse("1.2.0"),
 	"Gets the on ramp for a given destination chain selector",
@@ -110,7 +109,7 @@ var GetOnRamp = call.NewRead(
 	},
 )
 
-var GetFee = call.NewRead(
+var GetFee = contract.NewRead(
 	"router:get-fee",
 	semver.MustParse("1.2.0"),
 	"Gets the fee for a message",

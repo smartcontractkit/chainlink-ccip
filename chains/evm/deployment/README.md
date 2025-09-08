@@ -37,19 +37,19 @@ Reference this guide when writing tooling to support contracts.
 
 ### Operations
 
-Gethwrapper methods map 1:1 with operations. Operations yield reports that enable stateful retries, which are critical when you have a sequence that runs many operations. Use `call.NewRead`, `call.NewWrite`, and `deployment.New`. When creating operations, alias any gethwrapper types necessary such that consumers don't need to import gethwrappers when calling operations.
+Gethwrapper methods map 1:1 with operations. Operations yield reports that enable stateful retries, which are critical when you have a sequence that runs many operations. Use `contract.NewRead`, `contract.NewWrite`, and `contract.NewDeploy`. When creating operations, alias any gethwrapper types necessary such that consumers don't need to import gethwrappers when calling operations.
 
 #### Write
 
 ```golang
-var ApplySourceChainConfigUpdates = call.NewWrite(
+var ApplySourceChainConfigUpdates = contract.NewWrite(
 	"ccv-aggregator:apply-source-chain-config-updates", // Operation name - contract:method
 	semver.MustParse("1.7.0"), // The contract version
 	"Applies updates to source chain configurations on the CCVAggregator", // Operation description
 	ContractType, // The contract type ("CCVAggregator" in this case)
 	ccv_aggregator.CCVAggregatorABI, // Contract ABI - used to decode errors
 	ccv_aggregator.NewCCVAggregator, // Contract constructor from gethwrappers
-	call.OnlyOwner, // Allowed callers check - used to determine whether or not the deployer key can make the call
+	contract.OnlyOwner, // Allowed callers check - used to determine whether or not the deployer key can make the call
 	func([]SourceChainConfigArgs) error { return nil }, // Perform simple argument validations here (i.e. acceptable ranges)
 	func(ccvAggregator *ccv_aggregator.CCVAggregator, opts *bind.TransactOpts, args []SourceChainConfigArgs) (*types.Transaction, error) {
 		return ccvAggregator.ApplySourceChainConfigUpdates(opts, args)
@@ -60,7 +60,7 @@ var ApplySourceChainConfigUpdates = call.NewWrite(
 #### Read
 
 ```golang
-var GetStaticConfig = call.NewRead(
+var GetStaticConfig = contract.NewRead(
 	"ccv-aggregator:get-static-config", // Operation name - contract:method
 	semver.MustParse("1.7.0"), // The contract version
 	"Reads the static config of the CCVAggregator", // Operation description
@@ -75,14 +75,14 @@ var GetStaticConfig = call.NewRead(
 #### Deployment
 
 ```golang
-var Deploy = deployment.New(
+var Deploy = contract.NewDeploy(
 	"ccv-aggregator:deploy", // Operation name - contract:method
 	semver.MustParse("1.7.0"), // The contract version
 	"Deploys the CCVAggregator contract", // Operation description
 	ContractType, // The contract type ("CCVAggregator" in this case)
 	ccv_aggregator.CCVAggregatorABI, // Contract ABI - used to decode errors
 	func(ConstructorArgs) error { return nil }, // Perform simple argument validations here (i.e. acceptable ranges)
-	deployment.VMDeployers[ConstructorArgs]{
+	contract.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := ccv_aggregator.DeployCCVAggregator(opts, backend, args)
 			return address, tx, err

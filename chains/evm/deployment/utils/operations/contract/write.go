@@ -1,4 +1,4 @@
-package call
+package contract
 
 import (
 	"fmt"
@@ -37,12 +37,12 @@ func NewWrite[ARGS any, C any](
 	isAllowedCaller func(contract C, opts *bind.CallOpts, caller common.Address) (bool, error),
 	validate func(input ARGS) error,
 	callContract func(contract C, opts *bind.TransactOpts, input ARGS) (*eth_types.Transaction, error),
-) *operations.Operation[Input[ARGS], WriteOutput, evm.Chain] {
+) *operations.Operation[FunctionInput[ARGS], WriteOutput, evm.Chain] {
 	return operations.NewOperation(
 		name,
 		version,
 		description,
-		func(b operations.Bundle, chain evm.Chain, input Input[ARGS]) (WriteOutput, error) {
+		func(b operations.Bundle, chain evm.Chain, input FunctionInput[ARGS]) (WriteOutput, error) {
 			if validate != nil {
 				if err := validate(input.Args); err != nil {
 					return WriteOutput{}, fmt.Errorf("invalid args for %s: %w", name, err)
