@@ -19,15 +19,7 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
     s_ccvProxy = makeAddr("CCVProxy");
     s_nonceManager = NonceManager(makeAddr("NonceManager"));
 
-    s_commitOnRamp = new CommitOnRamp(
-      address(s_mockRMNRemote),
-      address(s_nonceManager),
-      CommitOnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter),
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN
-      })
-    );
+    s_commitOnRamp = new CommitOnRamp(address(s_mockRMNRemote), address(s_nonceManager), _getBasicDynamicConfig());
 
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = BaseOnRamp.DestChainConfigArgs({
@@ -37,6 +29,40 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
     });
 
     s_commitOnRamp.applyDestChainConfigUpdates(destChainConfigs);
+
+    vm.startPrank(OWNER);
+  }
+
+  /// @notice Helper to create a minimal dynamic config
+  function _getBasicDynamicConfig() internal view returns (CommitOnRamp.DynamicConfig memory) {
+    return CommitOnRamp.DynamicConfig({
+      feeQuoter: address(s_feeQuoter),
+      feeAggregator: FEE_AGGREGATOR,
+      allowlistAdmin: ALLOWLIST_ADMIN
+    });
+  }
+
+  /// @notice Helper to create a dynamic config with custom addresses
+  function _getDynamicConfig(
+    address feeQuoter,
+    address feeAggregator,
+    address allowlistAdmin
+  ) internal pure returns (CommitOnRamp.DynamicConfig memory) {
+    return
+      CommitOnRamp.DynamicConfig({feeQuoter: feeQuoter, feeAggregator: feeAggregator, allowlistAdmin: allowlistAdmin});
+  }
+
+  /// @notice Helper to create a destination chain config
+  function _getDestChainConfig(
+    address ccvProxy,
+    uint64 destChainSelector,
+    bool allowlistEnabled
+  ) internal pure returns (BaseOnRamp.DestChainConfigArgs memory) {
+    return BaseOnRamp.DestChainConfigArgs({
+      ccvProxy: ccvProxy,
+      destChainSelector: destChainSelector,
+      allowlistEnabled: allowlistEnabled
+    });
   }
 
   function _createEVM2AnyVerifierMessage(
