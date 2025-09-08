@@ -103,16 +103,15 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 							USDPerWETH:                     usdPerWeth,
 						},
 						CommitOffRamp: sequences.CommitOffRampParams{
-							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{{
-								ConfigDigest: [32]byte{0x01},
-								F:            1,
+							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
+								Threshold: 1,
 								Signers: []common.Address{
 									common.HexToAddress("0x02"),
 									common.HexToAddress("0x03"),
 									common.HexToAddress("0x04"),
 									common.HexToAddress("0x05"),
 								},
-							}},
+							},
 						},
 					},
 				},
@@ -206,16 +205,15 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 						USDPerWETH:                     usdPerWeth, // $2000
 					},
 					CommitOffRamp: sequences.CommitOffRampParams{
-						SignatureConfigArgs: commit_offramp.SignatureConfigArgs{{
-							ConfigDigest: [32]byte{0x01},
-							F:            1,
+						SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
+							Threshold: 1,
 							Signers: []common.Address{
 								common.HexToAddress("0x02"),
 								common.HexToAddress("0x03"),
 								common.HexToAddress("0x04"),
 								common.HexToAddress("0x05"),
 							},
-						}},
+						},
 					},
 				},
 			}
@@ -310,16 +308,15 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 							USDPerWETH:                     usdPerWeth,
 						},
 						CommitOffRamp: sequences.CommitOffRampParams{
-							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{{
-								ConfigDigest: [32]byte{0x01},
-								F:            1,
+							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
+								Threshold: 1,
 								Signers: []common.Address{
 									common.HexToAddress("0x02"),
 									common.HexToAddress("0x03"),
 									common.HexToAddress("0x04"),
 									common.HexToAddress("0x05"),
 								},
-							}},
+							},
 						},
 					},
 				}

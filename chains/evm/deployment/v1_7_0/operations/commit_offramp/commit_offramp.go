@@ -17,7 +17,7 @@ type ConstructorArgs struct {
 	NonceManager common.Address
 }
 
-type SignatureConfigArgs = []commit_offramp.SignatureQuorumVerifierSignatureConfigArgs
+type SignatureConfigArgs = commit_offramp.SignatureQuorumVerifierSignatureConfigArgs
 
 var Deploy = deployment.New(
 	"commit-offramp:deploy",
@@ -45,6 +45,6 @@ var SetSignatureConfigs = call.NewWrite(
 	call.OnlyOwner,
 	func(SignatureConfigArgs) error { return nil },
 	func(commitOffRamp *commit_offramp.CommitOffRamp, opts *bind.TransactOpts, args SignatureConfigArgs) (*types.Transaction, error) {
-		return commitOffRamp.SetSignatureConfigs(opts, args)
+		return commitOffRamp.SetSignatureConfig(opts, args)
 	},
 )
