@@ -91,6 +91,7 @@ var (
 
 type PromReporter struct {
 	lggr        logger.Logger
+	bhClient    beholder.Client
 	chainFamily string
 	chainID     string
 	// Prometheus components
@@ -110,34 +111,35 @@ type PromReporter struct {
 	bhCommitLatestRound         metric.Int64Gauge
 }
 
-func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*PromReporter, error) {
+func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhClient beholder.Client) (*PromReporter, error) {
 	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(selector)
 	if !ok {
 		return nil, fmt.Errorf("chainFamily and chainID not found for selector %d", selector)
 	}
-	processorLatencyHistogram, err := beholder.GetMeter().Int64Histogram("ccip_commit_processor_latency")
+	processorLatencyHistogram, err := bhClient.Meter.Int64Histogram("ccip_commit_processor_latency")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_processor_latency histogram: %w", err)
 	}
-	processorOutputCounter, err := beholder.GetMeter().Int64Counter("ccip_unexpired_commit_roots")
+	processorOutputCounter, err := bhClient.Meter.Int64Counter("ccip_unexpired_commit_roots")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_unexpired_commit_roots gauge: %w", err)
 	}
-	processorErrors, err := beholder.GetMeter().Int64Counter("ccip_commit_processor_errors")
+	processorErrors, err := bhClient.Meter.Int64Counter("ccip_commit_processor_errors")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_processor_errors gauge: %w", err)
 	}
-	sequenceNumbers, err := beholder.GetMeter().Int64Gauge("ccip_commit_max_sequence_number")
+	sequenceNumbers, err := bhClient.Meter.Int64Gauge("ccip_commit_max_sequence_number")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_max_sequence_number gauge: %w", err)
 	}
-	commitLatestRoundId, err := beholder.GetMeter().Int64Gauge("ccip_commit_latest_round_id")
+	commitLatestRoundId, err := bhClient.Meter.Int64Gauge("ccip_commit_latest_round_id")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_latest_round_id gauge: %w", err)
 	}
 
 	return &PromReporter{
 		lggr:        lggr,
+		bhClient:    bhClient,
 		chainFamily: chainFamily,
 		chainID:     chainID,
 

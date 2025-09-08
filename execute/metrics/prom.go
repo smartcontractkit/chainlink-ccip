@@ -99,6 +99,7 @@ var (
 
 type PromReporter struct {
 	lggr        logger.Logger
+	bhClient    beholder.Client
 	chainFamily string
 	chainID     string
 
@@ -120,39 +121,37 @@ type PromReporter struct {
 	bhExecLatestRound           metric.Int64Gauge
 }
 
-func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*PromReporter, error) {
+func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhClient beholder.Client) (*PromReporter, error) {
 	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(selector)
 	if !ok {
 		return nil, fmt.Errorf("chainFamily and chainID not found for selector %d", selector)
 	}
 
-	latencyHistogram, err := beholder.GetMeter().Int64Histogram("ccip_exec_latency")
+	latencyHistogram, err := bhClient.Meter.Int64Histogram("ccip_exec_latency")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_exec_latency histogram: %w", err)
 	}
-
-	processorLatencyHistogram, err := beholder.GetMeter().Int64Histogram("ccip_exec_processor_latency")
+	processorLatencyHistogram, err := bhClient.Meter.Int64Histogram("ccip_exec_processor_latency")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_exec_processor_latency histogram: %w", err)
 	}
-
-	execErrors, err := beholder.GetMeter().Int64Counter("ccip_exec_errors")
+	execErrors, err := bhClient.Meter.Int64Counter("ccip_exec_errors")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_exec_errors counter: %w", err)
 	}
-	outputDetailsCounter, err := beholder.GetMeter().Int64Counter("ccip_exec_output_sizes")
+	outputDetailsCounter, err := bhClient.Meter.Int64Counter("ccip_exec_output_sizes")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_exec_output_sizes counter: %w", err)
 	}
-	sequenceNumbers, err := beholder.GetMeter().Int64Gauge("ccip_exec_max_sequence_number")
+	sequenceNumbers, err := bhClient.Meter.Int64Gauge("ccip_exec_max_sequence_number")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_exec_max_sequence_number gauge: %w", err)
 	}
-	processorErrors, err := beholder.GetMeter().Int64Counter("ccip_exec_processor_errors")
+	processorErrors, err := bhClient.Meter.Int64Counter("ccip_exec_processor_errors")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_exec_processor_errors counter: %w", err)
 	}
-	execLatestRoundId, err := beholder.GetMeter().Int64Gauge("ccip_exec_latest_round_id")
+	execLatestRoundId, err := bhClient.Meter.Int64Gauge("ccip_exec_latest_round_id")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_exec_latest_round_id gauge: %w", err)
 	}
