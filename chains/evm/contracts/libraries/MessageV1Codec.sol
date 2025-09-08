@@ -10,6 +10,8 @@ library MessageV1Codec {
   error InvalidDataLength(EncodingErrorLocation location);
   error InvalidEncodingVersion(uint8 version);
 
+  uint256 public constant MAX_NUMBER_OF_TOKENS = 1;
+
   enum EncodingErrorLocation {
     // Message-level components
     MESSAGE_MIN_SIZE,
@@ -239,12 +241,12 @@ library MessageV1Codec {
     if (message.destBlob.length > type(uint16).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_DEST_BLOB_LENGTH);
     }
-    if (message.tokenTransfer.length > type(uint16).max) {
+    if (message.tokenTransfer.length > MAX_NUMBER_OF_TOKENS) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_TRANSFER_ARRAY_LENGTH);
     }
     if (message.data.length > type(uint16).max) revert InvalidDataLength(EncodingErrorLocation.ENCODE_DATA_LENGTH);
 
-    // Encode token transfers.
+    // Encode token the transfer if present. We checked above that there is at most 1 token transfer.
     bytes memory encodedTokenTransfers;
     if (message.tokenTransfer.length > 0) {
       encodedTokenTransfers = _encodeTokenTransferV1(message.tokenTransfer[0]);

@@ -114,8 +114,8 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     );
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR));
-    MessageV1Codec.MessageV1 memory msg = _getMessage();
-    (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(msg);
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
     s_agg.execute(encodedMsg, ccvs, ccvData);
   }
 
@@ -126,8 +126,8 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     );
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.SourceChainNotEnabled.selector, SOURCE_CHAIN_SELECTOR));
-    MessageV1Codec.MessageV1 memory msg = _getMessage();
-    (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(msg);
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
     s_agg.execute(encodedMsg, ccvs, ccvData);
   }
 
