@@ -5,14 +5,14 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract MessageV1CodecSetup is Test {
-  // Helper contract to make the args calldata for decode functions
+  // Helper contract to make the args calldata for decode functions.
   MessageV1CodecHelper internal s_helper;
 
   function setUp() public virtual {
     s_helper = new MessageV1CodecHelper();
   }
 
-  // Helper functions used across multiple test files
+  // Helper functions used across multiple test files.
   function _createBasicMessage() internal pure returns (MessageV1Codec.MessageV1 memory) {
     return MessageV1Codec.MessageV1({
       sourceChainSelector: 1,
@@ -39,7 +39,7 @@ contract MessageV1CodecSetup is Test {
     });
   }
 
-  // Assertion helpers for complex types used in multiple tests
+  // Assertion helpers for complex types used in multiple tests.
   function _assertMessageEqual(
     MessageV1Codec.MessageV1 memory expected,
     MessageV1Codec.MessageV1 memory actual
@@ -89,7 +89,7 @@ contract MessageV1CodecSetup is Test {
   }
 }
 
-// Helper contract to make the args calldata for decode functions
+// Helper contract to make the args calldata for decode functions.
 contract MessageV1CodecHelper {
   function decodeMessageV1(
     bytes calldata encoded

@@ -89,7 +89,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     // Minimum encoding: version (1) + amount (32) + 3 address lengths (3) + extraData length (2)
     assertEq(1 + 32 + 1 + 1 + 1 + 2, encoded.length);
 
-    // Decode and verify the result matches the original
+    // Decode and verify the result matches the original.
     MessageV1Codec.TokenTransferV1 memory decoded = s_helper.decodeTokenTransferV1(encoded);
 
     assertEq(0, decoded.amount);
@@ -114,7 +114,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     // 1 + 32 + 1 + 32 + 1 + 32 + 1 + 32 + 2 + 16 = 150 bytes
     assertEq(150, encoded.length);
 
-    // Decode and verify the result matches the original
+    // Decode and verify the result matches the original.
     MessageV1Codec.TokenTransferV1 memory decoded = s_helper.decodeTokenTransferV1(encoded);
 
     assertEq(type(uint256).max, decoded.amount);
@@ -144,7 +144,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     // 1 + 32 + 1 + 1 + 1 + 1 + 1 + 1 + 2 = 38 static length
     assertEq(38 + 3 * maxLengthAddress.length, encoded.length);
 
-    // Decode and verify the result matches the original
+    // Decode and verify the result matches the original.
     MessageV1Codec.TokenTransferV1 memory decoded = s_helper.decodeTokenTransferV1(encoded);
 
     assertEq(tokenTransfer.amount, decoded.amount);
@@ -174,7 +174,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     // 1 + 32 + 1 + 1 + 1 + 1 + 1 + 1 + 2 = 38 static length
     assertEq(38 + maxLengthExtraData.length, encoded.length);
 
-    // Decode and verify the result matches the original
+    // Decode and verify the result matches the original.
     MessageV1Codec.TokenTransferV1 memory decoded = s_helper.decodeTokenTransferV1(encoded);
 
     assertEq(tokenTransfer.amount, decoded.amount);
@@ -212,7 +212,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       + destTokenAddress.length + 2 + extraData.length;
     assertEq(expectedLength, encoded.length);
 
-    // Decode and verify the result matches the original
+    // Decode and verify the result matches the original.
     MessageV1Codec.TokenTransferV1 memory decoded = s_helper.decodeTokenTransferV1(encoded);
 
     assertEq(amount, decoded.amount);

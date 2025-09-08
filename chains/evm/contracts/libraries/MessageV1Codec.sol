@@ -13,7 +13,7 @@ library MessageV1Codec {
   uint256 public constant MAX_NUMBER_OF_TOKENS = 1;
 
   enum EncodingErrorLocation {
-    // Message-level components
+    // Message-level components.
     MESSAGE_MIN_SIZE,
     MESSAGE_ONRAMP_ADDRESS_CONTENT,
     MESSAGE_OFFRAMP_ADDRESS_LENGTH,
@@ -30,7 +30,7 @@ library MessageV1Codec {
     MESSAGE_DATA_LENGTH,
     MESSAGE_DATA_CONTENT,
     MESSAGE_FINAL_OFFSET,
-    // Token transfer components
+    // Token transfer components.
     TOKEN_TRANSFER_VERSION,
     TOKEN_TRANSFER_AMOUNT,
     TOKEN_TRANSFER_SOURCE_POOL_LENGTH,
@@ -41,7 +41,7 @@ library MessageV1Codec {
     TOKEN_TRANSFER_DEST_TOKEN_CONTENT,
     TOKEN_TRANSFER_EXTRA_DATA_LENGTH,
     TOKEN_TRANSFER_EXTRA_DATA_CONTENT,
-    // Encoding validation components
+    // Encoding validation components.
     ENCODE_ONRAMP_ADDRESS_LENGTH,
     ENCODE_OFFRAMP_ADDRESS_LENGTH,
     ENCODE_SENDER_LENGTH,
@@ -56,7 +56,7 @@ library MessageV1Codec {
   }
 
   /// @notice Message format used in the v1 protocol.
-  /// Protocol Header
+  /// Protocol Header.
   ///   uint8 version;              Version, for future use and backwards compatibility.
   ///   uint64 sourceChainSelector; Source Chain Selector.
   ///   uint64 destChainSelector;   Destination Chain Selector.
@@ -66,7 +66,7 @@ library MessageV1Codec {
   ///   uint8 offRampAddressLength; Length of the offRamp Address in bytes.
   ///   bytes offRampAddress;       Destination Chain OffRamp as unpadded bytes.
   ///
-  /// User controlled data
+  /// User controlled data.
   ///   uint16 finality;            Configurable per-message finality value.
   ///   uint8 senderLength;         Length of the Sender Address in bytes.
   ///   bytes sender;               Sender address as unpadded bytes.
@@ -86,7 +86,7 @@ library MessageV1Codec {
   /// to storage it would be in its encoded form.
   // solhint-disable-next-line gas-struct-packing
   struct MessageV1 {
-    // Protocol Header
+    // Protocol Header.
     uint64 sourceChainSelector; // ─╮ Source Chain Selector.
     uint64 destChainSelector; //    │ Destination Chain Selector.
     //                              │ Per-lane-unique sequence number for the message. When faster-than-finality is used

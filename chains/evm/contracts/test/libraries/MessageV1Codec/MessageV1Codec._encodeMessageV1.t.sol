@@ -58,11 +58,11 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
 
   function test__encodeMessageV1_MaxLengthFields() public view {
     uint256 testDataLength = 1000; // Reasonable size for testing
-    // Create maximum length fields to test boundary conditions
+    // Create maximum length fields to test boundary conditions.
     bytes memory maxLengthBytes = new bytes(type(uint8).max); // 255 bytes
     bytes memory maxLengthData = new bytes(testDataLength);
 
-    // Fill with some pattern for verification
+    // Fill with some pattern for verification.
     for (uint256 i = 0; i < maxLengthBytes.length; ++i) {
       maxLengthBytes[i] = bytes1(uint8(i % 256));
     }
@@ -197,7 +197,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
   function test__encodeMessageV1_RevertWhen_TokenTransferArrayTooLong() public {
     MessageV1Codec.MessageV1 memory message = _createBasicMessage();
 
-    // Create array with MAX_NUMBER_OF_TOKENS token transfers
+    // Create array with MAX_NUMBER_OF_TOKENS token transfers.
     message.tokenTransfer = new MessageV1Codec.TokenTransferV1[](MessageV1Codec.MAX_NUMBER_OF_TOKENS + 1);
 
     vm.expectRevert(
