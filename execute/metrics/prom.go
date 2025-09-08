@@ -89,9 +89,10 @@ var (
 			Name: "ccip_exec_max_sequence_number",
 			Help: "This metric tracks the max sequence number observed by the commit processor",
 		},
-		[]string{"chainFamily", "chainID", "sourceChainFamily", "sourceChain", "method", "source_network_name", "dest_network_name"},
+		[]string{"chainFamily", "chainID", "sourceChainFamily", "sourceChain",
+			"method", "source_network_name", "dest_network_name"},
 	)
-	PromExecLatestRoundId = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	PromExecLatestRoundID = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ccip_exec_latest_round_id",
 		Help: "The latest round ID observed by the exec plugin",
 	}, []string{"source_network_name", "dest_network_name", "plugin"})
@@ -110,7 +111,7 @@ type PromReporter struct {
 	sequenceNumbers           *prometheus.GaugeVec
 	processorLatencyHistogram *prometheus.HistogramVec
 	processorErrors           *prometheus.CounterVec
-	latestRoundId             *prometheus.GaugeVec
+	latestRoundID             *prometheus.GaugeVec
 	// Beholder reporters
 	bhProcessorLatencyHistogram metric.Int64Histogram
 	bhLatencyHistogram          metric.Int64Histogram
@@ -121,7 +122,9 @@ type PromReporter struct {
 	bhExecLatestRound           metric.Int64Gauge
 }
 
-func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhClient beholder.Client) (*PromReporter, error) {
+func NewPromReporter(
+	lggr logger.Logger, selector cciptypes.ChainSelector, bhClient beholder.Client) (*PromReporter, error,
+) {
 	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(selector)
 	if !ok {
 		return nil, fmt.Errorf("chainFamily and chainID not found for selector %d", selector)
@@ -151,7 +154,7 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhCli
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_exec_processor_errors counter: %w", err)
 	}
-	execLatestRoundId, err := bhClient.Meter.Int64Gauge("ccip_exec_latest_round_id")
+	execLatestRoundID, err := bhClient.Meter.Int64Gauge("ccip_exec_latest_round_id")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_exec_latest_round_id gauge: %w", err)
 	}
@@ -159,6 +162,7 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhCli
 	return &PromReporter{
 		lggr:        lggr,
 		chainFamily: chainFamily,
+		bhClient:    bhClient,
 		chainID:     chainID,
 
 		latencyHistogram:          PromExecLatencyHistogram,
@@ -167,7 +171,7 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhCli
 		sequenceNumbers:           PromSequenceNumbers,
 		processorLatencyHistogram: PromExecProcessorLatencyHistogram,
 		processorErrors:           PromExecProcessorErrors,
-		latestRoundId:             PromExecLatestRoundId,
+		latestRoundID:             PromExecLatestRoundID,
 
 		bhLatencyHistogram:          latencyHistogram,
 		bhProcessorLatencyHistogram: processorLatencyHistogram,
@@ -175,7 +179,7 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhCli
 		bhOutputDetailsCounter:      outputDetailsCounter,
 		bhSequenceNumbers:           sequenceNumbers,
 		beholderProcessorErrors:     processorErrors,
-		bhExecLatestRound:           execLatestRoundId,
+		bhExecLatestRound:           execLatestRoundID,
 	}, nil
 }
 
@@ -185,7 +189,7 @@ func (p *PromReporter) TrackObservation(obs exectypes.Observation, state exectyp
 	for sourceChainSelector, cr := range obs.Messages {
 		maxSeqNr := pickHighestSeqNr(maps.Keys(cr))
 		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.ObservationMethod)
-		p.trackLatestRoundId(uint64(round), sourceChainSelector, plugincommon.OutcomeMethod)
+		p.trackLatestRoundID(round, sourceChainSelector, plugincommon.OutcomeMethod)
 	}
 }
 
@@ -196,7 +200,7 @@ func (p *PromReporter) TrackOutcome(outcome exectypes.Outcome, state exectypes.P
 		sourceChainSelector := cr.SourceChain
 		maxSeqNr := pickHighestSeqNrInMessages(cr.Messages)
 		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.OutcomeMethod)
-		p.trackLatestRoundId(uint64(round), sourceChainSelector, plugincommon.OutcomeMethod)
+		p.trackLatestRoundID(round, sourceChainSelector, plugincommon.OutcomeMethod)
 	}
 }
 
@@ -213,7 +217,7 @@ func (p *PromReporter) TrackLatency(
 		p.bhExecErrors.Add(context.Background(), 1, metric.WithAttributes(
 			attribute.String("chainFamily", p.chainFamily),
 			attribute.String("chainID", p.chainID),
-			attribute.String("method", string(method)),
+			attribute.String("method", method),
 			attribute.String("state", string(state)),
 		))
 		return
@@ -223,7 +227,7 @@ func (p *PromReporter) TrackLatency(
 	p.bhLatencyHistogram.Record(context.Background(), int64(latency), metric.WithAttributes(
 		attribute.String("chainFamily", p.chainFamily),
 		attribute.String("chainID", p.chainID),
-		attribute.String("method", string(method)),
+		attribute.String("method", method),
 		attribute.String("state", string(state))))
 }
 
@@ -247,7 +251,7 @@ func (p *PromReporter) TrackProcessorLatency(
 		attribute.String("chainFamily", p.chainFamily),
 		attribute.String("chainID", p.chainID),
 		attribute.String("processor", processor),
-		attribute.String("method", string(method)),
+		attribute.String("method", method),
 	))
 }
 
@@ -257,7 +261,9 @@ func (p *PromReporter) TrackProcessorOutput(
 	// noop
 }
 
-func (p *PromReporter) trackLatestRoundId(latestRoundId uint64, sourceChainSelector cciptypes.ChainSelector, method plugincommon.MethodType) {
+func (p *PromReporter) trackLatestRoundID(
+	latestRoundID uint64, sourceChainSelector cciptypes.ChainSelector, method plugincommon.MethodType,
+) {
 	sourceFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChainSelector)
 	if !ok {
 		p.lggr.Errorw("failed to get chain ID from selector", "selector", sourceChainSelector)
@@ -265,14 +271,16 @@ func (p *PromReporter) trackLatestRoundId(latestRoundId uint64, sourceChainSelec
 	}
 	sourceName, err := libs.GetNameFromIDAndFamily(sourceChainID, sourceFamily)
 	if err != nil {
-		p.lggr.Errorw("failed to get chain name from ID and family", "chainID", sourceChainID, "family", sourceFamily, "err", err)
+		p.lggr.Errorw("failed to get chain name from ID and family", "chainID",
+			sourceChainID, "family", sourceFamily, "err", err)
 	}
 	destName, err := libs.GetNameFromIDAndFamily(p.chainID, p.chainFamily)
 	if err != nil {
-		p.lggr.Errorw("failed to get chain name from ID and family", "chainID", p.chainID, "family", p.chainFamily, "err", err)
+		p.lggr.Errorw("failed to get chain name from ID and family", "chainID",
+			p.chainID, "family", p.chainFamily, "err", err)
 	}
-	p.latestRoundId.WithLabelValues(sourceName, destName, method).Set(float64(latestRoundId))
-	p.bhExecLatestRound.Record(context.Background(), int64(latestRoundId), metric.WithAttributes(
+	p.latestRoundID.WithLabelValues(sourceName, destName, method).Set(float64(latestRoundID))
+	p.bhExecLatestRound.Record(context.Background(), int64(latestRoundID), metric.WithAttributes(
 		attribute.String("source_network_name", sourceName),
 		attribute.String("dest_network_name", destName),
 		attribute.String("plugin", method),
@@ -295,11 +303,13 @@ func (p *PromReporter) trackMaxSequenceNumber(
 	}
 	sourceName, err := libs.GetNameFromIDAndFamily(sourceChainID, sourceFamily)
 	if err != nil {
-		p.lggr.Errorw("failed to get chain name from ID and family", "chainID", sourceChainID, "family", sourceFamily, "err", err)
+		p.lggr.Errorw("failed to get chain name from ID and family", "chainID",
+			sourceChainID, "family", sourceFamily, "err", err)
 	}
 	destName, err := libs.GetNameFromIDAndFamily(p.chainID, p.chainFamily)
 	if err != nil {
-		p.lggr.Errorw("failed to get chain name from ID and family", "chainID", p.chainID, "family", p.chainFamily, "err", err)
+		p.lggr.Errorw("failed to get chain name from ID and family", "chainID",
+			p.chainID, "family", p.chainFamily, "err", err)
 	}
 
 	p.sequenceNumbers.
@@ -310,7 +320,7 @@ func (p *PromReporter) trackMaxSequenceNumber(
 		attribute.String("chainID", p.chainID),
 		attribute.String("sourceChainFamily", sourceFamily),
 		attribute.String("sourceChainID", sourceChainID),
-		attribute.String("method", string(method)),
+		attribute.String("method", method),
 		attribute.String("source_network_name", sourceName),
 		attribute.String("dest_network_name", destName),
 	))
@@ -339,7 +349,7 @@ func (p *PromReporter) trackOutputStats(
 		p.bhOutputDetailsCounter.Add(context.Background(), int64(val), metric.WithAttributes(
 			attribute.String("chainFamily", p.chainFamily),
 			attribute.String("chainID", p.chainID),
-			attribute.String("method", string(method)),
+			attribute.String("method", method),
 			attribute.String("state", stringState),
 			attribute.String("type", key),
 		))

@@ -97,7 +97,7 @@ func (p *Plugin) Outcome(
 		}
 		return nil, nil
 	}
-
+	//lint:ignore SA1019 we rely on Round for OTI metrics compatibility
 	p.observer.TrackOutcome(outcome, state, outctx.Round)
 	lggr.Infow("generated outcome",
 		"outcomeWithoutMsgData", outcome.ToLogFormat(),

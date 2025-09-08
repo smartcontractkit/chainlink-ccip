@@ -65,7 +65,8 @@ var (
 			Name: "ccip_commit_max_sequence_number",
 			Help: "This metric tracks the max sequence number observed by the commit processor",
 		},
-		[]string{"chainFamily", "chainID", "sourceChainFamily", "sourceChain", "method", "source_network_name", "dest_network_name"},
+		[]string{"chainFamily", "chainID", "sourceChainFamily", "sourceChain",
+			"method", "source_network_name", "dest_network_name"},
 	)
 	promMerkleProcessorRmnReportLatency = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -83,7 +84,7 @@ var (
 		},
 		[]string{"method", "nodeID", "error"},
 	)
-	promCommitLatestRoundId = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	promCommitLatestRoundID = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ccip_commit_latest_round_id",
 		Help: "The latest round ID observed by the commit plugin",
 	}, []string{"source_network_name", "dest_network_name", "contract_address", "plugin"})
@@ -111,7 +112,9 @@ type PromReporter struct {
 	bhCommitLatestRound         metric.Int64Gauge
 }
 
-func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhClient beholder.Client) (*PromReporter, error) {
+func NewPromReporter(
+	lggr logger.Logger, selector cciptypes.ChainSelector, bhClient beholder.Client) (*PromReporter, error,
+) {
 	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(selector)
 	if !ok {
 		return nil, fmt.Errorf("chainFamily and chainID not found for selector %d", selector)
@@ -132,7 +135,7 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhCli
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_max_sequence_number gauge: %w", err)
 	}
-	commitLatestRoundId, err := bhClient.Meter.Int64Gauge("ccip_commit_latest_round_id")
+	commitLatestRoundID, err := bhClient.Meter.Int64Gauge("ccip_commit_latest_round_id")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_latest_round_id gauge: %w", err)
 	}
@@ -147,7 +150,7 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhCli
 		rmnControllerRmnRequestHistogram:  promRmnControllerRmnRequestLatency,
 
 		sequenceNumbers:   promSequenceNumbers,
-		commitLatestRound: promCommitLatestRoundId,
+		commitLatestRound: promCommitLatestRoundID,
 
 		processorLatencyHistogram: promProcessorLatencyHistogram,
 		processorOutputCounter:    promProcessorOutputCounter,
@@ -157,7 +160,7 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector, bhCli
 		bhProcessorOutputCounter:    processorOutputCounter,
 		bhProcessorErrors:           processorErrors,
 		bhSequenceNumbers:           sequenceNumbers,
-		bhCommitLatestRound:         commitLatestRoundId,
+		bhCommitLatestRound:         commitLatestRoundID,
 	}, nil
 }
 
@@ -167,7 +170,7 @@ func (p *PromReporter) TrackObservation(obs committypes.Observation, round uint6
 		maxSeqNr := root.SeqNumsRange.End()
 		onramp := root.OnRampAddress.String()
 		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.ObservationMethod)
-		p.trackLatestRoundId(uint32(round), sourceChainSelector, onramp, plugincommon.ObservationMethod)
+		p.trackLatestRoundID(uint32(round), sourceChainSelector, onramp, plugincommon.ObservationMethod)
 	}
 }
 
@@ -177,11 +180,13 @@ func (p *PromReporter) TrackOutcome(outcome committypes.Outcome, round uint64) {
 		maxSeqNr := root.SeqNumsRange.End()
 		onramp := root.OnRampAddress.String()
 		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.OutcomeMethod)
-		p.trackLatestRoundId(uint32(round), sourceChainSelector, onramp, plugincommon.OutcomeMethod)
+		p.trackLatestRoundID(uint32(round), sourceChainSelector, onramp, plugincommon.OutcomeMethod)
 	}
 }
 
-func (p *PromReporter) trackLatestRoundId(latestRoundId uint32, sourceChainSelector cciptypes.ChainSelector, onramp string, method string) {
+func (p *PromReporter) trackLatestRoundID(
+	latestRoundID uint32, sourceChainSelector cciptypes.ChainSelector, onramp string, method string,
+) {
 
 	sourceFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChainSelector)
 	if !ok {
@@ -190,15 +195,17 @@ func (p *PromReporter) trackLatestRoundId(latestRoundId uint32, sourceChainSelec
 	}
 	sourceName, err := libs.GetNameFromIDAndFamily(sourceChainID, sourceFamily)
 	if err != nil {
-		p.lggr.Errorw("failed to get chain name from ID and family", "chainID", sourceChainID, "family", sourceFamily, "err", err)
+		p.lggr.Errorw("failed to get chain name from ID and family", "chainID",
+			sourceChainID, "family", sourceFamily, "err", err)
 	}
 	destName, err := libs.GetNameFromIDAndFamily(p.chainID, p.chainFamily)
 	if err != nil {
-		p.lggr.Errorw("failed to get chain name from ID and family", "chainID", p.chainID, "family", p.chainFamily, "err", err)
+		p.lggr.Errorw("failed to get chain name from ID and family", "chainID",
+			p.chainID, "family", p.chainFamily, "err", err)
 	}
 
-	p.commitLatestRound.WithLabelValues(sourceName, destName, onramp, method).Set(float64(latestRoundId))
-	p.bhCommitLatestRound.Record(context.Background(), int64(latestRoundId), metric.WithAttributes(
+	p.commitLatestRound.WithLabelValues(sourceName, destName, onramp, method).Set(float64(latestRoundID))
+	p.bhCommitLatestRound.Record(context.Background(), int64(latestRoundID), metric.WithAttributes(
 		attribute.String("source_network_name", sourceName),
 		attribute.String("dest_network_name", destName),
 		attribute.String("contract_address", onramp),
@@ -222,11 +229,13 @@ func (p *PromReporter) trackMaxSequenceNumber(
 	}
 	sourceName, err := libs.GetNameFromIDAndFamily(sourceChainID, sourceFamily)
 	if err != nil {
-		p.lggr.Errorw("failed to get chain name from ID and family", "chainID", sourceChainID, "family", sourceFamily, "err", err)
+		p.lggr.Errorw("failed to get chain name from ID and family", "chainID",
+			sourceChainID, "family", sourceFamily, "err", err)
 	}
 	destName, err := libs.GetNameFromIDAndFamily(p.chainID, p.chainFamily)
 	if err != nil {
-		p.lggr.Errorw("failed to get chain name from ID and family", "chainID", p.chainID, "family", p.chainFamily, "err", err)
+		p.lggr.Errorw("failed to get chain name from ID and family", "chainID",
+			p.chainID, "family", p.chainFamily, "err", err)
 	}
 
 	p.sequenceNumbers.
@@ -284,7 +293,7 @@ func (p *PromReporter) TrackProcessorLatency(
 		attribute.String("chainFamily", p.chainFamily),
 		attribute.String("chainID", p.chainID),
 		attribute.String("processor", processor),
-		attribute.String("method", string(method)),
+		attribute.String("method", method),
 	))
 }
 
@@ -301,7 +310,7 @@ func (p *PromReporter) TrackProcessorOutput(
 			attribute.String("chainFamily", p.chainFamily),
 			attribute.String("chainID", p.chainID),
 			attribute.String("processor", processor),
-			attribute.String("method", string(method)),
+			attribute.String("method", method),
 			attribute.String("type", key),
 		))
 	}
