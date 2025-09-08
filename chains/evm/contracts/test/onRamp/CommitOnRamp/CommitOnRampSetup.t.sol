@@ -19,7 +19,8 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
     s_ccvProxy = makeAddr("CCVProxy");
     s_nonceManager = NonceManager(makeAddr("NonceManager"));
 
-    s_commitOnRamp = new CommitOnRamp(address(s_mockRMNRemote), address(s_nonceManager), _getBasicDynamicConfig());
+    s_commitOnRamp =
+      new CommitOnRamp(address(s_mockRMNRemote), address(s_nonceManager), _createBasicDynamicConfigArgs());
 
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = BaseOnRamp.DestChainConfigArgs({
@@ -29,12 +30,10 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
     });
 
     s_commitOnRamp.applyDestChainConfigUpdates(destChainConfigs);
-
-    vm.startPrank(OWNER);
   }
 
   /// @notice Helper to create a minimal dynamic config
-  function _getBasicDynamicConfig() internal view returns (CommitOnRamp.DynamicConfig memory) {
+  function _createBasicDynamicConfigArgs() internal view returns (CommitOnRamp.DynamicConfig memory) {
     return CommitOnRamp.DynamicConfig({
       feeQuoter: address(s_feeQuoter),
       feeAggregator: FEE_AGGREGATOR,
@@ -43,7 +42,7 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
   }
 
   /// @notice Helper to create a dynamic config with custom addresses
-  function _getDynamicConfig(
+  function _createDynamicConfigArgs(
     address feeQuoter,
     address feeAggregator,
     address allowlistAdmin
@@ -53,7 +52,7 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
   }
 
   /// @notice Helper to create a destination chain config
-  function _getDestChainConfig(
+  function _createDestChainConfigArgs(
     address ccvProxy,
     uint64 destChainSelector,
     bool allowlistEnabled

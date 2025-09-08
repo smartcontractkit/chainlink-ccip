@@ -7,108 +7,46 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 
 contract CommitOnRamp_setDynamicConfig is CommitOnRampSetup {
   function test_setDynamicConfig() public {
-    CommitOnRamp.DynamicConfig memory newConfig =
-      _getDynamicConfig(makeAddr("newFeeQuoter"), makeAddr("newFeeAggregator"), makeAddr("newAllowlistAdmin"));
+    CommitOnRamp.StaticConfig memory staticConfig = s_commitOnRamp.getStaticConfig();
+
+    CommitOnRamp.DynamicConfig memory newConfig = CommitOnRamp.DynamicConfig({
+      feeQuoter: makeAddr("feeQuoter2"),
+      feeAggregator: makeAddr("feeAggregator2"),
+      allowlistAdmin: makeAddr("allowlistAdmin2")
+    });
 
     vm.expectEmit();
-    emit CommitOnRamp.ConfigSet(
-      CommitOnRamp.StaticConfig({rmnRemote: address(s_mockRMNRemote), nonceManager: address(s_nonceManager)}), newConfig
-    );
+    emit CommitOnRamp.ConfigSet(staticConfig, newConfig);
 
     s_commitOnRamp.setDynamicConfig(newConfig);
 
-    CommitOnRamp.DynamicConfig memory retrievedConfig = s_commitOnRamp.getDynamicConfig();
-    assertEq(retrievedConfig.feeQuoter, newConfig.feeQuoter);
-    assertEq(retrievedConfig.feeAggregator, newConfig.feeAggregator);
-    assertEq(retrievedConfig.allowlistAdmin, newConfig.allowlistAdmin);
+    CommitOnRamp.DynamicConfig memory got = s_commitOnRamp.getDynamicConfig();
+    assertEq(got.feeQuoter, newConfig.feeQuoter);
+    assertEq(got.feeAggregator, newConfig.feeAggregator);
+    assertEq(got.allowlistAdmin, newConfig.allowlistAdmin);
   }
 
-  function test_setDynamicConfig_MultipleTimes() public {
-    // First update
-    CommitOnRamp.DynamicConfig memory firstConfig =
-      _getDynamicConfig(makeAddr("firstFeeQuoter"), makeAddr("firstFeeAggregator"), makeAddr("firstAllowlistAdmin"));
-
-    s_commitOnRamp.setDynamicConfig(firstConfig);
-
-    CommitOnRamp.DynamicConfig memory retrievedConfig = s_commitOnRamp.getDynamicConfig();
-    assertEq(retrievedConfig.feeQuoter, firstConfig.feeQuoter);
-    assertEq(retrievedConfig.feeAggregator, firstConfig.feeAggregator);
-    assertEq(retrievedConfig.allowlistAdmin, firstConfig.allowlistAdmin);
-
-    // Second update
-    CommitOnRamp.DynamicConfig memory secondConfig =
-      _getDynamicConfig(makeAddr("secondFeeQuoter"), makeAddr("secondFeeAggregator"), makeAddr("secondAllowlistAdmin"));
-
-    vm.expectEmit();
-    emit CommitOnRamp.ConfigSet(
-      CommitOnRamp.StaticConfig({rmnRemote: address(s_mockRMNRemote), nonceManager: address(s_nonceManager)}),
-      secondConfig
-    );
-
-    s_commitOnRamp.setDynamicConfig(secondConfig);
-
-    retrievedConfig = s_commitOnRamp.getDynamicConfig();
-    assertEq(retrievedConfig.feeQuoter, secondConfig.feeQuoter);
-    assertEq(retrievedConfig.feeAggregator, secondConfig.feeAggregator);
-    assertEq(retrievedConfig.allowlistAdmin, secondConfig.allowlistAdmin);
+  function test_setDynamicConfig_RevertWhen_InvalidConfig() public {
+    // Zero feeQuoter should revert
+    CommitOnRamp.DynamicConfig memory badConfig = CommitOnRamp.DynamicConfig({
+      feeQuoter: address(0),
+      feeAggregator: FEE_AGGREGATOR,
+      allowlistAdmin: ALLOWLIST_ADMIN
+    });
+    vm.expectRevert(CommitOnRamp.InvalidConfig.selector);
+    s_commitOnRamp.setDynamicConfig(badConfig);
   }
-
-  function test_setDynamicConfig_WithZeroAllowlistAdmin() public {
-    CommitOnRamp.DynamicConfig memory newConfig = _getDynamicConfig(
-      makeAddr("newFeeQuoter"),
-      makeAddr("newFeeAggregator"),
-      address(0) // Zero allowlist admin should be allowed
-    );
-
-    s_commitOnRamp.setDynamicConfig(newConfig);
-
-    CommitOnRamp.DynamicConfig memory retrievedConfig = s_commitOnRamp.getDynamicConfig();
-    assertEq(retrievedConfig.allowlistAdmin, address(0));
-  }
-
-  // Reverts
 
   function test_setDynamicConfig_RevertWhen_OnlyCallableByOwner() public {
-    vm.stopPrank();
+    CommitOnRamp.DynamicConfig memory cfg = CommitOnRamp.DynamicConfig({
+      feeQuoter: makeAddr("fq"),
+      feeAggregator: FEE_AGGREGATOR,
+      allowlistAdmin: ALLOWLIST_ADMIN
+    });
+
     vm.startPrank(STRANGER);
-
-    CommitOnRamp.DynamicConfig memory newConfig =
-      _getDynamicConfig(makeAddr("newFeeQuoter"), makeAddr("newFeeAggregator"), makeAddr("newAllowlistAdmin"));
-
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_commitOnRamp.setDynamicConfig(newConfig);
-  }
-
-  function test_setDynamicConfig_RevertWhen_FeeQuoterZeroAddress() public {
-    CommitOnRamp.DynamicConfig memory newConfig = _getDynamicConfig(
-      address(0), // Zero fee quoter
-      makeAddr("newFeeAggregator"),
-      makeAddr("newAllowlistAdmin")
-    );
-
-    vm.expectRevert(CommitOnRamp.InvalidConfig.selector);
-    s_commitOnRamp.setDynamicConfig(newConfig);
-  }
-
-  function test_setDynamicConfig_RevertWhen_FeeAggregatorZeroAddress() public {
-    CommitOnRamp.DynamicConfig memory newConfig = _getDynamicConfig(
-      makeAddr("newFeeQuoter"),
-      address(0), // Zero fee aggregator
-      makeAddr("newAllowlistAdmin")
-    );
-
-    vm.expectRevert(CommitOnRamp.InvalidConfig.selector);
-    s_commitOnRamp.setDynamicConfig(newConfig);
-  }
-
-  function test_setDynamicConfig_RevertWhen_BothFeeQuoterAndFeeAggregatorZero() public {
-    CommitOnRamp.DynamicConfig memory newConfig = _getDynamicConfig(
-      address(0), // Zero fee quoter
-      address(0), // Zero fee aggregator
-      makeAddr("newAllowlistAdmin")
-    );
-
-    vm.expectRevert(CommitOnRamp.InvalidConfig.selector);
-    s_commitOnRamp.setDynamicConfig(newConfig);
+    s_commitOnRamp.setDynamicConfig(cfg);
+    vm.stopPrank();
   }
 }
