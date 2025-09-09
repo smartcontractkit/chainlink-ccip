@@ -30,6 +30,16 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
     return (s_required, s_optional, s_threshold);
   }
 
+  function updateCCVs(
+    address[] memory required,
+    address[] memory optional,
+    uint8 threshold
+  ) external {
+    s_required = required;
+    s_optional = optional;
+    s_threshold = threshold;
+  }
+
   function supportsInterface(
     bytes4 interfaceId
   ) external pure override returns (bool) {
