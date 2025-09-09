@@ -70,7 +70,6 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   ) external returns (bytes memory) {
     (messageId); // silence unused; reserved for future use
 
-    _assertNotCursed(message.destChainSelector);
     // For EVM, sender is expected to be 20 bytes.
     address senderAddress = address(bytes20(message.sender));
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
