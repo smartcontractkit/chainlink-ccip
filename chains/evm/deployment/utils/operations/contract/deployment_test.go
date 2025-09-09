@@ -1,4 +1,4 @@
-package deployment_test
+package contract_test
 
 import (
 	"context"
@@ -10,32 +10,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 	"github.com/zksync-sdk/zksync2-go/accounts"
 	"github.com/zksync-sdk/zksync2-go/clients"
 )
-
-var TestContractType = cldf_deployment.ContractType("TestContract")
-
-// Implements rpc.DataError from go-ethereum/rpc
-// Enables ABI decoding of revert reasons
-type rpcError struct {
-	Data interface{}
-}
-
-func (e *rpcError) Error() string {
-	return ""
-}
-
-func (e *rpcError) ErrorData() interface{} {
-	return e.Data
-}
 
 func TestDeploy(t *testing.T) {
 	address := common.HexToAddress("0x01")
@@ -44,13 +27,13 @@ func TestDeploy(t *testing.T) {
 
 	tests := []struct {
 		desc        string
-		input       deployment.Input[int]
+		input       contract.DeployInput[int]
 		isZkSyncVM  bool
 		expectedErr string
 	}{
 		{
 			desc: "args validation failure",
-			input: deployment.Input[int]{
+			input: contract.DeployInput[int]{
 				ChainSelector: validChainSel,
 				Args:          3,
 			},
@@ -58,7 +41,7 @@ func TestDeploy(t *testing.T) {
 		},
 		{
 			desc: "revert from contract",
-			input: deployment.Input[int]{
+			input: contract.DeployInput[int]{
 				ChainSelector: validChainSel,
 				Args:          10,
 			},
@@ -66,7 +49,7 @@ func TestDeploy(t *testing.T) {
 		},
 		{
 			desc: "mismatched chain selector",
-			input: deployment.Input[int]{
+			input: contract.DeployInput[int]{
 				ChainSelector: invalidChainSel,
 				Args:          2,
 			},
@@ -74,7 +57,7 @@ func TestDeploy(t *testing.T) {
 		},
 		{
 			desc: "zkSyncVM deployment",
-			input: deployment.Input[int]{
+			input: contract.DeployInput[int]{
 				ChainSelector: validChainSel,
 				Args:          2,
 			},
@@ -82,7 +65,7 @@ func TestDeploy(t *testing.T) {
 		},
 		{
 			desc: "evm deployment",
-			input: deployment.Input[int]{
+			input: contract.DeployInput[int]{
 				ChainSelector: validChainSel,
 				Args:          2,
 			},
@@ -98,11 +81,11 @@ func TestDeploy(t *testing.T) {
 				"type": "error"
 			}]`
 
-			op := deployment.New(
+			op := contract.NewDeploy(
 				"test-deployment",
 				semver.MustParse("1.0.0"),
 				"Test deployment operation",
-				TestContractType,
+				testContractType,
 				contractABI,
 				func(input int) error {
 					if input%2 != 0 {
@@ -110,7 +93,7 @@ func TestDeploy(t *testing.T) {
 					}
 					return nil
 				},
-				deployment.VMDeployers[int]{
+				contract.VMDeployers[int]{
 					DeployEVM: func(auth *bind.TransactOpts, client bind.ContractBackend, args int) (common.Address, *types.Transaction, error) {
 						// Not caught by operation validation, revert reason should be surfaced
 						if args == 10 {
@@ -165,7 +148,7 @@ func TestDeploy(t *testing.T) {
 				}
 				require.Equal(t, validChainSel, report.Output.ChainSelector, "Unexpected ChainSelector in output")
 				require.Equal(t, address.Hex(), report.Output.Address, "Unexpected address in output")
-				require.Equal(t, datastore.ContractType(TestContractType), report.Output.Type, "Unexpected contract type in output")
+				require.Equal(t, datastore.ContractType(testContractType), report.Output.Type, "Unexpected contract type in output")
 				require.Equal(t, semver.MustParse("1.0.0"), report.Output.Version, "Unexpected version in output")
 			}
 		})

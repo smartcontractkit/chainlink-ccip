@@ -5,8 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
@@ -22,14 +21,14 @@ type CurseArgs struct {
 	Subject [16]byte
 }
 
-var Deploy = deployment.New(
+var Deploy = contract.NewDeploy(
 	"rmn-remote:deploy",
 	semver.MustParse("1.6.0"),
 	"Deploys the RMNRemote contract",
 	ContractType,
 	rmn_remote.RMNRemoteABI,
 	func(ConstructorArgs) error { return nil },
-	deployment.VMDeployers[ConstructorArgs]{
+	contract.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
 			address, tx, _, err := rmn_remote.DeployRMNRemote(opts, backend, args.LocalChainSelector, args.LegacyRMN)
 			return address, tx, err
@@ -38,28 +37,28 @@ var Deploy = deployment.New(
 	},
 )
 
-var Curse = call.NewWrite(
+var Curse = contract.NewWrite(
 	"rmn-remote:curse",
 	semver.MustParse("1.6.0"),
 	"Applies a curse to an RMNRemote contract",
 	ContractType,
 	rmn_remote.RMNRemoteABI,
 	rmn_remote.NewRMNRemote,
-	call.OnlyOwner,
+	contract.OnlyOwner,
 	func(CurseArgs) error { return nil },
 	func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
 		return rmnRemote.Curse(opts, args.Subject)
 	},
 )
 
-var Uncurse = call.NewWrite(
+var Uncurse = contract.NewWrite(
 	"rmn-remote:uncurse",
 	semver.MustParse("1.6.0"),
 	"Uncurses an existing curse on an RMNRemote contract",
 	ContractType,
 	rmn_remote.RMNRemoteABI,
 	rmn_remote.NewRMNRemote,
-	call.OnlyOwner,
+	contract.OnlyOwner,
 	func(CurseArgs) error { return nil },
 	func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
 		return rmnRemote.Uncurse(opts, args.Subject)

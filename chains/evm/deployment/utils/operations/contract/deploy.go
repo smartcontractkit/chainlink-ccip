@@ -1,4 +1,4 @@
-package deployment
+package contract
 
 import (
 	"fmt"
@@ -15,8 +15,8 @@ import (
 	"github.com/zksync-sdk/zksync2-go/clients"
 )
 
-// Input is the input structure for the Deploy operation.
-type Input[ARGS any] struct {
+// DeployInput is the input structure for the Deploy operation.
+type DeployInput[ARGS any] struct {
 	// ChainSelector is the selector for the chain on which the contract will be deployed.
 	// Required to differentiate between operation runs with the same data targeting different chains.
 	ChainSelector uint64 `json:"chainSelector"`
@@ -31,9 +31,9 @@ type VMDeployers[ARGS any] struct {
 	DeployZksyncVM func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ARGS) (common.Address, error)
 }
 
-// New creates a new operation that deploys an EVM contract.
+// NewDeploy creates a new operation that deploys an EVM contract.
 // Any interfacing with gethwrappers should happen in the deploy function.
-func New[ARGS any](
+func NewDeploy[ARGS any](
 	name string,
 	version *semver.Version,
 	description string,
@@ -41,12 +41,12 @@ func New[ARGS any](
 	contractABI string,
 	validate func(input ARGS) error,
 	deployers VMDeployers[ARGS],
-) *operations.Operation[Input[ARGS], datastore.AddressRef, evm.Chain] {
+) *operations.Operation[DeployInput[ARGS], datastore.AddressRef, evm.Chain] {
 	return operations.NewOperation(
 		name,
 		version,
 		description,
-		func(b operations.Bundle, chain evm.Chain, input Input[ARGS]) (datastore.AddressRef, error) {
+		func(b operations.Bundle, chain evm.Chain, input DeployInput[ARGS]) (datastore.AddressRef, error) {
 			if validate != nil {
 				if err := validate(input.Args); err != nil {
 					return datastore.AddressRef{}, fmt.Errorf("invalid constructor args for %s: %w", name, err)
