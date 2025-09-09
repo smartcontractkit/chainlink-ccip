@@ -11,7 +11,7 @@ contract BaseOnRamp_assertSenderIsAllowed is BaseOnRampSetup {
   }
 
   function test_assertSenderIsAllowed() public {
-    // Should allow any sender when allowlist is disabled
+    // Should allow any sender when allowlist is disabled.
     address anySender = makeAddr("anySender");
 
     vm.prank(s_ccvProxy);
@@ -19,7 +19,7 @@ contract BaseOnRamp_assertSenderIsAllowed is BaseOnRampSetup {
   }
 
   function test_assertSenderIsAllowed_AllowlistEnabledWithAllowedSender() public {
-    // Enable allowlist and add a sender
+    // Enable allowlist and add a sender.
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = _getDestChainConfig(s_ccvProxy, DEST_CHAIN_SELECTOR, true);
 
@@ -36,10 +36,8 @@ contract BaseOnRamp_assertSenderIsAllowed is BaseOnRampSetup {
     vm.prank(OWNER);
     s_baseOnRamp.applyAllowlistUpdates(allowlistConfigs);
 
-    // Should allow the allowed sender
     vm.prank(s_ccvProxy);
     s_baseOnRamp.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, allowedSender);
-    // Should not revert
   }
 
   // Reverts
@@ -54,7 +52,7 @@ contract BaseOnRamp_assertSenderIsAllowed is BaseOnRampSetup {
   }
 
   function test_assertSenderIsAllowed_RevertWhen_SenderNotAllowed() public {
-    // Enable allowlist and add one sender
+    // Enable allowlist and add one sender.
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = _getDestChainConfig(s_ccvProxy, DEST_CHAIN_SELECTOR, true);
 
@@ -73,7 +71,7 @@ contract BaseOnRamp_assertSenderIsAllowed is BaseOnRampSetup {
     vm.prank(OWNER);
     s_baseOnRamp.applyAllowlistUpdates(allowlistConfigs);
 
-    // Should revert for non-allowed sender
+    // Should revert for non-allowed sender.
     vm.prank(s_ccvProxy);
     vm.expectRevert(abi.encodeWithSelector(BaseOnRamp.SenderNotAllowed.selector, notAllowedSender));
     s_baseOnRamp.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, notAllowedSender);

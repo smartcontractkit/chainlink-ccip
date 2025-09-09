@@ -16,7 +16,7 @@ contract BaseOnRamp_withdrawFeeTokens is BaseOnRampSetup {
   function test_withdrawFeeTokens() public {
     uint256 feeAmount = 1000 ether;
 
-    // Give the onRamp some fee tokens
+    // Give the onRamp some fee tokens.
     deal(s_sourceFeeToken, address(s_baseOnRamp), feeAmount);
 
     uint256 initialAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
@@ -30,7 +30,7 @@ contract BaseOnRamp_withdrawFeeTokens is BaseOnRampSetup {
     vm.expectEmit();
     emit BaseOnRamp.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount);
 
-    // Anyone can call withdrawFeeTokens
+    // Anyone can call withdrawFeeTokens.
     vm.prank(STRANGER);
     s_baseOnRamp.withdrawFeeTokens(feeTokens, FEE_AGGREGATOR);
 

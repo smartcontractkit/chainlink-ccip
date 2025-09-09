@@ -22,7 +22,7 @@ contract BaseOnRampSetup is FeeQuoterSetup {
 
     s_baseOnRamp = new BaseOnRampTestHelper(address(s_mockRMNRemote));
 
-    // Set up initial destination chain config
+    // Set up initial destination chain config.
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = BaseOnRamp.DestChainConfigArgs({
       ccvProxy: s_ccvProxy,
@@ -35,7 +35,7 @@ contract BaseOnRampSetup is FeeQuoterSetup {
     vm.startPrank(OWNER);
   }
 
-  /// @notice Helper to create a destination chain config
+  /// @notice Helper to create a destination chain config.
   function _getDestChainConfig(
     address ccvProxy,
     uint64 destChainSelector,
@@ -48,7 +48,7 @@ contract BaseOnRampSetup is FeeQuoterSetup {
     });
   }
 
-  /// @notice Helper to create allowlist config args
+  /// @notice Helper to create allowlist config args.
   function _getAllowlistConfig(
     uint64 destChainSelector,
     bool allowlistEnabled,

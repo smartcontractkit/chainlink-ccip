@@ -17,7 +17,7 @@ contract BaseOnRamp_applyDestChainConfigUpdates is BaseOnRampSetup {
 
     s_baseOnRamp.applyDestChainConfigUpdates(destChainConfigs);
 
-    // Verify config was set
+    // Verify config was set.
     (bool allowlistEnabled, address ccvProxy,) = s_baseOnRamp.getDestChainConfig(destChainConfigs[0].destChainSelector);
     assertEq(ccvProxy, destChainConfigs[0].ccvProxy);
     assertEq(allowlistEnabled, destChainConfigs[0].allowlistEnabled);

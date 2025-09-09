@@ -12,7 +12,7 @@ contract CommitOnRamp_constructor is CommitOnRampSetup {
     address expectedFeeAggregator = FEE_AGGREGATOR;
     address expectedAllowlistAdmin = ALLOWLIST_ADMIN;
 
-    // Expect ConfigSet event for the deployment below
+    // Expect ConfigSet event for the deployment below.
     vm.expectEmit();
     emit CommitOnRamp.ConfigSet(
       CommitOnRamp.StaticConfig({rmnRemote: expectedRmnRemote, nonceManager: expectedNonceManager}),
@@ -25,12 +25,12 @@ contract CommitOnRamp_constructor is CommitOnRampSetup {
       _createDynamicConfigArgs(expectedFeeQuoter, expectedFeeAggregator, expectedAllowlistAdmin)
     );
 
-    // Verify static config
+    // Verify static config.
     CommitOnRamp.StaticConfig memory staticConfig = newOnRamp.getStaticConfig();
     assertEq(staticConfig.rmnRemote, expectedRmnRemote);
     assertEq(staticConfig.nonceManager, expectedNonceManager);
 
-    // Verify dynamic config
+    // Verify dynamic config.
     CommitOnRamp.DynamicConfig memory dynamicConfig = newOnRamp.getDynamicConfig();
     assertEq(dynamicConfig.feeQuoter, expectedFeeQuoter);
     assertEq(dynamicConfig.feeAggregator, expectedFeeAggregator);
@@ -42,7 +42,7 @@ contract CommitOnRamp_constructor is CommitOnRampSetup {
   function test_constructor_RevertWhen_InvalidConfig_RmnRemoteZeroAddress() public {
     vm.expectRevert(CommitOnRamp.InvalidConfig.selector);
     new CommitOnRamp(
-      address(0), // Zero RMN remote address
+      address(0), // Zero RMN remote address.
       address(s_nonceManager),
       _createDynamicConfigArgs(address(s_feeQuoter), FEE_AGGREGATOR, ALLOWLIST_ADMIN)
     );
@@ -52,7 +52,7 @@ contract CommitOnRamp_constructor is CommitOnRampSetup {
     vm.expectRevert(CommitOnRamp.InvalidConfig.selector);
     new CommitOnRamp(
       address(s_mockRMNRemote),
-      address(0), // Zero nonce manager address
+      address(0), // Zero nonce manager address.
       _createDynamicConfigArgs(address(s_feeQuoter), FEE_AGGREGATOR, ALLOWLIST_ADMIN)
     );
   }

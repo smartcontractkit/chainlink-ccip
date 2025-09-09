@@ -5,7 +5,7 @@ import {BaseOnRampSetup} from "./BaseOnRampSetup.t.sol";
 
 contract BaseOnRamp_getDestChainConfig is BaseOnRampSetup {
   function test_getDestChainConfig() public view {
-    // Get config for the default destination chain set in setup
+    // Get config for the default destination chain set in setup.
     (bool allowlistEnabled, address ccvProxy, address[] memory allowedSenders) =
       s_baseOnRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
 
