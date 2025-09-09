@@ -5,6 +5,7 @@ import {ICCVOffRampV1} from "../../../interfaces/ICCVOffRampV1.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
+import {CCVRamp} from "../../../libraries/CCVRamp.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
@@ -28,7 +29,16 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.mockCall(
       s_defaultCCV,
       abi.encodeCall(
-        ICCVOffRampV1.verifyMessage, (message, messageHash, defaultCcvData, Internal.MessageExecutionState.UNTOUCHED)
+        ICCVOffRampV1.verifyMessage,
+        (
+          message.sourceChainSelector,
+          CCVRamp.V1,
+          address(s_agg),
+          message,
+          messageHash,
+          defaultCcvData,
+          Internal.MessageExecutionState.UNTOUCHED
+        )
       ),
       abi.encode(true)
     );
@@ -302,7 +312,16 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.mockCall(
       s_defaultCCV,
       abi.encodeCall(
-        ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
+        ICCVOffRampV1.verifyMessage,
+        (
+          message.sourceChainSelector,
+          CCVRamp.V1,
+          address(s_agg),
+          message,
+          messageId,
+          ccvData[0],
+          Internal.MessageExecutionState.UNTOUCHED
+        )
       ),
       abi.encode(true)
     );
@@ -335,7 +354,16 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.mockCallRevert(
       s_defaultCCV,
       abi.encodeCall(
-        ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
+        ICCVOffRampV1.verifyMessage,
+        (
+          message.sourceChainSelector,
+          CCVRamp.V1,
+          address(s_agg),
+          message,
+          messageId,
+          ccvData[0],
+          Internal.MessageExecutionState.UNTOUCHED
+        )
       ),
       revertReason
     );
@@ -389,6 +417,9 @@ contract ReentrantCCV is ICCVOffRampV1 {
   }
 
   function verifyMessage(
+    uint64, /* remoteChainSelector */
+    bytes32, /* version */
+    address, /* caller */
     MessageV1Codec.MessageV1 memory message,
     bytes32, /* messageHash */
     bytes memory ccvData,

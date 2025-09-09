@@ -11,6 +11,8 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
+
+import {CCVRamp} from "../libraries/CCVRamp.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
@@ -270,11 +272,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     bytes memory encodedMessage = abi.encode(newMessage);
     bytes[] memory receiptBlobs = new bytes[](newMessage.verifierReceipts.length);
 
-    for (uint256 i = 0; i < newMessage.verifierReceipts.length; ++i) {
-      address verifier = newMessage.verifierReceipts[i].issuer;
-
-      ICCVOnRamp(verifier).forwardToVerifier(encodedMessage, i);
-    }
+    _forwardToVerifiers(destChainSelector, newMessage, encodedMessage);
 
     // 7. emit event
 
@@ -283,6 +281,17 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     s_dynamicConfig.reentrancyGuardEntered = false;
 
     return newMessage.header.messageId;
+  }
+
+  function _forwardToVerifiers(
+    uint64 destChainSelector,
+    Internal.EVM2AnyVerifierMessage memory newMessage,
+    bytes memory encodedMessage
+  ) internal {
+    for (uint256 i = 0; i < newMessage.verifierReceipts.length; ++i) {
+      address verifier = newMessage.verifierReceipts[i].issuer;
+      ICCVOnRamp(verifier).forwardToVerifier(destChainSelector, CCVRamp.V1, address(this), encodedMessage, i);
+    }
   }
 
   /// @notice Merges lane mandated and pool required CCVs with user-provided CCVs.

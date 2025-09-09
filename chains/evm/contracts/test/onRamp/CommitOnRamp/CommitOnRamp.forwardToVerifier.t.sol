@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {CCVRamp} from "../../../libraries/CCVRamp.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {BaseOnRamp} from "../../../onRamp/BaseOnRamp.sol";
 import {CommitOnRamp} from "../../../onRamp/CommitOnRamp.sol";
@@ -28,7 +29,9 @@ contract CommitOnRamp_forwardToVerifier is CommitOnRampSetup {
     );
 
     vm.prank(s_ccvProxy);
-    bytes memory result = s_commitOnRamp.forwardToVerifier(abi.encode(message), verifierIndex);
+    bytes memory result = s_commitOnRamp.forwardToVerifier(
+      DEST_CHAIN_SELECTOR, CCVRamp.V1, address(this), abi.encode(message), verifierIndex
+    );
 
     uint64 nonce = abi.decode(result, (uint64));
     assertEq(nonce, expectedNonce);
@@ -48,7 +51,9 @@ contract CommitOnRamp_forwardToVerifier is CommitOnRampSetup {
     _setupForwardToVerifierMocks(true, DEST_CHAIN_SELECTOR, s_sourceFeeToken, feeTokenAmount, msg.sender, expectedNonce);
 
     vm.prank(s_ccvProxy);
-    bytes memory result = s_commitOnRamp.forwardToVerifier(abi.encode(message), verifierIndex);
+    bytes memory result = s_commitOnRamp.forwardToVerifier(
+      DEST_CHAIN_SELECTOR, CCVRamp.V1, address(this), abi.encode(message), verifierIndex
+    );
 
     uint64 nonce = abi.decode(result, (uint64));
     assertEq(nonce, expectedNonce); // Should return 0 for out of order execution.
@@ -65,7 +70,7 @@ contract CommitOnRamp_forwardToVerifier is CommitOnRampSetup {
 
     vm.prank(STRANGER);
     vm.expectRevert(BaseOnRamp.MustBeCalledByCCVProxy.selector);
-    s_commitOnRamp.forwardToVerifier(abi.encode(message), verifierIndex);
+    s_commitOnRamp.forwardToVerifier(DEST_CHAIN_SELECTOR, CCVRamp.V1, address(this), abi.encode(message), verifierIndex);
   }
 
   function test_forwardToVerifier_RevertWhen_MustBeCalledByCCVProxy_CCVProxyNotSet() public {
@@ -89,6 +94,8 @@ contract CommitOnRamp_forwardToVerifier is CommitOnRampSetup {
 
     vm.prank(s_ccvProxy);
     vm.expectRevert(BaseOnRamp.MustBeCalledByCCVProxy.selector);
-    commitOnRampWithoutCCVProxy.forwardToVerifier(abi.encode(message), verifierIndex);
+    commitOnRampWithoutCCVProxy.forwardToVerifier(
+      DEST_CHAIN_SELECTOR, CCVRamp.V1, address(this), abi.encode(message), verifierIndex
+    );
   }
 }

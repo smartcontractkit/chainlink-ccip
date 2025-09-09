@@ -12,6 +12,8 @@ import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
+
+import {CCVRamp} from "../libraries/CCVRamp.sol";
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -240,9 +242,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         _ensureCCVQuorumIsReached(message.sourceChainSelector, receiverAddress, ccvs, requiredPoolCCVs);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
+        _verifyMessage({
+          ccvToQuery: ccvsToQuery[i],
+          messageId: messageId,
           message: message,
-          messageHash: messageId,
           ccvData: ccvData[ccvDataIndex[i]],
           originalState: originalState
         });
@@ -265,6 +268,24 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     emit ExecutionStateChanged(message.sourceChainSelector, message.sequenceNumber, messageId, newState, returnData);
     s_reentrancyGuardEntered = false;
+  }
+
+  function _verifyMessage(
+    address ccvToQuery,
+    bytes32 messageId,
+    MessageV1Codec.MessageV1 memory message,
+    bytes memory ccvData,
+    Internal.MessageExecutionState originalState
+  ) internal {
+    ICCVOffRampV1(ccvToQuery).verifyMessage({
+      sourceChainSelector: message.sourceChainSelector,
+      version: CCVRamp.V1,
+      caller: address(this),
+      message: message,
+      messageHash: messageId,
+      ccvData: ccvData,
+      originalState: originalState
+    });
   }
 
   /// @notice Ensures that the provided CCVs meet the quorum required by the receiver, pool and lane.

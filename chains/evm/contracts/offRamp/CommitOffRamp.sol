@@ -31,6 +31,9 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
   }
 
   function verifyMessage(
+    uint64,
+    bytes32,
+    address,
     MessageV1Codec.MessageV1 calldata message,
     bytes32 messageHash,
     bytes calldata ccvData,

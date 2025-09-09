@@ -57,7 +57,13 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   /// @param rawMessage The encoded message containing all necessary data for verification.
   /// @param verifierIndex Index of this verifier in the message's verifier receipts array.
   /// @return Verifier-specific encoded data (nonce in case of commit onramp).
-  function forwardToVerifier(bytes calldata rawMessage, uint256 verifierIndex) external returns (bytes memory) {
+  function forwardToVerifier(
+    uint64,
+    bytes32,
+    address,
+    bytes calldata rawMessage,
+    uint256 verifierIndex
+  ) external returns (bytes memory) {
     Internal.EVM2AnyVerifierMessage memory message = abi.decode(rawMessage, (Internal.EVM2AnyVerifierMessage));
 
     _assertNotCursed(message.header.destChainSelector);
@@ -146,6 +152,8 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
 
   function getFee(
     uint64 destChainSelector,
+    bytes32,
+    address,
     Client.EVM2AnyMessage memory message,
     bytes memory // extraArgs
   ) external view returns (uint256) {
