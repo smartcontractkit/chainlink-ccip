@@ -489,7 +489,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         }
       }
       if (!found) {
-        revert RequiredCCVMissing(laneMandatedCCVs[i], true);
+        revert RequiredCCVMissing(laneMandatedCCVs[i], false);
       }
     }
 
