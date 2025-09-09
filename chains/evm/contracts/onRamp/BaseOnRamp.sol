@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICCVOnRamp} from "../interfaces/ICCVOnRamp.sol";
+import {ICCVOnRampV1} from "../interfaces/ICCVOnRampV1.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
@@ -12,7 +12,7 @@ import {SafeERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-abstract contract BaseOnRamp is ICCVOnRamp, ITypeAndVersion {
+abstract contract BaseOnRamp is ICCVOnRampV1, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using SafeERC20 for IERC20;
 
