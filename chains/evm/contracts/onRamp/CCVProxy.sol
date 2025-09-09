@@ -198,9 +198,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     uint256 requiredCCVsCount = resolvedExtraArgs.requiredCCV.length;
 
-    MessageV1Codec.TokenTransferV1[] memory tokenTransfers = message.tokenAmounts.length == 0
-      ? new MessageV1Codec.TokenTransferV1[](0)
-      : new MessageV1Codec.TokenTransferV1[](1);
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfers =
+      new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length);
 
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
@@ -208,7 +207,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       sequenceNumber: ++destChainConfig.sequenceNumber,
       onRampAddress: abi.encodePacked(address(this)),
       offRampAddress: destChainConfig.offRamp,
-      finality: uint16(resolvedExtraArgs.finalityConfig),
+      finality: resolvedExtraArgs.finalityConfig,
       sender: abi.encodePacked(originalSender),
       receiver: message.receiver, // TODO EVM2AnyMessage sends abi.encoded for EVM, we need to handle that
       destBlob: "", // TODO for SVM
