@@ -38,15 +38,10 @@ contract CommitOnRamp_setDynamicConfig is CommitOnRampSetup {
   }
 
   function test_setDynamicConfig_RevertWhen_OnlyCallableByOwner() public {
-    CommitOnRamp.DynamicConfig memory cfg = CommitOnRamp.DynamicConfig({
-      feeQuoter: makeAddr("fq"),
-      feeAggregator: FEE_AGGREGATOR,
-      allowlistAdmin: ALLOWLIST_ADMIN
-    });
+    CommitOnRamp.DynamicConfig memory cfg;
 
     vm.startPrank(STRANGER);
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_commitOnRamp.setDynamicConfig(cfg);
-    vm.stopPrank();
   }
 }
