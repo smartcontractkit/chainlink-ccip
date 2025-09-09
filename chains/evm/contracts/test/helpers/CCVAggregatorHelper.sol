@@ -37,13 +37,6 @@ contract CCVAggregatorHelper is CCVAggregator {
     return _getCCVsFromPool(localToken, sourceChainSelector, amount, extraData);
   }
 
-  function trialExecute(
-    MessageV1Codec.MessageV1 memory message,
-    bytes32 messageId
-  ) external returns (Internal.MessageExecutionState, bytes memory) {
-    return _trialExecute(message, messageId);
-  }
-
   function beforeExecuteSingleMessage(
     MessageV1Codec.MessageV1 memory message
   ) external returns (MessageV1Codec.MessageV1 memory) {

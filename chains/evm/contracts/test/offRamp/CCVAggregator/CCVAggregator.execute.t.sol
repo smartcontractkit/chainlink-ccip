@@ -61,9 +61,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     bytes memory defaultCcvData = abi.encode("mock ccv data");
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(
-        ICCVOffRampV1.verifyMessage, (message, messageHash, defaultCcvData, Internal.MessageExecutionState.UNTOUCHED)
-      ),
+      abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageHash, defaultCcvData)),
       abi.encode(true)
     );
   }
@@ -245,7 +243,10 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     // Try to execute the same message again - should revert.
     vm.expectRevert(
       abi.encodeWithSelector(
-        CCVAggregator.SkippedAlreadyExecutedMessage.selector, SOURCE_CHAIN_SELECTOR, message.sequenceNumber
+        CCVAggregator.SkippedAlreadyExecutedMessage.selector,
+        keccak256(encodedMessage),
+        SOURCE_CHAIN_SELECTOR,
+        message.sequenceNumber
       )
     );
     s_agg.execute(encodedMessage, ccvs, ccvData);
@@ -363,17 +364,13 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     // Mock validateReport to pass initial checks.
     vm.mockCall(
-      s_defaultCCV,
-      abi.encodeCall(
-        ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
-      ),
-      abi.encode(true)
+      s_defaultCCV, abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0])), abi.encode(true)
     );
 
     // Mock executeSingleMessage to revert with NOT_ENOUGH_GAS_FOR_CALL_SIG.
     vm.mockCallRevert(
       address(s_agg),
-      abi.encodeCall(s_agg.executeSingleMessage, (message, messageId)),
+      abi.encodeWithSelector(s_agg.executeSingleMessage.selector),
       abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
     );
 
@@ -397,11 +394,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     // Mock CCV validateReport to fail/revert.
     vm.mockCallRevert(
-      s_defaultCCV,
-      abi.encodeCall(
-        ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0], Internal.MessageExecutionState.UNTOUCHED)
-      ),
-      revertReason
+      s_defaultCCV, abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0])), revertReason
     );
 
     vm.expectRevert(revertReason);
@@ -411,12 +404,10 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   function test_execute_RevertWhen_ExecuteSingleMessageFails() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-    bytes32 messageId = keccak256(encodedMessage);
-
     bytes memory revertReason = "ExecuteSingleMessage failed";
 
     // Mock executeSingleMessage to revert.
-    vm.mockCallRevert(address(s_agg), abi.encodeCall(s_agg.executeSingleMessage, (message, messageId)), revertReason);
+    vm.mockCallRevert(address(s_agg), abi.encodeWithSelector(s_agg.executeSingleMessage.selector), revertReason);
 
     vm.expectEmit();
     emit CCVAggregator.ExecutionStateChanged(
@@ -455,8 +446,7 @@ contract ReentrantCCV is ICCVOffRampV1 {
   function verifyMessage(
     MessageV1Codec.MessageV1 memory message,
     bytes32, /* messageHash */
-    bytes memory ccvData,
-    Internal.MessageExecutionState /* originalState */
+    bytes memory ccvData
   ) external override {
     // Create a dummy report to trigger reentrancy.
     address[] memory ccvs = new address[](1);
