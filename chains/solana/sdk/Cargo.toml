@@ -1,0 +1,29 @@
+[package]
+name = "ccip-solana-sdk"
+version = "0.1.1"
+description = "Solana SDK to interact with CCIP Contracts v0.1.1"
+edition = "2021"
+
+[dependencies]
+# # Error handling
+# anyhow = "1"
+# thiserror = "1"
+
+# # Serialization (Anchor uses Borsh under the hood)
+borsh = "1"
+# borsh-derive = "1"
+
+# Hashing (needed to compute Anchor-style instruction discriminators)
+sha2 = "0.10"
+hex = "0.4"
+
+
+# # Solana SDK and RPC client
+solana-sdk = "2.1"
+solana-program = "3.0.0"
+# solana-client = "2.1"
+
+# # Token programs
+# spl-associated-token-account = "3"
+# spl-token = "4"          # Classic SPL Token program
+# spl-token-2022 = "3"     # Token-2022 program
