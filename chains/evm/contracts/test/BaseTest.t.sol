@@ -9,7 +9,7 @@ import {Router} from "../Router.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 
-import {WETH9} from "@chainlink/vendor/canonical-weth/WETH9.sol";
+import {WETH9} from "@chainlink/contracts/src/v0.8/vendor/canonical-weth/WETH9.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract BaseTest is Test {
@@ -101,5 +101,13 @@ contract BaseTest is Test {
       extraData: "",
       destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
+  }
+
+  function _arrayOf(
+    address addr
+  ) internal pure returns (address[] memory) {
+    address[] memory arr = new address[](1);
+    arr[0] = addr;
+    return arr;
   }
 }

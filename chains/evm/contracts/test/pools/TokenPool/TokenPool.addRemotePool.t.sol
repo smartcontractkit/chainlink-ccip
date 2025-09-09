@@ -120,7 +120,7 @@ contract TokenPool_addRemotePool is TokenPoolSetup {
       originalSender: abi.encode(OWNER),
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       receiver: OWNER,
-      amount: 1000,
+      sourceDenominatedAmount: 1000,
       localToken: address(s_token),
       sourcePoolAddress: sourcePoolAddress,
       sourcePoolData: "",
@@ -142,7 +142,7 @@ contract TokenPool_addRemotePool is TokenPoolSetup {
   function test_RevertWhen_ZeroLengthAddressNotAllowed() public {
     bytes memory remotePool = "";
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.ZeroAddressNotAllowed.selector));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ZeroAddressInvalid.selector));
 
     s_tokenPool.addRemotePool(DEST_CHAIN_SELECTOR, remotePool);
   }

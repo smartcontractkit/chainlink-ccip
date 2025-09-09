@@ -1,5 +1,5 @@
 export type TestCcipReceiver = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "test_ccip_receiver",
   "docs": [
     "This program an example of a CCIP Receiver Program.",
@@ -310,7 +310,7 @@ export type TestCcipReceiver = {
 };
 
 export const IDL: TestCcipReceiver = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "test_ccip_receiver",
   "docs": [
     "This program an example of a CCIP Receiver Program.",

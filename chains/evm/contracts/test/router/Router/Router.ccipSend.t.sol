@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 import {Router} from "../../../Router.sol";
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 import {IWrappedNative} from "../../../interfaces/IWrappedNative.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
 
 contract Router_ccipSend is OnRampSetup {
-  event Burned(address indexed sender, uint256 amount);
-
   function test_CCIPSendLinkFeeOneTokenSuccess_gas() public {
     vm.pauseGasMetering();
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -33,7 +33,12 @@ contract Router_ccipSend is OnRampSetup {
 
     // Assert that the tokens are burned
     vm.expectEmit();
-    emit Burned(address(s_onRamp), message.tokenAmounts[0].amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(sourceToken1),
+      sender: address(s_onRamp),
+      amount: message.tokenAmounts[0].amount
+    });
 
     Internal.EVM2AnyRampMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
 
@@ -95,7 +100,12 @@ contract Router_ccipSend is OnRampSetup {
     message.feeToken = address(0);
     // Assert that the tokens are burned
     vm.expectEmit();
-    emit Burned(address(s_onRamp), message.tokenAmounts[0].amount);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(sourceToken1),
+      sender: address(s_onRamp),
+      amount: message.tokenAmounts[0].amount
+    });
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent.header.sequenceNumber, msgEvent);

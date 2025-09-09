@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -112,7 +111,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 	}
 
 	// check that all the reports are the same.
-	if countUniqueReports(slicelib.Flatten(allReports)) > 1 {
+	if countUniqueReports(allReports) > 1 {
 		return RoundResult[RI]{}, fmt.Errorf("reports are not equal")
 	}
 
@@ -174,14 +173,21 @@ func (r *OCR3Runner[RI]) selectLeader() ocr3types.ReportingPlugin[RI] {
 		return nil
 	}
 
-	idx, err := rand.Int(rand.Reader, big.NewInt(int64(numNodes)))
+	// Generate random bytes and convert to index to avoid big.Int truncation issues
+	randomBytes := make([]byte, 4)
+	_, err := rand.Read(randomBytes)
 	if err != nil {
 		panic(err)
 	}
-	if !idx.IsInt64() {
-		panic("index is not int64")
+
+	// Convert bytes to uint32 and mod by numNodes
+	var randomUint32 uint32
+	for i, b := range randomBytes {
+		randomUint32 |= uint32(b) << (8 * i)
 	}
-	return r.nodes[idx.Int64()]
+
+	idx := int(randomUint32 % uint32(numNodes))
+	return r.nodes[idx]
 }
 
 type RoundResult[RI any] struct {
@@ -201,12 +207,16 @@ func countUniqueOutcomes(outcomes []ocr3types.Outcome) int {
 	return slicelib.CountUnique(flattenedHashes)
 }
 
-func countUniqueReports[RI any](reports []ocr3types.ReportPlus[RI]) int {
-	flattenedHashes := make([]string, 0, len(reports))
-	for _, report := range reports {
+func countUniqueReports[RI any](allReports [][]ocr3types.ReportPlus[RI]) int {
+	// Create hashes for each node's set of reports
+	nodeHashes := make([]string, len(allReports))
+	for i, reports := range allReports {
 		h := sha256.New()
-		h.Write(report.ReportWithInfo.Report)
-		flattenedHashes = append(flattenedHashes, hex.EncodeToString(h.Sum(nil)))
+		for _, report := range reports {
+			h.Write(report.ReportWithInfo.Report)
+		}
+		nodeHashes[i] = hex.EncodeToString(h.Sum(nil))
 	}
-	return slicelib.CountUnique(flattenedHashes)
+
+	return slicelib.CountUnique(nodeHashes)
 }

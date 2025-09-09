@@ -25,7 +25,7 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
@@ -45,7 +45,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -236,7 +235,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				if i == 0 {
 					reportCodec = n.reportCodec
 				}
-				prepareCcipReaderMock(n.ccipReader, false, tc.enableDiscovery, true)
+				prepareCcipReaderMock(n.ccipReader, false, tc.enableDiscovery, true, 0)
 
 				if len(tc.offRampNextSeqNumDefaultOverrideKeys) > 0 {
 					require.Equal(t, len(tc.offRampNextSeqNumDefaultOverrideKeys), len(tc.offRampNextSeqNumDefaultOverrideValues))
@@ -284,6 +283,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 		mockPriceReader       func(*readerpkg_mock.MockPriceReader)
 		expTransmittedReports []ccipocr3.CommitPluginReport
 		enableDiscovery       bool
+		onChainPriceSeqNr     uint64
 	}{
 		{
 			name:        "empty fee_quoter token updates, should select all token prices for update",
@@ -334,15 +334,16 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 		{
 			name: "prices already inflight, no prices to report",
 			prevOutcome: committypes.Outcome{
-				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 4},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 4, RemainingPriceChecks: 4},
 			},
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				TokenPriceOutcome: tokenprice.Outcome{},
-				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 3},
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 4, RemainingPriceChecks: 3},
 			},
 			expTransmittedReports: []ccipocr3.CommitPluginReport{},
+			onChainPriceSeqNr:     2,
 		},
 		{
 			name:        "fresh tokens don't need new updates",
@@ -444,7 +445,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					reportCodec = n.reportCodec
 				}
 
-				prepareCcipReaderMock(n.ccipReader, true, false, true)
+				prepareCcipReaderMock(n.ccipReader, true, false, true, tc.onChainPriceSeqNr)
 				tc.mockPriceReader(n.priceReader)
 			}
 
@@ -492,6 +493,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		prevOutcome             committypes.Outcome
 		expOutcome              committypes.Outcome
 		expTransmittedReportLen int
+		onChainPriceSeqNr       uint64
 
 		mockCCIPReader func(*readerpkg_mock.MockCCIPReader)
 	}{
@@ -560,17 +562,18 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		{
 			name: "fee components should not be updated when there's a subset of chains but we wait for prices",
 			prevOutcome: committypes.Outcome{
-				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 4},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 3, RemainingPriceChecks: 4},
 			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
-				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 3},
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 3, RemainingPriceChecks: 3},
 			},
 			expTransmittedReportLen: 0,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Unset()
-				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Return(0, nil).Maybe()
+				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Return(2, nil).Maybe()
 			},
+			onChainPriceSeqNr: 2,
 		},
 		{
 			name: "fee components should not be updated within deviation",
@@ -688,7 +691,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				n := setupNode(paramsCp)
 				nodes[i] = n.node
 
-				prepareCcipReaderMock(n.ccipReader, true, false, false)
+				prepareCcipReaderMock(n.ccipReader, true, false, false, tc.onChainPriceSeqNr)
 
 				preparePriceReaderMock(n.priceReader)
 
@@ -696,7 +699,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			}
 
 			encodedPrevOutcome, err := ocrTypCodec.EncodeOutcome(tc.prevOutcome)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			require.NoError(t, err)
@@ -724,6 +727,7 @@ func prepareCcipReaderMock(
 	mockEmptySeqNrs bool,
 	enableDiscovery bool,
 	mockChainFee bool,
+	onChainPriceSeqNr uint64,
 ) {
 	if mockChainFee {
 		ccipReader.EXPECT().
@@ -735,7 +739,7 @@ func prepareCcipReaderMock(
 	}
 	ccipReader.EXPECT().
 		GetLatestPriceSeqNr(mock.Anything).
-		Return(0, nil).Maybe()
+		Return(onChainPriceSeqNr, nil).Maybe()
 	ccipReader.EXPECT().
 		GetChainFeePriceUpdate(mock.Anything, mock.Anything).
 		Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{}).Maybe()
@@ -743,7 +747,7 @@ func prepareCcipReaderMock(
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
 	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-		Return(reader2.CurseInfo{}, nil).Maybe()
+		Return(ccipocr3.CurseInfo{}, nil).Maybe()
 	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
 		Return(sourceChainConfigs, nil).Maybe()
 
@@ -755,7 +759,7 @@ func prepareCcipReaderMock(
 	}
 
 	if enableDiscovery {
-		ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
+		ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
 	}
 }
@@ -947,7 +951,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 // Note:
 // oracleID will be set to 0
 func defaultNodeParams(t *testing.T) SetupNodeParams {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	donID := uint32(1)
@@ -963,9 +967,18 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 
 	peerIDsMap := mapset.NewSet(peerIDs...)
 	homeChainConfig := map[ccipocr3.ChainSelector]reader.ChainConfig{
-		destChain:       {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
-		sourceEvmChain1: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
-		sourceSolChain:  {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
+		destChain: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{
+			GasPriceDeviationPPB:   ccipocr3.NewBigInt(big.NewInt(1e9)), // 100% deviation
+			DAGasPriceDeviationPPB: ccipocr3.NewBigInt(big.NewInt(5e8)), // 50% deviation
+		}},
+		sourceEvmChain1: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{
+			GasPriceDeviationPPB:   ccipocr3.NewBigInt(big.NewInt(1e9)), // 100% deviation
+			DAGasPriceDeviationPPB: ccipocr3.NewBigInt(big.NewInt(5e8)), // 50% deviation
+		}},
+		sourceSolChain: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{
+			GasPriceDeviationPPB:   ccipocr3.NewBigInt(big.NewInt(1e9)), // 100% deviation
+			DAGasPriceDeviationPPB: ccipocr3.NewBigInt(big.NewInt(5e8)), // 50% deviation
+		}},
 	}
 
 	offRampNextSeqNum := map[ccipocr3.ChainSelector]ccipocr3.SeqNum{
@@ -994,6 +1007,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		MerkleRootAsyncObserverDisabled: true, // we want to keep it disabled since this test is deterministic
 		ChainFeeAsyncObserverDisabled:   true,
 		TokenPriceAsyncObserverDisabled: true,
+		DonBreakingChangesVersion:       pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}

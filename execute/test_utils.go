@@ -3,8 +3,11 @@ package execute
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +24,7 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -34,12 +37,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	cciptypesmocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	cciptypesmocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -55,8 +57,10 @@ type IntTest struct {
 	msgHasher           cciptypes.MessageHasher
 	ccipReader          *inmem.InMemoryCCIPReader
 	usdcServer          *ConfigurableAttestationServer
+	lbtcServer          *ConfigurableAttestationServer
 	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
-	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
+	tokenChainReader    map[cciptypes.ChainSelector]contractreader.Extended
+	offChainCfg         pluginconfig.ExecuteOffchainConfig
 }
 
 func SetupSimpleTest(t *testing.T,
@@ -88,8 +92,17 @@ func SetupSimpleTest(t *testing.T,
 		dstSelector:         dstSelector,
 		ccipReader:          &ccipReader,
 		tokenObserverConfig: []pluginconfig.TokenDataObserverConfig{},
-		tokenChainReader:    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{},
+		tokenChainReader:    map[cciptypes.ChainSelector]contractreader.Extended{},
+		offChainCfg: pluginconfig.ExecuteOffchainConfig{
+			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+			BatchGasLimit:             100000000,
+			MaxCommitReportsToFetch:   10,
+		},
 	}
+}
+
+func (it *IntTest) WithOffChainConfig(cfg pluginconfig.ExecuteOffchainConfig) {
+	it.offChainCfg = cfg
 }
 
 func (it *IntTest) WithMessages(
@@ -187,9 +200,9 @@ func (it *IntTest) WithUSDC(
 		usdcEvents[i] = types.Sequence{Data: e}
 	}
 
-	r := readermock.NewMockContractReaderFacade(it.t)
+	r := readermock.NewMockExtended(it.t)
 	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
-	r.EXPECT().QueryKey(
+	r.EXPECT().ExtendedQueryKey(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -197,17 +210,36 @@ func (it *IntTest) WithUSDC(
 		mock.Anything,
 	).Return(usdcEvents, nil).Maybe()
 
-	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.Extended{
 		srcSelector:    r,
 		it.dstSelector: r,
 	}
 }
 
+func (it *IntTest) WithLBTC(
+	sourcePoolAddress string,
+	attestations map[string]string,
+	srcSelector cciptypes.ChainSelector,
+) {
+	it.lbtcServer = newConfigurableAttestationServer(attestations)
+	it.tokenObserverConfig = append(it.tokenObserverConfig, pluginconfig.TokenDataObserverConfig{
+		Type:    "lbtc",
+		Version: "1",
+		LBTCObserverConfig: &pluginconfig.LBTCObserverConfig{
+			AttestationConfig: pluginconfig.AttestationConfig{
+				AttestationAPI:         it.lbtcServer.server.URL,
+				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
+				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+			},
+			SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
+				srcSelector: sourcePoolAddress,
+			},
+			AttestationAPIBatchSize: 1,
+		},
+	})
+}
+
 func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
-	cfg := pluginconfig.ExecuteOffchainConfig{
-		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
-		BatchGasLimit:             100000000,
-	}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
 			ChainSelector: it.dstSelector,
@@ -235,7 +267,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	}
 
 	homeChain := setupHomeChainPoller(it.t, it.lggr, chainConfigInfos)
-	ctx := tests.Context(it.t)
+	ctx := it.t.Context()
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
 	mockAddrCodec := internal.NewMockAddressCodecHex(it.t)
@@ -256,9 +288,9 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(it.offChainCfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(it.offChainCfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(it.offChainCfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -279,6 +311,9 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 func (it *IntTest) Close() {
 	if it.usdcServer != nil {
 		it.usdcServer.Close()
+	}
+	if it.lbtcServer != nil {
+		it.lbtcServer.Close()
 	}
 }
 
@@ -360,10 +395,55 @@ func newConfigurableAttestationServer(responses map[string]string) *Configurable
 				}
 			}
 		}
+		if r.Method == http.MethodPost {
+			var request map[string]interface{}
+			bodyRaw, err := io.ReadAll(r.Body)
+			if err != nil {
+				panic(err)
+			}
+			err = json.Unmarshal(bodyRaw, &request)
+			if err != nil {
+				panic(err)
+			}
+			payloadHashesUntyped := request["messageHash"].([]interface{})
+			if len(payloadHashesUntyped) == 0 {
+				w.WriteHeader(http.StatusBadRequest)
+			}
+			payloadHashes := make([]string, len(payloadHashesUntyped))
+			for i, hash := range payloadHashesUntyped {
+				payloadHashes[i] = hash.(string)
+			}
+			attestationResponse := attestationBatchByMessageHashes(payloadHashes, c.responses)
+			responseBytes, err := json.Marshal(attestationResponse)
+			if err != nil {
+				panic(err)
+			}
+			_, err = w.Write(responseBytes)
+			if err != nil {
+				panic(err)
+			}
+		}
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	c.server = server
 	return c
+}
+
+func attestationBatchByMessageHashes(payloadHashes []string, responses map[string]string) map[string]interface{} {
+	attestations := make([]interface{}, 0, len(responses))
+	for payloadHash, attestationRaw := range responses {
+		if slices.Contains(payloadHashes, payloadHash) {
+			var attestation map[string]interface{}
+			err := json.Unmarshal([]byte(attestationRaw), &attestation)
+			if err != nil {
+				panic(err)
+			}
+			attestations = append(attestations, attestation)
+		}
+	}
+	attestationResponse := make(map[string]interface{})
+	attestationResponse["attestations"] = attestations
+	return attestationResponse
 }
 
 func (c *ConfigurableAttestationServer) AddResponse(key, response string) {

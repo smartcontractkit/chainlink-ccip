@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
+use anchor_lang::Discriminator;
 use ethnum::U256;
 use solana_program::address_lookup_table::state::AddressLookupTable;
 
+use crate::router_accounts::TokenAdminRegistryV1;
 use crate::{
     context::TokenAccountsValidationContext, router_accounts::TokenAdminRegistry, seed,
     CommonCcipError,
@@ -10,6 +12,7 @@ use crate::{
 pub const MIN_TOKEN_POOL_ACCOUNTS: usize = 13; // see TokenAccounts struct for all required accounts
 const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 const EVM_PRECOMPILE_SPACE: u32 = 1024;
+pub const V1_TOKEN_ADMIN_REGISTRY_SIZE: usize = 169; // for migration v1->v2 of the TokenAdminRegistry, which adds the `supports_auto_derivation` field.
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
@@ -41,7 +44,7 @@ pub fn validate_and_parse_token_accounts<'info>(
     fee_quoter: Pubkey,
     offramp: Option<Pubkey>, // id of the offramp program that called this function, when the caller is not the router
     raw_acc_infos: &'info [AccountInfo<'info>],
-) -> Result<TokenAccounts> {
+) -> Result<TokenAccounts<'info>> {
     // The program_id here is provided solely to satisfy the interface of try_accounts.
     // Note: All program IDs for PDA derivation are explicitly defined in the account context
     // (TokenAccountsValidationContext) via seeds and program attributes.
@@ -128,8 +131,7 @@ pub fn validate_and_parse_token_accounts<'info>(
     // Additional validations that can't be expressed in the account context
     {
         // Check Lookup Table Address configured in TokenAdminRegistry
-        let token_admin_registry_account: Account<TokenAdminRegistry> =
-            Account::try_from(token_admin_registry)?;
+        let token_admin_registry_account = load_token_admin_registry_checked(token_admin_registry)?;
         require_keys_eq!(
             token_admin_registry_account.lookup_table,
             lookup_table.key(),
@@ -163,10 +165,23 @@ pub fn validate_and_parse_token_accounts<'info>(
             let mut remaining_keys: Vec<Pubkey> =
                 remaining_accounts.iter().map(|x| x.key()).collect();
             expected_keys.append(&mut remaining_keys);
-            require!(
-                lookup_table_account.addresses.as_ref() == expected_keys,
-                CommonCcipError::InvalidInputsLookupTableAccounts
-            );
+            if token_admin_registry_account.supports_auto_derivation {
+                // When auto-derivation is supported, there may be more accounts than what the lookup table contains.
+                // On those extra accounts, given that the token pool supports derivation, we also trust that the pool
+                // performs the required checks.
+                let n = lookup_table_account.addresses.len();
+                require!(
+                    lookup_table_account.addresses.as_ref() == expected_keys[..n].to_vec(),
+                    CommonCcipError::InvalidInputsLookupTableAccounts
+                );
+            } else {
+                // When the pool does not support auto-derivation, the lookup table must contain all the expected accounts,
+                // and CCIP is expected to validate them.
+                require!(
+                    lookup_table_account.addresses.as_ref() == expected_keys,
+                    CommonCcipError::InvalidInputsLookupTableAccounts
+                );
+            }
         }
         {
             // validate pool address writable
@@ -174,15 +189,40 @@ pub fn validate_and_parse_token_accounts<'info>(
             // check that the writability of the passed accounts match the writable configuration (using indexes)
             let mut expected_is_writable: Vec<bool> =
                 required_entries.iter().map(|x| x.is_writable).collect();
+
             let mut remaining_is_writable: Vec<bool> =
-                remaining_accounts.iter().map(|x| x.is_writable).collect();
+                if token_admin_registry_account.supports_auto_derivation {
+                    // when auto-derivation is supported, we only validate the accounts present in the LUT
+                    // as the pool is expected to validate the rest of the accounts. The LUT must contain
+                    // the required entries, plus it may contain some additional ones that are static,
+                    // and finally the auto-derivation may add more accounts at the end (static or message-dependant).
+                    let lut_len = lookup_table_account.addresses.len();
+                    let end = lut_len.checked_sub(required_entries.len()).unwrap();
+
+                    remaining_accounts[..end]
+                        .iter()
+                        .map(|x| x.is_writable)
+                        .collect()
+                } else {
+                    // when auto-derivation is not supported, we validate all remaining accounts
+                    // as they are all expected to be in the LUT
+                    remaining_accounts.iter().map(|x| x.is_writable).collect()
+                };
+
             expected_is_writable.append(&mut remaining_is_writable);
             for (i, is_writable) in expected_is_writable.iter().enumerate() {
-                require_eq!(
-                    token_admin_registry_writable::is(&token_admin_registry_account, i as u8),
-                    *is_writable,
-                    CommonCcipError::InvalidInputsLookupTableAccountWritable
-                );
+                let expected =
+                    token_admin_registry_writable::is(&token_admin_registry_account, i as u8);
+                let actual = *is_writable;
+                if expected != actual {
+                    msg!(
+                        "Expected account at index {} to be writable {}, but it is {}",
+                        i,
+                        expected,
+                        actual
+                    );
+                    return Err(CommonCcipError::InvalidInputsLookupTableAccountWritable.into());
+                }
             }
         }
     }
@@ -206,6 +246,44 @@ pub fn validate_and_parse_token_accounts<'info>(
         ccip_offramp_pool_signer_bump,
         remaining_accounts,
     })
+}
+
+pub fn load_token_admin_registry_checked<'info>(
+    token_admin_registry: &'info AccountInfo<'info>,
+) -> Result<TokenAdminRegistry> {
+    Ok(
+        if token_admin_registry.data_len() == V1_TOKEN_ADMIN_REGISTRY_SIZE {
+            load_v1_token_admin_registry(token_admin_registry)?
+        } else {
+            // this uses Anchor's built-in deserialization that already has ownership and discriminator checks
+            Account::<TokenAdminRegistry>::try_from(token_admin_registry)?.into_inner()
+        },
+    )
+}
+
+fn load_v1_token_admin_registry(
+    token_admin_registry: &AccountInfo<'_>,
+) -> Result<TokenAdminRegistry> {
+    const ANCHOR_DISCRIMINATOR_SIZE: usize = 8;
+
+    let borrowed_data = token_admin_registry.try_borrow_data()?;
+    let (discriminator, data) = borrowed_data.split_at(ANCHOR_DISCRIMINATOR_SIZE);
+
+    require_keys_eq!(
+        token_admin_registry.owner.key(),
+        crate::ID, // ccip-common crate must have the same ID as ccip-router, which is the actual program that owns it
+        CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
+    );
+
+    require!(
+        TokenAdminRegistry::DISCRIMINATOR == discriminator,
+        CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
+    );
+
+    let token_admin_registry_v1 = TokenAdminRegistryV1::deserialize(&mut &data[..])
+        .map_err(|_| CommonCcipError::InvalidInputsTokenAdminRegistryAccounts)?;
+
+    TokenAdminRegistry::try_from(token_admin_registry_v1)
 }
 
 pub mod token_admin_registry_writable {
@@ -249,6 +327,7 @@ pub mod token_admin_registry_writable {
                 lookup_table: Pubkey::default(),
                 writable_indexes: [0, 0],
                 mint: Pubkey::default(),
+                supports_auto_derivation: false,
             };
 
             set(state, 0);
@@ -288,6 +367,7 @@ pub mod token_admin_registry_writable {
                     2u128.pow(127 - 8) + 2u128.pow(127 - 56) + 2u128.pow(127 - 100),
                 ],
                 mint: Pubkey::default(),
+                supports_auto_derivation: false,
             };
 
             assert!(!is(state, 0));
@@ -337,4 +417,106 @@ pub fn validate_svm_address(address: &[u8], address_must_be_nonzero: bool) -> Re
     Pubkey::try_from_slice(address)
         .map(|_| ())
         .map_err(|_| CommonCcipError::InvalidSVMAddress.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_expected() -> TokenAdminRegistry {
+        TokenAdminRegistry {
+            version: 1,
+            administrator: Pubkey::new_unique(),
+            pending_administrator: Pubkey::new_unique(),
+            lookup_table: Pubkey::new_unique(),
+            writable_indexes: [1, 2],
+            mint: Pubkey::new_unique(),
+            supports_auto_derivation: false,
+        }
+    }
+
+    fn to_v1_bytes(t: &TokenAdminRegistry) -> Vec<u8> {
+        let mut bytes = t.try_to_vec().unwrap();
+        bytes.pop(); // remove the `supports_auto_derivation` field, as this is not part of the v1 data
+        bytes
+    }
+
+    fn to_acc_info<'a>(
+        key: &'a Pubkey,
+        lamports: &'a mut u64,
+        data: &'a mut [u8],
+    ) -> AccountInfo<'a> {
+        AccountInfo::new(key, false, true, lamports, data, &crate::ID, false, 0)
+    }
+
+    #[test]
+    fn test_valid_load_v1_token_admin_registry() {
+        let expected = get_expected();
+
+        let bytes = to_v1_bytes(&expected);
+
+        let mut data = vec![0u8; V1_TOKEN_ADMIN_REGISTRY_SIZE];
+        data[0..8].copy_from_slice(&TokenAdminRegistry::DISCRIMINATOR);
+        data[8..].copy_from_slice(bytes.as_slice());
+
+        let (mut lamports, key) = (0u64, Pubkey::new_unique());
+        let account_info = to_acc_info(&key, &mut lamports, &mut data);
+        let token_admin_registry = load_v1_token_admin_registry(&account_info).unwrap();
+
+        assert_eq!(token_admin_registry, expected);
+    }
+
+    #[test]
+    fn test_invalid_discriminator() {
+        let source = get_expected();
+        let bytes = to_v1_bytes(&source);
+
+        let mut data = vec![0u8; V1_TOKEN_ADMIN_REGISTRY_SIZE];
+        data[0..8].copy_from_slice(&TokenAdminRegistry::DISCRIMINATOR);
+        data[2] = 2; // change the discriminator to an invalid one
+        data[8..].copy_from_slice(bytes.as_slice());
+
+        let (mut lamports, key) = (0u64, Pubkey::new_unique());
+        let account_info = to_acc_info(&key, &mut lamports, &mut data);
+
+        let result = load_v1_token_admin_registry(&account_info);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_version() {
+        for v in [0, 2, 255] {
+            let mut source = get_expected();
+            source.version = v; // change the version to an invalid one for this function
+            let bytes = to_v1_bytes(&source);
+
+            let mut data = vec![0u8; V1_TOKEN_ADMIN_REGISTRY_SIZE];
+            data[0..8].copy_from_slice(&TokenAdminRegistry::DISCRIMINATOR);
+            data[8..].copy_from_slice(bytes.as_slice());
+
+            let (mut lamports, key) = (0u64, Pubkey::new_unique());
+            let account_info = to_acc_info(&key, &mut lamports, &mut data);
+
+            let result = load_v1_token_admin_registry(&account_info);
+            assert!(result.is_err(), "Version {} should not be valid", v);
+        }
+    }
+
+    #[test]
+    fn test_invalid_owner() {
+        let source = get_expected();
+        let bytes = to_v1_bytes(&source);
+
+        let mut data = vec![0u8; V1_TOKEN_ADMIN_REGISTRY_SIZE];
+        data[0..8].copy_from_slice(&TokenAdminRegistry::DISCRIMINATOR);
+        data[8..].copy_from_slice(bytes.as_slice());
+
+        let (mut lamports, key) = (0u64, Pubkey::new_unique());
+        let mut account_info = to_acc_info(&key, &mut lamports, &mut data);
+        let invalid_owner = Pubkey::new_unique();
+        account_info.owner = &invalid_owner; // change the owner to an invalid one
+
+        let result = load_v1_token_admin_registry(&account_info);
+        assert!(result.is_err());
+    }
 }

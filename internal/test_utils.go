@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	cciptypesmocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,11 +16,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
-
 	sel "github.com/smartcontractkit/chain-selectors"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 var (
@@ -80,8 +80,8 @@ func MustDecodeRaw(s string) []byte {
 }
 
 // NewMockAddressCodecHex returns a mock address codec that hex-encodes and decodes addresses.
-func NewMockAddressCodecHex(t *testing.T) *ccipocr3.MockAddressCodec {
-	mockAddrCodec := ccipocr3.NewMockAddressCodec(t)
+func NewMockAddressCodecHex(t *testing.T) *cciptypesmocks.MockAddressCodec {
+	mockAddrCodec := cciptypesmocks.NewMockAddressCodec(t)
 	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
 		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
 			return "0x" + hex.EncodeToString(addr)

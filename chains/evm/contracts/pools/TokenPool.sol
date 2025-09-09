@@ -7,13 +7,16 @@ import {IRouter} from "../interfaces/IRouter.sol";
 
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
-import {Ownable2StepMsgSender} from "@chainlink/shared/access/Ownable2StepMsgSender.sol";
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from
-  "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IERC165} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
-import {EnumerableSet} from "@chainlink/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {EnumerableSet} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice Base abstract class with common functions for all token pools.
 /// A token pool serves as isolated place for holding tokens and token specific logic
@@ -39,7 +42,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
 
   error CallerIsNotARampOnRouter(address caller);
-  error ZeroAddressNotAllowed();
+  error ZeroAddressInvalid();
   error SenderNotAllowed(address sender);
   error AllowListNotEnabled();
   error NonExistentChain(uint64 remoteChainSelector);
@@ -56,10 +59,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
   error InvalidDecimalArgs(uint8 expected, uint8 actual);
 
-  event Locked(address indexed sender, uint256 amount);
-  event Burned(address indexed sender, uint256 amount);
-  event Released(address indexed sender, address indexed recipient, uint256 amount);
-  event Minted(address indexed sender, address indexed recipient, uint256 amount);
+  event LockedOrBurned(uint64 indexed remoteChainSelector, address token, address sender, uint256 amount);
+  event ReleasedOrMinted(
+    uint64 indexed remoteChainSelector, address token, address sender, address recipient, uint256 amount
+  );
   event ChainAdded(
     uint64 remoteChainSelector,
     bytes remoteToken,
@@ -78,6 +81,8 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   event AllowListRemove(address sender);
   event RouterUpdated(address oldRouter, address newRouter);
   event RateLimitAdminSet(address rateLimitAdmin);
+  event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
+  event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector
@@ -122,7 +127,9 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   address internal s_rateLimitAdmin;
 
   constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
-    if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) revert ZeroAddressNotAllowed();
+    if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) {
+      revert ZeroAddressInvalid();
+    }
     i_token = token;
     i_rmnProxy = rmnProxy;
 
@@ -166,7 +173,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
   /// @notice Gets the pool's Router
   /// @return router The pool's Router
-  function getRouter() public view returns (address router) {
+  function getRouter() public view virtual returns (address router) {
     return address(s_router);
   }
 
@@ -175,7 +182,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   function setRouter(
     address newRouter
   ) public onlyOwner {
-    if (newRouter == address(0)) revert ZeroAddressNotAllowed();
+    if (newRouter == address(0)) revert ZeroAddressInvalid();
     address oldRouter = address(s_router);
     s_router = IRouter(newRouter);
 
@@ -189,6 +196,74 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     return interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IPoolV1).interfaceId
       || interfaceId == type(IERC165).interfaceId;
   }
+
+  // ================================================================
+  // │                        Lock or Burn                          │
+  // ================================================================
+
+  /// @notice Burn the token in the pool
+  /// @dev The _validateLockOrBurn check is an essential security check
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
+    _validateLockOrBurn(lockOrBurnIn);
+
+    _lockOrBurn(lockOrBurnIn.amount);
+
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
+
+    return Pool.LockOrBurnOutV1({
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: _encodeLocalDecimals()
+    });
+  }
+
+  /// @notice Contains the specific lock or burn token logic for a pool.
+  /// @dev overriding this method allows us to create pools with different lock/burn signatures
+  /// without duplicating the underlying logic.
+  function _lockOrBurn(
+    uint256 amount
+  ) internal virtual {}
+
+  // ================================================================
+  // │                      Release or Mint                         │
+  // ================================================================
+
+  /// @notice Mint tokens from the pool to the recipient
+  /// @dev The _validateReleaseOrMint check is an essential security check
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    // Calculate the local amount
+    uint256 localAmount = _calculateLocalAmount(
+      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
+    );
+
+    _validateReleaseOrMint(releaseOrMintIn, localAmount);
+
+    // Mint to the receiver
+    _releaseOrMint(releaseOrMintIn.receiver, localAmount);
+
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: localAmount
+    });
+
+    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+  }
+
+  /// @notice Contains the specific release or mint token logic for a pool.
+  /// @dev overriding this method allows us to create pools with different release/mint signatures
+  /// without duplicating the underlying logic.
+  function _releaseOrMint(address receiver, uint256 amount) internal virtual {}
 
   // ================================================================
   // │                         Validation                           │
@@ -221,11 +296,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// - if the source pool is valid
   /// - rate limit status
   /// @param releaseOrMintIn The input to validate.
+  /// @param localAmount The local amount to be released or minted.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
-  function _validateReleaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) internal {
+  function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn, uint256 localAmount) internal {
     if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
@@ -235,7 +309,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
 
-    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.amount);
+    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
   }
 
   // ================================================================
@@ -324,7 +398,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice Checks if the pool address is configured on the remote chain.
   /// @param remoteChainSelector Remote chain selector.
   /// @param remotePoolAddress The address of the remote pool.
-  function isRemotePool(uint64 remoteChainSelector, bytes calldata remotePoolAddress) public view returns (bool) {
+  function isRemotePool(uint64 remoteChainSelector, bytes memory remotePoolAddress) public view returns (bool) {
     return s_remoteChainConfigs[remoteChainSelector].remotePools.contains(keccak256(remotePoolAddress));
   }
 
@@ -410,11 +484,11 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
     for (uint256 i = 0; i < chainsToAdd.length; ++i) {
       ChainUpdate memory newChain = chainsToAdd[i];
-      RateLimiter._validateTokenBucketConfig(newChain.outboundRateLimiterConfig, false);
-      RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig, false);
+      RateLimiter._validateTokenBucketConfig(newChain.outboundRateLimiterConfig);
+      RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig);
 
       if (newChain.remoteTokenAddress.length == 0) {
-        revert ZeroAddressNotAllowed();
+        revert ZeroAddressInvalid();
       }
 
       // If the chain already exists, revert
@@ -458,7 +532,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @param remotePoolAddress The address of the new remote pool.
   function _setRemotePool(uint64 remoteChainSelector, bytes memory remotePoolAddress) internal {
     if (remotePoolAddress.length == 0) {
-      revert ZeroAddressNotAllowed();
+      revert ZeroAddressInvalid();
     }
 
     bytes32 poolHash = keccak256(remotePoolAddress);
@@ -514,11 +588,15 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice Consumes outbound rate limiting capacity in this pool
   function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._consume(amount, address(i_token));
+
+    emit OutboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
   function _consumeInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._consume(amount, address(i_token));
+
+    emit InboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
@@ -576,9 +654,9 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     RateLimiter.Config memory inboundConfig
   ) internal {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
-    RateLimiter._validateTokenBucketConfig(outboundConfig, false);
+    RateLimiter._validateTokenBucketConfig(outboundConfig);
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
-    RateLimiter._validateTokenBucketConfig(inboundConfig, false);
+    RateLimiter._validateTokenBucketConfig(inboundConfig);
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
     emit ChainConfigured(remoteChainSelector, outboundConfig, inboundConfig);
   }
@@ -589,18 +667,26 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned onRamp for the given chain on the Router.
+  /// @dev This function is marked virtual as other token pools may inherit from this contract, but do
+  /// not receive calls from the ramps directly, instead receiving them from a proxy contract. In that
+  /// situation this function must be overridden and the ramp-check removed and replaced with a different
+  /// access-control scheme.
   function _onlyOnRamp(
     uint64 remoteChainSelector
-  ) internal view {
+  ) internal view virtual {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!(msg.sender == s_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
   }
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned offRamp for the given chain on the Router.
+  /// @dev This function is marked virtual as other token pools may inherit from this contract, but do
+  /// not receive calls from the ramps directly, instead receiving them from a proxy contract. In that
+  /// situation this function must be overridden and the ramp-check removed and replaced with a different
+  /// access-control scheme.
   function _onlyOffRamp(
     uint64 remoteChainSelector
-  ) internal view {
+  ) internal view virtual {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!s_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
   }

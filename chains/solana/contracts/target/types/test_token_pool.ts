@@ -1,5 +1,5 @@
 export type TestTokenPool = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "test_token_pool",
   "instructions": [
     {
@@ -299,6 +299,31 @@ export type TestTokenPool = {
       ]
     },
     {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "deleteChainConfig",
       "accounts": [
         {
@@ -361,7 +386,7 @@ export type TestTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -432,7 +457,7 @@ export type TestTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -486,6 +511,44 @@ export type TestTokenPool = {
       ],
       "returns": {
         "defined": "LockOrBurnOutV1"
+      }
+    },
+    {
+      "name": "deriveAccountsReleaseOrMintTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
       }
     }
   ],
@@ -547,7 +610,7 @@ export type TestTokenPool = {
 };
 
 export const IDL: TestTokenPool = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "test_token_pool",
   "instructions": [
     {
@@ -847,6 +910,31 @@ export const IDL: TestTokenPool = {
       ]
     },
     {
+      "name": "setRateLimitAdmin",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "newRateLimitAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "deleteChainConfig",
       "accounts": [
         {
@@ -909,7 +997,7 @@ export const IDL: TestTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -980,7 +1068,7 @@ export const IDL: TestTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1034,6 +1122,44 @@ export const IDL: TestTokenPool = {
       ],
       "returns": {
         "defined": "LockOrBurnOutV1"
+      }
+    },
+    {
+      "name": "deriveAccountsReleaseOrMintTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
+      }
+    },
+    {
+      "name": "deriveAccountsLockOrBurnTokens",
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "lockOrBurn",
+          "type": {
+            "defined": "LockOrBurnInV1"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "DeriveAccountsResponse"
       }
     }
   ],

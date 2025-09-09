@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
 
@@ -11,13 +10,24 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
 
   function test_lockOrBurn_SiloedFunds() public {
     assertTrue(s_siloedLockReleaseTokenPool.isSiloed(SILOED_CHAIN_SELECTOR));
+    deal(address(s_token), address(s_siloedLockReleaseTokenPool), AMOUNT);
 
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(AMOUNT);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: SILOED_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: AMOUNT
+    });
+
     vm.expectEmit();
-    emit TokenPool.Locked(s_allowedOnRamp, AMOUNT);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: SILOED_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: AMOUNT
+    });
 
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -34,13 +44,24 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
 
   function test_lockOrBurn_UnsiloedFunds() public {
     vm.startPrank(s_allowedOnRamp);
+    deal(address(s_token), address(s_siloedLockReleaseTokenPool), AMOUNT);
 
     assertFalse(s_siloedLockReleaseTokenPool.isSiloed(DEST_CHAIN_SELECTOR));
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(AMOUNT);
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: AMOUNT
+    });
+
     vm.expectEmit();
-    emit TokenPool.Locked(s_allowedOnRamp, AMOUNT);
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: address(s_allowedOnRamp),
+      amount: AMOUNT
+    });
 
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({

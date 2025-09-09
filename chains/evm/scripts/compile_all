@@ -9,7 +9,8 @@ echo " └───────────────────────�
 # The offRamp uses a specific lower optimization runs value. All other contracts use the default value
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_OFFRAMP=800
-OPTIMIZE_RUNS_FEE_QUOTER=8000
+OPTIMIZE_RUNS_FEE_QUOTER=3000
+OPTIMIZE_RUNS_LARGE_TOKEN_POOL=5000
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
@@ -23,23 +24,29 @@ compileContract() {
   contract=$(basename "$1")
   echo "Compiling" "$contract"
   dir=$CONTRACTS_DIR/solc/$PROJECT/$contract
+  
+  local args # base args for forge
+  args="build $CONTRACTS_DIR/contracts/"$1.sol" --root $CONTRACTS_DIR"
+  
+  if [ "$ZKSYNC" = "true" ]; then
+    $(dirname "$0")/forge_zksync $args --zksync
+  else
+    local command
+    command="forge $args \
+    $(getOptimizations "$contract") \
+    --extra-output-files bin abi metadata \
+    --build-info \
+    --build-info-path $dir/build \
+    -o $dir"
 
-  local command
-  command="forge build $CONTRACTS_DIR/contracts/"$1.sol" \
-   --root $CONTRACTS_DIR \
-   $(getOptimizations "$contract") \
-   --extra-output-files bin abi metadata \
-   --build-info \
-   --build-info-path $dir/build \
-   -o $dir"
+    $command
 
-  $command
+    # Move the build info to an expected file name
+    mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
 
-  # Move the build info to an expected file name
-  mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
-
-  # Copy the generated abi files to a single folder
-  cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi
+    # Copy the generated abi files to a single folder
+    cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi.json
+  fi
 }
 
 # Define optimization overrides in this function. Anything that is not an override will use the default value
@@ -48,23 +55,34 @@ function getOptimizations() {
     local optimize_runs_override=""
 
     case $1 in
-      "OffRamp" | "OffRampWithMessageTransformer")
+      "OffRamp" | "OffRampOverSuperchainInterop" | "OffRampWithMessageTransformer")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
-      "FeeQuoter")
+      "FeeQuoter" | "FeeQuoterV2")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
+        ;;
+      "BurnMintFastTransferTokenPool" | "HybridLockReleaseUSDCTokenPool")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
         ;;
     esac
 
     echo "$optimize_runs_override"
 }
 
+# Mod sec
+compileContract onRamp/CCVProxy
+compileContract onRamp/CommitOnRamp
+compileContract onRamp/ExecutorOnRamp
+compileContract offRamp/CCVAggregator
+compileContract offRamp/CommitOffRamp
+
+# 1.6
 compileContract offRamp/OffRamp
 compileContract FeeQuoter
+compileContract FeeQuoterV2
 compileContract onRamp/OnRamp
 compileContract applications/PingPongDemo
 compileContract applications/EtherSenderReceiver
-compileContract MultiAggregateRateLimiter
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
@@ -85,7 +103,12 @@ compileContract pools/BurnWithFromMintTokenPool
 compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
 compileContract pools/USDC/USDCTokenPool
+compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/SiloedLockReleaseTokenPool
+compileContract pools/BurnMintFastTransferTokenPool
+compileContract pools/ERC20LockBox
+compileContract pools/USDC/SiloedUSDCTokenPool
+compileContract pools/USDC/USDCTokenPoolCCTPV2
 
 # Test helpers
 compileContract test/helpers/BurnMintERC677Helper
@@ -97,6 +120,7 @@ compileContract test/helpers/receivers/LogMessageDataReceiver
 compileContract test/helpers/MultiOCR3Helper
 compileContract test/mocks/MockE2EUSDCTokenMessenger
 compileContract test/mocks/MockE2EUSDCTransmitter
+compileContract test/mocks/MockE2ELBTCTokenPool
 compileContract test/helpers/CCIPReaderTester
 # Offchain test encoding utils
 compileContract test/helpers/EncodingUtils
@@ -105,4 +129,7 @@ compileContract test/helpers/EncodingUtils
 compileContract offRamp/OffRampWithMessageTransformer
 compileContract onRamp/OnRampWithMessageTransformer
 
+# Superchain Interop On/OffRamps
+compileContract onRamp/OnRampOverSuperchainInterop
+compileContract offRamp/OffRampOverSuperchainInterop
 

@@ -10,58 +10,21 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var (
+	ErrChainAccessorNotFound  = errors.New("chain accessor not found")
 	ErrContractReaderNotFound = errors.New("contract reader not found")
 	ErrContractWriterNotFound = errors.New("contract writer not found")
 )
 
 // ContractAddresses is a map of contract names across all chain selectors and their address.
 // Currently only one contract per chain per name is supported.
+// Deprecated: Use cciptypes.ContractAddresses instead.
 type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
-
-// ChainConfigSnapshot represents the complete configuration state of the chain
-type ChainConfigSnapshot struct {
-	Offramp   OfframpConfig
-	RMNProxy  RMNProxyConfig
-	RMNRemote RMNRemoteConfig
-	FeeQuoter FeeQuoterConfig
-	OnRamp    OnRampConfig
-	Router    RouterConfig
-	CurseInfo CurseInfo
-}
-
-type OnRampConfig struct {
-	DynamicConfig   getOnRampDynamicConfigResponse
-	DestChainConfig onRampDestChainConfig
-}
-
-type FeeQuoterConfig struct {
-	StaticConfig feeQuoterStaticConfig
-}
-
-type RMNRemoteConfig struct {
-	DigestHeader    rmnDigestHeader
-	VersionedConfig versionedConfig
-}
-
-type OfframpConfig struct {
-	CommitLatestOCRConfig OCRConfigResponse
-	ExecLatestOCRConfig   OCRConfigResponse
-	StaticConfig          offRampStaticChainConfig
-	DynamicConfig         offRampDynamicChainConfig
-}
-
-type RMNProxyConfig struct {
-	RemoteAddress []byte
-}
-
-type RouterConfig struct {
-	WrappedNativeAddress cciptypes.Bytes
-}
 
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
@@ -86,8 +49,8 @@ type StaticSourceChainConfig struct {
 
 // ToSourceChainConfig converts a CachedSourceChainConfig to a full SourceChainConfig
 // by adding the provided sequence number.
-func (s StaticSourceChainConfig) ToSourceChainConfig(minSeqNr uint64) SourceChainConfig {
-	return SourceChainConfig{
+func (s StaticSourceChainConfig) ToSourceChainConfig(minSeqNr uint64) cciptypes.SourceChainConfig {
+	return cciptypes.SourceChainConfig{
 		Router:                    s.Router,
 		IsEnabled:                 s.IsEnabled,
 		IsRMNVerificationDisabled: s.IsRMNVerificationDisabled,
@@ -120,41 +83,63 @@ func (s StaticSourceChainConfig) check() (bool /* enabled */, error) {
 func NewCCIPChainReader(
 	ctx context.Context,
 	lggr logger.Logger,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
-) CCIPReader {
+) (CCIPReader, error) {
+	reader, err := newCCIPChainReaderInternal(
+		ctx,
+		lggr,
+		chainAccessors,
+		contractReaders,
+		contractWriters,
+		destChain,
+		offrampAddress,
+		addrCodec,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return NewObservedCCIPReader(
-		newCCIPChainReaderInternal(
-			ctx,
-			lggr,
-			contractReaders,
-			contractWriters,
-			destChain,
-			offrampAddress,
-			addrCodec,
-		),
+		reader,
 		lggr,
 		destChain,
-	)
+	), nil
 }
 
 // NewCCIPReaderWithExtendedContractReaders can be used when you want to directly provide contractreader.Extended
+// Deprecated: This should only be used in tests if absolutely necessary. Use NewCCIPChainReader instead.
 func NewCCIPReaderWithExtendedContractReaders(
 	ctx context.Context,
 	lggr logger.Logger,
-	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
+	extendedContractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
 ) CCIPReader {
-	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec)
-	for ch, extendedCr := range contractReaders {
-		cr.WithExtendedContractReader(ch, extendedCr)
+	cr, err := newCCIPChainReaderInternal(
+		ctx,
+		lggr,
+		chainAccessors,
+		nil,
+		contractWriters,
+		destChain,
+		offrampAddress,
+		addrCodec,
+	)
+	if err != nil {
+		// Panic here since right now this is only called from tests in core
+		panic(fmt.Errorf("failed to create CCIP reader: %w", err))
 	}
+	for ch, extendedCr := range extendedContractReaders {
+		cr.WithExtendedContractReaderTESTONLY(ch, extendedCr)
+	}
+
 	return cr
 }
 
@@ -187,7 +172,8 @@ type CCIPReader interface {
 	// LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
 	LatestMsgSeqNum(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error)
 
-	// GetExpectedNextSequenceNumber reads the destination and returns the expected next onRamp sequence number.
+	// GetExpectedNextSequenceNumber reads the source chain and returns the expected next onRamp sequence number.
+	// DEPRECATED: Not used and should be removed.
 	GetExpectedNextSequenceNumber(
 		ctx context.Context,
 		sourceChainSelector cciptypes.ChainSelector,
@@ -199,7 +185,6 @@ type CCIPReader interface {
 		seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error)
 
 	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
-	// WARNING: This function will fail if the oracle does not support the requested chain.
 	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
 
 	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
@@ -210,47 +195,60 @@ type CCIPReader interface {
 	) (map[cciptypes.ChainSelector]map[string]uint64, error)
 
 	// GetChainsFeeComponents Returns all fee components for given chains if corresponding
-	// chain writer is available.
+	// chain writer is available. It will log errors and return a subset of the requested chains.
 	GetChainsFeeComponents(
 		ctx context.Context,
 		chains []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]types.ChainFeeComponents
 
 	// GetDestChainFeeComponents Reads the fee components for the destination chain.
+	// DEPRECATED: Not used and should be removed.
 	GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error)
 
 	// GetWrappedNativeTokenPriceUSD Gets the wrapped native token price in USD for the provided chains.
+	// It reads the prices from the FeeQuoter contract on each chain.
+	// If it encounters an issue (e.g. chain not supported) it logs the error and skips the chain.
 	GetWrappedNativeTokenPriceUSD(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]cciptypes.BigInt
 
-	// GetChainFeePriceUpdate Gets latest chain fee price update for the provided chains.
+	// GetChainFeePriceUpdate Gets latest chain fee price update for the provided chains from the destination.
+	// If it encounters an issue (e.g. dest chain not supported) it logs the error and returns an empty result.
 	GetChainFeePriceUpdate(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]cciptypes.TimestampedBig
 
+	// GetRMNRemoteConfig reads the RMN remote contract on the destination chain and returns the remote config.
 	GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error)
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
-	GetRmnCurseInfo(ctx context.Context) (CurseInfo, error)
+	GetRmnCurseInfo(ctx context.Context) (cciptypes.CurseInfo, error)
 
-	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
-	// contract and source chain selector.
+	// DiscoverContracts will discover as many addresses as possible based on which addresses are already known.
+	// Initially only the offramp address is known so in the first round the oracles that support the destination chain
+	// are reading the offramp to discover onRamps, dest routers, rmn remote, nonce manager and fee quoter addresses.
+	// On the next round the oracles that support the source chains should be able to access the onRamps since their
+	// addresses are known. That's how they eventually discover source fee quoters and source routers.
+	// They are returned per contract and source chain selector.
 	// allChains is needed because there is no way to enumerate all chain selectors on Solana. We'll attempt to
 	// fetch the source config from the offramp for each of them.
-	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
+	DiscoverContracts(ctx context.Context,
+		supportedChains, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
 
 	// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
 	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this
 	// function returning the price of LINK not in USD, but in a small denomination of USD, similar to returning
 	// the price of ETH not in ETH but in wei (1e-18 ETH).
+	// DEPRECATED: Not used and should be removed.
 	LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
-	// Returns a bool indicating whether something was updated.
+	// NOTE: this method may make network calls.
+	//
+	// NOTE: You should ensure that Sync is called deterministically for every oracle in the DON (e.g. in the Outcome).
 	Sync(ctx context.Context, contracts ContractAddresses) error
 
 	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.

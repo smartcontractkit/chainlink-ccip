@@ -15,10 +15,11 @@ import (
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -242,7 +243,7 @@ func createMockReader(
 		results := make(commontypes.ContractBatchResults, 2)
 		// Price result
 		priceResult := commontypes.BatchReadResult{ReadName: consts.MethodNameGetLatestRoundData}
-		priceResult.SetResult(&LatestRoundData{Answer: big.NewInt(price.Int64())}, nil)
+		priceResult.SetResult(&LatestRoundData{Answer: new(big.Int).Set(price)}, nil)
 		results[0] = priceResult
 
 		// Decimals result

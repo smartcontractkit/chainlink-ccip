@@ -6,21 +6,22 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 const (
-	chainID  = "2337"
-	selector = cciptypes.ChainSelector(12922642891491394802)
+	chainID  = "2"
+	selector = cciptypes.ChainSelector(743186221051783445)
 )
 
 func Test_LatencyIsTracked(t *testing.T) {
@@ -32,7 +33,7 @@ func Test_LatencyIsTracked(t *testing.T) {
 	query := types.Query([]byte("query"))
 	observation := types.Observation([]byte("observation"))
 	outcome := ocr3types.Outcome([]byte("outcome"))
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	origin := FakePlugin{
 		query:       query,
@@ -59,17 +60,17 @@ func Test_LatencyIsTracked(t *testing.T) {
 	}
 
 	l1 := internal.CounterFromHistogramByLabels(
-		t, metrics.PromExecLatencyHistogram, chainID, "observation", "GetCommitReports",
+		t, metrics.PromExecLatencyHistogram, "aptos", chainID, "observation", "GetCommitReports",
 	)
 	require.Equal(t, count, l1)
 
 	l2 := internal.CounterFromHistogramByLabels(
-		t, metrics.PromExecLatencyHistogram, chainID, "outcome", "GetCommitReports",
+		t, metrics.PromExecLatencyHistogram, "aptos", chainID, "outcome", "GetCommitReports",
 	)
 	require.Equal(t, count, l2)
 
 	l3 := internal.CounterFromHistogramByLabels(
-		t, metrics.PromExecLatencyHistogram, chainID, "query", "GetCommitReports",
+		t, metrics.PromExecLatencyHistogram, "aptos", chainID, "query", "GetCommitReports",
 	)
 	require.Equal(t, count, l3)
 }
@@ -89,18 +90,18 @@ func Test_ErrorIsTrackedWhenOriginReturns(t *testing.T) {
 	count := 100
 	for i := 0; i < count; i++ {
 		_, err = tracked.Outcome(
-			tests.Context(t), ocr3types.OutcomeContext{}, types.Query{}, []types.AttributedObservation{},
+			t.Context(), ocr3types.OutcomeContext{}, types.Query{}, []types.AttributedObservation{},
 		)
 		require.Error(t, err)
 	}
 
 	l1 := internal.CounterFromHistogramByLabels(
-		t, metrics.PromExecLatencyHistogram, chainID, "outcome", "GetCommitReports",
+		t, metrics.PromExecLatencyHistogram, "aptos", chainID, "outcome", "GetCommitReports",
 	)
 	require.Equal(t, 0, l1)
 
 	l2 := testutil.ToFloat64(
-		metrics.PromExecErrors.WithLabelValues(chainID, "outcome", "GetCommitReports"),
+		metrics.PromExecErrors.WithLabelValues("aptos", chainID, "outcome", "GetCommitReports"),
 	)
 	require.Equal(t, float64(count), l2)
 }

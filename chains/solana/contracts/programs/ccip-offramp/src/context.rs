@@ -5,10 +5,9 @@ use bytemuck::{Pod, Zeroable};
 use ccip_common::seed;
 use solana_program::sysvar::instructions;
 
-use crate::messages::ExecutionReportSingleChain;
 use crate::program::CcipOfframp;
 use crate::state::{
-    CommitReport, Config, GlobalState, ReferenceAddresses, SourceChain, SourceChainConfig,
+    CommitReport, Config, ExecutionReportBuffer, GlobalState, ReferenceAddresses, SourceChain,
 };
 use crate::CcipOfframpError;
 
@@ -224,7 +223,7 @@ pub struct AcceptOwnership<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(new_chain_selector: u64, _source_chain_config: SourceChainConfig)]
+#[instruction(new_chain_selector: u64)]
 pub struct AddSourceChain<'info> {
     /// Adding a chain selector implies initializing the state for a new chain
     #[account(
@@ -497,7 +496,9 @@ pub struct ExecuteReportContext<'info> {
     pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     #[account(
-        seeds = [seed::SOURCE_CHAIN, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
+        // The second seed here is self referencing, but it gets tied together with the `execution_report`
+        // in `validate_execution_report`.
+        seeds = [seed::SOURCE_CHAIN, source_chain.chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidVersion,
     )]
@@ -505,7 +506,7 @@ pub struct ExecuteReportContext<'info> {
 
     #[account(
         mut,
-        seeds = [seed::COMMIT_REPORT, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref(), commit_report.merkle_root.as_ref()],
+        seeds = [seed::COMMIT_REPORT, source_chain.chain_selector.to_le_bytes().as_ref(), commit_report.merkle_root.as_ref()],
         bump,
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidVersion,
     )]
@@ -573,9 +574,23 @@ pub struct ExecuteReportContext<'info> {
     // pool signer
     // token program
     // token mint
+    // fee token billing
     // ccip_router_pools_signer - derivable PDA [seed::EXTERNAL_TOKEN_POOL, pool_program], seeds::program=router (present in lookup table)
     // ...additional accounts for pool config
     // ] x N tokens
+    // +
+    // [execution_report_buffer] - optional account containing a buffered execution report. Must be last if present, and must only exist
+    // alongside an empty raw_execution_report parameter.
+}
+
+#[derive(Accounts)]
+pub struct ViewConfigOnly<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
 }
 
 #[derive(Accounts)]
@@ -623,6 +638,53 @@ pub struct CloseCommitReportAccount<'info> {
     pub fee_billing_signer: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+#[instruction(buffer_id: Vec<u8>, report_length: u32)]
+pub struct BufferExecutionReportContext<'info> {
+    #[account(
+        init_if_needed,
+        payer = authority,
+        seeds = [seed::EXECUTION_REPORT_BUFFER, &buffer_id, authority.key().as_ref()],
+        bump,
+        space = ANCHOR_DISCRIMINATOR + ExecutionReportBuffer::INIT_SPACE + report_length as usize
+    )]
+    pub execution_report_buffer: Account<'info, ExecutionReportBuffer>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(buffer_id: Vec<u8>)]
+pub struct CloseExecutionReportBufferContext<'info> {
+    #[account(
+        mut,
+        seeds = [seed::EXECUTION_REPORT_BUFFER, &buffer_id, authority.key().as_ref()],
+        bump,
+        close = authority
+    )]
+    pub execution_report_buffer: Account<'info, ExecutionReportBuffer>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 /// It's not possible to store enums in zero_copy accounts, so we wrap the discriminant

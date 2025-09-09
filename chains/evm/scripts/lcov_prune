@@ -6,13 +6,18 @@ input_coverage_file="./lcov.info"
 output_coverage_file="./lcov.info.pruned"
 
 exclusion_list_ccip=(
-  "contracts/libraries/Internal.sol"
-  "contracts/libraries/Client.sol"
-  "contracts/libraries/RateLimiter.sol"
   "contracts/libraries/USDPriceWith18Decimals.sol"
-  "contracts/libraries/MerkleMultiProof.sol"
   "contracts/applications/CCIPClientExample.sol"
   "contracts/test/*"
+
+  # Ignored for initial development of the skeleton
+  "contracts/onRamp/CCVProxy.sol"
+  "contracts/onRamp/BaseOnRamp.sol"
+  "contracts/onRamp/CommitOnRamp.sol"
+  "contracts/offRamp/CCVAggregator.sol"
+  "contracts/offRamp/CommitOffRamp.sol"
+  "contracts/offRamp/components/SignatureQuorumVerifier.sol"
+  "contracts/FeeQuoterV2.sol"
 )
 
 echo "Excluding the following files"

@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
 import {Internal} from "../../../libraries/Internal.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
-import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
-import {IERC20} from "@chainlink/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
   function setUp() public virtual override {
@@ -37,11 +38,11 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     vm.expectCall(
       s_destPoolBySourceToken[token],
       abi.encodeWithSelector(
-        LockReleaseTokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: originalSender,
           receiver: OWNER,
-          amount: amount,
+          sourceDenominatedAmount: amount,
           localToken: s_destTokenBySourceToken[token],
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: tokenAmount.sourcePoolAddress,

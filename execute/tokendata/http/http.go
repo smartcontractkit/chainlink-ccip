@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -17,8 +18,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 const (
@@ -39,6 +41,7 @@ type HTTPClient interface {
 	//	https://developers.circle.com/stablecoins/reference/getattestation
 	//	https://developers.circle.com/stablecoins/docs/transfer-usdc-on-testnet-from-ethereum-to-avalanche
 	Get(ctx context.Context, path string) (cciptypes.Bytes, HTTPStatus, error)
+	Post(ctx context.Context, path string, requestData cciptypes.Bytes) (cciptypes.Bytes, HTTPStatus, error)
 }
 
 // httpClient is a client for the USDC attestation API. It encapsulates all the details specific to the Attestation API:
@@ -123,7 +126,30 @@ func (h *httpClient) Get(ctx context.Context, requestPath string) (cciptypes.Byt
 	response, httpStatus, err := h.callAPI(ctx, lggr, http.MethodGet, requestURL, nil)
 	lggr.Debugw(
 		"Response from attestation API",
+		"Method", "GET",
 		"requestURL", requestURL.String(),
+		"status", httpStatus,
+		"err", err,
+	)
+	return response, httpStatus, err
+}
+
+func (h *httpClient) Post(
+	ctx context.Context,
+	requestPath string,
+	requestData cciptypes.Bytes,
+) (cciptypes.Bytes, HTTPStatus, error) {
+	lggr := logutil.WithContextValues(ctx, h.lggr)
+
+	requestURL := *h.apiURL
+	requestURL.Path = path.Join(requestURL.Path, requestPath)
+
+	response, httpStatus, err := h.callAPI(ctx, lggr, http.MethodPost, requestURL, bytes.NewBuffer(requestData))
+	h.lggr.Debugw(
+		"Response from attestation API",
+		"Method", "POST",
+		"requestURL", requestURL.String(),
+		"requestBody", string(requestData),
 		"status", httpStatus,
 		"err", err,
 	)
@@ -209,7 +235,6 @@ func (h *httpClient) setCoolDownPeriod(lggr logger.Logger, headers http.Header) 
 			}
 		}
 	}
-
 	coolDownDuration = min(coolDownDuration, maxCoolDownDuration)
 	//Logging on the error level, because we should always self-rate limit before hitting the API rate limit
 	lggr.Errorw(

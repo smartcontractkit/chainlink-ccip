@@ -8,13 +8,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 type protoTranslator struct{}
@@ -627,6 +628,7 @@ func (t *protoTranslator) encodeMessage(msg cciptypes.Message) *ocrtypecodecpb.M
 			Nonce:               msg.Header.Nonce,
 			MsgHash:             msg.Header.MsgHash[:],
 			OnRamp:              msg.Header.OnRamp,
+			TxHash:              msg.Header.TxHash,
 		},
 		Sender:         msg.Sender,
 		Data:           msg.Data,
@@ -880,45 +882,55 @@ func (t *protoTranslator) nonceObservationsFromProto(
 	return nonces
 }
 
-func (t *protoTranslator) chainReportsToProto(
-	reports []cciptypes.ExecutePluginReportSingleChain,
-) []*ocrtypecodecpb.ChainReport {
-	pbReports := make([]*ocrtypecodecpb.ChainReport, len(reports))
+func (t *protoTranslator) execPluginReportsToProto(
+	reports []cciptypes.ExecutePluginReport,
+) []*ocrtypecodecpb.ExecutePluginReport {
+	pbReports := make([]*ocrtypecodecpb.ExecutePluginReport, len(reports))
 
 	for i, r := range reports {
-		offchainTokenData := make([]*ocrtypecodecpb.RepeatedBytes, 0)
-		for _, data := range r.OffchainTokenData {
-			offchainTokenData = append(offchainTokenData, &ocrtypecodecpb.RepeatedBytes{Items: data})
+		pbReports[i] = &ocrtypecodecpb.ExecutePluginReport{
+			ChainReports: make([]*ocrtypecodecpb.ChainReport, len(r.ChainReports)),
 		}
+		for j, cr := range r.ChainReports {
+			offchainTokenData := make([]*ocrtypecodecpb.RepeatedBytes, 0)
+			for _, data := range cr.OffchainTokenData {
+				offchainTokenData = append(offchainTokenData, &ocrtypecodecpb.RepeatedBytes{Items: data})
+			}
 
-		pbReports[i] = &ocrtypecodecpb.ChainReport{
-			SourceChainSelector: uint64(r.SourceChainSelector),
-			Messages:            t.messagesToProto(r.Messages),
-			OffchainTokenData:   offchainTokenData,
-			Proofs:              t.bytes32SliceToProto(r.Proofs),
-			ProofFlagBits:       r.ProofFlagBits.Bytes(),
+			pbReports[i].ChainReports[j] = &ocrtypecodecpb.ChainReport{
+				SourceChainSelector: uint64(cr.SourceChainSelector),
+				Messages:            t.messagesToProto(cr.Messages),
+				OffchainTokenData:   offchainTokenData,
+				Proofs:              t.bytes32SliceToProto(cr.Proofs),
+				ProofFlagBits:       cr.ProofFlagBits.Bytes(),
+			}
 		}
 	}
 	return pbReports
 }
 
-func (t *protoTranslator) chainReportsFromProto(
-	pbReports []*ocrtypecodecpb.ChainReport,
-) []cciptypes.ExecutePluginReportSingleChain {
-	reports := make([]cciptypes.ExecutePluginReportSingleChain, len(pbReports))
+func (t *protoTranslator) execPluginReportsFromProto(
+	pbReports []*ocrtypecodecpb.ExecutePluginReport,
+) []cciptypes.ExecutePluginReport {
+	reports := make([]cciptypes.ExecutePluginReport, len(pbReports))
 
 	for i, r := range pbReports {
-		offchainTokenData := make([][][]byte, 0)
-		for _, data := range r.OffchainTokenData {
-			offchainTokenData = append(offchainTokenData, data.Items)
+		reports[i] = cciptypes.ExecutePluginReport{
+			ChainReports: make([]cciptypes.ExecutePluginReportSingleChain, len(r.ChainReports)),
 		}
+		for j, cr := range r.ChainReports {
+			offchainTokenData := make([][][]byte, 0)
+			for _, data := range cr.OffchainTokenData {
+				offchainTokenData = append(offchainTokenData, data.Items)
+			}
 
-		reports[i] = cciptypes.ExecutePluginReportSingleChain{
-			SourceChainSelector: cciptypes.ChainSelector(r.SourceChainSelector),
-			Messages:            t.decodeMessages(r.Messages),
-			OffchainTokenData:   offchainTokenData,
-			Proofs:              t.bytes32SliceFromProto(r.Proofs),
-			ProofFlagBits:       cciptypes.NewBigInt(big.NewInt(0).SetBytes(r.ProofFlagBits)),
+			reports[i].ChainReports[j] = cciptypes.ExecutePluginReportSingleChain{
+				SourceChainSelector: cciptypes.ChainSelector(cr.SourceChainSelector),
+				Messages:            t.decodeMessages(cr.Messages),
+				OffchainTokenData:   offchainTokenData,
+				Proofs:              t.bytes32SliceFromProto(cr.Proofs),
+				ProofFlagBits:       cciptypes.NewBigInt(big.NewInt(0).SetBytes(cr.ProofFlagBits)),
+			}
 		}
 	}
 
@@ -984,6 +996,7 @@ func (t *protoTranslator) decodeMessageHeader(header *ocrtypecodecpb.RampMessage
 		Nonce:               header.Nonce,
 		MsgHash:             cciptypes.Bytes32(header.MsgHash),
 		OnRamp:              header.OnRamp,
+		TxHash:              header.TxHash,
 	}
 }
 

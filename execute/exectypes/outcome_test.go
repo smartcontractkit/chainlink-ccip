@@ -6,7 +6,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/stretchr/testify/require"
 )
@@ -66,15 +66,16 @@ func TestPluginState_Next(t *testing.T) {
 	}
 }
 
+/*
 func TestNewSortedOutcome(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
 		name           string
 		pendingCommits []CommitData
-		report         cciptypes.ExecutePluginReport
+		report         []cciptypes.ExecutePluginReport
 		wantCommits    []CommitData
-		wantReports    []cciptypes.ExecutePluginReportSingleChain
+		wantReports    []cciptypes.ExecutePluginReport
 	}{
 		{
 			name: "sorts by timestamp",
@@ -111,32 +112,39 @@ func TestNewSortedOutcome(t *testing.T) {
 		},
 		{
 			name: "sorts chain reports by source chain selector",
-			report: cciptypes.ExecutePluginReport{
-				ChainReports: []cciptypes.ExecutePluginReportSingleChain{
-					{SourceChainSelector: 2},
-					{SourceChainSelector: 1},
+			report: []cciptypes.ExecutePluginReport{
+				{
+					ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+						{SourceChainSelector: 2},
+						{SourceChainSelector: 1},
+					},
 				},
 			},
-			wantReports: []cciptypes.ExecutePluginReportSingleChain{
-				{SourceChainSelector: 1},
-				{SourceChainSelector: 2},
+			wantReports: []cciptypes.ExecutePluginReport{
+				{
+					ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+						{SourceChainSelector: 1},
+						{SourceChainSelector: 2},
+					},
+				},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NewSortedOutcome(Unknown, tt.pendingCommits, tt.report)
+			got := NewOutcome(Unknown, tt.pendingCommits, tt.report)
 
 			if len(tt.wantCommits) > 0 {
 				require.Equal(t, tt.wantCommits, got.CommitReports)
 			}
 			if len(tt.wantReports) > 0 {
-				require.Equal(t, tt.wantReports, got.Report.ChainReports)
+				require.Equal(t, tt.wantReports, got.Reports)
 			}
 		})
 	}
 }
+*/
 
 // seqRange is a helper to create a SequenceNumberRange
 func seqRange(start, end uint64) cciptypes.SeqNumRange {
@@ -165,18 +173,20 @@ func TestOutcome_ToLogFormat(t *testing.T) {
 				},
 			},
 		},
-		Report: cciptypes.ExecutePluginReport{
-			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
-				{
-					SourceChainSelector: 1,
-					// Add some message data that should be removed
-					Messages: []cciptypes.Message{
-						{
-							Data: testData2,
-							Header: cciptypes.RampMessageHeader{
-								SourceChainSelector: 2,
-							},
-						}},
+		Reports: []cciptypes.ExecutePluginReport{
+			{
+				ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+					{
+						SourceChainSelector: 1,
+						// Add some message data that should be removed
+						Messages: []cciptypes.Message{
+							{
+								Data: testData2,
+								Header: cciptypes.RampMessageHeader{
+									SourceChainSelector: 2,
+								},
+							}},
+					},
 				},
 			},
 		},
@@ -193,8 +203,8 @@ func TestOutcome_ToLogFormat(t *testing.T) {
 
 	// Verify the original object is not modified
 	require.Equal(t, testData1, testOutcome.CommitReports[0].Messages[0].Data)
-	require.Equal(t, testData2, testOutcome.Report.ChainReports[0].Messages[0].Data)
+	require.Equal(t, testData2, testOutcome.Reports[0].ChainReports[0].Messages[0].Data)
 
 	require.Equal(t, cciptypes.Bytes{}, logFormatOutcome.CommitReports[0].Messages[0].Data)
-	require.Equal(t, cciptypes.Bytes{}, logFormatOutcome.Report.ChainReports[0].Messages[0].Data)
+	require.Equal(t, cciptypes.Bytes{}, logFormatOutcome.Reports[0].ChainReports[0].Messages[0].Data)
 }

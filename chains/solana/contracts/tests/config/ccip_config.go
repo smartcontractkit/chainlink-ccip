@@ -21,10 +21,14 @@ var (
 	CcipInvalidReceiverProgram = GetProgramID("test_ccip_invalid_receiver")
 	CcipTokenPoolProgram       = GetProgramID("test_token_pool")
 	Token2022Program           = solana.Token2022ProgramID
+	SPLTokenProgram            = solana.TokenProgramID
 	FeeQuoterProgram           = GetProgramID("fee_quoter")
 	CcipOfframpProgram         = GetProgramID("ccip_offramp")
 	RMNRemoteProgram           = GetProgramID("rmn_remote")
 	PingPongProgram            = GetProgramID("ping_pong_demo")
+	CctpMessageTransmitter     = GetProgramID("cctp_message_transmitter")
+	CctpTokenMessengerMinter   = GetProgramID("cctp_token_messenger_minter")
+	CctpTokenPoolProgram       = GetProgramID("cctp_token_pool")
 
 	// test values
 	OnRampAddress                   = []byte{1, 2, 3}
@@ -40,6 +44,7 @@ var (
 	EVMToken1AddressBytes = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	EVMToken2AddressBytes = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
 	EVMToken3AddressBytes = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
+	EVMUsdcAddressBytes   = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
 
 	// chain selectors
 	SvmChainSelector uint64 = 15

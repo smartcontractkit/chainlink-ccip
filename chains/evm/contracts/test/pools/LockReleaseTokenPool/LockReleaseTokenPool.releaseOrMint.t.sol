@@ -34,15 +34,26 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     deal(address(s_token), address(s_lockReleaseTokenPool), amount);
 
     vm.expectEmit();
-    emit RateLimiter.TokensConsumed(amount);
+    emit TokenPool.InboundRateLimitConsumed({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
+    });
+
     vm.expectEmit();
-    emit TokenPool.Released(s_allowedOffRamp, OWNER, amount);
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: s_allowedOffRamp,
+      recipient: OWNER,
+      amount: amount
+    });
 
     s_lockReleaseTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_sourcePoolAddress),
@@ -72,18 +83,28 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
       // Only rate limit if the amount is >0
       if (amount > 0) {
         vm.expectEmit();
-        emit RateLimiter.TokensConsumed(amount);
+        emit TokenPool.InboundRateLimitConsumed({
+          remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+          token: address(s_token),
+          amount: amount
+        });
       }
 
       vm.expectEmit();
-      emit TokenPool.Released(s_allowedOffRamp, recipient, amount);
+      emit TokenPool.ReleasedOrMinted({
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        token: address(s_token),
+        sender: s_allowedOffRamp,
+        recipient: recipient,
+        amount: amount
+      });
     }
 
     s_lockReleaseTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: recipient,
-        amount: amount,
+        sourceDenominatedAmount: amount,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_sourcePoolAddress),
@@ -106,7 +127,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: 1e5,
+        sourceDenominatedAmount: 1e5,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_sourcePoolAddress),
@@ -126,7 +147,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
         receiver: OWNER,
-        amount: 1e5,
+        sourceDenominatedAmount: 1e5,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: _generateSourceTokenData().sourcePoolAddress,

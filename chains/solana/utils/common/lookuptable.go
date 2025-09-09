@@ -88,19 +88,19 @@ func CreateLookupTable(ctx context.Context, client *rpc.Client, admin solana.Pri
 		return solana.PublicKey{}, ierr
 	}
 
-	_, err := SendAndConfirm(ctx, client, []solana.Instruction{instruction}, admin, rpc.CommitmentConfirmed)
+	_, err := SendAndConfirmWithLookupTablesAndRetries(ctx, client, []solana.Instruction{instruction}, admin, rpc.CommitmentConfirmed, map[solana.PublicKey]solana.PublicKeySlice{})
 	return table, err
 }
 
 func ExtendLookupTable(ctx context.Context, client *rpc.Client, table solana.PublicKey, admin solana.PrivateKey, entries []solana.PublicKey) error {
-	_, err := SendAndConfirm(ctx, client, []solana.Instruction{
+	_, err := SendAndConfirmWithLookupTablesAndRetries(ctx, client, []solana.Instruction{
 		NewExtendLookupTableInstruction(
 			table,
 			admin.PublicKey(),
 			admin.PublicKey(),
 			entries,
 		),
-	}, admin, rpc.CommitmentConfirmed)
+	}, admin, rpc.CommitmentConfirmed, map[solana.PublicKey]solana.PublicKeySlice{})
 	return err
 }
 

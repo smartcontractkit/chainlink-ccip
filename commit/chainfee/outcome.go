@@ -11,11 +11,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func (p *processor) Outcome(
@@ -25,6 +27,10 @@ func (p *processor) Outcome(
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
+
+	if invalidateCache, ok := ctx.Value(consts.InvalidateCacheKey).(bool); ok && invalidateCache {
+		p.obs.invalidateCaches(ctx, lggr)
+	}
 
 	consensusObs, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
@@ -101,6 +107,7 @@ func (p *processor) Outcome(
 		"gasPrices", gasPrices,
 		"consensusTimestamp", consensusObs.TimestampNow,
 	)
+
 	out := Outcome{GasPrices: gasPrices}
 	return out, nil
 }
@@ -231,6 +238,14 @@ func (p *processor) getGasPricesToUpdate(
 ) []cciptypes.GasPriceChain {
 	var gasPrices []cciptypes.GasPriceChain
 
+	destChainCfg, err := p.homeChain.GetChainConfig(p.destChain)
+	if err != nil {
+		lggr.Errorw("error getting dest chain config", "chain", p.destChain, "err", err)
+		return gasPrices
+	}
+	execGasPriceDeviation := destChainCfg.Config.GasPriceDeviationPPB.Int64()
+	daGasPriceDeviation := destChainCfg.Config.DAGasPriceDeviationPPB.Int64()
+
 	for chain, currentChainFee := range currentChainUSDFees {
 		chainCfg, err := p.homeChain.GetChainConfig(chain)
 		if err != nil {
@@ -284,13 +299,13 @@ func (p *processor) getGasPricesToUpdate(
 		executionFeeDeviates := mathslib.Deviates(
 			currentChainFee.ExecutionFeePriceUSD,
 			lastUpdate.ChainFee.ExecutionFeePriceUSD,
-			feeConfig.GasPriceDeviationPPB.Int64(),
+			execGasPriceDeviation,
 		)
 
 		dataAvFeeDeviates := mathslib.Deviates(
 			currentChainFee.DataAvFeePriceUSD,
 			lastUpdate.ChainFee.DataAvFeePriceUSD,
-			feeConfig.DAGasPriceDeviationPPB.Int64(),
+			daGasPriceDeviation,
 		)
 
 		if executionFeeDeviates || dataAvFeeDeviates {
@@ -304,11 +319,16 @@ func (p *processor) getGasPricesToUpdate(
 				ChainSel: chain,
 				GasPrice: packedFee,
 			})
-		} else {
-			lggr.Debugw("chain fee update not needed: within deviation thresholds",
-				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
-				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
+			continue
 		}
+
+		lggr.Infow("chain fee update not needed",
+			"chain", chain,
+			"currentChainFee", currentChainFee,
+			"lastUpdateTimestamp", lastUpdate.Timestamp,
+			"currentTimestamp", consensusTimestamp,
+			"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
+			"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
 	}
 
 	return gasPrices

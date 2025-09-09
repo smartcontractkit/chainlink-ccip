@@ -4,7 +4,8 @@ use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELEC
 
 use crate::context::{
     AcceptOwnership, AddBillingTokenConfig, AddDestChain, AddPriceUpdater, RemovePriceUpdater,
-    SetTokenTransferFeeConfig, UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig,
+    SetTokenTransferFeeConfig, UpdateBillingTokenConfig, UpdateConfig, UpdateConfigLinkMint,
+    UpdateDestChainConfig,
 };
 use crate::event::{
     ConfigSet, DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled,
@@ -24,8 +25,14 @@ pub struct Impl;
 impl Admin for Impl {
     fn transfer_ownership(&self, ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()> {
         let config = &mut ctx.accounts.config;
-        require!(
-            proposed_owner != config.owner,
+        require_keys_neq!(
+            proposed_owner,
+            Pubkey::default(),
+            FeeQuoterError::DefaultOwnerProposal
+        );
+        require_keys_neq!(
+            proposed_owner,
+            config.owner,
             FeeQuoterError::RedundantOwnerProposal
         );
         emit!(OwnershipTransferRequested {
@@ -77,6 +84,21 @@ impl Admin for Impl {
     ) -> Result<()> {
         let config = &mut ctx.accounts.config;
         config.max_fee_juels_per_msg = max_fee_juels_per_msg;
+
+        emit!(ConfigSet {
+            max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+            link_token_mint: config.link_token_mint,
+            link_token_local_decimals: config.link_token_local_decimals,
+            onramp: config.onramp,
+            default_code_version: config.default_code_version
+        });
+        Ok(())
+    }
+
+    fn set_link_token_mint(&self, ctx: Context<UpdateConfigLinkMint>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.link_token_mint = ctx.accounts.link_token_mint.key();
+        config.link_token_local_decimals = ctx.accounts.link_token_mint.decimals;
 
         emit!(ConfigSet {
             max_fee_juels_per_msg: config.max_fee_juels_per_msg,

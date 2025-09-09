@@ -3,15 +3,17 @@ use anchor_lang::prelude::*;
 use crate::context::{
     AcceptOwnership, AddChainSelector, AddOfframp, CcipSend, RemoveOfframp, TransferOwnership,
     UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, UpdateDestChainSelectorConfigNoRealloc,
-    WithdrawBilledFunds,
+    ViewConfigOnly, WithdrawBilledFunds,
 };
 use crate::messages::{GetFeeResult, SVM2AnyMessage};
-use crate::state::{CodeVersion, DestChainConfig};
+use crate::state::{
+    CodeVersion, DeriveAccountsCcipSendParams, DeriveAccountsResponse, DestChainConfig,
+};
 use crate::token_context::{
-    AcceptAdminRoleTokenAdminRegistry, ModifyTokenAdminRegistry,
+    AcceptAdminRoleTokenAdminRegistry, EditPoolTokenAdminRegistry, ModifyTokenAdminRegistry,
     OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
     RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner,
-    SetPoolTokenAdminRegistry,
+    SetPoolTokenAdminRegistry, UpgradeTokenAdminRegistry,
 };
 use crate::GetFee;
 
@@ -28,6 +30,12 @@ pub trait Admin {
         &self,
         ctx: Context<UpdateConfigCCIPRouter>,
         code_version: CodeVersion,
+    ) -> Result<()>;
+
+    fn set_link_token_mint(
+        &self,
+        ctx: Context<UpdateConfigCCIPRouter>,
+        link_token_mint: Pubkey,
     ) -> Result<()>;
 
     fn update_fee_aggregator(
@@ -111,6 +119,13 @@ pub trait OnRamp {
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
     ) -> Result<GetFeeResult>;
+
+    fn derive_accounts_ccip_send<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, ViewConfigOnly<'info>>,
+        params: DeriveAccountsCcipSendParams,
+        stage: String,
+    ) -> Result<DeriveAccountsResponse>;
 }
 
 pub trait TokenAdminRegistry {
@@ -155,6 +170,14 @@ pub trait TokenAdminRegistry {
         ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
     ) -> Result<()>;
 
+    /// Setter method for the pool's flag for support of account auto-derivation
+    fn set_pool_supports_auto_derivation(
+        &self,
+        ctx: Context<EditPoolTokenAdminRegistry>,
+        mint: Pubkey,
+        supports_auto_derivation: bool,
+    ) -> Result<()>;
+
     /// Sets the lookup table for pool for a token.
     /// Setting the lookup table to address(0) effectively delists the token from CCIP.
     /// Setting the lookup table to any other address enables the token on CCIP.
@@ -162,5 +185,13 @@ pub trait TokenAdminRegistry {
         &self,
         ctx: Context<SetPoolTokenAdminRegistry>,
         writable_indexes: Vec<u8>,
+    ) -> Result<()>;
+
+    /// Upgrades the token admin registry from v1 to v2.
+    /// This is a one-way operation that cannot be reverted. It is permissionless
+    /// and the resulting value is backwards compatible.
+    fn upgrade_token_admin_registry_from_v1(
+        &self,
+        ctx: Context<UpgradeTokenAdminRegistry>,
     ) -> Result<()>;
 }

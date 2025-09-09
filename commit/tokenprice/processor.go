@@ -7,11 +7,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -84,6 +86,10 @@ func (p *processor) Outcome(
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
+
+	if invalidateCache, ok := ctx.Value(consts.InvalidateCacheKey).(bool); ok && invalidateCache {
+		p.obs.invalidateCaches(ctx, lggr)
+	}
 
 	lggr.Infow("processing token price outcome")
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).

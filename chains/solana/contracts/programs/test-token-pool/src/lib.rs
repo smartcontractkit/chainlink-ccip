@@ -6,10 +6,13 @@ declare_id!("JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ");
 mod context;
 use crate::context::*;
 
+const ARBITRARY_SEED: &[u8] = b"arbitrary_seed";
+const ANOTHER_ARBITRARY_SEED: &[u8] = b"another_arbitrary_seed";
+
 #[program]
 pub mod test_token_pool {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
-    use burnmint_token_pool::{burn_tokens, mint_tokens};
+    use burnmint_token_pool::{burn_tokens, mint_tokens, MintTokenAccountsInfo};
     use lockrelease_token_pool::{lock_tokens, release_tokens};
 
     use super::*;
@@ -112,6 +115,18 @@ pub mod test_token_pool {
         )
     }
 
+    // set rate limit admin
+    pub fn set_rate_limit_admin(
+        ctx: Context<SetRateLimitAdmin>,
+        _mint: Pubkey,
+        new_rate_limit_admin: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts
+            .state
+            .config
+            .set_rate_limit_admin(new_rate_limit_admin)
+    }
+
     // delete chain config
     pub fn delete_chain_config(
         _ctx: Context<DeleteChainConfig>,
@@ -129,6 +144,22 @@ pub mod test_token_pool {
         ctx: Context<'_, '_, '_, 'info, TokenOfframp<'info>>,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<ReleaseOrMintOutV1> {
+        // The last two remaining accounts are not used, but if present they verify the autoderive
+        // functionality. The first remaining account is the (potential) multisig
+
+        if let [.., a, b] = &ctx.remaining_accounts {
+            require_eq!(
+                a.key(),
+                Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID).0,
+                CcipTokenPoolError::InvalidInputs
+            );
+            require_eq!(
+                b.key(),
+                Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID).0,
+                CcipTokenPoolError::InvalidInputs
+            );
+        }
+
         let parsed_amount = to_svm_token_amount(
             release_or_mint.amount,
             ctx.accounts.chain_config.base.remote.decimals,
@@ -152,6 +183,8 @@ pub mod test_token_pool {
             ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
+        let mint_authority = ctx.accounts.mint.mint_authority.unwrap_or_default();
+
         match ctx.accounts.state.pool_type {
             PoolType::LockAndRelease => release_tokens(
                 ctx.accounts.token_program.key(),
@@ -166,12 +199,24 @@ pub mod test_token_pool {
             )?,
             PoolType::BurnAndMint => mint_tokens(
                 ctx.accounts.token_program.key(),
-                ctx.accounts.receiver_token_account.to_account_info(),
-                ctx.accounts.mint.to_account_info(),
-                ctx.accounts.pool_signer.to_account_info(),
-                ctx.bumps.pool_signer,
                 release_or_mint,
                 parsed_amount,
+                MintTokenAccountsInfo {
+                    receiver_token_account: &ctx.accounts.receiver_token_account.to_account_info(),
+                    mint: &ctx.accounts.mint.to_account_info(),
+                    pool_signer: &ctx.accounts.pool_signer.to_account_info(),
+                    pool_signer_bump: ctx.bumps.pool_signer,
+                    multisig: if mint_authority != ctx.accounts.pool_signer.key() {
+                        Some(
+                            ctx.remaining_accounts
+                                .iter()
+                                .find(|acc| acc.key() == mint_authority)
+                                .ok_or(CcipTokenPoolError::InvalidInputs)?,
+                        )
+                    } else {
+                        None
+                    },
+                },
             )?,
             PoolType::Wrapped => {
                 // The External Execution Config Account is used to sign the CPI instruction
@@ -232,6 +277,22 @@ pub mod test_token_pool {
         ctx: Context<'_, '_, '_, 'info, TokenOnramp<'info>>,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<LockOrBurnOutV1> {
+        // The last two remaining accounts are not used, but if present they verify the autoderive
+        // functionality. The first remaining account is the (potential) multisig
+
+        if let [.., a, b] = &ctx.remaining_accounts {
+            require_eq!(
+                a.key(),
+                Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID).0,
+                CcipTokenPoolError::InvalidInputs
+            );
+            require_eq!(
+                b.key(),
+                Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID).0,
+                CcipTokenPoolError::InvalidInputs
+            );
+        }
+
         validate_lock_or_burn(
             &lock_or_burn,
             ctx.accounts.state.config.mint,
@@ -310,6 +371,44 @@ pub mod test_token_pool {
                 abi_encoded_decimals[31] = ctx.accounts.state.config.decimals;
                 abi_encoded_decimals
             },
+        })
+    }
+
+    pub fn derive_accounts_release_or_mint_tokens<'info>(
+        _ctx: Context<'_, '_, 'info, 'info, Empty>,
+        stage: String,
+        _release_or_mint: ReleaseOrMintInV1,
+    ) -> Result<DeriveAccountsResponse> {
+        Ok(DeriveAccountsResponse {
+            current_stage: stage,
+            accounts_to_save: vec![
+                Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID)
+                    .0
+                    .readonly(),
+                Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID)
+                    .0
+                    .readonly(),
+            ],
+            ..Default::default()
+        })
+    }
+
+    pub fn derive_accounts_lock_or_burn_tokens<'info>(
+        _ctx: Context<'_, '_, 'info, 'info, Empty>,
+        stage: String,
+        _lock_or_burn: LockOrBurnInV1,
+    ) -> Result<DeriveAccountsResponse> {
+        Ok(DeriveAccountsResponse {
+            current_stage: stage,
+            accounts_to_save: vec![
+                Pubkey::find_program_address(&[ARBITRARY_SEED], &crate::ID)
+                    .0
+                    .readonly(),
+                Pubkey::find_program_address(&[ANOTHER_ARBITRARY_SEED], &crate::ID)
+                    .0
+                    .readonly(),
+            ],
+            ..Default::default()
         })
     }
 }

@@ -1,0 +1,30 @@
+[package]
+name = "cctp-token-pool"
+version = "0.1.1"
+description = "USDC Token Pool for CCIP utilizing CCTP"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "cctp_token_pool"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
+anchor-spl = "0.29.0"
+base-token-pool = { version = "0.1.1", path = "../base-token-pool/", features = ["no-entrypoint"] }
+ccip_common = {path = "../ccip-common"}
+solana-program = "1.17.25"
+
+[build-dependencies]
+build_commit = { path = "../../crates/build-commit" }
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic", "custom-heap"))']

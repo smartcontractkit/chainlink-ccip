@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
-import {Ownable2Step} from "@chainlink/shared/access/Ownable2Step.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract OnRamp_setDynamicConfig is OnRampSetup {
   function test_setDynamicConfig() public {
@@ -49,7 +49,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
       allowlistAdmin: address(0)
     });
 
-    // Invalid price reg reverts.
+    // Invalid fee quoter reverts.
     newConfig.feeQuoter = address(0);
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);

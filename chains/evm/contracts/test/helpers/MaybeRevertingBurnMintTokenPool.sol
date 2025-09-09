@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
+import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
@@ -37,10 +37,16 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     s_releaseOrMintMultiplier = multiplier;
   }
 
+  function _lockOrBurn(
+    uint256 amount
+  ) internal override {
+    IBurnMintERC20(address(i_token)).burn(amount);
+  }
+
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory out) {
+    out = super.lockOrBurn(lockOrBurnIn);
 
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
@@ -49,19 +55,21 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
       }
     }
 
-    IBurnMintERC20(address(i_token)).burn(lockOrBurnIn.amount);
-    emit Burned(msg.sender, lockOrBurnIn.amount);
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: s_sourceTokenData.length == 0 ? _encodeLocalDecimals() : s_sourceTokenData
-    });
+    if (s_sourceTokenData.length != 0) {
+      out.destPoolData = s_sourceTokenData;
+    }
+    return out;
+  }
+
+  function _releaseOrMint(address receiver, uint256 amount) internal override {
+    IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
 
   /// @notice Reverts depending on the value of `s_revertReason`
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory out) {
+    out = super.releaseOrMint(releaseOrMintIn);
 
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
@@ -69,14 +77,11 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
         revert(add(32, revertReason), mload(revertReason))
       }
     }
-    // Calculate the local amount
-    uint256 localAmount =
-      _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
 
-    uint256 amount = localAmount * s_releaseOrMintMultiplier;
-    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, amount);
+    return out;
+  }
 
-    emit Minted(msg.sender, releaseOrMintIn.receiver, amount);
-    return Pool.ReleaseOrMintOutV1({destinationAmount: amount});
+  function _calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) internal view override returns (uint256) {
+    return super._calculateLocalAmount(remoteAmount, remoteDecimals) * s_releaseOrMintMultiplier;
   }
 }

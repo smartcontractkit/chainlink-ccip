@@ -1,11 +1,14 @@
 package chainfee
 
 import (
+	"context"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/stretchr/testify/mock"
 
@@ -24,10 +27,10 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -367,11 +370,31 @@ func TestProcessor_Outcome(t *testing.T) {
 			},
 			chainFeeWriteFrequency: chainFeePriceBatchWriteFrequency, // Needs a frequency
 		},
+		{
+			name: "Observations with FChain, TimestampNow, and ChainFeeUpdates",
+			aos: sameObs(numOracles, Observation{
+				FChain:       fChains,
+				TimestampNow: ts,
+				ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
+					internal.EvmChainSelector: {
+						Timestamp: ts,
+						ChainFee: ComponentsUSDPrices{
+							ExecutionFeePriceUSD: big.NewInt(1),
+							DataAvFeePriceUSD:    big.NewInt(1),
+						},
+					},
+				},
+			}),
+			expectedError: false,
+			expectedOutcome: func() Outcome {
+				return Outcome{}
+			},
+		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := tests.Context(t)
+			ctx := t.Context()
 			homeChainMock := mock_home_chain.NewMockHomeChain(t)
 			if tt.feeInfo == nil {
 				homeChainMock.EXPECT().GetChainConfig(mock.Anything).
@@ -410,4 +433,47 @@ func TestProcessor_Outcome(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProcessor_Outcome_cacheInvalidation(t *testing.T) {
+	lggr := logger.Test(t)
+	ctx := t.Context()
+
+	obs := &asyncObserver{
+		lggr:            lggr,
+		cancelFunc:      nil,
+		mu:              &sync.RWMutex{},
+		triggerSyncChan: make(chan time.Time),
+	}
+
+	p := &processor{
+		lggr: lggr,
+		obs:  obs,
+	}
+
+	obs.mu.Lock()
+	obs.chainFeePriceUpdates = map[cciptypes.ChainSelector]Update{1: {}}
+	obs.mu.Unlock()
+
+	// cache is not invalidated with a normal context
+	_, _ = p.Outcome(ctx, Outcome{}, Query{}, nil)
+	updates := obs.getChainFeePriceUpdates(ctx, lggr)
+	require.Len(t, updates, 1)
+
+	// cache is not invalidated with invalidation context set to false
+	ctx = context.WithValue(ctx, consts.InvalidateCacheKey, false)
+	_, _ = p.Outcome(ctx, Outcome{}, Query{}, nil)
+	updates = obs.getChainFeePriceUpdates(ctx, lggr)
+	require.Len(t, updates, 1)
+
+	// cache is invalidated with invalidation context set to true and a sync op is triggered
+	wg := sync.WaitGroup{}
+	go func() {
+		<-obs.triggerSyncChan
+	}()
+	ctx = context.WithValue(ctx, consts.InvalidateCacheKey, true)
+	_, _ = p.Outcome(ctx, Outcome{}, Query{}, nil)
+	updates = obs.getChainFeePriceUpdates(ctx, lggr)
+	require.Len(t, updates, 0)
+	wg.Wait() // wait until receiving the sync operation signal
 }

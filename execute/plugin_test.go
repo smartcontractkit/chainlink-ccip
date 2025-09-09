@@ -1,6 +1,7 @@
 package execute
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -27,8 +28,8 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
@@ -36,13 +37,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	plugincommon_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func genRandomChainReports(numReports, numMsgsPerReport int) []cciptypes.ExecutePluginReportSingleChain {
@@ -224,7 +224,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				lggr:       logger.Test(t),
 				ccipReader: ccipReaderMock,
 			}
-			err := p.checkAlreadyExecuted(tests.Context(t), p.lggr, chainReports)
+			err := p.checkAlreadyExecuted(t.Context(), p.lggr, chainReports)
 			if tc.shouldErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "already executed")
@@ -247,6 +247,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 		unfinalizedRanges       map[cciptypes.ChainSelector][]cciptypes.SeqNum // unfinalized
 		cursedSourceChains      map[cciptypes.ChainSelector]bool               // cursed chains
 		canExec                 CanExecuteHandle
+		fetchFrom               time.Time
 		wantObs                 exectypes.CommitObservations
 		wantExecutedFinalized   []exectypes.CommitData
 		wantExecutedUnfinalized []exectypes.CommitData
@@ -258,6 +259,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			ranges:                  nil,
 			unfinalizedRanges:       nil,
 			cursedSourceChains:      nil,
+			fetchFrom:               time.Time{},
 			wantObs:                 exectypes.CommitObservations{},
 			wantExecutedFinalized:   nil,
 			wantExecutedUnfinalized: nil,
@@ -286,6 +288,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				1: nil,
 			},
 			cursedSourceChains: nil,
+			fetchFrom:          time.Time{},
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
@@ -323,6 +326,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				1: {7, 8},
 			},
 			cursedSourceChains: nil, // No cursed chains
+			fetchFrom:          time.Time{},
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
@@ -361,6 +365,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				1: nil,
 			},
 			cursedSourceChains: nil, // No cursed chains
+			fetchFrom:          time.Time{},
 			wantObs: exectypes.CommitObservations{
 				1: nil,
 			},
@@ -398,6 +403,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				1: cciptypes.NewSeqNumRange(1, 10).ToSlice(),
 			},
 			cursedSourceChains: nil, // No cursed chains
+			fetchFrom:          time.Time{},
 			wantObs: exectypes.CommitObservations{
 				1: nil,
 			},
@@ -423,6 +429,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 							{
 								ChainSel:     1,
 								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+								MerkleRoot:   cciptypes.Bytes32{1}, // Unique root
 							},
 						},
 					},
@@ -435,6 +442,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 							{
 								ChainSel:     1,
 								SeqNumsRange: cciptypes.NewSeqNumRange(11, 20),
+								MerkleRoot:   cciptypes.Bytes32{2}, // Unique root
 							},
 						},
 					},
@@ -447,6 +455,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				1: cciptypes.NewSeqNumRange(11, 20).ToSlice(),
 			},
 			cursedSourceChains: nil, // No cursed chains
+			fetchFrom:          time.Time{},
 			wantObs: exectypes.CommitObservations{
 				1: nil,
 			},
@@ -456,6 +465,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 					SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
 					Timestamp:           time.UnixMilli(10101010101),
 					BlockNum:            999,
+					MerkleRoot:          cciptypes.Bytes32{1}, // Match unique root
 				},
 			},
 			wantExecutedUnfinalized: []exectypes.CommitData{
@@ -464,6 +474,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 					SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20),
 					Timestamp:           time.UnixMilli(10101010102),
 					BlockNum:            1000,
+					MerkleRoot:          cciptypes.Bytes32{2}, // Match unique root
 				},
 			},
 			wantErr: assert.NoError,
@@ -488,6 +499,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			ranges:             nil,
 			unfinalizedRanges:  nil,
 			cursedSourceChains: nil, // No cursed chains
+			fetchFrom:          time.Time{},
 			wantObs: exectypes.CommitObservations{
 				1: nil,
 			},
@@ -506,6 +518,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 							{
 								ChainSel:     1,
 								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+								MerkleRoot:   cciptypes.Bytes32{1}, // Unique root
 							},
 						},
 					},
@@ -518,6 +531,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 							{
 								ChainSel:     1,
 								SeqNumsRange: cciptypes.NewSeqNumRange(11, 20),
+								MerkleRoot:   cciptypes.Bytes32{2}, // Unique root
 							},
 						},
 					},
@@ -530,6 +544,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 							{
 								ChainSel:     1,
 								SeqNumsRange: cciptypes.NewSeqNumRange(21, 30),
+								MerkleRoot:   cciptypes.Bytes32{3}, // Unique root
 							},
 						},
 					},
@@ -543,6 +558,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				// First report partially executed, third report fully executed unfinalized
 			},
 			cursedSourceChains: nil, // No cursed chains
+			fetchFrom:          time.Time{},
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
@@ -551,6 +567,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 						Timestamp:           time.UnixMilli(10101010101),
 						BlockNum:            1000,
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
+						MerkleRoot:          cciptypes.Bytes32{1}, // Match unique root
 					},
 				},
 			},
@@ -560,6 +577,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 					SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20),
 					Timestamp:           time.UnixMilli(10101010102),
 					BlockNum:            1001,
+					MerkleRoot:          cciptypes.Bytes32{2}, // Match unique root
 				},
 			},
 			wantExecutedUnfinalized: []exectypes.CommitData{
@@ -568,6 +586,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 					SequenceNumberRange: cciptypes.NewSeqNumRange(21, 30),
 					Timestamp:           time.UnixMilli(10101010103),
 					BlockNum:            1002,
+					MerkleRoot:          cciptypes.Bytes32{3}, // Match unique root
 				},
 			},
 			wantErr: assert.NoError,
@@ -595,6 +614,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				1: {7, 8},
 			},
 			cursedSourceChains: nil, // No cursed chains
+			fetchFrom:          time.Time{},
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
@@ -631,6 +651,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			cursedSourceChains: map[cciptypes.ChainSelector]bool{
 				1: true, // Chain 1 is cursed
 			},
+			fetchFrom:               time.Time{},
 			wantObs:                 exectypes.CommitObservations{}, // Empty observations since all chains are cursed
 			wantExecutedFinalized:   nil,
 			wantExecutedUnfinalized: nil,
@@ -668,6 +689,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				1: true,  // Chain 1 is cursed
 				2: false, // Chain 2 is not cursed
 			},
+			fetchFrom: time.Time{},
 			wantObs: exectypes.CommitObservations{
 				2: []exectypes.CommitData{
 					{
@@ -715,6 +737,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				1: false, // Chain 1 is not cursed
 				2: true,  // Chain 2 is cursed
 			},
+			fetchFrom: time.Time{},
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
@@ -753,6 +776,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				1: {4, 5},
 			},
 			cursedSourceChains: nil, // No curse information available
+			fetchFrom:          time.Time{},
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
@@ -768,26 +792,140 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 			wantExecutedUnfinalized: nil,
 			wantErr:                 assert.NoError,
 		},
+		{
+			name: "filters_price_reports_and_processes_merkle_report",
+			reports: []cciptypes.CommitPluginReportWithMeta{
+				// Price report 1 (no Merkle roots)
+				{
+					BlockNum:  1000,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: nil, // Indicates a price-only report or similar non-executable
+					},
+				},
+				// Price report 2 (no Merkle roots)
+				{
+					BlockNum:  1001,
+					Timestamp: time.UnixMilli(10101010102),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{}, // Also indicates non-executable for messages
+					},
+				},
+				// Report with an actual Merkle root
+				{
+					BlockNum:  1002,
+					Timestamp: time.UnixMilli(10101010103),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1, // Source chain selector
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+								MerkleRoot:   cciptypes.Bytes32{0x01}, // Example Merkle root
+							},
+						},
+					},
+				},
+			},
+			ranges:             nil, // No finalized messages for this new report
+			unfinalizedRanges:  nil, // No unfinalized messages for this new report
+			cursedSourceChains: nil,
+			fetchFrom:          time.Time{},
+			canExec:            canExecute(true), // Assume the Merkle root is executable
+			wantObs: exectypes.CommitObservations{
+				1: []exectypes.CommitData{ // Expecting only the report with the Merkle root to be processed
+					{
+						SourceChain:         1,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+						Timestamp:           time.UnixMilli(10101010103),
+						BlockNum:            1002,
+						MerkleRoot:          cciptypes.Bytes32{0x01},
+					},
+				},
+			},
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
+		{ // New test case for progress with low limit due to cache advancing
+			name: "progress_with_low_limit_due_to_cache_advancing",
+			// reports that the mockReader.CommitReportsGTETimestamp should return in this specific call
+			reports: []cciptypes.CommitPluginReportWithMeta{
+				{
+					BlockNum:  1002,
+					Timestamp: time.UnixMilli(10101010103), // Timestamp of the executable report
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+								MerkleRoot:   cciptypes.Bytes32{0x01},
+							},
+						},
+					},
+				},
+			},
+			ranges:             nil,
+			unfinalizedRanges:  nil,
+			cursedSourceChains: nil,
+			fetchFrom:          time.UnixMilli(10101010000), // Broader visibility window
+			canExec:            canExecute(true),
+			wantObs: exectypes.CommitObservations{
+				1: []exectypes.CommitData{
+					{
+						SourceChain:         1,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+						Timestamp:           time.UnixMilli(10101010103),
+						BlockNum:            1002,
+						MerkleRoot:          cciptypes.Bytes32{0x01},
+					},
+				},
+			},
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
 	}
 
 	for _, tt := range tcs {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
+			currentTestLogger := logger.Test(t)
 			if tt.canExec == nil {
 				tt.canExec = canExecute(true)
 			}
-			mockReader := readerpkg_mock.NewMockCCIPReader(t)
-			mockReader.On(
-				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, primitives.Unconfirmed,
-				mock.Anything,
-			).Return(tt.reports, nil)
-			mockReader.On(
-				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, primitives.Finalized,
-				mock.Anything,
-			).Return([]cciptypes.CommitPluginReportWithMeta{}, nil)
 
-			// Set up finalized messages mock
+			mockReader := readerpkg_mock.NewMockCCIPReader(t)
+			var mockCache cache.CommitReportCache = &noopCommitReportCache{}
+
+			offchainConfigForTest := pluginconfig.ExecuteOffchainConfig{MaxCommitReportsToFetch: 10} // Default for most tests
+
+			if tt.name == "progress_with_low_limit_due_to_cache_advancing" {
+				configurableCache := &configurableCommitReportCache{
+					reportsToQueryFrom:    time.UnixMilli(10101010102), // Advanced timestamp
+					cachedReportsToReturn: []cciptypes.CommitPluginReportWithMeta{},
+					lggr:                  currentTestLogger,
+				}
+				// For this specific test, DeduplicateReports should directly return what CommitReportsGTETimestamp returns
+				// as we assume cachedReportsToReturn is empty and the new reports are tt.reports.
+				configurableCache.deduplicateShouldReturn = tt.reports
+				mockCache = configurableCache
+				offchainConfigForTest.MaxCommitReportsToFetch = 1 // Crucial for this test case
+
+				mockReader.EXPECT().CommitReportsGTETimestamp(
+					mock.Anything,               // context
+					time.UnixMilli(10101010102), // Expecting the advanced timestamp from cache
+					primitives.Unconfirmed,
+					int(1), // Expecting the low fetch limit
+				).Return(tt.reports, nil)
+			} else {
+				// Default mock setup for other tests
+				mockReader.EXPECT().CommitReportsGTETimestamp(
+					mock.Anything,
+					mock.Anything,
+					primitives.Unconfirmed,
+					mock.Anything, // Most tests use a default MaxCommitReportsToFetch or don't care about this specific arg
+				).Return(tt.reports, nil)
+			}
+
 			executed := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
 			for k, v := range tt.ranges {
 				if _, exists := executed[k]; !exists {
@@ -795,9 +933,8 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				}
 				executed[k] = append(executed[k], v...)
 			}
-			mockReader.On("ExecutedMessages", mock.Anything, mock.Anything, primitives.Finalized).Return(executed, nil)
+			mockReader.EXPECT().ExecutedMessages(mock.Anything, mock.Anything, primitives.Finalized).Return(executed, nil)
 
-			// Set up unfinalized messages mock
 			unfinalized := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
 			for k, v := range tt.unfinalizedRanges {
 				if _, exists := unfinalized[k]; !exists {
@@ -805,15 +942,17 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				}
 				unfinalized[k] = append(unfinalized[k], v...)
 			}
-			mockReader.On("ExecutedMessages", mock.Anything, mock.Anything, primitives.Unconfirmed).Return(unfinalized, nil)
+			mockReader.EXPECT().ExecutedMessages(mock.Anything, mock.Anything, primitives.Unconfirmed).Return(unfinalized, nil)
 
-			got, gotFinalized, gotUnfinalized, _, err := getPendingReportsForExecution(
-				tests.Context(t),
+			got, gotFinalized, gotUnfinalized, err := getPendingReportsForExecution(
+				t.Context(),
 				mockReader,
+				mockCache,
 				tt.canExec,
-				time.Now(),
+				tt.fetchFrom,
 				tt.cursedSourceChains,
-				logger.Test(t),
+				int(offchainConfigForTest.MaxCommitReportsToFetch), // limit int
+				currentTestLogger,
 			)
 			if !tt.wantErr(t, err, "getPendingReportsForExecution(...)") {
 				return
@@ -841,13 +980,13 @@ func TestPlugin_Close(t *testing.T) {
 
 func TestPlugin_Query(t *testing.T) {
 	p := &Plugin{}
-	q, err := p.Query(tests.Context(t), ocr3types.OutcomeContext{})
+	q, err := p.Query(t.Context(), ocr3types.OutcomeContext{})
 	require.NoError(t, err)
 	require.Equal(t, types.Query{}, q)
 }
 
 func TestPlugin_ObservationQuorum(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{
 		reportingCfg: ocr3types.ReportingPluginConfig{F: 1},
 	}
@@ -861,7 +1000,7 @@ func TestPlugin_ObservationQuorum(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{ocrTypeCodec: ocrTypeCodec}
 	err := p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: []byte("not a valid observation"),
@@ -871,7 +1010,7 @@ func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{
 		ocrTypeCodec: ocrTypeCodec,
 	}
@@ -883,7 +1022,7 @@ func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
@@ -925,7 +1064,7 @@ func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
@@ -944,7 +1083,7 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
 			{
-				MerkleRoot:          cciptypes.Bytes32{},
+				MerkleRoot:          cciptypes.Bytes32{123},
 				SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2),
 				SourceChain:         1,
 			},
@@ -961,11 +1100,11 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 	require.Error(t, err)
 	assert.Contains(t,
 		err.Error(),
-		"validate commit reports reading eligibility: observer not allowed to read from chain 1")
+		"destination chain not supported but observed commit report")
 }
 
 func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
@@ -1001,7 +1140,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
@@ -1042,7 +1181,7 @@ func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
 	}
-	_, err := p.Observation(tests.Context(t), ocr3types.OutcomeContext{
+	_, err := p.Observation(t.Context(), ocr3types.OutcomeContext{
 		PreviousOutcome: []byte("not a valid observation"),
 	}, nil)
 	require.Error(t, err)
@@ -1056,24 +1195,40 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
 	mockHomeChain.EXPECT().GetFChain().Return(map[cciptypes.ChainSelector]int{}, nil)
 
-	// Create a mock commit roots cache
-	mockCommitRootsCache := cache.NewCommitRootsCache(
-		lggr,
-		8*time.Hour,   // messageVisibilityInterval
-		5*time.Minute, // rootSnoozeTime
-	)
+	// Create a mock CCIP reader with a relaxed approach - any calls will return a non-error response
+	mockCCIPReader := readerpkg_mock.NewMockCCIPReader(t)
 
-	// Create the plugin
+	// Use .Maybe() to make expectations optional, so the test is more robust
+	mockCCIPReader.EXPECT().
+		CommitReportsGTETimestamp(
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+		).Return([]cciptypes.CommitPluginReportWithMeta{}, nil).Maybe()
+
+	mockCCIPReader.EXPECT().
+		GetRmnCurseInfo(mock.Anything).
+		Return(cciptypes.CurseInfo{}, nil).Maybe()
+
+	// Create a simplified plugin structure that will test the eligibility failure
+	// This removes the dependency on actual cache implementations
 	p := &Plugin{
-		homeChain:        mockHomeChain,
-		oracleIDToP2pID:  map[commontypes.OracleID]libocrtypes.PeerID{},
-		lggr:             lggr,
-		ocrTypeCodec:     ocrTypeCodec,
-		commitRootsCache: mockCommitRootsCache,
+		homeChain:       mockHomeChain,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{}, // Empty map to trigger the eligibility check error
+		lggr:            lggr,
+		ocrTypeCodec:    ocrTypeCodec,
+		ccipReader:      mockCCIPReader,
+		commitRootsCache: cache.NewCommitRootsCache(
+			lggr,
+			8*time.Hour,
+			5*time.Minute,
+		),
+		commitReportCache: &noopCommitReportCache{},
 	}
 
-	// Run the test
-	_, err := p.Observation(tests.Context(t), ocr3types.OutcomeContext{}, nil)
+	// Run the test - this should fail with the eligibility check error
+	_, err := p.Observation(t.Context(), ocr3types.OutcomeContext{}, nil)
 	require.Error(t, err)
 	assert.Contains(t,
 		err.Error(),
@@ -1081,8 +1236,29 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 			"error getting supported chains: oracle ID 0 not found in oracleIDToP2pID")
 }
 
+// noopCommitReportCache is a simple implementation of CommitReportCache that does nothing
+type noopCommitReportCache struct{}
+
+func (c *noopCommitReportCache) RefreshCache(ctx context.Context) error {
+	return nil
+}
+
+func (c *noopCommitReportCache) GetReportsToQueryFromTimestamp() time.Time {
+	return time.Now().Add(-8 * time.Hour)
+}
+
+func (c *noopCommitReportCache) GetCachedReports(fromTimestamp time.Time) []cciptypes.CommitPluginReportWithMeta {
+	return nil
+}
+
+func (c *noopCommitReportCache) DeduplicateReports(
+	reports []cciptypes.CommitPluginReportWithMeta,
+) []cciptypes.CommitPluginReportWithMeta {
+	return reports // Simply return the reports without any deduplication
+}
+
 func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	fChainMap := map[cciptypes.ChainSelector]int{
 		1: 1,
 		2: 2,
@@ -1106,7 +1282,7 @@ func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
 }
 
 func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
@@ -1123,7 +1299,7 @@ func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 }
 
 func TestPlugin_Outcome_BelowF(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	fChainMap := map[cciptypes.ChainSelector]int{
 		0: 1,
 		2: 2,
@@ -1150,7 +1326,7 @@ func TestPlugin_Outcome_BelowF(t *testing.T) {
 }
 
 func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	fChainMap := map[cciptypes.ChainSelector]int{
 		10: 20,
 		0:  3,
@@ -1180,7 +1356,7 @@ func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
 }
 
 func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	fChainMap := map[cciptypes.ChainSelector]int{
 		0:  3,
 		10: 20,
@@ -1214,8 +1390,90 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 	require.Len(t, outcome, 0)
 }
 
+func TestPlugin_Reports_MultipleReports(t *testing.T) {
+	ctx := t.Context()
+	lggr := logger.Test(t)
+
+	mockReportCodec := codec_mocks.NewMockExecutePluginCodec(t)
+	mockReportCodec.On("Encode", mock.Anything, mock.MatchedBy(func(report cciptypes.ExecutePluginReport) bool {
+		return len(report.ChainReports) > 0
+	})).Return([]byte("encoded_report_1"), nil).Once()
+	mockReportCodec.On("Encode", mock.Anything, mock.MatchedBy(func(report cciptypes.ExecutePluginReport) bool {
+		return len(report.ChainReports) > 0
+	})).Return([]byte("encoded_report_2"), nil).Once()
+
+	// Mock chain support for transmission schedule
+	mockChainSupport := plugincommon_mock.NewMockChainSupport(t)
+	mockChainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
+
+	// Create plugin instance with necessary mocks
+	p := &Plugin{
+		lggr:         lggr,
+		reportCodec:  mockReportCodec,
+		ocrTypeCodec: ocrTypeCodec,
+		chainSupport: mockChainSupport,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			1: {},
+		},
+	}
+
+	// Create test outcome with two reports
+	commitReports := []exectypes.CommitData{
+		{
+			SourceChain: 100,
+			MerkleRoot:  cciptypes.Bytes32{1, 2, 3},
+		},
+		{
+			SourceChain: 200,
+			MerkleRoot:  cciptypes.Bytes32{4, 5, 6},
+		},
+	}
+
+	reports := []cciptypes.ExecutePluginReport{
+		{
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+				{
+					SourceChainSelector: 100,
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
+					},
+				},
+			},
+		},
+		{
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+				{
+					SourceChainSelector: 200,
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+					},
+				},
+			},
+		},
+	}
+
+	outcome := exectypes.NewOutcome(exectypes.Filter, commitReports, reports)
+	encodedOutcome, err := ocrTypeCodec.EncodeOutcome(outcome)
+	require.NoError(t, err)
+
+	reportPlus, err := p.Reports(ctx, 1, encodedOutcome)
+
+	require.NoError(t, err)
+	require.Len(t, reportPlus, 2, "Should return 2 reports")
+
+	// First report
+	assert.Equal(t, types.Report("encoded_report_1"), reportPlus[0].ReportWithInfo.Report)
+	assert.NotEmpty(t, reportPlus[0].ReportWithInfo.Info, "Report info should not be empty")
+	assert.NotEmpty(t, reportPlus[0].TransmissionScheduleOverride, "Transmission schedule should not be empty")
+
+	// Second report
+	assert.Equal(t, types.Report("encoded_report_2"), reportPlus[1].ReportWithInfo.Report)
+	assert.NotEmpty(t, reportPlus[1].ReportWithInfo.Info, "Report info should not be empty")
+	assert.NotEmpty(t, reportPlus[1].TransmissionScheduleOverride, "Transmission schedule should not be empty")
+}
+
 func TestPlugin_Reports_UnableToParse(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
@@ -1226,22 +1484,33 @@ func TestPlugin_Reports_UnableToParse(t *testing.T) {
 }
 
 func TestPlugin_Reports_UnableToEncode(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
-	p := &Plugin{reportCodec: codec, lggr: logger.Test(t), ocrTypeCodec: ocrTypeCodec}
+	// Mock chain support for transmission schedule
+	chainSupport := plugincommon_mock.NewMockChainSupport(t)
+	chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
+	p := &Plugin{
+		reportCodec:  codec,
+		lggr:         logger.Test(t),
+		ocrTypeCodec: ocrTypeCodec,
+		chainSupport: chainSupport,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			0: {},
+		},
+	}
 	report, err := ocrTypeCodec.EncodeOutcome(exectypes.NewOutcome(
-		exectypes.Unknown, nil,
-		cciptypes.ExecutePluginReport{ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+		exectypes.Unknown, []exectypes.CommitData{{}, {}},
+		[]cciptypes.ExecutePluginReport{{ChainReports: []cciptypes.ExecutePluginReportSingleChain{
 			{},
 			{},
-		}}))
+		}}}))
 	require.NoError(t, err)
 
 	_, err = p.Reports(ctx, 0, report)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to encode report: test error")
+	assert.Contains(t, err.Error(), "unable to encode report")
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
@@ -1249,12 +1518,22 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
 
+	cs := plugincommon_mock.NewMockChainSupport(t)
+	cs.EXPECT().SupportsDestChain(1).Return(true, nil).Maybe()
+
+	homeChain := reader_mock.NewMockHomeChain(t)
+	homeChain.EXPECT().GetSupportedChainsForPeer(libocrtypes.PeerID{1}).
+		Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
+
 	p := &Plugin{
-		reportCodec: codec,
-		lggr:        logger.Test(t),
+		reportCodec:     codec,
+		lggr:            logger.Test(t),
+		chainSupport:    cs,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{0: {1}},
+		homeChain:       homeChain,
 	}
 
-	_, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
+	_, err := p.ShouldAcceptAttestedReport(t.Context(), 0, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("will not decode"), // faked out, see mock above
 	})
 	require.Error(t, err)
@@ -1266,11 +1545,21 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 	codec.EXPECT().Decode(mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, nil)
 
+	cs := plugincommon_mock.NewMockChainSupport(t)
+	cs.EXPECT().SupportsDestChain(1).Return(true, nil).Maybe()
+
+	homeChain := reader_mock.NewMockHomeChain(t)
+	homeChain.EXPECT().GetSupportedChainsForPeer(libocrtypes.PeerID{1}).
+		Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
+
 	p := &Plugin{
-		lggr:        logger.Test(t),
-		reportCodec: codec,
+		lggr:            logger.Test(t),
+		reportCodec:     codec,
+		chainSupport:    cs,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{0: {1}},
+		homeChain:       homeChain,
 	}
-	result, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
+	result, err := p.ShouldAcceptAttestedReport(t.Context(), 0, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("empty report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -1355,7 +1644,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(reader2.CurseInfo{
+					Return(cciptypes.CurseInfo{
 						CursedSourceChains: map[cciptypes.ChainSelector]bool{
 							cciptypes.ChainSelector(sourceChain): false,
 						}}, nil)
@@ -1377,7 +1666,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(reader2.CurseInfo{}, fmt.Errorf("test error"))
+					Return(cciptypes.CurseInfo{}, fmt.Errorf("test error"))
 
 				homeChain := basicHomeChain()
 				codec := basicMockCodec()
@@ -1397,7 +1686,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(reader2.CurseInfo{GlobalCurse: true}, nil)
+					Return(cciptypes.CurseInfo{GlobalCurse: true}, nil)
 
 				homeChain := basicHomeChain()
 				codec := basicMockCodec()
@@ -1417,7 +1706,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(reader2.CurseInfo{CursedDestination: true}, nil)
+					Return(cciptypes.CurseInfo{CursedDestination: true}, nil)
 
 				homeChain := basicHomeChain()
 				codec := basicMockCodec()
@@ -1437,7 +1726,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(reader2.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{
+					Return(cciptypes.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{
 						cciptypes.ChainSelector(sourceChain): true,
 					},
 					}, nil)
@@ -1495,27 +1784,33 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			codec, homeChain, ccipReader := tc.getDeps()
 			lggr, obs := logger.TestObserved(t, zapcore.DebugLevel)
+
+			cs := plugincommon.NewChainSupport(
+				logger.Test(t),
+				homeChain,
+				map[commontypes.OracleID]libocrtypes.PeerID{
+					1: [32]byte{1},
+				},
+				1,
+				cciptypes.ChainSelector(destChain),
+			)
+			homeChain.EXPECT().GetSupportedChainsForPeer(libocrtypes.PeerID{1}).
+				Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
+
 			p := &Plugin{
-				lggr:        lggr,
-				reportCodec: codec,
-				homeChain:   homeChain,
-				ccipReader:  ccipReader,
-				chainSupport: plugincommon.NewChainSupport(
-					logger.Test(t),
-					homeChain,
-					map[commontypes.OracleID]libocrtypes.PeerID{
-						1: [32]byte{1},
-					},
-					1,
-					cciptypes.ChainSelector(destChain),
-				),
+				lggr:            lggr,
+				reportCodec:     codec,
+				homeChain:       homeChain,
+				ccipReader:      ccipReader,
+				chainSupport:    cs,
+				oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{1: {1}},
 				reportingCfg: ocr3types.ReportingPluginConfig{
 					OracleID:     1,
 					ConfigDigest: configDigest,
 				},
 			}
 
-			result, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
+			result, err := p.ShouldAcceptAttestedReport(t.Context(), 0, ocr3types.ReportWithInfo[[]byte]{
 				Report: []byte("report"), // faked out, see mock above
 			})
 
@@ -1544,7 +1839,7 @@ func TestPlugin_ShouldTransmitAcceptReport_NilReport(t *testing.T) {
 		lggr: lggr,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{})
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{})
 	require.NoError(t, err)
 	require.False(t, shouldTransmit)
 }
@@ -1560,7 +1855,7 @@ func TestPlugin_ShouldTransmitAcceptedReport_DecodeFailure(t *testing.T) {
 		reportCodec: codec,
 	}
 
-	_, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	_, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("will not decode"), // faked out, see mock above
 	})
 	require.Error(t, err)
@@ -1590,7 +1885,7 @@ func TestPlugin_ShouldTransmitAcceptReport_SupportsDestChainCheckFails(t *testin
 		reportCodec: codec,
 	}
 
-	_, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	_, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.Error(t, err)
@@ -1620,7 +1915,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DontSupportDestChain(t *testing.T) {
 		reportCodec: codec,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -1673,7 +1968,7 @@ func TestPlugin_ShouldTransmitAcceptedReport_MismatchingConfigDigests(t *testing
 		ccipReader:  ccipReaderMock,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -1738,7 +2033,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 		ccipReader:  ccipReaderMock,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -1807,7 +2102,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Failure_AlreadyExecuted(t *testing.T)
 		ccipReader:  ccipReaderMock,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -1875,24 +2170,24 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 		},
 		{
 			//nolint:lll
-			Observation: mustDecodeBase64(t, "eyJjb21taXRSZXBvcnRzIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjpudWxsLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6W3siY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjM3OjU1WiIsImJsb2NrTnVtIjoxMjU2Mzc4OTQsIm1lcmtsZVJvb3QiOiIweGFmYmJiNjc4OWE5ZDAwOGQwNDM4MjEwZTBkOWFiMWNkZTc1ZjgxMWIwOWI4YjZkNjU4ODIyYzAwY2QxOGM5ZTYiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMTY4LDE3OV0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6Mzk6MTlaIiwiYmxvY2tOdW0iOjEyNTYzODIwNCwibWVya2xlUm9vdCI6IjB4ZDFmYWY4MmFjOWRjYTc2Y2NhYmZhMzQzNjcxM2VkZWRhNjc4M2JiZWQ5ZjFlZmQxYzY5NGZhM2FhZmVmMjM0ZSIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsxODAsMTkwXSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0MDo0NVoiLCJibG9ja051bSI6MTI1NjM4NTM4LCJtZXJrbGVSb290IjoiMHg5MjRhYTQwNGVmNWFmZTcwNGYzZWFiMjEwMTk5MDA1Njg0OTA1NDQxMmM4N2Q3ZWRiNGExZGY5MmFiZmZkM2NmIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzE5MSwyMDFdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9LHsiY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjQyOjA0WiIsImJsb2NrTnVtIjoxMjU2Mzg4MzcsIm1lcmtsZVJvb3QiOiIweDFhNjkyZmQwMWJkZTgzNjc1MGJlZWI3ZTRkZjNkOTRhNGYyYTQ1NWJiZGI3MzY2YjYzZjYyZWFmMDVhNjRhM2EiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMjAyLDIxNF0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6NDM6MjlaIiwiYmxvY2tOdW0iOjEyNTYzOTE3MiwibWVya2xlUm9vdCI6IjB4OTJhMjdjODI4YzUxMjkyMDQyYTIwYzI2MDllNjU0MTMyY2I1MWNjOTFjOWQ4OWE2NmZmZWUwNDhlNDZhYWRjNCIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsyMTUsMjI3XSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0NDo1M1oiLCJibG9ja051bSI6MTI1NjM5NTAyLCJtZXJrbGVSb290IjoiMHgxMzJlM2IzMjdhMTc3ZDBhODAyMzUwNGRiMWU5OGMwMWJjNTJkZjU2MWI1ODczZDhlYjhmY2UwZTYzZDllMjcyIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzIyOCwyMzZdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9XSwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOm51bGwsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjpudWxsLCI1MjI0NDczMjc3MjM2MzMxMjk1IjpbeyJjaGFpblNlbGVjdG9yIjo1MjI0NDczMjc3MjM2MzMxMjk1LCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyMGM4NjQ5ZmRlNDhmYzc5NTE1NGUxZjlmNWQ5ZGVlZjA3MTk2OTNjIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTozNzo1NVoiLCJibG9ja051bSI6MTI1NjM3ODk0LCJtZXJrbGVSb290IjoiMHg3NmI4Y2I2ZDQ1N2NiYmY0ZGUyMTAwNDE1YTQwOTI1OTZlN2NjNDA4YTg4MWJhNzEyNTJhNjI0Y2IzNmU3MzIyIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzE0MSwxNDFdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9XX0sIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJ0b2tlbkRhdGFPYnNlcnZhdGlvbnMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJub25jZXMiOm51bGwsImNvbnRyYWN0cyI6eyJGQ2hhaW4iOnsiMTAzNDQ5NzEyMzU4NzQ0NjUwODAiOjEsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoxLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6MSwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOjEsIjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOjEsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOjF9LCJBZGRyZXNzZXMiOnsiRmVlUXVvdGVyIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoiMHg5NDVkOTg0NWJjMTRhNWU0ZmY2NDQ1N2JiNjc3MGFhYzAyOGNlZDM5IiwiMTQ3Njc0ODI1MTA3ODQ4MDYwNDMiOiIweGVhYjc0Mjk3ZTZiYjMwYTA2M2ViYThmZTFhYTQ1MDU4OTI5YmZmMmMiLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6IjB4ZmVlNzE5ZmZhZDBkYzYxMjQ2YjgyZDliODBmYTM1YzJmOGJmOTM4NyIsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoiMHg5NDVkOTg0NWJjMTRhNWU0ZmY2NDQ1N2JiNjc3MGFhYzAyOGNlZDM5IiwiMzQ3ODQ4NzIzODUyNDUxMjEwNiI6IjB4MzM3MTIzODYxNTFlNTdhMDFmZDcxYWI5MGU1OWMwMDEwZDhkMTBkMCIsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOiIweDk0NWQ5ODQ1YmMxNGE1ZTRmZjY0NDU3YmI2NzcwYWFjMDI4Y2VkMzkifSwiTm9uY2VNYW5hZ2VyIjp7IjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOiIweGU1MzJmNmNhYmY4ODkyOTlhMjk1NGMwYWU4MDYzNTgyY2Q2NzIwNjUifSwiT25SYW1wIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyMGM4NjQ5ZmRlNDhmYzc5NTE1NGUxZjlmNWQ5ZGVlZjA3MTk2OTNjIiwiMTQ3Njc0ODI1MTA3ODQ4MDYwNDMiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDI0YTY4MDRjMGFmYjk3MTg5YWVmZmRlNTM3MWU2ODM1YzU3YzZkMyIsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyMGM4NjQ5ZmRlNDhmYzc5NTE1NGUxZjlmNWQ5ZGVlZjA3MTk2OTNjIiwiNTIyNDQ3MzI3NzIzNjMzMTI5NSI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMjBjODY0OWZkZTQ4ZmM3OTUxNTRlMWY5ZjVkOWRlZWYwNzE5NjkzYyJ9LCJSTU5SZW1vdGUiOnsiMzQ3ODQ4NzIzODUyNDUxMjEwNiI6IjB4YWU1YWViMmMxMTkwNTM1ODM5NGViZjQ0YTMyNTQyNjI3ZjQ5MmE4MyJ9LCJSb3V0ZXIiOnsiMTAzNDQ5NzEyMzU4NzQ0NjUwODAiOiIweGQzZTE5MGYzODFmMDZkYzBkMjg5NTkwZmQ0NTJjNDJmYTJkYWM1ODYiLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6IjB4ODA2Y2NjYzVmZDNlZGI4Y2IyNGE3NGZkYTdkZTI0ZDg0Y2UwZDFmYiIsIjE2MDE1Mjg2NjAxNzU3ODI1NzUzIjoiMHg0MGM5ZGY2ZTJiZTdlZDA2Njk0ZTEwZDk0NTU5MDQ5Y2NjMjM4YjE0IiwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOiIweGQzZTE5MGYzODFmMDZkYzBkMjg5NTkwZmQ0NTJjNDJmYTJkYWM1ODYiLCIzNDc4NDg3MjM4NTI0NTEyMTA2IjoiMHhlY2IyZDQwN2M5NTUxZTJlMTA4Y2NhZjAyNmU5MTM0ZjJiMzQxNmQ3IiwiNTIyNDQ3MzI3NzIzNjMzMTI5NSI6IjB4ZDNlMTkwZjM4MWYwNmRjMGQyODk1OTBmZDQ1MmM0MmZhMmRhYzU4NiJ9fX0sImZDaGFpbiI6eyIxMDM0NDk3MTIzNTg3NDQ2NTA4MCI6MSwiMTQ3Njc0ODI1MTA3ODQ4MDYwNDMiOjEsIjE2MDE1Mjg2NjAxNzU3ODI1NzUzIjoxLCIxNjI4MTcxMTM5MTY3MDYzNDQ0NSI6MSwiMzQ3ODQ4NzIzODUyNDUxMjEwNiI6MSwiNTIyNDQ3MzI3NzIzNjMzMTI5NSI6MX19"),
+			Observation: mustDecodeBase64(t, "eyJjb21taXRSZXBvcnRzIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjpudWxsLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6W3siY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjM3OjU1WiIsImJsb2NrTnVtIjoxMjU2Mzc4OTQsIm1lcmtsZVJvb3QiOiIweGFmYmJiNjc4OWE5ZDAwOGQwNDM4MjEwZTBkOWFiMWNkZTc1ZjgxMWIwOWI4YjZkNjU4ODIyYzAwY2QxOGM5ZTYiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMTY4LDE3OV0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6Mzk6MTlaIiwiYmxvY2tOdW0iOjEyNTYzODIwNCwibWVya2xlUm9vdCI6IjB4ZDFmYWY4MmFjOWRjYTc2Y2NhYmZhMzQzNjcxM2VkZWRhNjc4M2JiZWQ5ZjFlZmQxYzY5NGZhM2FhZmVmMjM0ZSIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsxODAsMTkwXSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0MDo0NVoiLCJibG9ja051bSI6MTI1NjM4NTM4LCJtZXJrbGVSb290IjoiMHg5MjRhYTQwNGVmNWFmZTcwNGYzZWFiMjEwMTk5MDA1Njg0OTA1NDQxMmM4N2Q3ZWRiNGExZGY5MmFiZmZkM2NmIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzE5MSwyMDFdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9LHsiY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjQyOjA0WiIsImJsb2NrTnVtIjoxMjU2Mzg4MzcsIm1lcmtsZVJvb3QiOiIweDFhNjkyZmQwMWJkZTgzNjc1MGJlZWI3ZTRkZjNkOTRhNGYyYTQ1NWJiZGI3MzY2YjYzZjYyZWFmMDVhNjRhM2EiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMjAyLDIxNF0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6NDM6MjlaIiwiYmxvY2tOdW0iOjEyNTYzOTE3MiwibWVya2xlUm9vdCI6IjB4OTJhMjdjODI4YzUxMjkyMDQyYTIwYzI2MDllNjU0MTMyY2I1MWNjOTFjOWQ4OWE2NmZmZWUwNDhlNDZhYWRjNCIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsyMTUsMjI3XSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0NDo1M1oiLCJibG9ja051bSI6MTI1NjM5NTAyLCJtZXJrbGVSb290IjoiMHgxMzJlM2IzMjdhMTc3ZDBhODAyMzUwNGRiMWU5OGMwMWJjNTJkZjU2MWI1ODczZDhlYjhmY2UwZTYzZDllMjcyIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzIyOCwyMzZdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9LHsiY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjQ0OjUzWiIsImJsb2NrTnVtIjoxMjU2Mzk1MDIsIm1lcmtsZVJvb3QiOiIweDEzMmUzYjMyN2ExNzdkMGE4MDIzNTA0ZGIxZTk4YzAxYmM1MmRmNTYxYjU4NzNkOGViOGZjZTBlNjNkOWUyNzIiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMjI4LDIzNl0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH1dLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6bnVsbCwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOm51bGwsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOm51bGx9LCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwidG9rZW5EYXRhT2JzZXJ2YXRpb25zIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibm9uY2VzIjpudWxsLCJjb250cmFjdHMiOnsiRkNoYWluIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoxLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6MSwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOjEsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoxLCIzNDc4NDg3MjM4NTI0NTEyMTA2IjoxLCI1MjI0NDczMjc3MjM2MzMxMjk1IjoxfSwiQWRkcmVzc2VzIjp7IkZlZVF1b3RlciI6eyIxMDM0NDk3MTIzNTg3NDQ2NTA4MCI6IjB4OTQ1ZDk4NDViYzE0YTVlNGZmNjQ0NTdiYjY3NzBhYWMwMjhjZWQzOSIsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoiMHhlYWI3NDI5N2U2YmIzMGEwNjNlYmE4ZmUxYWE0NTA1ODkyOWJmZjJjIiwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOiIweGZlZTcxOWZmYWQwZGM2MTI0NmI4MmQ5YjgwZmEzNWMyZjhiZjkzODciLCIxNjI4MTcxMTM5MTY3MDYzNDQ0NSI6IjB4OTQ1ZDk4NDViYzE0YTVlNGZmNjQ0NTdiYjY3NzBhYWMwMjhjZWQzOSIsIjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOiIweDMzNzEyMzg2MTUxZTU3YTAxZmQ3MWFiOTBlNTljMDAxMGQ4ZDEwZDAiLCI1MjI0NDczMjc3MjM2MzMxMjk1IjoiMHg5NDVkOTg0NWJjMTRhNWU0ZmY2NDQ1N2JiNjc3MGFhYzAyOGNlZDM5In0sIk5vbmNlTWFuYWdlciI6eyIzNDc4NDg3MjM4NTI0NTEyMTA2IjoiMHhlNTMyZjZjYWJmODg5Mjk5YTI5NTRjMGFlODA2MzU4MmNkNjcyMDY1In0sIk9uUmFtcCI6eyIxMDM0NDk3MTIzNTg3NDQ2NTA4MCI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMjBjODY0OWZkZTQ4ZmM3OTUxNTRlMWY5ZjVkOWRlZWYwNzE5NjkzYyIsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyNGE2ODA0YzBhZmI5NzE4OWFlZmZkZTUzNzFlNjgzNWM1N2M2ZDMiLCIxNjI4MTcxMTM5MTY3MDYzNDQ0NSI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMjBjODY0OWZkZTQ4ZmM3OTUxNTRlMWY5ZjVkOWRlZWYwNzE5NjkzYyIsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIwYzg2NDlmZGU0OGZjNzk1MTU0ZTFmOWY1ZDlkZWVmMDcxOTY5M2MifSwiUk1OUmVtb3RlIjp7IjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOiIweGFlNWFlYjJjMTE5MDUzNTgzOTRlYmY0NGEzMjU0MjYyN2Y0OTJhODMifSwiUm91dGVyIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoiMHhkM2UxOTBmMzgxZjA2ZGMwZDI4OTU5MGZkNDUyYzQyZmEyZGFjNTg2IiwiMTQ3Njc0ODI1MTA3ODQ4MDYwNDMiOiIweDgwNmNjY2M1ZmQzZWRiOGNiMjRhNzRmZGE3ZGUyNGQ4NGNlMGQxZmIiLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6IjB4NDBjOWRmNmUyYmU3ZWQwNjY5NGUxMGQ5NDU1OTA0OWNjYzIzOGIxNCIsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoiMHhkM2UxOTBmMzgxZjA2ZGMwZDI4OTU5MGZkNDUyYzQyZmEyZGFjNTg2IiwiMzQ3ODQ4NzIzODUyNDUxMjEwNiI6IjB4ZWNiMmQ0MDdjOTU1MWUyZTEwOGNjYWYwMjZlOTEzNGYyYjM0MTZkNyIsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOiIweGQzZTE5MGYzODFmMDZkYzBkMjg5NTkwZmQ0NTJjNDJmYTJkYWM1ODYifX19LCJmQ2hhaW4iOnsiMTAzNDQ5NzEyMzU4NzQ0NjUwODAiOjEsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoxLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6MSwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOjEsIjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOjEsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOjF9fQ=="),
 			Observer:    1,
 		},
 		{
 			//nolint:lll
-			Observation: mustDecodeBase64(t, "eyJjb21taXRSZXBvcnRzIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjpudWxsLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6W3siY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjM3OjU1WiIsImJsb2NrTnVtIjoxMjU2Mzc4OTQsIm1lcmtsZVJvb3QiOiIweGFmYmJiNjc4OWE5ZDAwOGQwNDM4MjEwZTBkOWFiMWNkZTc1ZjgxMWIwOWI4YjZkNjU4ODIyYzAwY2QxOGM5ZTYiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMTY4LDE3OV0sImV4ZWN1dGVkTWVzc2FnZXMiOlsxNjgsMTY5LDE3MCwxNzEsMTcyLDE3MywxNzQsMTc1XSwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTozOToxOVoiLCJibG9ja051bSI6MTI1NjM4MjA0LCJtZXJrbGVSb290IjoiMHhkMWZhZjgyYWM5ZGNhNzZjY2FiZmEzNDM2NzEzZWRlZGE2NzgzYmJlZDlmMWVmZDFjNjk0ZmEzYWFmZWYyMzRlIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzE4MCwxOTBdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9LHsiY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjQwOjQ1WiIsImJsb2NrTnVtIjoxMjU2Mzg1MzgsIm1lcmtsZVJvb3QiOiIweDkyNGFhNDA0ZWY1YWZlNzA0ZjNlYWIyMTAxOTkwMDU2ODQ5MDU0NDEyYzg3ZDdlZGI0YTFkZjkyYWJmZmQzY2YiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMTkxLDIwMV0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6NDI6MDRaIiwiYmxvY2tOdW0iOjEyNTYzODgzNywibWVya2xlUm9vdCI6IjB4MWE2OTJmZDAxYmRlODM2NzUwYmVlYjdlNGRmM2Q5NGE0ZjJhNDU1YmJkYjczNjZiNjNmNjJlYWYwNWE2NGEzYSIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsyMDIsMjE0XSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0MzoyOVoiLCJibG9ja051bSI6MTI1NjM5MTcyLCJtZXJrbGVSb290IjoiMHg5MmEyN2M4MjhjNTEyOTIwNDJhMjBjMjYwOWU2NTQxMzJjYjUxY2M5MWM5ZDg5YTY2ZmZlZTA0OGU0NmFhZGM0Iiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzIxNSwyMjddLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9LHsiY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjQ0OjUzWiIsImJsb2NrTnVtIjoxMjU2Mzk1MDIsIm1lcmtsZVJvb3QiOiIweDEzMmUzYjMyN2ExNzdkMGE4MDIzNTA0ZGIxZTk4YzAxYmM1MmRmNTYxYjU4NzNkOGViOGZjZTBlNjNkOWUyNzIiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMjI4LDIzNl0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH1dLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6bnVsbCwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOm51bGwsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOm51bGx9LCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwidG9rZW5EYXRhT2JzZXJ2YXRpb25zIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibm9uY2VzIjpudWxsLCJjb250cmFjdHMiOnsiRkNoYWluIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoxLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6MSwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOjEsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoxLCIzNDc4NDg3MjM4NTI0NTEyMTA2IjoxLCI1MjI0NDczMjc3MjM2MzMxMjk1IjoxfSwiQWRkcmVzc2VzIjp7IkZlZVF1b3RlciI6eyIxMDM0NDk3MTIzNTg3NDQ2NTA4MCI6IjB4OTQ1ZDk4NDViYzE0YTVlNGZmNjQ0NTdiYjY3NzBhYWMwMjhjZWQzOSIsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoiMHhlYWI3NDI5N2U2YmIzMGEwNjNlYmE4ZmUxYWE0NTA1ODkyOWJmZjJjIiwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOiIweGZlZTcxOWZmYWQwZGM2MTI0NmI4MmQ5YjgwZmEzNWMyZjhiZjkzODciLCIxNjI4MTcxMTM5MTY3MDYzNDQ0NSI6IjB4OTQ1ZDk4NDViYzE0YTVlNGZmNjQ0NTdiYjY3NzBhYWMwMjhjZWQzOSIsIjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOiIweDMzNzEyMzg2MTUxZTU3YTAxZmQ3MWFiOTBlNTljMDAxMGQ4ZDEwZDAiLCI1MjI0NDczMjc3MjM2MzMxMjk1IjoiMHg5NDVkOTg0NWJjMTRhNWU0ZmY2NDQ1N2JiNjc3MGFhYzAyOGNlZDM5In0sIk5vbmNlTWFuYWdlciI6eyIzNDc4NDg3MjM4NTI0NTEyMTA2IjoiMHhlNTMyZjZjYWJmODg5Mjk5YTI5NTRjMGFlODA2MzU4MmNkNjcyMDY1In0sIk9uUmFtcCI6eyIxMDM0NDk3MTIzNTg3NDQ2NTA4MCI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMjBjODY0OWZkZTQ4ZmM3OTUxNTRlMWY5ZjVkOWRlZWYwNzE5NjkzYyIsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyNGE2ODA0YzBhZmI5NzE4OWFlZmZkZTUzNzFlNjgzNWM1N2M2ZDMiLCIxNjI4MTcxMTM5MTY3MDYzNDQ0NSI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMjBjODY0OWZkZTQ4ZmM3OTUxNTRlMWY5ZjVkOWRlZWYwNzE5NjkzYyIsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIwYzg2NDlmZGU0OGZjNzk1MTU0ZTFmOWY1ZDlkZWVmMDcxOTY5M2MifSwiUk1OUmVtb3RlIjp7IjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOiIweGFlNWFlYjJjMTE5MDUzNTgzOTRlYmY0NGEzMjU0MjYyN2Y0OTJhODMifSwiUm91dGVyIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoiMHhkM2UxOTBmMzgxZjA2ZGMwZDI4OTU5MGZkNDUyYzQyZmEyZGFjNTg2IiwiMTQ3Njc0ODI1MTA3ODQ4MDYwNDMiOiIweDgwNmNjY2M1ZmQzZWRiOGNiMjRhNzRmZGE3ZGUyNGQ4NGNlMGQxZmIiLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6IjB4NDBjOWRmNmUyYmU3ZWQwNjY5NGUxMGQ5NDU1OTA0OWNjYzIzOGIxNCIsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoiMHhkM2UxOTBmMzgxZjA2ZGMwZDI4OTU5MGZkNDUyYzQyZmEyZGFjNTg2IiwiMzQ3ODQ4NzIzODUyNDUxMjEwNiI6IjB4ZWNiMmQ0MDdjOTU1MWUyZTEwOGNjYWYwMjZlOTEzNGYyYjM0MTZkNyIsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOiIweGQzZTE5MGYzODFmMDZkYzBkMjg5NTkwZmQ0NTJjNDJmYTJkYWM1ODYifX19LCJmQ2hhaW4iOnsiMTAzNDQ5NzEyMzU4NzQ0NjUwODAiOjEsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoxLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6MSwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOjEsIjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOjEsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOjF9fQ=="),
+			Observation: mustDecodeBase64(t, "eyJjb21taXRSZXBvcnRzIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjpudWxsLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6W3siY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjM3OjU1WiIsImJsb2NrTnVtIjoxMjU2Mzc4OTQsIm1lcmtsZVJvb3QiOiIweGFmYmJiNjc4OWE5ZDAwOGQwNDM4MjEwZTBkOWFiMWNkZTc1ZjgxMWIwOWI4YjZkNjU4ODIyYzAwY2QxOGM5ZTYiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMTY4LDE3OV0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6Mzk6MTlaIiwiYmxvY2tOdW0iOjEyNTYzODIwNCwibWVya2xlUm9vdCI6IjB4ZDFmYWY4MmFjOWRjYTc2Y2NhYmZhMzQzNjcxM2VkZWRhNjc4M2JiZWQ5ZjFlZmQxYzY5NGZhM2FhZmVmMjM0ZSIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsxODAsMTkwXSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0MDo0NVoiLCJibG9ja051bSI6MTI1NjM4NTM4LCJtZXJrbGVSb290IjoiMHg5MjRhYTQwNGVmNWFmZTcwNGYzZWFiMjEwMTk5MDA1Njg0OTA1NDQxMmM4N2Q3ZWRiNGExZGY5MmFiZmZkM2NmIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzE5MSwyMDFdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9LHsiY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjQyOjA0WiIsImJsb2NrTnVtIjoxMjU2Mzg4MzcsIm1lcmtsZVJvb3QiOiIweDFhNjkyZmQwMWJkZTgzNjc1MGJlZWI3ZTRkZjNkOTRhNGYyYTQ1NWJiZGI3MzY2YjYzZjYyZWFmMDVhNjRhM2EiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMjAyLDIxNF0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6NDM6MjlaIiwiYmxvY2tOdW0iOjEyNTYzOTE3MiwibWVya2xlUm9vdCI6IjB4OTJhMjdjODI4YzUxMjkyMDQyYTIwYzI2MDllNjU0MTMyY2I1MWNjOTFjOWQ4OWE2NmZmZWUwNDhlNDZhYWRjNCIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsyMTUsMjI3XSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0NDo1M1oiLCJibG9ja051bSI6MTI1NjM5NTAyLCJtZXJrbGVSb290IjoiMHgxMzJlM2IzMjdhMTc3ZDBhODAyMzUwNGRiMWU5OGMwMWJjNTJkZjU2MWI1ODczZDhlYjhmY2UwZTYzZDllMjcyIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzIyOCwyMzZdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9LHsiY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjQ0OjUzWiIsImJsb2NrTnVtIjoxMjU2Mzk1MDIsIm1lcmtsZVJvb3QiOiIweDEzMmUzYjMyN2ExNzdkMGE4MDIzNTA0ZGIxZTk4YzAxYmM1MmRmNTYxYjU4NzNkOGViOGZjZTBlNjNkOWUyNzIiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMjI4LDIzNl0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH1dLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6bnVsbCwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOm51bGwsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOm51bGx9LCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwidG9rZW5EYXRhT2JzZXJ2YXRpb25zIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibm9uY2VzIjpudWxsLCJjb250cmFjdHMiOnsiRkNoYWluIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoxLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6MSwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOjEsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoxLCIzNDc4NDg3MjM4NTI0NTEyMTA2IjoxLCI1MjI0NDczMjc3MjM2MzMxMjk1IjoxfSwiQWRkcmVzc2VzIjp7IkZlZVF1b3RlciI6eyIxMDM0NDk3MTIzNTg3NDQ2NTA4MCI6IjB4OTQ1ZDk4NDViYzE0YTVlNGZmNjQ0NTdiYjY3NzBhYWMwMjhjZWQzOSIsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoiMHhlYWI3NDI5N2U2YmIzMGEwNjNlYmE4ZmUxYWE0NTA1ODkyOWJmZjJjIiwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOiIweGZlZTcxOWZmYWQwZGM2MTI0NmI4MmQ5YjgwZmEzNWMyZjhiZjkzODciLCIxNjI4MTcxMTM5MTY3MDYzNDQ0NSI6IjB4OTQ1ZDk4NDViYzE0YTVlNGZmNjQ0NTdiYjY3NzBhYWMwMjhjZWQzOSIsIjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOiIweDMzNzEyMzg2MTUxZTU3YTAxZmQ3MWFiOTBlNTljMDAxMGQ4ZDEwZDAiLCI1MjI0NDczMjc3MjM2MzMxMjk1IjoiMHg5NDVkOTg0NWJjMTRhNWU0ZmY2NDQ1N2JiNjc3MGFhYzAyOGNlZDM5In0sIk5vbmNlTWFuYWdlciI6eyIzNDc4NDg3MjM4NTI0NTEyMTA2IjoiMHhlNTMyZjZjYWJmODg5Mjk5YTI5NTRjMGFlODA2MzU4MmNkNjcyMDY1In0sIk9uUmFtcCI6eyIxMDM0NDk3MTIzNTg3NDQ2NTA4MCI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMjBjODY0OWZkZTQ4ZmM3OTUxNTRlMWY5ZjVkOWRlZWYwNzE5NjkzYyIsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyNGE2ODA0YzBhZmI5NzE4OWFlZmZkZTUzNzFlNjgzNWM1N2M2ZDMiLCIxNjI4MTcxMTM5MTY3MDYzNDQ0NSI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMjBjODY0OWZkZTQ4ZmM3OTUxNTRlMWY5ZjVkOWRlZWYwNzE5NjkzYyIsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIwYzg2NDlmZGU0OGZjNzk1MTU0ZTFmOWY1ZDlkZWVmMDcxOTY5M2MifSwiUk1OUmVtb3RlIjp7IjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOiIweGFlNWFlYjJjMTE5MDUzNTgzOTRlYmY0NGEzMjU0MjYyN2Y0OTJhODMifSwiUm91dGVyIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoiMHhkM2UxOTBmMzgxZjA2ZGMwZDI4OTU5MGZkNDUyYzQyZmEyZGFjNTg2IiwiMTQ3Njc0ODI1MTA3ODQ4MDYwNDMiOiIweDgwNmNjY2M1ZmQzZWRiOGNiMjRhNzRmZGE3ZGUyNGQ4NGNlMGQxZmIiLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6IjB4NDBjOWRmNmUyYmU3ZWQwNjY5NGUxMGQ5NDU1OTA0OWNjYzIzOGIxNCIsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoiMHhkM2UxOTBmMzgxZjA2ZGMwZDI4OTU5MGZkNDUyYzQyZmEyZGFjNTg2IiwiMzQ3ODQ4NzIzODUyNDUxMjEwNiI6IjB4ZWNiMmQ0MDdjOTU1MWUyZTEwOGNjYWYwMjZlOTEzNGYyYjM0MTZkNyIsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOiIweGQzZTE5MGYzODFmMDZkYzBkMjg5NTkwZmQ0NTJjNDJmYTJkYWM1ODYifX19LCJmQ2hhaW4iOnsiMTAzNDQ5NzEyMzU4NzQ0NjUwODAiOjEsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoxLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6MSwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOjEsIjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOjEsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOjF9fQ=="),
 			Observer:    2,
 		},
 		{
 			//nolint:lll
-			Observation: mustDecodeBase64(t, "eyJjb21taXRSZXBvcnRzIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjpudWxsLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6W3siY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjM3OjU1WiIsImJsb2NrTnVtIjoxMjU2Mzc4OTQsIm1lcmtsZVJvb3QiOiIweGFmYmJiNjc4OWE5ZDAwOGQwNDM4MjEwZTBkOWFiMWNkZTc1ZjgxMWIwOWI4YjZkNjU4ODIyYzAwY2QxOGM5ZTYiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMTY4LDE3OV0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6Mzk6MTlaIiwiYmxvY2tOdW0iOjEyNTYzODIwNCwibWVya2xlUm9vdCI6IjB4ZDFmYWY4MmFjOWRjYTc2Y2NhYmZhMzQzNjcxM2VkZWRhNjc4M2JiZWQ5ZjFlZmQxYzY5NGZhM2FhZmVmMjM0ZSIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsxODAsMTkwXSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0MDo0NVoiLCJibG9ja051bSI6MTI1NjM4NTM4LCJtZXJrbGVSb290IjoiMHg5MjRhYTQwNGVmNWFmZTcwNGYzZWFiMjEwMTk5MDA1Njg0OTA1NDQxMmM4N2Q3ZWRiNGExZGY5MmFiZmZkM2NmIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzE5MSwyMDFdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9LHsiY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjQyOjA0WiIsImJsb2NrTnVtIjoxMjU2Mzg4MzcsIm1lcmtsZVJvb3QiOiIweDFhNjkyZmQwMWJkZTgzNjc1MGJlZWI3ZTRkZjNkOTRhNGYyYTQ1NWJiZGI3MzY2YjYzZjYyZWFmMDVhNjRhM2EiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMjAyLDIxNF0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6NDM6MjlaIiwiYmxvY2tOdW0iOjEyNTYzOTE3MiwibWVya2xlUm9vdCI6IjB4OTJhMjdjODI4YzUxMjkyMDQyYTIwYzI2MDllNjU0MTMyY2I1MWNjOTFjOWQ4OWE2NmZmZWUwNDhlNDZhYWRjNCIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsyMTUsMjI3XSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0NDo1M1oiLCJibG9ja051bSI6MTI1NjM5NTAyLCJtZXJrbGVSb290IjoiMHgxMzJlM2IzMjdhMTc3ZDBhODAyMzUwNGRiMWU5OGMwMWJjNTJkZjU2MWI1ODczZDhlYjhmY2UwZTYzZDllMjcyIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzIyOCwyMzZdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9XSwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOm51bGwsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjpudWxsLCI1MjI0NDczMjc3MjM2MzMxMjk1IjpbeyJjaGFpblNlbGVjdG9yIjo1MjI0NDczMjc3MjM2MzMxMjk1LCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyMGM4NjQ5ZmRlNDhmYzc5NTE1NGUxZjlmNWQ5ZGVlZjA3MTk2OTNjIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTozNzo1NVoiLCJibG9ja051bSI6MTI1NjM3ODk0LCJtZXJrbGVSb290IjoiMHg3NmI4Y2I2ZDQ1N2NiYmY0ZGUyMTAwNDE1YTQwOTI1OTZlN2NjNDA4YTg4MWJhNzEyNTJhNjI0Y2IzNmU3MzIyIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzE0MSwxNDFdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9XX0sIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJ0b2tlbkRhdGFPYnNlcnZhdGlvbnMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJub25jZXMiOm51bGwsImNvbnRyYWN0cyI6eyJGQ2hhaW4iOnsiMTAzNDQ5NzEyMzU4NzQ0NjUwODAiOjEsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoxLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6MSwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOjEsIjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOjEsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOjF9LCJBZGRyZXNzZXMiOnsiRmVlUXVvdGVyIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoiMHg5NDVkOTg0NWJjMTRhNWU0ZmY2NDQ1N2JiNjc3MGFhYzAyOGNlZDM5IiwiMTQ3Njc0ODI1MTA3ODQ4MDYwNDMiOiIweGVhYjc0Mjk3ZTZiYjMwYTA2M2ViYThmZTFhYTQ1MDU4OTI5YmZmMmMiLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6IjB4ZmVlNzE5ZmZhZDBkYzYxMjQ2YjgyZDliODBmYTM1YzJmOGJmOTM4NyIsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoiMHg5NDVkOTg0NWJjMTRhNWU0ZmY2NDQ1N2JiNjc3MGFhYzAyOGNlZDM5IiwiMzQ3ODQ4NzIzODUyNDUxMjEwNiI6IjB4MzM3MTIzODYxNTFlNTdhMDFmZDcxYWI5MGU1OWMwMDEwZDhkMTBkMCIsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOiIweDk0NWQ5ODQ1YmMxNGE1ZTRmZjY0NDU3YmI2NzcwYWFjMDI4Y2VkMzkifSwiTm9uY2VNYW5hZ2VyIjp7IjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOiIweGU1MzJmNmNhYmY4ODkyOTlhMjk1NGMwYWU4MDYzNTgyY2Q2NzIwNjUifSwiT25SYW1wIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyMGM4NjQ5ZmRlNDhmYzc5NTE1NGUxZjlmNWQ5ZGVlZjA3MTk2OTNjIiwiMTQ3Njc0ODI1MTA3ODQ4MDYwNDMiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDI0YTY4MDRjMGFmYjk3MTg5YWVmZmRlNTM3MWU2ODM1YzU3YzZkMyIsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyMGM4NjQ5ZmRlNDhmYzc5NTE1NGUxZjlmNWQ5ZGVlZjA3MTk2OTNjIiwiNTIyNDQ3MzI3NzIzNjMzMTI5NSI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMjBjODY0OWZkZTQ4ZmM3OTUxNTRlMWY5ZjVkOWRlZWYwNzE5NjkzYyJ9LCJSTU5SZW1vdGUiOnsiMzQ3ODQ4NzIzODUyNDUxMjEwNiI6IjB4YWU1YWViMmMxMTkwNTM1ODM5NGViZjQ0YTMyNTQyNjI3ZjQ5MmE4MyJ9LCJSb3V0ZXIiOnsiMTAzNDQ5NzEyMzU4NzQ0NjUwODAiOiIweGQzZTE5MGYzODFmMDZkYzBkMjg5NTkwZmQ0NTJjNDJmYTJkYWM1ODYiLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6IjB4ODA2Y2NjYzVmZDNlZGI4Y2IyNGE3NGZkYTdkZTI0ZDg0Y2UwZDFmYiIsIjE2MDE1Mjg2NjAxNzU3ODI1NzUzIjoiMHg0MGM5ZGY2ZTJiZTdlZDA2Njk0ZTEwZDk0NTU5MDQ5Y2NjMjM4YjE0IiwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOiIweGQzZTE5MGYzODFmMDZkYzBkMjg5NTkwZmQ0NTJjNDJmYTJkYWM1ODYiLCIzNDc4NDg3MjM4NTI0NTEyMTA2IjoiMHhlY2IyZDQwN2M5NTUxZTJlMTA4Y2NhZjAyNmU5MTM0ZjJiMzQxNmQ3IiwiNTIyNDQ3MzI3NzIzNjMzMTI5NSI6IjB4ZDNlMTkwZjM4MWYwNmRjMGQyODk1OTBmZDQ1MmM0MmZhMmRhYzU4NiJ9fX0sImZDaGFpbiI6eyIxMDM0NDk3MTIzNTg3NDQ2NTA4MCI6MSwiMTQ3Njc0ODI1MTA3ODQ4MDYwNDMiOjEsIjE2MDE1Mjg2NjAxNzU3ODI1NzUzIjoxLCIxNjI4MTcxMTM5MTY3MDYzNDQ0NSI6MSwiMzQ3ODQ4NzIzODUyNDUxMjEwNiI6MSwiNTIyNDQ3MzI3NzIzNjMzMTI5NSI6MX19"),
+			Observation: mustDecodeBase64(t, "eyJjb21taXRSZXBvcnRzIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjpudWxsLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6W3siY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjM3OjU1WiIsImJsb2NrTnVtIjoxMjU2Mzc4OTQsIm1lcmtsZVJvb3QiOiIweGFmYmJiNjc4OWE5ZDAwOGQwNDM4MjEwZTBkOWFiMWNkZTc1ZjgxMWIwOWI4YjZkNjU4ODIyYzAwY2QxOGM5ZTYiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMTY4LDE3OV0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6Mzk6MTlaIiwiYmxvY2tOdW0iOjEyNTYzODIwNCwibWVya2xlUm9vdCI6IjB4ZDFmYWY4MmFjOWRjYTc2Y2NhYmZhMzQzNjcxM2VkZWRhNjc4M2JiZWQ5ZjFlZmQxYzY5NGZhM2FhZmVmMjM0ZSIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsxODAsMTkwXSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0MDo0NVoiLCJibG9ja051bSI6MTI1NjM4NTM4LCJtZXJrbGVSb290IjoiMHg5MjRhYTQwNGVmNWFmZTcwNGYzZWFiMjEwMTk5MDA1Njg0OTA1NDQxMmM4N2Q3ZWRiNGExZGY5MmFiZmZkM2NmIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzE5MSwyMDFdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9LHsiY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjQyOjA0WiIsImJsb2NrTnVtIjoxMjU2Mzg4MzcsIm1lcmtsZVJvb3QiOiIweDFhNjkyZmQwMWJkZTgzNjc1MGJlZWI3ZTRkZjNkOTRhNGYyYTQ1NWJiZGI3MzY2YjYzZjYyZWFmMDVhNjRhM2EiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMjAyLDIxNF0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH0seyJjaGFpblNlbGVjdG9yIjoxNDc2NzQ4MjUxMDc4NDgwNjA0MywiT25SYW1wQWRkcmVzcyI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDUwMDQ0Mzk5NTNkOGYyZjUyZjczNTBiNTY3YWU2NDRmYmRhNDY5ZSIsInRpbWVzdGFtcCI6IjIwMjUtMDItMjBUMTU6NDM6MjlaIiwiYmxvY2tOdW0iOjEyNTYzOTE3MiwibWVya2xlUm9vdCI6IjB4OTJhMjdjODI4YzUxMjkyMDQyYTIwYzI2MDllNjU0MTMyY2I1MWNjOTFjOWQ4OWE2NmZmZWUwNDhlNDZhYWRjNCIsInNlcXVlbmNlTnVtYmVyUmFuZ2UiOlsyMTUsMjI3XSwiZXhlY3V0ZWRNZXNzYWdlcyI6bnVsbCwibWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VIYXNoZXMiOm51bGwsImNvc3RseU1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlVG9rZW5EYXRhIjpudWxsfSx7ImNoYWluU2VsZWN0b3IiOjE0NzY3NDgyNTEwNzg0ODA2MDQzLCJPblJhbXBBZGRyZXNzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwidGltZXN0YW1wIjoiMjAyNS0wMi0yMFQxNTo0NDo1M1oiLCJibG9ja051bSI6MTI1NjM5NTAyLCJtZXJrbGVSb290IjoiMHgxMzJlM2IzMjdhMTc3ZDBhODAyMzUwNGRiMWU5OGMwMWJjNTJkZjU2MWI1ODczZDhlYjhmY2UwZTYzZDllMjcyIiwic2VxdWVuY2VOdW1iZXJSYW5nZSI6WzIyOCwyMzZdLCJleGVjdXRlZE1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwiY29zdGx5TWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VUb2tlbkRhdGEiOm51bGx9LHsiY2hhaW5TZWxlY3RvciI6MTQ3Njc0ODI1MTA3ODQ4MDYwNDMsIk9uUmFtcEFkZHJlc3MiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ1MDA0NDM5OTUzZDhmMmY1MmY3MzUwYjU2N2FlNjQ0ZmJkYTQ2OWUiLCJ0aW1lc3RhbXAiOiIyMDI1LTAyLTIwVDE1OjQ0OjUzWiIsImJsb2NrTnVtIjoxMjU2Mzk1MDIsIm1lcmtsZVJvb3QiOiIweDEzMmUzYjMyN2ExNzdkMGE4MDIzNTA0ZGIxZTk4YzAxYmM1MmRmNTYxYjU4NzNkOGViOGZjZTBlNjNkOWUyNzIiLCJzZXF1ZW5jZU51bWJlclJhbmdlIjpbMjI4LDIzNl0sImV4ZWN1dGVkTWVzc2FnZXMiOm51bGwsIm1lc3NhZ2VzIjpudWxsLCJtZXNzYWdlSGFzaGVzIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibWVzc2FnZVRva2VuRGF0YSI6bnVsbH1dLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6bnVsbCwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOm51bGwsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOm51bGx9LCJtZXNzYWdlcyI6bnVsbCwibWVzc2FnZUhhc2hlcyI6bnVsbCwidG9rZW5EYXRhT2JzZXJ2YXRpb25zIjpudWxsLCJjb3N0bHlNZXNzYWdlcyI6bnVsbCwibm9uY2VzIjpudWxsLCJjb250cmFjdHMiOnsiRkNoYWluIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoxLCIxNDc2NzQ4MjUxMDc4NDgwNjA0MyI6MSwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOjEsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoxLCIzNDc4NDg3MjM4NTI0NTEyMTA2IjoxLCI1MjI0NDczMjc3MjM2MzMxMjk1IjoxfSwiQWRkcmVzc2VzIjp7IkZlZVF1b3RlciI6eyIxMDM0NDk3MTIzNTg3NDQ2NTA4MCI6IjB4OTQ1ZDk4NDViYzE0YTVlNGZmNjQ0NTdiYjY3NzBhYWMwMjhjZWQzOSIsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoiMHhlYWI3NDI5N2U2YmIzMGEwNjNlYmE4ZmUxYWE0NTA1ODkyOWJmZjJjIiwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOiIweGZlZTcxOWZmYWQwZGM2MTI0NmI4MmQ5YjgwZmEzNWMyZjhiZjkzODciLCIxNjI4MTcxMTM5MTY3MDYzNDQ0NSI6IjB4OTQ1ZDk4NDViYzE0YTVlNGZmNjQ0NTdiYjY3NzBhYWMwMjhjZWQzOSIsIjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOiIweDMzNzEyMzg2MTUxZTU3YTAxZmQ3MWFiOTBlNTljMDAxMGQ4ZDEwZDAiLCI1MjI0NDczMjc3MjM2MzMxMjk1IjoiMHg5NDVkOTg0NWJjMTRhNWU0ZmY2NDQ1N2JiNjc3MGFhYzAyOGNlZDM5In0sIk5vbmNlTWFuYWdlciI6eyIzNDc4NDg3MjM4NTI0NTEyMTA2IjoiMHhlNTMyZjZjYWJmODg5Mjk5YTI5NTRjMGFlODA2MzU4MmNkNjcyMDY1In0sIk9uUmFtcCI6eyIxMDM0NDk3MTIzNTg3NDQ2NTA4MCI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMjBjODY0OWZkZTQ4ZmM3OTUxNTRlMWY5ZjVkOWRlZWYwNzE5NjkzYyIsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NTAwNDQzOTk1M2Q4ZjJmNTJmNzM1MGI1NjdhZTY0NGZiZGE0NjllIiwiMTYwMTUyODY2MDE3NTc4MjU3NTMiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyNGE2ODA0YzBhZmI5NzE4OWFlZmZkZTUzNzFlNjgzNWM1N2M2ZDMiLCIxNjI4MTcxMTM5MTY3MDYzNDQ0NSI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMjBjODY0OWZkZTQ4ZmM3OTUxNTRlMWY5ZjVkOWRlZWYwNzE5NjkzYyIsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIwYzg2NDlmZGU0OGZjNzk1MTU0ZTFmOWY1ZDlkZWVmMDcxOTY5M2MifSwiUk1OUmVtb3RlIjp7IjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOiIweGFlNWFlYjJjMTE5MDUzNTgzOTRlYmY0NGEzMjU0MjYyN2Y0OTJhODMifSwiUm91dGVyIjp7IjEwMzQ0OTcxMjM1ODc0NDY1MDgwIjoiMHhkM2UxOTBmMzgxZjA2ZGMwZDI4OTU5MGZkNDUyYzQyZmEyZGFjNTg2IiwiMTQ3Njc0ODI1MTA3ODQ4MDYwNDMiOiIweDgwNmNjY2M1ZmQzZWRiOGNiMjRhNzRmZGE3ZGUyNGQ4NGNlMGQxZmIiLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6IjB4NDBjOWRmNmUyYmU3ZWQwNjY5NGUxMGQ5NDU1OTA0OWNjYzIzOGIxNCIsIjE2MjgxNzExMzkxNjcwNjM0NDQ1IjoiMHhkM2UxOTBmMzgxZjA2ZGMwZDI4OTU5MGZkNDUyYzQyZmEyZGFjNTg2IiwiMzQ3ODQ4NzIzODUyNDUxMjEwNiI6IjB4ZWNiMmQ0MDdjOTU1MWUyZTEwOGNjYWYwMjZlOTEzNGYyYjM0MTZkNyIsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOiIweGQzZTE5MGYzODFmMDZkYzBkMjg5NTkwZmQ0NTJjNDJmYTJkYWM1ODYifX19LCJmQ2hhaW4iOnsiMTAzNDQ5NzEyMzU4NzQ0NjUwODAiOjEsIjE0NzY3NDgyNTEwNzg0ODA2MDQzIjoxLCIxNjAxNTI4NjYwMTc1NzgyNTc1MyI6MSwiMTYyODE3MTEzOTE2NzA2MzQ0NDUiOjEsIjM0Nzg0ODcyMzg1MjQ1MTIxMDYiOjEsIjUyMjQ0NzMyNzcyMzYzMzEyOTUiOjF9fQ=="),
 			Observer:    0,
 		},
 	}
 
 	jsonCodec := ocrtypecodec.NewExecCodecJSON()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	p := &Plugin{
 		lggr:         logger.Test(t),
 		ocrTypeCodec: jsonCodec,
@@ -1921,14 +2216,8 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 func TestCommitRootsCache_SkippedRootScenario(t *testing.T) {
 	lggr := logger.Test(t)
 
-	now := time.Now()
 	messageVisibilityInterval := 8 * time.Hour
-
-	// Create timestamps that match the scenario
-	// Root1 at 10:30am, Root2 at 10:40am, Root3 at 10:50am
-	timestamp1 := now.Add(-30 * time.Minute) // 10:30am
-	timestamp2 := now.Add(-20 * time.Minute) // 10:40am
-	timestamp3 := now.Add(-10 * time.Minute) // 10:50am
+	rootSnoozeTime := 5 * time.Minute
 
 	// Create chain selector and roots
 	selector := cciptypes.ChainSelector(1)
@@ -1936,28 +2225,7 @@ func TestCommitRootsCache_SkippedRootScenario(t *testing.T) {
 	root2 := cciptypes.Bytes32{2}
 	root3 := cciptypes.Bytes32{3}
 
-	// Create commit data objects
-	report1 := exectypes.CommitData{
-		SourceChain:         selector,
-		MerkleRoot:          root1,
-		SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
-		Timestamp:           timestamp1,
-	}
-	report2 := exectypes.CommitData{
-		SourceChain:         selector,
-		MerkleRoot:          root2,
-		SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20),
-		Timestamp:           timestamp2,
-	}
-	report3 := exectypes.CommitData{
-		SourceChain:         selector,
-		MerkleRoot:          root3,
-		SequenceNumberRange: cciptypes.NewSeqNumRange(21, 30),
-		Timestamp:           timestamp3,
-	}
-
 	// Create the cache
-	rootSnoozeTime := 5 * time.Minute
 	cache := cache.NewCommitRootsCache(
 		lggr,
 		messageVisibilityInterval,
@@ -1965,31 +2233,17 @@ func TestCommitRootsCache_SkippedRootScenario(t *testing.T) {
 	)
 
 	t.Run("Root2 is not missed when Root1 and Root3 are executed", func(t *testing.T) {
-		// Update with all reports
-		allReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
-			selector: {report1, report2, report3},
-		}
-		cache.UpdateEarliestUnexecutedRoot(allReports)
-
-		// Initial query should use earliest timestamp (Root1)
-		queryTimestamp := cache.GetTimestampToQueryFrom()
-		assert.Equal(t, timestamp1, queryTimestamp,
-			"Initial query should use earliest root timestamp (Root1)")
+		// Initially all roots should be executable
+		assert.True(t, cache.CanExecute(selector, root1),
+			"Root1 should be executable initially")
+		assert.True(t, cache.CanExecute(selector, root2),
+			"Root2 should be executable initially")
+		assert.True(t, cache.CanExecute(selector, root3),
+			"Root3 should be executable initially")
 
 		// Execute Root1 and Root3, but not Root2
 		cache.MarkAsExecuted(selector, root1)
 		cache.MarkAsExecuted(selector, root3)
-
-		// Update with remaining unexecuted report (just Root2)
-		remainingReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
-			selector: {report2},
-		}
-		cache.UpdateEarliestUnexecutedRoot(remainingReports)
-
-		// Query should now use Root2's timestamp
-		queryTimestamp = cache.GetTimestampToQueryFrom()
-		assert.Equal(t, timestamp2, queryTimestamp,
-			"Query should use Root2's timestamp even though Root3 was executed")
 
 		// Verify Root2 is still marked as executable
 		assert.True(t, cache.CanExecute(selector, root2),
@@ -2002,134 +2256,42 @@ func TestCommitRootsCache_SkippedRootScenario(t *testing.T) {
 		// Now execute Root2
 		cache.MarkAsExecuted(selector, root2)
 
-		// Update with empty reports
-		cache.UpdateEarliestUnexecutedRoot(map[cciptypes.ChainSelector][]exectypes.CommitData{})
-
-		// Based on the logs, we can see that the implementation keeps using timestamp2
-		// after all roots are executed. Let's fix the test to match the actual behavior.
-		queryTimestamp = cache.GetTimestampToQueryFrom()
-		assert.Equal(t, timestamp2, queryTimestamp,
-			"Query should use last known earliest root timestamp (Root2) after all roots executed")
+		// Verify all roots are now non-executable
+		assert.False(t, cache.CanExecute(selector, root1),
+			"Root1 should not be executable")
+		assert.False(t, cache.CanExecute(selector, root2),
+			"Root2 should not be executable")
+		assert.False(t, cache.CanExecute(selector, root3),
+			"Root3 should not be executable")
 	})
 }
 
-func TestCommitRootsCache_CoreOptimizationBehavior(t *testing.T) {
-	lggr := logger.Test(t)
-
-	// Create a custom time provider to have control over "now"
-	now := time.Now().UTC()
-	timeProvider := &customTimeProvider{currentTime: now}
-
-	// Configuration
-	messageVisibilityInterval := 8 * time.Hour
-	rootSnoozeTime := 5 * time.Minute
-
-	// Expected visibility window based on now time
-	expectedVisibilityWindow := now.Add(-messageVisibilityInterval)
-
-	// Create a root before visibility window and one after
-	beforeTimestamp := expectedVisibilityWindow.Add(-30 * time.Minute)
-	afterTimestamp := expectedVisibilityWindow.Add(30 * time.Minute)
-
-	// Create chain selector and roots
-	selector := cciptypes.ChainSelector(1)
-	beforeRoot := cciptypes.Bytes32{1}
-	afterRoot := cciptypes.Bytes32{2}
-
-	// Create commit data objects
-	beforeReport := createCommitData(beforeTimestamp, selector, beforeRoot)
-	afterReport := createCommitData(afterTimestamp, selector, afterRoot)
-
-	t.Run("Core optimization behaviors", func(t *testing.T) {
-		// Create the cache with our custom time provider
-		// Using the correct function call syntax with the package name
-		var cache cache.CommitsRootsCache = cache.NewCommitRootsCacheWithTimeProvider(
-			lggr,
-			messageVisibilityInterval,
-			rootSnoozeTime,
-			timeProvider,
-		)
-
-		// Test 1: Initial state uses visibility window
-		queryTimestamp := cache.GetTimestampToQueryFrom()
-		assert.Equal(t, expectedVisibilityWindow.UTC(), queryTimestamp.UTC(),
-			"Initial query should use visibility window")
-
-		// Test 2: With roots before and after visibility window
-		allReports := createCommitReports(beforeReport, afterReport)
-		cache.UpdateEarliestUnexecutedRoot(allReports)
-
-		// Since the default is to track the earliest unexecuted root,
-		// the cache will have beforeTimestamp as the earliest.
-		// But GetTimestampToQueryFrom should return expectedVisibilityWindow
-		// since beforeTimestamp is before that.
-		queryTimestamp = cache.GetTimestampToQueryFrom()
-		assert.Equal(t, expectedVisibilityWindow.UTC(), queryTimestamp.UTC(),
-			"Query should use visibility window when earliest root is before it")
-
-		// Test 3: When only after root remains, use its timestamp
-		cache.MarkAsExecuted(selector, beforeRoot)
-
-		remainingReports := createCommitReports(afterReport)
-		cache.UpdateEarliestUnexecutedRoot(remainingReports)
-
-		queryTimestamp = cache.GetTimestampToQueryFrom()
-		assert.Equal(t, afterTimestamp.UTC(), queryTimestamp.UTC(),
-			"Query should use after root's timestamp when it's the only root and after visibility window")
-
-		// Test 4: When all roots are executed, use the last known root timestamp
-		cache.MarkAsExecuted(selector, afterRoot)
-		cache.UpdateEarliestUnexecutedRoot(createCommitReports())
-
-		queryTimestamp = cache.GetTimestampToQueryFrom()
-		assert.Equal(t, afterTimestamp.UTC(), queryTimestamp.UTC(),
-			"Query should use last known root timestamp after all roots executed")
-
-		// Test 5: When visibility window moves past all roots, use visibility window
-		// We simulate this by advancing the time
-		timeProvider.currentTime = now.Add(1 * time.Hour)
-
-		// Calculate the new expected visibility window
-		laterVisibilityWindow := timeProvider.currentTime.Add(-messageVisibilityInterval)
-
-		// If the visibility window has moved past all root timestamps,
-		// it should be used instead
-		if laterVisibilityWindow.After(afterTimestamp) {
-			queryTimestamp = cache.GetTimestampToQueryFrom()
-			assert.Equal(t, laterVisibilityWindow.UTC(), queryTimestamp.UTC(),
-				"Query should use later visibility window when it's after all roots")
-		}
-	})
+// configurableCommitReportCache is a mock for testing specific cache behaviors.
+// Define this near Test_getPendingReportsForExecution or in a test helper section
+type configurableCommitReportCache struct {
+	reportsToQueryFrom      time.Time
+	cachedReportsToReturn   []cciptypes.CommitPluginReportWithMeta
+	lggr                    logger.Logger
+	deduplicateShouldReturn []cciptypes.CommitPluginReportWithMeta // Control what DeduplicateReports returns
 }
 
-// Custom time provider for testing
-type customTimeProvider struct {
-	currentTime time.Time
+func (c *configurableCommitReportCache) RefreshCache(ctx context.Context) error { return nil }
+func (c *configurableCommitReportCache) GetReportsToQueryFromTimestamp() time.Time {
+	return c.reportsToQueryFrom
 }
-
-func (p *customTimeProvider) Now() time.Time {
-	return p.currentTime
+func (c *configurableCommitReportCache) GetCachedReports(
+	fromTimestamp time.Time) []cciptypes.CommitPluginReportWithMeta {
+	return c.cachedReportsToReturn
 }
-
-// Helper function to create commit reports
-func createCommitReports(reports ...exectypes.CommitData) map[cciptypes.ChainSelector][]exectypes.CommitData {
-	result := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
-	for _, report := range reports {
-		selector := report.SourceChain
-		result[selector] = append(result[selector], report)
+func (c *configurableCommitReportCache) DeduplicateReports(
+	reports []cciptypes.CommitPluginReportWithMeta,
+) []cciptypes.CommitPluginReportWithMeta {
+	if c.deduplicateShouldReturn != nil {
+		return c.deduplicateShouldReturn
 	}
-	return result
-}
-
-// Helper function to create commit data
-func createCommitData(
-	timestamp time.Time,
-	selector cciptypes.ChainSelector,
-	merkleRoot cciptypes.Bytes32) exectypes.CommitData {
-	return exectypes.CommitData{
-		SourceChain:         selector,
-		MerkleRoot:          merkleRoot,
-		SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
-		Timestamp:           timestamp,
+	// Fallback to real deduplication if not overridden, requires lggr to be set.
+	if c.lggr != nil {
+		return cache.DeduplicateReports(c.lggr, reports)
 	}
+	return reports // Or panic, or handle error, if lggr is essential but not provided
 }

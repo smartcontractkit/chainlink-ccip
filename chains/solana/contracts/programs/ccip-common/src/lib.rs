@@ -38,6 +38,7 @@ pub enum CommonCcipError {
 // https://github.com/smartcontractkit/chainlink/blob/ff8a597fd9df653f8967427498eaa5a04b19febb/contracts/src/v0.8/ccip/libraries/Internal.sol#L276
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
 pub const CHAIN_FAMILY_SELECTOR_SVM: u32 = 0x1e10bdc4;
+pub const CHAIN_FAMILY_SELECTOR_TVM: u32 = 0x647e2ba9;
 
 // Duplicates the router ID to declare router accounts that must be visible from the common crate,
 // avoiding a circular dependency. This means this crate may only declare accounts that belong
@@ -51,7 +52,7 @@ pub mod router_accounts {
     use super::*;
 
     #[account]
-    #[derive(InitSpace)]
+    #[derive(InitSpace, PartialEq, Debug)]
     pub struct TokenAdminRegistry {
         pub version: u8,
         pub administrator: Pubkey,
@@ -61,5 +62,43 @@ pub mod router_accounts {
         // lookup table can store 256 addresses
         pub writable_indexes: [u128; 2],
         pub mint: Pubkey,
+        // if true, the pool supports calling `derive_accounts_lock_or_burn` and
+        // `derive_accounts_release_or_mint` to derive the list of accounts and LUTs
+        // needed to interact with it.
+        pub supports_auto_derivation: bool,
+    }
+
+    #[derive(AnchorDeserialize)]
+    pub(super) struct TokenAdminRegistryV1 {
+        pub version: u8,
+        pub administrator: Pubkey,
+        pub pending_administrator: Pubkey,
+        pub lookup_table: Pubkey,
+        pub writable_indexes: [u128; 2],
+        pub mint: Pubkey,
+    }
+
+    impl TryFrom<TokenAdminRegistryV1> for TokenAdminRegistry {
+        type Error = anchor_lang::error::Error;
+
+        fn try_from(
+            v1: TokenAdminRegistryV1,
+        ) -> std::result::Result<TokenAdminRegistry, Self::Error> {
+            require_eq!(
+                v1.version,
+                1, // this deserialization is only valid for v1
+                CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
+            );
+
+            Ok(TokenAdminRegistry {
+                version: 1,
+                administrator: v1.administrator,
+                pending_administrator: v1.pending_administrator,
+                lookup_table: v1.lookup_table,
+                writable_indexes: v1.writable_indexes,
+                mint: v1.mint,
+                supports_auto_derivation: false, // this is not part of the v1 data, it defaults to false
+            })
+        }
     }
 }

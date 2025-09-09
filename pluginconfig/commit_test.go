@@ -12,8 +12,9 @@ import (
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func TestArbitrumPriceSource_Validate(t *testing.T) {
@@ -420,7 +421,9 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 				MerkleRootAsyncObserverDisabled:    true,
 				ChainFeeAsyncObserverDisabled:      true,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverDisabled:    true,
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
 			},
 		},
 		{

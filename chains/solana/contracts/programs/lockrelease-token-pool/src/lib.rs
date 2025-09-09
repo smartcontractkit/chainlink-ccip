@@ -13,19 +13,78 @@ pub mod lockrelease_token_pool {
 
     use super::*;
 
-    pub fn initialize(
-        ctx: Context<InitializeTokenPool>,
-        router: Pubkey,
-        rmn_remote: Pubkey,
+    pub fn init_global_config(
+        ctx: Context<InitGlobalConfig>,
+        router_address: Pubkey,
+        rmn_address: Pubkey,
     ) -> Result<()> {
+        ctx.accounts.config.set_inner(PoolConfig {
+            self_served_allowed: false,
+            version: 1,
+            router: router_address,
+            rmn_remote: rmn_address,
+        });
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+            router: ctx.accounts.config.router,
+            rmn_remote: ctx.accounts.config.rmn_remote,
+        });
+
+        Ok(())
+    }
+
+    pub fn update_self_served_allowed(
+        ctx: Context<UpdateGlobalConfig>,
+        self_served_allowed: bool,
+    ) -> Result<()> {
+        ctx.accounts.config.self_served_allowed = self_served_allowed;
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+            router: ctx.accounts.config.router,
+            rmn_remote: ctx.accounts.config.rmn_remote,
+        });
+
+        Ok(())
+    }
+
+    pub fn update_default_router(
+        ctx: Context<UpdateGlobalConfig>,
+        router_address: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts.config.router = router_address;
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+            router: ctx.accounts.config.router,
+            rmn_remote: ctx.accounts.config.rmn_remote,
+        });
+
+        Ok(())
+    }
+
+    pub fn update_default_rmn(ctx: Context<UpdateGlobalConfig>, rmn_address: Pubkey) -> Result<()> {
+        ctx.accounts.config.rmn_remote = rmn_address;
+
+        emit!(GlobalConfigUpdated {
+            self_served_allowed: ctx.accounts.config.self_served_allowed,
+            router: ctx.accounts.config.router,
+            rmn_remote: ctx.accounts.config.rmn_remote,
+        });
+
+        Ok(())
+    }
+
+    pub fn initialize(ctx: Context<InitializeTokenPool>) -> Result<()> {
         ctx.accounts.state.set_inner(State {
             version: 1,
             config: BaseConfig::init(
                 &ctx.accounts.mint,
                 ctx.program_id.key(),
                 ctx.accounts.authority.key(),
-                router,
-                rmn_remote,
+                ctx.accounts.config.router,
+                ctx.accounts.config.rmn_remote,
             ),
         });
         Ok(())
@@ -53,11 +112,15 @@ pub mod lockrelease_token_pool {
 
     // set_router changes the expected signers for mint/release + burn/lock method calls
     // this is used to update the router address
-    pub fn set_router(ctx: Context<SetConfig>, new_router: Pubkey) -> Result<()> {
+    pub fn set_router(ctx: Context<AdminUpdateTokenPool>, new_router: Pubkey) -> Result<()> {
         ctx.accounts
             .state
             .config
             .set_router(new_router, ctx.program_id)
+    }
+
+    pub fn set_rmn(ctx: Context<AdminUpdateTokenPool>, rmn_address: Pubkey) -> Result<()> {
+        ctx.accounts.state.config.set_rmn(rmn_address)
     }
 
     // permissionless method to set a pool's `state.version` value, only when
@@ -131,6 +194,18 @@ pub mod lockrelease_token_pool {
         )
     }
 
+    // set rate limit admin
+    pub fn set_rate_limit_admin(
+        ctx: Context<SetRateLimitAdmin>,
+        _mint: Pubkey,
+        new_rate_limit_admin: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts
+            .state
+            .config
+            .set_rate_limit_admin(new_rate_limit_admin)
+    }
+
     // delete chain config
     pub fn delete_chain_config(
         _ctx: Context<DeleteChainConfig>,
@@ -167,13 +242,19 @@ pub mod lockrelease_token_pool {
         remove: Vec<Pubkey>,
     ) -> Result<()> {
         let list = &mut ctx.accounts.state.config.allow_list;
-        for key in remove {
-            require!(
-                list.contains(&key),
-                CcipTokenPoolError::AllowlistKeyDidNotExist
-            );
-            list.retain(|k| k != &key);
-        }
+        // Cache initial length
+        let initial_list_len = list.len();
+        // Collect all keys to remove into a HashSet for O(1) lookups
+        let keys_to_remove: std::collections::HashSet<Pubkey> = remove.into_iter().collect();
+        // Perform a single pass through the list
+        list.retain(|k| !keys_to_remove.contains(k));
+
+        // We don't store repeated keys, so the keys_to_remove should match the removed keys
+        require_eq!(
+            initial_list_len,
+            list.len().checked_add(keys_to_remove.len()).unwrap(),
+            CcipTokenPoolError::AllowlistKeyDidNotExist
+        );
 
         Ok(())
     }
@@ -249,6 +330,7 @@ pub mod lockrelease_token_pool {
         })
     }
 
+    // set the rebalancer address for the pool, if the rebalancer is the default address then no rebalance is allowed
     pub fn set_rebalancer(ctx: Context<SetConfig>, rebalancer: Pubkey) -> Result<()> {
         ctx.accounts.state.config.set_rebalancer(rebalancer)
     }
@@ -257,7 +339,8 @@ pub mod lockrelease_token_pool {
         ctx.accounts.state.config.set_can_accept_liquidity(allow)
     }
 
-    pub fn provide_liquidity(ctx: Context<TokenTransfer>, amount: u64) -> Result<()> {
+    pub fn provide_liquidity(ctx: Context<RebalancerTokenTransfer>, amount: u64) -> Result<()> {
+        require_gt!(amount, 0, CcipTokenPoolError::TransferZeroTokensNotAllowed);
         require!(
             ctx.accounts.state.config.can_accept_liquidity,
             CcipTokenPoolError::LiquidityNotAccepted
@@ -275,7 +358,12 @@ pub mod lockrelease_token_pool {
     }
 
     // withdraw liquidity can be used to transfer liquidity from one pool to another by setting the `rebalancer` to the calling pool
-    pub fn withdraw_liquidity(ctx: Context<TokenTransfer>, amount: u64) -> Result<()> {
+    pub fn withdraw_liquidity(ctx: Context<RebalancerTokenTransfer>, amount: u64) -> Result<()> {
+        require_gt!(amount, 0, CcipTokenPoolError::TransferZeroTokensNotAllowed);
+        require!(
+            ctx.accounts.state.config.can_accept_liquidity,
+            CcipTokenPoolError::LiquidityNotAccepted
+        );
         transfer_tokens(
             ctx.accounts.token_program.key(),
             ctx.accounts.remote_token_account.to_account_info(), // to
