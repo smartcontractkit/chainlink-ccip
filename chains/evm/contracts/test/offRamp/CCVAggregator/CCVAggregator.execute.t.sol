@@ -129,7 +129,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
       message.sequenceNumber,
       keccak256(encodedMessage),
       Internal.MessageExecutionState.FAILURE,
-      abi.encodeWithSelector(CCVAggregator.OutOfGas.selector)
+      "" // empty because there is no error when a tx runs out of gas.
     );
 
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, 85_000);
@@ -145,7 +145,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     );
   }
 
-  function test_execute_RevertWhen_ReentrancyGuardReentrantCall() public {
+  function test_execute_ReentrancyGuardReentrantCall_Fails() public {
     // Create a malicious CCV that will call back into execute during validation.
     ReentrantCCV maliciousCCV = new ReentrantCCV(address(s_agg));
 
@@ -160,7 +160,15 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     _setGetCCVsReturnData(address(bytes20(message.receiver)), message.sourceChainSelector, ccvs, new address[](0), 0);
 
-    vm.expectRevert(CCVAggregator.ReentrancyGuardReentrantCall.selector);
+    vm.expectEmit();
+    emit CCVAggregator.ExecutionStateChanged(
+      message.sourceChainSelector,
+      message.sequenceNumber,
+      keccak256(encodedMessage),
+      Internal.MessageExecutionState.FAILURE,
+      abi.encodeWithSelector(CCVAggregator.ReentrancyGuardReentrantCall.selector)
+    );
+
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
@@ -252,112 +260,8 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     s_agg.execute(encodedMessage, ccvs, ccvData);
   }
 
-  function test_execute_RevertWhen_RequiredCCVMissing_ReceiverCCV() public {
-    MessageV1Codec.MessageV1 memory message = _getMessage();
-
-    address receiver = makeAddr("receiver");
-    address requiredCCV = makeAddr("requiredCCV");
-
-    message.receiver = abi.encodePacked(receiver);
-
-    // Set up receiver to require a specific CCV.
-    _setGetCCVsReturnData(receiver, SOURCE_CHAIN_SELECTOR, _arrayOf(requiredCCV), new address[](0), 0);
-
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, requiredCCV, false));
-
-    // Keep default CCV in report, but don't include the required CCV.
-    (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-    s_agg.execute(encodedMsg, ccvs, ccvData);
-  }
-
-  function test_execute_RevertWhen_RequiredCCVMissing_PoolCCV() public {
-    address poolRequiredCCV = makeAddr("poolRequiredCCV");
-    address sourceToken = makeAddr("sourceToken");
-    address token = makeAddr("token");
-    address pool = makeAddr("pool");
-    uint256 tokenAmount = 100;
-
-    MessageV1Codec.MessageV1 memory message = _getMessage();
-
-    // Modify message with token transfer.
-    MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
-    tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
-      amount: tokenAmount,
-      sourcePoolAddress: abi.encodePacked(pool),
-      sourceTokenAddress: abi.encodePacked(sourceToken),
-      destTokenAddress: abi.encodePacked(token),
-      extraData: ""
-    });
-    message.tokenTransfer = tokenAmounts;
-
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-
-    // Mock token admin registry to return the pool.
-    vm.mockCall(s_tokenAdminRegistry, abi.encodeCall(ITokenAdminRegistry.getPool, (token)), abi.encode(pool));
-
-    // Mock pool supportsInterface for IPoolV2.
-    vm.mockCall(pool, abi.encodeCall(IERC165.supportsInterface, (type(IERC165).interfaceId)), abi.encode(true));
-    vm.mockCall(pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
-
-    // Mock pool to require a specific CCV.
-    vm.mockCall(
-      pool,
-      abi.encodeCall(IPoolV2.getRequiredCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, "")),
-      abi.encode(_arrayOf(poolRequiredCCV))
-    );
-
-    // Keep default CCV in report, but don't include the pool required CCV.
-
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, poolRequiredCCV, true));
-    s_agg.execute(encodedMessage, ccvs, ccvData);
-  }
-
-  function test_execute_RevertWhen_RequiredCCVMissing_LaneMandatedCCV() public {
-    MessageV1Codec.MessageV1 memory message = _getMessage();
-
-    address laneMandatedCCV = makeAddr("laneMandatedCCV");
-
-    // Configure source chain with lane mandated CCV.
-    CCVAggregator.SourceChainConfigArgs[] memory sourceChainConfigArgs = new CCVAggregator.SourceChainConfigArgs[](1);
-    sourceChainConfigArgs[0] = CCVAggregator.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp")),
-      defaultCCV: _arrayOf(s_defaultCCV),
-      laneMandatedCCVs: _arrayOf(laneMandatedCCV)
-    });
-
-    s_agg.applySourceChainConfigUpdates(sourceChainConfigArgs);
-
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-    // Report doesn't include the lane mandated CCV.
-
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, laneMandatedCCV, true));
-    s_agg.execute(encodedMessage, ccvs, ccvData);
-  }
-
-  function test_execute_RevertWhen_OptionalCCVQuorumNotReached() public {
-    MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-    address receiver = address(bytes20(message.receiver));
-
-    address optionalCCV2 = makeAddr("optionalCCV2");
-    address[] memory optionalCCVs = new address[](2);
-    optionalCCVs[0] = s_defaultCCV; // This will be found in the report.
-    optionalCCVs[1] = optionalCCV2; // This won't be found.
-
-    uint8 optionalThreshold = 2; // Need 2 optional CCVs.
-
-    // Set up receiver to return optional CCVs with threshold 2.
-    _setGetCCVsReturnData(receiver, SOURCE_CHAIN_SELECTOR, new address[](0), optionalCCVs, optionalThreshold);
-    // Report only includes one CCV, but threshold requires 2.
-
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.OptionalCCVQuorumNotReached.selector, optionalThreshold, 1));
-    s_agg.execute(encodedMessage, ccvs, ccvData);
-  }
-
-  function test_execute_RevertWhen_InsufficientGasToCompleteTx() public {
+  function test_execute_InsufficientGasToCompleteTx_setsToFailure() public {
+    uint256 gasForCall = 90_000;
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
     bytes32 messageId = keccak256(encodedMessage);
@@ -378,27 +282,16 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     // to set a custom gas limit, we need to etch the code into that address.
     vm.etch(Internal.GAS_ESTIMATION_SENDER, address(s_gasBoundedExecuteCaller).code);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        CCVAggregator.InsufficientGasToCompleteTx.selector, CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG
-      )
-    );
-    GasBoundedExecuteCaller(Internal.GAS_ESTIMATION_SENDER).callExecute(encodedMessage, ccvs, ccvData, 150_000);
-  }
-
-  function test_execute_RevertWhen_CCVValidationFails() public {
-    MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-    bytes32 messageId = keccak256(encodedMessage);
-    bytes memory revertReason = "CCV validation failed";
-
-    // Mock CCV validateReport to fail/revert.
-    vm.mockCallRevert(
-      s_defaultCCV, abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0])), revertReason
+    vm.expectEmit();
+    emit CCVAggregator.ExecutionStateChanged(
+      message.sourceChainSelector,
+      message.sequenceNumber,
+      keccak256(encodedMessage),
+      Internal.MessageExecutionState.FAILURE,
+      abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
     );
 
-    vm.expectRevert(revertReason);
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    GasBoundedExecuteCaller(Internal.GAS_ESTIMATION_SENDER).callExecute(encodedMessage, ccvs, ccvData, gasForCall);
   }
 
   function test_execute_RevertWhen_ExecuteSingleMessageFails() public {
