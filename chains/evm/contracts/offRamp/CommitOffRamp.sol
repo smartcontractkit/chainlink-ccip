@@ -13,14 +13,10 @@ import {IERC165} from
 contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersion {
   string public constant override typeAndVersion = "CommitOffRamp 1.7.0-dev";
 
-  function verifyMessage(
-    MessageV1Codec.MessageV1 calldata message,
-    bytes32 messageHash,
-    bytes calldata ccvData
-  ) external {
+  function verifyMessage(MessageV1Codec.MessageV1 calldata, bytes32 messageHash, bytes calldata ccvData) external view {
     (bytes32[] memory rs, bytes32[] memory ss) = abi.decode(ccvData, (bytes32[], bytes32[]));
 
-    _validateSignatures(keccak256(bytes.concat(messageHash)), rs, ss);
+    _validateSignatures(messageHash, rs, ss);
   }
 
   function supportsInterface(

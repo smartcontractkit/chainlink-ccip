@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
-import {Internal} from "../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
 import {CCVAggregator} from "../../offRamp/CCVAggregator.sol";

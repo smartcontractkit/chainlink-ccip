@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {SignatureQuorumVerifier} from "../../../offRamp/components/SignatureQuorumVerifier.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {SignatureQuorumVerifierHelper} from "../../helpers/SignatureQuorumVerifierHelper.sol";
 
@@ -31,9 +30,7 @@ contract SignatureVerifierSetup is BaseTest {
 
     s_sigQuorumVerifier = new SignatureQuorumVerifierHelper();
 
-    s_sigQuorumVerifier.setSignatureConfig(
-      SignatureQuorumVerifier.SignatureConfigArgs({signers: s_validSigners, threshold: 1})
-    );
+    s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 1);
   }
 
   function _getSignatures(
