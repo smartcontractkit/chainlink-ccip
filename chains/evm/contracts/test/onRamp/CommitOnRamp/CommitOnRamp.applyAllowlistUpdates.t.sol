@@ -31,6 +31,11 @@ contract CommitOnRamp_applyAllowlistUpdates is CommitOnRampSetup {
     emit BaseOnRamp.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders);
 
     s_commitOnRamp.applyAllowlistUpdates(allowlistConfigs);
+
+    (bool allowlistEnabled,, address[] memory allowlistSender) = s_commitOnRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    assertEq(allowlistEnabled, true);
+    assertEq(allowlistSender.length, 1);
+    assertEq(allowlistSender[0], senders[0]);
   }
 
   function test_applyAllowlistUpdates_AsAllowlistAdmin() public {

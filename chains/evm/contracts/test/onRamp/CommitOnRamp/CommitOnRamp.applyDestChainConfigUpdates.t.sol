@@ -8,7 +8,7 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 contract CommitOnRamp_applyDestChainConfigUpdates is CommitOnRampSetup {
   uint64 internal constant NEW_DEST_SELECTOR = uint64(uint256(keccak256("COMMIT_ONRAMP_NEW_DEST_SELECTOR")));
 
-  function test_applyDestChainConfigUpdates_SetsConfigAndEmitsEvent() public {
+  function test_applyDestChainConfigUpdates() public {
     address newCCVProxy = makeAddr("newCCVProxy");
 
     BaseOnRamp.DestChainConfigArgs[] memory args = new BaseOnRamp.DestChainConfigArgs[](1);
