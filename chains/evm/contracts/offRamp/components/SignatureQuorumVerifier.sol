@@ -50,12 +50,16 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
 
     uint256 numberOfSignatures = rs.length;
 
-    if (numberOfSignatures != s_threshold) revert WrongNumberOfSignatures();
+    uint256 threshold = s_threshold;
+
+    // We allow more signatures than the threshold, but we will only validate up to the threshold to save gas.
+    // This still preserves the security properties while adding flexibility.
+    if (numberOfSignatures < threshold) revert WrongNumberOfSignatures();
     if (numberOfSignatures != ss.length) revert SignaturesOutOfRegistration();
 
     uint160 lastSigner = 0;
 
-    for (uint256 i; i < numberOfSignatures; ++i) {
+    for (uint256 i; i < threshold; ++i) {
       // We use ECDSA malleability to only have signatures with a `v` value of 27.
       address signer = ecrecover(reportHash, 27, rs[i], ss[i]);
       // Check that the signer is registered.
