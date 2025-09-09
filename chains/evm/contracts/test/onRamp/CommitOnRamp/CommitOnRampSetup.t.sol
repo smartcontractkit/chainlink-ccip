@@ -5,18 +5,14 @@ import {NonceManager} from "../../../NonceManager.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {BaseOnRamp} from "../../../onRamp/BaseOnRamp.sol";
 import {CommitOnRamp} from "../../../onRamp/CommitOnRamp.sol";
-import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
+import {BaseOnRampSetup} from "../BaseOnRamp/BaseOnRampSetup.t.sol";
 
-contract CommitOnRampSetup is FeeQuoterFeeSetup {
-  address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
-  address internal constant ALLOWLIST_ADMIN = 0x1234567890123456789012345678901234567890;
-  address internal s_ccvProxy;
+contract CommitOnRampSetup is BaseOnRampSetup {
   CommitOnRamp internal s_commitOnRamp;
   NonceManager internal s_nonceManager;
 
   function setUp() public virtual override {
     super.setUp();
-    s_ccvProxy = makeAddr("CCVProxy");
     s_nonceManager = NonceManager(makeAddr("NonceManager"));
 
     s_commitOnRamp =
@@ -49,19 +45,6 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
   ) internal pure returns (CommitOnRamp.DynamicConfig memory) {
     return
       CommitOnRamp.DynamicConfig({feeQuoter: feeQuoter, feeAggregator: feeAggregator, allowlistAdmin: allowlistAdmin});
-  }
-
-  /// @notice Helper to create a destination chain config
-  function _createDestChainConfigArgs(
-    address ccvProxy,
-    uint64 destChainSelector,
-    bool allowlistEnabled
-  ) internal pure returns (BaseOnRamp.DestChainConfigArgs memory) {
-    return BaseOnRamp.DestChainConfigArgs({
-      ccvProxy: ccvProxy,
-      destChainSelector: destChainSelector,
-      allowlistEnabled: allowlistEnabled
-    });
   }
 
   function _createEVM2AnyVerifierMessage(

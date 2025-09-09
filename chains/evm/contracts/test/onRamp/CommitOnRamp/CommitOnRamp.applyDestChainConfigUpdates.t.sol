@@ -39,9 +39,9 @@ contract CommitOnRamp_applyDestChainConfigUpdates is CommitOnRampSetup {
       allowlistEnabled: false
     });
 
-    vm.startPrank(STRANGER);
+    vm.stopPrank();
+    vm.prank(STRANGER);
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_commitOnRamp.applyDestChainConfigUpdates(args);
-    vm.stopPrank();
   }
 }
