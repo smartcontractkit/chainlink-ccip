@@ -997,7 +997,12 @@ func (l *DefaultAccessor) processCommitReports(
 		return reports
 	}
 	lggr.Errorw("too many commit reports received, commit report results are truncated",
-		"numTruncatedReports", len(reports)-limit, "truncatedReports", reports[limit:])
+		"numTruncatedReports", len(reports)-limit)
+	for l := limit; l < len(reports); l++ {
+		if !reports[l].Report.HasNoRoots() {
+			lggr.Warnw("dropping merkle root commit report which doesn't fit in limit", "report", reports[l])
+		}
+	}
 	return reports[:limit]
 }
 
