@@ -44,7 +44,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
   error InsufficientGasToCompleteTx(bytes4 err);
-  error SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
+  error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 sequenceNumber);
   error InvalidVerifierSelector(bytes4 selector);
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV, bool isPoolCCV);
@@ -177,11 +177,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       _beforeExecuteSingleMessage(MessageV1Codec._decodeMessageV1(encodedMessage));
     bytes32 messageId = keccak256(encodedMessage);
 
-    if (message.receiver.length != 20) {
-      revert Internal.InvalidEVMAddress(message.receiver);
-    }
-    address receiverAddress = address(bytes20(message.receiver));
-
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
     }
@@ -194,11 +189,15 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     if (ccvs.length != ccvData.length) {
       revert InvalidCCVDataLength(ccvs.length, ccvData.length);
     }
+    if (message.receiver.length != 20) {
+      revert Internal.InvalidEVMAddress(message.receiver);
+    }
 
     /////// Original state checks ///////
 
-    bytes32 executionStateKey =
-      _calculateExecutionStateKey(message.sourceChainSelector, message.sequenceNumber, message.sender, receiverAddress);
+    bytes32 executionStateKey = _calculateExecutionStateKey(
+      message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
+    );
 
     Internal.MessageExecutionState originalState = s_executionStates[executionStateKey];
 
@@ -211,120 +210,79 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
           || originalState == Internal.MessageExecutionState.FAILURE
       )
     ) {
-      revert SkippedAlreadyExecutedMessage(message.sourceChainSelector, message.sequenceNumber);
-    }
-
-    /////// SECURITY CRITICAL CHECKS ///////
-
-    {
-      address[] memory requiredPoolCCVs = new address[](0);
-      if (message.tokenTransfer.length > 0) {
-        if (message.tokenTransfer.length != 1) {
-          revert InvalidNumberOfTokens(message.tokenTransfer.length);
-        }
-
-        if (message.tokenTransfer[0].destTokenAddress.length != 20) {
-          revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
-        }
-        address localTokenAddress = address(bytes20(message.tokenTransfer[0].destTokenAddress));
-
-        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
-        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
-        // that do not support the V2 interface.
-        requiredPoolCCVs = _getCCVsFromPool(
-          localTokenAddress,
-          message.sourceChainSelector,
-          message.tokenTransfer[0].amount,
-          message.tokenTransfer[0].extraData
-        );
-      }
-
-      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
-        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiverAddress, ccvs, requiredPoolCCVs);
-
-      for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
-          message: message,
-          messageHash: messageId,
-          ccvData: ccvData[ccvDataIndex[i]],
-          originalState: originalState
-        });
-      }
+      revert SkippedAlreadyExecutedMessage(messageId, message.sourceChainSelector, message.sequenceNumber);
     }
 
     /////// Execution ///////
 
     s_executionStates[executionStateKey] = Internal.MessageExecutionState.IN_PROGRESS;
-    (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, messageId);
+
+    (bool success, bytes memory err,) =
+      _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, ccvData)));
+    Internal.MessageExecutionState newState =
+      success ? Internal.MessageExecutionState.SUCCESS : Internal.MessageExecutionState.FAILURE;
+
     s_executionStates[executionStateKey] = newState;
 
-    // The only valid prior states are UNTOUCHED and FAILURE (checked above).
-    // The only valid post states are FAILURE and SUCCESS (checked below).
-    if (newState != Internal.MessageExecutionState.SUCCESS) {
-      if (newState != Internal.MessageExecutionState.FAILURE) {
-        revert InvalidNewState(message.sourceChainSelector, message.sequenceNumber, newState);
-      }
-    }
-
-    emit ExecutionStateChanged(message.sourceChainSelector, message.sequenceNumber, messageId, newState, returnData);
+    emit ExecutionStateChanged(message.sourceChainSelector, message.sequenceNumber, messageId, newState, err);
     s_reentrancyGuardEntered = false;
   }
 
   error OutOfGas();
 
-  /// @notice Try executing a message, and catch any errors. The goal of this function is to never revert except when
-  /// called by the Internal.GAS_ESTIMATION_SENDER address. Most errors are easy to catch, but out of gas errors can
-  /// cause issues because the outer function needs enough gas to handle them gracefully without running out of gas
-  /// itself. To solve this, we call the _callWithGasBuffer function which ensures there is a gas buffer left to update
-  /// the state after the call.
-  /// @param message The message to be executed.
-  /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
-  /// @return errData Revert data in bytes if the execution state is FAILURE. The revert data can come from the pool,
-  /// the receiver, our internal execution logic or any downstream calls from these sources.
-  function _trialExecute(
-    MessageV1Codec.MessageV1 memory message,
-    bytes32 messageId
-  ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-    (bool success, bytes memory err, uint256 minimumGasLeft) =
-      _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId)));
-
-    if (success) {
-      // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
-      return (Internal.MessageExecutionState.SUCCESS, "");
-    }
-
-    // We want to detect if we ran out of gas inside the CallWithGasBuffer to allow for better error handling.
-    // EIP-150 means only 63/64 of the gas is forwarded to the callee. If they ran out of gas, the 1/64 is available
-    // in this function again and should not be counted towards the gas that was left inside the function.
-    // 20_000 gas is an additional buffer as the contract ran out of gas before it could do some action that would have
-    // taken it over the gas allowance. The most expensive operation that is regularly done is an SSTORE which costs
-    // 20_000 gas when setting a storage slot from zero to non-zero. This quite large buffer does mean there could be
-    // false positives.
-    bool ranOutOfGasInCall = err.length == 0 && gasleft() < minimumGasLeft + 20_000;
-
-    // We have a special gas estimator caller address that is used to cause reverts on Out Of Gas situations. Normally,
-    // the call would succeed but mark the message as failed. However, for gas estimation we want to know if the
-    // message would have succeeded or not, so we revert here to signal to the gas estimator that the gas limit was
-    // insufficient.
-    if (msg.sender == Internal.GAS_ESTIMATION_SENDER) {
-      if (
-        CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(err)
-          || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(err)
-          || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(err) || ranOutOfGasInCall
-      ) {
-        revert InsufficientGasToCompleteTx(bytes4(err));
-      }
-    }
-    // We don't compare against gasBufferToUpdateState as we know there was enough gas to perform the call, so
-    // we expect it to be spent. This reduces false positives in the out of gas detection.
-    if (ranOutOfGasInCall) {
-      err = abi.encodeWithSelector(OutOfGas.selector);
-    }
-
-    // return the message execution state as FAILURE and the revert data.
-    // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES.
-    return (Internal.MessageExecutionState.FAILURE, err);
-  }
+  //  /// @notice Try executing a message, and catch any errors. The goal of this function is to never revert except when
+  //  /// called by the Internal.GAS_ESTIMATION_SENDER address. Most errors are easy to catch, but out of gas errors can
+  //  /// cause issues because the outer function needs enough gas to handle them gracefully without running out of gas
+  //  /// itself. To solve this, we call the _callWithGasBuffer function which ensures there is a gas buffer left to update
+  //  /// the state after the call.
+  //  /// @param message The message to be executed.
+  //  /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
+  //  /// @return errData Revert data in bytes if the execution state is FAILURE. The revert data can come from the pool,
+  //  /// the receiver, our internal execution logic or any downstream calls from these sources.
+  //  function _trialExecute(
+  //    MessageV1Codec.MessageV1 memory message,
+  //    bytes32 messageId
+  //  ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
+  //    (bool success, bytes memory err, uint256 minimumGasLeft) =
+  //      _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId)));
+  //
+  //    if (success) {
+  //      // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
+  //      return (Internal.MessageExecutionState.SUCCESS, "");
+  //    }
+  //
+  //    // We want to detect if we ran out of gas inside the CallWithGasBuffer to allow for better error handling.
+  //    // EIP-150 means only 63/64 of the gas is forwarded to the callee. If they ran out of gas, the 1/64 is available
+  //    // in this function again and should not be counted towards the gas that was left inside the function.
+  //    // 20_000 gas is an additional buffer as the contract ran out of gas before it could do some action that would have
+  //    // taken it over the gas allowance. The most expensive operation that is regularly done is an SSTORE which costs
+  //    // 20_000 gas when setting a storage slot from zero to non-zero. This quite large buffer does mean there could be
+  //    // false positives.
+  //    bool ranOutOfGasInCall = err.length == 0 && gasleft() < minimumGasLeft + 20_000;
+  //
+  //    // We have a special gas estimator caller address that is used to cause reverts on Out Of Gas situations. Normally,
+  //    // the call would succeed but mark the message as failed. However, for gas estimation we want to know if the
+  //    // message would have succeeded or not, so we revert here to signal to the gas estimator that the gas limit was
+  //    // insufficient.
+  //    if (msg.sender == Internal.GAS_ESTIMATION_SENDER) {
+  //      if (
+  //        CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(err)
+  //          || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(err)
+  //          || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(err) || ranOutOfGasInCall
+  //      ) {
+  //        revert InsufficientGasToCompleteTx(bytes4(err));
+  //      }
+  //    }
+  //    // We don't compare against gasBufferToUpdateState as we know there was enough gas to perform the call, so
+  //    // we expect it to be spent. This reduces false positives in the out of gas detection.
+  //    if (ranOutOfGasInCall) {
+  //      err = abi.encodeWithSelector(OutOfGas.selector);
+  //    }
+  //
+  //    // return the message execution state as FAILURE and the revert data.
+  //    // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES.
+  //    return (Internal.MessageExecutionState.FAILURE, err);
+  //  }
 
   function _callWithGasBuffer(
     bytes memory payload
@@ -363,9 +321,51 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
   /// smart contract wallets, without an associated message.
-  function executeSingleMessage(MessageV1Codec.MessageV1 memory message, bytes32 messageId) external {
+  function executeSingleMessage(
+    MessageV1Codec.MessageV1 calldata message,
+    bytes32 messageId,
+    address[] calldata ccvs,
+    bytes[] calldata ccvData
+  ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
+
+    /////// SECURITY CRITICAL CHECKS ///////
     address receiver = address(bytes20(message.receiver));
+
+    {
+      address[] memory requiredPoolCCVs = new address[](0);
+      if (message.tokenTransfer.length > 0) {
+        if (message.tokenTransfer.length != 1) {
+          revert InvalidNumberOfTokens(message.tokenTransfer.length);
+        }
+
+        if (message.tokenTransfer[0].destTokenAddress.length != 20) {
+          revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
+        }
+        address localTokenAddress = address(bytes20(message.tokenTransfer[0].destTokenAddress));
+
+        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
+        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
+        // that do not support the V2 interface.
+        requiredPoolCCVs = _getCCVsFromPool(
+          localTokenAddress,
+          message.sourceChainSelector,
+          message.tokenTransfer[0].amount,
+          message.tokenTransfer[0].extraData
+        );
+      }
+
+      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
+        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, ccvs, requiredPoolCCVs);
+
+      for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
+        ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
+          message: message,
+          messageHash: messageId,
+          ccvData: ccvData[ccvDataIndex[i]]
+        });
+      }
+    }
 
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
     for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
