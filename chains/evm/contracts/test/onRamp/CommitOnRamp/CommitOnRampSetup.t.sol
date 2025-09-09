@@ -5,29 +5,18 @@ import {NonceManager} from "../../../NonceManager.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {BaseOnRamp} from "../../../onRamp/BaseOnRamp.sol";
 import {CommitOnRamp} from "../../../onRamp/CommitOnRamp.sol";
-import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
+import {BaseOnRampSetup} from "../BaseOnRamp/BaseOnRampSetup.t.sol";
 
-contract CommitOnRampSetup is FeeQuoterFeeSetup {
-  address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
-  address internal constant ALLOWLIST_ADMIN = 0x1234567890123456789012345678901234567890;
-  address internal s_ccvProxy;
+contract CommitOnRampSetup is BaseOnRampSetup {
   CommitOnRamp internal s_commitOnRamp;
   NonceManager internal s_nonceManager;
 
   function setUp() public virtual override {
     super.setUp();
-    s_ccvProxy = makeAddr("CCVProxy");
     s_nonceManager = NonceManager(makeAddr("NonceManager"));
 
-    s_commitOnRamp = new CommitOnRamp(
-      address(s_mockRMNRemote),
-      address(s_nonceManager),
-      CommitOnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter),
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN
-      })
-    );
+    s_commitOnRamp =
+      new CommitOnRamp(address(s_mockRMNRemote), address(s_nonceManager), _createBasicDynamicConfigArgs());
 
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = BaseOnRamp.DestChainConfigArgs({
@@ -37,6 +26,25 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
     });
 
     s_commitOnRamp.applyDestChainConfigUpdates(destChainConfigs);
+  }
+
+  /// @notice Helper to create a minimal dynamic config.
+  function _createBasicDynamicConfigArgs() internal view returns (CommitOnRamp.DynamicConfig memory) {
+    return CommitOnRamp.DynamicConfig({
+      feeQuoter: address(s_feeQuoter),
+      feeAggregator: FEE_AGGREGATOR,
+      allowlistAdmin: ALLOWLIST_ADMIN
+    });
+  }
+
+  /// @notice Helper to create a dynamic config with custom addresses.
+  function _createDynamicConfigArgs(
+    address feeQuoter,
+    address feeAggregator,
+    address allowlistAdmin
+  ) internal pure returns (CommitOnRamp.DynamicConfig memory) {
+    return
+      CommitOnRamp.DynamicConfig({feeQuoter: feeQuoter, feeAggregator: feeAggregator, allowlistAdmin: allowlistAdmin});
   }
 
   function _createEVM2AnyVerifierMessage(
@@ -77,13 +85,13 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
     return message;
   }
 
-  /// @notice Helper function to mock fee quoter response for forwardToVerifier tests
-  /// @param isOutOfOrderExecution Whether the message should be processed out of order
-  /// @param destChainSelector The destination chain selector
-  /// @param feeToken The fee token address
-  /// @param feeTokenAmount The fee token amount
-  /// @param extraArgs The extra arguments
-  /// @param receiver The receiver address
+  /// @notice Helper function to mock fee quoter response for forwardToVerifier tests.
+  /// @param isOutOfOrderExecution Whether the message should be processed out of order.
+  /// @param destChainSelector The destination chain selector.
+  /// @param feeToken The fee token address.
+  /// @param feeTokenAmount The fee token amount.
+  /// @param extraArgs The extra arguments.
+  /// @param receiver The receiver address.
   function _mockFeeQuoterResponse(
     bool isOutOfOrderExecution,
     uint64 destChainSelector,
@@ -106,10 +114,10 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
     );
   }
 
-  /// @notice Helper function to mock nonce manager response for forwardToVerifier tests
-  /// @param destChainSelector The destination chain selector
-  /// @param sender The sender address
-  /// @param nonce The nonce to return
+  /// @notice Helper function to mock nonce manager response for forwardToVerifier tests.
+  /// @param destChainSelector The destination chain selector.
+  /// @param sender The sender address.
+  /// @param nonce The nonce to return.
   function _mockNonceManagerResponse(uint64 destChainSelector, address sender, uint64 nonce) internal {
     vm.mockCall(
       address(s_nonceManager),
@@ -118,13 +126,13 @@ contract CommitOnRampSetup is FeeQuoterFeeSetup {
     );
   }
 
-  /// @notice Helper function to set up common mocks for forwardToVerifier tests
-  /// @param isOutOfOrderExecution Whether the message should be processed out of order
-  /// @param destChainSelector The destination chain selector
-  /// @param feeToken The fee token address
-  /// @param feeTokenAmount The fee token amount
-  /// @param receiver The receiver address
-  /// @param nonce The nonce to return (only used for ordered execution)
+  /// @notice Helper function to set up common mocks for forwardToVerifier tests.
+  /// @param isOutOfOrderExecution Whether the message should be processed out of order.
+  /// @param destChainSelector The destination chain selector.
+  /// @param feeToken The fee token address.
+  /// @param feeTokenAmount The fee token amount.
+  /// @param receiver The receiver address.
+  /// @param nonce The nonce to return (only used for ordered execution).
   function _setupForwardToVerifierMocks(
     bool isOutOfOrderExecution,
     uint64 destChainSelector,
