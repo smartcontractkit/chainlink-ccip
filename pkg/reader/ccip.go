@@ -175,6 +175,32 @@ func (r *ccipChainReader) Close() error {
 
 // ---------------------------------------------------
 
+// printReports is used to trim the size of the printed report. There can be a
+// large number of reports, especially on Solana where gas and token
+// price updates are split into separate reports. This function removes price
+// only reports, and removes price data from combined reports in an attempt to
+// ensure merkle roots are easier to find if logs are truncated.
+func printReports(lggr logger.Logger, reports []cciptypes.CommitPluginReportWithMeta) {
+	tokenPriceUpdates := 0
+	gasPriceUpdates := 0
+	var reportsWithRoots []cciptypes.CommitPluginReportWithMeta
+	for _, report := range reports {
+		gasPriceUpdates += len(report.Report.PriceUpdates.GasPriceUpdates)
+		tokenPriceUpdates += len(report.Report.PriceUpdates.TokenPriceUpdates)
+
+		if !report.Report.HasNoRoots() {
+			// remove price updates from the report.
+			cp := report
+			cp.Report.PriceUpdates = cciptypes.PriceUpdates{}
+			reportsWithRoots = append(reportsWithRoots, cp)
+		}
+	}
+	lggr.Debugw("decoded commit reports",
+		"numTokenPriceUpdates", tokenPriceUpdates,
+		"numGasPriceUpdates", gasPriceUpdates,
+		"reportsWithRoots", reportsWithRoots)
+}
+
 func (r *ccipChainReader) CommitReportsGTETimestamp(
 	ctx context.Context,
 	ts time.Time,
@@ -193,7 +219,8 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		return nil, fmt.Errorf("failed to get commit reports from accessor: %w", err)
 	}
 
-	lggr.Debugw("decoded commit reports", "reports", reports)
+	printReports(lggr, reports)
+
 	return reports, nil
 }
 
