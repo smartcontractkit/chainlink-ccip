@@ -31,12 +31,12 @@ abstract contract BaseOnRamp is ICCVOnRampV1, ITypeAndVersion {
 
   struct DestChainConfig {
     bool allowlistEnabled; // ─╮ True if the allowlist is enabled.
-    IRouter router; // ──────╯ Local CCVProxy that is allowed to forward messages to this contract.
+    IRouter router; // ────────╯ Local router to use for messages going to this dest chain.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
 
   struct DestChainConfigArgs {
-    IRouter router; // ────────╮ CCVProxy address that is allowed to forward messages to this contract.
+    IRouter router; // ──────────╮ Local router to use for messages going to this dest chain.
     uint64 destChainSelector; // │ Destination chain selector.
     bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
   }
