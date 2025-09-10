@@ -158,7 +158,7 @@ jobs:
         run: go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" # always use latest stable release from solana
+          sh -c "$(curl -sSfL https://release.anza.xyz/v2.3.8/install)" # Fix to v2 until we ugprade to v3
           echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
       - name: build + test
         run: |
