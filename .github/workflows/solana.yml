@@ -160,7 +160,6 @@ jobs:
         run: |
           sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" # always use latest stable release from solana
           echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
           solana --version
           cat /etc/os-release
       - name: build + test
@@ -170,7 +169,6 @@ jobs:
 
           # Avoid port collisions across packages
           export GOFLAGS="-p=1"
-          # If you use t.Parallel() inside a package, you can also add:
           export GOMAXPROCS=1
           # More file descriptors
           ulimit -n 65535 || true
