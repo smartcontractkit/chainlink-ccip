@@ -182,7 +182,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     }
 
     // 2. get pool params, this potentially mutates CCV list
-
     // TODO pool call & fill receipt
 
     Internal.Receipt memory poolReceipt;
@@ -196,8 +195,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       resolvedExtraArgs.optionalThreshold
     );
 
-    uint256 requiredCCVsCount = resolvedExtraArgs.requiredCCV.length;
-
     MessageV1Codec.TokenTransferV1[] memory tokenTransfers =
       new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length);
 
@@ -209,80 +206,80 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       offRampAddress: destChainConfig.offRamp,
       finality: resolvedExtraArgs.finalityConfig,
       sender: abi.encodePacked(originalSender),
-      receiver: message.receiver, // TODO EVM2AnyMessage sends abi.encoded for EVM, we need to handle that
+      // Since EVM2AnyMessage sends abi.encoded for EVM, we handle that by slicing the receiver address.
+      // TODO handle non-EVM chain families, maybe through fee quoter
+      receiver: message.receiver[12:32],
       destBlob: "", // TODO for SVM
       tokenTransfer: tokenTransfers, //  values are populated with _lockOrBurnSingleToken
       data: message.data
     });
 
-    // 3. Build verifier/executor receipts
-    uint256 optionalCCVsCount = resolvedExtraArgs.optionalCCV.length;
-    Internal.Receipt[] memory verifierReceipts = new Internal.Receipt[](requiredCCVsCount + optionalCCVsCount);
-    for (uint256 i = 0; i < requiredCCVsCount; ++i) {
-      Client.CCV memory verifier = resolvedExtraArgs.requiredCCV[i];
-      verifierReceipts[i] = Internal.Receipt({
-        issuer: verifier.ccvAddress,
+    bytes32 messageId;
+    {
+      // 3. Build verifier/executor receipts
+      Internal.Receipt[] memory verifierReceipts =
+        new Internal.Receipt[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
+      for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
+        Client.CCV memory verifier = resolvedExtraArgs.requiredCCV[i];
+        verifierReceipts[i] = Internal.Receipt({
+          issuer: verifier.ccvAddress,
+          destGasLimit: 0, // TODO
+          destBytesOverhead: 0, // TODO
+          feeTokenAmount: 0, // TODO
+          extraArgs: verifier.args
+        });
+      }
+      for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
+        Client.CCV memory verifier = resolvedExtraArgs.optionalCCV[i];
+        verifierReceipts[resolvedExtraArgs.requiredCCV.length + i] = Internal.Receipt({
+          issuer: verifier.ccvAddress,
+          destGasLimit: 0, // TODO
+          destBytesOverhead: 0, // TODO
+          feeTokenAmount: 0, // TODO
+          extraArgs: verifier.args
+        });
+      }
+      Internal.Receipt memory executorReceipt = Internal.Receipt({
+        issuer: resolvedExtraArgs.executor,
         destGasLimit: 0, // TODO
         destBytesOverhead: 0, // TODO
         feeTokenAmount: 0, // TODO
-        extraArgs: verifier.args
+        extraArgs: resolvedExtraArgs.executorArgs
       });
-    }
-    for (uint256 i = 0; i < optionalCCVsCount; ++i) {
-      Client.CCV memory verifier = resolvedExtraArgs.optionalCCV[i];
-      verifierReceipts[requiredCCVsCount + i] = Internal.Receipt({
-        issuer: verifier.ccvAddress,
-        destGasLimit: 0, // TODO
-        destBytesOverhead: 0, // TODO
-        feeTokenAmount: 0, // TODO
-        extraArgs: verifier.args
-      });
-    }
-    Internal.Receipt memory executorReceipt = Internal.Receipt({
-      issuer: resolvedExtraArgs.executor,
-      destGasLimit: 0, // TODO
-      destBytesOverhead: 0, // TODO
-      feeTokenAmount: 0, // TODO
-      extraArgs: resolvedExtraArgs.executorArgs
-    });
 
-    // TODO: Handle the fee returned
-    // Currently only used for validations
-    _getExecutorFee(resolvedExtraArgs, message, destChainSelector);
+      // TODO: Handle the fee returned
+      // Currently only used for validations
+      _getExecutorFee(resolvedExtraArgs, message, destChainSelector);
 
-    // TODO
+      // 4. lockOrBurn
+      if (message.tokenAmounts.length != 0) {
+        if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
+        newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
+          message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
+        );
+      }
 
-    // 4. lockOrBurn
+      // 5. encode message and calculate messageId
+      bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
+      messageId = keccak256(encodedMessage);
 
-    if (message.tokenAmounts.length != 0) {
-      if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
-      newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
-        message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
+      // 6. emit event
+      emit CCIPMessageSent(
+        destChainSelector, newMessage.sequenceNumber, messageId, encodedMessage, verifierReceipts, executorReceipt
       );
     }
 
-    // 5. encode message and calculate messageId
-    bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
-    bytes32 messageId = keccak256(encodedMessage);
-
-    // 6. call each verifier
-
-    for (uint256 i = 0; i < requiredCCVsCount; ++i) {
+    // 7. call each verifier
+    for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
       ICCVOnRampV1(ccv.ccvAddress).forwardToVerifier(newMessage, messageId, message.feeToken, feeTokenAmount, ccv.args);
     }
-    for (uint256 i = 0; i < optionalCCVsCount; ++i) {
+    for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
       Client.CCV memory ccvOpt = resolvedExtraArgs.optionalCCV[i];
       ICCVOnRampV1(ccvOpt.ccvAddress).forwardToVerifier(
         newMessage, messageId, message.feeToken, feeTokenAmount, ccvOpt.args
       );
     }
-
-    // 7. emit event
-
-    emit CCIPMessageSent(
-      destChainSelector, newMessage.sequenceNumber, messageId, encodedMessage, verifierReceipts, executorReceipt
-    );
 
     s_dynamicConfig.reentrancyGuardEntered = false;
 
