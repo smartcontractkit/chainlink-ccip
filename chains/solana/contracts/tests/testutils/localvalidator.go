@@ -30,7 +30,7 @@ func SetupLocalSolNode(t *testing.T) string {
 func getPorts(t *testing.T) (port string, wsPort string, faucetPort string) {
 	t.Helper()
 
-	attempts := 5
+	attempts := 30
 
 	for i := 0; i < attempts; i++ {
 		port = utils.MustRandomPort(t)
