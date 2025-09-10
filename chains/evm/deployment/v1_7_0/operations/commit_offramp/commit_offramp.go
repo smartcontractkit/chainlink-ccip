@@ -11,6 +11,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "CommitOffRamp"
+var ProxyType cldf_deployment.ContractType = "CommitOffRampProxy"
 
 type ConstructorArgs struct {
 	NonceManager common.Address

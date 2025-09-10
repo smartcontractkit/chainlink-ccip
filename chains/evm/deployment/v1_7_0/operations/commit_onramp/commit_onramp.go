@@ -11,6 +11,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "CommitOnRamp"
+var ProxyType cldf_deployment.ContractType = "CommitOnRampProxy"
 
 type DynamicConfig = commit_onramp.CommitOnRampDynamicConfig
 

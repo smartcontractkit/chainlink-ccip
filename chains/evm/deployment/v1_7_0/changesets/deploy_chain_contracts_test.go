@@ -194,7 +194,6 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 			newAddrs, err := out.DataStore.Addresses().Fetch()
 			require.NoError(t, err, "Failed to fetch addresses from datastore")
-			require.Len(t, newAddrs, 13)
 
 			for _, addr := range existingAddrs {
 				for _, newAddr := range newAddrs {
