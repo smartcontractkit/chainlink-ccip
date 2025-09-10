@@ -27,26 +27,33 @@ func SetupLocalSolNode(t *testing.T) string {
 }
 
 // helper function to get a set of different random open ports
-func getPorts(t *testing.T) (port string, wsPort string, faucetPort string) {
+func getPorts(t *testing.T) (rpcPort, wsPort, faucetPort, gossipPort string) {
 	t.Helper()
-
 	attempts := 5
 
 	for i := 0; i < attempts; i++ {
-		port = utils.MustRandomPort(t)
+		rpcPort = utils.MustRandomPort(t)
 
-		portInt, _ := strconv.Atoi(port)
-		wsPort = strconv.Itoa(portInt + 1) // ws port is always +1 from the rpc port, required by solana
+		portInt, _ := strconv.Atoi(rpcPort)
+		wsPort = strconv.Itoa(portInt + 1) // WS port must be RPC+1
+
 		if !utils.IsPortOpen(t, wsPort) {
 			continue
 		}
 
 		faucetPort = utils.MustRandomPort(t)
-		if faucetPort != port && faucetPort != wsPort {
-			return
+		if faucetPort == rpcPort || faucetPort == wsPort {
+			continue
 		}
-	}
 
+		gossipPort = utils.MustRandomPort(t)
+		if gossipPort == rpcPort || gossipPort == wsPort || gossipPort == faucetPort {
+			continue
+		}
+
+		// All distinct and open
+		return
+	}
 	panic(fmt.Sprintf("unable to find unique open ports after %d attempts", attempts))
 }
 
@@ -54,17 +61,17 @@ func getPorts(t *testing.T) (port string, wsPort string, faucetPort string) {
 func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) {
 	t.Helper()
 
-	port, wsPort, faucetPort := getPorts(t)
+	rpcPort, wsPort, faucetPort, gossipPort := getPorts(t)
 
-	url := "http://127.0.0.1:" + port
+	url := "http://127.0.0.1:" + rpcPort
 	wsURL := "ws://127.0.0.1:" + wsPort
 
 	args := append([]string{
 		"--reset",
-		"--rpc-port", port,
+		"--rpc-port", rpcPort,
 		"--faucet-port", faucetPort,
+		"--gossip-port", gossipPort,
 		"--ledger", t.TempDir(),
-		"--log",
 		// Configurations to make the local cluster faster
 		"--ticks-per-slot", "8", // value in mainnet: 64
 		// account data direct mapping feature is disabled on mainnet,
