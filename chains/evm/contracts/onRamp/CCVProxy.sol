@@ -573,4 +573,77 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       }
     }
   }
+
+  // ================================================================
+  // │                        Development                           │
+  // ================================================================
+
+  /// @notice Development function to send a simple message for testing event subscriptions
+  /// @param destChainSelector The destination chain selector
+  /// @param data The message data payload
+  /// @param receiver The receiver address on destination chain
+  /// @return messageId The computed message ID
+  /// @dev This function is for testing purposes only and bypasses all validations
+  function dev_send(
+    uint64 destChainSelector,
+    bytes calldata data,
+    address receiver
+  ) external returns (bytes32 messageId) {
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    
+    // Create minimal message structure for testing
+    Internal.EVM2AnyVerifierMessage memory newMessage = Internal.EVM2AnyVerifierMessage({
+      header: Internal.Header({
+        messageId: "", // Will be set after hash calculation
+        sourceChainSelector: i_localChainSelector,
+        destChainSelector: destChainSelector,
+        sequenceNumber: ++destChainConfig.sequenceNumber
+      }),
+      sender: msg.sender,
+      data: data,
+      receiver: abi.encode(receiver),
+      feeToken: address(0), // No fee token for testing
+      feeTokenAmount: 0,
+      feeValueJuels: 0,
+      tokenTransfer: new Internal.EVMTokenTransfer[](0), // No token transfers
+      verifierReceipts: new Internal.Receipt[](1), // Single empty receipt for testing
+      executorReceipt: Internal.Receipt({
+        issuer: address(0),
+        feeTokenAmount: 0,
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        extraArgs: ""
+      })
+    });
+
+    // Add minimal verifier receipt
+    newMessage.verifierReceipts[0] = Internal.Receipt({
+      issuer: address(this), // Use this contract as issuer for testing
+      feeTokenAmount: 0,
+      destGasLimit: 200000, // Mock gas limit
+      destBytesOverhead: 0,
+      extraArgs: ""
+    });
+
+    // Calculate message ID (simplified for testing)
+    bytes32 metadataHash = keccak256(
+      abi.encode(
+        "DEV_SEND_TEST", // Simple metadata for testing
+        i_localChainSelector,
+        destChainSelector,
+        address(this)
+      )
+    );
+    
+    messageId = Internal._hash(newMessage, metadataHash);
+    newMessage.header.messageId = messageId;
+
+    // Create empty receipt blobs for the event
+    bytes[] memory receiptBlobs = new bytes[](newMessage.verifierReceipts.length);
+
+    // Emit the CCIPMessageSent event
+    emit CCIPMessageSent(destChainSelector, newMessage.header.sequenceNumber, newMessage, receiptBlobs);
+
+    return messageId;
+  }
 }
