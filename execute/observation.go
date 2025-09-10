@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -20,6 +21,10 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+)
+
+var (
+	errOffRampConfigMismatch = errors.New("offramp config digest mismatch")
 )
 
 // Observation collects data across two phases which happen in separate rounds.
@@ -546,7 +551,7 @@ func (p *Plugin) checkConfigDigest() error {
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
 			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
 		)
-		return fmt.Errorf("offramp config digest mismatch")
+		return errOffRampConfigMismatch
 	}
 	return nil
 }

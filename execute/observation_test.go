@@ -139,7 +139,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 		outCtx := ocr3types.OutcomeContext{PreviousOutcome: enc}
 		_, err = plugin.Observation(context.Background(), outCtx, nil)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "offramp config digest mismatch")
+		require.Contains(t, err.Error(), errOffRampConfigMismatch.Error())
 		// Cache is not updated due to config digest mismatch
 		require.False(t, plugin.inflightMessageCache.IsInflight(1, getID("1")))
 		require.False(t, plugin.inflightMessageCache.IsInflight(1, getID("2")))
