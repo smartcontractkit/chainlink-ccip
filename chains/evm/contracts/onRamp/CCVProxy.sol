@@ -182,9 +182,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     }
 
     // 2. get pool params, this potentially mutates CCV list
-    // TODO pool call & fill receipt
-
-    // Internal.Receipt memory poolReceipt;
+    // TODO pool call to get CCVs from IPoolV2 getRequiredCCVs
 
     (resolvedExtraArgs.requiredCCV, resolvedExtraArgs.optionalCCV, resolvedExtraArgs.optionalThreshold) =
     _mergeCCVsWithPoolAndLaneMandated(
