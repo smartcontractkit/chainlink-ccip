@@ -22,11 +22,20 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       router: router,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: laneMandated,
-      defaultExecutor: defaultExecutor
+      defaultExecutor: defaultExecutor,
+      offRamp: abi.encodePacked(address(s_ccvAggregatorRemote))
     });
 
     vm.expectEmit();
-    emit CCVProxy.DestChainConfigSet(NEW_DEST_SELECTOR, 0, IRouter(router), defaultCCVs, laneMandated, defaultExecutor);
+    emit CCVProxy.DestChainConfigSet(
+      NEW_DEST_SELECTOR,
+      0,
+      IRouter(router),
+      defaultCCVs,
+      laneMandated,
+      defaultExecutor,
+      abi.encodePacked(address(s_ccvAggregatorRemote))
+    );
     s_ccvProxy.applyDestChainConfigUpdates(args);
 
     CCVProxy.DestChainConfig memory cfg = s_ccvProxy.getDestChainConfig(NEW_DEST_SELECTOR);
@@ -46,7 +55,8 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       router: IRouter(address(0)),
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
-      defaultExecutor: makeAddr("executor")
+      defaultExecutor: makeAddr("executor"),
+      offRamp: abi.encodePacked(address(s_ccvAggregatorRemote))
     });
 
     // Should not revert, router can be zero.
@@ -64,7 +74,8 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       router: s_sourceRouter,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
-      defaultExecutor: makeAddr("executor")
+      defaultExecutor: makeAddr("executor"),
+      offRamp: abi.encodePacked(address(s_ccvAggregatorRemote))
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVProxy.InvalidDestChainConfig.selector, uint64(0)));
@@ -80,7 +91,8 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       router: s_sourceRouter,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
-      defaultExecutor: address(0)
+      defaultExecutor: address(0),
+      offRamp: abi.encodePacked(address(s_ccvAggregatorRemote))
     });
 
     vm.expectRevert(CCVProxy.InvalidConfig.selector);
@@ -97,7 +109,8 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       router: s_sourceRouter,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
-      defaultExecutor: makeAddr("executor")
+      defaultExecutor: makeAddr("executor"),
+      offRamp: abi.encodePacked(address(s_ccvAggregatorRemote))
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVProxy.InvalidDestChainConfig.selector, SOURCE_CHAIN_SELECTOR));

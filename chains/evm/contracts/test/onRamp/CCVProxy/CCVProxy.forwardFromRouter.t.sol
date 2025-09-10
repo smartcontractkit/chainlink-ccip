@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {CCVProxySetup} from "./CCVProxySetup.t.sol";
 
@@ -15,20 +16,27 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
   function test_forwardFromRouter_oldExtraArgs() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
+    (
+      bytes32 messageId,
+      bytes memory encodedMessage,
+      Internal.Receipt[] memory verifierReceipts,
+      Internal.Receipt memory executorReceipt
+    ) = _evmMessageToEvent({
+      message: message,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      seqNum: 1,
+      feeTokenAmount: 1e17,
+      originalSender: STRANGER
+    });
+
     vm.expectEmit();
     emit CCVProxy.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: 1,
-      message: _evmMessageToEvent({
-        message: message,
-        destChainSelector: DEST_CHAIN_SELECTOR,
-        seqNum: 1,
-        feeTokenAmount: 1e17,
-        feeValueJuels: 0,
-        originalSender: STRANGER,
-        metadataHash: s_metadataHash
-      }),
-      receiptBlobs: new bytes[](1)
+      messageId: messageId,
+      encodedMessage: encodedMessage,
+      verifierReceipts: verifierReceipts,
+      executorReceipt: executorReceipt
     });
 
     s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
@@ -41,39 +49,53 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
     CCVProxy.DestChainConfig memory destConfig = s_ccvProxy.getDestChainConfig(DEST_CHAIN_SELECTOR);
     destConfig.sequenceNumber++;
     // 1) Expect seq to increment for the first message.
+    (
+      bytes32 messageId1Expected,
+      bytes memory encodedMessage1,
+      Internal.Receipt[] memory verifierReceipts1,
+      Internal.Receipt memory executorReceipt1
+    ) = _evmMessageToEvent({
+      message: message,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      seqNum: destConfig.sequenceNumber,
+      feeTokenAmount: 1e17,
+      originalSender: STRANGER
+    });
+
     vm.expectEmit();
     emit CCVProxy.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: destConfig.sequenceNumber,
-      message: _evmMessageToEvent({
-        message: message,
-        destChainSelector: DEST_CHAIN_SELECTOR,
-        seqNum: destConfig.sequenceNumber,
-        feeTokenAmount: 1e17,
-        feeValueJuels: 0,
-        originalSender: STRANGER,
-        metadataHash: s_metadataHash
-      }),
-      receiptBlobs: new bytes[](1)
+      messageId: messageId1Expected,
+      encodedMessage: encodedMessage1,
+      verifierReceipts: verifierReceipts1,
+      executorReceipt: executorReceipt1
     });
     bytes32 messageId1 = s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
     // 2) Expect seq to increment again for the next message.
     destConfig.sequenceNumber++;
+    (
+      bytes32 messageId2Expected,
+      bytes memory encodedMessage2,
+      Internal.Receipt[] memory verifierReceipts2,
+      Internal.Receipt memory executorReceipt2
+    ) = _evmMessageToEvent({
+      message: message,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      seqNum: destConfig.sequenceNumber,
+      feeTokenAmount: 1e17,
+      originalSender: STRANGER
+    });
+
     vm.expectEmit();
     emit CCVProxy.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: destConfig.sequenceNumber,
-      message: _evmMessageToEvent({
-        message: message,
-        destChainSelector: DEST_CHAIN_SELECTOR,
-        seqNum: destConfig.sequenceNumber,
-        feeTokenAmount: 1e17,
-        feeValueJuels: 0,
-        originalSender: STRANGER,
-        metadataHash: s_metadataHash
-      }),
-      receiptBlobs: new bytes[](1)
+      messageId: messageId2Expected,
+      encodedMessage: encodedMessage2,
+      verifierReceipts: verifierReceipts2,
+      executorReceipt: executorReceipt2
     });
     bytes32 messageId2 = s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
