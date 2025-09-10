@@ -148,6 +148,18 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("1")))
 		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("2")))
 		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("3")))
+
+		// now set the correct config digest
+		plugin.reportingCfg.ConfigDigest = onchainConfigDigest
+		// run the observation again, cache for chain 1 should be updated
+		_, err = plugin.Observation(context.Background(), outCtx, nil)
+		require.Error(t, err) // home reader error
+		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("1")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("2")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("3")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("1")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("2")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("3")))
 	}
 
 }
