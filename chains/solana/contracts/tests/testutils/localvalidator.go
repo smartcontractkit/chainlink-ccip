@@ -64,6 +64,7 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 		"--rpc-port", port,
 		"--faucet-port", faucetPort,
 		"--ledger", t.TempDir(),
+		"--log",
 		// Configurations to make the local cluster faster
 		"--ticks-per-slot", "8", // value in mainnet: 64
 		// account data direct mapping feature is disabled on mainnet,
