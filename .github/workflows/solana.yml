@@ -158,11 +158,26 @@ jobs:
         run: go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v2.3.7/install)" # Fix to v2.3.7 until we ugprade to v2.3.8 or v3
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" # always use latest stable release from solana
           echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          solana --version
+          cat /etc/os-release
       - name: build + test
+        shell: bash
         run: |
           set -eoux pipefail
+
+          # Avoid port collisions across packages
+          export GOFLAGS="-p=1"
+          # If you use t.Parallel() inside a package, you can also add:
+          export GOMAXPROCS=1
+          # More file descriptors
+          ulimit -n 65535 || true
+          # Useful logs if the validator panics
+          export RUST_BACKTRACE=1
+          export RUST_LOG=info,solana=debug,solana_runtime=debug
+
           # compile artifacts
           docker run -v "$(pwd)/":/solana ccip-solana:build bash -c "\
           set -eoux pipefail &&\
