@@ -30,7 +30,7 @@ func SetupLocalSolNode(t *testing.T) string {
 func getPorts(t *testing.T) (port string, wsPort string, faucetPort string) {
 	t.Helper()
 
-	attempts := 30
+	attempts := 5
 
 	for i := 0; i < attempts; i++ {
 		port = utils.MustRandomPort(t)
@@ -89,8 +89,8 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 
 	// Wait for api server to boot
 	var ready bool
-	for i := 0; i < 50; i++ {
-		time.Sleep(5 * time.Second)
+	for i := 0; i < 30; i++ {
+		time.Sleep(time.Second)
 		client := rpc.New(url)
 		out, err := client.GetHealth(tests.Context(t))
 		if err != nil || out != rpc.HealthOk {
