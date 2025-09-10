@@ -1,7 +1,9 @@
 package execute
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"sort"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
@@ -50,6 +53,9 @@ func (p *Plugin) Observation(
 
 	// If the previous outcome was the filter state, and reports were built, mark the messages as inflight.
 	if previousOutcome.State == exectypes.Filter {
+		if err := p.checkConfigDigest(); err != nil {
+			return types.Observation{}, fmt.Errorf("unable to build inflight cache: %w", err)
+		}
 		for _, execReport := range previousOutcome.Reports {
 			for _, chainReport := range execReport.ChainReports {
 				for _, message := range chainReport.Messages {
@@ -527,4 +533,20 @@ func (p *Plugin) getFilterObservation(
 		observation.Nonces = nonceObservations
 	}
 	return observation, nil
+}
+
+func (p *Plugin) checkConfigDigest() error {
+	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(context.Background(), consts.PluginTypeExecute)
+	if err != nil {
+		return fmt.Errorf("get offramp config digest: %w", err)
+	}
+
+	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
+		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not starting",
+			"myConfigDigest", p.reportingCfg.ConfigDigest,
+			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+		)
+		return fmt.Errorf("offramp config digest mismatch")
+	}
+	return nil
 }
