@@ -51,7 +51,7 @@ var obs = Observation{
 
 var offChainCfg = pluginconfig.CommitOffchainConfig{
 	TokenPriceBatchWriteFrequency: *commonconfig.MustNewDuration(time.Minute),
-	TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+	TokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 		tokenA: {DeviationPPB: cbi(1)},
 		tokenB: {DeviationPPB: cbi(2)},
 		tokenC: {DeviationPPB: cbi(3)},

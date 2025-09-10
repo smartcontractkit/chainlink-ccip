@@ -293,7 +293,8 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 	return seqNum, nil
 }
 
-// GetExpectedNextSequenceNumber implements CCIP.
+// GetExpectedNextSequenceNumber queries the next expected sequence number from the source
+// chain OnRamp
 func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
 	sourceChainSelector cciptypes.ChainSelector,
@@ -306,7 +307,7 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	}
 	expectedNextSeqNum, err := sourceChainAccessor.GetExpectedNextSequenceNumber(ctx, r.destChain)
 	if err != nil {
-		return 0, fmt.Errorf("failed to call accessor LatestMsgSeqNum, source chain: %d, dest chain: %d: %w",
+		return 0, fmt.Errorf("failed to call accessor GetExpectedNextSequenceNumber, source chain: %d, dest chain: %d: %w",
 			sourceChainSelector, r.destChain, err)
 	}
 
@@ -524,7 +525,18 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
 	}
 
-	return destChainAccessor.GetChainFeePriceUpdate(ctx, selectors)
+	updates, err := destChainAccessor.GetChainFeePriceUpdate(ctx, selectors)
+	if err != nil {
+		lggr.Errorw("failed to get chain fee price updates", "chain", r.destChain, "err", err)
+		return nil
+	}
+
+	var result = make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig, len(updates))
+	for chain, update := range updates {
+		result[chain] = cciptypes.TimeStampedBigFromUnix(update)
+	}
+
+	return result
 }
 
 // buildSigners converts internal signer representation to RMN signer info format
@@ -914,10 +926,6 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	chains []cciptypes.ChainSelector,
 	includeDisabled bool,
 ) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return nil, fmt.Errorf("validate extended reader existence: %w", err)
-	}
-
 	// Use the ConfigPoller to handle caching
 	configs, err := r.configPoller.GetOfframpSourceChainConfigs(ctx, r.destChain, chains)
 	if err != nil {
@@ -1112,14 +1120,10 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 		return 0, fmt.Errorf("get latest price sequence number from accessor: %w", err)
 	}
 
-	return latestPriceSeqNum, nil
+	return uint64(latestPriceSeqNum), nil
 }
 
 func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
-	if err := validateReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return [32]byte{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
-	}
-
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("get chain config: %w", err)

@@ -212,7 +212,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 
 	onChainTokenPricesReader := readerpkg.NewPriceReader(
 		logutil.WithComponent(lggr, "PriceReader"),
-		readerFacades,
+		p.chainAccessors,
 		offchainConfig.TokenInfo,
 		ccipReader,
 		offchainConfig.PriceFeedChainSelector,

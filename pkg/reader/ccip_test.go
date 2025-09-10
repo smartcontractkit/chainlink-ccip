@@ -1522,7 +1522,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 		mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRampAddress, nil)
 		chainAccessors[destChain].(*commonccipocr3.MockChainAccessor).EXPECT().
 			GetChainFeePriceUpdate(mock.Anything, selectors).
-			Return(map[cciptypes.ChainSelector]cciptypes.TimestampedBig{})
+			Return(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig{}, nil)
 		ccipReader, err := newCCIPChainReaderInternal(
 			t.Context(),
 			logger.Test(t),
@@ -1736,16 +1736,8 @@ func mockExpectChainAccessorGetChainFeePriceUpdate(
 	selectors []cciptypes.ChainSelector,
 	expectedResult map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig,
 ) {
-	// Convert TimestampedUnixBig to TimestampedBig
-	convertedResult := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig)
-	for k, v := range expectedResult {
-		convertedResult[k] = cciptypes.TimestampedBig{
-			Value:     cciptypes.NewBigInt(v.Value),
-			Timestamp: time.Unix(int64(v.Timestamp), 0),
-		}
-	}
 	chainAccessor.(*commonccipocr3.MockChainAccessor).EXPECT().
-		GetChainFeePriceUpdate(mock.Anything, selectors).Return(convertedResult)
+		GetChainFeePriceUpdate(mock.Anything, selectors).Return(expectedResult, nil)
 }
 
 type mockConfigCache struct {
@@ -1789,112 +1781,4 @@ func (m *mockConfigCache) Name() string {
 
 func (m *mockConfigCache) Ready() error {
 	return m.Called().Error(0)
-}
-
-func Test_printReports(t *testing.T) {
-	genGasPriceReport := func() cciptypes.CommitPluginReportWithMeta {
-		return cciptypes.CommitPluginReportWithMeta{
-			Report: cciptypes.CommitPluginReport{
-				PriceUpdates: cciptypes.PriceUpdates{
-					GasPriceUpdates: []cciptypes.GasPriceChain{
-						{
-							ChainSel: cciptypes.ChainSelector(1),
-							GasPrice: cciptypes.NewBigInt(big.NewInt(100)),
-						},
-					},
-				},
-			},
-		}
-	}
-	genTokenPriceReport := func() cciptypes.CommitPluginReportWithMeta {
-		return cciptypes.CommitPluginReportWithMeta{
-			Report: cciptypes.CommitPluginReport{
-				PriceUpdates: cciptypes.PriceUpdates{
-					TokenPriceUpdates: []cciptypes.TokenPrice{
-						{
-							Price: cciptypes.NewBigInt(big.NewInt(100)),
-						},
-					},
-				},
-			},
-		}
-	}
-	genReport := func(withPrice bool) cciptypes.CommitPluginReportWithMeta {
-		var pu cciptypes.PriceUpdates
-		if withPrice {
-			pu = cciptypes.PriceUpdates{
-				TokenPriceUpdates: []cciptypes.TokenPrice{
-					{
-						Price: cciptypes.NewBigInt(big.NewInt(100)),
-					},
-				},
-			}
-		}
-		return cciptypes.CommitPluginReportWithMeta{
-			Report: cciptypes.CommitPluginReport{
-				PriceUpdates: pu,
-				UnblessedMerkleRoots: []cciptypes.MerkleRootChain{
-					{
-						ChainSel:      cciptypes.ChainSelector(1),
-						OnRampAddress: nil,
-						SeqNumsRange:  cciptypes.SeqNumRange{1, 2},
-						MerkleRoot:    cciptypes.Bytes32{},
-					},
-				},
-			},
-		}
-	}
-
-	t.Run("prices", func(t *testing.T) {
-		var reports []cciptypes.CommitPluginReportWithMeta
-		for i := 0; i < 50; i++ {
-			reports = append(reports, genGasPriceReport())
-			reports = append(reports, genTokenPriceReport())
-		}
-
-		lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
-		printReports(lggr, reports)
-
-		fmt.Println(hook.Len())
-		assert.Len(t, hook.All(), 1)
-		z := hook.All()[0]
-		for _, ctx := range z.Context {
-			switch ctx.Key {
-			case "numGasPriceUpdates":
-				assert.Equal(t, int64(50), ctx.Integer)
-			case "numTokenPriceUpdates":
-				assert.Equal(t, int64(50), ctx.Integer)
-			case "reportsWithRoots":
-				assert.Nil(t, ctx.Interface)
-			default:
-				assert.Fail(t, "unexpected context key: %s", ctx.Key)
-			}
-		}
-	})
-
-	t.Run("reports", func(t *testing.T) {
-		var reports []cciptypes.CommitPluginReportWithMeta
-		for i := 0; i < 50; i++ {
-			reports = append(reports, genReport(i%2 == 0))
-		}
-
-		lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
-		printReports(lggr, reports)
-
-		fmt.Println(hook.Len())
-		assert.Len(t, hook.All(), 1)
-		z := hook.All()[0]
-		for _, ctx := range z.Context {
-			switch ctx.Key {
-			case "numGasPriceUpdates":
-				assert.Equal(t, int64(0), ctx.Integer)
-			case "numTokenPriceUpdates":
-				assert.Equal(t, int64(25), ctx.Integer)
-			case "reportsWithRoots":
-				assert.Len(t, ctx.Interface, 50)
-			default:
-				assert.Fail(t, "unexpected context key: %s", ctx.Key)
-			}
-		}
-	})
 }
