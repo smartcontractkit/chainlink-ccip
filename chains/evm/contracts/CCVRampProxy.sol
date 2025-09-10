@@ -5,6 +5,8 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
+/// @notice CCVRampProxy enables upgrades to CCVOnRamps and CCVOffRamps without breaking existing references in token pools, receivers, and apps.
+/// @dev All future versions of ICCVOnRamp and ICCVOffRamp must maintain remoteChainSelector, version, and caller as the first three parameters in every method.
 contract CCVRampProxy is Ownable2StepMsgSender, ITypeAndVersion {
   error InvalidRemoteChainSelector(uint64 remoteChainSelector);
   error InvalidRampAddress(address rampAddress);
@@ -15,8 +17,14 @@ contract CCVRampProxy is Ownable2StepMsgSender, ITypeAndVersion {
 
   string public constant override typeAndVersion = "CCVRampProxy 1.7.0-dev";
 
+  /// @notice The supported ramps.
+  /// @dev Each remote chain selector can have multiple ramps, each with a different version. This protects in-flight messages during upgrades.
   mapping(uint64 => mapping(bytes32 => address)) private s_ramps;
 
+  /// @notice Sets the ramp address for a given remote chain selector and version.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param version The version of the ramp.
+  /// @param rampAddress The address of the ramp.
   function setRamp(uint64 remoteChainSelector, bytes32 version, address rampAddress) external onlyOwner {
     if (remoteChainSelector == 0) revert InvalidRemoteChainSelector(remoteChainSelector);
     if (version == bytes32(0)) revert InvalidVersion(version);
@@ -25,10 +33,15 @@ contract CCVRampProxy is Ownable2StepMsgSender, ITypeAndVersion {
     emit RampSet(remoteChainSelector, version, rampAddress);
   }
 
+  /// @notice Gets the ramp address for a given remote chain selector and version.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param version The version of the ramp.
+  /// @return rampAddress The address of the ramp.
   function getRamp(uint64 remoteChainSelector, bytes32 version) external view returns (address) {
     return s_ramps[remoteChainSelector][version];
   }
 
+  // The fallback function forwards all calls to the appropriate ramp contract based on the remote chain selector and version.
   // solhint-disable-next-line payable-fallback, no-complex-fallback
   fallback() external {
     uint64 remoteChainSelector;

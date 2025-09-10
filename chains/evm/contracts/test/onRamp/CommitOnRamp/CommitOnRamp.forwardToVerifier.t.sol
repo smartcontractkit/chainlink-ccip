@@ -29,9 +29,8 @@ contract CommitOnRamp_forwardToVerifier is CommitOnRampSetup {
     );
 
     vm.prank(s_ccvProxy);
-    bytes memory result = s_commitOnRamp.forwardToVerifier(
-      DEST_CHAIN_SELECTOR, CCVRamp.V1, address(this), abi.encode(message), verifierIndex
-    );
+    bytes memory result =
+      s_commitOnRamp.forwardToVerifier(DEST_CHAIN_SELECTOR, CCVRamp.V1, s_ccvProxy, abi.encode(message), verifierIndex);
 
     uint64 nonce = abi.decode(result, (uint64));
     assertEq(nonce, expectedNonce);
@@ -51,9 +50,8 @@ contract CommitOnRamp_forwardToVerifier is CommitOnRampSetup {
     _setupForwardToVerifierMocks(true, DEST_CHAIN_SELECTOR, s_sourceFeeToken, feeTokenAmount, msg.sender, expectedNonce);
 
     vm.prank(s_ccvProxy);
-    bytes memory result = s_commitOnRamp.forwardToVerifier(
-      DEST_CHAIN_SELECTOR, CCVRamp.V1, address(this), abi.encode(message), verifierIndex
-    );
+    bytes memory result =
+      s_commitOnRamp.forwardToVerifier(DEST_CHAIN_SELECTOR, CCVRamp.V1, s_ccvProxy, abi.encode(message), verifierIndex);
 
     uint64 nonce = abi.decode(result, (uint64));
     assertEq(nonce, expectedNonce); // Should return 0 for out of order execution.

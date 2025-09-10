@@ -15,7 +15,7 @@ interface ICCVOnRamp {
   /// @notice Message sending
   // TODO versioning?
   function forwardToVerifier(
-    uint64 remoteChainSelector,
+    uint64 destChainSelector,
     bytes32 version,
     address caller,
     bytes memory rawMessage,

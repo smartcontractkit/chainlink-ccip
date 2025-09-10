@@ -26,8 +26,8 @@ contract BaseOnRampTestHelper is BaseOnRamp {
     _withdrawFeeTokens(feeTokens, feeAggregator);
   }
 
-  function assertSenderIsAllowed(uint64 destChainSelector, address sender) external view {
-    _assertSenderIsAllowed(destChainSelector, sender);
+  function assertSenderIsAllowed(uint64 destChainSelector, address sender, address caller) external view {
+    _assertSenderIsAllowed(destChainSelector, sender, caller);
   }
 
   function assertNotCursed(

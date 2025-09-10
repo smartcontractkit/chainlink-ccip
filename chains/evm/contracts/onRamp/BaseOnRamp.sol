@@ -102,11 +102,11 @@ abstract contract BaseOnRamp is ICCVOnRamp, ITypeAndVersion {
     }
   }
 
-  function _assertSenderIsAllowed(uint64 destChainSelector, address sender) internal view {
+  function _assertSenderIsAllowed(uint64 destChainSelector, address sender, address caller) internal view {
     DestChainConfig storage destChainConfig = _getDestChainConfig(destChainSelector);
 
     // VerifierAggregator address may be zero intentionally to pause, which should stop all messages.
-    if (msg.sender != destChainConfig.ccvProxy) revert MustBeCalledByCCVProxy();
+    if (caller != destChainConfig.ccvProxy) revert MustBeCalledByCCVProxy();
 
     if (destChainConfig.allowlistEnabled) {
       if (!destChainConfig.allowedSendersList.contains(sender)) {

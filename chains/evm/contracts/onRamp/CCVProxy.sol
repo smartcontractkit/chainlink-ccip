@@ -283,6 +283,10 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     return newMessage.header.messageId;
   }
 
+  /// @notice Forwards the message to all verifiers specified in the message.
+  /// @param destChainSelector The destination chain selector.
+  /// @param newMessage The message to be forwarded.
+  /// @param encodedMessage The ABI encoded message.
   function _forwardToVerifiers(
     uint64 destChainSelector,
     Internal.EVM2AnyVerifierMessage memory newMessage,
