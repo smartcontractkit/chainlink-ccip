@@ -317,15 +317,15 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, commitOffRampRef)
 
 		// Set signature config on the CommitOffRamp
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfigs, chain, contract.FunctionInput[commit_offramp.SignatureConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(commitOffRampRef.Address),
-			Args:          input.ContractParams.CommitOffRamp.SignatureConfigArgs,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitOffRamp: %w", err)
-		}
-		writes = append(writes, setSignatureConfigReport.Output)
+		//setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfigs, chain, contract.FunctionInput[commit_offramp.SignatureConfigArgs]{
+		//	ChainSelector: chain.Selector,
+		//	Address:       common.HexToAddress(commitOffRampRef.Address),
+		//	Args:          input.ContractParams.CommitOffRamp.SignatureConfigArgs,
+		//})
+		//if err != nil {
+		//	return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitOffRamp: %w", err)
+		//}
+		//writes = append(writes, setSignatureConfigReport.Output)
 
 		// Add CommitOnRamp and CommitOffRamp as AuthorizedCallers on NonceManager
 		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, nonce_manager.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[nonce_manager.AuthorizedCallerArgs]{
