@@ -12,8 +12,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -175,7 +176,7 @@ func Test_Observation(t *testing.T) {
 }
 
 var defaultCfg = pluginconfig.CommitOffchainConfig{
-	TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+	TokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 		tokenA: {
 			Decimals:          18,
 			AggregatorAddress: "0x1111111111111111111111Ff18C45Df59775Fbb2",

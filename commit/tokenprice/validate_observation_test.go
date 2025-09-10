@@ -25,14 +25,14 @@ var (
 	nilBig                = cciptypes.NewBigInt(nil)
 	defaultOffChainConfig = pluginconfig.CommitOffchainConfig{
 		PriceFeedChainSelector: feedChainSel,
-		TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+		TokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 			"0x1": {},
 			"0x2": {},
 			"0x3": {},
 			"0xa": {},
 		},
 	}
-	defaultTokensToQuery = map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+	defaultTokensToQuery = map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 		"0x1": {},
 		"0x2": {},
 		"0x3": {},
@@ -44,7 +44,7 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 	testCases := []struct {
 		name          string
 		tokenPrices   cciptypes.TokenPriceMap
-		tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
+		tokensToQuery map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo
 		expErr        bool
 	}{
 		{
@@ -272,7 +272,7 @@ func TestValidateObservedTokenUpdates(t *testing.T) {
 	testCases := []struct {
 		name          string
 		tokenUpdates  map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
-		tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
+		tokensToQuery map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo
 		expErr        bool
 	}{
 		{
