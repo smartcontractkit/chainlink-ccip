@@ -94,12 +94,16 @@ interface IFastTransferPool {
   ) external payable returns (bytes32 settlementId);
 
   /// @notice Fast fills a transfer using liquidity provider funds.
+  /// @notice Fillers must ensure that the parameters provided here exactly match the
+  /// values emitted in the `FastTransferRequested` event on the source chain.
+  /// It is recommended that the fillId must be passed directly from the event to avoid any mismatch
+  /// as encoding differences can cause divergence between fast fill and slow path settlement IDs.
   /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
   /// @param fillId The fill ID, computed from the fill request parameters.
   /// @param sourceChainSelector The source chain selector.
   /// @param sourceAmountNetFee The amount being filled, excluding the fast fill fee, expressed in source token decimals.
   /// @param sourceDecimals The decimals of the token on the source token.
-  /// @param receiver The receiver on the destination chain. ABI encoded in the case of an EVM destination chain.
+  /// @param receiver The receiver on the destination chain.
   function fastFill(
     bytes32 settlementId,
     bytes32 fillId,
