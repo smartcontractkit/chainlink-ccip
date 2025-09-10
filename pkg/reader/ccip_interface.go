@@ -218,7 +218,7 @@ type CCIPReader interface {
 	GetChainFeePriceUpdate(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
-	) map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig
+	) map[cciptypes.ChainSelector]cciptypes.TimestampedBig
 
 	// GetRMNRemoteConfig reads the RMN remote contract on the destination chain and returns the remote config.
 	GetRMNRemoteConfig(ctx context.Context) (cciptypes.RemoteConfig, error)

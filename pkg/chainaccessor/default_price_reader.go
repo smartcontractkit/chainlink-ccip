@@ -7,10 +7,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 )
 
@@ -30,13 +29,13 @@ type LatestRoundData struct {
 const priceReaderOperationCount = 2
 
 // ContractTokenMap maps contracts to their token indices
-type ContractTokenMap map[types.BoundContract][]cciptypes.UnknownEncodedAddress
+type ContractTokenMap map[types.BoundContract][]ccipocr3.UnknownEncodedAddress
 
 func (l *DefaultAccessor) GetFeedPricesUSD(
 	ctx context.Context,
-	tokens []cciptypes.UnknownEncodedAddress,
-	tokenInfoMap map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo,
-) (cciptypes.TokenPriceMap, error) {
+	tokens []ccipocr3.UnknownEncodedAddress,
+	tokenInfoMap map[ccipocr3.UnknownEncodedAddress]ccipocr3.TokenInfo,
+) (ccipocr3.TokenPriceMap, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
 
 	prices := make(ccipocr3.TokenPriceMap)
@@ -108,9 +107,9 @@ func normalizePrice(price *big.Int, decimals uint8) *big.Int {
 
 func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
-	tokens []cciptypes.UnknownEncodedAddress,
-	chain cciptypes.ChainSelector,
-) (map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedUnixBig, error) {
+	tokens []ccipocr3.UnknownEncodedAddress,
+	chain ccipocr3.ChainSelector,
+) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
 	byteTokens := make([][]byte, 0, len(tokens))
 	for _, token := range tokens {
@@ -131,10 +130,10 @@ func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 	feeQuoterAddressStr, err := l.addrCodec.AddressBytesToString(feeQuoterAddress[:], chain)
 	if err != nil {
 		lggr.Warnw("failed to convert fee quoter address to string", "chain", chain, "err", err)
-		return make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedUnixBig), nil
+		return make(map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig), nil
 	}
 
-	updates := make([]cciptypes.TimestampedUnixBig, len(tokens))
+	updates := make([]ccipocr3.TimestampedUnixBig, len(tokens))
 	boundContract := types.BoundContract{
 		Address: feeQuoterAddressStr,
 		Name:    consts.ContractNameFeeQuoter,
@@ -155,7 +154,7 @@ func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 		return nil, fmt.Errorf("failed to get fee quoter token updates: %w", err)
 	}
 
-	updateMap := make(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedUnixBig)
+	updateMap := make(map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig)
 	for i, token := range tokens {
 		// token not available on fee quoter
 		if updates[i].Timestamp == 0 || updates[i].Value == nil || updates[i].Value.Cmp(big.NewInt(0)) == 0 {
@@ -173,8 +172,8 @@ func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 
 // prepareBatchRequest creates a batch request grouped by contract and returns the mapping of contracts to token indices
 func (l *DefaultAccessor) prepareBatchRequest(
-	tokens []cciptypes.UnknownEncodedAddress,
-	tokenInfoMap map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo,
+	tokens []ccipocr3.UnknownEncodedAddress,
+	tokenInfoMap map[ccipocr3.UnknownEncodedAddress]ccipocr3.TokenInfo,
 ) (types.BatchGetLatestValuesRequest, ContractTokenMap) {
 	batchRequest := make(types.BatchGetLatestValuesRequest)
 	contractTokenMap := make(ContractTokenMap)

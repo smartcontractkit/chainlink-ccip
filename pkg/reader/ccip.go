@@ -513,7 +513,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 // https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L263-L263
 //
 //nolint:lll
-func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig {
+func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	destChainAccessor, err := getChainAccessor(r.accessors, r.destChain)
 	if err != nil {
@@ -522,7 +522,7 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	}
 
 	if len(selectors) == 0 {
-		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig) // Return a new empty map
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
 	}
 
 	updates, err := destChainAccessor.GetChainFeePriceUpdate(ctx, selectors)
@@ -530,7 +530,13 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 		lggr.Errorw("failed to get chain fee price updates", "chain", r.destChain, "err", err)
 		return nil
 	}
-	return updates
+
+	var result = make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig, len(updates))
+	for chain, update := range updates {
+		result[chain] = cciptypes.TimeStampedBigFromUnix(update)
+	}
+
+	return result
 }
 
 // buildSigners converts internal signer representation to RMN signer info format

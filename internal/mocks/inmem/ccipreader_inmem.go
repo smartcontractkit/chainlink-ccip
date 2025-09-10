@@ -190,7 +190,7 @@ func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
 func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig {
+) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
 	return nil
 }
 

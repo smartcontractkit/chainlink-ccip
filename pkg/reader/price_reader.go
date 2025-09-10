@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 type PriceReader interface {
@@ -31,7 +30,7 @@ type PriceReader interface {
 type priceReader struct {
 	lggr           logger.Logger
 	chainAccessors map[ccipocr3.ChainSelector]ccipocr3.ChainAccessor
-	tokenInfo      map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
+	tokenInfo      map[ccipocr3.UnknownEncodedAddress]ccipocr3.TokenInfo
 	ccipReader     CCIPReader
 	feedChain      ccipocr3.ChainSelector
 	addressCodec   ccipocr3.AddressCodec

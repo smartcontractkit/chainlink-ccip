@@ -272,7 +272,7 @@ func TestValidateObservedTokenUpdates(t *testing.T) {
 	testCases := []struct {
 		name          string
 		tokenUpdates  map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
-		tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
+		tokensToQuery map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo
 		expErr        bool
 	}{
 		{
