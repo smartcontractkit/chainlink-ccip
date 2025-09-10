@@ -90,7 +90,7 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	// Wait for api server to boot
 	var ready bool
 	for i := 0; i < 50; i++ {
-		time.Sleep(time.Second)
+		time.Sleep(5 * time.Second)
 		client := rpc.New(url)
 		out, err := client.GetHealth(tests.Context(t))
 		if err != nil || out != rpc.HealthOk {
