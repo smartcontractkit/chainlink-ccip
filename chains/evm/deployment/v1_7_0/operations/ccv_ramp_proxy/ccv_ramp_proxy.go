@@ -8,43 +8,41 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/ccv_ramp_proxy"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 )
 
 var ContractType cldf_deployment.ContractType = "CCVRampProxy"
-var Version = semver.MustParse("1.7.0")
 
-type SetRampArgs struct {
+type SetRampArgs = ccv_ramp_proxy.CCVRampProxySetRampsArgs
+
+type GetRampArgs struct {
 	RemoteChainSelector uint64
 	Version             [32]byte
-	RampAddress         common.Address
 }
 
-var Deploy = contract.NewDeploy(
-	"ccv-ramp-proxy:deploy",
-	Version,
-	"Deploys the CCVRampProxy contract",
-	ContractType,
-	ccv_ramp_proxy.CCVRampProxyABI,
-	func(any) error { return nil },
-	contract.VMDeployers[any]{
-		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args any) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := ccv_ramp_proxy.DeployCCVRampProxy(opts, backend)
-			return address, tx, err
-		},
-		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args any) (common.Address, error)
-	},
-)
+var V1Ramp = utils.MustHash("CCVRamp_V1")
 
 var SetRamp = contract.NewWrite(
-	"ccv-ramp-proxy:set-ramp",
-	Version,
-	"Sets the ramp address for a given remote chain selector and version on the CCVRampProxy",
+	"ccv-ramp-proxy:set-ramps",
+	semver.MustParse("1.7.0"),
+	"Sets multiple ramp addresses on the CCVRampProxy, each tied to a remote chain selector and CCVRamp version",
 	ContractType,
 	ccv_ramp_proxy.CCVRampProxyABI,
 	ccv_ramp_proxy.NewCCVRampProxy,
 	contract.OnlyOwner,
-	func(SetRampArgs) error { return nil },
-	func(ccvRampProxy *ccv_ramp_proxy.CCVRampProxy, opts *bind.TransactOpts, args SetRampArgs) (*types.Transaction, error) {
-		return ccvRampProxy.SetRamp(opts, args.RemoteChainSelector, args.Version, args.RampAddress)
+	func([]SetRampArgs) error { return nil },
+	func(ccvRampProxy *ccv_ramp_proxy.CCVRampProxy, opts *bind.TransactOpts, args []SetRampArgs) (*types.Transaction, error) {
+		return ccvRampProxy.SetRamps(opts, args)
+	},
+)
+
+var GetRamp = contract.NewRead(
+	"ccv-ramp-proxy:get-ramp",
+	semver.MustParse("1.7.0"),
+	"Gets the ramp address for a given remote chain selector and CCVRamp version",
+	ContractType,
+	ccv_ramp_proxy.NewCCVRampProxy,
+	func(ccvRampProxy *ccv_ramp_proxy.CCVRampProxy, opts *bind.CallOpts, args GetRampArgs) (common.Address, error) {
+		return ccvRampProxy.GetRamp(opts, args.RemoteChainSelector, args.Version)
 	},
 )

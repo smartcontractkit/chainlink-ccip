@@ -19,6 +19,12 @@ contract CCVRampProxySetup is BaseTest {
     s_ccvRampProxy = new CCVRampProxy();
     s_mockCCVOnRamp = new MockCCVOnRamp();
 
-    s_ccvRampProxy.setRamp(REMOTE_CHAIN_SELECTOR, CCVRamp.V1, address(s_mockCCVOnRamp));
+    CCVRampProxy.SetRampsArgs[] memory ramps = new CCVRampProxy.SetRampsArgs[](1);
+    ramps[0] = CCVRampProxy.SetRampsArgs({
+      remoteChainSelector: REMOTE_CHAIN_SELECTOR,
+      version: CCVRamp.V1,
+      addr: address(s_mockCCVOnRamp)
+    });
+    s_ccvRampProxy.setRamps(ramps);
   }
 }

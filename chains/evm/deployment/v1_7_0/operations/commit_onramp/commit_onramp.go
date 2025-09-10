@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/ccv_ramp_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/commit_onramp"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
@@ -48,6 +49,22 @@ var Deploy = contract.NewDeploy(
 			return address, tx, err
 		},
 		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)
+	},
+)
+
+var DeployProxy = contract.NewDeploy(
+	"commit-off-ramp-proxy:deploy",
+	semver.MustParse("1.7.0"),
+	"Deploys the CommitOffRampProxy contract",
+	ProxyType,
+	ccv_ramp_proxy.CCVRampProxyABI,
+	func(any) error { return nil },
+	contract.VMDeployers[any]{
+		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args any) (common.Address, *types.Transaction, error) {
+			address, tx, _, err := ccv_ramp_proxy.DeployCCVRampProxy(opts, backend)
+			return address, tx, err
+		},
+		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args any) (common.Address, error)
 	},
 )
 

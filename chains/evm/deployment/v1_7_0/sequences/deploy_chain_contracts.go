@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_ramp_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
@@ -276,13 +275,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, nonceManagerRef)
 
 		// Deploy CommitOnRampProxy
-		commitOnRampProxyRef, err := maybeDeployContract(b, ccv_ramp_proxy.Deploy, commit_onramp.ProxyType, chain, contract.DeployInput[any]{
+		commitOnRampProxyRef, err := maybeDeployContract(b, commit_onramp.DeployProxy, commit_onramp.ProxyType, chain, contract.DeployInput[any]{
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOnRampProxy: %w", err)
 		}
-		commitOnRampProxyRef.Type = datastore.ContractType(commit_onramp.ProxyType) // Correct the type, otherwise it would use "CCVRampProxy"
 		addresses = append(addresses, commitOnRampProxyRef)
 
 		// Deploy CommitOnRamp
@@ -316,13 +314,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, executorOnRampRef)
 
 		// Deploy CommitOffRampProxy
-		commitOffRampProxyRef, err := maybeDeployContract(b, ccv_ramp_proxy.Deploy, commit_offramp.ProxyType, chain, contract.DeployInput[any]{
+		commitOffRampProxyRef, err := maybeDeployContract(b, commit_offramp.DeployProxy, commit_offramp.ProxyType, chain, contract.DeployInput[any]{
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOffRampProxy: %w", err)
 		}
-		commitOffRampProxyRef.Type = datastore.ContractType(commit_offramp.ProxyType) // Correct the type, otherwise it would use "CCVRampProxy"
 		addresses = append(addresses, commitOffRampProxyRef)
 
 		// Deploy CommitOffRamp

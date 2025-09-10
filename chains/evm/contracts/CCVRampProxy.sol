@@ -15,6 +15,12 @@ contract CCVRampProxy is Ownable2StepMsgSender, ITypeAndVersion {
 
   event RampSet(uint64 indexed remoteChainSelector, bytes32 indexed version, address indexed rampAddress);
 
+  struct SetRampsArgs {
+    uint64 remoteChainSelector;
+    address addr;
+    bytes32 version;
+  }
+
   string public constant override typeAndVersion = "CCVRampProxy 1.7.0-dev";
 
   /// @notice The supported ramps.
@@ -22,15 +28,19 @@ contract CCVRampProxy is Ownable2StepMsgSender, ITypeAndVersion {
   mapping(uint64 => mapping(bytes32 => address)) private s_ramps;
 
   /// @notice Sets the ramp address for a given remote chain selector and version.
-  /// @param remoteChainSelector The remote chain selector.
-  /// @param version The version of the ramp.
-  /// @param rampAddress The address of the ramp.
-  function setRamp(uint64 remoteChainSelector, bytes32 version, address rampAddress) external onlyOwner {
-    if (remoteChainSelector == 0) revert InvalidRemoteChainSelector(remoteChainSelector);
-    if (version == bytes32(0)) revert InvalidVersion(version);
-    if (rampAddress == address(0)) revert InvalidRampAddress(rampAddress);
-    s_ramps[remoteChainSelector][version] = rampAddress;
-    emit RampSet(remoteChainSelector, version, rampAddress);
+  /// @dev Can be used to remove a ramp by setting the address to 0.
+  /// @param ramps The array of ramps to set.
+  function setRamps(
+    SetRampsArgs[] calldata ramps
+  ) external onlyOwner {
+    for (uint256 i = 0; i < ramps.length; ++i) {
+      SetRampsArgs memory ramp = ramps[i];
+      if (ramp.remoteChainSelector == 0) revert InvalidRemoteChainSelector(ramp.remoteChainSelector);
+      if (ramp.version == bytes32(0)) revert InvalidVersion(ramp.version);
+      if (ramp.addr == address(0)) revert InvalidRampAddress(ramp.addr);
+      s_ramps[ramp.remoteChainSelector][ramp.version] = ramp.addr;
+      emit RampSet(ramp.remoteChainSelector, ramp.version, ramp.addr);
+    }
   }
 
   /// @notice Gets the ramp address for a given remote chain selector and version.

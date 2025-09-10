@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_ramp_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
@@ -113,6 +114,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 			var ccvAggregator common.Address
 			var commitOffRamp common.Address
 			var executorOnRamp common.Address
+			var commitOnRampProxy common.Address
+			var commitOffRampProxy common.Address
 			for _, addr := range deploymentReport.Output.Addresses {
 				switch addr.Type {
 				case datastore.ContractType(router.ContractType):
@@ -129,6 +132,10 @@ func TestConfigureChainForLanes(t *testing.T) {
 					commitOffRamp = common.HexToAddress(addr.Address)
 				case datastore.ContractType(executor_onramp.ContractType):
 					executorOnRamp = common.HexToAddress(addr.Address)
+				case datastore.ContractType(commit_onramp.ProxyType):
+					commitOnRampProxy = common.HexToAddress(addr.Address)
+				case datastore.ContractType(commit_offramp.ProxyType):
+					commitOffRampProxy = common.HexToAddress(addr.Address)
 				}
 			}
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
@@ -158,12 +165,15 @@ func TestConfigureChainForLanes(t *testing.T) {
 				sequences.ConfigureChainForLanes,
 				evmChain,
 				sequences.ConfigureChainForLanesInput{
-					ChainSelector: chainSelector,
-					Router:        r,
-					CCVProxy:      ccvProxy,
-					CommitOnRamp:  commitOnRamp,
-					FeeQuoter:     feeQuoter,
-					CCVAggregator: ccvAggregator,
+					ChainSelector:      chainSelector,
+					Router:             r,
+					CCVProxy:           ccvProxy,
+					CommitOnRamp:       commitOnRamp,
+					CommitOffRamp:      commitOffRamp,
+					CommitOnRampProxy:  commitOnRampProxy,
+					CommitOffRampProxy: commitOffRampProxy,
+					FeeQuoter:          feeQuoter,
+					CCVAggregator:      ccvAggregator,
 					RemoteChains: map[uint64]sequences.RemoteChainConfig{
 						remoteChainSelector: {
 							AllowTrafficFrom:            true,
@@ -243,6 +253,30 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Len(t, executorOnRampDestChains.Output, 1, "There should be one dest chain on ExecutorOnRamp")
 			require.Equal(t, remoteChainSelector, executorOnRampDestChains.Output[0], "Dest chain selector on ExecutorOnRamp should match remote chain selector")
+
+			// Check CommitOffRampProxy settings
+			rampOnCommitOffRampProxy, err := operations.ExecuteOperation(bundle, ccv_ramp_proxy.GetRamp, evmChain, contract.FunctionInput[ccv_ramp_proxy.GetRampArgs]{
+				ChainSelector: evmChain.Selector,
+				Address:       commitOffRampProxy,
+				Args: ccv_ramp_proxy.GetRampArgs{
+					RemoteChainSelector: remoteChainSelector,
+					Version:             ccv_ramp_proxy.V1Ramp,
+				},
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Equal(t, commitOffRamp.Hex(), rampOnCommitOffRampProxy.Output.Hex(), "Ramp on CommitOffRampProxy should match CommitOffRamp address")
+
+			// Check CommitOnRampProxy settings
+			rampOnCommitOnRampProxy, err := operations.ExecuteOperation(bundle, ccv_ramp_proxy.GetRamp, evmChain, contract.FunctionInput[ccv_ramp_proxy.GetRampArgs]{
+				ChainSelector: evmChain.Selector,
+				Address:       commitOnRampProxy,
+				Args: ccv_ramp_proxy.GetRampArgs{
+					RemoteChainSelector: remoteChainSelector,
+					Version:             ccv_ramp_proxy.V1Ramp,
+				},
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Equal(t, commitOnRamp.Hex(), rampOnCommitOnRampProxy.Output.Hex(), "Ramp on CommitOnRampProxy should match CommitOnRamp address")
 
 			/////////////////////////////////////////
 			// Try sending CCIP message /////////////

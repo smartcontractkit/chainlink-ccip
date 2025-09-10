@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
@@ -78,6 +79,21 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 				Type:          datastore.ContractType(ccv_aggregator.ContractType),
 				Version:       semver.MustParse("1.7.0"),
 			},
+			{
+				ChainSelector: cfg.ChainSel,
+				Type:          datastore.ContractType(commit_offramp.ProxyType),
+				Version:       semver.MustParse("1.7.0"),
+			},
+			{
+				ChainSelector: cfg.ChainSel,
+				Type:          datastore.ContractType(commit_onramp.ProxyType),
+				Version:       semver.MustParse("1.7.0"),
+			},
+			{
+				ChainSelector: cfg.ChainSel,
+				Type:          datastore.ContractType(commit_offramp.ProxyType),
+				Version:       semver.MustParse("1.7.0"),
+			},
 		}, datastore_utils.ToEVMAddress)
 		if err != nil {
 			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve contract refs: %w", err)
@@ -87,6 +103,9 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		commitOnRampAddr := staticAddrs[2]
 		feeQuoterAddr := staticAddrs[3]
 		ccvAggregatorAddr := staticAddrs[4]
+		commitOffRampAddr := staticAddrs[5]
+		commitOnRampProxyAddr := staticAddrs[6]
+		commitOffRampProxyAddr := staticAddrs[7]
 
 		remoteChains := make(map[uint64]sequences.RemoteChainConfig, len(cfg.RemoteChains))
 		for remoteChainSel, remoteConfig := range cfg.RemoteChains {
@@ -143,13 +162,16 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		}
 
 		return sequences.ConfigureChainForLanesInput{
-			ChainSelector: cfg.ChainSel,
-			Router:        routerAddr,
-			CCVProxy:      ccvProxyAddr,
-			CommitOnRamp:  commitOnRampAddr,
-			FeeQuoter:     feeQuoterAddr,
-			CCVAggregator: ccvAggregatorAddr,
-			RemoteChains:  remoteChains,
+			ChainSelector:      cfg.ChainSel,
+			Router:             routerAddr,
+			CCVProxy:           ccvProxyAddr,
+			CommitOnRamp:       commitOnRampAddr,
+			FeeQuoter:          feeQuoterAddr,
+			CCVAggregator:      ccvAggregatorAddr,
+			CommitOffRamp:      commitOffRampAddr,
+			CommitOnRampProxy:  commitOnRampProxyAddr,
+			CommitOffRampProxy: commitOffRampProxyAddr,
+			RemoteChains:       remoteChains,
 		}, nil
 	},
 	ResolveDep: changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],

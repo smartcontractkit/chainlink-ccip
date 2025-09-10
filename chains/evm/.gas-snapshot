@@ -91,7 +91,7 @@ CCVProxy_parseExtraArgsWithDefaults:test_parseExtraArgsWithDefaults_WithOptional
 CCVProxy_setDynamicConfig:test_SetDynamicConfig() (gas: 35478)
 CCVProxy_setDynamicConfig:test_SetDynamicConfig_MultipleUpdates() (gas: 41700)
 CCVRampProxy_fallback:test_fallback() (gas: 15559)
-CCVRampProxy_setRamp:test_setRamp() (gas: 23806)
+CCVRampProxy_setRamps:test_setRamps() (gas: 24599)
 CommitOnRamp_applyAllowlistUpdates:test_applyAllowlistUpdates_AsAllowlistAdmin() (gas: 93070)
 CommitOnRamp_applyAllowlistUpdates:test_applyAllowlistUpdates_AsOwner() (gas: 94599)
 CommitOnRamp_applyDestChainConfigUpdates:test_applyDestChainConfigUpdates() (gas: 46053)
