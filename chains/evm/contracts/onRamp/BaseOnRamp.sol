@@ -2,7 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {ICCVOnRampV1} from "../interfaces/ICCVOnRampV1.sol";
+
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
+import {IRouter} from "../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {IERC20} from
@@ -20,7 +22,7 @@ abstract contract BaseOnRamp is ICCVOnRampV1, ITypeAndVersion {
   error InvalidDestChainConfig(uint64 destChainSelector);
   error InvalidAllowListRequest(uint64 destChainSelector);
   error SenderNotAllowed(address sender);
-  error MustBeCalledByCCVProxy();
+  error CallerIsNotARampOnRouter(address caller);
 
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
   event DestChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
@@ -29,12 +31,12 @@ abstract contract BaseOnRamp is ICCVOnRampV1, ITypeAndVersion {
 
   struct DestChainConfig {
     bool allowlistEnabled; // ─╮ True if the allowlist is enabled.
-    address ccvProxy; // ──────╯ Local CCVProxy that is allowed to forward messages to this contract.
+    IRouter router; // ──────╯ Local CCVProxy that is allowed to forward messages to this contract.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
 
   struct DestChainConfigArgs {
-    address ccvProxy; // ────────╮ CCVProxy address that is allowed to forward messages to this contract.
+    IRouter router; // ────────╮ CCVProxy address that is allowed to forward messages to this contract.
     uint64 destChainSelector; // │ Destination chain selector.
     bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
   }
@@ -53,25 +55,19 @@ abstract contract BaseOnRamp is ICCVOnRampV1, ITypeAndVersion {
   /// @dev The destination chain specific configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) private s_destChainConfigs;
 
-  constructor(
-    address rmnRemote
-  ) {
-    i_rmnRemote = IRMNRemote(rmnRemote);
-  }
-
   /// @notice get ChainConfig configured for the DestinationChainSelector.
   /// @param destChainSelector The destination chain selector.
   /// @return allowlistEnabled boolean indicator to specify if allowlist check is enabled.
-  /// @return ccvProxy address of the local ccvProxy.
+  /// @return router address of the local router.
   /// @return allowedSendersList list of addresses that are allowed to send messages to the destination chain.
   function getDestChainConfig(
     uint64 destChainSelector
-  ) external view returns (bool allowlistEnabled, address ccvProxy, address[] memory allowedSendersList) {
+  ) external view returns (bool allowlistEnabled, address router, address[] memory allowedSendersList) {
     DestChainConfig storage config = _getDestChainConfig(destChainSelector);
     allowlistEnabled = config.allowlistEnabled;
-    ccvProxy = config.ccvProxy;
+    router = address(config.router);
     allowedSendersList = config.allowedSendersList.values();
-    return (allowlistEnabled, ccvProxy, allowedSendersList);
+    return (allowlistEnabled, router, allowedSendersList);
   }
 
   function _getDestChainConfig(
@@ -95,18 +91,17 @@ abstract contract BaseOnRamp is ICCVOnRampV1, ITypeAndVersion {
 
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain
-      destChainConfig.ccvProxy = destChainConfigArg.ccvProxy;
+      destChainConfig.router = destChainConfigArg.router;
       destChainConfig.allowlistEnabled = destChainConfigArg.allowlistEnabled;
 
-      emit DestChainConfigSet(destChainSelector, destChainConfigArg.ccvProxy, destChainConfig.allowlistEnabled);
+      emit DestChainConfigSet(destChainSelector, address(destChainConfigArg.router), destChainConfig.allowlistEnabled);
     }
   }
 
   function _assertSenderIsAllowed(uint64 destChainSelector, address sender) internal view {
     DestChainConfig storage destChainConfig = _getDestChainConfig(destChainSelector);
 
-    // VerifierAggregator address may be zero intentionally to pause, which should stop all messages.
-    if (msg.sender != destChainConfig.ccvProxy) revert MustBeCalledByCCVProxy();
+    if (msg.sender != destChainConfig.router.getOnRamp(destChainSelector)) revert CallerIsNotARampOnRouter(msg.sender);
 
     if (destChainConfig.allowlistEnabled) {
       if (!destChainConfig.allowedSendersList.contains(sender)) {
@@ -152,19 +147,6 @@ abstract contract BaseOnRamp is ICCVOnRampV1, ITypeAndVersion {
         );
       }
     }
-  }
-
-  /// @notice Asserts the destination chain is not cursed by the RMN, and no global curse is active.
-  /// @dev Reverts if cursed.
-  /// @param destChainSelector The destination chain selector.
-  function _assertNotCursed(
-    uint64 destChainSelector
-  ) internal view {
-    if (address(i_rmnRemote) == address(0)) {
-      // If the RMN is not set, the implementation choose to not use the RMN curse feature.
-      return;
-    }
-    if (i_rmnRemote.isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.

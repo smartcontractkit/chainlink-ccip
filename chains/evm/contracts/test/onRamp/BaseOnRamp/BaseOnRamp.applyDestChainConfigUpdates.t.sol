@@ -8,18 +8,18 @@ contract BaseOnRamp_applyDestChainConfigUpdates is BaseOnRampSetup {
   function test_applyDestChainConfigUpdates() public {
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
 
-    destChainConfigs[0] = _getDestChainConfig(makeAddr("ccvProxy1"), 12345, true);
+    destChainConfigs[0] = _getDestChainConfig(s_router, 12345, true);
 
     vm.expectEmit();
     emit BaseOnRamp.DestChainConfigSet(
-      destChainConfigs[0].destChainSelector, destChainConfigs[0].ccvProxy, destChainConfigs[0].allowlistEnabled
+      destChainConfigs[0].destChainSelector, address(destChainConfigs[0].router), destChainConfigs[0].allowlistEnabled
     );
 
     s_baseOnRamp.applyDestChainConfigUpdates(destChainConfigs);
 
     // Verify config was set.
-    (bool allowlistEnabled, address ccvProxy,) = s_baseOnRamp.getDestChainConfig(destChainConfigs[0].destChainSelector);
-    assertEq(ccvProxy, destChainConfigs[0].ccvProxy);
+    (bool allowlistEnabled, address router,) = s_baseOnRamp.getDestChainConfig(destChainConfigs[0].destChainSelector);
+    assertEq(router, address(destChainConfigs[0].router));
     assertEq(allowlistEnabled, destChainConfigs[0].allowlistEnabled);
   }
 
@@ -27,7 +27,7 @@ contract BaseOnRamp_applyDestChainConfigUpdates is BaseOnRampSetup {
 
   function test_applyDestChainConfigUpdates_RevertWhen_InvalidDestChainConfig_ZeroDestChainSelector() public {
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(makeAddr("ccvProxy"), 0, false);
+    destChainConfigs[0] = _getDestChainConfig(s_router, 0, false);
 
     vm.expectRevert(abi.encodeWithSelector(BaseOnRamp.InvalidDestChainConfig.selector, 0));
     s_baseOnRamp.applyDestChainConfigUpdates(destChainConfigs);

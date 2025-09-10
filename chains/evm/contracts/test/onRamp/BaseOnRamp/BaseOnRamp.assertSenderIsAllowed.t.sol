@@ -21,7 +21,7 @@ contract BaseOnRamp_assertSenderIsAllowed is BaseOnRampSetup {
   function test_assertSenderIsAllowed_AllowlistEnabledWithAllowedSender() public {
     // Enable allowlist and add a sender.
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(s_ccvProxy, DEST_CHAIN_SELECTOR, true);
+    destChainConfigs[0] = _getDestChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
 
     vm.prank(OWNER);
     s_baseOnRamp.applyDestChainConfigUpdates(destChainConfigs);
@@ -42,19 +42,19 @@ contract BaseOnRamp_assertSenderIsAllowed is BaseOnRampSetup {
 
   // Reverts
 
-  function test_assertSenderIsAllowed_RevertWhen_MustBeCalledByCCVProxy() public {
+  function test_assertSenderIsAllowed_RevertWhen_CallerIsNotARampOnRouter() public {
     address sender = makeAddr("sender");
 
     // Try calling from non-ccvProxy address
     vm.prank(STRANGER);
-    vm.expectRevert(BaseOnRamp.MustBeCalledByCCVProxy.selector);
+    vm.expectRevert(abi.encodeWithSelector(BaseOnRamp.CallerIsNotARampOnRouter.selector, STRANGER));
     s_baseOnRamp.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, sender);
   }
 
   function test_assertSenderIsAllowed_RevertWhen_SenderNotAllowed() public {
     // Enable allowlist and add one sender.
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(s_ccvProxy, DEST_CHAIN_SELECTOR, true);
+    destChainConfigs[0] = _getDestChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
 
     vm.prank(OWNER);
     s_baseOnRamp.applyDestChainConfigUpdates(destChainConfigs);
