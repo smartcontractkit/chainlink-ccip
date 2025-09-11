@@ -23,8 +23,8 @@ contract CCIPClientExample_sanity is OnRampSetup {
     // Can set chain
     Client.EVMExtraArgsV1 memory extraArgs = Client.EVMExtraArgsV1({gasLimit: 300_000});
     bytes memory encodedExtraArgs = Client._argsToBytes(extraArgs);
-    exampleContract.enableChain(DEST_CHAIN_SELECTOR, encodedExtraArgs, new address[](0), new address[](0), 0);
-    assertEq(exampleContract.getChainConfig(DEST_CHAIN_SELECTOR).extraArgsBytes, encodedExtraArgs);
+    exampleContract.enableRemoteChain(DEST_CHAIN_SELECTOR, encodedExtraArgs, new address[](0), new address[](0), 0);
+    assertEq(exampleContract.getRemoteChainConfig(DEST_CHAIN_SELECTOR).extraArgsBytes, encodedExtraArgs);
 
     address toAddress = makeAddr("toAddress");
 
@@ -57,6 +57,6 @@ contract CCIPClientExample_sanity is OnRampSetup {
     assertTrue(ERC165Checker.supportsInterface(address(exampleContract), type(IAny2EVMMessageReceiver).interfaceId));
 
     // Can disable chain
-    exampleContract.disableChain(DEST_CHAIN_SELECTOR);
+    exampleContract.disableRemoteChain(DEST_CHAIN_SELECTOR);
   }
 }
