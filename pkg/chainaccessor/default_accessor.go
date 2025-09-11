@@ -689,6 +689,8 @@ func (l *DefaultAccessor) Nonces(
 	sortedChains := maps.Keys(addressesByChain)
 	slices.Sort(sortedChains)
 
+	l.lggr.Debugw("DefaultAccessor Nonces", "addressesByChain", addressesByChain)
+
 	// create the structure that will contain our result
 	res := make(map[cciptypes.ChainSelector]map[string]uint64)
 	var addressCount int
@@ -707,6 +709,8 @@ func (l *DefaultAccessor) Nonces(
 		return nil, err
 	}
 
+	l.lggr.Debugw("DefaultAccessor Nonces", "contractInput", contractInput, "responses", responses)
+
 	request := contractreader.ExtendedBatchGetLatestValuesRequest{
 		consts.ContractNameNonceManager: contractInput,
 	}
@@ -720,6 +724,8 @@ func (l *DefaultAccessor) Nonces(
 		return nil, fmt.Errorf("batch get nonces failed: %w", err)
 	}
 
+	l.lggr.Debugw("DefaultAccessor Nonces", "batchResult", batchResult)
+
 	// Process results, we range over batchResults, but there should only be result for nonce manager
 	for _, results := range batchResult {
 		if len(results) != len(responses) {
@@ -729,12 +735,14 @@ func (l *DefaultAccessor) Nonces(
 		}
 		for i, readResult := range results {
 			key := responses[i]
+			l.lggr.Debugw("DefaultAccessor Nonces", "chain", key.chain, "address", key.address)
 
 			returnVal, err := readResult.GetResult()
 			if err != nil {
 				lggr.Errorw("failed to get nonce for address", "address", key.address, "err", err)
 				continue
 			}
+			l.lggr.Debugw("DefaultAccessor Nonces", "returnVal", returnVal, "chain", key.chain, "address", key.address)
 
 			val, ok := returnVal.(*uint64)
 			if !ok || val == nil {
@@ -747,6 +755,8 @@ func (l *DefaultAccessor) Nonces(
 			res[key.chain][key.address] = *val
 		}
 	}
+
+	l.lggr.Debugw("DefaultAccessor Nonces", "result", res)
 
 	return res, nil
 }

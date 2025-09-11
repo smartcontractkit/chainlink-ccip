@@ -382,10 +382,14 @@ func (r *ccipChainReader) Nonces(
 		}
 	}
 
+	r.lggr.Debugw("ccip reader Nonces", "addressesByUnknownEncodedAddress", addressesByUnknownEncodedAddress)
+
 	noncesByAddressByChain, err := destChainAccessor.Nonces(ctx, addressesByUnknownEncodedAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get nonces for addresses: %w", err)
 	}
+
+	r.lggr.Debugw("ccip reader Nonces", "noncesByAddressByChain", noncesByAddressByChain)
 
 	return noncesByAddressByChain, nil
 }
