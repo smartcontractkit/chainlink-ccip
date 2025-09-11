@@ -110,6 +110,9 @@ compileContract pools/ERC20LockBox
 compileContract pools/USDC/SiloedUSDCTokenPool
 compileContract pools/USDC/USDCTokenPoolCCTPV2
 
+# Applications
+compileContract applications/DefensiveExample
+
 # Test helpers
 compileContract test/helpers/BurnMintERC677Helper
 compileContract test/helpers/MessageHasher

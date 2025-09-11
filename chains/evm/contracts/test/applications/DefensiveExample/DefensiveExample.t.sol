@@ -20,7 +20,7 @@ contract DefensiveExampleTest is OnRampSetup {
     super.setUp();
 
     s_receiver = new DefensiveExample(s_destRouter, IERC20(s_destFeeToken));
-    s_receiver.enableChain(s_sourceChainSelector, abi.encode(""));
+    s_receiver.enableChain(s_sourceChainSelector, abi.encode(""), new address[](0), new address[](0), 0);
   }
 
   function test_Recovery() public {

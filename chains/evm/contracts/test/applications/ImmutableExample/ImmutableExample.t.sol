@@ -23,8 +23,8 @@ contract CCIPClientExample_sanity is OnRampSetup {
     // Can set chain
     Client.EVMExtraArgsV1 memory extraArgs = Client.EVMExtraArgsV1({gasLimit: 300_000});
     bytes memory encodedExtraArgs = Client._argsToBytes(extraArgs);
-    exampleContract.enableChain(DEST_CHAIN_SELECTOR, encodedExtraArgs);
-    assertEq(exampleContract.s_chains(DEST_CHAIN_SELECTOR), encodedExtraArgs);
+    exampleContract.enableChain(DEST_CHAIN_SELECTOR, encodedExtraArgs, new address[](0), new address[](0), 0);
+    assertEq(exampleContract.getChainConfig(DEST_CHAIN_SELECTOR).extraArgsBytes, encodedExtraArgs);
 
     address toAddress = makeAddr("toAddress");
 

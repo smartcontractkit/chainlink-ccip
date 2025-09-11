@@ -29,6 +29,15 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
   event MessageSent(bytes32 messageId);
   event MessageReceived(bytes32 messageId);
 
+  /// @notice Configuration for a remote chain.
+  /// @dev extraArgsBytes are added to a msg on source, CCV params are checked on dest.
+  struct ChainConfig {
+    bytes extraArgsBytes;
+    address[] requiredCCVs;
+    address[] optionalCCVs;
+    uint8 optionalThreshold;
+  }
+
   // Current feeToken
   IERC20 public s_feeToken;
   // Below is a simplistic example (same params for all messages) of using storage to allow for new options without
@@ -43,15 +52,32 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
   // and update storage with the new args.
   // If different options are required for different messages, for example different gas limits,
   // one can simply key based on (chainSelector, messageType) instead of only chainSelector.
-  mapping(uint64 destChainSelector => bytes extraArgsBytes) public s_chains;
+  mapping(uint64 destChainSelector => ChainConfig chainConfig) internal s_chains;
 
   constructor(IRouterClient router, IERC20 feeToken) CCIPReceiver(address(router)) {
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), type(uint256).max);
   }
 
-  function enableChain(uint64 chainSelector, bytes memory extraArgs) external onlyOwner {
-    s_chains[chainSelector] = extraArgs;
+  function getChainConfig(
+    uint64 selector
+  ) external view returns (ChainConfig memory) {
+    return s_chains[selector];
+  }
+
+  function enableChain(
+    uint64 chainSelector,
+    bytes memory extraArgs,
+    address[] memory requiredCCVs,
+    address[] memory optionalCCVs,
+    uint8 optionalThreshold
+  ) external onlyOwner {
+    s_chains[chainSelector] = ChainConfig({
+      extraArgsBytes: extraArgs,
+      requiredCCVs: requiredCCVs,
+      optionalCCVs: optionalCCVs,
+      optionalThreshold: optionalThreshold
+    });
   }
 
   function disableChain(
@@ -86,7 +112,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainSelector],
+      extraArgs: s_chains[destChainSelector].extraArgsBytes,
       feeToken: address(0) // We leave the feeToken empty indicating we'll pay raw native.
     });
     bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
@@ -106,7 +132,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainSelector],
+      extraArgs: s_chains[destChainSelector].extraArgsBytes,
       feeToken: address(s_feeToken)
     });
     // Optional uint256 fee = i_ccipRouter.getFee(destChainSelector, message);
@@ -131,7 +157,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainSelector],
+      extraArgs: s_chains[destChainSelector].extraArgsBytes,
       feeToken: address(s_feeToken)
     });
     // Optional uint256 fee = i_ccipRouter.getFee(destChainSelector, message);
@@ -157,7 +183,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainSelector],
+      extraArgs: s_chains[destChainSelector].extraArgsBytes,
       feeToken: address(s_feeToken)
     });
     // Optional uint256 fee = i_ccipRouter.getFee(destChainSelector, message);
@@ -167,10 +193,23 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
     emit MessageSent(messageId);
   }
 
+  /// @notice Return the CCVs required/optional for a source chain.
+  function getCCVs(
+    uint64 sourceChainSelector
+  )
+    external
+    view
+    override
+    returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold)
+  {
+    ChainConfig memory config = s_chains[sourceChainSelector];
+    return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold);
+  }
+
   modifier validChain(
     uint64 chainSelector
   ) {
-    if (s_chains[chainSelector].length == 0) revert InvalidChain(chainSelector);
+    if (s_chains[chainSelector].extraArgsBytes.length == 0) revert InvalidChain(chainSelector);
     _;
   }
 }

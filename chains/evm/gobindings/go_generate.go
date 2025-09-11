@@ -39,6 +39,9 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip SiloedUSDCTokenPool siloed_usdc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip USDCTokenPoolCCTPV2 usdc_token_pool_cctp_v2 latest
 
+// Applications
+//go:generate go run generation/generate/wrap.go ccip DefensiveExample defensive_example_receiver latest
+
 // Helpers
 //go:generate go run generation/generate/wrap.go ccip MaybeRevertMessageReceiver maybe_revert_message_receiver latest
 //go:generate go run generation/generate/wrap.go ccip LogMessageDataReceiver log_message_data_receiver latest
