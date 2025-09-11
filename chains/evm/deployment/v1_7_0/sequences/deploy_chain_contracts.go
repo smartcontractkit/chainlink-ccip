@@ -278,8 +278,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		commitOnRampRef, err := maybeDeployContract(b, commit_onramp.Deploy, commit_onramp.ContractType, chain, contract.DeployInput[commit_onramp.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: commit_onramp.ConstructorArgs{
-				RMNRemote:    common.HexToAddress(rmnRemoteRef.Address),
-				NonceManager: common.HexToAddress(nonceManagerRef.Address),
 				DynamicConfig: commit_onramp.DynamicConfig{
 					FeeQuoter:      common.HexToAddress(feeQuoterRef.Address),
 					FeeAggregator:  input.ContractParams.CommitOnRamp.FeeAggregator,
