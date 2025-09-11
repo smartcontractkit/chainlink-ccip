@@ -1,7 +1,10 @@
 package execute
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -16,7 +19,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+)
+
+var (
+	errOffRampConfigMismatch = errors.New("offramp config digest mismatch")
 )
 
 // Observation collects data across two phases which happen in separate rounds.
@@ -50,6 +58,12 @@ func (p *Plugin) Observation(
 
 	// If the previous outcome was the filter state, and reports were built, mark the messages as inflight.
 	if previousOutcome.State == exectypes.Filter {
+		// the lane is invalid due to a config digest mismatch, skip updating
+		// the inflight cache so that messages will retry immediately when the digest is valid again.
+		if err := p.checkConfigDigest(); err != nil {
+			p.lggr.Errorw("skipping marking messages inflight due to config digest mismatch", "err", err)
+			return types.Observation{}, fmt.Errorf("skipping observation: %w", err)
+		}
 		for _, execReport := range previousOutcome.Reports {
 			for _, chainReport := range execReport.ChainReports {
 				for _, message := range chainReport.Messages {
@@ -527,4 +541,20 @@ func (p *Plugin) getFilterObservation(
 		observation.Nonces = nonceObservations
 	}
 	return observation, nil
+}
+
+func (p *Plugin) checkConfigDigest() error {
+	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(context.Background(), consts.PluginTypeExecute)
+	if err != nil {
+		return fmt.Errorf("get offramp config digest: %w", err)
+	}
+
+	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
+		p.lggr.Warnw("home chain config digest doesn't match offramp's config digest, not starting",
+			"homeChainConfigDigest", p.reportingCfg.ConfigDigest,
+			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+		)
+		return errOffRampConfigMismatch
+	}
+	return nil
 }
