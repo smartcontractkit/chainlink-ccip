@@ -2,12 +2,14 @@ package metrics
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -24,7 +26,9 @@ const (
 )
 
 func Test_TrackingTokenReadiness(t *testing.T) {
-	reporter, err := NewPromReporter(logger.Test(t), selector)
+	var b strings.Builder
+	bhClient, _ := beholder.NewWriterClient(&b)
+	reporter, err := NewPromReporter(logger.Test(t), selector, *bhClient)
 	require.NoError(t, err)
 
 	t.Cleanup(cleanupMetrics(reporter))
@@ -65,7 +69,7 @@ func Test_TrackingTokenReadiness(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackObservation(exectypes.Observation{TokenData: tc.observation}, tc.state)
+			reporter.TrackObservation(exectypes.Observation{TokenData: tc.observation}, tc.state, 10)
 
 			readyTokens := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
@@ -82,10 +86,14 @@ func Test_TrackingTokenReadiness(t *testing.T) {
 			require.Equal(t, tc.expectedWaitingTokens, int(waitingTokens))
 		})
 	}
+	bhClient.Close()
+	require.Contains(t, b.String(), "ccip_exec_output_sizes")
 }
 
 func Test_TrackingObservations(t *testing.T) {
-	reporter, err := NewPromReporter(logger.Test(t), selector)
+	var b strings.Builder
+	bhClient, _ := beholder.NewWriterClient(&b)
+	reporter, err := NewPromReporter(logger.Test(t), selector, *bhClient)
 	require.NoError(t, err)
 
 	t.Cleanup(cleanupMetrics(reporter))
@@ -131,7 +139,7 @@ func Test_TrackingObservations(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackObservation(tc.observation, tc.state)
+			reporter.TrackObservation(tc.observation, tc.state, 10)
 
 			nonces := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
@@ -155,10 +163,14 @@ func Test_TrackingObservations(t *testing.T) {
 			require.Equal(t, tc.expectedMessageCount, int(messages))
 		})
 	}
+	bhClient.Close()
+	require.Contains(t, b.String(), "ccip_exec_output_sizes")
 }
 
 func Test_TrackingOutcomes(t *testing.T) {
-	reporter, err := NewPromReporter(logger.Test(t), selector)
+	var b strings.Builder
+	bhClient, _ := beholder.NewWriterClient(&b)
+	reporter, err := NewPromReporter(logger.Test(t), selector, *bhClient)
 	require.NoError(t, err)
 
 	t.Cleanup(cleanupMetrics(reporter))
@@ -234,7 +246,7 @@ func Test_TrackingOutcomes(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackOutcome(tc.outcome, tc.state)
+			reporter.TrackOutcome(tc.outcome, tc.state, 10)
 
 			messages := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
@@ -258,12 +270,15 @@ func Test_TrackingOutcomes(t *testing.T) {
 			require.Equal(t, tc.expectedTokenDataCount, int(tokenData))
 		})
 	}
+	bhClient.Close()
+	require.Contains(t, b.String(), "ccip_exec_output_sizes")
 }
 
 func Test_SequenceNumbers(t *testing.T) {
 	selector1 := cciptypes.ChainSelector(12922642891491394802)
 	selector2 := cciptypes.ChainSelector(909606746561742123)
-
+	var b strings.Builder
+	bhClient, _ := beholder.NewWriterClient(&b)
 	tt := []struct {
 		name   string
 		obs    exectypes.Observation
@@ -373,33 +388,42 @@ func Test_SequenceNumbers(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter, err := NewPromReporter(logger.Test(t), selector)
+			reporter, err := NewPromReporter(logger.Test(t), selector, *bhClient)
 			require.NoError(t, err)
 
 			t.Cleanup(cleanupMetrics(reporter))
 
 			switch tc.method {
 			case plugincommon.ObservationMethod:
-				reporter.TrackObservation(tc.obs, exectypes.GetCommitReports)
+				reporter.TrackObservation(tc.obs, exectypes.GetCommitReports, 10)
 			case plugincommon.OutcomeMethod:
-				reporter.TrackOutcome(tc.out, exectypes.GetCommitReports)
+				reporter.TrackOutcome(tc.out, exectypes.GetCommitReports, 10)
 			}
 
 			for sourceSelector, maxSeqNr := range tc.exp {
 				sourceFamily, sourceID, ok := libs.GetChainInfoFromSelector(sourceSelector)
 				require.True(t, ok)
-
+				sourceName, err := libs.GetNameFromIDAndFamily(sourceID, sourceFamily)
+				require.NoError(t, err)
+				destName, err := libs.GetNameFromIDAndFamily(reporter.chainID, reporter.chainFamily)
+				require.NoError(t, err)
 				seqNum := testutil.ToFloat64(
-					reporter.sequenceNumbers.WithLabelValues("solana", chainID, sourceFamily, sourceID, tc.method),
+					reporter.sequenceNumbers.WithLabelValues("solana", chainID, sourceFamily,
+						sourceID, tc.method, sourceName, destName),
 				)
 				require.Equal(t, float64(maxSeqNr), seqNum)
 			}
 		})
 	}
+	bhClient.Close()
+	require.Contains(t, b.String(), "ccip_exec_max_sequence_number")
+	require.Contains(t, b.String(), "ccip_exec_latest_round_id")
 }
 
 func Test_ExecLatency(t *testing.T) {
-	reporter, err := NewPromReporter(logger.Test(t), selector)
+	var b strings.Builder
+	bhClient, _ := beholder.NewWriterClient(&b)
+	reporter, err := NewPromReporter(logger.Test(t), selector, *bhClient)
 	require.NoError(t, err)
 
 	t.Run("single latency observation", func(t *testing.T) {
@@ -434,10 +458,14 @@ func Test_ExecLatency(t *testing.T) {
 		)
 		require.Equal(t, float64(errCounter), errs)
 	})
+	bhClient.Close()
+	require.Contains(t, b.String(), "ccip_exec_latency")
 }
 
 func Test_LatencyAndErrors(t *testing.T) {
-	reporter, err := NewPromReporter(logger.Test(t), selector)
+	var b strings.Builder
+	bhClient, _ := beholder.NewWriterClient(&b)
+	reporter, err := NewPromReporter(logger.Test(t), selector, *bhClient)
 	require.NoError(t, err)
 
 	t.Run("single latency metric", func(t *testing.T) {
@@ -483,6 +511,8 @@ func Test_LatencyAndErrors(t *testing.T) {
 		)
 		require.Equal(t, float64(errCounter), errs)
 	})
+	bhClient.Close()
+	require.Contains(t, b.String(), "ccip_exec_processor_latency")
 }
 
 func cleanupMetrics(p *PromReporter) func() {
