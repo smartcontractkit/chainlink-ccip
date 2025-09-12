@@ -231,7 +231,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, ccvProxy.Hex(), commitOnRampDestChainConfig.Output.CcvProxy.Hex(), "CcvProxy in CommitOnRamp dest chain config should match CommitOnRamp address")
+			require.Equal(t, r.Hex(), commitOnRampDestChainConfig.Output.Router.Hex(), "Router in CommitOnRamp dest chain config should match Router address")
 			require.False(t, commitOnRampDestChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitOnRamp dest chain config should be false")
 
 			// Check dest chains on ExecutorOnRamp

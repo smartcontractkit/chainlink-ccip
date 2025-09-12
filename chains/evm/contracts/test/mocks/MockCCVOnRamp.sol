@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ICCVOnRamp} from "../../interfaces/ICCVOnRamp.sol";
-import {Client} from "../../libraries/Client.sol";
+import {ICCVOnRampV1} from "../../interfaces/ICCVOnRampV1.sol";
 
-contract MockCCVOnRamp is ICCVOnRamp {
-  function forwardToVerifier(bytes memory, uint256) external pure returns (bytes memory) {
+import {Client} from "../../libraries/Client.sol";
+import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
+
+contract MockCCVOnRamp is ICCVOnRampV1 {
+  function forwardToVerifier(
+    MessageV1Codec.MessageV1 calldata,
+    bytes32,
+    address,
+    uint256,
+    bytes calldata
+  ) external pure returns (bytes memory) {
     return "";
   }
 

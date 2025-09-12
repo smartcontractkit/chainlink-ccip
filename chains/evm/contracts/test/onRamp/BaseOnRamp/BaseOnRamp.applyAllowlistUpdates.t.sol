@@ -10,7 +10,7 @@ contract BaseOnRamp_applyAllowlistUpdates is BaseOnRampSetup {
 
     // First enable allowlist for the destination chain.
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(s_ccvProxy, DEST_CHAIN_SELECTOR, true);
+    destChainConfigs[0] = _getDestChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
     s_baseOnRamp.applyDestChainConfigUpdates(destChainConfigs);
   }
 
@@ -87,7 +87,7 @@ contract BaseOnRamp_applyAllowlistUpdates is BaseOnRampSetup {
   function test_applyAllowlistUpdates_RevertWhen_InvalidAllowListRequest_AddingToDisabledAllowlist() public {
     // First disable allowlist on the chain.
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(s_ccvProxy, DEST_CHAIN_SELECTOR, false);
+    destChainConfigs[0] = _getDestChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
     s_baseOnRamp.applyDestChainConfigUpdates(destChainConfigs);
 
     address[] memory senders = new address[](1);

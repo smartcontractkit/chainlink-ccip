@@ -11,7 +11,7 @@ contract CommitOnRamp_applyAllowlistUpdates is CommitOnRampSetup {
 
     // Enable allowlist for destination chain once.
     BaseOnRamp.DestChainConfigArgs[] memory destChainConfigs = new BaseOnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(s_ccvProxy, DEST_CHAIN_SELECTOR, true);
+    destChainConfigs[0] = _getDestChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
     s_commitOnRamp.applyDestChainConfigUpdates(destChainConfigs);
   }
 
