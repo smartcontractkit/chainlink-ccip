@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_ramp_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
@@ -61,6 +62,12 @@ type ConfigureChainForLanesInput struct {
 	CCVProxy common.Address
 	// The CommitOnRamp on the EVM chain being configured
 	CommitOnRamp common.Address
+	// The CommitOffRamp on the EVM chain being configured
+	CommitOffRamp common.Address
+	// The CommitOnRampProxy on the EVM chain being configured
+	CommitOnRampProxy common.Address
+	// The CommitOffRampProxy on the EVM chain being configured
+	CommitOffRampProxy common.Address
 	// The FeeQuoter on the EVM chain being configured
 	FeeQuoter common.Address
 	// The CCVAggregator on the EVM chain being configured
@@ -81,6 +88,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		ccvProxyArgs := make([]ccv_proxy.DestChainConfigArgs, 0, len(input.RemoteChains))
 		commitOnRampDestConfigArgs := make([]commit_onramp.DestChainConfigArgs, 0, len(input.RemoteChains))
 		commitOnRampAllowlistArgs := make([]commit_onramp.AllowlistConfigArgs, 0, len(input.RemoteChains))
+		commitOnRampProxyArgs := make([]ccv_ramp_proxy.SetRampArgs, 0, len(input.RemoteChains))
+		commitOffRampProxyArgs := make([]ccv_ramp_proxy.SetRampArgs, 0, len(input.RemoteChains))
 		feeQuoterArgs := make([]fee_quoter_v2.DestChainConfigArgs, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
@@ -110,6 +119,16 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				AllowlistEnabled:          remoteConfig.CommitOnRampDestChainConfig.AllowlistEnabled,
 				AddedAllowlistedSenders:   remoteConfig.CommitOnRampDestChainConfig.AddedAllowlistedSenders,
 				RemovedAllowlistedSenders: remoteConfig.CommitOnRampDestChainConfig.RemovedAllowlistedSenders,
+			})
+			commitOnRampProxyArgs = append(commitOnRampProxyArgs, ccv_ramp_proxy.SetRampArgs{
+				RemoteChainSelector: remoteSelector,
+				Version:             ccv_ramp_proxy.V1Ramp,
+				Addr:                input.CommitOnRamp,
+			})
+			commitOffRampProxyArgs = append(commitOffRampProxyArgs, ccv_ramp_proxy.SetRampArgs{
+				RemoteChainSelector: remoteSelector,
+				Version:             ccv_ramp_proxy.V1Ramp,
+				Addr:                input.CommitOffRamp,
 			})
 			feeQuoterArgs = append(feeQuoterArgs, fee_quoter_v2.DestChainConfigArgs{
 				DestChainSelector: remoteSelector,
@@ -150,6 +169,28 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CCVProxy(%s) on chain %s: %w", input.CCVProxy, chain, err)
 		}
 		writes = append(writes, ccvProxyReport.Output)
+
+		// SetRamp on CommitOnRampProxy
+		commitOnRampProxyReport, err := cldf_ops.ExecuteOperation(b, ccv_ramp_proxy.SetRamp, chain, contract.FunctionInput[[]ccv_ramp_proxy.SetRampArgs]{
+			ChainSelector: chain.Selector,
+			Address:       input.CommitOnRampProxy,
+			Args:          commitOnRampProxyArgs,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set ramps on CommitOnRampProxy(%s) on chain %s: %w", input.CommitOnRampProxy, chain, err)
+		}
+		writes = append(writes, commitOnRampProxyReport.Output)
+
+		// SetRamp on CommitOffRampProxy
+		commitOffRampProxyReport, err := cldf_ops.ExecuteOperation(b, ccv_ramp_proxy.SetRamp, chain, contract.FunctionInput[[]ccv_ramp_proxy.SetRampArgs]{
+			ChainSelector: chain.Selector,
+			Address:       input.CommitOffRampProxy,
+			Args:          commitOffRampProxyArgs,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set ramps on CommitOffRampProxy(%s) on chain %s: %w", input.CommitOffRampProxy, chain, err)
+		}
+		writes = append(writes, commitOffRampProxyReport.Output)
 
 		// ApplyDestChainConfigUpdates on CommitOnRamp
 		commitOnRampReport, err := cldf_ops.ExecuteOperation(b, commit_onramp.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]commit_onramp.DestChainConfigArgs]{

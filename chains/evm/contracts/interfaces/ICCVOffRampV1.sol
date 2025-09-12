@@ -10,6 +10,9 @@ import {IERC165} from
 interface ICCVOffRampV1 is IERC165 {
   /// @notice Message execution
   function verifyMessage(
+    uint64 sourceChainSelector,
+    bytes32 version,
+    address caller,
     MessageV1Codec.MessageV1 memory message,
     bytes32 messageHash,
     bytes memory ccvData,

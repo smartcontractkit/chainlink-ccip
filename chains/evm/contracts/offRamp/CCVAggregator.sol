@@ -12,6 +12,8 @@ import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
+
+import {CCVRamp} from "../libraries/CCVRamp.sol";
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -239,14 +241,14 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
         _ensureCCVQuorumIsReached(message.sourceChainSelector, receiverAddress, ccvs, requiredPoolCCVs);
 
-      for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
-          message: message,
-          messageHash: messageId,
-          ccvData: ccvData[ccvDataIndex[i]],
-          originalState: originalState
-        });
-      }
+      _verifyMessageAgainstCCVs({
+        ccvsToQuery: ccvsToQuery,
+        messageId: messageId,
+        message: message,
+        ccvData: ccvData,
+        ccvDataIndex: ccvDataIndex,
+        originalState: originalState
+      });
     }
 
     /////// Execution ///////
@@ -265,6 +267,34 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     emit ExecutionStateChanged(message.sourceChainSelector, message.sequenceNumber, messageId, newState, returnData);
     s_reentrancyGuardEntered = false;
+  }
+
+  /// @notice Verifies a message against all required CCVs.
+  /// @param ccvsToQuery The CCVs against which the message will be verified.
+  /// @param messageId The ID of the message.
+  /// @param message The message that will be verified.
+  /// @param ccvData The CCV-specific data used to verify the message.
+  /// @param ccvDataIndex The indices in ccvData at which the data for each CCV in ccvsToQuery can be found.
+  /// @param originalState The original state of the message prior to this execution attempt.
+  function _verifyMessageAgainstCCVs(
+    address[] memory ccvsToQuery,
+    bytes32 messageId,
+    MessageV1Codec.MessageV1 memory message,
+    bytes[] calldata ccvData,
+    uint256[] memory ccvDataIndex,
+    Internal.MessageExecutionState originalState
+  ) internal {
+    for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
+      ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
+        sourceChainSelector: message.sourceChainSelector,
+        version: CCVRamp.V1,
+        caller: address(this),
+        message: message,
+        messageHash: messageId,
+        ccvData: ccvData[ccvDataIndex[i]],
+        originalState: originalState
+      });
+    }
   }
 
   /// @notice Ensures that the provided CCVs meet the quorum required by the receiver, pool and lane.

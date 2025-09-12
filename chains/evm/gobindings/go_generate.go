@@ -1,6 +1,7 @@
 package ccip
 
 // Mod sec
+//go:generate go run generation/generate/wrap.go ccip CCVRampProxy ccv_ramp_proxy latest
 //go:generate go run generation/generate/wrap.go ccip CCVProxy ccv_proxy latest
 //go:generate go run generation/generate/wrap.go ccip CommitOnRamp commit_onramp latest
 //go:generate go run generation/generate/wrap.go ccip ExecutorOnRamp executor_onramp latest
