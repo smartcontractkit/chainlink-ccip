@@ -130,6 +130,8 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	var allChainConfigInfos []ChainConfigInfo
 	pageIndex := uint64(0)
 
+	r.lggr.Debugw("OGT fetchAndSetConfigs fetching chain configs", "page", pageIndex)
+
 	for {
 		var chainConfigInfos []ChainConfigInfo
 		err := r.homeChainReader.GetLatestValue(
@@ -142,6 +144,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 			},
 			&chainConfigInfos,
 		)
+		r.lggr.Debugw("OGT fetchAndSetConfigs finished fetching chain configs", "page", pageIndex, "numConfigs", len(chainConfigInfos), "err", err)
 		if err != nil {
 			return fmt.Errorf("get config index:%d pagesize:%d: %w", pageIndex, defaultConfigPageSize, err)
 		}
@@ -149,6 +152,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		validCfgInfos := getValidChainConfigInfos(r.lggr, chainConfigInfos)
 
 		if len(validCfgInfos) == 0 {
+			r.lggr.Warnw("OGT fetchAndSetConfigs no valid chain config infos found on page", "page", pageIndex)
 			continue
 		}
 		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
@@ -160,6 +164,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		pageIndex++
 	}
 
+	r.lggr.Debugw("OGT fetchAndSetConfigs setting state with fetched chain configs", "numConfigs", len(allChainConfigInfos))
 	r.setState(convertOnChainConfigToHomeChainConfig(r.lggr, allChainConfigInfos))
 
 	if len(allChainConfigInfos) == 0 {
@@ -172,6 +177,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 }
 
 func (r *homeChainPoller) setState(chainConfigs map[cciptypes.ChainSelector]ChainConfig) {
+	r.lggr.Debugw("OGT setState", "numConfigs", len(chainConfigs))
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	s := &r.state
@@ -179,6 +185,13 @@ func (r *homeChainPoller) setState(chainConfigs map[cciptypes.ChainSelector]Chai
 	s.nodeSupportedChains = createNodesSupportedChains(chainConfigs)
 	s.knownSourceChains = createKnownChains(chainConfigs)
 	s.fChain = createFChain(chainConfigs)
+
+	r.lggr.Debugw("OGT setState",
+		"chainConfigs", s.chainConfigs,
+		"nodeSupportedChains", s.nodeSupportedChains,
+		"knownSourceChains", s.knownSourceChains,
+		"fChain", s.fChain,
+	)
 }
 
 func (r *homeChainPoller) GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error) {
@@ -324,6 +337,7 @@ func convertOnChainConfigToHomeChainConfig(
 ) map[cciptypes.ChainSelector]ChainConfig {
 	chainConfigs := make(map[cciptypes.ChainSelector]ChainConfig)
 	for _, chainConfigInfo := range chainConfigInfos {
+		lggr.Debugw("OGT convertOnChainConfigToHomeChainConfig", "chainSelector", chainConfigInfo.ChainSelector, "fChain", chainConfigInfo.ChainConfig.FChain, "numReaders", len(chainConfigInfo.ChainConfig.Readers), "configSize", len(chainConfigInfo.ChainConfig.Config))
 		chainSelector := chainConfigInfo.ChainSelector
 		chainConfig := chainConfigInfo.ChainConfig
 		decoded, err := chainconfig.DecodeChainConfig(chainConfig.Config)
@@ -332,6 +346,7 @@ func convertOnChainConfigToHomeChainConfig(
 			continue
 		}
 
+		lggr.Debugw("OGT convertOnChainConfigToHomeChainConfig decoded config", "chainSelector", chainSelector, "decodedConfig", decoded)
 		chainConfigs[chainSelector] = ChainConfig{
 			FChain:         int(chainConfig.FChain),
 			SupportedNodes: mapset.NewSet(chainConfig.Readers...),
@@ -367,6 +382,7 @@ func getValidChainConfigInfos(lggr logger.Logger, chainConfigInfos []ChainConfig
 			lggr.Warnw("invalid chain config info", "err", err)
 			continue
 		}
+		lggr.Debugw("OGT appending valid chain config info", "chainSelector", chainConfigInfo.ChainSelector, "fChain", chainConfigInfo.ChainConfig.FChain, "numReaders", len(chainConfigInfo.ChainConfig.Readers), "configSize", len(chainConfigInfo.ChainConfig.Config))
 		validChainConfigInfos = append(validChainConfigInfos, chainConfigInfo)
 	}
 	return validChainConfigInfos
