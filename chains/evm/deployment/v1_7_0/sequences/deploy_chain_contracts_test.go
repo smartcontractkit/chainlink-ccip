@@ -117,7 +117,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
-			require.Len(t, report.Output.Addresses, 13, "Expected 13 addresses in output")
+			require.Len(t, report.Output.Addresses, 14, "Expected 14 addresses in output")
 			require.Len(t, report.Output.Writes, 4, "Expected 4 writes in output")
 			for _, write := range report.Output.Writes {
 				// Contracts are deployed & still owned by deployer, so all writes should be executed
@@ -230,7 +230,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 
 		for i, report := range allReports {
 			require.NotEmpty(t, report.Output.Addresses, "Expected addresses for chain %d", chainSelectors[i])
-			require.Len(t, report.Output.Addresses, 13)
+			require.Len(t, report.Output.Addresses, 14)
 		}
 	})
 
@@ -339,7 +339,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		for _, result := range results {
 			require.NoError(t, result.err, "Failed to execute sequence for chain %d", result.chainSelector)
 			require.NotEmpty(t, result.report.Output.Addresses, "Expected addresses for chain %d", result.chainSelector)
-			require.Len(t, result.report.Output.Addresses, 13)
+			require.Len(t, result.report.Output.Addresses, 14)
 		}
 	})
 }
