@@ -877,7 +877,7 @@ func computeConsensusObservation(
 
 	destFChain, ok := fChain[destChain]
 	if !ok {
-		return exectypes.Observation{}, fmt.Errorf("destination chain %d is not in FChain %v", destChain, fChain)
+		return exectypes.Observation{}, fmt.Errorf("OGT destination chain %d is not in FChain %v", destChain, fChain)
 	}
 
 	consensusObservation := exectypes.NewObservation(
@@ -889,7 +889,7 @@ func computeConsensusObservation(
 		computeMessageHashesConsensus(lggr, observations, fChain),
 	)
 
-	lggr.Debugw("computeConsensusObservation has finished computing the consensus observation",
+	lggr.Debugw("OGT computeConsensusObservation has finished computing the consensus observation",
 		"fChain", fChain,
 		"observations", observations,
 		"destChain", destChain,

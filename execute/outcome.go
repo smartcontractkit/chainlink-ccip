@@ -42,13 +42,16 @@ func (p *Plugin) Outcome(
 		"attributedObservations", aos,
 	)
 
+	lggr.Debugw("OGT Outcome", "attributedObservations_length", len(aos))
 	decodedAos, err := decodeAttributedObservations(aos, p.ocrTypeCodec)
+	lggr.Debugw("OGT Outcome", "decodedAos_length", len(decodedAos))
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode observations: %w", err)
 	}
 
 	// discovery processor disabled by setting it to nil.
 	if p.discovery != nil {
+		lggr.Debugw("OGT Outcome calling discovery processor", "contractsInitialized", p.contractsInitialized)
 		mapper := func(
 			ao plugincommon.AttributedObservation[exectypes.Observation],
 		) plugincommon.AttributedObservation[dt.Observation] {
@@ -64,6 +67,8 @@ func (p *Plugin) Outcome(
 		} else {
 			p.contractsInitialized = true
 		}
+	} else {
+		lggr.Debugw("OGT Outcome discovery processer is nil", "contractsInitialized", p.contractsInitialized)
 	}
 
 	observation, err := computeConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F)
