@@ -133,7 +133,7 @@ cd integration-tests  # This must be done — it's a separate Go module
 go test -v -timeout 5m -run "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest" ./...
 ```
 
-You can now make changes changes in your localhost and run tests on docker using:
+You can now make changes in your localhost and run tests on docker using:
 ```bash
 # copy the changes to docker (localhost)
 docker exec amd64-ubuntu rm -rf /app && docker cp ./chainlink amd64-ubuntu:/app
