@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/stretchr/testify/require"
@@ -44,11 +45,25 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 
 	homeChain := reader.NewMockHomeChain(t)
 	homeChain.EXPECT().GetFChain().Return(nil, fmt.Errorf("early return"))
+
+	configDigest := [32]byte{0xde, 0xad, 0xbe, 0xef}
+	onchainConfigDigest := [32]byte{0xde, 0xad, 0xbe, 0xef}
+
+	ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
+	ccipReaderMock.
+		EXPECT().
+		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeExecute).
+		Return(onchainConfigDigest, nil)
 	plugin := &Plugin{
 		lggr:                 mocks.NullLogger,
 		homeChain:            homeChain,
 		ocrTypeCodec:         ocrTypeCodec,
 		inflightMessageCache: cache.NewInflightMessageCache(10 * time.Minute),
+		ccipReader:           ccipReaderMock,
+		reportingCfg: ocr3types.ReportingPluginConfig{
+			OracleID:     commontypes.OracleID(1),
+			ConfigDigest: configDigest,
+		},
 	}
 
 	outcome := exectypes.Outcome{
@@ -101,6 +116,44 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 		_, err = plugin.Observation(context.Background(), outCtx, nil)
 		require.Error(t, err)
 
+		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("1")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("2")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("3")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("1")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("2")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("3")))
+	}
+
+	// offRamp and plugin config digests mismatch
+	{
+		// Clear cache for one chain to test re-adding to cache with new config digest
+		plugin.inflightMessageCache.Delete(1, getID("1"))
+		plugin.inflightMessageCache.Delete(1, getID("2"))
+		plugin.inflightMessageCache.Delete(1, getID("3"))
+		newConfigDigest := [32]byte{0xba, 0xad, 0xf0, 0x0d}
+		plugin.reportingCfg.ConfigDigest = newConfigDigest
+		outcome.State = exectypes.Filter
+		enc, err := ocrTypeCodec.EncodeOutcome(outcome)
+		require.NoError(t, err)
+
+		outCtx := ocr3types.OutcomeContext{PreviousOutcome: enc}
+		_, err = plugin.Observation(context.Background(), outCtx, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), errOffRampConfigMismatch.Error())
+		// Cache is not updated due to config digest mismatch
+		require.False(t, plugin.inflightMessageCache.IsInflight(1, getID("1")))
+		require.False(t, plugin.inflightMessageCache.IsInflight(1, getID("2")))
+		require.False(t, plugin.inflightMessageCache.IsInflight(1, getID("3")))
+		// Chain 2 remains in cache as it was already present
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("1")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("2")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("3")))
+
+		// now set the correct config digest
+		plugin.reportingCfg.ConfigDigest = onchainConfigDigest
+		// run the observation again, cache for chain 1 should be updated
+		_, err = plugin.Observation(context.Background(), outCtx, nil)
+		require.Error(t, err) // home reader error
 		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("1")))
 		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("2")))
 		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("3")))
