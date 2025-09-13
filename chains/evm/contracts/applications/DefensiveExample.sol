@@ -50,7 +50,7 @@ contract DefensiveExample is CCIPClientExample {
   /// @dev Extremely important to ensure only router calls this.
   function ccipReceive(
     Client.Any2EVMMessage calldata message
-  ) external override onlyRouter validChain(message.sourceChainSelector) {
+  ) external override onlyRouter validRemoteChain(message.sourceChainSelector) {
     try this.processMessage(message) {}
     catch (bytes memory err) {
       // Could set different error codes based on the caught error. Each could be handled differently.
@@ -71,7 +71,7 @@ contract DefensiveExample is CCIPClientExample {
   /// @dev It has to be external because of the try/catch.
   function processMessage(
     Client.Any2EVMMessage calldata message
-  ) external onlySelf validChain(message.sourceChainSelector) {
+  ) external onlySelf validRemoteChain(message.sourceChainSelector) {
     // Simulate a revert.
     if (s_simRevert) revert ErrorCase();
 

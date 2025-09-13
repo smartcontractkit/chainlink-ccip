@@ -24,10 +24,19 @@ import {IERC20} from
 // @dev The receiver's are encoded offchain and passed as direct arguments to permit supporting
 // new chain family receivers (e.g. a Solana encoded receiver address) without upgrading.
 contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
-  error InvalidChain(uint64 chainSelector);
+  error InvalidRemoteChain(uint64 remoteChainSelector);
 
   event MessageSent(bytes32 messageId);
   event MessageReceived(bytes32 messageId);
+
+  /// @notice Configuration for a remote chain.
+  /// @dev extraArgsBytes are added to a msg on source, CCV params are checked on dest.
+  struct RemoteChainConfig {
+    bytes extraArgsBytes;
+    address[] requiredCCVs;
+    address[] optionalCCVs;
+    uint8 optionalThreshold;
+  }
 
   // Current feeToken
   IERC20 public s_feeToken;
@@ -42,27 +51,44 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
   //    bytes memory encodedV2ExtraArgs = Client._argsToBytes(extraArgs);
   // and update storage with the new args.
   // If different options are required for different messages, for example different gas limits,
-  // one can simply key based on (chainSelector, messageType) instead of only chainSelector.
-  mapping(uint64 destChainSelector => bytes extraArgsBytes) public s_chains;
+  // one can simply key based on (remoteChainSelector, messageType) instead of only chainSelector.
+  mapping(uint64 remoteChainSelector => RemoteChainConfig remoteChainConfig) internal s_remoteChains;
 
   constructor(IRouterClient router, IERC20 feeToken) CCIPReceiver(address(router)) {
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), type(uint256).max);
   }
 
-  function enableChain(uint64 chainSelector, bytes memory extraArgs) external onlyOwner {
-    s_chains[chainSelector] = extraArgs;
+  function getRemoteChainConfig(
+    uint64 remoteChainSelector
+  ) external view returns (RemoteChainConfig memory) {
+    return s_remoteChains[remoteChainSelector];
   }
 
-  function disableChain(
-    uint64 chainSelector
+  function enableRemoteChain(
+    uint64 remoteChainSelector,
+    bytes memory extraArgs,
+    address[] memory requiredCCVs,
+    address[] memory optionalCCVs,
+    uint8 optionalThreshold
   ) external onlyOwner {
-    delete s_chains[chainSelector];
+    s_remoteChains[remoteChainSelector] = RemoteChainConfig({
+      extraArgsBytes: extraArgs,
+      requiredCCVs: requiredCCVs,
+      optionalCCVs: optionalCCVs,
+      optionalThreshold: optionalThreshold
+    });
+  }
+
+  function disableRemoteChain(
+    uint64 remoteChainSelector
+  ) external onlyOwner {
+    delete s_remoteChains[remoteChainSelector];
   }
 
   function ccipReceive(
     Client.Any2EVMMessage calldata message
-  ) external virtual override onlyRouter validChain(message.sourceChainSelector) {
+  ) external virtual override onlyRouter validRemoteChain(message.sourceChainSelector) {
     // Extremely important to ensure only router calls this.
     // Tokens in message if any will be transferred to this contract.
     // TODO: Validate sender/origin chain and process message and/or tokens.
@@ -80,13 +106,13 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
     uint64 destChainSelector,
     bytes memory receiver,
     bytes memory data
-  ) external validChain(destChainSelector) {
+  ) external validRemoteChain(destChainSelector) {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainSelector],
+      extraArgs: s_remoteChains[destChainSelector].extraArgsBytes,
       feeToken: address(0) // We leave the feeToken empty indicating we'll pay raw native.
     });
     bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
@@ -100,13 +126,13 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
     uint64 destChainSelector,
     bytes memory receiver,
     bytes memory data
-  ) external validChain(destChainSelector) {
+  ) external validRemoteChain(destChainSelector) {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainSelector],
+      extraArgs: s_remoteChains[destChainSelector].extraArgsBytes,
       feeToken: address(s_feeToken)
     });
     // Optional uint256 fee = i_ccipRouter.getFee(destChainSelector, message);
@@ -122,7 +148,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
     bytes memory receiver,
     bytes memory data,
     Client.EVMTokenAmount[] memory tokenAmounts
-  ) external validChain(destChainSelector) {
+  ) external validRemoteChain(destChainSelector) {
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
       IERC20(tokenAmounts[i].token).approve(i_ccipRouter, tokenAmounts[i].amount);
@@ -131,7 +157,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainSelector],
+      extraArgs: s_remoteChains[destChainSelector].extraArgsBytes,
       feeToken: address(s_feeToken)
     });
     // Optional uint256 fee = i_ccipRouter.getFee(destChainSelector, message);
@@ -147,7 +173,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
     uint64 destChainSelector,
     bytes memory receiver,
     Client.EVMTokenAmount[] memory tokenAmounts
-  ) external validChain(destChainSelector) {
+  ) external validRemoteChain(destChainSelector) {
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
       IERC20(tokenAmounts[i].token).approve(i_ccipRouter, tokenAmounts[i].amount);
@@ -157,7 +183,7 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainSelector],
+      extraArgs: s_remoteChains[destChainSelector].extraArgsBytes,
       feeToken: address(s_feeToken)
     });
     // Optional uint256 fee = i_ccipRouter.getFee(destChainSelector, message);
@@ -167,10 +193,23 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
     emit MessageSent(messageId);
   }
 
-  modifier validChain(
-    uint64 chainSelector
+  /// @notice Return the CCVs required/optional for a source chain.
+  function getCCVs(
+    uint64 sourceChainSelector
+  )
+    external
+    view
+    override
+    returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold)
+  {
+    RemoteChainConfig memory config = s_remoteChains[sourceChainSelector];
+    return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold);
+  }
+
+  modifier validRemoteChain(
+    uint64 remoteChainSelector
   ) {
-    if (s_chains[chainSelector].length == 0) revert InvalidChain(chainSelector);
+    if (s_remoteChains[remoteChainSelector].extraArgsBytes.length == 0) revert InvalidRemoteChain(remoteChainSelector);
     _;
   }
 }
