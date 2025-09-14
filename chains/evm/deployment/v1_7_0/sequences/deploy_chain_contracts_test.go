@@ -8,7 +8,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	sequence_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
@@ -31,12 +30,6 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 		{
 			desc: "partial deployment",
 			existingAddresses: []datastore.AddressRef{
-				{
-					ChainSelector: 5009297550715157269,
-					Type:          datastore.ContractType(link.ContractType),
-					Version:       semver.MustParse("1.0.0"),
-					Address:       common.HexToAddress("0x01").Hex(),
-				},
 				{
 					ChainSelector: 5009297550715157269,
 					Type:          datastore.ContractType(weth.ContractType),

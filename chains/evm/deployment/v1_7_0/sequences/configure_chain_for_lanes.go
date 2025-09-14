@@ -1,9 +1,12 @@
 package sequences
 
 import (
+	"bytes"
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
@@ -11,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/defensive_example_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -61,6 +65,10 @@ type ConfigureChainForLanesInput struct {
 	CCVProxy common.Address
 	// The CommitOnRamp on the EVM chain being configured
 	CommitOnRamp common.Address
+	// The CommitOffRamp on the EVM chain being configured
+	CommitOffRamp common.Address
+	// The DefensiveExampleReceiver on the EVM chain being configured
+	DefensiveExampleReceiver common.Address
 	// The FeeQuoter on the EVM chain being configured
 	FeeQuoter common.Address
 	// The CCVAggregator on the EVM chain being configured
@@ -85,7 +93,13 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
 		destChainSelectorsPerExecutor := make(map[common.Address][]uint64)
+		remoteChainConfigsForReceiver := make(map[uint64]defensive_example_receiver.RemoteChainConfig, len(input.RemoteChains))
 		for remoteSelector, remoteConfig := range input.RemoteChains {
+			extraArgs, err := newGenericExtraArgsV2(big.NewInt(500_000), true)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to encode GenericExtraArgsV2 for remote chain %d: %w", remoteSelector, err)
+			}
+
 			ccvAggregatorArgs = append(ccvAggregatorArgs, ccv_aggregator.SourceChainConfigArgs{
 				Router:              input.Router,
 				SourceChainSelector: remoteSelector,
@@ -127,6 +141,26 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] = []uint64{}
 			}
 			destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] = append(destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor], remoteSelector)
+			remoteChainConfigsForReceiver[remoteSelector] = defensive_example_receiver.RemoteChainConfig{
+				RemoteChainSelector: remoteSelector,
+				ExtraArgs:           extraArgs,
+				RequiredCCVs:        []common.Address{input.CommitOffRamp},
+				OptionalCCVs:        []common.Address{},
+				OptionalThreshold:   0,
+			}
+		}
+
+		// EnableRemoteChain on DefensiveExampleReceiver
+		for remoteChainSel := range input.RemoteChains {
+			receiverReport, err := cldf_ops.ExecuteOperation(b, defensive_example_receiver.EnableRemoteChain, chain, contract.FunctionInput[defensive_example_receiver.RemoteChainConfig]{
+				Address:       input.DefensiveExampleReceiver,
+				ChainSelector: chain.Selector,
+				Args:          remoteChainConfigsForReceiver[remoteChainSel],
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to enable remote chain %d on DefensiveExampleReceiver(%s) on chain %s: %w", remoteChainSel, input.CommitOffRamp, chain, err)
+			}
+			writes = append(writes, receiverReport.Output)
 		}
 
 		// ApplySourceChainConfigUpdates on CCVAggregator
@@ -219,3 +253,144 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+// newGenericExtraArgsV2 encodes the GenericExtraArgsV2 struct according to the ABI
+func newGenericExtraArgsV2(gasLimit *big.Int, allowOutOfOrderExecution bool) ([]byte, error) {
+	clientABI := `
+			[
+				{
+					"name": "encodeGenericExtraArgsV2",
+					"type": "function",
+					"inputs": [
+						{
+							"components": [
+								{
+									"name": "gasLimit",
+									"type": "uint256"
+								},
+								{
+									"name": "allowOutOfOrderExecution",
+									"type": "bool"
+								}
+							],
+							"name": "args",
+							"type": "tuple"
+						}
+					],
+					"outputs": [],
+					"stateMutability": "pure"
+				}
+			]
+			`
+
+	parsedABI, err := abi.JSON(bytes.NewReader([]byte(clientABI)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+
+	genericExtraArgsV2 := struct {
+		GasLimit                 *big.Int
+		AllowOutOfOrderExecution bool
+	}{
+		GasLimit:                 gasLimit,
+		AllowOutOfOrderExecution: allowOutOfOrderExecution,
+	}
+	encoded, err := parsedABI.Methods["encodeGenericExtraArgsV2"].Inputs.Pack(genericExtraArgsV2)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ABI encode GenericExtraArgsV2: %w", err)
+	}
+
+	tag := []byte{0x18, 0x1d, 0xcf, 0x10} // GENERIC_EXTRA_ARGS_V2_TAG
+	return append(tag, encoded...), nil
+}
+
+/*
+// newEVMExtraArgsV3 encodes the EVMExtraArgsV3 struct according to the ABI
+// TODO: Use later once FeeQuoter supports it
+func newEVMExtraArgsV3(requiredCCVs, optionalCCVs []common.Address, optionalThreshold uint8, finalityConfig uint32, executor common.Address, executorArgs, tokenArgs []byte) ([]byte, error) {
+	clientABI := `
+			[
+				{
+					"name": "encodeEVMExtraArgsV3",
+					"type": "function",
+					"inputs": [
+						{
+							"components": [
+								{
+									"internalType": "address[]",
+									"name": "requiredCCV",
+									"type": "address[]"
+								},
+								{
+									"internalType": "address[]",
+									"name": "optionalCCV",
+									"type": "address[]"
+								},
+								{
+									"internalType": "uint8",
+									"name": "optionalThreshold",
+									"type": "uint8"
+								},
+								{
+									"internalType": "uint32",
+									"name": "finalityConfig",
+									"type": "uint32"
+								},
+								{
+									"internalType": "address",
+									"name": "executor",
+									"type": "address"
+								},
+								{
+									"internalType": "bytes",
+									"name": "executorArgs",
+									"type": "bytes"
+								},
+								{
+									"internalType": "bytes",
+									"name": "tokenArgs",
+									"type": "bytes"
+								}
+							],
+							"internalType": "struct EVMExtraArgsV3",
+							"name": "args",
+							"type": "tuple"
+						}
+					],
+					"outputs": [],
+					"stateMutability": "pure"
+				}
+			]
+			`
+
+	parsedABI, err := abi.JSON(bytes.NewReader([]byte(clientABI)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+
+	evmExtraArgsV3 := struct {
+		RequiredCCV       []common.Address
+		OptionalCCV       []common.Address
+		OptionalThreshold uint8
+		FinalityConfig    uint32
+		Executor          common.Address
+		ExecutorArgs      []byte
+		TokenArgs         []byte
+	}{
+		RequiredCCV:       requiredCCVs,
+		OptionalCCV:       optionalCCVs,
+		OptionalThreshold: optionalThreshold,
+		FinalityConfig:    finalityConfig,
+		Executor:          executor,
+		ExecutorArgs:      executorArgs,
+		TokenArgs:         tokenArgs,
+	}
+	encoded, err := parsedABI.Methods["encodeEVMExtraArgsV3"].Inputs.Pack(evmExtraArgsV3)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ABI encode EVMExtraArgsV3: %w", err)
+	}
+
+	tag := []byte{0x30, 0x23, 0x26, 0xcb} // GENERIC_EXTRA_ARGS_V3_TAG
+	return append(tag, encoded...), nil
+}
+*/
