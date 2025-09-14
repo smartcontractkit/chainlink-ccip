@@ -7,7 +7,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
@@ -101,12 +100,6 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 				ds := datastore.NewMemoryDataStore()
 				_ = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: 5009297550715157269,
-					Type:          datastore.ContractType(link.ContractType),
-					Version:       semver.MustParse("1.0.0"),
-					Address:       common.HexToAddress("0x01").Hex(),
-				})
-				_ = ds.Addresses().Add(datastore.AddressRef{
-					ChainSelector: 5009297550715157269,
 					Type:          datastore.ContractType(weth.ContractType),
 					Version:       semver.MustParse("1.0.0"),
 					Address:       common.HexToAddress("0x02").Hex(),
@@ -194,7 +187,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 			newAddrs, err := out.DataStore.Addresses().Fetch()
 			require.NoError(t, err, "Failed to fetch addresses from datastore")
-			require.Len(t, newAddrs, 13)
+			require.Len(t, newAddrs, 14)
 
 			for _, addr := range existingAddrs {
 				for _, newAddr := range newAddrs {

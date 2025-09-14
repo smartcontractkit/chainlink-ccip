@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/defensive_example_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -83,7 +84,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	semver.MustParse("1.7.0"),
 	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
 	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
-		addresses := make([]datastore.AddressRef, 0, 13) // 13 = number of maybeDeployContract calls
+		addresses := make([]datastore.AddressRef, 0, 14) // 14 = number of maybeDeployContract calls
 		writes := make([]contract.WriteOutput, 0, 4)     // 4 = number of ExecuteOperation calls
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
@@ -159,6 +160,19 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, routerRef)
+
+		// Deploy DefensiveExampleReceiver
+		defensiveExampleReceiverRef, err := maybeDeployContract(b, defensive_example_receiver.Deploy, defensive_example_receiver.ContractType, chain, contract.DeployInput[defensive_example_receiver.ConstructorArgs]{
+			ChainSelector: chain.Selector,
+			Args: defensive_example_receiver.ConstructorArgs{
+				Router:   common.HexToAddress(routerRef.Address),
+				FeeToken: common.HexToAddress(linkRef.Address),
+			},
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		addresses = append(addresses, defensiveExampleReceiverRef)
 
 		// Deploy TokenAdminRegistry
 		tokenAdminRegistryRef, err := maybeDeployContract(b, token_admin_registry.Deploy, token_admin_registry.ContractType, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{

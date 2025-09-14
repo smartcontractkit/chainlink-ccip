@@ -1,12 +1,10 @@
 package sequences_test
 
 import (
-	"bytes"
 	"context"
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -14,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/defensive_example_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
@@ -113,6 +112,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			var ccvAggregator common.Address
 			var commitOffRamp common.Address
 			var executorOnRamp common.Address
+			var defensiveExampleReceiver common.Address
 			for _, addr := range deploymentReport.Output.Addresses {
 				switch addr.Type {
 				case datastore.ContractType(router.ContractType):
@@ -129,6 +129,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 					commitOffRamp = common.HexToAddress(addr.Address)
 				case datastore.ContractType(executor_onramp.ContractType):
 					executorOnRamp = common.HexToAddress(addr.Address)
+				case datastore.ContractType(defensive_example_receiver.ContractType):
+					defensiveExampleReceiver = common.HexToAddress(addr.Address)
 				}
 			}
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
@@ -158,12 +160,14 @@ func TestConfigureChainForLanes(t *testing.T) {
 				sequences.ConfigureChainForLanes,
 				evmChain,
 				sequences.ConfigureChainForLanesInput{
-					ChainSelector: chainSelector,
-					Router:        r,
-					CCVProxy:      ccvProxy,
-					CommitOnRamp:  commitOnRamp,
-					FeeQuoter:     feeQuoter,
-					CCVAggregator: ccvAggregator,
+					ChainSelector:            chainSelector,
+					Router:                   r,
+					CCVProxy:                 ccvProxy,
+					CommitOnRamp:             commitOnRamp,
+					CommitOffRamp:            commitOffRamp,
+					DefensiveExampleReceiver: defensiveExampleReceiver,
+					FeeQuoter:                feeQuoter,
+					CCVAggregator:            ccvAggregator,
 					RemoteChains: map[uint64]sequences.RemoteChainConfig{
 						remoteChainSelector: {
 							AllowTrafficFrom:            true,
@@ -248,70 +252,22 @@ func TestConfigureChainForLanes(t *testing.T) {
 			// Try sending CCIP message /////////////
 			/////////////////////////////////////////
 
-			const clientABI = `
-			[
-				{
-					"name": "encodeGenericExtraArgsV2",
-					"type": "function",
-					"inputs": [
-						{
-							"components": [
-								{
-									"name": "gasLimit",
-									"type": "uint256"
-								},
-								{
-									"name": "allowOutOfOrderExecution",
-									"type": "bool"
-								}
-							],
-							"name": "args",
-							"type": "tuple"
-						}
-					],
-					"outputs": [],
-					"stateMutability": "pure"
-				}
-			]
-			`
-
-			parsedABI, err := abi.JSON(bytes.NewReader([]byte(clientABI)))
-			require.NoError(t, err, "Failed to parse ABI")
-
-			genericExtraArgsV2 := struct {
-				GasLimit                 *big.Int
-				AllowOutOfOrderExecution bool
-			}{
-				GasLimit:                 big.NewInt(1_000_000),
-				AllowOutOfOrderExecution: true,
-			}
-			encoded, err := parsedABI.Methods["encodeGenericExtraArgsV2"].Inputs.Pack(genericExtraArgsV2)
-			require.NoError(t, err, "Failed to ABI encode GenericExtraArgsV2")
-
-			tag := []byte{0x18, 0x1d, 0xcf, 0x10} // GENERIC_EXTRA_ARGS_V2_TAG
-			ccipSendArgs := router.CCIPSendArgs{
-				DestChainSelector: remoteChainSelector,
-				EVM2AnyMessage: router.EVM2AnyMessage{
-					Receiver:     common.LeftPadBytes(evmChain.DeployerKey.From.Bytes(), 32),
-					Data:         []byte{},
-					TokenAmounts: []router.EVMTokenAmount{},
-					ExtraArgs:    append(tag, encoded...),
-				},
-			}
-
-			fee, err := operations.ExecuteOperation(bundle, router.GetFee, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
+			_, err = operations.ExecuteOperation(bundle, defensive_example_receiver.ProvideNativeToken, evmChain, contract.FunctionInput[*big.Int]{
 				ChainSelector: evmChain.Selector,
-				Address:       r,
-				Args:          ccipSendArgs,
+				Address:       defensiveExampleReceiver,
+				Args:          big.NewInt(1e18), // 1 ETH
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 
-			// Send CCIP message with value
-			ccipSendArgs.Value = fee.Output
-			_, err = operations.ExecuteOperation(bundle, router.CCIPSend, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
+			_, err = operations.ExecuteOperation(bundle, defensive_example_receiver.SendData, evmChain, contract.FunctionInput[defensive_example_receiver.SendDataArgs]{
 				ChainSelector: evmChain.Selector,
-				Address:       r,
-				Args:          ccipSendArgs,
+				Address:       defensiveExampleReceiver,
+				Args: defensive_example_receiver.SendDataArgs{
+					Method:            defensive_example_receiver.NativeToken,
+					DestChainSelector: remoteChainSelector,
+					Receiver:          common.LeftPadBytes(evmChain.DeployerKey.From.Bytes(), 32),
+					Data:              []byte("Hello World!"),
+				},
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 		})
