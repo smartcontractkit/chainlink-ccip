@@ -3,43 +3,39 @@ pragma solidity ^0.8.24;
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-
 /// @notice CCVRampProxy enables upgrades to CCVOnRamps and CCVOffRamps without breaking existing references in token pools, receivers, and apps.
 /// @dev All future versions of ICCVOnRamp and ICCVOffRamp must maintain remoteChainSelector, version, and caller as the first three parameters in every method.
-contract CCVRampProxy is Ownable2StepMsgSender, ITypeAndVersion {
+abstract contract CCVRampProxy is ITypeAndVersion {
   error InvalidRemoteChainSelector(uint64 remoteChainSelector);
-  error InvalidRampAddress(address rampAddress);
   error InvalidVersion(bytes32 version);
-  error UnknownRamp(uint64 remoteChainSelector, bytes32 version);
+  error RampNotFound(uint64 remoteChainSelector, bytes32 version);
 
   event RampSet(uint64 indexed remoteChainSelector, bytes32 indexed version, address indexed rampAddress);
 
   struct SetRampsArgs {
-    uint64 remoteChainSelector;
-    address addr;
-    bytes32 version;
+    uint64 remoteChainSelector; // ─╮ The remote chain selector.
+    address rampAddress; // ────────╯ The address of the ramp contract.
+    bytes32 version; // The version of the ramp.
   }
 
   string public constant override typeAndVersion = "CCVRampProxy 1.7.0-dev";
 
   /// @notice The supported ramps.
   /// @dev Each remote chain selector can have multiple ramps, each with a different version. This protects in-flight messages during upgrades.
-  mapping(uint64 => mapping(bytes32 => address)) private s_ramps;
+  mapping(uint64 remoteChainSelector => mapping(bytes32 version => address rampAddress)) private s_ramps;
 
   /// @notice Sets the ramp address for a given remote chain selector and version.
   /// @dev Can be used to remove a ramp by setting the address to 0.
   /// @param ramps The array of ramps to set.
-  function setRamps(
+  function _setRamps(
     SetRampsArgs[] calldata ramps
-  ) external onlyOwner {
+  ) internal {
     for (uint256 i = 0; i < ramps.length; ++i) {
       SetRampsArgs memory ramp = ramps[i];
       if (ramp.remoteChainSelector == 0) revert InvalidRemoteChainSelector(ramp.remoteChainSelector);
       if (ramp.version == bytes32(0)) revert InvalidVersion(ramp.version);
-      if (ramp.addr == address(0)) revert InvalidRampAddress(ramp.addr);
-      s_ramps[ramp.remoteChainSelector][ramp.version] = ramp.addr;
-      emit RampSet(ramp.remoteChainSelector, ramp.version, ramp.addr);
+      s_ramps[ramp.remoteChainSelector][ramp.version] = ramp.rampAddress;
+      emit RampSet(ramp.remoteChainSelector, ramp.version, ramp.rampAddress);
     }
   }
 
@@ -63,7 +59,7 @@ contract CCVRampProxy is Ownable2StepMsgSender, ITypeAndVersion {
     }
 
     address rampAddress = s_ramps[remoteChainSelector][version];
-    if (rampAddress == address(0)) revert UnknownRamp(remoteChainSelector, version);
+    if (rampAddress == address(0)) revert RampNotFound(remoteChainSelector, version);
 
     assembly {
       // We never cede control back to Solidity, so we can overwrite memory starting from index 0.

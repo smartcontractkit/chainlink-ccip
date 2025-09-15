@@ -123,12 +123,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			commitOnRampProxyArgs = append(commitOnRampProxyArgs, ccv_ramp_proxy.SetRampArgs{
 				RemoteChainSelector: remoteSelector,
 				Version:             ccv_ramp_proxy.V1Ramp,
-				Addr:                input.CommitOnRamp,
+				RampAddress:         input.CommitOnRamp,
 			})
 			commitOffRampProxyArgs = append(commitOffRampProxyArgs, ccv_ramp_proxy.SetRampArgs{
 				RemoteChainSelector: remoteSelector,
 				Version:             ccv_ramp_proxy.V1Ramp,
-				Addr:                input.CommitOffRamp,
+				RampAddress:         input.CommitOffRamp,
 			})
 			feeQuoterArgs = append(feeQuoterArgs, fee_quoter_v2.DestChainConfigArgs{
 				DestChainSelector: remoteSelector,

@@ -6,14 +6,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/ccv_ramp_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/ownable_ccv_ramp_proxy"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 )
 
 var ContractType cldf_deployment.ContractType = "CCVRampProxy"
 
-type SetRampArgs = ccv_ramp_proxy.CCVRampProxySetRampsArgs
+type SetRampArgs = ownable_ccv_ramp_proxy.CCVRampProxySetRampsArgs
 
 type GetRampArgs struct {
 	RemoteChainSelector uint64
@@ -27,11 +27,11 @@ var SetRamp = contract.NewWrite(
 	semver.MustParse("1.7.0"),
 	"Sets multiple ramp addresses on the CCVRampProxy, each tied to a remote chain selector and CCVRamp version",
 	ContractType,
-	ccv_ramp_proxy.CCVRampProxyABI,
-	ccv_ramp_proxy.NewCCVRampProxy,
+	ownable_ccv_ramp_proxy.OwnableCCVRampProxyABI,
+	ownable_ccv_ramp_proxy.NewOwnableCCVRampProxy,
 	contract.OnlyOwner,
 	func([]SetRampArgs) error { return nil },
-	func(ccvRampProxy *ccv_ramp_proxy.CCVRampProxy, opts *bind.TransactOpts, args []SetRampArgs) (*types.Transaction, error) {
+	func(ccvRampProxy *ownable_ccv_ramp_proxy.OwnableCCVRampProxy, opts *bind.TransactOpts, args []SetRampArgs) (*types.Transaction, error) {
 		return ccvRampProxy.SetRamps(opts, args)
 	},
 )
@@ -41,8 +41,8 @@ var GetRamp = contract.NewRead(
 	semver.MustParse("1.7.0"),
 	"Gets the ramp address for a given remote chain selector and CCVRamp version",
 	ContractType,
-	ccv_ramp_proxy.NewCCVRampProxy,
-	func(ccvRampProxy *ccv_ramp_proxy.CCVRampProxy, opts *bind.CallOpts, args GetRampArgs) (common.Address, error) {
+	ownable_ccv_ramp_proxy.NewOwnableCCVRampProxy,
+	func(ccvRampProxy *ownable_ccv_ramp_proxy.OwnableCCVRampProxy, opts *bind.CallOpts, args GetRampArgs) (common.Address, error) {
 		return ccvRampProxy.GetRamp(opts, args.RemoteChainSelector, args.Version)
 	},
 )
