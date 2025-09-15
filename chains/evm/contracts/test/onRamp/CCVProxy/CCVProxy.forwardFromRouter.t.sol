@@ -20,7 +20,8 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
       bytes32 messageId,
       bytes memory encodedMessage,
       Internal.Receipt[] memory verifierReceipts,
-      Internal.Receipt memory executorReceipt
+      Internal.Receipt memory executorReceipt,
+      bytes[] memory receiptBlobs
     ) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -36,7 +37,8 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
       messageId: messageId,
       encodedMessage: encodedMessage,
       verifierReceipts: verifierReceipts,
-      executorReceipt: executorReceipt
+      executorReceipt: executorReceipt,
+      receiptBlobs: receiptBlobs
     });
 
     s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
@@ -50,10 +52,11 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
     destConfig.sequenceNumber++;
     // 1) Expect seq to increment for the first message.
     (
-      bytes32 messageId1Expected,
-      bytes memory encodedMessage1,
-      Internal.Receipt[] memory verifierReceipts1,
-      Internal.Receipt memory executorReceipt1
+      bytes32 messageIdExpected,
+      bytes memory encodedMessage,
+      Internal.Receipt[] memory verifierReceipts,
+      Internal.Receipt memory executorReceipt,
+      bytes[] memory receiptBlobs
     ) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -66,21 +69,17 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
     emit CCVProxy.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: destConfig.sequenceNumber,
-      messageId: messageId1Expected,
-      encodedMessage: encodedMessage1,
-      verifierReceipts: verifierReceipts1,
-      executorReceipt: executorReceipt1
+      messageId: messageIdExpected,
+      encodedMessage: encodedMessage,
+      verifierReceipts: verifierReceipts,
+      executorReceipt: executorReceipt,
+      receiptBlobs: receiptBlobs
     });
     bytes32 messageId1 = s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
     // 2) Expect seq to increment again for the next message.
     destConfig.sequenceNumber++;
-    (
-      bytes32 messageId2Expected,
-      bytes memory encodedMessage2,
-      Internal.Receipt[] memory verifierReceipts2,
-      Internal.Receipt memory executorReceipt2
-    ) = _evmMessageToEvent({
+    (messageIdExpected, encodedMessage, verifierReceipts, executorReceipt, receiptBlobs) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
       seqNum: destConfig.sequenceNumber,
@@ -92,10 +91,11 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
     emit CCVProxy.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: destConfig.sequenceNumber,
-      messageId: messageId2Expected,
-      encodedMessage: encodedMessage2,
-      verifierReceipts: verifierReceipts2,
-      executorReceipt: executorReceipt2
+      messageId: messageIdExpected,
+      encodedMessage: encodedMessage,
+      verifierReceipts: verifierReceipts,
+      executorReceipt: executorReceipt,
+      receiptBlobs: receiptBlobs
     });
     bytes32 messageId2 = s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 

@@ -54,7 +54,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     address[] defaultCCVs,
     address[] laneMandatedCCVs,
     address defaultExecutor,
-    bytes offRamp
+    bytes ccvAggregator
   );
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
@@ -64,7 +64,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     bytes32 indexed messageId,
     bytes encodedMessage,
     Internal.Receipt[] verifierReceipts,
-    Internal.Receipt executorReceipt
+    Internal.Receipt executorReceipt,
+    bytes[] receiptBlobs
   );
 
   /// @dev Struct that contains the static configuration.
@@ -93,7 +94,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     address defaultExecutor; // Default executor to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
-    bytes offRamp; // Destination OffRamp address as raw bytes.
+    bytes ccvAggregator; // Destination ccvAggregator address, NOT abi encoded but raw bytes.
   }
 
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these can be passed in the
@@ -105,7 +106,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address defaultExecutor;
-    bytes offRamp; // Destination OffRamp address as raw bytes.
+    bytes ccvAggregator; // Destination ccvAggregator address, NOT abi encoded but raw bytes.
   }
 
   // STATIC CONFIG
@@ -171,8 +172,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause, which should stop all messages.
     if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
-
-    // 1. parse extraArgs
+    // 1. parse extraArgs.
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
     // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
     bytes memory tokenReceiver =
@@ -181,7 +181,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       tokenReceiver = abi.encode(message.receiver);
     }
 
-    // 2. get pool params, this potentially mutates CCV list
+    // 2. get pool params, this potentially mutates CCV list.
     // TODO pool call to get CCVs from IPoolV2 getRequiredCCVs
 
     (resolvedExtraArgs.requiredCCV, resolvedExtraArgs.optionalCCV, resolvedExtraArgs.optionalThreshold) =
@@ -193,91 +193,95 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       resolvedExtraArgs.optionalThreshold
     );
 
-    MessageV1Codec.TokenTransferV1[] memory tokenTransfers =
-      new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length);
-
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
       sequenceNumber: ++destChainConfig.sequenceNumber,
       onRampAddress: abi.encodePacked(address(this)),
-      offRampAddress: destChainConfig.offRamp,
+      offRampAddress: destChainConfig.ccvAggregator,
       finality: resolvedExtraArgs.finalityConfig,
       sender: abi.encodePacked(originalSender),
-      // Since EVM2AnyMessage sends abi.encoded for EVM, we handle that by slicing the receiver address.
+      // The user encodes the receiver with abi.encode when creating EVM2AnyMessage
+      // whereas MessageV1 expects just the raw bytes, so we strip the first 12 bytes.
       // TODO handle non-EVM chain families, maybe through fee quoter
-      receiver: message.receiver[12:32],
+      receiver: message.receiver[12:],
       destBlob: "", // TODO for SVM
-      tokenTransfer: tokenTransfers, //  values are populated with _lockOrBurnSingleToken
+      tokenTransfer: new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length), //  values are populated with _lockOrBurnSingleToken.
       data: message.data
     });
 
-    bytes32 messageId;
-    {
-      // 3. Build verifier/executor receipts
-      Internal.Receipt[] memory verifierReceipts =
-        new Internal.Receipt[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
-      for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
-        Client.CCV memory verifier = resolvedExtraArgs.requiredCCV[i];
-        verifierReceipts[i] = Internal.Receipt({
-          issuer: verifier.ccvAddress,
-          destGasLimit: 0, // TODO
-          destBytesOverhead: 0, // TODO
-          feeTokenAmount: 0, // TODO
-          extraArgs: verifier.args
-        });
-      }
-      for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
-        Client.CCV memory verifier = resolvedExtraArgs.optionalCCV[i];
-        verifierReceipts[resolvedExtraArgs.requiredCCV.length + i] = Internal.Receipt({
-          issuer: verifier.ccvAddress,
-          destGasLimit: 0, // TODO
-          destBytesOverhead: 0, // TODO
-          feeTokenAmount: 0, // TODO
-          extraArgs: verifier.args
-        });
-      }
-      Internal.Receipt memory executorReceipt = Internal.Receipt({
-        issuer: resolvedExtraArgs.executor,
+    // 3. getFee on all verifiers & executor.
+    Internal.Receipt[] memory verifierReceipts =
+      new Internal.Receipt[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
+    for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
+      Client.CCV memory verifier = resolvedExtraArgs.requiredCCV[i];
+      verifierReceipts[i] = Internal.Receipt({
+        issuer: verifier.ccvAddress,
         destGasLimit: 0, // TODO
         destBytesOverhead: 0, // TODO
         feeTokenAmount: 0, // TODO
-        extraArgs: resolvedExtraArgs.executorArgs
+        extraArgs: verifier.args
       });
+    }
+    for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
+      Client.CCV memory verifier = resolvedExtraArgs.optionalCCV[i];
+      verifierReceipts[resolvedExtraArgs.requiredCCV.length + i] = Internal.Receipt({
+        issuer: verifier.ccvAddress,
+        destGasLimit: 0, // TODO
+        destBytesOverhead: 0, // TODO
+        feeTokenAmount: 0, // TODO
+        extraArgs: verifier.args
+      });
+    }
+    Internal.Receipt memory executorReceipt = Internal.Receipt({
+      issuer: resolvedExtraArgs.executor,
+      destGasLimit: 0, // TODO
+      destBytesOverhead: 0, // TODO
+      feeTokenAmount: 0, // TODO
+      extraArgs: resolvedExtraArgs.executorArgs
+    });
 
-      // TODO: Handle the fee returned
-      // Currently only used for validations
-      _getExecutorFee(resolvedExtraArgs, message, destChainSelector);
-
-      // 4. lockOrBurn
-      if (message.tokenAmounts.length != 0) {
-        if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
-        newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
-          message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
-        );
-      }
-
-      // 5. encode message and calculate messageId
-      bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
-      messageId = keccak256(encodedMessage);
-
-      // 6. emit event
-      emit CCIPMessageSent(
-        destChainSelector, newMessage.sequenceNumber, messageId, encodedMessage, verifierReceipts, executorReceipt
+    // TODO: Handle the fee returned
+    // Currently only used for validations.
+    _getExecutorFee(resolvedExtraArgs, message, destChainSelector);
+    // 4. lockOrBurn
+    if (message.tokenAmounts.length != 0) {
+      if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
+      newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
+        message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
       );
     }
-
-    // 7. call each verifier
+    // created fresh locals like near the callsite to fix stack too deep.
+    address feeToken = message.feeToken;
+    uint256 feeTokenAmount = feeTokenAmount;
+    uint64 destChainSelector = destChainSelector;
+    // 5. encode message and calculate messageId.
+    bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
+    bytes32 messageId = keccak256(encodedMessage);
+    bytes[] memory receiptBlobs =
+      new bytes[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
+    // 6. call each verifier.
     for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
-      ICCVOnRampV1(ccv.ccvAddress).forwardToVerifier(newMessage, messageId, message.feeToken, feeTokenAmount, ccv.args);
+      receiptBlobs[i] =
+        ICCVOnRampV1(ccv.ccvAddress).forwardToVerifier(newMessage, messageId, feeToken, feeTokenAmount, ccv.args);
     }
     for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
       Client.CCV memory ccvOpt = resolvedExtraArgs.optionalCCV[i];
-      ICCVOnRampV1(ccvOpt.ccvAddress).forwardToVerifier(
-        newMessage, messageId, message.feeToken, feeTokenAmount, ccvOpt.args
-      );
+      receiptBlobs[resolvedExtraArgs.requiredCCV.length + i] =
+        ICCVOnRampV1(ccvOpt.ccvAddress).forwardToVerifier(newMessage, messageId, feeToken, feeTokenAmount, ccvOpt.args);
     }
+
+    // 7. emit event
+    emit CCIPMessageSent(
+      destChainSelector,
+      newMessage.sequenceNumber,
+      messageId,
+      encodedMessage,
+      verifierReceipts,
+      executorReceipt,
+      receiptBlobs
+    );
 
     s_dynamicConfig.reentrancyGuardEntered = false;
 
@@ -531,7 +535,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       // executor. A zero executor would break backward compatibility and cause otherwise-valid traffic to revert.
       if (destChainConfigArg.defaultExecutor == address(0)) revert InvalidConfig();
       destChainConfig.defaultExecutor = destChainConfigArg.defaultExecutor;
-      destChainConfig.offRamp = destChainConfigArg.offRamp;
+      destChainConfig.ccvAggregator = destChainConfigArg.ccvAggregator;
 
       emit DestChainConfigSet(
         destChainSelector,
@@ -540,7 +544,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         destChainConfigArg.defaultCCVs,
         destChainConfigArg.laneMandatedCCVs,
         destChainConfigArg.defaultExecutor,
-        destChainConfigArg.offRamp
+        destChainConfigArg.ccvAggregator
       );
     }
   }
@@ -605,16 +609,15 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       })
     );
 
-    // Build MessageV1 token transfer
-    MessageV1Codec.TokenTransferV1 memory tokenTransferV1;
-    tokenTransferV1.amount = tokenAndAmount.amount;
-    tokenTransferV1.sourcePoolAddress = abi.encodePacked(address(sourcePool));
-    tokenTransferV1.sourceTokenAddress = abi.encodePacked(tokenAndAmount.token);
-    // TODO handle bytes destTokenAddress for EVM since poolReturnData return abi.encoded for EVM
-    tokenTransferV1.destTokenAddress = poolReturnData.destTokenAddress;
-    tokenTransferV1.extraData = poolReturnData.destPoolData;
     // NOTE: pool data validations are outsourced to the FeeQuoter to handle family-specific logic handling.
-    return tokenTransferV1;
+    return MessageV1Codec.TokenTransferV1({
+      amount: tokenAndAmount.amount,
+      sourcePoolAddress: abi.encodePacked(address(sourcePool)),
+      sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
+      // TODO handle bytes destTokenAddress for EVM since poolReturnData return abi.encoded for EVM
+      destTokenAddress: poolReturnData.destTokenAddress,
+      extraData: poolReturnData.destPoolData
+    });
   }
 
   // ================================================================

@@ -42,7 +42,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
       defaultExecutor: address(new MockExecutor()),
-      offRamp: abi.encodePacked(address(s_ccvAggregatorRemote))
+      ccvAggregator: abi.encodePacked(address(s_ccvAggregatorRemote))
     });
 
     s_ccvProxy.applyDestChainConfigUpdates(destChainConfigArgs);
@@ -62,7 +62,8 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       bytes32 messageId,
       bytes memory encodedMessage,
       Internal.Receipt[] memory verifierReceipts,
-      Internal.Receipt memory executorReceipt
+      Internal.Receipt memory executorReceipt,
+      bytes[] memory receiptBlobs
     )
   {
     // TODO handle token transfers
@@ -99,12 +100,14 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       destBytesOverhead: 0,
       extraArgs: message.extraArgs
     });
-
+    receiptBlobs = new bytes[](1);
+    receiptBlobs[0] = "";
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
       MessageV1Codec._encodeMessageV1(messageV1),
       verifierReceipts,
-      executorReceipt
+      executorReceipt,
+      receiptBlobs
     );
   }
 

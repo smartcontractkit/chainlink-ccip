@@ -44,20 +44,18 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   /// @dev This function is called by the CCV proxy to delegate message verification to this specific verifier.
   /// It performs critical validation to ensure message integrity and proper sequencing.
   /// @param message Decoded MessageV1 payload for verification.
-  /// @param messageId keccak256(encodedMessage) of the message.
+  /// @param 2nd parameter is messageId, unused.
   /// @param feeToken Fee token used for the message.
   /// @param feeTokenAmount Amount of fee token provided.
   /// @param verifierArgs Opaque verifier-specific args.
   /// @return verifierReturnData Verifier-specific encoded data
   function forwardToVerifier(
     MessageV1Codec.MessageV1 calldata message,
-    bytes32 messageId,
+    bytes32, // messageId, unused
     address feeToken,
     uint256 feeTokenAmount,
     bytes calldata verifierArgs
   ) external returns (bytes memory verifierReturnData) {
-    (messageId); // silence unused; reserved for future use
-
     // For EVM, sender is expected to be 20 bytes.
     address senderAddress = address(bytes20(message.sender));
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
@@ -66,7 +64,7 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
     IFeeQuoterV2(s_dynamicConfig.feeQuoter).processMessageArgs(
       message.destChainSelector, feeToken, feeTokenAmount, verifierArgs, message.receiver
     );
-    return verifierReturnData;
+    return "";
   }
 
   // ================================================================

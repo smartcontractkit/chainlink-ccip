@@ -45,7 +45,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
       defaultExecutor: s_defaultExecutor,
       laneMandatedCCVs: s_laneMandatedCCVs,
       defaultCCVs: s_defaultCCVs,
-      offRamp: abi.encodePacked(address(s_ccvAggregatorRemote))
+      ccvAggregator: abi.encodePacked(address(s_ccvAggregatorRemote))
     });
   }
 

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {ICCVOnRampV1} from "../interfaces/ICCVOnRampV1.sol";
-
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -100,7 +99,8 @@ abstract contract BaseOnRamp is ICCVOnRampV1, ITypeAndVersion {
 
   function _assertSenderIsAllowed(uint64 destChainSelector, address sender) internal view {
     DestChainConfig storage destChainConfig = _getDestChainConfig(destChainSelector);
-
+    // CCVs should query the CCVProxy address from the router, this allows for CCVProxy updates without touching CCVs
+    // CCVProxy address may be zero intentionally to pause, which should stop all messages.
     if (msg.sender != destChainConfig.router.getOnRamp(destChainSelector)) revert CallerIsNotARampOnRouter(msg.sender);
 
     if (destChainConfig.allowlistEnabled) {
