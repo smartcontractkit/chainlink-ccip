@@ -111,7 +111,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				DefaultExecutor:   remoteConfig.DefaultExecutor,
 			})
 			commitOnRampDestConfigArgs = append(commitOnRampDestConfigArgs, commit_onramp.DestChainConfigArgs{
-				CcvProxy:          input.CCVProxy,
+				Router:            input.Router,
 				DestChainSelector: remoteSelector,
 				AllowlistEnabled:  remoteConfig.CommitOnRampDestChainConfig.AllowlistEnabled,
 			})

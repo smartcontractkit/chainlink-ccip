@@ -17,8 +17,6 @@ var ProxyType cldf_deployment.ContractType = "CommitOnRampProxy"
 type DynamicConfig = commit_onramp.CommitOnRampDynamicConfig
 
 type ConstructorArgs struct {
-	RMNRemote     common.Address
-	NonceManager  common.Address
 	DynamicConfig DynamicConfig
 }
 
@@ -45,7 +43,7 @@ var Deploy = contract.NewDeploy(
 	func(ConstructorArgs) error { return nil },
 	contract.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := commit_onramp.DeployCommitOnRamp(opts, backend, args.RMNRemote, args.NonceManager, args.DynamicConfig)
+			address, tx, _, err := commit_onramp.DeployCommitOnRamp(opts, backend, args.DynamicConfig)
 			return address, tx, err
 		},
 		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)

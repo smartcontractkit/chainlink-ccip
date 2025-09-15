@@ -2,14 +2,11 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
+import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {BaseOnRamp} from "../../onRamp/BaseOnRamp.sol";
 
 /// @notice Test helper contract to expose BaseOnRamp's internal functions for testing
 contract BaseOnRampTestHelper is BaseOnRamp {
-  constructor(
-    address rmnRemote
-  ) BaseOnRamp(rmnRemote) {}
-
   function applyDestChainConfigUpdates(
     DestChainConfigArgs[] calldata destChainConfigArgs
   ) external {
@@ -30,13 +27,15 @@ contract BaseOnRampTestHelper is BaseOnRamp {
     _assertSenderIsAllowed(destChainSelector, sender, caller);
   }
 
-  function assertNotCursed(
-    uint64 destChainSelector
-  ) external view {
-    _assertNotCursed(destChainSelector);
-  }
-
-  function forwardToVerifier(uint64, address, bytes memory, uint256) external pure returns (bytes memory) {
+  function forwardToVerifier(
+    uint64,
+    address,
+    MessageV1Codec.MessageV1 calldata,
+    bytes32,
+    address,
+    uint256,
+    bytes calldata
+  ) external pure returns (bytes memory) {
     return "";
   }
 

@@ -1,21 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ICCVOnRamp} from "../../interfaces/ICCVOnRamp.sol";
+import {ICCVOnRampV1} from "../../interfaces/ICCVOnRampV1.sol";
 
 import {Client} from "../../libraries/Client.sol";
+import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
-contract MockCCVOnRamp is ICCVOnRamp {
-  bytes internal s_returnData;
+contract MockCCVOnRamp is ICCVOnRampV1 {
+  bytes private s_verifierResult;
 
   constructor(
-    bytes memory returnData
+    bytes memory verifierResult
   ) {
-    s_returnData = returnData;
+    s_verifierResult = verifierResult;
   }
 
-  function forwardToVerifier(uint64, address, bytes memory, uint256) external view returns (bytes memory) {
-    return s_returnData;
+  function forwardToVerifier(
+    uint64,
+    address,
+    MessageV1Codec.MessageV1 calldata,
+    bytes32,
+    address,
+    uint256,
+    bytes calldata
+  ) external view returns (bytes memory) {
+    return s_verifierResult;
   }
 
   function getFee(
