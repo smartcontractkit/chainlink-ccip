@@ -127,8 +127,8 @@ func (p *Plugin) Observation(
 	default:
 		return nil, fmt.Errorf("get observation: unknown state")
 	}
-
-	p.observer.TrackObservation(observation, state)
+	p.observer.TrackObservation(
+		observation, state, outctx.Round) //nolint:staticcheck // we rely on Round for OTI metrics compatibility
 	numCommitReports := 0
 	for _, reports := range observation.CommitReports {
 		numCommitReports += len(reports)

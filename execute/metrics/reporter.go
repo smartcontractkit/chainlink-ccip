@@ -14,8 +14,8 @@ import (
 // - understand how efficiently we batch (number of messages, number of token data, number of source chains used etc.)
 // - understand how many messages, reports, token data are observed by plugins
 type Reporter interface {
-	TrackObservation(obs exectypes.Observation, state exectypes.PluginState)
-	TrackOutcome(outcome exectypes.Outcome, state exectypes.PluginState)
+	TrackObservation(obs exectypes.Observation, state exectypes.PluginState, round uint64)
+	TrackOutcome(outcome exectypes.Outcome, state exectypes.PluginState, round uint64)
 	TrackLatency(state exectypes.PluginState, method plugincommon.MethodType, latency time.Duration, err error)
 	TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable)
 	TrackProcessorLatency(processor string, method plugincommon.MethodType, latency time.Duration, err error)
@@ -23,9 +23,9 @@ type Reporter interface {
 
 type Noop struct{}
 
-func (n *Noop) TrackObservation(exectypes.Observation, exectypes.PluginState) {}
+func (n *Noop) TrackObservation(exectypes.Observation, exectypes.PluginState, uint64) {}
 
-func (n *Noop) TrackOutcome(exectypes.Outcome, exectypes.PluginState) {}
+func (n *Noop) TrackOutcome(exectypes.Outcome, exectypes.PluginState, uint64) {}
 
 func (n *Noop) TrackLatency(exectypes.PluginState, plugincommon.MethodType, time.Duration, error) {}
 
