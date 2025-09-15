@@ -11,9 +11,9 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 )
 
-var ContractType cldf_deployment.ContractType = "CCVRampProxy"
+var ContractType cldf_deployment.ContractType = "RampProxy"
 
-type SetRampArgs = ownable_ccv_ramp_proxy.CCVRampProxySetRampsArgs
+type SetRampArgs = ownable_ccv_ramp_proxy.RampProxySetRampsArgs
 
 type GetRampArgs struct {
 	RemoteChainSelector uint64
@@ -25,14 +25,14 @@ var V1Ramp = utils.MustHash("CCVRamp_V1")
 var SetRamp = contract.NewWrite(
 	"ccv-ramp-proxy:set-ramps",
 	semver.MustParse("1.7.0"),
-	"Sets multiple ramp addresses on the CCVRampProxy, each tied to a remote chain selector and CCVRamp version",
+	"Sets multiple ramp addresses on the RampProxy, each tied to a remote chain selector and CCVRamp version",
 	ContractType,
-	ownable_ccv_ramp_proxy.OwnableCCVRampProxyABI,
-	ownable_ccv_ramp_proxy.NewOwnableCCVRampProxy,
+	ownable_ccv_ramp_proxy.OwnableRampProxyABI,
+	ownable_ccv_ramp_proxy.NewOwnableRampProxy,
 	contract.OnlyOwner,
 	func([]SetRampArgs) error { return nil },
-	func(ccvRampProxy *ownable_ccv_ramp_proxy.OwnableCCVRampProxy, opts *bind.TransactOpts, args []SetRampArgs) (*types.Transaction, error) {
-		return ccvRampProxy.SetRamps(opts, args)
+	func(rampProxy *ownable_ccv_ramp_proxy.OwnableRampProxy, opts *bind.TransactOpts, args []SetRampArgs) (*types.Transaction, error) {
+		return rampProxy.SetRamps(opts, args)
 	},
 )
 
@@ -41,8 +41,8 @@ var GetRamp = contract.NewRead(
 	semver.MustParse("1.7.0"),
 	"Gets the ramp address for a given remote chain selector and CCVRamp version",
 	ContractType,
-	ownable_ccv_ramp_proxy.NewOwnableCCVRampProxy,
-	func(ccvRampProxy *ownable_ccv_ramp_proxy.OwnableCCVRampProxy, opts *bind.CallOpts, args GetRampArgs) (common.Address, error) {
-		return ccvRampProxy.GetRamp(opts, args.RemoteChainSelector, args.Version)
+	ownable_ccv_ramp_proxy.NewOwnableRampProxy,
+	func(rampProxy *ownable_ccv_ramp_proxy.OwnableRampProxy, opts *bind.CallOpts, args GetRampArgs) (common.Address, error) {
+		return rampProxy.GetRamp(opts, args.RemoteChainSelector, args.Version)
 	},
 )

@@ -12,7 +12,6 @@ import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 
-import {CCVRamp} from "../libraries/CCVRamp.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
@@ -294,7 +293,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   ) internal {
     for (uint256 i = 0; i < newMessage.verifierReceipts.length; ++i) {
       address verifier = newMessage.verifierReceipts[i].issuer;
-      ICCVOnRamp(verifier).forwardToVerifier(destChainSelector, CCVRamp.V1, address(this), encodedMessage, i);
+      ICCVOnRamp(verifier).forwardToVerifier(destChainSelector, address(this), encodedMessage, i);
     }
   }
 

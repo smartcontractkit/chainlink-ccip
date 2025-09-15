@@ -6,8 +6,7 @@ import {Client} from "../libraries/Client.sol";
 interface ICCVOnRamp {
   function getFee(
     uint64 destChainSelector,
-    bytes32 version,
-    address caller,
+    address originalCaller,
     Client.EVM2AnyMessage memory message,
     bytes memory extraArgs
   ) external view returns (uint256);
@@ -16,8 +15,7 @@ interface ICCVOnRamp {
   // TODO versioning?
   function forwardToVerifier(
     uint64 destChainSelector,
-    bytes32 version,
-    address caller,
+    address originalCaller,
     bytes memory rawMessage,
     uint256 verifierIndex
   ) external returns (bytes memory);

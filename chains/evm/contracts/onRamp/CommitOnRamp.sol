@@ -59,15 +59,14 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   /// @return Verifier-specific encoded data (nonce in case of commit onramp).
   function forwardToVerifier(
     uint64, // destChainSelector
-    bytes32, // version
-    address caller,
+    address originalCaller,
     bytes calldata rawMessage,
     uint256 verifierIndex
   ) external returns (bytes memory) {
     Internal.EVM2AnyVerifierMessage memory message = abi.decode(rawMessage, (Internal.EVM2AnyVerifierMessage));
 
     _assertNotCursed(message.header.destChainSelector);
-    _assertSenderIsAllowed(message.header.destChainSelector, message.sender, caller);
+    _assertSenderIsAllowed(message.header.destChainSelector, message.sender, originalCaller);
 
     // Process message arguments to determine execution mode.
     (, bool isOutOfOrderExecution,,) = IFeeQuoterV2(s_dynamicConfig.feeQuoter).processMessageArgs(
@@ -152,8 +151,7 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
 
   function getFee(
     uint64 destChainSelector,
-    bytes32, // version
-    address, // caller
+    address, // originalCaller
     Client.EVM2AnyMessage memory message,
     bytes memory // extraArgs
   ) external view returns (uint256) {

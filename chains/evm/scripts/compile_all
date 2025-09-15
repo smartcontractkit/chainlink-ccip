@@ -71,7 +71,7 @@ function getOptimizations() {
 
 
 # Mod sec
-compileContract OwnableCCVRampProxy
+compileContract OwnableRampProxy
 compileContract onRamp/CCVProxy
 compileContract onRamp/CommitOnRamp
 compileContract onRamp/ExecutorOnRamp

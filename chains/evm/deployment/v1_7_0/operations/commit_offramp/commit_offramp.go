@@ -42,11 +42,11 @@ var DeployProxy = contract.NewDeploy(
 	semver.MustParse("1.7.0"),
 	"Deploys the CommitOnRampProxy contract",
 	ProxyType,
-	ownable_ccv_ramp_proxy.OwnableCCVRampProxyABI,
+	ownable_ccv_ramp_proxy.OwnableRampProxyABI,
 	func(any) error { return nil },
 	contract.VMDeployers[any]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args any) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := ownable_ccv_ramp_proxy.DeployOwnableCCVRampProxy(opts, backend)
+			address, tx, _, err := ownable_ccv_ramp_proxy.DeployOwnableRampProxy(opts, backend)
 			return address, tx, err
 		},
 		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args any) (common.Address, error)

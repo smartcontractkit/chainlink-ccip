@@ -13,7 +13,6 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 
-import {CCVRamp} from "../libraries/CCVRamp.sol";
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -287,8 +286,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
       ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
         sourceChainSelector: message.sourceChainSelector,
-        version: CCVRamp.V1,
-        caller: address(this),
+        originalCaller: address(this),
         message: message,
         messageHash: messageId,
         ccvData: ccvData[ccvDataIndex[i]],

@@ -1,12 +1,12 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCVRampProxy} from "./CCVRampProxy.sol";
+import {RampProxy} from "./RampProxy.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-/// @notice OwnableCCVRampProxy is a CCVRampProxy that uses Ownable2StepMsgSender for ownership management.
-contract OwnableCCVRampProxy is CCVRampProxy, Ownable2StepMsgSender {
+/// @notice OwnableRampProxy is a RampProxy that uses Ownable2StepMsgSender for ownership management.
+contract OwnableRampProxy is RampProxy, Ownable2StepMsgSender {
   /// @notice Sets the ramp address for a given remote chain selector and version.
   /// @dev Can be used to remove a ramp by setting the address to 0.
   /// @param ramps The array of ramps to set.

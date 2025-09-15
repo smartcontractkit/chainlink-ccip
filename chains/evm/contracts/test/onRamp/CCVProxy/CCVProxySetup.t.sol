@@ -30,7 +30,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       })
     );
     address[] memory defaultCCVs = new address[](1);
-    defaultCCVs[0] = address(new MockCCVOnRamp());
+    defaultCCVs[0] = address(new MockCCVOnRamp(""));
     CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
     destChainConfigArgs[0] = CCVProxy.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,

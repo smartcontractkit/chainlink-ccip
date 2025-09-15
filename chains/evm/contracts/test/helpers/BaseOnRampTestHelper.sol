@@ -36,11 +36,11 @@ contract BaseOnRampTestHelper is BaseOnRamp {
     _assertNotCursed(destChainSelector);
   }
 
-  function forwardToVerifier(uint64, bytes32, address, bytes memory, uint256) external pure returns (bytes memory) {
+  function forwardToVerifier(uint64, address, bytes memory, uint256) external pure returns (bytes memory) {
     return "";
   }
 
-  function getFee(uint64, bytes32, address, Client.EVM2AnyMessage memory, bytes memory) external pure returns (uint256) {
+  function getFee(uint64, address, Client.EVM2AnyMessage memory, bytes memory) external pure returns (uint256) {
     return 0;
   }
 
