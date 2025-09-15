@@ -7,8 +7,6 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 
 contract CommitOnRamp_setDynamicConfig is CommitOnRampSetup {
   function test_setDynamicConfig() public {
-    CommitOnRamp.StaticConfig memory staticConfig = s_commitOnRamp.getStaticConfig();
-
     CommitOnRamp.DynamicConfig memory newConfig = CommitOnRamp.DynamicConfig({
       feeQuoter: makeAddr("feeQuoter2"),
       feeAggregator: makeAddr("feeAggregator2"),
@@ -16,7 +14,7 @@ contract CommitOnRamp_setDynamicConfig is CommitOnRampSetup {
     });
 
     vm.expectEmit();
-    emit CommitOnRamp.ConfigSet(staticConfig, newConfig);
+    emit CommitOnRamp.ConfigSet(newConfig);
 
     s_commitOnRamp.setDynamicConfig(newConfig);
 

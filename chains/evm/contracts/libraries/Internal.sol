@@ -338,26 +338,6 @@ library Internal {
     bytes extraArgs; // Extra args that have been passed in on the source chain.
   }
 
-  struct EVM2AnyVerifierMessage {
-    Header header; // Message header.
-    address sender; // sender address on the source chain.
-    bytes data; // arbitrary data payload supplied by the message sender.
-    bytes receiver; // receiver address on the destination chain.
-    address feeToken; // fee token.
-    uint256 feeTokenAmount; // fee token amount.
-    uint256 feeValueJuels; // fee amount in Juels.
-    EVMTokenTransfer[] tokenTransfer;
-    Receipt[] verifierReceipts;
-    Receipt executorReceipt;
-  }
-
-  struct Header {
-    bytes32 messageId; // Unique identifier for the message, generated with the source chain's encoding scheme (i.e. not necessarily abi.encoded).
-    uint64 sourceChainSelector; // ─╮ the chain selector of the source chain, note: not chainId.
-    uint64 destChainSelector; //    │ the chain selector of the destination chain, note: not chainId.
-    uint64 sequenceNumber; // ──────╯ sequence number, not unique across lanes.
-  }
-
   struct EVMTokenTransfer {
     address sourceTokenAddress;
     // The EVM address of the destination token.
@@ -366,22 +346,5 @@ library Internal {
     uint256 amount; // Number of tokens.
     bytes extraData; // Optional pool data to be transferred to the destination chain.
     Receipt receipt;
-  }
-
-  function _hash(EVM2AnyVerifierMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
-    // Fixed-size message fields are included in nested hash to reduce stack pressure.
-    // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
-    return keccak256(
-      abi.encode(
-        MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
-        metadataHash,
-        keccak256(
-          abi.encode(original.sender, original.header.sequenceNumber, original.feeToken, original.feeTokenAmount)
-        ),
-        keccak256(original.receiver),
-        keccak256(original.data),
-        keccak256(abi.encode(original.tokenTransfer))
-      )
-    );
   }
 }

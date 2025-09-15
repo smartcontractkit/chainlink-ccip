@@ -2,10 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
-import {INonceManager} from "../interfaces/INonceManager.sol";
 
 import {Client} from "../libraries/Client.sol";
-import {Internal} from "../libraries/Internal.sol";
+import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseOnRamp} from "./BaseOnRamp.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
@@ -16,12 +15,7 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   error InvalidConfig();
   error OnlyCallableByOwnerOrAllowlistAdmin();
 
-  event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
-
-  struct StaticConfig {
-    address rmnRemote; // RMN remote address.
-    address nonceManager; // Nonce manager address.
-  }
+  event ConfigSet(DynamicConfig dynamicConfig);
 
   /// @dev Struct that contains the dynamic configuration.
   // solhint-disable-next-line gas-struct-packing
@@ -40,57 +34,42 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   /// @dev The dynamic config for the onRamp.
   DynamicConfig private s_dynamicConfig;
 
-  constructor(address rmnRemote, address nonceManager, DynamicConfig memory dynamicConfig) BaseOnRamp(rmnRemote) {
-    // The BaseOnRamp allows the RMN to be zero, but the CommitOnRamp requires it to be set.
-    if (address(rmnRemote) == address(0) || nonceManager == address(0)) {
-      revert InvalidConfig();
-    }
-
-    i_nonceManager = nonceManager;
-
+  constructor(
+    DynamicConfig memory dynamicConfig
+  ) {
     _setDynamicConfig(dynamicConfig);
   }
 
   /// @notice Forwards a message from CCV proxy to this verifier for processing and returns verifier-specific data.
   /// @dev This function is called by the CCV proxy to delegate message verification to this specific verifier.
   /// It performs critical validation to ensure message integrity and proper sequencing.
-  /// @param rawMessage The encoded message containing all necessary data for verification.
-  /// @param verifierIndex Index of this verifier in the message's verifier receipts array.
-  /// @return Verifier-specific encoded data (nonce in case of commit onramp).
-  function forwardToVerifier(bytes calldata rawMessage, uint256 verifierIndex) external returns (bytes memory) {
-    Internal.EVM2AnyVerifierMessage memory message = abi.decode(rawMessage, (Internal.EVM2AnyVerifierMessage));
+  /// @param message Decoded MessageV1 payload for verification.
+  /// @param 2nd parameter is messageId, unused.
+  /// @param feeToken Fee token used for the message.
+  /// @param feeTokenAmount Amount of fee token provided.
+  /// @param verifierArgs Opaque verifier-specific args.
+  /// @return verifierReturnData Verifier-specific encoded data
+  function forwardToVerifier(
+    MessageV1Codec.MessageV1 calldata message,
+    bytes32, // messageId, unused
+    address feeToken,
+    uint256 feeTokenAmount,
+    bytes calldata verifierArgs
+  ) external returns (bytes memory verifierReturnData) {
+    // For EVM, sender is expected to be 20 bytes.
+    address senderAddress = address(bytes20(message.sender));
+    _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
-    _assertNotCursed(message.header.destChainSelector);
-    _assertSenderIsAllowed(message.header.destChainSelector, message.sender);
-
-    // Process message arguments to determine execution mode.
-    (, bool isOutOfOrderExecution,,) = IFeeQuoterV2(s_dynamicConfig.feeQuoter).processMessageArgs(
-      message.header.destChainSelector,
-      message.feeToken,
-      message.feeTokenAmount,
-      message.verifierReceipts[verifierIndex].extraArgs,
-      message.receiver
+    // TODO
+    IFeeQuoterV2(s_dynamicConfig.feeQuoter).processMessageArgs(
+      message.destChainSelector, feeToken, feeTokenAmount, verifierArgs, message.receiver
     );
-
-    uint64 nonce = 0;
-    if (!isOutOfOrderExecution) {
-      nonce =
-        INonceManager(i_nonceManager).getIncrementedOutboundNonce(message.header.destChainSelector, message.sender);
-    }
-
-    return abi.encode(nonce);
+    return "";
   }
 
   // ================================================================
   // │                           Config                             │
   // ================================================================
-
-  /// @notice Returns the static onRamp config.
-  /// @dev RMN depends on this function, if modified, please notify the RMN maintainers.
-  /// @return staticConfig the static configuration.
-  function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({rmnRemote: address(i_rmnRemote), nonceManager: i_nonceManager});
-  }
 
   /// @notice Returns the dynamic onRamp config.
   /// @return dynamicConfig the dynamic configuration.
@@ -114,7 +93,7 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
 
     s_dynamicConfig = dynamicConfig;
 
-    emit ConfigSet(StaticConfig({rmnRemote: address(i_rmnRemote), nonceManager: i_nonceManager}), dynamicConfig);
+    emit ConfigSet(dynamicConfig);
   }
 
   /// @notice Updates destination chains specific configs.
