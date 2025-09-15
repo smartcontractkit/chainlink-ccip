@@ -172,7 +172,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause, which should stop all messages.
     if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
+
     // 1. parse extraArgs.
+
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
     // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
     bytes memory tokenReceiver =
@@ -182,6 +184,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     }
 
     // 2. get pool params, this potentially mutates CCV list.
+
     // TODO pool call to get CCVs from IPoolV2 getRequiredCCVs
 
     (resolvedExtraArgs.requiredCCV, resolvedExtraArgs.optionalCCV, resolvedExtraArgs.optionalThreshold) =
@@ -211,8 +214,10 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     });
 
     // 3. getFee on all verifiers & executor.
+
     Internal.Receipt[] memory verifierReceipts =
       new Internal.Receipt[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
+
     for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory verifier = resolvedExtraArgs.requiredCCV[i];
       verifierReceipts[i] = Internal.Receipt({
@@ -223,6 +228,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         extraArgs: verifier.args
       });
     }
+
     for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
       Client.CCV memory verifier = resolvedExtraArgs.optionalCCV[i];
       verifierReceipts[resolvedExtraArgs.requiredCCV.length + i] = Internal.Receipt({
@@ -233,6 +239,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         extraArgs: verifier.args
       });
     }
+
     Internal.Receipt memory executorReceipt = Internal.Receipt({
       issuer: resolvedExtraArgs.executor,
       destGasLimit: 0, // TODO
@@ -244,23 +251,30 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     // TODO: Handle the fee returned
     // Currently only used for validations.
     _getExecutorFee(resolvedExtraArgs, message, destChainSelector);
+
     // 4. lockOrBurn
+
     if (message.tokenAmounts.length != 0) {
       if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
       newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
         message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
       );
     }
+
     // created fresh locals like near the callsite to fix stack too deep.
     address feeToken = message.feeToken;
     uint256 feeTokenAmount = feeTokenAmount;
     uint64 destChainSelector = destChainSelector;
+
     // 5. encode message and calculate messageId.
+
     bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
     bytes32 messageId = keccak256(encodedMessage);
     bytes[] memory receiptBlobs =
       new bytes[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
+
     // 6. call each verifier.
+
     for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
       receiptBlobs[i] =
