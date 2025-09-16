@@ -1003,7 +1003,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     bytes4 extraArgsTag = bytes4(extraArgs);
     bytes memory argsData = extraArgs[4:];
 
-    if (extraArgsTag == Client.GENERIC_EXTRA_ARGS_V2_TAG) {
+    if (extraArgsTag == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
+      // Use default values for extra args V3.
+      return Client.GenericExtraArgsV2({gasLimit: defaultTxGasLimit, allowOutOfOrderExecution: false});
+    } else if (extraArgsTag == Client.GENERIC_EXTRA_ARGS_V2_TAG) {
       return abi.decode(argsData, (Client.GenericExtraArgsV2));
     } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
       // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
