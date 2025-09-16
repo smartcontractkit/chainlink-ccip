@@ -169,6 +169,12 @@ library Client {
     bytes tokenArgs;
   }
 
+  function _argsToBytes(
+    EVMExtraArgsV3 memory extraArgs
+  ) internal pure returns (bytes memory bts) {
+    return abi.encodeWithSelector(GENERIC_EXTRA_ARGS_V3_TAG, extraArgs);
+  }
+
   // TODO milestone 2
   struct TokenPoolSettings {
     CCV[] requiredVerifiers; // Token pool can only add required verifiers.
