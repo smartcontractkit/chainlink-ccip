@@ -210,10 +210,10 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
     });
     message.tokenTransfer = tokenAmounts;
 
-    // Encode the message with single token transfer first
+    // Encode the message with single token transfer first.
     bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
 
-    // Now manually create the invalid message with 2 token transfers for the executeSingleMessage call
+    // Now manually create the invalid message with 2 token transfers for the executeSingleMessage call.
     MessageV1Codec.TokenTransferV1[] memory invalidTokenAmounts = new MessageV1Codec.TokenTransferV1[](2);
     invalidTokenAmounts[0] = tokenAmounts[0];
     invalidTokenAmounts[1] = tokenAmounts[0];

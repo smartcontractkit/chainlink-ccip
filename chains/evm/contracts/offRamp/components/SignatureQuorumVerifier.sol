@@ -34,12 +34,14 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     i_chainID = block.chainid;
   }
 
-  /// @notice Validates the signatures of a given report hash.
-  /// @param reportHash The hash of the report to validate signatures for.
+  /// @notice Validates the signatures of a given report hash. IMPORTANT: the signatures must be provided in order of
+  /// their signer addresses. This is required to efficiently check for duplicated signatures. If any signature is out
+  /// of order, this function will revert with `NonOrderedOrNonUniqueSignatures`.
+  /// @param signedHash The hash that is signed.
   /// @param rs The r values of the signatures.
   /// @param ss The s values of the signatures.
   /// @dev The v values are assumed to be 27 for all signatures, this can be achieved by using ECDSA malleability.
-  function _validateSignatures(bytes32 reportHash, bytes32[] memory rs, bytes32[] memory ss) internal view {
+  function _validateSignatures(bytes32 signedHash, bytes32[] memory rs, bytes32[] memory ss) internal view {
     if (s_signers.length() == 0) {
       revert InvalidConfig();
     }
@@ -61,7 +63,7 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
 
     for (uint256 i; i < threshold; ++i) {
       // We use ECDSA malleability to only have signatures with a `v` value of 27.
-      address signer = ecrecover(reportHash, 27, rs[i], ss[i]);
+      address signer = ecrecover(signedHash, 27, rs[i], ss[i]);
       // Check that the signer is registered.
       if (!s_signers.contains(signer)) revert UnauthorizedSigner();
       // This requires ordered signatures to check for duplicates. This also disallows the zero address.
@@ -82,8 +84,8 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     }
 
     // We must remove all current signers first.
-    for (uint256 i = 0; i < s_signers.length();) {
-      s_signers.remove(s_signers.at(i));
+    while (s_signers.length() > 0) {
+      s_signers.remove(s_signers.at(0));
     }
 
     // Add new signers.

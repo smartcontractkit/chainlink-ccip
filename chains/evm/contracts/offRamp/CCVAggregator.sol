@@ -360,7 +360,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
           message: message,
-          messageHash: messageId,
+          messageId: messageId,
           ccvData: ccvData[ccvDataIndex[i]]
         });
       }

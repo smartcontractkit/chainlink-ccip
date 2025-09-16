@@ -2,17 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {ICCVOffRampV1} from "../../../interfaces/ICCVOffRampV1.sol";
-import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
-import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
-
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 contract GasBoundedExecuteCaller {
   CCVAggregator internal immutable i_aggregator;
@@ -58,10 +53,9 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(message);
     bytes32 messageHash = keccak256(encodedMessage);
 
-    bytes memory defaultCcvData = abi.encode("mock ccv data");
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageHash, defaultCcvData)),
+      abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageHash, abi.encode("mock ccv data"))),
       abi.encode(true)
     );
   }
@@ -118,7 +112,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     );
   }
 
-  function test_execute_runsOutOfGasAndSetsStateToFailure() public {
+  function test_execute_RunsOutOfGasAndSetsStateToFailure() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 

@@ -55,7 +55,7 @@ CCVAggregator_ensureCCVQuorumIsReached:test_ensureCCVQuorumIsReached_Success_Opt
 CCVAggregator_execute:test_execute() (gas: 112754)
 CCVAggregator_execute:test_execute_InsufficientGasToCompleteTx_setsToFailure() (gas: 91454)
 CCVAggregator_execute:test_execute_ReentrancyGuardReentrantCall_Fails() (gas: 841302)
-CCVAggregator_execute:test_execute_runsOutOfGasAndSetsStateToFailure() (gas: 111845)
+CCVAggregator_execute:test_execute_RunsOutOfGasAndSetsStateToFailure() (gas: 111889)
 CCVAggregator_getAllSourceChainConfigs:test_getAllSourceChainConfigs_ReturnsMultipleChains() (gas: 227566)
 CCVAggregator_getAllSourceChainConfigs:test_getAllSourceChainConfigs_ReturnsSingleChain() (gas: 40328)
 CCVAggregator_getCCVsFromPool:test_getCCVsFromPool_ReturnsDefaultCCVs_WhenPoolDoesNotSupportV2() (gas: 272666)
