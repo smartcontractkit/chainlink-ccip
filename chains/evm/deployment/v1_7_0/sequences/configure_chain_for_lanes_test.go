@@ -3,6 +3,7 @@ package sequences_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -132,6 +133,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				}
 			}
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
+			ccipMessageDest := common.HexToAddress("0x11").Bytes()
 			fqDestChainConfig := fee_quoter_v2.DestChainConfig{
 				IsEnabled:                         true,
 				MaxNumberOfTokensPerMsg:           10,
@@ -168,6 +170,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 						remoteChainSelector: {
 							AllowTrafficFrom:            true,
 							CCIPMessageSource:           ccipMessageSource,
+							CCIPMessageDest:             ccipMessageDest,
 							DefaultCCVOffRamps:          []common.Address{commitOffRamp},
 							DefaultCCVOnRamps:           []common.Address{commitOnRamp},
 							DefaultExecutor:             executorOnRamp,
@@ -248,54 +251,24 @@ func TestConfigureChainForLanes(t *testing.T) {
 			// Try sending CCIP message /////////////
 			/////////////////////////////////////////
 
-			const clientABI = `
-			[
-				{
-					"name": "encodeGenericExtraArgsV2",
-					"type": "function",
-					"inputs": [
-						{
-							"components": [
-								{
-									"name": "gasLimit",
-									"type": "uint256"
-								},
-								{
-									"name": "allowOutOfOrderExecution",
-									"type": "bool"
-								}
-							],
-							"name": "args",
-							"type": "tuple"
-						}
-					],
-					"outputs": [],
-					"stateMutability": "pure"
-				}
-			]
-			`
+			extraArgs, err := newEVMExtraArgsV3(
+				[]common.Address{commitOnRamp}, // requiredCCVs
+				[]common.Address{},             // optionalCCVs
+				0,                              // optionalThreshold
+				0,                              // finalityConfig
+				executorOnRamp,
+				[]byte{}, // executorArgs
+				[]byte{}, // tokenArgs
+			)
+			require.NoError(t, err, "newEVMExtraArgsV3 should not error")
 
-			parsedABI, err := abi.JSON(bytes.NewReader([]byte(clientABI)))
-			require.NoError(t, err, "Failed to parse ABI")
-
-			genericExtraArgsV2 := struct {
-				GasLimit                 *big.Int
-				AllowOutOfOrderExecution bool
-			}{
-				GasLimit:                 big.NewInt(1_000_000),
-				AllowOutOfOrderExecution: true,
-			}
-			encoded, err := parsedABI.Methods["encodeGenericExtraArgsV2"].Inputs.Pack(genericExtraArgsV2)
-			require.NoError(t, err, "Failed to ABI encode GenericExtraArgsV2")
-
-			tag := []byte{0x18, 0x1d, 0xcf, 0x10} // GENERIC_EXTRA_ARGS_V2_TAG
 			ccipSendArgs := router.CCIPSendArgs{
 				DestChainSelector: remoteChainSelector,
 				EVM2AnyMessage: router.EVM2AnyMessage{
 					Receiver:     common.LeftPadBytes(evmChain.DeployerKey.From.Bytes(), 32),
 					Data:         []byte{},
 					TokenAmounts: []router.EVMTokenAmount{},
-					ExtraArgs:    append(tag, encoded...),
+					ExtraArgs:    extraArgs,
 				},
 			}
 
@@ -316,4 +289,89 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.NoError(t, err, "ExecuteOperation should not error")
 		})
 	}
+}
+
+// newEVMExtraArgsV3 encodes the EVMExtraArgsV3 struct according to the ABI
+func newEVMExtraArgsV3(requiredCCVs, optionalCCVs []common.Address, optionalThreshold uint8, finalityConfig uint32, executor common.Address, executorArgs, tokenArgs []byte) ([]byte, error) {
+	clientABI := `
+			[
+				{
+					"name": "encodeEVMExtraArgsV3",
+					"type": "function",
+					"inputs": [
+						{
+							"components": [
+								{
+									"internalType": "address[]",
+									"name": "requiredCCV",
+									"type": "address[]"
+								},
+								{
+									"internalType": "address[]",
+									"name": "optionalCCV",
+									"type": "address[]"
+								},
+								{
+									"internalType": "uint8",
+									"name": "optionalThreshold",
+									"type": "uint8"
+								},
+								{
+									"internalType": "uint32",
+									"name": "finalityConfig",
+									"type": "uint32"
+								},
+								{
+									"internalType": "address",
+									"name": "executor",
+									"type": "address"
+								},
+								{
+									"internalType": "bytes",
+									"name": "executorArgs",
+									"type": "bytes"
+								},
+								{
+									"internalType": "bytes",
+									"name": "tokenArgs",
+									"type": "bytes"
+								}
+							],
+							"internalType": "struct EVMExtraArgsV3",
+							"name": "args",
+							"type": "tuple"
+						}
+					],
+					"outputs": [],
+					"stateMutability": "pure"
+				}
+			]
+			`
+	parsedABI, err := abi.JSON(bytes.NewReader([]byte(clientABI)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+	evmExtraArgsV3 := struct {
+		RequiredCCV       []common.Address
+		OptionalCCV       []common.Address
+		OptionalThreshold uint8
+		FinalityConfig    uint32
+		Executor          common.Address
+		ExecutorArgs      []byte
+		TokenArgs         []byte
+	}{
+		RequiredCCV:       requiredCCVs,
+		OptionalCCV:       optionalCCVs,
+		OptionalThreshold: optionalThreshold,
+		FinalityConfig:    finalityConfig,
+		Executor:          executor,
+		ExecutorArgs:      executorArgs,
+		TokenArgs:         tokenArgs,
+	}
+	encoded, err := parsedABI.Methods["encodeEVMExtraArgsV3"].Inputs.Pack(evmExtraArgsV3)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ABI encode EVMExtraArgsV3: %w", err)
+	}
+	tag := []byte{0x30, 0x23, 0x26, 0xcb} // GENERIC_EXTRA_ARGS_V3_TAG
+	return append(tag, encoded...), nil
 }
