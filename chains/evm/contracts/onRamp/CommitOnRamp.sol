@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
-
 import {Client} from "../libraries/Client.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseOnRamp} from "./BaseOnRamp.sol";
@@ -121,11 +119,12 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   // ================================================================
 
   function getFee(
-    uint64 destChainSelector,
-    Client.EVM2AnyMessage memory message,
+    uint64, // destChainSelector
+    Client.EVM2AnyMessage memory, // message
     bytes memory // extraArgs
   ) external view returns (uint256) {
-    return IFeeQuoterV2(s_dynamicConfig.feeQuoter).getValidatedFee(destChainSelector, message);
+    // TODO: Process msg & return fee
+    return 0;
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.

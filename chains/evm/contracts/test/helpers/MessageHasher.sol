@@ -101,20 +101,6 @@ contract MessageHasher {
     return Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: allowOutOfOrderExecution});
   }
 
-  function decodeGenericExtraArgsV3(
-    Client.CCV[] memory requiredCCV,
-    Client.CCV[] memory optionalCCV,
-    uint8 optionalThreshold,
-    uint16 finalityConfig,
-    address executor,
-    bytes memory executorArgs,
-    bytes memory tokenArgs
-  ) public pure returns (Client.EVMExtraArgsV3 memory) {
-    return Client.EVMExtraArgsV3(
-      requiredCCV, optionalCCV, optionalThreshold, finalityConfig, executor, executorArgs, tokenArgs
-    );
-  }
-
   function decodeEVMExtraArgsV2(
     uint256 gasLimit,
     bool allowOutOfOrderExecution
