@@ -177,8 +177,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
     // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
-    bytes memory tokenReceiver =
-      IFeeQuoterV2(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
+    bytes memory tokenReceiver = IFeeQuoterV2(s_dynamicConfig.feeQuoter).resolveTokenReceiver(message.extraArgs);
     if (tokenReceiver.length == 0) {
       tokenReceiver = abi.encode(message.receiver);
     }
