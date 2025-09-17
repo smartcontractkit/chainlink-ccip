@@ -19,6 +19,10 @@ type WriteOutput struct {
 	ChainSelector uint64 `json:"chainSelector"`
 	// Tx is the prepared transaction (in MCMS format)
 	Tx mcms_types.Transaction `json:"tx"`
+	// TimelockAddress is the address of the timelock contract, if applicable for MCMS proposals
+	TimelockAddress common.Address `json:"timelockAddress,omitempty"`
+	// MCMAddress is the address of the MCMS contract, if applicable for MCMS proposals
+	MCMAddress common.Address `json:"mcmAddress,omitempty"`
 	// Executed indicates whether the transaction was executed (signed and sent) or not
 	Executed bool `json:"executed"`
 }
@@ -92,6 +96,8 @@ func NewWrite[ARGS any, C any](
 					Data:             tx.Data(),
 					AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
 				},
+				TimelockAddress: input.TimelockAddress,
+				MCMAddress:      input.MCMAddress,
 			}, nil
 		},
 	)

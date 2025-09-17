@@ -2,13 +2,12 @@ package changesets
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 )
 
 // NewFromOnChainSequenceParams configures NewFromOnChainSequence.
@@ -19,6 +18,8 @@ type NewFromOnChainSequenceParams[IN any, DEP any, CFG any] struct {
 	ResolveInput func(e deployment.Environment, cfg CFG) (IN, error)
 	// ResolveDeps resolves the dependencies for the sequence based on the environment and changeset config.
 	ResolveDep func(e deployment.Environment, cfg CFG) (DEP, error)
+	// ResolveMCMS resolves the MCMS configuration based on the environment and changeset config.
+	ResolveMCMS func(e deployment.Environment, cfg CFG) (MCMSParams, error)
 	// Describe returns a human-readable description of the changeset.
 	Describe func(in IN, dep DEP) string
 }
@@ -26,26 +27,31 @@ type NewFromOnChainSequenceParams[IN any, DEP any, CFG any] struct {
 // NewFromOnChainSequence creates a Changeset from an operations.Sequence that deploys contracts on-chain and performs write operations.
 // It wraps sequence execution with DataStore and MCMS integration.
 func NewFromOnChainSequence[IN any, DEP any, CFG any](params NewFromOnChainSequenceParams[IN, DEP, CFG]) deployment.ChangeSetV2[CFG] {
-	resolve := func(e deployment.Environment, cfg CFG) (IN, DEP, error) {
+	resolve := func(e deployment.Environment, cfg CFG) (IN, DEP, MCMSParams, error) {
 		var in IN
 		var dep DEP
 		var err error
 		in, err = params.ResolveInput(e, cfg)
 		if err != nil {
-			return in, dep, fmt.Errorf("failed to resolve input for sequence with ID %s: %w", params.Sequence.ID(), err)
+			return in, dep, MCMSParams{}, fmt.Errorf("failed to resolve input for sequence with ID %s: %w", params.Sequence.ID(), err)
 		}
 		dep, err = params.ResolveDep(e, cfg)
 		if err != nil {
-			return in, dep, fmt.Errorf("failed to resolve dependencies for sequence with ID %s: %w", params.Sequence.ID(), err)
+			return in, dep, MCMSParams{}, fmt.Errorf("failed to resolve dependencies for sequence with ID %s: %w", params.Sequence.ID(), err)
 		}
-		return in, dep, nil
+		mcmsParams, err := params.ResolveMCMS(e, cfg)
+		if err != nil {
+			return in, dep, MCMSParams{}, fmt.Errorf("failed to resolve MCMS config for sequence with ID %s: %w", params.Sequence.ID(), err)
+		}
+		mcmsParams.Description = params.Describe(in, dep)
+		return in, dep, mcmsParams, nil
 	}
 	validate := func(e deployment.Environment, cfg CFG) error {
-		_, _, err := resolve(e, cfg)
+		_, _, _, err := resolve(e, cfg)
 		return err
 	}
 	apply := func(e deployment.Environment, cfg CFG) (deployment.ChangesetOutput, error) {
-		input, deps, err := resolve(e, cfg)
+		input, deps, mcmsParams, err := resolve(e, cfg)
 		if err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
@@ -64,16 +70,7 @@ func NewFromOnChainSequence[IN any, DEP any, CFG any](params NewFromOnChainSeque
 			WithReports(report.ExecutionReports).
 			WithDataStore(ds).
 			WithWriteOutputs(report.Output.Writes).
-			Build(MCMSParams{
-				Description: params.Describe(input, deps),
-				// TODO: Populate these with correct values later
-				OverridePreviousRoot: false,
-				ValidUntil:           2756219818,
-				TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
-				TimelockAction:       mcms_types.TimelockActionSchedule,
-				TimelockAddresses:    nil,
-				ChainMetadata:        nil,
-			})
+			Build(mcmsParams)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)

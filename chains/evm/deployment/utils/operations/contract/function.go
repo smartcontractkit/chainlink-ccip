@@ -11,4 +11,14 @@ type FunctionInput[ARGS any] struct {
 	ChainSelector uint64 `json:"chainSelector"`
 	// Args are the parameters passed to the contract call.
 	Args ARGS `json:"args"`
+	// TimelockAddress is the address of the timelock contract, if applicable for MCMS proposals
+	TimelockAddress common.Address `json:"timelockAddress,omitempty"`
+	// MCMAddress is the address of the MCMS contract, if applicable for MCMS proposals
+	MCMAddress common.Address `json:"mcmAddress,omitempty"`
+}
+
+func (fi FunctionInput[ARGS]) WithMCM(timelock common.Address, mcm common.Address) FunctionInput[ARGS] {
+	fi.TimelockAddress = timelock
+	fi.MCMAddress = mcm
+	return fi
 }

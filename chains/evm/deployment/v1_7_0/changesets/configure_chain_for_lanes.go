@@ -4,6 +4,10 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -12,9 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 type RemoteChainConfig struct {
@@ -32,6 +33,21 @@ type RemoteChainConfig struct {
 type ConfigureChainForLanesCfg struct {
 	ChainSel     uint64
 	RemoteChains map[uint64]RemoteChainConfig
+}
+
+func (c ConfigureChainForLanesCfg) MCMSConfig() *changesets.MCMSConfig {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c ConfigureChainForLanesCfg) TimelockAddressQualifier() string {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c ConfigureChainForLanesCfg) MCMSAddressQualifier() string {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (c ConfigureChainForLanesCfg) ChainSelector() uint64 {
@@ -152,5 +168,6 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			RemoteChains:  remoteChains,
 		}, nil
 	},
-	ResolveDep: changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],
+	ResolveDep:  changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],
+	ResolveMCMS: changesets.ResolveMCMSParams[ConfigureChainForLanesCfg],
 })
