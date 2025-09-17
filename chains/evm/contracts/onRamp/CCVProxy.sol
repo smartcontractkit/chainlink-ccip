@@ -177,7 +177,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
     // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
-    bytes memory tokenReceiver = IFeeQuoterV2(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
+    bytes memory tokenReceiver =
+      IFeeQuoterV2(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
     if (tokenReceiver.length == 0) {
       tokenReceiver = abi.encode(message.receiver);
     }
@@ -640,7 +641,6 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   /// @inheritdoc IEVM2AnyOnRampClient
   /// @dev getFee MUST revert if the feeToken is not listed in the fee token config, as the router assumes it does.
   /// @param destChainSelector The destination chain selector.
-  /// @param message The message to get quote for.
   /// @return feeTokenAmount The amount of fee token needed for the fee, in smallest denomination of the fee token.
   function getFee(
     uint64 destChainSelector,
