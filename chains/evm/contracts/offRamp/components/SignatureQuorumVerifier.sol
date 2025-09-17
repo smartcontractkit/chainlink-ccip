@@ -17,10 +17,12 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   error InvalidConfig();
   error ForkedChain(uint256 expected, uint256 actual);
   error WrongNumberOfSignatures();
-  error SignaturesOutOfRegistration();
   error UnauthorizedSigner();
   error NonOrderedOrNonUniqueSignatures();
   error OracleCannotBeZeroAddress();
+
+  uint256 internal constant SIGNATURE_LENGTH = 64;
+  uint256 internal constant SIGNATURE_COMPONENT_LENGTH = 32;
 
   uint256 internal immutable i_chainID;
 
@@ -38,10 +40,11 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   /// their signer addresses. This is required to efficiently check for duplicated signatures. If any signature is out
   /// of order, this function will revert with `NonOrderedOrNonUniqueSignatures`.
   /// @param signedHash The hash that is signed.
-  /// @param rs The r values of the signatures.
-  /// @param ss The s values of the signatures.
+  /// @param signatures The concatenated signatures to validate. Each signature is 64 bytes long, consisting of r
+  /// (32 bytes) and s (32 bytes). The signatures must be provided in order of their signer addresses. For example, if
+  /// the signers are [A, B, C] with addresses [0x1, 0x2, 0x3], the signatures must be provided ordered as [A, B, C].
   /// @dev The v values are assumed to be 27 for all signatures, this can be achieved by using ECDSA malleability.
-  function _validateSignatures(bytes32 signedHash, bytes32[] memory rs, bytes32[] memory ss) internal view {
+  function _validateSignatures(bytes32 signedHash, bytes calldata signatures) internal view {
     if (s_signers.length() == 0) {
       revert InvalidConfig();
     }
@@ -50,20 +53,25 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     // This avoids a (rare) scenario where chain A forks into chain A and A', and a report signed on A is replayed on A'.
     if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
-    uint256 numberOfSignatures = rs.length;
+    uint256 numberOfSignatures = signatures.length / SIGNATURE_LENGTH;
 
     uint256 threshold = s_threshold;
 
     // We allow more signatures than the threshold, but we will only validate up to the threshold to save gas.
     // This still preserves the security properties while adding flexibility.
     if (numberOfSignatures < threshold) revert WrongNumberOfSignatures();
-    if (numberOfSignatures != ss.length) revert SignaturesOutOfRegistration();
 
     uint160 lastSigner = 0;
 
     for (uint256 i; i < threshold; ++i) {
+      uint256 offset = i * SIGNATURE_LENGTH;
       // We use ECDSA malleability to only have signatures with a `v` value of 27.
-      address signer = ecrecover(signedHash, 27, rs[i], ss[i]);
+      address signer = ecrecover(
+        signedHash,
+        27,
+        bytes32(signatures[offset:offset + SIGNATURE_COMPONENT_LENGTH]),
+        bytes32(signatures[offset + SIGNATURE_COMPONENT_LENGTH:offset + SIGNATURE_LENGTH])
+      );
       // Check that the signer is registered.
       if (!s_signers.contains(signer)) revert UnauthorizedSigner();
       // This requires ordered signatures to check for duplicates. This also disallows the zero address.

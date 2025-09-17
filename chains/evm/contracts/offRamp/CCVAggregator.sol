@@ -216,7 +216,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     s_executionStates[executionStateKey] = Internal.MessageExecutionState.IN_PROGRESS;
 
-    (bool success, bytes memory err,) =
+    (bool success, bytes memory err) =
       _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, ccvData)));
     Internal.MessageExecutionState newState =
       success ? Internal.MessageExecutionState.SUCCESS : Internal.MessageExecutionState.FAILURE;
@@ -227,72 +227,15 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     s_reentrancyGuardEntered = false;
   }
 
-  error OutOfGas();
-
-  //  /// @notice Try executing a message, and catch any errors. The goal of this function is to never revert except when
-  //  /// called by the Internal.GAS_ESTIMATION_SENDER address. Most errors are easy to catch, but out of gas errors can
-  //  /// cause issues because the outer function needs enough gas to handle them gracefully without running out of gas
-  //  /// itself. To solve this, we call the _callWithGasBuffer function which ensures there is a gas buffer left to update
-  //  /// the state after the call.
-  //  /// @param message The message to be executed.
-  //  /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
-  //  /// @return errData Revert data in bytes if the execution state is FAILURE. The revert data can come from the pool,
-  //  /// the receiver, our internal execution logic or any downstream calls from these sources.
-  //  function _trialExecute(
-  //    MessageV1Codec.MessageV1 memory message,
-  //    bytes32 messageId
-  //  ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-  //    (bool success, bytes memory err, uint256 minimumGasLeft) =
-  //      _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId)));
-  //
-  //    if (success) {
-  //      // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
-  //      return (Internal.MessageExecutionState.SUCCESS, "");
-  //    }
-  //
-  //    // We want to detect if we ran out of gas inside the CallWithGasBuffer to allow for better error handling.
-  //    // EIP-150 means only 63/64 of the gas is forwarded to the callee. If they ran out of gas, the 1/64 is available
-  //    // in this function again and should not be counted towards the gas that was left inside the function.
-  //    // 20_000 gas is an additional buffer as the contract ran out of gas before it could do some action that would have
-  //    // taken it over the gas allowance. The most expensive operation that is regularly done is an SSTORE which costs
-  //    // 20_000 gas when setting a storage slot from zero to non-zero. This quite large buffer does mean there could be
-  //    // false positives.
-  //    bool ranOutOfGasInCall = err.length == 0 && gasleft() < minimumGasLeft + 20_000;
-  //
-  //    // We have a special gas estimator caller address that is used to cause reverts on Out Of Gas situations. Normally,
-  //    // the call would succeed but mark the message as failed. However, for gas estimation we want to know if the
-  //    // message would have succeeded or not, so we revert here to signal to the gas estimator that the gas limit was
-  //    // insufficient.
-  //    if (msg.sender == Internal.GAS_ESTIMATION_SENDER) {
-  //      if (
-  //        CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(err)
-  //          || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(err)
-  //          || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(err) || ranOutOfGasInCall
-  //      ) {
-  //        revert InsufficientGasToCompleteTx(bytes4(err));
-  //      }
-  //    }
-  //    // We don't compare against gasBufferToUpdateState as we know there was enough gas to perform the call, so
-  //    // we expect it to be spent. This reduces false positives in the out of gas detection.
-  //    if (ranOutOfGasInCall) {
-  //      err = abi.encodeWithSelector(OutOfGas.selector);
-  //    }
-  //
-  //    // return the message execution state as FAILURE and the revert data.
-  //    // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES.
-  //    return (Internal.MessageExecutionState.FAILURE, err);
-  //  }
-
   function _callWithGasBuffer(
     bytes memory payload
-  ) internal returns (bool success, bytes memory retData, uint256 minimumGasLeft) {
+  ) internal returns (bool success, bytes memory retData) {
     // allocate retData memory ahead of time
     retData = new bytes(Internal.MAX_RET_BYTES);
     uint16 maxReturnBytes = Internal.MAX_RET_BYTES;
 
     uint256 gasLeft = gasleft();
-    // We add 100 gas as a buffer for the operations after the gasleft() call on the line above.
-    if (gasLeft <= MAX_GAS_BUFFER_TO_UPDATE_STATE + 100) {
+    if (gasLeft <= MAX_GAS_BUFFER_TO_UPDATE_STATE) {
       revert InsufficientGasToCompleteTx(bytes4(uint32(gasleft())));
     }
 
@@ -311,7 +254,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       // copy the bytes from retData[0:_toCopy]
       returndatacopy(add(retData, 0x20), 0x0, toCopy)
     }
-    return (success, retData, gasLimit / 64 + MAX_GAS_BUFFER_TO_UPDATE_STATE);
+    return (success, retData);
   }
 
   /// @notice Executes a single message.
@@ -404,6 +347,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       gasleft() - i_gasForCallExactCheck - 10000,
       receiver
     );
+
     // If CCIP receiver execution is not successful, revert the call including token transfers.
     if (!success) revert ReceiverError(returnData);
   }
