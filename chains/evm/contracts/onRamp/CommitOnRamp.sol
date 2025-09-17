@@ -42,11 +42,11 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   /// @dev This function is called by the CCV proxy to delegate message verification to this specific verifier.
   /// It performs critical validation to ensure message integrity and proper sequencing.
   /// @param message Decoded MessageV1 payload for verification.
-  /// @param 2nd parameter is messageId, unused.
-  /// @param 3rd parameter is feeToken, unused.
-  /// @param 4th parameter is feeTokenAmount, unused.
-  /// @param 5th parameter, is verifierArgs (opaque verifier-specific args), unused.
-  /// @return verifierReturnData Verifier-specific encoded data
+  /// @param 2nd parameter is messageId, unused. Allows the onRamp to use the messageId to enable their offchain components.
+  /// @param 3rd parameter is feeToken, unused. Helps determine verifierReturnData.
+  /// @param 4th parameter is feeTokenAmount, unused. Helps determine verifierReturnData.
+  /// @param 5th parameter, is verifierArgs (opaque verifier-specific args), unused. Helps determine verifierReturnData.
+  /// @return verifierReturnData Verifier-specific encoded data.
   function forwardToVerifier(
     MessageV1Codec.MessageV1 calldata message,
     bytes32, // messageId, unused

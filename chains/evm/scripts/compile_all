@@ -9,7 +9,7 @@ echo " └───────────────────────�
 # The offRamp uses a specific lower optimization runs value. All other contracts use the default value
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_OFFRAMP=800
-OPTIMIZE_RUNS_FEE_QUOTER=2500
+OPTIMIZE_RUNS_FEE_QUOTER=3000
 OPTIMIZE_RUNS_LARGE_TOKEN_POOL=5000
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
