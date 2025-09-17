@@ -10,44 +10,42 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
-  /// @param signers ith element is address ith oracle uses to sign a report.
-  /// @param F maximum number of faulty/dishonest singers the protocol can tolerate while still working correctly.
-  event ConfigSet(address[] signers, uint8 F);
+  /// @param signers List of valid signers of which only `threshold` are required to sign each report.
+  /// @param threshold The number of signatures required for a report to be valid.
+  event ConfigSet(address[] signers, uint8 threshold);
 
   error InvalidConfig();
   error ForkedChain(uint256 expected, uint256 actual);
   error WrongNumberOfSignatures();
-  error SignaturesOutOfRegistration();
   error UnauthorizedSigner();
-  error NonUniqueSignatures();
+  error NonOrderedOrNonUniqueSignatures();
   error OracleCannotBeZeroAddress();
 
-  struct SignatureConfigArgs {
-    uint8 threshold; // The expected number of signatures for a report.
-    address[] signers; // The signing address of each signer.
-  }
-
-  struct SignatureConfigConfig {
-    uint8 threshold; // The expected number of signatures for a report.
-    EnumerableSet.AddressSet signers; // The signing address of each signer.
-  }
-
-  SignatureConfigConfig private s_config;
+  uint256 internal constant SIGNATURE_LENGTH = 64;
+  uint256 internal constant SIGNATURE_COMPONENT_LENGTH = 32;
 
   uint256 internal immutable i_chainID;
+
+  /// @notice List of valid signers of which only `threshold` are required to sign each report.
+  EnumerableSet.AddressSet internal s_signers;
+
+  /// @notice The number of signatures required for a report to be valid.
+  uint8 internal s_threshold;
 
   constructor() {
     i_chainID = block.chainid;
   }
 
-  /// @notice Validates the signatures of a given report hash.
-  /// @param reportHash The hash of the report to validate signatures for.
-  /// @param rs The r values of the signatures.
-  /// @param ss The s values of the signatures.
+  /// @notice Validates the signatures of a given report hash. IMPORTANT: the signatures must be provided in order of
+  /// their signer addresses. This is required to efficiently check for duplicated signatures. If any signature is out
+  /// of order, this function will revert with `NonOrderedOrNonUniqueSignatures`.
+  /// @param signedHash The hash that is signed.
+  /// @param signatures The concatenated signatures to validate. Each signature is 64 bytes long, consisting of r
+  /// (32 bytes) and s (32 bytes). The signatures must be provided in order of their signer addresses. For example, if
+  /// the signers are [A, B, C] with addresses [0x1, 0x2, 0x3], the signatures must be provided ordered as [A, B, C].
   /// @dev The v values are assumed to be 27 for all signatures, this can be achieved by using ECDSA malleability.
-  function _validateSignatures(bytes32 reportHash, bytes32[] memory rs, bytes32[] memory ss) internal view {
-    SignatureConfigConfig storage config = s_config;
-    if (config.signers.length() == 0) {
+  function _validateSignatures(bytes32 signedHash, bytes calldata signatures) internal view {
+    if (s_signers.length() == 0) {
       revert InvalidConfig();
     }
 
@@ -55,56 +53,61 @@ contract SignatureQuorumVerifier is Ownable2StepMsgSender {
     // This avoids a (rare) scenario where chain A forks into chain A and A', and a report signed on A is replayed on A'.
     if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
-    uint256 numberOfSignatures = rs.length;
+    uint256 numberOfSignatures = signatures.length / SIGNATURE_LENGTH;
 
-    if (numberOfSignatures != config.threshold) revert WrongNumberOfSignatures();
-    if (numberOfSignatures != ss.length) revert SignaturesOutOfRegistration();
+    uint256 threshold = s_threshold;
+
+    // We allow more signatures than the threshold, but we will only validate up to the threshold to save gas.
+    // This still preserves the security properties while adding flexibility.
+    if (numberOfSignatures < threshold) revert WrongNumberOfSignatures();
 
     uint160 lastSigner = 0;
 
-    for (uint256 i; i < numberOfSignatures; ++i) {
+    for (uint256 i; i < threshold; ++i) {
+      uint256 offset = i * SIGNATURE_LENGTH;
       // We use ECDSA malleability to only have signatures with a `v` value of 27.
-      address signer = ecrecover(reportHash, 27, rs[i], ss[i]);
+      address signer = ecrecover(
+        signedHash,
+        27,
+        bytes32(signatures[offset:offset + SIGNATURE_COMPONENT_LENGTH]),
+        bytes32(signatures[offset + SIGNATURE_COMPONENT_LENGTH:offset + SIGNATURE_LENGTH])
+      );
       // Check that the signer is registered.
-      if (!config.signers.contains(signer)) revert UnauthorizedSigner();
+      if (!s_signers.contains(signer)) revert UnauthorizedSigner();
       // This requires ordered signatures to check for duplicates. This also disallows the zero address.
-      if (uint160(signer) <= lastSigner) revert NonUniqueSignatures();
+      if (uint160(signer) <= lastSigner) revert NonOrderedOrNonUniqueSignatures();
       lastSigner = uint160(signer);
     }
   }
 
   /// @notice Returns the signer sets, and F value.
-  function getSignatureConfig() external view returns (SignatureConfigArgs memory) {
-    return SignatureConfigArgs({threshold: s_config.threshold, signers: s_config.signers.values()});
+  function getSignatureConfig() external view returns (address[] memory, uint8) {
+    return (s_signers.values(), s_threshold);
   }
 
   /// @notice Sets a new signature configuration.
-  function setSignatureConfig(
-    SignatureConfigArgs calldata signatureConfig
-  ) external onlyOwner {
-    if (signatureConfig.threshold == 0 || signatureConfig.threshold > signatureConfig.signers.length) {
+  function setSignatureConfig(address[] memory signers, uint8 threshold) external onlyOwner {
+    if (threshold == 0 || threshold > signers.length) {
       revert InvalidConfig();
     }
 
-    SignatureConfigConfig storage config = s_config;
-
     // We must remove all current signers first.
-    for (uint256 i = 0; i < config.signers.length();) {
-      config.signers.remove(config.signers.at(i));
+    while (s_signers.length() > 0) {
+      s_signers.remove(s_signers.at(0));
     }
 
     // Add new signers.
-    for (uint256 signerIndex = 0; signerIndex < signatureConfig.signers.length; ++signerIndex) {
-      if (signatureConfig.signers[signerIndex] == address(0)) revert OracleCannotBeZeroAddress();
+    for (uint256 signerIndex = 0; signerIndex < signers.length; ++signerIndex) {
+      if (signers[signerIndex] == address(0)) revert OracleCannotBeZeroAddress();
 
       // This checks for duplicates.
-      if (!config.signers.add(signatureConfig.signers[signerIndex])) {
+      if (!s_signers.add(signers[signerIndex])) {
         revert InvalidConfig();
       }
     }
 
-    config.threshold = signatureConfig.threshold;
+    s_threshold = threshold;
 
-    emit ConfigSet(signatureConfig.signers, signatureConfig.threshold);
+    emit ConfigSet(signers, threshold);
   }
 }
