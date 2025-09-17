@@ -53,7 +53,7 @@ contract FeeQuoterV2 is IFeeQuoterV2, FeeQuoter {
   function resolveTokenReceiver(
     bytes calldata extraArgs
   ) external pure returns (bytes memory tokenReceiver) {
-    if (bytes4(extraArgs[:4]) != Client.SVM_EXTRA_ARGS_V1_TAG) {
+    if (extraArgs.length < 4 || bytes4(extraArgs[:4]) != Client.SVM_EXTRA_ARGS_V1_TAG) {
       return (bytes(""));
     }
 

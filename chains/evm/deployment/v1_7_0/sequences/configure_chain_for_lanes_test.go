@@ -1,12 +1,11 @@
 package sequences_test
 
 import (
-	"bytes"
 	"context"
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -17,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
@@ -132,6 +132,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				}
 			}
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
+			ccipMessageDest := common.HexToAddress("0x11").Bytes()
 			fqDestChainConfig := fee_quoter_v2.DestChainConfig{
 				IsEnabled:                         true,
 				MaxNumberOfTokensPerMsg:           10,
@@ -168,6 +169,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 						remoteChainSelector: {
 							AllowTrafficFrom:            true,
 							CCIPMessageSource:           ccipMessageSource,
+							CCIPMessageDest:             ccipMessageDest,
 							DefaultCCVOffRamps:          []common.Address{commitOffRamp},
 							DefaultCCVOnRamps:           []common.Address{commitOnRamp},
 							DefaultExecutor:             executorOnRamp,
@@ -220,6 +222,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, r.Hex(), destChainConfig.Output.Router.Hex(), "Router in dest chain config should match Router address")
+			require.Equal(t, ccipMessageDest, destChainConfig.Output.CcvAggregator, "CcvAggregator in dest chain config should match CCIPMessageDest")
 			require.Equal(t, executorOnRamp.Hex(), destChainConfig.Output.DefaultExecutor.Hex(), "DefaultExecutor in dest chain config should match configured DefaultExecutor")
 			require.Len(t, destChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in dest chain config")
 			require.Equal(t, commitOnRamp.Hex(), destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitOnRamp address")
@@ -248,54 +251,37 @@ func TestConfigureChainForLanes(t *testing.T) {
 			// Try sending CCIP message /////////////
 			/////////////////////////////////////////
 
-			const clientABI = `
-			[
-				{
-					"name": "encodeGenericExtraArgsV2",
-					"type": "function",
-					"inputs": [
+			_, tx, msgHasher, err := message_hasher.DeployMessageHasher(evmChain.DeployerKey, evmChain.Client)
+			require.NoError(t, err, "Failed to deploy MessageHasher")
+			_, err = evmChain.Confirm(tx)
+			require.NoError(t, err, "Failed to confirm MessageHasher deployment")
+
+			extraArgs, err := msgHasher.EncodeGenericExtraArgsV3(
+				&bind.CallOpts{Context: t.Context()},
+				message_hasher.ClientEVMExtraArgsV3{
+					RequiredCCV: []message_hasher.ClientCCV{
 						{
-							"components": [
-								{
-									"name": "gasLimit",
-									"type": "uint256"
-								},
-								{
-									"name": "allowOutOfOrderExecution",
-									"type": "bool"
-								}
-							],
-							"name": "args",
-							"type": "tuple"
-						}
-					],
-					"outputs": [],
-					"stateMutability": "pure"
-				}
-			]
-			`
+							CcvAddress: commitOnRamp,
+							Args:       []byte{},
+						},
+					},
+					OptionalCCV:       []message_hasher.ClientCCV{},
+					OptionalThreshold: 0,
+					FinalityConfig:    0,
+					Executor:          executorOnRamp,
+					ExecutorArgs:      []byte{},
+					TokenArgs:         []byte{},
+				},
+			)
+			require.NoError(t, err, "EncodeGenericExtraArgsV3 should not error")
 
-			parsedABI, err := abi.JSON(bytes.NewReader([]byte(clientABI)))
-			require.NoError(t, err, "Failed to parse ABI")
-
-			genericExtraArgsV2 := struct {
-				GasLimit                 *big.Int
-				AllowOutOfOrderExecution bool
-			}{
-				GasLimit:                 big.NewInt(1_000_000),
-				AllowOutOfOrderExecution: true,
-			}
-			encoded, err := parsedABI.Methods["encodeGenericExtraArgsV2"].Inputs.Pack(genericExtraArgsV2)
-			require.NoError(t, err, "Failed to ABI encode GenericExtraArgsV2")
-
-			tag := []byte{0x18, 0x1d, 0xcf, 0x10} // GENERIC_EXTRA_ARGS_V2_TAG
 			ccipSendArgs := router.CCIPSendArgs{
 				DestChainSelector: remoteChainSelector,
 				EVM2AnyMessage: router.EVM2AnyMessage{
 					Receiver:     common.LeftPadBytes(evmChain.DeployerKey.From.Bytes(), 32),
 					Data:         []byte{},
 					TokenAmounts: []router.EVMTokenAmount{},
-					ExtraArgs:    append(tag, encoded...),
+					ExtraArgs:    extraArgs,
 				},
 			}
 

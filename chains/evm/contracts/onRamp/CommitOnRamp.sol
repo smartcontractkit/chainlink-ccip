@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
-
 import {Client} from "../libraries/Client.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseOnRamp} from "./BaseOnRamp.sol";
@@ -44,26 +42,23 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   /// @dev This function is called by the CCV proxy to delegate message verification to this specific verifier.
   /// It performs critical validation to ensure message integrity and proper sequencing.
   /// @param message Decoded MessageV1 payload for verification.
-  /// @param 2nd parameter is messageId, unused.
-  /// @param feeToken Fee token used for the message.
-  /// @param feeTokenAmount Amount of fee token provided.
-  /// @param verifierArgs Opaque verifier-specific args.
-  /// @return verifierReturnData Verifier-specific encoded data
+  /// @param 2nd parameter is messageId, unused. Allows the onRamp to use the messageId to enable their offchain components.
+  /// @param 3rd parameter is feeToken, unused. Helps determine verifierReturnData.
+  /// @param 4th parameter is feeTokenAmount, unused. Helps determine verifierReturnData.
+  /// @param 5th parameter, is verifierArgs (opaque verifier-specific args), unused. Helps determine verifierReturnData.
+  /// @return verifierReturnData Verifier-specific encoded data.
   function forwardToVerifier(
     MessageV1Codec.MessageV1 calldata message,
     bytes32, // messageId, unused
-    address feeToken,
-    uint256 feeTokenAmount,
-    bytes calldata verifierArgs
+    address, // feeToken, unused
+    uint256, // feeTokenAmount, unused
+    bytes calldata // verifierArgs, unused
   ) external returns (bytes memory verifierReturnData) {
     // For EVM, sender is expected to be 20 bytes.
     address senderAddress = address(bytes20(message.sender));
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
-    // TODO
-    IFeeQuoterV2(s_dynamicConfig.feeQuoter).processMessageArgs(
-      message.destChainSelector, feeToken, feeTokenAmount, verifierArgs, message.receiver
-    );
+    // TODO: Process msg & return verifier data
     return "";
   }
 
@@ -124,11 +119,12 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
   // ================================================================
 
   function getFee(
-    uint64 destChainSelector,
-    Client.EVM2AnyMessage memory message,
+    uint64, // destChainSelector
+    Client.EVM2AnyMessage memory, // message
     bytes memory // extraArgs
   ) external view returns (uint256) {
-    return IFeeQuoterV2(s_dynamicConfig.feeQuoter).getValidatedFee(destChainSelector, message);
+    // TODO: Process msg & return fee
+    return 0;
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
