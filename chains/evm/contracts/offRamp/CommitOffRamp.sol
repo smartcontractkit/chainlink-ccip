@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {ICCVOffRampV1} from "../interfaces/ICCVOffRampV1.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {SignatureQuorumVerifier} from "./components/SignatureQuorumVerifier.sol";
 
@@ -12,33 +11,25 @@ import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersion {
-  error ZeroAddressNotAllowed();
-
-  error InvalidNonce(uint64 nonce);
+  error InvalidCCVData();
 
   string public constant override typeAndVersion = "CommitOffRamp 1.7.0-dev";
 
-  address internal immutable i_nonceManager;
+  uint256 internal constant SIGNATURE_LENGTH_BYTES = 2;
 
-  constructor(
-    address nonceManager
-  ) {
-    if (nonceManager == address(0)) {
-      revert ZeroAddressNotAllowed();
+  function verifyMessage(MessageV1Codec.MessageV1 calldata, bytes32 messageHash, bytes calldata ccvData) external view {
+    if (ccvData.length < SIGNATURE_LENGTH_BYTES) {
+      revert InvalidCCVData();
     }
-    i_nonceManager = nonceManager;
-  }
 
-  function verifyMessage(
-    MessageV1Codec.MessageV1 calldata,
-    bytes32 messageHash,
-    bytes calldata ccvData,
-    Internal.MessageExecutionState
-  ) external {
-    (bytes memory ccvArgs, bytes32[] memory rs, bytes32[] memory ss) =
-      abi.decode(ccvData, (bytes, bytes32[], bytes32[]));
+    uint256 signatureLength = uint16(bytes2(ccvData[:SIGNATURE_LENGTH_BYTES]));
+    if (ccvData.length < SIGNATURE_LENGTH_BYTES + signatureLength) {
+      revert InvalidCCVData();
+    }
 
-    _validateSignatures(keccak256(bytes.concat(messageHash, ccvArgs)), rs, ss);
+    // Even though the current version of this contract only expects signatures to be included in the ccvData, bounding
+    // it to the given length allows potential forward compatibility with future formats that supply more data.
+    _validateSignatures(messageHash, ccvData[SIGNATURE_LENGTH_BYTES:SIGNATURE_LENGTH_BYTES + signatureLength]);
   }
 
   function supportsInterface(

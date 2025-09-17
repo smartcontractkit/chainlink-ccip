@@ -13,10 +13,7 @@ import (
 var ContractType cldf_deployment.ContractType = "CommitOffRamp"
 
 type ConstructorArgs struct {
-	NonceManager common.Address
 }
-
-type SignatureConfigArgs = commit_offramp.SignatureQuorumVerifierSignatureConfigArgs
 
 var Deploy = contract.NewDeploy(
 	"commit-offramp:deploy",
@@ -27,12 +24,17 @@ var Deploy = contract.NewDeploy(
 	func(ConstructorArgs) error { return nil },
 	contract.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := commit_offramp.DeployCommitOffRamp(opts, backend, args.NonceManager)
+			address, tx, _, err := commit_offramp.DeployCommitOffRamp(opts, backend)
 			return address, tx, err
 		},
 		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)
 	},
 )
+
+type SetSignatureConfigArgs struct {
+	Signers   []common.Address
+	Threshold uint8
+}
 
 var SetSignatureConfigs = contract.NewWrite(
 	"commit-offramp:set-signature-config",
@@ -42,8 +44,8 @@ var SetSignatureConfigs = contract.NewWrite(
 	commit_offramp.CommitOffRampABI,
 	commit_offramp.NewCommitOffRamp,
 	contract.OnlyOwner,
-	func(SignatureConfigArgs) error { return nil },
-	func(commitOffRamp *commit_offramp.CommitOffRamp, opts *bind.TransactOpts, args SignatureConfigArgs) (*types.Transaction, error) {
-		return commitOffRamp.SetSignatureConfig(opts, args)
+	func(SetSignatureConfigArgs) error { return nil },
+	func(commitOffRamp *commit_offramp.CommitOffRamp, opts *bind.TransactOpts, args SetSignatureConfigArgs) (*types.Transaction, error) {
+		return commitOffRamp.SetSignatureConfig(opts, args.Signers, args.Threshold)
 	},
 )

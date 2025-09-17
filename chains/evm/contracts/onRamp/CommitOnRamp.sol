@@ -53,7 +53,7 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
     address, // feeToken, unused
     uint256, // feeTokenAmount, unused
     bytes calldata // verifierArgs, unused
-  ) external returns (bytes memory verifierReturnData) {
+  ) external view returns (bytes memory verifierReturnData) {
     // For EVM, sender is expected to be 20 bytes.
     address senderAddress = address(bytes20(message.sender));
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
@@ -122,7 +122,7 @@ contract CommitOnRamp is Ownable2StepMsgSender, BaseOnRamp {
     uint64, // destChainSelector
     Client.EVM2AnyMessage memory, // message
     bytes memory // extraArgs
-  ) external view returns (uint256) {
+  ) external pure returns (uint256) {
     // TODO: Process msg & return fee
     return 0;
   }
