@@ -40,23 +40,6 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
       abi.decode(ccvData, (bytes, bytes32[], bytes32[]));
 
     _validateSignatures(keccak256(bytes.concat(messageHash, ccvArgs)), rs, ss);
-
-    uint64 nonce = abi.decode(ccvArgs, (uint64));
-
-    // Nonce changes per state transition (these only apply for ordered messages):
-    // UNTOUCHED -> FAILURE  nonce bump.
-    // UNTOUCHED -> SUCCESS  nonce bump.
-    // FAILURE   -> SUCCESS  no nonce bump.
-    // UNTOUCHED messages MUST be executed in order always.
-    // If nonce == 0 then out of order execution is allowed.
-    if (nonce != 0) {
-      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
-        if (!INonceManager(i_nonceManager).incrementInboundNonce(message.sourceChainSelector, nonce, message.sender)) {
-          revert InvalidNonce(nonce);
-        }
-      }
-    }
   }
 
   function supportsInterface(
