@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {ICCVOffRampV1} from "../interfaces/ICCVOffRampV1.sol";
-import {INonceManager} from "../interfaces/INonceManager.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Internal} from "../libraries/Internal.sol";
@@ -31,10 +30,10 @@ contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersio
   }
 
   function verifyMessage(
-    MessageV1Codec.MessageV1 calldata message,
+    MessageV1Codec.MessageV1 calldata,
     bytes32 messageHash,
     bytes calldata ccvData,
-    Internal.MessageExecutionState originalState
+    Internal.MessageExecutionState
   ) external {
     (bytes memory ccvArgs, bytes32[] memory rs, bytes32[] memory ss) =
       abi.decode(ccvData, (bytes, bytes32[], bytes32[]));
