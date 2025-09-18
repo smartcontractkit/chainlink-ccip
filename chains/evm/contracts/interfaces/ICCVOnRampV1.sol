@@ -12,8 +12,6 @@ interface ICCVOnRampV1 {
   /// where required (e.g., verifier hooks), but using EVM2AnyMessage here keeps the
   /// interface aligned with what clients construct and pass to the router.
   function getFee(
-    uint64 destChainSelector,
-    address originalCaller,
     Client.EVM2AnyMessage memory message,
     bytes memory extraArgs
   ) external view returns (uint256);
@@ -26,8 +24,6 @@ interface ICCVOnRampV1 {
   /// @param verifierArgs Opaque verifier-specific arguments from the sender.
   /// @return verifierData Verifier-specific return data blob.
   function forwardToVerifier(
-    uint64 destChainSelector,
-    address originalCaller,
     MessageV1Codec.MessageV1 calldata message,
     bytes32 messageId,
     address feeToken,

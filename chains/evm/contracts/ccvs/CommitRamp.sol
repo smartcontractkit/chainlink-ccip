@@ -1,0 +1,177 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {ICCVOffRampV1} from "../interfaces/ICCVOffRampV1.sol";
+
+import {Client} from "../libraries/Client.sol";
+import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
+import {BaseOnRamp} from "./components/BaseOnRamp.sol";
+import {SignatureQuorumVerifier} from "./components/SignatureQuorumVerifier.sol";
+import {Proxiable} from "./components/Proxiable.sol";
+
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+
+/// @notice The CommitRamp is a contract that handles lane-specific fee logic and message verification.
+/// @dev OnRamp and OffRamp capabilities are combined to enable a single proxy address for a CCV each chain.
+contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVerifier, BaseOnRamp, Proxiable {
+  error InvalidConfig();
+  error InvalidCCVData();
+  error OnlyCallableByOwnerOrAllowlistAdmin();
+
+  event ConfigSet(DynamicConfig dynamicConfig);
+
+  /// @dev Defines upgradeable configuration parameters.
+  // solhint-disable-next-line gas-struct-packing
+  struct DynamicConfig {
+    address feeQuoter; // The contract used to quote fees on source.
+    address feeAggregator; // Entity capable of withdrawing fees from the ramp.
+    address allowlistAdmin; // Entity capable adding or removing allowed senders.
+  }
+
+  // STATIC CONFIG
+  string public constant override typeAndVersion = "CommitRamp 1.7.0-dev";
+  /// @dev The number of bytes allocated to encoding the signature length within the ccvData.
+  uint256 internal constant SIGNATURE_LENGTH_BYTES = 2;
+
+  // DYNAMIC CONFIG
+  DynamicConfig private s_dynamicConfig;
+
+  constructor(
+    DynamicConfig memory dynamicConfig
+  ) {
+    _setDynamicConfig(dynamicConfig);
+  }
+
+  function supportsInterface(
+    bytes4 interfaceId
+  ) external pure returns (bool) {
+    return interfaceId == type(ICCVOffRampV1).interfaceId || interfaceId == type(IERC165).interfaceId;
+  }
+
+  /// @notice Forwards a message from CCV proxy to this verifier for processing and returns verifier-specific data.
+  /// @dev This function is called by the CCV proxy to delegate message verification to this specific verifier.
+  /// It performs critical validation to ensure message integrity and proper sequencing.
+  /// @param message Decoded MessageV1 payload for verification.
+  /// @param 2nd parameter is messageId, unused. Allows the onRamp to use the messageId to enable their offchain components.
+  /// @param 3rd parameter is feeToken, unused. Helps determine verifierReturnData.
+  /// @param 4th parameter is feeTokenAmount, unused. Helps determine verifierReturnData.
+  /// @param 5th parameter, is verifierArgs (opaque verifier-specific args), unused. Helps determine verifierReturnData.
+  /// @return verifierReturnData Verifier-specific encoded data.
+  function forwardToVerifier(
+    MessageV1Codec.MessageV1 calldata message,
+    bytes32, // messageId, unused
+    address, // feeToken, unused
+    uint256, // feeTokenAmount, unused
+    bytes calldata // verifierArgs, unused
+  ) external view returns (bytes memory verifierReturnData) {
+    // For EVM, sender is expected to be 20 bytes.
+    address senderAddress = address(bytes20(message.sender));
+    _assertSenderIsAllowed(message.destChainSelector, senderAddress, msg.sender);
+
+    // TODO: Process msg & return verifier data
+    return "";
+  }
+
+  function verifyMessage(MessageV1Codec.MessageV1 calldata, bytes32 messageHash, bytes calldata ccvData) external view {
+    if (ccvData.length < SIGNATURE_LENGTH_BYTES) {
+      revert InvalidCCVData();
+    }
+
+    uint256 signatureLength = uint16(bytes2(ccvData[:SIGNATURE_LENGTH_BYTES]));
+    if (ccvData.length < SIGNATURE_LENGTH_BYTES + signatureLength) {
+      revert InvalidCCVData();
+    }
+
+    // Even though the current version of this contract only expects signatures to be included in the ccvData, bounding
+    // it to the given length allows potential forward compatibility with future formats that supply more data.
+    _validateSignatures(messageHash, ccvData[SIGNATURE_LENGTH_BYTES:SIGNATURE_LENGTH_BYTES + signatureLength]);
+  }
+
+  // ================================================================
+  // │                           Config                             │
+  // ================================================================
+
+  /// @notice Returns the dynamic config.
+  /// @return dynamicConfig the dynamic configuration.
+  function getDynamicConfig() external view returns (DynamicConfig memory dynamicConfig) {
+    return s_dynamicConfig;
+  }
+
+  /// @notice Sets the dynamic configuration.
+  /// @param dynamicConfig The configuration.
+  function setDynamicConfig(
+    DynamicConfig memory dynamicConfig
+  ) external onlyOwner {
+    _setDynamicConfig(dynamicConfig);
+  }
+
+  /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
+  function _setDynamicConfig(
+    DynamicConfig memory dynamicConfig
+  ) internal {
+    if (dynamicConfig.feeQuoter == address(0) || dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
+
+    s_dynamicConfig = dynamicConfig;
+
+    emit ConfigSet(dynamicConfig);
+  }
+
+  /// @notice Updates destination chains specific configs.
+  /// @param destChainConfigArgs Array of destination chain specific configs.
+  function applyDestChainConfigUpdates(
+    DestChainConfigArgs[] calldata destChainConfigArgs
+  ) external onlyOwner {
+    _applyDestChainConfigUpdates(destChainConfigArgs);
+  }
+
+  /// @notice Updates allowlistConfig for Senders.
+  /// @dev configuration used to set the list of senders who are authorized to send messages.
+  /// @param allowlistConfigArgsItems Array of AllowlistConfigArguments where each item is for a destChainSelector.
+  function applyAllowlistUpdates(
+    AllowlistConfigArgs[] calldata allowlistConfigArgsItems
+  ) external {
+    if (msg.sender != owner()) {
+      if (msg.sender != s_dynamicConfig.allowlistAdmin) {
+        revert OnlyCallableByOwnerOrAllowlistAdmin();
+      }
+    }
+
+    _applyAllowlistUpdates(allowlistConfigArgsItems);
+  }
+
+  // ================================================================
+  // │                             Fees                             │
+  // ================================================================
+
+  function getFee(
+    Client.EVM2AnyMessage memory, // message
+    bytes memory // extraArgs
+  ) external pure returns (uint256) {
+    // TODO: Process msg & return fee
+    return 0;
+  }
+
+  /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
+  /// @param feeTokens The fee tokens to withdraw.
+  /// @dev This function can be permissionless as it only transfers tokens to the fee aggregator which is a trusted address.
+  function withdrawFeeTokens(
+    address[] calldata feeTokens
+  ) external {
+    _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
+  }
+
+  // ================================================================
+  // │                             Upgrades                         │
+  // ================================================================
+
+  /// @notice Upgrades the implementation address to `newAddress`.
+  /// @param newAddress The new implementation address.
+  function upgradeTo(address newAddress) external onlyOwner {
+    updateCodeAddress(newAddress);
+
+    // TODO: applyStorageUpdates();
+  }
+}

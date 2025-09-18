@@ -331,8 +331,6 @@ contract ReentrantCCV is ICCVOffRampV1 {
   }
 
   function verifyMessage(
-    uint64, /* remoteChainSelector */
-    address, /* originalCaller */
     MessageV1Codec.MessageV1 memory message,
     bytes32, /* messageHash */
     bytes memory ccvData

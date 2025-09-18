@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
-import {BaseOnRamp} from "../../onRamp/BaseOnRamp.sol";
+import {BaseOnRamp} from "../../ccvs/components/BaseOnRamp.sol";
 
 /// @notice Test helper contract to expose BaseOnRamp's internal functions for testing
 contract BaseOnRampTestHelper is BaseOnRamp {
@@ -28,8 +28,6 @@ contract BaseOnRampTestHelper is BaseOnRamp {
   }
 
   function forwardToVerifier(
-    uint64,
-    address,
     MessageV1Codec.MessageV1 calldata,
     bytes32,
     address,
@@ -39,7 +37,7 @@ contract BaseOnRampTestHelper is BaseOnRamp {
     return "";
   }
 
-  function getFee(uint64, address, Client.EVM2AnyMessage memory, bytes memory) external pure returns (uint256) {
+  function getFee(Client.EVM2AnyMessage memory, bytes memory) external pure returns (uint256) {
     return 0;
   }
 
