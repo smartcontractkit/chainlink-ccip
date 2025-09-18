@@ -31,11 +31,10 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
   // ================================================================
 
   function lockOrBurn(
-    Pool.LockOrBurnV2 calldata lockOrBurnIn
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    bytes calldata /* tokenExtraData */
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(
-      lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, lockOrBurnIn.originalSender, lockOrBurnIn.amount
-    );
+    _validateLockOrBurn(lockOrBurnIn);
     _lockOrBurn(lockOrBurnIn.amount);
 
     emit LockedOrBurned({

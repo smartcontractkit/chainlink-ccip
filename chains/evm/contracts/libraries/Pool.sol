@@ -61,15 +61,6 @@ library Pool {
 
   // Pool v2 structs.
 
-  struct LockOrBurnV2 {
-    bytes receiver; //  The recipient of the tokens on the destination chain, abi encoded.
-    uint64 remoteChainSelector; // ─╮ The chain ID of the destination chain.
-    address originalSender; // ─────╯ The original sender of the tx on the source chain.
-    uint256 amount; //  The amount of tokens to lock or burn, denominated in the source token's decimals.
-    address localToken; //  The address on this chain of the token to lock or burn.
-    bytes tokenExtraData; // Extra data for token operations.
-  }
-
   struct Quote {
     uint256 feeTokenAmount; //The amount of fee token needed for the fee, in smallest denomination of the fee token.
     uint256 transferTokenFee; // The amount billed in token pool's localToken.

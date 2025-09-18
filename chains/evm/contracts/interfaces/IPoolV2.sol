@@ -14,7 +14,8 @@ interface IPoolV2 is IPoolV1 {
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
   /// @return lockOrBurnOut Encoded data fields for the processing of tokens on the destination chain.
   function lockOrBurn(
-    Pool.LockOrBurnV2 calldata lockOrBurnIn
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    bytes calldata tokenExtraData
   ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut);
 
   // TODO add new methods here for V2. Everything below is a placeholder.

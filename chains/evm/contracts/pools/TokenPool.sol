@@ -275,10 +275,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// - allowlist status
   /// - if the sender is a valid onRamp
   /// - rate limit status
-  /// @param localToken The local token to be locked or burned.
-  /// @param remoteChainSelector The remote chain selector to which the tokens are being sent.
-  /// @param originalSender The original sender of the tokens on the source chain.
-  /// @param amount The amount to be locked or burned.
+  /// @param lockOrBurnIn The input to validate.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
   function _validateLockOrBurn(
