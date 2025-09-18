@@ -113,7 +113,7 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
     // Mock pool to require a specific CCV.
     vm.mockCall(
       pool,
-      abi.encodeCall(IPoolV2.getRequiredCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, "")),
+      abi.encodeCall(IPoolV2.getRequiredInboundCCVs, (SOURCE_CHAIN_SELECTOR, tokenAmount, "")),
       abi.encode(_arrayOf(poolRequiredCCV))
     );
 
