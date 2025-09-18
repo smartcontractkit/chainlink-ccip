@@ -152,19 +152,6 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = abi.encode(address(s_lockReleasePool));
 
-    // Call applyChainUpdates to add support for remoteChainSelector 99999
-    {
-      TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-      chainUpdates[0] = TokenPool.ChainUpdate({
-        remoteChainSelector: testChainSelector,
-        remotePoolAddresses: remotePoolAddresses,
-        remoteTokenAddress: abi.encode(address(s_USDCToken)),
-        outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-        inboundRateLimiterConfig: _getInboundRateLimiterConfig()
-      });
-      s_usdcTokenPoolProxy.applyChainUpdates(new uint64[](0), chainUpdates);
-    }
-
     vm.mockCall(
       address(s_router),
       abi.encodeWithSelector(bytes4(keccak256("getOnRamp(uint64)")), uint64(testChainSelector)),

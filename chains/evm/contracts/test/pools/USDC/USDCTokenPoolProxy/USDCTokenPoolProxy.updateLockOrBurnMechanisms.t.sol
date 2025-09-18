@@ -39,18 +39,6 @@ contract USDCTokenPoolProxy_updateLockOrBurnMechanisms is USDCTokenPoolProxySetu
 
   // Reverts
 
-  function test_updateLockOrBurnMechanisms_RevertWhen_NonExistentChain() public {
-    uint64 nonExistentChainSelector = 9999999;
-    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
-    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
-    uint64[] memory chainSelectors = new uint64[](1);
-    chainSelectors[0] = nonExistentChainSelector;
-
-    changePrank(OWNER);
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, nonExistentChainSelector));
-    s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
-  }
-
   function test_updateLockOrBurnMechanisms_RevertWhen_MismatchedArrayLengths() public {
     uint64[] memory chainSelectors = new uint64[](1);
     chainSelectors[0] = SOURCE_CHAIN_SELECTOR;

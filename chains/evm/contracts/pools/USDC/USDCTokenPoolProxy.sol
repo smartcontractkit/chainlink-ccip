@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
-import {TokenPool} from "../TokenPool.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
 
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from
@@ -29,17 +29,18 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 /// On/OffRamp
 ///     ↓
 /// USDCPoolProxy
-///     ├──→ LegacyCCTPV1Pool → CCTPV1 -> CCTP V1
+///     ├──→ LegacyCCTPV1Pool → CCTPV1
 ///     ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
 ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
-contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
+contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
   error PoolAddressCannotBeZero();
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(uint32 version);
   error InvalidMessageLength(uint256 length);
+  error MismatchedArrayLengths();
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
@@ -64,28 +65,22 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
 
   string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.3-dev";
 
-  constructor(
-    IERC20 token,
-    address router,
-    address[] memory allowlist,
-    address rmnProxy,
-    PoolAddresses memory pools
-  ) TokenPool(token, 6, allowlist, rmnProxy, router) {
+  IERC20 internal immutable i_token;
+
+  constructor(IERC20 token, PoolAddresses memory pools) {
     // Note: The legacy pool is allowed to be zero, as it is not requireed if this proxy is being deployed
     // on a chain which has already migrated to a pool that utilizes a message transmitter proxy.
     if (pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0) || pools.lockReleasePool == address(0)) {
       revert PoolAddressCannotBeZero();
     }
 
+    i_token = token;
     s_pools = pools;
   }
 
-  /// @inheritdoc TokenPool
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
-
+  ) public virtual returns (Pool.LockOrBurnOutV1 memory) {
     LockOrBurnMechanism mechanism = s_lockOrBurnMechanism[lockOrBurnIn.remoteChainSelector];
 
     // If a mechanism has not been configured for the remote chain selector, revert.
@@ -107,23 +102,19 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
       destinationPool = pools.lockReleasePool;
     }
 
-    // Transfer the tokens to the destination pool otherwise any burn or transfer will revert due to insufficient balance.
+    // Transfer the tokens to the proper child pool, as this contract is only a proxy and will not perform
+    // the lock/burn itself.
     i_token.safeTransfer(destinationPool, lockOrBurnIn.amount);
 
     return USDCTokenPool(destinationPool).lockOrBurn(lockOrBurnIn);
   }
 
-  /// @inheritdoc TokenPool
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
-
-    PoolAddresses memory pools = s_pools;
-
+  ) public virtual returns (Pool.ReleaseOrMintOutV1 memory) {
     // If the source pool data is the lock release flag, we use the lock release pool.
     if (bytes4(releaseOrMintIn.sourcePoolData) == LOCK_RELEASE_FLAG) {
-      return USDCTokenPool(pools.lockReleasePool).releaseOrMint(releaseOrMintIn);
+      return USDCTokenPool(s_pools.lockReleasePool).releaseOrMint(releaseOrMintIn);
     }
 
     // In previous versions of the USDC Token Pool, the sourcePoolData only contained two fields, a uint64 and uint32.
@@ -140,23 +131,20 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
       // In the first scenario, only the message's destinationCaller, I.E the legacy pool, can execute the mint, and so
       // the message needs to be routed to the legacy pool. In the second scenario, the destinationCaller will be the
       // message transmitter proxy, and the message needs to be routed to the appropriate V1-compatible pool.
-
-      // The below check is necessary to determine which scenario is present.
-      if (_checkForLegacyInflightMessages(releaseOrMintIn)) {
+      if (_checkForLegacyInflightMessages(releaseOrMintIn.offchainTokenData)) {
         // Note: Supporting this branch will require this proxy to be set as an offRamp in the router, which is a design
         // decision that is not ideal, but allows for a direct upgrade from the first version of the USDC Token Pool to
         // this version.
-        return USDCTokenPool(pools.legacyCctpV1Pool).releaseOrMint(releaseOrMintIn);
+        return USDCTokenPool(s_pools.legacyCctpV1Pool).releaseOrMint(releaseOrMintIn);
       } else {
         // Since the new pool and the inflight message should utilize the same version of CCTP, and would have the same
         // destinationCaller (the message transmitter proxy), we can route the message to the v1 pool, but we first
         // need to turn the source pool data into the new format, otherwise abi-decoding will revert. Once there is
         // confidence that no more messages are inflight, these branches can be safely removed.
-        Pool.ReleaseOrMintInV1 memory legacyReleaseOrMintIn = _generateNewReleaseOrMintIn(releaseOrMintIn);
 
         // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
         // needed to route the message to the v1 pool.
-        return USDCTokenPool(pools.cctpV1Pool).releaseOrMint(legacyReleaseOrMintIn);
+        return USDCTokenPool(s_pools.cctpV1Pool).releaseOrMint(_generateNewReleaseOrMintIn(releaseOrMintIn));
       }
     }
 
@@ -173,9 +161,9 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     uint32 version = uint32(bytes4(usdcMessage[0:4]));
 
     if (version == 0) {
-      return USDCTokenPool(pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
+      return USDCTokenPool(s_pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
     } else if (version == 1) {
-      return USDCTokenPool(pools.cctpV2Pool).releaseOrMint(releaseOrMintIn);
+      return USDCTokenPool(s_pools.cctpV2Pool).releaseOrMint(releaseOrMintIn);
     } else {
       revert InvalidMessageVersion(version);
     }
@@ -223,10 +211,6 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     }
 
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
-      if (!isSupportedChain(remoteChainSelectors[i])) {
-        revert TokenPool.NonExistentChain(remoteChainSelectors[i]);
-      }
-
       s_lockOrBurnMechanism[remoteChainSelectors[i]] = mechanisms[i];
       emit LockOrBurnMechanismUpdated(remoteChainSelectors[i], mechanisms[i]);
     }
@@ -234,11 +218,11 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
 
   /// @notice Check if the releaseOrMintIn struct is an inflight message from a legacy pool that did not utilize a
   /// message transmitter proxy.
-  /// @param releaseOrMintIn The releaseOrMintIn struct to check for a legacy inflight message.
+  /// @param offChainTokenData The off chain message and attestation needed to check for destinationCaller.
   /// @return True if the releaseOrMintIn struct is an inflight message from a legacy pool that did not utilize a
   /// message transmitter proxy, false otherwise.
   function _checkForLegacyInflightMessages(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+    bytes calldata offChainTokenData
   ) internal view virtual returns (bool) {
     // Cache the legacy pool address to avoid multiple SLOADs.
     address legacyPool = s_pools.legacyCctpV1Pool;
@@ -248,11 +232,9 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
       return false;
     }
 
-    USDCTokenPool.MessageAndAttestation memory msgAndAttestation =
-      abi.decode(releaseOrMintIn.offchainTokenData, (USDCTokenPool.MessageAndAttestation));
+    bytes memory messageBytes = abi.decode(offChainTokenData, (USDCTokenPool.MessageAndAttestation)).message;
 
     bytes32 destinationCallerBytes32;
-    bytes memory messageBytes = msgAndAttestation.message;
     assembly {
       // destinationCaller is a 32-byte word starting at position 84 in messageBytes body, so add 32 to skip the 1st word
       // representing bytes length.
@@ -287,21 +269,20 @@ contract USDCTokenPoolProxy is TokenPool, ITypeAndVersion {
     (uint64 nonce, uint32 sourceDomain) = abi.decode(releaseOrMintIn.sourcePoolData, (uint64, uint32));
 
     // Create the new payload out of the legacy sourcePoolData.
-    USDCTokenPool.SourceTokenDataPayload memory newPayload = USDCTokenPool.SourceTokenDataPayload({
-      nonce: nonce,
-      sourceDomain: sourceDomain,
-      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-      amount: releaseOrMintIn.sourceDenominatedAmount,
-      destinationDomain: localDomain,
-      mintRecipient: bytes32(uint256(uint160(releaseOrMintIn.receiver))), // Cast the receiver address to a bytes32.
-      burnToken: releaseOrMintIn.localToken,
-      destinationCaller: allowedCaller,
-      maxFee: 0, // Since maxFee is not used in CCTP V1, we set it to 0.
-      minFinalityThreshold: 0 // Since minFinalityThreshold is not used in CCTP V1, we set it to 0.
-    });
-
-    // Encode the new payload into the sourcePoolData field of the newReleaseOrMintIn struct.
-    newReleaseOrMintIn.sourcePoolData = abi.encode(newPayload);
+    newReleaseOrMintIn.sourcePoolData = abi.encode(
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: nonce,
+        sourceDomain: sourceDomain,
+        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
+        amount: releaseOrMintIn.sourceDenominatedAmount,
+        destinationDomain: localDomain,
+        mintRecipient: bytes32(uint256(uint160(releaseOrMintIn.receiver))), // Cast the receiver address to a bytes32.
+        burnToken: releaseOrMintIn.localToken,
+        destinationCaller: allowedCaller,
+        maxFee: 0, // Since maxFee is not used in CCTP V1, we set it to 0.
+        minFinalityThreshold: 0 // Since minFinalityThreshold is not used in CCTP V1, we set it to 0.
+      })
+    );
 
     return newReleaseOrMintIn;
   }

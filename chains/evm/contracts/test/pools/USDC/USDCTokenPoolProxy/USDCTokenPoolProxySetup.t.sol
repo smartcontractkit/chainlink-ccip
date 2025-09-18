@@ -29,9 +29,6 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     // Deploy the proxy
     s_usdcTokenPoolProxy = new USDCTokenPoolProxy(
       s_USDCToken,
-      address(s_router),
-      new address[](0),
-      address(s_mockRMNRemote),
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
@@ -43,22 +40,8 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     // Deal some tokens to the proxy to test the transfer to the destination pool
     deal(address(s_USDCToken), address(s_usdcTokenPoolProxy), 1000e6);
 
-    // Configure the pools
-    _poolApplyChainUpdates(address(s_usdcTokenPoolProxy));
-
     bytes[] memory sourcePoolAddresses = new bytes[](1);
     sourcePoolAddresses[0] = abi.encode(SOURCE_CHAIN_USDC_POOL);
-
-    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-    chainUpdates[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: s_remoteLockReleaseChainSelector,
-      remotePoolAddresses: sourcePoolAddresses,
-      remoteTokenAddress: abi.encode(address(s_USDCToken)),
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
-    });
-
-    s_usdcTokenPoolProxy.applyChainUpdates(new uint64[](0), chainUpdates);
 
     // Configure allowed callers for the CCTP message transmitter proxy
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =

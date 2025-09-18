@@ -14,9 +14,6 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     // Arrange: Define test constants
     USDCTokenPoolProxy proxy = new USDCTokenPoolProxy(
       s_USDCToken,
-      address(s_router),
-      new address[](0),
-      address(s_mockRMNRemote),
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
@@ -38,9 +35,6 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
     new USDCTokenPoolProxy(
       s_USDCToken,
-      address(s_router),
-      new address[](0),
-      address(s_mockRMNRemote),
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
@@ -54,9 +48,6 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
     new USDCTokenPoolProxy(
       s_USDCToken,
-      address(s_router),
-      new address[](0),
-      address(s_mockRMNRemote),
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
