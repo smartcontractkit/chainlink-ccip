@@ -206,7 +206,9 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
+    _validateLockOrBurn(
+      lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, lockOrBurnIn.originalSender, lockOrBurnIn.amount
+    );
 
     _lockOrBurn(lockOrBurnIn.amount);
 
@@ -279,14 +281,17 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
   function _validateLockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+    address localToken,
+    uint64 remoteChainSelector,
+    address originalSender,
+    uint256 amount
   ) internal {
-    if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
-    _checkAllowList(lockOrBurnIn.originalSender);
+    if (!isSupportedToken(localToken)) revert InvalidToken(localToken);
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(remoteChainSelector)))) revert CursedByRMN();
+    _checkAllowList(originalSender);
 
-    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
-    _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
+    _onlyOnRamp(remoteChainSelector);
+    _consumeOutboundRateLimit(remoteChainSelector, amount);
   }
 
   /// @notice Validates the release or mint input for correctness on
