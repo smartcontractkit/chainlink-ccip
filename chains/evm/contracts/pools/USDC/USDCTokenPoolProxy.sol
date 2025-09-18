@@ -36,7 +36,7 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  error PoolAddressCannotBeZero();
+  error AddressCannotBeZero();
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(uint32 version);
   error InvalidMessageLength(uint256 length);
@@ -70,8 +70,11 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   constructor(IERC20 token, PoolAddresses memory pools) {
     // Note: The legacy pool is allowed to be zero, as it is not requireed if this proxy is being deployed
     // on a chain which has already migrated to a pool that utilizes a message transmitter proxy.
-    if (pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0) || pools.lockReleasePool == address(0)) {
-      revert PoolAddressCannotBeZero();
+    if (
+      address(token) == address(0) || pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0)
+        || pools.lockReleasePool == address(0)
+    ) {
+      revert AddressCannotBeZero();
     }
 
     i_token = token;
@@ -170,12 +173,13 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   }
 
   /// @notice Update the pool addresses that this token pool will route a message to.
-  /// @param pools The new pool addresses to update the token pool proxy with.
+  /// @param pools The new pool addresses to update the token pool proxy with. Since the legacy CCTP V1 pool may not be
+  /// used, the zero address is a valid input and therefore input sanitization for it is not required.
   function updatePoolAddresses(
     PoolAddresses calldata pools
   ) external onlyOwner {
     if (pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0) || pools.lockReleasePool == address(0)) {
-      revert PoolAddressCannotBeZero();
+      revert AddressCannotBeZero();
     }
 
     s_pools = pools;

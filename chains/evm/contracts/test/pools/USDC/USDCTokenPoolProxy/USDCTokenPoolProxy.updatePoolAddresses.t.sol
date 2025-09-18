@@ -60,7 +60,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
     // Act & Assert: Should revert with PoolAddressCannotBeZero error
     changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
   }
 
@@ -76,7 +76,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
     // Act & Assert: Should revert with PoolAddressCannotBeZero error
     changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
   }
 
@@ -92,7 +92,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
     // Act & Assert: Should revert with PoolAddressCannotBeZero error
     changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
   }
 

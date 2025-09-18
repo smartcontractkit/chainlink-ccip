@@ -4,6 +4,9 @@ pragma solidity ^0.8.24;
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+
 contract USDCTokenPoolProxy_constructor is USDCSetup {
   address internal s_legacyCctpV1Pool = makeAddr("legacyCctpV1Pool");
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
@@ -30,9 +33,21 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   }
 
   // Reverts
+  function test_constructor_RevertWhen_TokenAddressIsZero() public {
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
+    new USDCTokenPoolProxy(
+      IERC20(address(0)),
+      USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: s_legacyCctpV1Pool,
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: address(0),
+        lockReleasePool: s_lockReleasePool
+      })
+    );
+  }
 
   function test_constructor_RevertWhen_CCTPV2PoolIsZero() public {
-    vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
     new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
@@ -45,7 +60,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   }
 
   function test_constructor_RevertWhen_LockReleasePoolIsZero() public {
-    vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeZero.selector);
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
     new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
