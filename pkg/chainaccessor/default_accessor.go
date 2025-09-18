@@ -78,6 +78,7 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 	destChainSelector cciptypes.ChainSelector,
 	sourceChainSelectors []cciptypes.ChainSelector,
 ) (cciptypes.ChainConfigSnapshot, map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
+	l.lggr.Info("CALLING GET ALL CONFIG LEGACY")
 	lggr := logutil.WithContextValues(ctx, l.lggr)
 
 	var configRequests contractreader.ExtendedBatchGetLatestValuesRequest
@@ -92,18 +93,21 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 		configRequests = prepareSourceChainRequest(destChainSelector)
 	}
 
+	l.lggr.Info("GETALLCONFIGLEGACY REQUEST: ", configRequests)
 	batchResult, skipped, err := l.contractReader.ExtendedBatchGetLatestValues(ctx, configRequests, true)
 	if err != nil {
 		return cciptypes.ChainConfigSnapshot{}, nil,
 			fmt.Errorf("batch config fetch for chain: %s: %w", l.chainSelector, err)
 	}
 
+	l.lggr.Info("BATCH RESULT ", batchResult)
 	if len(skipped) > 0 {
 		lggr.Warnw("chain reader skipped some config requests", "skipped", skipped)
 	}
 
 	// Process standard results (ChainConfigSnapshot)
 	standardResultsCopy := extractStandardChainConfigResults(batchResult, standardOffRampRequestCount)
+	l.lggr.Info("PROCESS CONFIG RESULTS: ", standardResultsCopy)
 	standardConfigs, err := processConfigResults(lggr, l.chainSelector, destChainSelector, standardResultsCopy)
 	if err != nil {
 		// Log error but don't return yet and attempt to process source chain configs
@@ -111,6 +115,7 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 		standardConfigs = cciptypes.ChainConfigSnapshot{}
 	}
 
+	l.lggr.Info("STANDARD CONFIGS: ", standardConfigs)
 	// Process source chain config results
 	sourceChainConfigs := processSourceChainConfigResults(
 		lggr,
@@ -118,6 +123,8 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 		standardOffRampRequestCount,
 		sourceChainSelectors,
 	)
+
+	l.lggr.Info("STANDARD CHAIN CONFIGS: ", sourceChainConfigs)
 	return standardConfigs, sourceChainConfigs, nil
 }
 
