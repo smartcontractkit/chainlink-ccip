@@ -1129,6 +1129,7 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		return [32]byte{}, fmt.Errorf("get chain config: %w", err)
 	}
 
+	r.lggr.Info("OFFRAMP CONFIG DIGEST CONFIG: ", config)
 	var resp cciptypes.OCRConfigResponse
 	if pluginType == consts.PluginTypeCommit {
 		resp = config.Offramp.CommitLatestOCRConfig
@@ -1136,6 +1137,7 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		resp = config.Offramp.ExecLatestOCRConfig
 	}
 
+	r.lggr.Info("RESPONSE CONFIG DIGEST: ", resp.OCRConfig.ConfigInfo.ConfigDigest)
 	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil
 }
 
