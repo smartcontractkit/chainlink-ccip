@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 
+import {IPoolV2} from "../interfaces/IPoolV2.sol";
+
+import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
-import {IPoolV2} from "../interfaces/IPoolV2.sol";
+import {IERC165} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 abstract contract TokenPoolV2 is IPoolV2, TokenPool {
   // ================================================================
@@ -28,5 +32,13 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
       destPoolData: _encodeLocalDecimals()
     });
+  }
+
+  /// @notice Signals which version of the pool interface is supported
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure virtual override(TokenPool, IERC165) returns (bool) {
+    return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == type(IPoolV2).interfaceId
+      || interfaceId == type(IERC165).interfaceId;
   }
 }
