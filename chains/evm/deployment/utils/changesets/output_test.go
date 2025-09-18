@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	changeset "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -49,7 +49,7 @@ func TestWithWriteOutputs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			b := changeset.NewOutputBuilder()
-			out, err := b.WithWriteOutputs([]call.WriteOutput{
+			out, err := b.WithWriteOutputs([]contract.WriteOutput{
 				{
 					ChainSelector: 5009297550715157269,
 					Executed:      test.executed,

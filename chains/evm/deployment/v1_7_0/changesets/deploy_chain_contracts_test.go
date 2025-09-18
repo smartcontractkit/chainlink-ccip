@@ -58,15 +58,15 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "valid input",
 			input: changesets.DeployChainContractsCfg{
-				ChainSelector: 5009297550715157269,
-				Params:        sequences.ContractParams{},
+				ChainSel: 5009297550715157269,
+				Params:   sequences.ContractParams{},
 			},
 		},
 		{
 			desc: "invalid chain selector",
 			input: changesets.DeployChainContractsCfg{
-				ChainSelector: 12345,
-				Params:        sequences.ContractParams{},
+				ChainSel: 12345,
+				Params:   sequences.ContractParams{},
 			},
 			expectedErr: "no EVM chain with selector 12345 found in environment",
 		},
@@ -150,11 +150,19 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 				DataStore:        ds.Seal(),
 			}
 
+			usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
+			require.True(t, ok, "Failed to parse USDPerLINK")
+			usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
+			require.True(t, ok, "Failed to parse USDPerWETH")
+
 			out, err := changesets.DeployChainContracts.Apply(e, changesets.DeployChainContractsCfg{
-				ChainSelector: 5009297550715157269,
+				ChainSel: 5009297550715157269,
 				Params: sequences.ContractParams{
 					RMNRemote:     sequences.RMNRemoteParams{},
 					CCVAggregator: sequences.CCVAggregatorParams{},
+					ExecutorOnRamp: sequences.ExecutorOnRampParams{
+						MaxCCVsPerMsg: 10,
+					},
 					CommitOnRamp: sequences.CommitOnRampParams{
 						FeeAggregator: common.HexToAddress("0x01"),
 					},
@@ -166,18 +174,17 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 						TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
 						LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
 						WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
+						USDPerLINK:                     usdPerLink,
+						USDPerWETH:                     usdPerWeth,
 					},
 					CommitOffRamp: sequences.CommitOffRampParams{
-						SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
-							{
-								ConfigDigest: [32]byte{0x01},
-								F:            1,
-								Signers: []common.Address{
-									common.HexToAddress("0x02"),
-									common.HexToAddress("0x03"),
-									common.HexToAddress("0x04"),
-									common.HexToAddress("0x05"),
-								},
+						SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
+							Threshold: 1,
+							Signers: []common.Address{
+								common.HexToAddress("0x02"),
+								common.HexToAddress("0x03"),
+								common.HexToAddress("0x04"),
+								common.HexToAddress("0x05"),
 							},
 						},
 					},
@@ -187,7 +194,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 			newAddrs, err := out.DataStore.Addresses().Fetch()
 			require.NoError(t, err, "Failed to fetch addresses from datastore")
-			require.Len(t, newAddrs, 12, "Expected 12 addresses in datastore")
+			require.Len(t, newAddrs, 14)
 
 			for _, addr := range existingAddrs {
 				for _, newAddr := range newAddrs {

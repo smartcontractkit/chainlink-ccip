@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -16,7 +16,7 @@ import (
 // Should be kept chain-family agnostic in case we want to move it out of evm-specific package later.
 // Even call.WriteOutput is not EVM-specific, could potentially extract as a standard.
 type OutputBuilder struct {
-	writeOutputs    []call.WriteOutput
+	writeOutputs    []contract.WriteOutput
 	changesetOutput deployment.ChangesetOutput
 }
 
@@ -60,7 +60,7 @@ func (b *OutputBuilder) WithDataStore(ds datastore.MutableDataStore) *OutputBuil
 }
 
 // WithWriteOutputs sets the write outputs on the OutputBuilder.
-func (b *OutputBuilder) WithWriteOutputs(outs []call.WriteOutput) *OutputBuilder {
+func (b *OutputBuilder) WithWriteOutputs(outs []contract.WriteOutput) *OutputBuilder {
 	b.writeOutputs = outs
 	return b
 }

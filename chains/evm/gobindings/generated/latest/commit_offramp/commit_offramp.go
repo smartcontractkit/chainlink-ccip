@@ -28,45 +28,38 @@ var (
 	_ = abi.ConvertType
 )
 
-type InternalAny2EVMMessage struct {
-	Header       InternalHeader
-	Sender       []byte
-	Data         []byte
-	Receiver     common.Address
-	GasLimit     uint32
-	TokenAmounts []InternalTokenTransfer
-}
-
-type InternalHeader struct {
-	MessageId           [32]byte
+type MessageV1CodecMessageV1 struct {
 	SourceChainSelector uint64
 	DestChainSelector   uint64
 	SequenceNumber      uint64
+	OnRampAddress       []byte
+	OffRampAddress      []byte
+	Finality            uint16
+	Sender              []byte
+	Receiver            []byte
+	DestBlob            []byte
+	TokenTransfer       []MessageV1CodecTokenTransferV1
+	Data                []byte
 }
 
-type InternalTokenTransfer struct {
-	SourcePoolAddress []byte
-	DestTokenAddress  common.Address
-	ExtraData         []byte
-	Amount            *big.Int
-}
-
-type SignatureQuorumVerifierSignatureConfigArgs struct {
-	ConfigDigest [32]byte
-	F            uint8
-	Signers      []common.Address
+type MessageV1CodecTokenTransferV1 struct {
+	Amount             *big.Int
+	SourcePoolAddress  []byte
+	SourceTokenAddress []byte
+	DestTokenAddress   []byte
+	ExtraData          []byte
 }
 
 var CommitOffRampMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"nonceManager\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getActiveConfigDigests\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32[]\",\"internalType\":\"bytes32[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllActiveConfigs\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"tuple[]\",\"internalType\":\"structSignatureQuorumVerifier.SignatureConfigArgs[]\",\"components\":[{\"name\":\"configDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"F\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"signers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"revokeConfigDigests\",\"inputs\":[{\"name\":\"configDigests\",\"type\":\"bytes32[]\",\"internalType\":\"bytes32[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setSignatureConfigs\",\"inputs\":[{\"name\":\"signatureConfigs\",\"type\":\"tuple[]\",\"internalType\":\"structSignatureQuorumVerifier.SignatureConfigArgs[]\",\"components\":[{\"name\":\"configDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"F\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"signers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"validateReport\",\"inputs\":[{\"name\":\"message\",\"type\":\"tuple\",\"internalType\":\"structInternal.Any2EVMMessage\",\"components\":[{\"name\":\"header\",\"type\":\"tuple\",\"internalType\":\"structInternal.Header\",\"components\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"sequenceNumber\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"gasLimit\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"tokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"structInternal.TokenTransfer[]\",\"components\":[{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAddress\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"extraData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]},{\"name\":\"messageHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"ccvData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"originalState\",\"type\":\"uint8\",\"internalType\":\"enumInternal.MessageExecutionState\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"ConfigRevoked\",\"inputs\":[{\"name\":\"configDigest\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ConfigSet\",\"inputs\":[{\"name\":\"configDigest\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"signers\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"},{\"name\":\"F\",\"type\":\"uint8\",\"indexed\":false,\"internalType\":\"uint8\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ConfigDigestAlreadyExists\",\"inputs\":[{\"name\":\"configDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"ForkedChain\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"actual\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidConfig\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidConfigDigest\",\"inputs\":[{\"name\":\"configDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"InvalidNonce\",\"inputs\":[{\"name\":\"nonce\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NonUniqueSignatures\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OracleCannotBeZeroAddress\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"SignaturesOutOfRegistration\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"UnauthorizedSigner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"WrongNumberOfSignatures\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
-	Bin: "0x60c0346100b757601f61174538819003918201601f19168301916001600160401b038311848410176100bc578084926020946040528339810103126100b757516001600160a01b0381168082036100b75733156100a657600180546001600160a01b0319163317905546608052156100955760a05260405161167290816100d3823960805181610d93015260a05181610f020152f35b6342bcdf7f60e11b60005260046000fd5b639b15e16f60e01b60005260046000fd5b600080fd5b634e487b7160e01b600052604160045260246000fdfe6080604052600436101561001257600080fd5b60003560e01c806301e0fdea14610b7257806301ffc9a714610ab3578063181f5a77146109e35780635982e36914610967578063741e4ba81461085657806379ba50971461076d578063827535cf146105425780638da5cb5b146104f0578063f2fde38b146103fd5763f50a00941461008a57600080fd5b346103f85760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126103f85760043567ffffffffffffffff81116103f8576100d9903690600401611222565b906100e26113ca565b6000907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa181360301925b808310156103f6576000928060051b830135858112156103f2578301906060823603126103f25760405195610140876111c5565b8235875260208301359260ff841684036103ea576020880193845260408101359067ffffffffffffffff82116103ee57019336601f860112156103ea57843561018881611312565b9561019660405197886111e1565b81875260208088019260051b820101903682116103e657602001915b8183106103b557505050604088019480865260ff85511680159182156103aa575b505080156103a1575b61037957875187526004602052604087205461034c57948751875260026020526040872091879660018401975b875180518210156102c2576102338273ffffffffffffffffffffffffffffffffffffffff9261132a565b51161561029a5761026573ffffffffffffffffffffffffffffffffffffffff61025d838b5161132a565b51168a611610565b1561027257600101610209565b60048a7f35be3ac8000000000000000000000000000000000000000000000000000000008152fd5b60048a7fd6c62c9b000000000000000000000000000000000000000000000000000000008152fd5b50509861033a9298507f5b1f376eb2bda670fa39339616d0a73f45b61bec8faeba8ca834f2ebb49676e09391975060ff6001979596511691827fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0082541617905551935190604051928392604084526040840190611253565b9060208301520390a20191909261010c565b60248789517f95e5047d000000000000000000000000000000000000000000000000000000008252600452fd5b6004877f35be3ac8000000000000000000000000000000000000000000000000000000008152fd5b508751156101dc565b5110905038806101d3565b823573ffffffffffffffffffffffffffffffffffffffff811681036103e2578152602092830192016101b2565b8a80fd5b8980fd5b8680fd5b8780fd5b8480fd5b005b600080fd5b346103f85760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126103f85760043573ffffffffffffffffffffffffffffffffffffffff81168091036103f8576104556113ca565b3381146104c657807fffffffffffffffffffffffff0000000000000000000000000000000000000000600054161760005573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b346103f85760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126103f857602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b346103f85760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126103f857610579611415565b8051907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe06105bf6105a984611312565b936105b760405195866111e1565b808552611312565b0160005b81811061074157505060005b815181101561069f576105e2818361132a565b516105ed828461132a565b51600052600260205260ff60406000205416610609838561132a565b51600052600260205260016040600020019060405191805480845260208401916000526020600020906000905b80821061068757505050906106528360019695949303836111e1565b6040519261065f846111c5565b835260208301526040820152610675828661132a565b52610680818561132a565b50016105cf565b90919260016020819286548152019401920190610636565b826040518091602082016020835281518091526040830190602060408260051b8601019301916000905b8282106106d857505050500390f35b91936020610731827fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc06001959799849503018652606060408a518051845260ff8682015116868501520151918160408201520190611253565b96019201920185949391926106c9565b602090604051610750816111c5565b6000815260008382015260606040820152828287010152016105c3565b346103f85760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126103f85760005473ffffffffffffffffffffffffffffffffffffffff8116330361082c577fffffffffffffffffffffffff00000000000000000000000000000000000000006001549133828416176001551660005573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b346103f85760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126103f85760043567ffffffffffffffff81116103f8576108a5903690600401611222565b6108ad6113ca565b60005b818110156103f65760008160051b840135906108cb8261147a565b1561093c578181526002602052600160408220828155018054908281558161091e575b5050907ffdde4bfc1a9ef28a2e3dbe34a4ccc65b0ad588f6b0406e492637aeaa733421608260019493a2016108b0565b825260208220908101905b818110156108ee57828155600101610929565b6024917f2f01e576000000000000000000000000000000000000000000000000000000008252600452fd5b346103f85760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126103f85761099e611415565b60405180916020820160208352815180915260206040840192019060005b8181106109ca575050500390f35b82518452859450602093840193909201916001016109bc565b346103f85760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126103f8576040805190610a2181836111e1565b601782527f436f6d6d69744f666652616d7020312e372e302d6465760000000000000000006020830152805180926020825280519081602084015260005b828110610a9c5750506000828201840152601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0168101030190f35b602082820181015187830187015286945001610a5f565b346103f85760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126103f8576004357fffffffff0000000000000000000000000000000000000000000000000000000081168091036103f857807f01e0fdea0000000000000000000000000000000000000000000000000000000060209214908115610b48575b506040519015158152f35b7f01ffc9a70000000000000000000000000000000000000000000000000000000091501482610b3d565b346103f85760807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126103f85760043567ffffffffffffffff81116103f8578036036101207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc8201126103f8576044359167ffffffffffffffff83116103f857366023840112156103f857826004013567ffffffffffffffff81116103f85783019160248301933685116103f8576064359360048510156103f857604090829003126103f857602481013567ffffffffffffffff81116103f857856024610c5d9284010161129d565b9460448201359167ffffffffffffffff83116103f857610c80920160240161129d565b93805194602082019560408382810103126103f857604087519301519667ffffffffffffffff88168098036103f8572060405160208101916024358352604082015260408152610cd16060826111e1565b51902090826000526002602052604060002091600183019384541561119857508151820160208101926020818303126103f857602081015167ffffffffffffffff81116103f8570190604090829003126103f857604051926040840184811067ffffffffffffffff82111761116957604052602082015167ffffffffffffffff81116103f857816020610d669285010161136d565b845260408201519167ffffffffffffffff83116103f857610d8a920160200161136d565b602083019081527f00000000000000000000000000000000000000000000000000000000000000004681036111385750600160ff8451519554160160ff81116111095760ff1684036110df5780515184036110b557600092835b858510610fb3578a8a8a8a83610df657005b60009215610e0057005b60248201359167ffffffffffffffff8316809303610faf577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd60848201359201821215610faf57019060048201359167ffffffffffffffff8311610faf57602401908236038213610faf579060846020927fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f8660405197889687957fe0e03cae00000000000000000000000000000000000000000000000000000000875260048701528b6024870152606060448701528160648701528686013788858286010152011681010301818573ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165af1908115610fa4578291610f65575b5015610f3a57005b6024917f5c33785a000000000000000000000000000000000000000000000000000000008252600452fd5b90506020813d602011610f9c575b81610f80602093836111e1565b81010312610f9857518015158103610f985783610f32565b5080fd5b3d9150610f73565b6040513d84823e3d90fd5b8380fd5b602060006080610fc488865161132a565b51610fd089885161132a565b5160405191898352601b868401526040830152606082015282805260015afa156110a95773ffffffffffffffffffffffffffffffffffffffff6000511690611028828960019160005201602052604060002054151590565b1561107f5773ffffffffffffffffffffffffffffffffffffffff1681111561105557600190940193610de4565b7ff67bc7c40000000000000000000000000000000000000000000000000000000060005260046000fd5b7fca31867a0000000000000000000000000000000000000000000000000000000060005260046000fd5b6040513d6000823e3d90fd5b7fa75d88af0000000000000000000000000000000000000000000000000000000060005260046000fd5b7f71253a250000000000000000000000000000000000000000000000000000000060005260046000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b7f0f01ce85000000000000000000000000000000000000000000000000000000006000526004524660245260446000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b7f2f01e5760000000000000000000000000000000000000000000000000000000060005260045260246000fd5b6060810190811067ffffffffffffffff82111761116957604052565b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761116957604052565b9181601f840112156103f85782359167ffffffffffffffff83116103f8576020808501948460051b0101116103f857565b906020808351928381520192019060005b8181106112715750505090565b825173ffffffffffffffffffffffffffffffffffffffff16845260209384019390920191600101611264565b81601f820112156103f85780359067ffffffffffffffff821161116957604051926112f0601f84017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016602001856111e1565b828452602083830101116103f857816000926020809301838601378301015290565b67ffffffffffffffff81116111695760051b60200190565b805182101561133e5760209160051b010190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b9080601f830112156103f857815161138481611312565b9261139260405194856111e1565b81845260208085019260051b8201019283116103f857602001905b8282106113ba5750505090565b81518152602091820191016113ad565b73ffffffffffffffffffffffffffffffffffffffff6001541633036113eb57565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b604051906003548083528260208101600360005260206000209260005b818110611449575050611447925003836111e1565b565b8454835260019485019487945060209093019201611432565b805482101561133e5760005260206000200190600090565b6000818152600460205260409020548015611609577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff810181811161110957600354907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82019182116111095781810361159a575b505050600354801561156b577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01611528816003611462565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b19169055600355600052600460205260006040812055600190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b6115f16115ab6115bc936003611462565b90549060031b1c9283926003611462565b81939154907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b905560005260046020526040600020553880806114ef565b5050600090565b60008281526001820160205260409020546116095780549068010000000000000000821015611169578261164e6115bc846001809601855584611462565b90558054926000520160205260406000205560019056fea164736f6c634300081a000a",
+	ABI: "[{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getSignatureConfig\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setSignatureConfig\",\"inputs\":[{\"name\":\"signers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"threshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"verifyMessage\",\"inputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structMessageV1Codec.MessageV1\",\"components\":[{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"sequenceNumber\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onRampAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offRampAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"finality\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destBlob\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenTransfer\",\"type\":\"tuple[]\",\"internalType\":\"structMessageV1Codec.TokenTransferV1[]\",\"components\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourceTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"messageHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"ccvData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"ConfigSet\",\"inputs\":[{\"name\":\"signers\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"},{\"name\":\"threshold\",\"type\":\"uint8\",\"indexed\":false,\"internalType\":\"uint8\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ForkedChain\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"actual\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidCCVData\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidConfig\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NonOrderedOrNonUniqueSignatures\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OracleCannotBeZeroAddress\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"UnauthorizedSigner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"WrongNumberOfSignatures\",\"inputs\":[]}]",
+	Bin: "0x60a08060405234604a573315603957600180546001600160a01b0319163317905546608052610e9f908161005082396080518161025e0152f35b639b15e16f60e01b60005260046000fd5b600080fdfe608080604052600436101561001357600080fd5b60003560e01c90816301ffc9a714610a4757508063181f5a77146109645780636ed0e217146108b457806379ba5097146107cb5780638da5cb5b14610779578063b2d6d66b146104d8578063e8aa10be1461016f5763f2fde38b1461007757600080fd5b3461016a5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016a5760043573ffffffffffffffffffffffffffffffffffffffff811680910361016a576100cf610bfe565b33811461014057807fffffffffffffffffffffffff0000000000000000000000000000000000000000600054161760005573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b600080fd5b3461016a5760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016a5760043567ffffffffffffffff811161016a577ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc610160913603011261016a5760243560443567ffffffffffffffff811161016a573660238201121561016a57806004013567ffffffffffffffff811161016a57366024828401011161016a57600281106104ae578060021161016a576024820135918260f01c9182600201806002116103fa578082106104ae571161016a576026019260025415610484577f0000000000000000000000000000000000000000000000000000000000000000468103610453575060ff60045416809360f61c1061042957600091825b8484106102a357005b8360061b848104604014851517156103fa5760208101908181116103fa576102d66102d08383878c610be6565b90610c49565b90600092604082018092116103cd576020926102fa6102d086946080948a8f610be6565b60405191898352601b868401526040830152606082015282805260015afa156103c15773ffffffffffffffffffffffffffffffffffffffff8151169182825260036020526040822054156103995773ffffffffffffffffffffffffffffffffffffffff16821115610371575060019093019261029a565b807fb70ad94b0000000000000000000000000000000000000000000000000000000060049252fd5b6004827fca31867a000000000000000000000000000000000000000000000000000000008152fd5b604051903d90823e3d90fd5b6024847f4e487b710000000000000000000000000000000000000000000000000000000081526011600452fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b7f71253a250000000000000000000000000000000000000000000000000000000060005260046000fd5b7f0f01ce85000000000000000000000000000000000000000000000000000000006000526004524660245260446000fd5b7f35be3ac80000000000000000000000000000000000000000000000000000000060005260046000fd5b7fbba6473c0000000000000000000000000000000000000000000000000000000060005260046000fd5b3461016a5760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016a5760043567ffffffffffffffff811161016a573660238201121561016a5780600401359067ffffffffffffffff821161074a578160051b906040519261054f6020840185610b03565b8352602460208401928201019036821161016a57602401915b81831061071d57836024359060ff82169182810361016a57610588610bfe565b82158015610713575b610484575b60025415610620576000600254156105f357600290527f405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace546105ed9073ffffffffffffffffffffffffffffffffffffffff16610c9c565b50610596565b807f4e487b7100000000000000000000000000000000000000000000000000000000602492526032600452fd5b60005b82518110156106b25773ffffffffffffffffffffffffffffffffffffffff61064b8285610ba3565b5116156106885761067b73ffffffffffffffffffffffffffffffffffffffff6106748386610ba3565b5116610e32565b1561048457600101610623565b7fd6c62c9b0000000000000000000000000000000000000000000000000000000060005260046000fd5b50907f65dcea71616ef4f8e7b901bfb6c7f2cfd07ae7925b4c245aefca27a911424cb3927fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00600454161760045561070e60405192839283610b44565b0390a1005b5081518311610591565b823573ffffffffffffffffffffffffffffffffffffffff8116810361016a57815260209283019201610568565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b3461016a5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016a57602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b3461016a5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016a5760005473ffffffffffffffffffffffffffffffffffffffff8116330361088a577fffffffffffffffffffffffff00000000000000000000000000000000000000006001549133828416176001551660005573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b3461016a5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016a5760405180816020600254928381520160026000527f405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace9260005b81811061094b57505061093192500382610b03565b60ff600454169061094760405192839283610b44565b0390f35b845483526001948501948694506020909301920161091c565b3461016a5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016a576040516040810181811067ffffffffffffffff82111761074a57604052601781527f436f6d6d69744f666652616d7020312e372e302d646576000000000000000000602082015260405190602082528181519182602083015260005b838110610a2f5750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f836000604080968601015201168101030190f35b602082820181015160408784010152859350016109ef565b3461016a5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016a57600435907fffffffff00000000000000000000000000000000000000000000000000000000821680920361016a57817fe8aa10be0000000000000000000000000000000000000000000000000000000060209314908115610ad9575b5015158152f35b7f01ffc9a70000000000000000000000000000000000000000000000000000000091501483610ad2565b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761074a57604052565b909291926040820160408352815180915260206060840192019060005b818110610b775750505060ff6020919416910152565b825173ffffffffffffffffffffffffffffffffffffffff16845260209384019390920191600101610b61565b8051821015610bb75760209160051b010190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b9093929384831161016a57841161016a578101920390565b73ffffffffffffffffffffffffffffffffffffffff600154163303610c1f57565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b359060208110610c57575090565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060200360031b1b1690565b8054821015610bb75760005260206000200190600090565b6000818152600360205260409020548015610e2b577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff81018181116103fa57600254907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82019182116103fa57818103610dbc575b5050506002548015610d8d577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01610d4a816002610c84565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b19169055600255600052600360205260006040812055600190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b610e13610dcd610dde936002610c84565b90549060031b1c9283926002610c84565b81939154907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b90556000526003602052604060002055388080610d11565b5050600090565b80600052600360205260406000205415600014610e8c576002546801000000000000000081101561074a57610e73610dde8260018594016002556002610c84565b9055600254906000526003602052604060002055600190565b5060009056fea164736f6c634300081a000a",
 }
 
 var CommitOffRampABI = CommitOffRampMetaData.ABI
 
 var CommitOffRampBin = CommitOffRampMetaData.Bin
 
-func DeployCommitOffRamp(auth *bind.TransactOpts, backend bind.ContractBackend, nonceManager common.Address) (common.Address, *types.Transaction, *CommitOffRamp, error) {
+func DeployCommitOffRamp(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *CommitOffRamp, error) {
 	parsed, err := CommitOffRampMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -75,7 +68,7 @@ func DeployCommitOffRamp(auth *bind.TransactOpts, backend bind.ContractBackend, 
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(CommitOffRampBin), backend, nonceManager)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(CommitOffRampBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -198,48 +191,27 @@ func (_CommitOffRamp *CommitOffRampTransactorRaw) Transact(opts *bind.TransactOp
 	return _CommitOffRamp.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_CommitOffRamp *CommitOffRampCaller) GetActiveConfigDigests(opts *bind.CallOpts) ([][32]byte, error) {
+func (_CommitOffRamp *CommitOffRampCaller) GetSignatureConfig(opts *bind.CallOpts) ([]common.Address, uint8, error) {
 	var out []interface{}
-	err := _CommitOffRamp.contract.Call(opts, &out, "getActiveConfigDigests")
+	err := _CommitOffRamp.contract.Call(opts, &out, "getSignatureConfig")
 
 	if err != nil {
-		return *new([][32]byte), err
+		return *new([]common.Address), *new(uint8), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new([][32]byte)).(*[][32]byte)
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
+	out1 := *abi.ConvertType(out[1], new(uint8)).(*uint8)
 
-	return out0, err
-
-}
-
-func (_CommitOffRamp *CommitOffRampSession) GetActiveConfigDigests() ([][32]byte, error) {
-	return _CommitOffRamp.Contract.GetActiveConfigDigests(&_CommitOffRamp.CallOpts)
-}
-
-func (_CommitOffRamp *CommitOffRampCallerSession) GetActiveConfigDigests() ([][32]byte, error) {
-	return _CommitOffRamp.Contract.GetActiveConfigDigests(&_CommitOffRamp.CallOpts)
-}
-
-func (_CommitOffRamp *CommitOffRampCaller) GetAllActiveConfigs(opts *bind.CallOpts) ([]SignatureQuorumVerifierSignatureConfigArgs, error) {
-	var out []interface{}
-	err := _CommitOffRamp.contract.Call(opts, &out, "getAllActiveConfigs")
-
-	if err != nil {
-		return *new([]SignatureQuorumVerifierSignatureConfigArgs), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new([]SignatureQuorumVerifierSignatureConfigArgs)).(*[]SignatureQuorumVerifierSignatureConfigArgs)
-
-	return out0, err
+	return out0, out1, err
 
 }
 
-func (_CommitOffRamp *CommitOffRampSession) GetAllActiveConfigs() ([]SignatureQuorumVerifierSignatureConfigArgs, error) {
-	return _CommitOffRamp.Contract.GetAllActiveConfigs(&_CommitOffRamp.CallOpts)
+func (_CommitOffRamp *CommitOffRampSession) GetSignatureConfig() ([]common.Address, uint8, error) {
+	return _CommitOffRamp.Contract.GetSignatureConfig(&_CommitOffRamp.CallOpts)
 }
 
-func (_CommitOffRamp *CommitOffRampCallerSession) GetAllActiveConfigs() ([]SignatureQuorumVerifierSignatureConfigArgs, error) {
-	return _CommitOffRamp.Contract.GetAllActiveConfigs(&_CommitOffRamp.CallOpts)
+func (_CommitOffRamp *CommitOffRampCallerSession) GetSignatureConfig() ([]common.Address, uint8, error) {
+	return _CommitOffRamp.Contract.GetSignatureConfig(&_CommitOffRamp.CallOpts)
 }
 
 func (_CommitOffRamp *CommitOffRampCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
@@ -308,6 +280,26 @@ func (_CommitOffRamp *CommitOffRampCallerSession) TypeAndVersion() (string, erro
 	return _CommitOffRamp.Contract.TypeAndVersion(&_CommitOffRamp.CallOpts)
 }
 
+func (_CommitOffRamp *CommitOffRampCaller) VerifyMessage(opts *bind.CallOpts, arg0 MessageV1CodecMessageV1, messageHash [32]byte, ccvData []byte) error {
+	var out []interface{}
+	err := _CommitOffRamp.contract.Call(opts, &out, "verifyMessage", arg0, messageHash, ccvData)
+
+	if err != nil {
+		return err
+	}
+
+	return err
+
+}
+
+func (_CommitOffRamp *CommitOffRampSession) VerifyMessage(arg0 MessageV1CodecMessageV1, messageHash [32]byte, ccvData []byte) error {
+	return _CommitOffRamp.Contract.VerifyMessage(&_CommitOffRamp.CallOpts, arg0, messageHash, ccvData)
+}
+
+func (_CommitOffRamp *CommitOffRampCallerSession) VerifyMessage(arg0 MessageV1CodecMessageV1, messageHash [32]byte, ccvData []byte) error {
+	return _CommitOffRamp.Contract.VerifyMessage(&_CommitOffRamp.CallOpts, arg0, messageHash, ccvData)
+}
+
 func (_CommitOffRamp *CommitOffRampTransactor) AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
 	return _CommitOffRamp.contract.Transact(opts, "acceptOwnership")
 }
@@ -320,28 +312,16 @@ func (_CommitOffRamp *CommitOffRampTransactorSession) AcceptOwnership() (*types.
 	return _CommitOffRamp.Contract.AcceptOwnership(&_CommitOffRamp.TransactOpts)
 }
 
-func (_CommitOffRamp *CommitOffRampTransactor) RevokeConfigDigests(opts *bind.TransactOpts, configDigests [][32]byte) (*types.Transaction, error) {
-	return _CommitOffRamp.contract.Transact(opts, "revokeConfigDigests", configDigests)
+func (_CommitOffRamp *CommitOffRampTransactor) SetSignatureConfig(opts *bind.TransactOpts, signers []common.Address, threshold uint8) (*types.Transaction, error) {
+	return _CommitOffRamp.contract.Transact(opts, "setSignatureConfig", signers, threshold)
 }
 
-func (_CommitOffRamp *CommitOffRampSession) RevokeConfigDigests(configDigests [][32]byte) (*types.Transaction, error) {
-	return _CommitOffRamp.Contract.RevokeConfigDigests(&_CommitOffRamp.TransactOpts, configDigests)
+func (_CommitOffRamp *CommitOffRampSession) SetSignatureConfig(signers []common.Address, threshold uint8) (*types.Transaction, error) {
+	return _CommitOffRamp.Contract.SetSignatureConfig(&_CommitOffRamp.TransactOpts, signers, threshold)
 }
 
-func (_CommitOffRamp *CommitOffRampTransactorSession) RevokeConfigDigests(configDigests [][32]byte) (*types.Transaction, error) {
-	return _CommitOffRamp.Contract.RevokeConfigDigests(&_CommitOffRamp.TransactOpts, configDigests)
-}
-
-func (_CommitOffRamp *CommitOffRampTransactor) SetSignatureConfigs(opts *bind.TransactOpts, signatureConfigs []SignatureQuorumVerifierSignatureConfigArgs) (*types.Transaction, error) {
-	return _CommitOffRamp.contract.Transact(opts, "setSignatureConfigs", signatureConfigs)
-}
-
-func (_CommitOffRamp *CommitOffRampSession) SetSignatureConfigs(signatureConfigs []SignatureQuorumVerifierSignatureConfigArgs) (*types.Transaction, error) {
-	return _CommitOffRamp.Contract.SetSignatureConfigs(&_CommitOffRamp.TransactOpts, signatureConfigs)
-}
-
-func (_CommitOffRamp *CommitOffRampTransactorSession) SetSignatureConfigs(signatureConfigs []SignatureQuorumVerifierSignatureConfigArgs) (*types.Transaction, error) {
-	return _CommitOffRamp.Contract.SetSignatureConfigs(&_CommitOffRamp.TransactOpts, signatureConfigs)
+func (_CommitOffRamp *CommitOffRampTransactorSession) SetSignatureConfig(signers []common.Address, threshold uint8) (*types.Transaction, error) {
+	return _CommitOffRamp.Contract.SetSignatureConfig(&_CommitOffRamp.TransactOpts, signers, threshold)
 }
 
 func (_CommitOffRamp *CommitOffRampTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
@@ -354,145 +334,6 @@ func (_CommitOffRamp *CommitOffRampSession) TransferOwnership(to common.Address)
 
 func (_CommitOffRamp *CommitOffRampTransactorSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
 	return _CommitOffRamp.Contract.TransferOwnership(&_CommitOffRamp.TransactOpts, to)
-}
-
-func (_CommitOffRamp *CommitOffRampTransactor) ValidateReport(opts *bind.TransactOpts, message InternalAny2EVMMessage, messageHash [32]byte, ccvData []byte, originalState uint8) (*types.Transaction, error) {
-	return _CommitOffRamp.contract.Transact(opts, "validateReport", message, messageHash, ccvData, originalState)
-}
-
-func (_CommitOffRamp *CommitOffRampSession) ValidateReport(message InternalAny2EVMMessage, messageHash [32]byte, ccvData []byte, originalState uint8) (*types.Transaction, error) {
-	return _CommitOffRamp.Contract.ValidateReport(&_CommitOffRamp.TransactOpts, message, messageHash, ccvData, originalState)
-}
-
-func (_CommitOffRamp *CommitOffRampTransactorSession) ValidateReport(message InternalAny2EVMMessage, messageHash [32]byte, ccvData []byte, originalState uint8) (*types.Transaction, error) {
-	return _CommitOffRamp.Contract.ValidateReport(&_CommitOffRamp.TransactOpts, message, messageHash, ccvData, originalState)
-}
-
-type CommitOffRampConfigRevokedIterator struct {
-	Event *CommitOffRampConfigRevoked
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *CommitOffRampConfigRevokedIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(CommitOffRampConfigRevoked)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(CommitOffRampConfigRevoked)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *CommitOffRampConfigRevokedIterator) Error() error {
-	return it.fail
-}
-
-func (it *CommitOffRampConfigRevokedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type CommitOffRampConfigRevoked struct {
-	ConfigDigest [32]byte
-	Raw          types.Log
-}
-
-func (_CommitOffRamp *CommitOffRampFilterer) FilterConfigRevoked(opts *bind.FilterOpts, configDigest [][32]byte) (*CommitOffRampConfigRevokedIterator, error) {
-
-	var configDigestRule []interface{}
-	for _, configDigestItem := range configDigest {
-		configDigestRule = append(configDigestRule, configDigestItem)
-	}
-
-	logs, sub, err := _CommitOffRamp.contract.FilterLogs(opts, "ConfigRevoked", configDigestRule)
-	if err != nil {
-		return nil, err
-	}
-	return &CommitOffRampConfigRevokedIterator{contract: _CommitOffRamp.contract, event: "ConfigRevoked", logs: logs, sub: sub}, nil
-}
-
-func (_CommitOffRamp *CommitOffRampFilterer) WatchConfigRevoked(opts *bind.WatchOpts, sink chan<- *CommitOffRampConfigRevoked, configDigest [][32]byte) (event.Subscription, error) {
-
-	var configDigestRule []interface{}
-	for _, configDigestItem := range configDigest {
-		configDigestRule = append(configDigestRule, configDigestItem)
-	}
-
-	logs, sub, err := _CommitOffRamp.contract.WatchLogs(opts, "ConfigRevoked", configDigestRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(CommitOffRampConfigRevoked)
-				if err := _CommitOffRamp.contract.UnpackLog(event, "ConfigRevoked", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_CommitOffRamp *CommitOffRampFilterer) ParseConfigRevoked(log types.Log) (*CommitOffRampConfigRevoked, error) {
-	event := new(CommitOffRampConfigRevoked)
-	if err := _CommitOffRamp.contract.UnpackLog(event, "ConfigRevoked", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
 }
 
 type CommitOffRampConfigSetIterator struct {
@@ -556,34 +397,23 @@ func (it *CommitOffRampConfigSetIterator) Close() error {
 }
 
 type CommitOffRampConfigSet struct {
-	ConfigDigest [32]byte
-	Signers      []common.Address
-	F            uint8
-	Raw          types.Log
+	Signers   []common.Address
+	Threshold uint8
+	Raw       types.Log
 }
 
-func (_CommitOffRamp *CommitOffRampFilterer) FilterConfigSet(opts *bind.FilterOpts, configDigest [][32]byte) (*CommitOffRampConfigSetIterator, error) {
+func (_CommitOffRamp *CommitOffRampFilterer) FilterConfigSet(opts *bind.FilterOpts) (*CommitOffRampConfigSetIterator, error) {
 
-	var configDigestRule []interface{}
-	for _, configDigestItem := range configDigest {
-		configDigestRule = append(configDigestRule, configDigestItem)
-	}
-
-	logs, sub, err := _CommitOffRamp.contract.FilterLogs(opts, "ConfigSet", configDigestRule)
+	logs, sub, err := _CommitOffRamp.contract.FilterLogs(opts, "ConfigSet")
 	if err != nil {
 		return nil, err
 	}
 	return &CommitOffRampConfigSetIterator{contract: _CommitOffRamp.contract, event: "ConfigSet", logs: logs, sub: sub}, nil
 }
 
-func (_CommitOffRamp *CommitOffRampFilterer) WatchConfigSet(opts *bind.WatchOpts, sink chan<- *CommitOffRampConfigSet, configDigest [][32]byte) (event.Subscription, error) {
+func (_CommitOffRamp *CommitOffRampFilterer) WatchConfigSet(opts *bind.WatchOpts, sink chan<- *CommitOffRampConfigSet) (event.Subscription, error) {
 
-	var configDigestRule []interface{}
-	for _, configDigestItem := range configDigest {
-		configDigestRule = append(configDigestRule, configDigestItem)
-	}
-
-	logs, sub, err := _CommitOffRamp.contract.WatchLogs(opts, "ConfigSet", configDigestRule)
+	logs, sub, err := _CommitOffRamp.contract.WatchLogs(opts, "ConfigSet")
 	if err != nil {
 		return nil, err
 	}
@@ -896,12 +726,8 @@ func (_CommitOffRamp *CommitOffRampFilterer) ParseOwnershipTransferred(log types
 	return event, nil
 }
 
-func (CommitOffRampConfigRevoked) Topic() common.Hash {
-	return common.HexToHash("0xfdde4bfc1a9ef28a2e3dbe34a4ccc65b0ad588f6b0406e492637aeaa73342160")
-}
-
 func (CommitOffRampConfigSet) Topic() common.Hash {
-	return common.HexToHash("0x5b1f376eb2bda670fa39339616d0a73f45b61bec8faeba8ca834f2ebb49676e0")
+	return common.HexToHash("0x65dcea71616ef4f8e7b901bfb6c7f2cfd07ae7925b4c245aefca27a911424cb3")
 }
 
 func (CommitOffRampOwnershipTransferRequested) Topic() common.Hash {
@@ -917,9 +743,7 @@ func (_CommitOffRamp *CommitOffRamp) Address() common.Address {
 }
 
 type CommitOffRampInterface interface {
-	GetActiveConfigDigests(opts *bind.CallOpts) ([][32]byte, error)
-
-	GetAllActiveConfigs(opts *bind.CallOpts) ([]SignatureQuorumVerifierSignatureConfigArgs, error)
+	GetSignatureConfig(opts *bind.CallOpts) ([]common.Address, uint8, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
@@ -927,25 +751,17 @@ type CommitOffRampInterface interface {
 
 	TypeAndVersion(opts *bind.CallOpts) (string, error)
 
+	VerifyMessage(opts *bind.CallOpts, arg0 MessageV1CodecMessageV1, messageHash [32]byte, ccvData []byte) error
+
 	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
 
-	RevokeConfigDigests(opts *bind.TransactOpts, configDigests [][32]byte) (*types.Transaction, error)
-
-	SetSignatureConfigs(opts *bind.TransactOpts, signatureConfigs []SignatureQuorumVerifierSignatureConfigArgs) (*types.Transaction, error)
+	SetSignatureConfig(opts *bind.TransactOpts, signers []common.Address, threshold uint8) (*types.Transaction, error)
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
-	ValidateReport(opts *bind.TransactOpts, message InternalAny2EVMMessage, messageHash [32]byte, ccvData []byte, originalState uint8) (*types.Transaction, error)
+	FilterConfigSet(opts *bind.FilterOpts) (*CommitOffRampConfigSetIterator, error)
 
-	FilterConfigRevoked(opts *bind.FilterOpts, configDigest [][32]byte) (*CommitOffRampConfigRevokedIterator, error)
-
-	WatchConfigRevoked(opts *bind.WatchOpts, sink chan<- *CommitOffRampConfigRevoked, configDigest [][32]byte) (event.Subscription, error)
-
-	ParseConfigRevoked(log types.Log) (*CommitOffRampConfigRevoked, error)
-
-	FilterConfigSet(opts *bind.FilterOpts, configDigest [][32]byte) (*CommitOffRampConfigSetIterator, error)
-
-	WatchConfigSet(opts *bind.WatchOpts, sink chan<- *CommitOffRampConfigSet, configDigest [][32]byte) (event.Subscription, error)
+	WatchConfigSet(opts *bind.WatchOpts, sink chan<- *CommitOffRampConfigSet) (event.Subscription, error)
 
 	ParseConfigSet(log types.Log) (*CommitOffRampConfigSet, error)
 

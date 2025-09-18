@@ -11,12 +11,13 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
+import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
@@ -42,7 +43,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
   error InsufficientGasToCompleteTx(bytes4 err);
-  error SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
+  error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 sequenceNumber);
   error InvalidVerifierSelector(bytes4 selector);
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV, bool isPoolCCV);
@@ -58,6 +59,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     bytes returnData
   );
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
+
+  // 5k for updating the state + 5k for the event and misc costs.
+  uint256 internal constant MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
 
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
   // solhint-disable-next-line gas-struct-packing
@@ -87,20 +91,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     bytes onRamp; // OnRamp address on the source chain.
     address[] defaultCCV; // Default CCV to use for messages from this source chain.
     address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
-  }
-
-  struct AggregatedReport {
-    /// @notice The message that is being executed.
-    Internal.Any2EVMMessage message; // The message is attested to by each CCV in the report.
-    /// @notice CCVs that attested to the message. They must match the CCVs specified by the receiver of the message,
-    /// and the pool of the token being transferred. They can be a superset, but the ones not specified by the receiver
-    /// will be ignored. If there is no token transfer, no additional token CCVs are required. If the receiver is an EOA
-    /// or a contract that does not support the IAny2EVMMessageReceiver2 interface, the default and required CCVs are
-    /// used.
-    /// @dev Must be the same length as ccvData.
-    address[] ccvs;
-    /// @notice This data is specific to the CCV implementation and is used to verify the message.
-    bytes[] ccvData;
   }
 
   // STATIC CONFIG
@@ -174,38 +164,39 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     return keccak256(abi.encode(sourceChainSelector, sequenceNumber, sender, receiver));
   }
 
-  /// @notice Executes a report, executing each message in order.
-  /// @param report The execution report containing the messages and proofs.
-  /// @dev If called from the DON, this array is always empty.
-  /// @dev If called from manual execution, this array is always same length as messages.
-  /// @dev This function can fully revert in some cases, reverting potentially valid other reports with it. The reasons
-  /// for these reverts are so severe that we prefer to revert the entire batch instead of silently failing.
-  function execute(
-    AggregatedReport calldata report
-  ) external {
+  /// @notice Executes a message from a source chain.
+  /// @param encodedMessage The message that is being executed, encoded as bytes.
+  /// @param ccvs CCVs that attested to the message. Must match the CCVs specified by the receiver and token pool.
+  /// @param ccvData CCV-specific data used to verify the message. Must be same length as ccvs array.
+  function execute(bytes calldata encodedMessage, address[] calldata ccvs, bytes[] calldata ccvData) external {
     if (s_reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_reentrancyGuardEntered = true;
 
-    Internal.Any2EVMMessage memory message = _beforeExecuteSingleMessage(report.message);
+    MessageV1Codec.MessageV1 memory message =
+      _beforeExecuteSingleMessage(MessageV1Codec._decodeMessageV1(encodedMessage));
+    bytes32 messageId = keccak256(encodedMessage);
 
-    uint64 sourceChainSelector = message.header.sourceChainSelector;
-
-    if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
-      revert CursedByRMN(sourceChainSelector);
+    if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
+      revert CursedByRMN(message.sourceChainSelector);
     }
-    if (!s_sourceChainConfigs[sourceChainSelector].isEnabled) {
-      revert SourceChainNotEnabled(sourceChainSelector);
+    if (!s_sourceChainConfigs[message.sourceChainSelector].isEnabled) {
+      revert SourceChainNotEnabled(message.sourceChainSelector);
     }
-    if (message.header.destChainSelector != i_chainSelector) {
-      revert InvalidMessageDestChainSelector(message.header.destChainSelector);
+    if (message.destChainSelector != i_chainSelector) {
+      revert InvalidMessageDestChainSelector(message.destChainSelector);
     }
-    if (report.ccvs.length != report.ccvData.length) {
-      revert InvalidCCVDataLength(report.ccvs.length, report.ccvData.length);
+    if (ccvs.length != ccvData.length) {
+      revert InvalidCCVDataLength(ccvs.length, ccvData.length);
+    }
+    if (message.receiver.length != 20) {
+      revert Internal.InvalidEVMAddress(message.receiver);
     }
 
     /////// Original state checks ///////
-    bytes32 executionStateKey =
-      _calculateExecutionStateKey(sourceChainSelector, message.header.sequenceNumber, message.sender, message.receiver);
+
+    bytes32 executionStateKey = _calculateExecutionStateKey(
+      message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
+    );
 
     Internal.MessageExecutionState originalState = s_executionStates[executionStateKey];
 
@@ -218,63 +209,152 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
           || originalState == Internal.MessageExecutionState.FAILURE
       )
     ) {
-      revert SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
-    }
-
-    /////// SECURITY CRITICAL CHECKS ///////
-
-    {
-      address[] memory requiredPoolCCVs = new address[](0);
-      if (message.tokenAmounts.length > 0) {
-        if (message.tokenAmounts.length != 1) {
-          revert InvalidNumberOfTokens(message.tokenAmounts.length);
-        }
-
-        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
-        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
-        // that do not support the V2 interface.
-        requiredPoolCCVs = _getCCVsFromPool(
-          message.tokenAmounts[0].destTokenAddress,
-          message.header.sourceChainSelector,
-          message.tokenAmounts[0].amount,
-          message.tokenAmounts[0].extraData
-        );
-      }
-
-      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
-        _ensureCCVQuorumIsReached(message.header.sourceChainSelector, message.receiver, report.ccvs, requiredPoolCCVs);
-
-      // TODO real hash
-      bytes32 messageHash = keccak256(abi.encode(message));
-      for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        ICCVOffRampV1(ccvsToQuery[i]).validateReport({
-          message: message,
-          messageHash: messageHash,
-          ccvData: report.ccvData[ccvDataIndex[i]],
-          originalState: originalState
-        });
-      }
+      revert SkippedAlreadyExecutedMessage(messageId, message.sourceChainSelector, message.sequenceNumber);
     }
 
     /////// Execution ///////
 
     s_executionStates[executionStateKey] = Internal.MessageExecutionState.IN_PROGRESS;
-    (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message);
+
+    (bool success, bytes memory err) =
+      _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, ccvData)));
+    Internal.MessageExecutionState newState =
+      success ? Internal.MessageExecutionState.SUCCESS : Internal.MessageExecutionState.FAILURE;
+
     s_executionStates[executionStateKey] = newState;
 
-    // The only valid prior states are UNTOUCHED and FAILURE (checked above).
-    // The only valid post states are FAILURE and SUCCESS (checked below).
-    if (newState != Internal.MessageExecutionState.SUCCESS) {
-      if (newState != Internal.MessageExecutionState.FAILURE) {
-        revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
+    emit ExecutionStateChanged(message.sourceChainSelector, message.sequenceNumber, messageId, newState, err);
+    s_reentrancyGuardEntered = false;
+  }
+
+  function _callWithGasBuffer(
+    bytes memory payload
+  ) internal returns (bool success, bytes memory retData) {
+    // allocate retData memory ahead of time
+    retData = new bytes(Internal.MAX_RET_BYTES);
+    uint16 maxReturnBytes = Internal.MAX_RET_BYTES;
+
+    uint256 gasLeft = gasleft();
+    if (gasLeft <= MAX_GAS_BUFFER_TO_UPDATE_STATE) {
+      revert InsufficientGasToCompleteTx(bytes4(uint32(gasleft())));
+    }
+
+    uint256 gasLimit = gasLeft - MAX_GAS_BUFFER_TO_UPDATE_STATE;
+
+    assembly {
+      // call and return whether we succeeded. ignore return data
+      // call(gas, addr, value, argsOffset, argsLength, retOffset, retLength)
+      success := call(gasLimit, address(), 0, add(payload, 0x20), mload(payload), 0x0, 0x0)
+
+      // limit our copy to maxReturnBytes bytes
+      let toCopy := returndatasize()
+      if gt(toCopy, maxReturnBytes) { toCopy := maxReturnBytes }
+      // Store the length of the copied bytes
+      mstore(retData, toCopy)
+      // copy the bytes from retData[0:_toCopy]
+      returndatacopy(add(retData, 0x20), 0x0, toCopy)
+    }
+    return (success, retData);
+  }
+
+  /// @notice Executes a single message.
+  /// @param message The message that will be executed.
+  /// @dev We make this external and callable by the contract itself, in order to try/catch
+  /// its execution and enforce atomicity among successful message processing and token transfer.
+  /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
+  /// smart contract wallets, without an associated message.
+  function executeSingleMessage(
+    MessageV1Codec.MessageV1 calldata message,
+    bytes32 messageId,
+    address[] calldata ccvs,
+    bytes[] calldata ccvData
+  ) external {
+    if (msg.sender != address(this)) revert CanOnlySelfCall();
+
+    /////// SECURITY CRITICAL CHECKS ///////
+    address receiver = address(bytes20(message.receiver));
+
+    {
+      address[] memory requiredPoolCCVs = new address[](0);
+      if (message.tokenTransfer.length > 0) {
+        if (message.tokenTransfer.length != 1) {
+          revert InvalidNumberOfTokens(message.tokenTransfer.length);
+        }
+
+        if (message.tokenTransfer[0].destTokenAddress.length != 20) {
+          revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
+        }
+        address localTokenAddress = address(bytes20(message.tokenTransfer[0].destTokenAddress));
+
+        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
+        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
+        // that do not support the V2 interface.
+        requiredPoolCCVs = _getCCVsFromPool(
+          localTokenAddress,
+          message.sourceChainSelector,
+          message.tokenTransfer[0].amount,
+          message.tokenTransfer[0].extraData
+        );
+      }
+
+      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
+        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, ccvs, requiredPoolCCVs);
+
+      for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
+        ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
+          message: message,
+          messageId: messageId,
+          ccvData: ccvData[ccvDataIndex[i]]
+        });
       }
     }
 
-    emit ExecutionStateChanged(
-      sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
+    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
+      destTokenAmounts[i] =
+        _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, receiver, message.sourceChainSelector);
+    }
+
+    // TODO gaslimit
+    uint256 gasLimit = 200000;
+
+    // There are three cases in which we skip calling the receiver:
+    // 1. If the message data is empty AND the gas limit is 0.
+    //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
+    //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
+    //          receiver without any gas, which would revert the transaction.
+    // 2. If the receiver is not a contract.
+    // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
+    //
+    // The ordering of these checks is important, as the first check is the cheapest to execute.
+    //
+    // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
+    // which checks for sufficient gas before making the external call.
+    if (
+      (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
+        || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
+    ) return;
+
+    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: message.sourceChainSelector,
+        sender: message.sender,
+        data: message.data,
+        destTokenAmounts: destTokenAmounts
+      }),
+      i_gasForCallExactCheck,
+      gasleft() - i_gasForCallExactCheck - 10000,
+      receiver
     );
-    s_reentrancyGuardEntered = false;
+
+    // If CCIP receiver execution is not successful, revert the call including token transfers.
+    if (!success) revert ReceiverError(returnData);
   }
+
+  // ================================================================
+  // │                            CCVs                              │
+  // ================================================================
 
   /// @notice Ensures that the provided CCVs meet the quorum required by the receiver, pool and lane.
   /// @param sourceChainSelector The source chain selector of the message.
@@ -353,7 +433,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         }
       }
       if (!found) {
-        revert RequiredCCVMissing(laneMandatedCCVs[i], true);
+        revert RequiredCCVMissing(laneMandatedCCVs[i], false);
       }
     }
 
@@ -441,82 +521,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     return requiredCCV;
   }
 
-  /// @notice Try executing a message.
-  /// @param message Internal.Any2EVMMultiProofMessage memory message.
-  /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
-  /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
-  function _trialExecute(
-    Internal.Any2EVMMessage memory message
-  ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-    try this.executeSingleMessage(message) {}
-    catch (bytes memory err) {
-      if (msg.sender == Internal.GAS_ESTIMATION_SENDER) {
-        if (
-          CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(err)
-            || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(err)
-            || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(err)
-        ) {
-          revert InsufficientGasToCompleteTx(bytes4(err));
-        }
-      }
-      // return the message execution state as FAILURE and the revert data.
-      // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES.
-      return (Internal.MessageExecutionState.FAILURE, err);
-    }
-    // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
-    return (Internal.MessageExecutionState.SUCCESS, "");
-  }
-
-  /// @notice Executes a single message.
-  /// @param message The message that will be executed.
-  /// @dev We make this external and callable by the contract itself, in order to try/catch
-  /// its execution and enforce atomicity among successful message processing and token transfer.
-  /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
-  /// smart contract wallets, without an associated message.
-  function executeSingleMessage(
-    Internal.Any2EVMMessage memory message
-  ) external {
-    if (msg.sender != address(this)) revert CanOnlySelfCall();
-
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenAmounts.length);
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      destTokenAmounts[i] = _releaseOrMintSingleToken(
-        message.tokenAmounts[i], message.sender, message.receiver, message.header.sourceChainSelector
-      );
-    }
-
-    Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-      messageId: message.header.messageId,
-      sourceChainSelector: message.header.sourceChainSelector,
-      sender: message.sender,
-      data: message.data,
-      destTokenAmounts: destTokenAmounts
-    });
-
-    // There are three cases in which we skip calling the receiver:
-    // 1. If the message data is empty AND the gas limit is 0.
-    //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
-    //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
-    //          receiver without any gas, which would revert the transaction.
-    // 2. If the receiver is not a contract.
-    // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
-    //
-    // The ordering of these checks is important, as the first check is the cheapest to execute.
-    //
-    // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
-    // which checks for sufficient gas before making the external call.
-    if (
-      (message.data.length == 0 && message.gasLimit == 0) || message.receiver.code.length == 0
-        || !message.receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
-    ) return;
-
-    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.header.sourceChainSelector]
-      .router
-      .routeMessage(any2EvmMessage, i_gasForCallExactCheck, message.gasLimit, message.receiver);
-    // If CCIP receiver execution is not successful, revert the call including token transfers.
-    if (!success) revert ReceiverError(returnData);
-  }
-
   // ================================================================
   // │                      Tokens and pools                        │
   // ================================================================
@@ -532,12 +536,14 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param sourceChainSelector The remote source chain selector
   /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
-    Internal.TokenTransfer memory sourceTokenAmount,
+    MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
-    address localToken = sourceTokenAmount.destTokenAddress;
+    Internal._validateEVMAddress(sourceTokenAmount.destTokenAddress);
+
+    address localToken = abi.decode(sourceTokenAmount.destTokenAddress, (address));
     // We check with the token admin registry if the token has a pool on this chain.
     address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
     // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
@@ -652,33 +658,35 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     SourceChainConfigArgs[] calldata sourceChainConfigUpdates
   ) external onlyOwner {
     for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
-      SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
+      SourceChainConfigArgs memory configUpdate = sourceChainConfigUpdates[i];
 
-      if (sourceConfigUpdate.sourceChainSelector == 0) {
+      if (configUpdate.sourceChainSelector == 0) {
         revert ZeroChainSelectorNotAllowed();
       }
-      if (address(sourceConfigUpdate.router) == address(0) || sourceConfigUpdate.defaultCCV.length == 0) {
+      if (address(configUpdate.router) == address(0) || configUpdate.defaultCCV.length == 0) {
         revert ZeroAddressNotAllowed();
       }
 
-      // OnRamp can never be zero - if it is, then the source chain has been added for the first time.
-      if (sourceConfigUpdate.onRamp.length == 0 || keccak256(sourceConfigUpdate.onRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
+      // OnRamp can never be zero.
+      if (configUpdate.onRamp.length == 0 || keccak256(configUpdate.onRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
         revert ZeroAddressNotAllowed();
       }
+
+      CCVConfigValidation._validateDefaultAndMandatedCCVs(configUpdate.defaultCCV, configUpdate.laneMandatedCCVs);
 
       // TODO check replay protection if onRamp changes
-      SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceConfigUpdate.sourceChainSelector];
+      SourceChainConfig storage currentConfig = s_sourceChainConfigs[configUpdate.sourceChainSelector];
 
-      currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
-      currentConfig.router = sourceConfigUpdate.router;
-      currentConfig.onRamp = sourceConfigUpdate.onRamp;
-      currentConfig.defaultCCVs = sourceConfigUpdate.defaultCCV;
-      currentConfig.laneMandatedCCVs = sourceConfigUpdate.laneMandatedCCVs;
+      currentConfig.isEnabled = configUpdate.isEnabled;
+      currentConfig.router = configUpdate.router;
+      currentConfig.onRamp = configUpdate.onRamp;
+      currentConfig.defaultCCVs = configUpdate.defaultCCV;
+      currentConfig.laneMandatedCCVs = configUpdate.laneMandatedCCVs;
 
       // We don't need to check the return value, as inserting the item twice has no effect.
-      s_sourceChainSelectors.add(sourceConfigUpdate.sourceChainSelector);
+      s_sourceChainSelectors.add(configUpdate.sourceChainSelector);
 
-      emit SourceChainConfigSet(sourceConfigUpdate.sourceChainSelector, currentConfig);
+      emit SourceChainConfigSet(configUpdate.sourceChainSelector, currentConfig);
     }
   }
 
@@ -686,8 +694,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param message initial message
   /// @return transformedMessage modified message
   function _beforeExecuteSingleMessage(
-    Internal.Any2EVMMessage memory message
-  ) internal virtual returns (Internal.Any2EVMMessage memory transformedMessage) {
+    MessageV1Codec.MessageV1 memory message
+  ) internal virtual returns (MessageV1Codec.MessageV1 memory transformedMessage) {
     return message;
   }
 }

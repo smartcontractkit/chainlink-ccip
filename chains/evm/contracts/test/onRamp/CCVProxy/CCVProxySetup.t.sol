@@ -3,6 +3,9 @@ pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
+import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+
+import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
 import {MockCCVOnRamp} from "../../mocks/MockCCVOnRamp.sol";
@@ -10,11 +13,9 @@ import {MockExecutor} from "../../mocks/MockExecutor.sol";
 
 contract CCVProxySetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
-  bytes32 internal s_metadataHash;
 
   CCVProxy internal s_ccvProxy;
-  MockCCVOnRamp internal s_mockCCVOne;
-  MockExecutor internal s_mockExecutor;
+  CCVAggregator internal s_ccvAggregatorRemote;
 
   function setUp() public virtual override {
     super.setUp();
@@ -31,60 +32,111 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
-    s_mockCCVOne = new MockCCVOnRamp();
-
-    CCVProxy.DestChainConfigArgs[] memory destChainConfigs = new CCVProxy.DestChainConfigArgs[](1);
-    destChainConfigs[0] = CCVProxy.DestChainConfigArgs({
+    s_ccvAggregatorRemote = CCVAggregator(makeAddr("CCVAggregatorRemote"));
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = address(new MockCCVOnRamp());
+    CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = CCVProxy.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
-      defaultCCV: address(s_mockCCVOne),
-      requiredCCV: address(0),
-      defaultExecutor: address(s_mockExecutor)
+      laneMandatedCCVs: new address[](0),
+      defaultCCVs: defaultCCVs,
+      defaultExecutor: address(new MockExecutor()),
+      ccvAggregator: abi.encodePacked(address(s_ccvAggregatorRemote))
     });
 
-    s_ccvProxy.applyDestChainConfigUpdates(destChainConfigs);
+    s_ccvProxy.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
+  // TODO make this work for other cases as well
   function _evmMessageToEvent(
     Client.EVM2AnyMessage memory message,
     uint64 destChainSelector,
     uint64 seqNum,
     uint256 feeTokenAmount,
-    uint256 feeValueJuels,
-    address originalSender,
-    bytes32 metadataHash
-  ) internal pure returns (Internal.EVM2AnyVerifierMessage memory) {
-    // TODO
-    //    if (message.tokenAmounts.length > 0) {
-    //      tokenTransfer =
-    //        Internal.EVM2AnyTokenTransfer({token: message.tokenAmounts[0].token, amount: message.tokenAmounts[0].amount});
-    //    }
+    address originalSender
+  )
+    internal
+    view
+    returns (
+      bytes32 messageId,
+      bytes memory encodedMessage,
+      Internal.Receipt[] memory verifierReceipts,
+      Internal.Receipt memory executorReceipt,
+      bytes[] memory receiptBlobs
+    )
+  {
+    // TODO handle token transfers
+    CCVProxy.DestChainConfig memory destChainConfig = s_ccvProxy.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    MessageV1Codec.MessageV1 memory messageV1 = MessageV1Codec.MessageV1({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      destChainSelector: destChainSelector,
+      sequenceNumber: seqNum,
+      onRampAddress: abi.encodePacked(address(s_ccvProxy)),
+      offRampAddress: abi.encodePacked(address(s_ccvAggregatorRemote)),
+      finality: 0,
+      sender: abi.encodePacked(originalSender),
+      receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
+      destBlob: "",
+      tokenTransfer: new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length),
+      data: message.data
+    });
 
-    Internal.EVM2AnyVerifierMessage memory messageEvent = Internal.EVM2AnyVerifierMessage({
-      header: Internal.Header({
-        messageId: "",
-        sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-        destChainSelector: destChainSelector,
-        sequenceNumber: seqNum
-      }),
-      sender: originalSender,
-      data: message.data,
-      receiver: message.receiver,
-      feeToken: message.feeToken,
-      feeTokenAmount: feeTokenAmount,
-      feeValueJuels: feeValueJuels,
-      tokenTransfer: new Internal.EVMTokenTransfer[](message.tokenAmounts.length),
-      verifierReceipts: new Internal.Receipt[](0),
-      executorReceipt: Internal.Receipt({
-        issuer: address(0),
+    verifierReceipts = new Internal.Receipt[](destChainConfig.defaultCCVs.length);
+    for (uint256 i = 0; i < verifierReceipts.length; ++i) {
+      verifierReceipts[i] = Internal.Receipt({
+        issuer: destChainConfig.defaultCCVs[i],
         feeTokenAmount: 0,
         destGasLimit: 0,
         destBytesOverhead: 0,
-        extraArgs: ""
-      })
+        // TODO when v3 extra args are passed in
+        extraArgs: message.extraArgs
+      });
+    }
+    executorReceipt = Internal.Receipt({
+      issuer: destChainConfig.defaultExecutor,
+      feeTokenAmount: 0, // Matches current CCVProxy event behavior
+      destGasLimit: 0,
+      destBytesOverhead: 0,
+      extraArgs: message.extraArgs
     });
+    receiptBlobs = new bytes[](1);
+    receiptBlobs[0] = "";
+    return (
+      keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
+      MessageV1Codec._encodeMessageV1(messageV1),
+      verifierReceipts,
+      executorReceipt,
+      receiptBlobs
+    );
+  }
 
-    messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
-    return messageEvent;
+  // Helper function to create EVMExtraArgsV3 struct
+  function _createV3ExtraArgs(
+    Client.CCV[] memory requiredCCVs,
+    Client.CCV[] memory optionalCCVs,
+    uint8 optionalThreshold
+  ) internal pure returns (Client.EVMExtraArgsV3 memory) {
+    return Client.EVMExtraArgsV3({
+      requiredCCV: requiredCCVs,
+      optionalCCV: optionalCCVs,
+      optionalThreshold: optionalThreshold,
+      finalityConfig: 12,
+      executor: address(0), // No executor specified.
+      executorArgs: "",
+      tokenArgs: ""
+    });
+  }
+
+  // Helper function to assert that two CCV arrays are equal
+  function _assertCCVArraysEqual(Client.CCV[] memory actual, Client.CCV[] memory expected) internal pure {
+    assertEq(actual.length, expected.length, "CCV arrays have different lengths");
+
+    for (uint256 i = 0; i < actual.length; i++) {
+      assertEq(
+        actual[i].ccvAddress, expected[i].ccvAddress, string.concat("CCV address mismatch at index ", vm.toString(i))
+      );
+      assertEq(actual[i].args, expected[i].args, string.concat("CCV args mismatch at index ", vm.toString(i)));
+    }
   }
 }
