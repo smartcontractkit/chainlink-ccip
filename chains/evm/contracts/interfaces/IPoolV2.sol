@@ -18,25 +18,36 @@ interface IPoolV2 is IPoolV1 {
   ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut);
 
   // TODO add new methods here for V2. Everything below is a placeholder.
-  function getRequiredCCVs(
-    address token,
-    uint64 sourceChainSelector,
-    uint256 amount,
-    bytes memory extraData
-  ) external view returns (address[] memory requiredCCVs);
 
+  /// @notice Returns the list of required outbound CCVs (CCV OnRamps) for a given destination chain and amount.
+  /// @param destChainSelector The chain selector of the destination chain.
+  /// @param amount The amount of tokens to be transferred.
+  /// @param tokenArgs Additional token arguments.
+  /// @return An array of addresses representing the required outbound CCVs.
   function getRequiredOutboundCCVs(
     uint64 destChainSelector,
     uint256 amount,
     bytes calldata tokenArgs
   ) external view returns (address[] memory);
 
+  /// @notice Returns the list of required inbound CCVs (CCV OffRamps) for a given source chain and amount.
+  /// @param sourceChainSelector The chain selector of the source chain.
+  /// @param amount The amount of tokens to be transferred.
+  /// @param tokenArgs Additional token arguments.
+  /// @return An array of addresses representing the required inbound CCVs.
   function getRequiredInboundCCVs(
     uint64 sourceChainSelector,
     uint256 amount,
     bytes calldata tokenArgs
   ) external view returns (address[] memory);
 
+  /// @notice Returns a fee quote for transferring tokens to a destination chain.
+  /// @param destChainSelector The chain selector of the destination chain.
+  /// @param sender The address of the sender on the source chain.
+  /// @param feeToken The address of the token to be used for fee payment.
+  /// @param tokenAmounts An array of token amounts to be transferred.
+  /// @param tokenArgs Additional token arguments.
+  /// @return A Pool.Quote struct containing the fee breakdown.
   function getFee(
     uint64 destChainSelector,
     address sender,
