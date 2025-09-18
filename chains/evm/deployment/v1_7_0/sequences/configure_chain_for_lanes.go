@@ -34,6 +34,8 @@ type RemoteChainConfig struct {
 	// The address on the remote chain from which the message is emitted
 	// For example, on EVM chains, this is the CCVProxy
 	CCIPMessageSource []byte
+	// The address on the remote chain against which the message gets executed
+	CCIPMessageDest []byte
 	// The default CCVs that will be applied to messages FROM this remote chain if no receiver is specified
 	DefaultCCVOffRamps []common.Address
 	// Any CCVs that must always be used for messages FROM this remote chain
@@ -109,6 +111,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				DefaultCCVs:       remoteConfig.DefaultCCVOnRamps,
 				LaneMandatedCCVs:  remoteConfig.LaneMandatedCCVOnRamps,
 				DefaultExecutor:   remoteConfig.DefaultExecutor,
+				CcvAggregator:     remoteConfig.CCIPMessageDest,
 			})
 			commitOnRampDestConfigArgs = append(commitOnRampDestConfigArgs, commit_onramp.DestChainConfigArgs{
 				Router:            input.Router,
@@ -119,6 +122,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				AllowlistEnabled:          remoteConfig.CommitOnRampDestChainConfig.AllowlistEnabled,
 				AddedAllowlistedSenders:   remoteConfig.CommitOnRampDestChainConfig.AddedAllowlistedSenders,
 				RemovedAllowlistedSenders: remoteConfig.CommitOnRampDestChainConfig.RemovedAllowlistedSenders,
+				DestChainSelector:         remoteSelector,
 			})
 			commitOnRampProxyArgs = append(commitOnRampProxyArgs, ccv_ramp_proxy.SetRampArgs{
 				RemoteChainSelector: remoteSelector,

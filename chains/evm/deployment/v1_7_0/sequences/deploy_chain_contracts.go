@@ -43,7 +43,7 @@ type CommitOnRampParams struct {
 }
 
 type CommitOffRampParams struct {
-	SignatureConfigArgs commit_offramp.SignatureConfigArgs
+	SignatureConfigArgs commit_offramp.SetSignatureConfigArgs
 }
 
 type CCVProxyParams struct {
@@ -324,9 +324,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy CommitOffRamp
 		commitOffRampRef, err := maybeDeployContract(b, commit_offramp.Deploy, commit_offramp.ContractType, chain, contract.DeployInput[commit_offramp.ConstructorArgs]{
 			ChainSelector: chain.Selector,
-			Args: commit_offramp.ConstructorArgs{
-				NonceManager: common.HexToAddress(nonceManagerRef.Address),
-			},
+			Args:          commit_offramp.ConstructorArgs{},
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOffRamp: %w", err)
@@ -345,7 +343,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, mockReceiver)
 
 		// Set signature config on the CommitOffRamp
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfigs, chain, contract.FunctionInput[commit_offramp.SignatureConfigArgs]{
+		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfigs, chain, contract.FunctionInput[commit_offramp.SetSignatureConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(commitOffRampRef.Address),
 			Args:          input.ContractParams.CommitOffRamp.SignatureConfigArgs,

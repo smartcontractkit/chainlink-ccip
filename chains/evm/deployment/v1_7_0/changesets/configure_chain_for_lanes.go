@@ -21,6 +21,7 @@ import (
 type RemoteChainConfig struct {
 	AllowTrafficFrom            bool
 	CCIPMessageSource           datastore.AddressRef
+	CCIPMessageDest             datastore.AddressRef
 	DefaultCCVOffRamps          []datastore.AddressRef
 	LaneMandatedCCVOffRamps     []datastore.AddressRef
 	DefaultCCVOnRamps           []datastore.AddressRef
@@ -139,13 +140,15 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			//   fmt.Println(chain.AddressToBytes(addresses[chainSel]))
 			// }
 			// Right now, we just assume that the remote chain is EVM, which is not correct.
+			// Same goes for CCIPMessageDest.
 			remoteConfig.CCIPMessageSource.ChainSelector = remoteChainSel
-			refs = append(refs, remoteConfig.CCIPMessageSource)
+			remoteConfig.CCIPMessageDest.ChainSelector = remoteChainSel
 			remoteAddrs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{
 				remoteConfig.CCIPMessageSource,
+				remoteConfig.CCIPMessageDest,
 			}, datastore_utils.ToPaddedEVMAddress)
 			if err != nil {
-				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve CCIPMessageSource ref: %w", err)
+				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve CCIPMessageSource and CCIPMessageDest ref: %w", err)
 			}
 
 			remoteChains[remoteChainSel] = sequences.RemoteChainConfig{
@@ -156,6 +159,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 				DefaultCCVOnRamps:           addrs[laneMandatedCCVOffRampsEnd:defaultCCVOnRampsEnd],
 				LaneMandatedCCVOnRamps:      addrs[defaultCCVOnRampsEnd:laneMandatedCCVOnRampsEnd],
 				CCIPMessageSource:           remoteAddrs[0],
+				CCIPMessageDest:             remoteAddrs[1],
 				CommitOnRampDestChainConfig: remoteConfig.CommitOnRampDestChainConfig,
 				FeeQuoterDestChainConfig:    remoteConfig.FeeQuoterDestChainConfig,
 			}

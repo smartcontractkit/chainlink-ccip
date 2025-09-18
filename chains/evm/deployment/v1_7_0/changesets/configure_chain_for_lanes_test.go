@@ -8,6 +8,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
@@ -96,7 +98,7 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 							USDPerWETH:                     usdPerWeth,
 						},
 						CommitOffRamp: sequences.CommitOffRampParams{
-							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
+							SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
 								Threshold: 1,
 								Signers: []common.Address{
 									common.HexToAddress("0x02"),
@@ -120,7 +122,11 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 					4356164186791070119: {
 						AllowTrafficFrom: true,
 						CCIPMessageSource: datastore.AddressRef{
-							Type:    datastore.ContractType(commit_onramp.ContractType),
+							Type:    datastore.ContractType(ccv_proxy.ContractType),
+							Version: semver.MustParse("1.7.0"),
+						},
+						CCIPMessageDest: datastore.AddressRef{
+							Type:    datastore.ContractType(ccv_aggregator.ContractType),
 							Version: semver.MustParse("1.7.0"),
 						},
 						DefaultCCVOffRamps: []datastore.AddressRef{

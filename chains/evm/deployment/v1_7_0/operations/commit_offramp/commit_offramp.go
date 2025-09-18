@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/commit_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/ownable_ccv_ramp_proxy"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -16,10 +15,7 @@ var ContractType cldf_deployment.ContractType = "CommitOffRamp"
 var ProxyType cldf_deployment.ContractType = "CommitOffRampProxy"
 
 type ConstructorArgs struct {
-	NonceManager common.Address
 }
-
-type SignatureConfigArgs = commit_offramp.SignatureQuorumVerifierSignatureConfigArgs
 
 var Deploy = contract.NewDeploy(
 	"commit-offramp:deploy",
@@ -30,28 +26,17 @@ var Deploy = contract.NewDeploy(
 	func(ConstructorArgs) error { return nil },
 	contract.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := commit_offramp.DeployCommitOffRamp(opts, backend, args.NonceManager)
+			address, tx, _, err := commit_offramp.DeployCommitOffRamp(opts, backend)
 			return address, tx, err
 		},
 		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)
 	},
 )
 
-var DeployProxy = contract.NewDeploy(
-	"commit-on-ramp-proxy:deploy",
-	semver.MustParse("1.7.0"),
-	"Deploys the CommitOnRampProxy contract",
-	ProxyType,
-	ownable_ccv_ramp_proxy.OwnableRampProxyABI,
-	func(any) error { return nil },
-	contract.VMDeployers[any]{
-		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args any) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := ownable_ccv_ramp_proxy.DeployOwnableRampProxy(opts, backend)
-			return address, tx, err
-		},
-		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args any) (common.Address, error)
-	},
-)
+type SetSignatureConfigArgs struct {
+	Signers   []common.Address
+	Threshold uint8
+}
 
 var SetSignatureConfigs = contract.NewWrite(
 	"commit-offramp:set-signature-config",
@@ -61,8 +46,8 @@ var SetSignatureConfigs = contract.NewWrite(
 	commit_offramp.CommitOffRampABI,
 	commit_offramp.NewCommitOffRamp,
 	contract.OnlyOwner,
-	func(SignatureConfigArgs) error { return nil },
-	func(commitOffRamp *commit_offramp.CommitOffRamp, opts *bind.TransactOpts, args SignatureConfigArgs) (*types.Transaction, error) {
-		return commitOffRamp.SetSignatureConfig(opts, args)
+	func(SetSignatureConfigArgs) error { return nil },
+	func(commitOffRamp *commit_offramp.CommitOffRamp, opts *bind.TransactOpts, args SetSignatureConfigArgs) (*types.Transaction, error) {
+		return commitOffRamp.SetSignatureConfig(opts, args.Signers, args.Threshold)
 	},
 )
