@@ -23,8 +23,8 @@ contract BurnMintMultiTokenPool is MultiTokenPool {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) external virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(
-  lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, lockOrBurnIn.originalSender, lockOrBurnIn.amount
-);;
+      lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, lockOrBurnIn.originalSender, lockOrBurnIn.amount
+    );
 
     IBurnMintERC20(lockOrBurnIn.localToken).burn(lockOrBurnIn.amount);
 
