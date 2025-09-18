@@ -58,4 +58,20 @@ library Pool {
     // chain have the same number of decimals.
     uint256 destinationAmount;
   }
+
+  // Pool v2 structs.
+
+  struct LockOrBurnV2 {
+    bytes receiver; //  The recipient of the tokens on the destination chain, abi encoded.
+    uint64 remoteChainSelector; // ─╮ The chain ID of the destination chain.
+    address originalSender; // ─────╯ The original sender of the tx on the source chain.
+    uint256 amount; //  The amount of tokens to lock or burn, denominated in the source token's decimals.
+    address localToken; //  The address on this chain of the token to lock or burn.
+    bytes tokenExtraData;
+  }
+
+  struct Quote {
+    uint256 feeTokenAmount;//amount of fee token owed
+    uint256 transferTokenFee; //amount billed in token pool's localToken
+  }
 }
