@@ -67,11 +67,11 @@ library Pool {
     address originalSender; // ─────╯ The original sender of the tx on the source chain.
     uint256 amount; //  The amount of tokens to lock or burn, denominated in the source token's decimals.
     address localToken; //  The address on this chain of the token to lock or burn.
-    bytes tokenExtraData;
+    bytes tokenExtraData; // Extra data for token operations.
   }
 
   struct Quote {
-    uint256 feeTokenAmount;//amount of fee token owed
-    uint256 transferTokenFee; //amount billed in token pool's localToken
+    uint256 feeTokenAmount; //The amount of fee token needed for the fee, in smallest denomination of the fee token.
+    uint256 transferTokenFee; // The amount billed in token pool's localToken.
   }
 }
