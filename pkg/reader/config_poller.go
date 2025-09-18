@@ -498,18 +498,18 @@ func (c *configPoller) GetChainConfig(
 		return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
 	}
 
-	chainCache := c.getOrCreateChainCache(chainSel)
+	// chainCache := c.getOrCreateChainCache(chainSel)
 
-	chainCache.chainConfigMu.RLock()
-	// Check if we have any data in cache
-	if !chainCache.chainConfigRefresh.IsZero() {
-		defer chainCache.chainConfigMu.RUnlock()
-		c.lggr.Debugw("Returning cached chain config",
-			"chain", chainSel,
-			"cacheAge", time.Since(chainCache.chainConfigRefresh))
-		return chainCache.chainConfigData, nil
-	}
-	chainCache.chainConfigMu.RUnlock()
+	// chainCache.chainConfigMu.RLock()
+	// // Check if we have any data in cache
+	// if !chainCache.chainConfigRefresh.IsZero() {
+	// 	defer chainCache.chainConfigMu.RUnlock()
+	// 	c.lggr.Debugw("Returning cached chain config",
+	// 		"chain", chainSel,
+	// 		"cacheAge", time.Since(chainCache.chainConfigRefresh))
+	// 	return chainCache.chainConfigData, nil
+	// }
+	// chainCache.chainConfigMu.RUnlock()
 
 	// No cached data yet, must block for initial load
 	c.lggr.Debugw("No cached data available, performing initial fetch",
