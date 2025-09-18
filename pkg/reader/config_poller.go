@@ -734,6 +734,8 @@ func (c *configPoller) fetchChainConfig(
 		return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("batch get latest values for chain %d: %w", chainSel, err)
 	}
 
+	c.lggr.Info("BATCH RESULT FROM FETCHCHAINCONFIG: ", batchResult)
+
 	if len(skipped) > 0 {
 		c.lggr.Infow("some contracts were skipped due to no bindings",
 			"chain", chainSel,
