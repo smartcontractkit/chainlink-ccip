@@ -28,9 +28,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(
-      lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, lockOrBurnIn.originalSender, lockOrBurnIn.amount
-    );
+    _validateLockOrBurn(lockOrBurnIn);
 
     _lockOrBurn(lockOrBurnIn.amount);
 

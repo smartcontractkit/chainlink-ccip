@@ -187,9 +187,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(
-      lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, lockOrBurnIn.originalSender, lockOrBurnIn.amount
-    );
+    _validateLockOrBurn(lockOrBurnIn);
 
     Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
