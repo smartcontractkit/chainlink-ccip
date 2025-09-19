@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -10,6 +11,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -30,6 +32,8 @@ func Test_LatencyIsTracked(t *testing.T) {
 		metrics.PromExecLatencyHistogram.Reset()
 	})
 
+	var b strings.Builder
+	bhClient, _ := beholder.NewWriterClient(&b)
 	query := types.Query([]byte("query"))
 	observation := types.Observation([]byte("observation"))
 	outcome := ocr3types.Outcome([]byte("outcome"))
@@ -40,7 +44,7 @@ func Test_LatencyIsTracked(t *testing.T) {
 		observation: observation,
 		outcome:     outcome,
 	}
-	reporter, err := metrics.NewPromReporter(lggr, selector)
+	reporter, err := metrics.NewPromReporter(lggr, selector, *bhClient)
 	require.NoError(t, err)
 	tracked := NewTrackedPlugin(origin, lggr, reporter, ocrtypecodec.DefaultExecCodec)
 
@@ -80,10 +84,11 @@ func Test_ErrorIsTrackedWhenOriginReturns(t *testing.T) {
 		metrics.PromExecErrors.Reset()
 		metrics.PromExecLatencyHistogram.Reset()
 	})
-
+	var b strings.Builder
+	bhClient, _ := beholder.NewWriterClient(&b)
 	lggr := logger.Test(t)
 	origin := FakePlugin{err: fmt.Errorf("error")}
-	reporter, err := metrics.NewPromReporter(lggr, selector)
+	reporter, err := metrics.NewPromReporter(lggr, selector, *bhClient)
 	require.NoError(t, err)
 	tracked := NewTrackedPlugin(origin, lggr, reporter, ocrtypecodec.DefaultExecCodec)
 

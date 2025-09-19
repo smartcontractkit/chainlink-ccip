@@ -97,8 +97,8 @@ func (p *Plugin) Outcome(
 		}
 		return nil, nil
 	}
-
-	p.observer.TrackOutcome(outcome, state)
+	p.observer.TrackOutcome(outcome,
+		state, outctx.Round) //nolint:staticcheck // we rely on Round for OTI metrics compatibility
 	lggr.Infow("generated outcome",
 		"outcomeWithoutMsgData", outcome.ToLogFormat(),
 		"numCommitReports", len(outcome.CommitReports),

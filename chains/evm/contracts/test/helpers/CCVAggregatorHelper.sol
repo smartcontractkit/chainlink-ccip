@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
-import {Internal} from "../../libraries/Internal.sol";
+import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
 import {CCVAggregator} from "../../offRamp/CCVAggregator.sol";
 
@@ -36,20 +36,14 @@ contract CCVAggregatorHelper is CCVAggregator {
     return _getCCVsFromPool(localToken, sourceChainSelector, amount, extraData);
   }
 
-  function trialExecute(
-    Internal.Any2EVMMessage memory message
-  ) external returns (Internal.MessageExecutionState, bytes memory) {
-    return _trialExecute(message);
-  }
-
   function beforeExecuteSingleMessage(
-    Internal.Any2EVMMessage memory message
-  ) external returns (Internal.Any2EVMMessage memory) {
+    MessageV1Codec.MessageV1 memory message
+  ) external returns (MessageV1Codec.MessageV1 memory) {
     return _beforeExecuteSingleMessage(message);
   }
 
   function releaseOrMintSingleToken(
-    Internal.TokenTransfer memory sourceTokenAmount,
+    MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector

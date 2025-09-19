@@ -390,7 +390,7 @@ func (s roleDonTestSetup) newRoleDonTestPlugin(oracleID commontypes.OracleID, in
 		plugintypes.DonID(999),
 		s.oracleIDToPeerID,
 		pluginconfig.CommitOffchainConfig{
-			TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+			TokenInfo: map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo{
 				"0x01": {
 					AggregatorAddress: "0x02",
 					DeviationPPB:      cciptypes.NewBigIntFromInt64(123),
