@@ -6,8 +6,7 @@ import {ICCVRampV1} from "../../interfaces/ICCVRampV1.sol";
 import {Client} from "../../libraries/Client.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract MockCCVRamp is ICCVRampV1 {
   bytes private s_verifierResult;

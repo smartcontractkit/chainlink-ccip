@@ -7,8 +7,7 @@ import {SuperchainInterop} from "../../../libraries/SuperchainInterop.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampOverSuperchainInteropSetup} from "./OnRampOverSuperchainInteropSetup.t.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract OnRampOverSuperchainInterop_forwardFromRouter is OnRampOverSuperchainInteropSetup {
   function setUp() public virtual override {

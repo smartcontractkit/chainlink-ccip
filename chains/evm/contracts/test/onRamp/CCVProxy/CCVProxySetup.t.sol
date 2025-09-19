@@ -8,7 +8,7 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
-import {MockCCVRamp} from "../../mocks/MockCCVOnRamp.sol";
+import {MockCCVRamp} from "../../mocks/MockCCVRamp.sol";
 import {MockExecutor} from "../../mocks/MockExecutor.sol";
 
 contract CCVProxySetup is FeeQuoterFeeSetup {

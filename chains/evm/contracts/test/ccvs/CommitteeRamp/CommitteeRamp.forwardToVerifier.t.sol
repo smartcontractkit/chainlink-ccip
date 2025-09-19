@@ -15,8 +15,6 @@ contract CommitteeRamp_forwardToVerifier is CommitteeRampSetup {
   }
 
   function test_forwardToVerifier() public {
-    bytes memory testData = "test data";
-
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _generateBasicMessageV1();
 
     vm.prank(s_ccvProxy);
@@ -24,7 +22,6 @@ contract CommitteeRamp_forwardToVerifier is CommitteeRampSetup {
   }
 
   function test_forwardToVerifier_ViaRampProxy() public {
-    bytes memory testData = "test data";
     RampProxy rampProxy = new RampProxy(address(s_commitRamp));
 
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _generateBasicMessageV1();
@@ -34,8 +31,6 @@ contract CommitteeRamp_forwardToVerifier is CommitteeRampSetup {
   }
 
   function test_forwardToVerifier_RevertWhen_CallerIsNotARampOnRouter() public {
-    bytes memory testData = "test data";
-
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _generateBasicMessageV1();
 
     vm.prank(STRANGER);
