@@ -1,51 +1,60 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Pool} from "../libraries/Pool.sol";
+import {IPoolV1} from "./IPool.sol";
 
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {Client} from "../libraries/Client.sol";
+import {Pool} from "../libraries/Pool.sol";
 
 // TODO Milestone 2: implement.
 /// @notice Shared public interface for multiple V2 pool types.
 /// Each pool type handles a different child token model e.g. lock/unlock, mint/burn.
-interface IPoolV2 is IERC165 {
+interface IPoolV2 is IPoolV1 {
   /// @notice Lock tokens into the pool or burn the tokens.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @param tokenArgs Additional token arguments.
   /// @return lockOrBurnOut Encoded data fields for the processing of tokens on the destination chain.
   function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    bytes calldata tokenArgs
   ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut);
 
-  /// @notice Releases or mints tokens to the receiver address.
-  /// @param releaseOrMintIn All data required to release or mint tokens.
-  /// @return releaseOrMintOut The amount of tokens released or minted on the local chain, denominated
-  /// in the local token's decimals.
-  /// @dev The offRamp asserts that the balanceOf of the receiver has been incremented by exactly the number
-  /// of tokens that is returned in ReleaseOrMintOutV1.destinationAmount. If the amounts do not match, the tx reverts.
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) external returns (Pool.ReleaseOrMintOutV1 memory);
-
-  /// @notice Checks whether a remote chain is supported in the token pool.
-  /// @param remoteChainSelector The selector of the remote chain.
-  /// @return true if the given chain is a permissioned remote chain.
-  function isSupportedChain(
-    uint64 remoteChainSelector
-  ) external view returns (bool);
-
-  /// @notice Returns if the token pool supports the given token.
-  /// @param token The address of the token.
-  /// @return true if the token is supported by the pool.
-  function isSupportedToken(
-    address token
-  ) external view returns (bool);
-
   // TODO add new methods here for V2. Everything below is a placeholder.
-  function getRequiredCCVs(
-    address token,
+
+  /// @notice Returns the set of required CCVs for outgoing messages to a destination chain.
+  /// @param destChainSelector The chain selector of the destination chain.
+  /// @param amount The amount of tokens to be transferred.
+  /// @param tokenArgs Additional token arguments.
+  /// @return requiredCCVs A set of addresses representing the required outbound CCVs.
+  function getRequiredOutboundCCVs(
+    uint64 destChainSelector,
+    uint256 amount,
+    bytes calldata tokenArgs
+  ) external view returns (address[] memory requiredCCVs);
+
+  /// @notice Returns the set of required CCVs for incoming messages from a source chain.
+  /// @param sourceChainSelector The chain selector of the source chain.
+  /// @param amount The amount of tokens to be transferred.
+  /// @param tokenArgs Additional token arguments.
+  /// @return requiredCCVs A set of addresses representing the required inbound CCVs.
+  function getRequiredInboundCCVs(
     uint64 sourceChainSelector,
     uint256 amount,
-    bytes memory extraData
+    bytes calldata tokenArgs
   ) external view returns (address[] memory requiredCCVs);
+
+  /// @notice Returns a fee quote for transferring tokens to a destination chain.
+  /// @param destChainSelector The chain selector of the destination chain.
+  /// @param sender The address of the sender on the source chain.
+  /// @param feeToken The address of the token to be used for fee payment.
+  /// @param tokenAmounts An array of token amounts to be transferred.
+  /// @param tokenArgs Additional token arguments.
+  /// @return A Pool.Quote struct containing the fee breakdown.
+  function getFee(
+    uint64 destChainSelector,
+    address sender,
+    address feeToken,
+    Client.EVMTokenAmount[] calldata tokenAmounts,
+    bytes calldata tokenArgs
+  ) external view returns (Pool.Quote memory);
 }

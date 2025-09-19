@@ -17,7 +17,7 @@ contract MockPoolV2 {
     s_requiredCCVs = requiredCCVs;
   }
 
-  function getRequiredCCVs(address, uint64, uint256, bytes memory) external view returns (address[] memory) {
+  function getRequiredInboundCCVs(uint64, uint256, bytes memory) external view returns (address[] memory) {
     return s_requiredCCVs;
   }
 
