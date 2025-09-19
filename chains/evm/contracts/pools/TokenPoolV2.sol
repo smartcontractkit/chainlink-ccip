@@ -117,8 +117,8 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
     return s_verifierConfig[destChainSelector].outboundCCVs;
   }
 
-  /// @notice Validates a CCV array for zero addresses and duplicates
-  /// @param ccvs The array of CCV addresses to validate
+  /// @notice Validates a CCV array for zero addresses and duplicates.
+  /// @param ccvs The array of CCV addresses to validate.
   function _validateCCVArray(
     address[] calldata ccvs
   ) private pure {
