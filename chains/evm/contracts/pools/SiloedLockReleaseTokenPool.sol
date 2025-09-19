@@ -8,10 +8,8 @@ import {Pool} from "../libraries/Pool.sol";
 import {ERC20LockBox} from "./ERC20LockBox.sol";
 import {TokenPool} from "./TokenPool.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice A variation on Lock Release token pools where liquidity is shared among some chains, and stored independently
 /// for others. Chains which do not share liquidity are known as siloed chains.
