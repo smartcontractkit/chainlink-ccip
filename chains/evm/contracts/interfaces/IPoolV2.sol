@@ -21,7 +21,7 @@ interface IPoolV2 is IPoolV1 {
 
   // TODO add new methods here for V2. Everything below is a placeholder.
 
-  /// @notice Returns the list of required outbound CCVs (CCV OnRamps) for a given destination chain and amount.
+  /// @notice Returns the set of required CCVs for outgoing messages to a destination chain.
   /// @param destChainSelector The chain selector of the destination chain.
   /// @param amount The amount of tokens to be transferred.
   /// @param tokenArgs Additional token arguments.
@@ -32,7 +32,7 @@ interface IPoolV2 is IPoolV1 {
     bytes calldata tokenArgs
   ) external view returns (address[] memory);
 
-  /// @notice Returns the list of required inbound CCVs (CCV OffRamps) for a given source chain and amount.
+  /// @notice Returns the set of required CCVs for incoming messages from a source chain.
   /// @param sourceChainSelector The chain selector of the source chain.
   /// @param amount The amount of tokens to be transferred.
   /// @param tokenArgs Additional token arguments.
