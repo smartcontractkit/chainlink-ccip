@@ -12,10 +12,11 @@ import {Pool} from "../libraries/Pool.sol";
 interface IPoolV2 is IPoolV1 {
   /// @notice Lock tokens into the pool or burn the tokens.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @param tokenArgs Additional token arguments.
   /// @return lockOrBurnOut Encoded data fields for the processing of tokens on the destination chain.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes calldata tokenExtraData
+    bytes calldata tokenArgs
   ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut);
 
   // TODO add new methods here for V2. Everything below is a placeholder.

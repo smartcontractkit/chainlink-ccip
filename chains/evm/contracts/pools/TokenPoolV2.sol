@@ -9,14 +9,22 @@ import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 abstract contract TokenPoolV2 is IPoolV2, TokenPool {
-  event DynamicVerifiersSet(uint64 indexed remoteChainSelector, address[] outbound, address[] inbound);
+  event DestChainConfigUpdated(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
 
-  struct DynamicVerifierConfig {
-    address[] outbound;
-    address[] inbound;
+  struct DestChainConfigArg {
+    uint64 destChainSelector;
+    address[] outboundCCVs;
+    address[] inboundCCVs;
   }
+  // TODO billing related config args
 
-  mapping(uint64 remoteChainSelector => DynamicVerifierConfig) internal s_dynamicVerifiers;
+  struct DestChainConfig {
+    address[] outboundCCVs;
+    address[] inboundCCVs;
+  }
+  // TODO billing related config
+
+  mapping(uint64 remoteChainSelector => DestChainConfig) internal s_destChainConfig;
 
   /// @notice Signals which version of the pool interface is supported.
   function supportsInterface(
@@ -32,7 +40,7 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
 
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes calldata /* tokenExtraData */
+    bytes calldata /* tokenArgs */
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
     _lockOrBurn(lockOrBurnIn.amount);
@@ -51,28 +59,28 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
   }
 
   // ================================================================
-  // │                            CCV                               │
+  // │                          Config                               │
   // ================================================================
 
-  function setRequiredCCVs(
+  function applyDestChainConfigUpdates(
     uint64 remoteChainSelector,
     address[] calldata outbound,
     address[] calldata inbound
   ) external onlyOwner {
-    s_dynamicVerifiers[remoteChainSelector] = DynamicVerifierConfig({outbound: outbound, inbound: inbound});
-    emit DynamicVerifiersSet({remoteChainSelector: remoteChainSelector, outbound: outbound, inbound: inbound});
+    s_destChainConfig[remoteChainSelector] = DestChainConfig({outboundCCVs: outbound, inboundCCVs: inbound});
+    emit DestChainConfigUpdated(remoteChainSelector, s_destChainConfig[remoteChainSelector]);
   }
+
+  // ================================================================
+  // │                          CCV                                  │
+  // ================================================================
 
   function getRequiredInboundCCVs(
     uint64 sourceChainSelector,
     uint256,
     bytes calldata
   ) external view virtual returns (address[] memory) {
-    DynamicVerifierConfig memory config = s_dynamicVerifiers[sourceChainSelector];
-    if (config.inbound.length > 0) {
-      return config.inbound;
-    }
-    return s_dynamicVerifiers[sourceChainSelector].inbound;
+    return s_destChainConfig[sourceChainSelector].inboundCCVs;
   }
 
   function getRequiredOutboundCCVs(
@@ -80,10 +88,6 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
     uint256,
     bytes calldata
   ) external view virtual returns (address[] memory) {
-    DynamicVerifierConfig memory config = s_dynamicVerifiers[destChainSelector];
-    if (config.outbound.length > 0) {
-      return config.outbound;
-    }
-    return s_dynamicVerifiers[destChainSelector].outbound;
+    return s_destChainConfig[destChainSelector].outboundCCVs;
   }
 }
