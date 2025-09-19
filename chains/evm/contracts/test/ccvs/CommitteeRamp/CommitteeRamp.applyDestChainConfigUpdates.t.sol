@@ -3,11 +3,11 @@ pragma solidity ^0.8.24;
 
 import {BaseOnRamp} from "../../../ccvs/components/BaseOnRamp.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
-import {CommitRampSetup} from "./CommitRampSetup.t.sol";
+import {CommitteeRampSetup} from "./CommitteeRampSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract CommitRamp_applyDestChainConfigUpdates is CommitRampSetup {
-  uint64 internal constant NEW_DEST_SELECTOR = uint64(uint256(keccak256("COMMIT_ONRAMP_NEW_DEST_SELECTOR")));
+contract CommitteeRamp_applyDestChainConfigUpdates is CommitteeRampSetup {
+  uint64 internal constant NEW_DEST_SELECTOR = uint64(uint256(keccak256("COMMITTEE_RAMP_NEW_DEST_SELECTOR")));
 
   function test_applyDestChainConfigUpdates() public {
     address router = makeAddr("newRouter");

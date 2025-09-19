@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICCVOffRampV1} from "../interfaces/ICCVOffRampV1.sol";
+import {ICCVRampV1} from "../interfaces/ICCVRampV1.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
@@ -13,9 +13,9 @@ import {IERC165} from
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-/// @notice The CommitRamp is a contract that handles lane-specific fee logic and message verification.
+/// @notice The CommitteeRamp is a contract that handles lane-specific fee logic and message verification.
 /// @dev OnRamp and OffRamp capabilities are combined to enable a single proxy address for a CCV each chain.
-contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVerifier, BaseOnRamp {
+contract CommitteeRamp is Ownable2StepMsgSender, ICCVRampV1, SignatureQuorumVerifier, BaseOnRamp {
   error InvalidConfig();
   error InvalidCCVData();
   error OnlyCallableByOwnerOrAllowlistAdmin();
@@ -31,7 +31,7 @@ contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVeri
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "CommitRamp 1.7.0-dev";
+  string public constant override typeAndVersion = "CommitteeRamp 1.7.0-dev";
   /// @dev The number of bytes allocated to encoding the signature length within the ccvData.
   uint256 internal constant SIGNATURE_LENGTH_BYTES = 2;
 
@@ -47,19 +47,10 @@ contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVeri
   function supportsInterface(
     bytes4 interfaceId
   ) external pure returns (bool) {
-    return interfaceId == type(ICCVOffRampV1).interfaceId || interfaceId == type(IERC165).interfaceId;
+    return interfaceId == type(ICCVRampV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
-  /// @notice Forwards a message from CCV proxy to this verifier for processing and returns verifier-specific data.
-  /// @dev This function is called by the CCV proxy to delegate message verification to this specific verifier.
-  /// It performs critical validation to ensure message integrity and proper sequencing.
-  /// @param originalCaller The original caller of forwardToVerifier, which is passed as input to enable proxy patterns.
-  /// @param message Decoded MessageV1 payload for verification.
-  /// @param 3rd parameter is messageId, unused. Allows the onRamp to use the messageId to enable their offchain components.
-  /// @param 4th parameter is feeToken, unused. Helps determine verifierReturnData.
-  /// @param 5th parameter is feeTokenAmount, unused. Helps determine verifierReturnData.
-  /// @param 6th parameter, is verifierArgs (opaque verifier-specific args), unused. Helps determine verifierReturnData.
-  /// @return verifierReturnData Verifier-specific encoded data.
+  /// @inheritdoc ICCVRampV1
   function forwardToVerifier(
     address originalCaller,
     MessageV1Codec.MessageV1 calldata message,
@@ -76,6 +67,7 @@ contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVeri
     return "";
   }
 
+  /// @inheritdoc ICCVRampV1
   function verifyMessage(
     address,
     MessageV1Codec.MessageV1 calldata,
@@ -152,8 +144,10 @@ contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVeri
   // │                             Fees                             │
   // ================================================================
 
+  /// @inheritdoc ICCVRampV1
   function getFee(
     address, // originalCaller
+    uint64, // destChainSelector
     Client.EVM2AnyMessage memory, // message
     bytes memory // extraArgs
   ) external pure returns (uint256) {

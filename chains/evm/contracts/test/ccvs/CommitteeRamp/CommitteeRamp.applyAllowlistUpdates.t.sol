@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CommitRamp} from "../../../ccvs/CommitRamp.sol";
+import {CommitteeRamp} from "../../../ccvs/CommitteeRamp.sol";
 import {BaseOnRamp} from "../../../ccvs/components/BaseOnRamp.sol";
-import {CommitRampSetup} from "./CommitRampSetup.t.sol";
+import {CommitteeRampSetup} from "./CommitteeRampSetup.t.sol";
 
-contract CommitRamp_applyAllowlistUpdates is CommitRampSetup {
+contract CommitteeRamp_applyAllowlistUpdates is CommitteeRampSetup {
   function setUp() public override {
     super.setUp();
 
@@ -71,7 +71,7 @@ contract CommitRamp_applyAllowlistUpdates is CommitRampSetup {
       removedAllowlistedSenders: new address[](0)
     });
 
-    vm.expectRevert(CommitRamp.OnlyCallableByOwnerOrAllowlistAdmin.selector);
+    vm.expectRevert(CommitteeRamp.OnlyCallableByOwnerOrAllowlistAdmin.selector);
     s_commitRamp.applyAllowlistUpdates(allowlistConfigs);
   }
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
@@ -35,10 +35,10 @@ type CCVAggregatorParams struct {
 	GasForCallExactCheck uint16
 }
 
-type CommitRampParams struct {
+type CommitteeRampParams struct {
 	AllowlistAdmin      common.Address
 	FeeAggregator       common.Address
-	SignatureConfigArgs commit_ramp.SetSignatureConfigArgs
+	SignatureConfigArgs committee_ramp.SetSignatureConfigArgs
 }
 
 type CCVProxyParams struct {
@@ -61,7 +61,7 @@ type ExecutorOnRampParams struct {
 type ContractParams struct {
 	RMNRemote      RMNRemoteParams
 	CCVAggregator  CCVAggregatorParams
-	CommitRamp     CommitRampParams
+	CommitteeRamp  CommitteeRampParams
 	CCVProxy       CCVProxyParams
 	FeeQuoter      FeeQuoterParams
 	ExecutorOnRamp ExecutorOnRampParams
@@ -78,8 +78,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	semver.MustParse("1.7.0"),
 	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
 	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
-		addresses := make([]datastore.AddressRef, 0, 15) // 15 = number of maybeDeployContract calls
-		writes := make([]contract.WriteOutput, 0, 4)     // 4 = number of ExecuteOperation calls
+		addresses := make([]datastore.AddressRef, 0, 13) // 13 = number of maybeDeployContract calls
+		writes := make([]contract.WriteOutput, 0, 3)     // 3 calls
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
 
@@ -174,7 +174,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					LinkToken:                    common.HexToAddress(linkRef.Address),
 				},
 				PriceUpdaters: []common.Address{
-					// NOTE: CommitRamp not set here in 1.7.0, as price updates are out of scope for launch.
+					// Price updates via protocol are out of scope for initial launch.
 					// TODO: Add Timelock here when MCMS support is needed.
 					chain.DeployerKey.From,
 				},
@@ -260,42 +260,42 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, ccvProxyRef)
 
-		// Deploy CommitRamp
-		commitRampRef, err := maybeDeployContract(b, commit_ramp.Deploy, commit_ramp.ContractType, chain, contract.DeployInput[commit_ramp.ConstructorArgs]{
+		// Deploy CommitteeRamp
+		committeeRampRef, err := maybeDeployContract(b, committee_ramp.Deploy, committee_ramp.ContractType, chain, contract.DeployInput[committee_ramp.ConstructorArgs]{
 			ChainSelector: chain.Selector,
-			Args: commit_ramp.ConstructorArgs{
-				DynamicConfig: commit_ramp.DynamicConfig{
+			Args: committee_ramp.ConstructorArgs{
+				DynamicConfig: committee_ramp.DynamicConfig{
 					FeeQuoter:      common.HexToAddress(feeQuoterRef.Address),
-					FeeAggregator:  input.ContractParams.CommitRamp.FeeAggregator,
-					AllowlistAdmin: input.ContractParams.CommitRamp.AllowlistAdmin,
+					FeeAggregator:  input.ContractParams.CommitteeRamp.FeeAggregator,
+					AllowlistAdmin: input.ContractParams.CommitteeRamp.AllowlistAdmin,
 				},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeRamp: %w", err)
 		}
-		addresses = append(addresses, commitRampRef)
+		addresses = append(addresses, committeeRampRef)
 
-		// Set signature config on the CommitRamp
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_ramp.SetSignatureConfigs, chain, contract.FunctionInput[commit_ramp.SetSignatureConfigArgs]{
+		// Set signature config on the CommitteeRamp
+		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_ramp.SetSignatureConfigs, chain, contract.FunctionInput[committee_ramp.SetSignatureConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(commitRampRef.Address),
-			Args:          input.ContractParams.CommitRamp.SignatureConfigArgs,
+			Address:       common.HexToAddress(committeeRampRef.Address),
+			Args:          input.ContractParams.CommitteeRamp.SignatureConfigArgs,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitteeRamp: %w", err)
 		}
 		writes = append(writes, setSignatureConfigReport.Output)
 
-		// Deploy CommitRampProxy
-		commitRampProxyRef, err := maybeDeployContract(b, commit_ramp.DeployProxy, commit_ramp.ProxyType, chain, contract.DeployInput[common.Address]{
+		// Deploy CommitteeRampProxy
+		committeeRampProxyRef, err := maybeDeployContract(b, committee_ramp.DeployProxy, committee_ramp.ProxyType, chain, contract.DeployInput[common.Address]{
 			ChainSelector: chain.Selector,
-			Args:          common.HexToAddress(commitRampRef.Address),
+			Args:          common.HexToAddress(committeeRampRef.Address),
 		}, input.ExistingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitRampProxy: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeRampProxy: %w", err)
 		}
-		addresses = append(addresses, commitRampProxyRef)
+		addresses = append(addresses, committeeRampProxyRef)
 
 		// Deploy ExecutorOnRamp
 		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, executor_onramp.ContractType, chain, contract.DeployInput[executor_onramp.ConstructorArgs]{
@@ -309,11 +309,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, executorOnRampRef)
 
-		// Deploy MockReceiver (defines commit verifier as required)
+		// Deploy MockReceiver (defines committee ramp as required)
 		mockReceiver, err := maybeDeployContract(b, mock_receiver.Deploy, mock_receiver.ContractType, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: mock_receiver.ConstructorArgs{
-				RequiredVerifiers: []common.Address{common.HexToAddress(commitOffRampRef.Address)},
+				RequiredVerifiers: []common.Address{common.HexToAddress(committeeRampRef.Address)},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {

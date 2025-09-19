@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CommitRamp} from "../../../ccvs/CommitRamp.sol";
+import {CommitteeRamp} from "../../../ccvs/CommitteeRamp.sol";
 import {BaseOnRamp} from "../../../ccvs/components/BaseOnRamp.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 
 import {BaseOnRampSetup} from "../components/BaseOnRamp/BaseOnRampSetup.t.sol";
 
-contract CommitRampSetup is BaseOnRampSetup {
-  CommitRamp internal s_commitRamp;
+contract CommitteeRampSetup is BaseOnRampSetup {
+  CommitteeRamp internal s_commitRamp;
 
   uint256 internal constant PRIVATE_KEY_0 = 0x60b919c82f0b4791a5b7c6a7275970ace1748759ebdaa8a5c3a4b2f5a8b1e8d1;
   address internal constant MOCK_SENDER = 0x3333333333333333333333333333333333333333;
@@ -17,7 +17,7 @@ contract CommitRampSetup is BaseOnRampSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_commitRamp = new CommitRamp(_createBasicDynamicConfigArgs());
+    s_commitRamp = new CommitteeRamp(_createBasicDynamicConfigArgs());
 
     address[] memory validSigner = new address[](1);
     validSigner[0] = vm.addr(PRIVATE_KEY_0);
@@ -35,8 +35,8 @@ contract CommitRampSetup is BaseOnRampSetup {
   }
 
   /// @notice Helper to create a minimal dynamic config.
-  function _createBasicDynamicConfigArgs() internal view returns (CommitRamp.DynamicConfig memory) {
-    return CommitRamp.DynamicConfig({
+  function _createBasicDynamicConfigArgs() internal view returns (CommitteeRamp.DynamicConfig memory) {
+    return CommitteeRamp.DynamicConfig({
       feeQuoter: address(s_feeQuoter),
       feeAggregator: FEE_AGGREGATOR,
       allowlistAdmin: ALLOWLIST_ADMIN
@@ -48,29 +48,24 @@ contract CommitRampSetup is BaseOnRampSetup {
     address feeQuoter,
     address feeAggregator,
     address allowlistAdmin
-  ) internal pure returns (CommitRamp.DynamicConfig memory) {
+  ) internal pure returns (CommitteeRamp.DynamicConfig memory) {
     return
-      CommitRamp.DynamicConfig({feeQuoter: feeQuoter, feeAggregator: feeAggregator, allowlistAdmin: allowlistAdmin});
+      CommitteeRamp.DynamicConfig({feeQuoter: feeQuoter, feeAggregator: feeAggregator, allowlistAdmin: allowlistAdmin});
   }
 
-  function _createMessageV1(
-    uint64 destChainSelector,
-    address sender,
-    bytes memory data,
-    address receiver
-  ) internal view returns (MessageV1Codec.MessageV1 memory, bytes32 messageId) {
+  function _generateBasicMessageV1() internal pure returns (MessageV1Codec.MessageV1 memory, bytes32 messageId) {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec.MessageV1({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      destChainSelector: destChainSelector,
+      sourceChainSelector: 1,
+      destChainSelector: 2,
       sequenceNumber: 1,
-      onRampAddress: abi.encodePacked(address(s_ccvProxy)),
-      offRampAddress: abi.encodePacked(address(s_ccvAggregatorRemote)),
-      finality: 0,
-      sender: abi.encodePacked(sender),
-      receiver: abi.encodePacked(receiver),
+      onRampAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
+      offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
+      finality: 100,
+      sender: abi.encodePacked(address(0x3333333333333333333333333333333333333333)),
+      receiver: abi.encodePacked(address(0x4444444444444444444444444444444444444444)),
       destBlob: "",
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
-      data: data
+      data: ""
     });
 
     return (message, keccak256(MessageV1Codec._encodeMessageV1(message)));

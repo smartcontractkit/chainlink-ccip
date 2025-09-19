@@ -8,7 +8,7 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
-import {MockCCVOnRamp} from "../../mocks/MockCCVOnRamp.sol";
+import {MockCCVRamp} from "../../mocks/MockCCVOnRamp.sol";
 import {MockExecutor} from "../../mocks/MockExecutor.sol";
 
 contract CCVProxySetup is FeeQuoterFeeSetup {
@@ -34,7 +34,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     );
     s_ccvAggregatorRemote = CCVAggregator(makeAddr("CCVAggregatorRemote"));
     address[] memory defaultCCVs = new address[](1);
-    defaultCCVs[0] = address(new MockCCVOnRamp(""));
+    defaultCCVs[0] = address(new MockCCVRamp(""));
     CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
     destChainConfigArgs[0] = CCVProxy.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,

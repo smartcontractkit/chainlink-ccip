@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+
 /// @notice RampProxy enables upgrades to CCVRamps without breaking existing references in token pools, receivers, and apps.
 /// The address of this contract will be referenced in the following places:
 ///   - Users / apps will specify required and optional CCVs as part of ccipSend extraArgs.
@@ -12,7 +14,7 @@ pragma solidity ^0.8.24;
 /// @dev On source, the CCVProxy will forward requests (i.e. getFee, forwardToVerifier) through this contract to the required CCVRamp.
 /// The same applies on destination. The CCVAggregator will forward requests (i.e. verifyMessage) through this contract to the required CCVRamp.
 /// To support this proxy, all future CCVRamp interfaces must have originalCaller defined as the first arg to each method.
-contract RampProxy {
+contract RampProxy is Ownable2StepMsgSender {
   error ZeroAddressNotAllowed();
 
   event RampUpdated(address indexed oldRamp, address indexed newRamp);
@@ -26,6 +28,25 @@ contract RampProxy {
     _setRamp(rampAddress);
   }
 
+  /// @dev Allows for child contracts to modify the access control logic.
+  modifier onlyAllowedCaller(
+    address caller
+  ) virtual {
+    if (caller != owner()) {
+      revert OnlyCallableByOwner();
+    }
+    _;
+  }
+
+  /// @notice Sets the address of the ramp contract.
+  /// @param rampAddress The address of the new ramp contract.
+  function setRamp(
+    address rampAddress
+  ) external onlyAllowedCaller(msg.sender) {
+    _setRamp(rampAddress);
+  }
+
+  /// @dev Internal method that allows for reuse in constructor.
   function _setRamp(
     address rampAddress
   ) internal {
@@ -38,6 +59,9 @@ contract RampProxy {
   }
 
   // The fallback function forwards all calls to the ramp contract via delegatecall.
+  // The first argument of the calldata is always overwritten with the caller of the proxy.
+  // This ensures that the ramp contract always sees the original caller of the proxy.
+  // It also means originalCaller should be the first argument of any method called via this proxy.
   // solhint-disable-next-line payable-fallback, no-complex-fallback
   fallback() external {
     address rampAddress = s_ramp;

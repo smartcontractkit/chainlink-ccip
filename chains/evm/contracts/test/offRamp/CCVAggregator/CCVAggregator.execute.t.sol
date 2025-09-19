@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICCVOffRampV1} from "../../../interfaces/ICCVOffRampV1.sol";
+import {ICCVRampV1} from "../../../interfaces/ICCVRampV1.sol";
 
+import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
@@ -55,7 +56,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICCVOffRampV1.verifyMessage, (address(s_agg), message, messageHash, abi.encode("mock ccv data"))),
+      abi.encodeCall(ICCVRampV1.verifyMessage, (address(s_agg), message, messageHash, abi.encode("mock ccv data"))),
       abi.encode(true)
     );
   }
@@ -263,7 +264,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     // Mock validateReport to pass initial checks.
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICCVOffRampV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
+      abi.encodeCall(ICCVRampV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
       abi.encode(true)
     );
 
@@ -323,13 +324,33 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 }
 
-contract ReentrantCCV is ICCVOffRampV1 {
+contract ReentrantCCV is ICCVRampV1 {
   CCVAggregator internal immutable i_aggregator;
 
   constructor(
     address aggregator
   ) {
     i_aggregator = CCVAggregator(aggregator);
+  }
+
+  function forwardToVerifier(
+    address,
+    MessageV1Codec.MessageV1 calldata,
+    bytes32,
+    address,
+    uint256,
+    bytes calldata
+  ) external view returns (bytes memory) {
+    return "";
+  }
+
+  function getFee(
+    address, // originalSender
+    uint64, // destChainSelector
+    Client.EVM2AnyMessage memory, // message
+    bytes memory // extraArgs
+  ) external pure returns (uint256) {
+    return 0;
   }
 
   function verifyMessage(
@@ -351,6 +372,6 @@ contract ReentrantCCV is ICCVOffRampV1 {
   function supportsInterface(
     bytes4 interfaceId
   ) external pure override returns (bool) {
-    return interfaceId == type(ICCVOffRampV1).interfaceId;
+    return interfaceId == type(ICCVRampV1).interfaceId;
   }
 }

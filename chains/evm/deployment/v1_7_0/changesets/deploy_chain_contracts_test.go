@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -163,8 +163,17 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 					ExecutorOnRamp: sequences.ExecutorOnRampParams{
 						MaxCCVsPerMsg: 10,
 					},
-					CommitOnRamp: sequences.CommitOnRampParams{
+					CommitteeRamp: sequences.CommitteeRampParams{
 						FeeAggregator: common.HexToAddress("0x01"),
+						SignatureConfigArgs: committee_ramp.SetSignatureConfigArgs{
+							Threshold: 1,
+							Signers: []common.Address{
+								common.HexToAddress("0x02"),
+								common.HexToAddress("0x03"),
+								common.HexToAddress("0x04"),
+								common.HexToAddress("0x05"),
+							},
+						},
 					},
 					CCVProxy: sequences.CCVProxyParams{
 						FeeAggregator: common.HexToAddress("0x01"),
@@ -176,17 +185,6 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 						WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
 						USDPerLINK:                     usdPerLink,
 						USDPerWETH:                     usdPerWeth,
-					},
-					CommitOffRamp: sequences.CommitOffRampParams{
-						SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
-							Threshold: 1,
-							Signers: []common.Address{
-								common.HexToAddress("0x02"),
-								common.HexToAddress("0x03"),
-								common.HexToAddress("0x04"),
-								common.HexToAddress("0x05"),
-							},
-						},
 					},
 				},
 			})

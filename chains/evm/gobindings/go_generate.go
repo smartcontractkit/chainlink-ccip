@@ -1,8 +1,8 @@
 package ccip
 
 // Mod sec
-//go:generate go run generation/generate/wrap.go ccip OwnableRampProxy ownable_ramp_proxy latest
-//go:generate go run generation/generate/wrap.go ccip CommitRamp commit_ramp latest
+//go:generate go run generation/generate/wrap.go ccip RampProxy ramp_proxy latest
+//go:generate go run generation/generate/wrap.go ccip CommitteeRamp committee_ramp latest
 //go:generate go run generation/generate/wrap.go ccip CCVProxy ccv_proxy latest
 //go:generate go run generation/generate/wrap.go ccip ExecutorOnRamp executor_onramp latest
 //go:generate go run generation/generate/wrap.go ccip CCVAggregator ccv_aggregator latest

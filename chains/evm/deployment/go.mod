@@ -18,7 +18,6 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250320090719-315440f5b0a7
 	github.com/smartcontractkit/chainlink-common v0.9.5-0.20250910201107-cb4c31b624d3
 	github.com/smartcontractkit/chainlink-deployments-framework v0.37.1
-	github.com/smartcontractkit/chainlink-evm v0.3.3
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3
 	github.com/smartcontractkit/mcms v0.21.1
 	github.com/stretchr/testify v1.10.0
@@ -186,6 +185,7 @@ require (
 	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a // indirect
 	github.com/oklog/run v1.2.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/onsi/gomega v1.36.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect

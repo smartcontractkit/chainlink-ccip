@@ -13,14 +13,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
+	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -99,9 +98,9 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 						ExecutorOnRamp: sequences.ExecutorOnRampParams{
 							MaxCCVsPerMsg: 10,
 						},
-						CommitRamp: sequences.CommitRampParams{
+						CommitteeRamp: sequences.CommitteeRampParams{
 							FeeAggregator: common.HexToAddress("0x01"),
-							SignatureConfigArgs: commit_ramp.SetSignatureConfigArgs{
+							SignatureConfigArgs: committee_ramp.SetSignatureConfigArgs{
 								Threshold: 1,
 								Signers: []common.Address{
 									common.HexToAddress("0x02"),
@@ -133,18 +132,18 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 
 			exists := map[deployment.ContractType]bool{
 				rmn_remote.ContractType:           false,
-				nonce_manager.ContractType:        false,
 				router.ContractType:               false,
 				executor_onramp.ContractType:      false,
 				link.ContractType:                 false,
 				weth.ContractType:                 false,
-				commit_ramp.ContractType:          false,
+				committee_ramp.ContractType:       false,
 				ccv_proxy.ContractType:            false,
 				ccv_aggregator.ContractType:       false,
 				fee_quoter_v2.ContractType:        false,
-				commit_ramp.ProxyType:             false,
+				committee_ramp.ProxyType:          false,
 				rmn_proxy.ContractType:            false,
 				token_admin_registry.ContractType: false,
+				mock_receiver.ContractType:        false,
 			}
 			for _, addr := range report.Output.Addresses {
 				exists[deployment.ContractType(addr.Type)] = true
@@ -219,9 +218,9 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 					ExecutorOnRamp: sequences.ExecutorOnRampParams{
 						MaxCCVsPerMsg: 10,
 					},
-					CommitRamp: sequences.CommitRampParams{
+					CommitteeRamp: sequences.CommitteeRampParams{
 						FeeAggregator: common.HexToAddress("0x01"),
-						SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
+						SignatureConfigArgs: committee_ramp.SetSignatureConfigArgs{
 							Threshold: 1,
 							Signers: []common.Address{
 								common.HexToAddress("0x02"),
@@ -319,9 +318,9 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 						ExecutorOnRamp: sequences.ExecutorOnRampParams{
 							MaxCCVsPerMsg: 10,
 						},
-						CommitRamp: sequences.CommitRampParams{
+						CommitteeRamp: sequences.CommitteeRampParams{
 							FeeAggregator: common.HexToAddress("0x01"),
-							SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
+							SignatureConfigArgs: committee_ramp.SetSignatureConfigArgs{
 								Threshold: 1,
 								Signers: []common.Address{
 									common.HexToAddress("0x02"),

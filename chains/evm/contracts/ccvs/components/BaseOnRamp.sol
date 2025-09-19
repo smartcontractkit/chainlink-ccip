@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICCVOnRampV1} from "../../interfaces/ICCVOnRampV1.sol";
+import {ICCVRampV1} from "../../interfaces/ICCVRampV1.sol";
 import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -13,7 +13,7 @@ import {SafeERC20} from
 import {EnumerableSet} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-abstract contract BaseOnRamp is ICCVOnRampV1, ITypeAndVersion {
+abstract contract BaseOnRamp is ICCVRampV1, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using SafeERC20 for IERC20;
 
@@ -97,11 +97,13 @@ abstract contract BaseOnRamp is ICCVOnRampV1, ITypeAndVersion {
     }
   }
 
-  function _assertSenderIsAllowed(uint64 destChainSelector, address sender, address caller) internal view {
+  function _assertSenderIsAllowed(uint64 destChainSelector, address sender, address rampOnRouter) internal view {
     DestChainConfig storage destChainConfig = _getDestChainConfig(destChainSelector);
     // CCVs should query the CCVProxy address from the router, this allows for CCVProxy updates without touching CCVs
     // CCVProxy address may be zero intentionally to pause, which should stop all messages.
-    if (caller != destChainConfig.router.getOnRamp(destChainSelector)) revert CallerIsNotARampOnRouter(msg.sender);
+    if (rampOnRouter != destChainConfig.router.getOnRamp(destChainSelector)) {
+      revert CallerIsNotARampOnRouter(msg.sender);
+    }
 
     if (destChainConfig.allowlistEnabled) {
       if (!destChainConfig.allowedSendersList.contains(sender)) {

@@ -9,8 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -19,16 +18,16 @@ import (
 )
 
 type RemoteChainConfig struct {
-	AllowTrafficFrom            bool
-	CCIPMessageSource           datastore.AddressRef
-	CCIPMessageDest             datastore.AddressRef
-	DefaultCCVOffRamps          []datastore.AddressRef
-	LaneMandatedCCVOffRamps     []datastore.AddressRef
-	DefaultCCVOnRamps           []datastore.AddressRef
-	LaneMandatedCCVOnRamps      []datastore.AddressRef
-	DefaultExecutor             datastore.AddressRef
-	CommitOnRampDestChainConfig sequences.CommitOnRampDestChainConfig
-	FeeQuoterDestChainConfig    fee_quoter_v2.DestChainConfig
+	AllowTrafficFrom             bool
+	CCIPMessageSource            datastore.AddressRef
+	CCIPMessageDest              datastore.AddressRef
+	DefaultCCVOffRamps           []datastore.AddressRef
+	LaneMandatedCCVOffRamps      []datastore.AddressRef
+	DefaultCCVOnRamps            []datastore.AddressRef
+	LaneMandatedCCVOnRamps       []datastore.AddressRef
+	DefaultExecutor              datastore.AddressRef
+	CommitteeRampDestChainConfig sequences.CommitteeRampDestChainConfig
+	FeeQuoterDestChainConfig     fee_quoter_v2.DestChainConfig
 }
 
 type ConfigureChainForLanesCfg struct {
@@ -67,7 +66,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			},
 			{
 				ChainSelector: cfg.ChainSel,
-				Type:          datastore.ContractType(commit_onramp.ContractType),
+				Type:          datastore.ContractType(committee_ramp.ContractType),
 				Version:       semver.MustParse("1.7.0"),
 			},
 			{
@@ -80,33 +79,15 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 				Type:          datastore.ContractType(ccv_aggregator.ContractType),
 				Version:       semver.MustParse("1.7.0"),
 			},
-			{
-				ChainSelector: cfg.ChainSel,
-				Type:          datastore.ContractType(commit_offramp.ProxyType),
-				Version:       semver.MustParse("1.7.0"),
-			},
-			{
-				ChainSelector: cfg.ChainSel,
-				Type:          datastore.ContractType(commit_onramp.ProxyType),
-				Version:       semver.MustParse("1.7.0"),
-			},
-			{
-				ChainSelector: cfg.ChainSel,
-				Type:          datastore.ContractType(commit_offramp.ProxyType),
-				Version:       semver.MustParse("1.7.0"),
-			},
 		}, datastore_utils.ToEVMAddress)
 		if err != nil {
 			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve contract refs: %w", err)
 		}
 		routerAddr := staticAddrs[0]
 		ccvProxyAddr := staticAddrs[1]
-		commitOnRampAddr := staticAddrs[2]
+		committeeRampAddr := staticAddrs[2]
 		feeQuoterAddr := staticAddrs[3]
 		ccvAggregatorAddr := staticAddrs[4]
-		commitOffRampAddr := staticAddrs[5]
-		commitOnRampProxyAddr := staticAddrs[6]
-		commitOffRampProxyAddr := staticAddrs[7]
 
 		remoteChains := make(map[uint64]sequences.RemoteChainConfig, len(cfg.RemoteChains))
 		for remoteChainSel, remoteConfig := range cfg.RemoteChains {
@@ -152,30 +133,27 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			}
 
 			remoteChains[remoteChainSel] = sequences.RemoteChainConfig{
-				AllowTrafficFrom:            remoteConfig.AllowTrafficFrom,
-				DefaultExecutor:             addrs[0],
-				DefaultCCVOffRamps:          addrs[1:defaultCCVOffRampsEnd],
-				LaneMandatedCCVOffRamps:     addrs[defaultCCVOffRampsEnd:laneMandatedCCVOffRampsEnd],
-				DefaultCCVOnRamps:           addrs[laneMandatedCCVOffRampsEnd:defaultCCVOnRampsEnd],
-				LaneMandatedCCVOnRamps:      addrs[defaultCCVOnRampsEnd:laneMandatedCCVOnRampsEnd],
-				CCIPMessageSource:           remoteAddrs[0],
-				CCIPMessageDest:             remoteAddrs[1],
-				CommitOnRampDestChainConfig: remoteConfig.CommitOnRampDestChainConfig,
-				FeeQuoterDestChainConfig:    remoteConfig.FeeQuoterDestChainConfig,
+				AllowTrafficFrom:             remoteConfig.AllowTrafficFrom,
+				DefaultExecutor:              addrs[0],
+				DefaultCCVOffRamps:           addrs[1:defaultCCVOffRampsEnd],
+				LaneMandatedCCVOffRamps:      addrs[defaultCCVOffRampsEnd:laneMandatedCCVOffRampsEnd],
+				DefaultCCVOnRamps:            addrs[laneMandatedCCVOffRampsEnd:defaultCCVOnRampsEnd],
+				LaneMandatedCCVOnRamps:       addrs[defaultCCVOnRampsEnd:laneMandatedCCVOnRampsEnd],
+				CCIPMessageSource:            remoteAddrs[0],
+				CCIPMessageDest:              remoteAddrs[1],
+				CommitteeRampDestChainConfig: remoteConfig.CommitteeRampDestChainConfig,
+				FeeQuoterDestChainConfig:     remoteConfig.FeeQuoterDestChainConfig,
 			}
 		}
 
 		return sequences.ConfigureChainForLanesInput{
-			ChainSelector:      cfg.ChainSel,
-			Router:             routerAddr,
-			CCVProxy:           ccvProxyAddr,
-			CommitOnRamp:       commitOnRampAddr,
-			FeeQuoter:          feeQuoterAddr,
-			CCVAggregator:      ccvAggregatorAddr,
-			CommitOffRamp:      commitOffRampAddr,
-			CommitOnRampProxy:  commitOnRampProxyAddr,
-			CommitOffRampProxy: commitOffRampProxyAddr,
-			RemoteChains:       remoteChains,
+			ChainSelector: cfg.ChainSel,
+			Router:        routerAddr,
+			CCVProxy:      ccvProxyAddr,
+			CommitteeRamp: committeeRampAddr,
+			FeeQuoter:     feeQuoterAddr,
+			CCVAggregator: ccvAggregatorAddr,
+			RemoteChains:  remoteChains,
 		}, nil
 	},
 	ResolveDep: changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],

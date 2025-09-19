@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICCVOnRampV1} from "../interfaces/ICCVOnRampV1.sol";
+import {ICCVRampV1} from "../interfaces/ICCVRampV1.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IExecutorOnRamp} from "../interfaces/IExecutorOnRamp.sol";
 import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
@@ -11,18 +11,17 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
-
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
-
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {SafeERC20} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from
@@ -277,13 +276,13 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     // 6. call each verifier.
     for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
-      receiptBlobs[i] = ICCVOnRampV1(ccv.ccvAddress).forwardToVerifier(
+      receiptBlobs[i] = ICCVRampV1(ccv.ccvAddress).forwardToVerifier(
         address(this), newMessage, messageId, feeToken, feeTokenAmount, ccv.args
       );
     }
     for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
       Client.CCV memory ccvOpt = resolvedExtraArgs.optionalCCV[i];
-      receiptBlobs[resolvedExtraArgs.requiredCCV.length + i] = ICCVOnRampV1(ccvOpt.ccvAddress).forwardToVerifier(
+      receiptBlobs[resolvedExtraArgs.requiredCCV.length + i] = ICCVRampV1(ccvOpt.ccvAddress).forwardToVerifier(
         address(this), newMessage, messageId, feeToken, feeTokenAmount, ccvOpt.args
       );
     }

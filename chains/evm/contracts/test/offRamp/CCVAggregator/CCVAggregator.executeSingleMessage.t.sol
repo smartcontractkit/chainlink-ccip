@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 /// forge-config: default.allow_internal_expect_revert = true
 
-import {ICCVOffRampV1} from "../../../interfaces/ICCVOffRampV1.sol";
+import {ICCVRampV1} from "../../../interfaces/ICCVRampV1.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
@@ -27,7 +27,7 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
     bytes memory defaultCcvData = abi.encode("mock ccv data");
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICCVOffRampV1.verifyMessage, (address(s_agg), message, messageHash, defaultCcvData)),
+      abi.encodeCall(ICCVRampV1.verifyMessage, (address(s_agg), message, messageHash, defaultCcvData)),
       abi.encode(true)
     );
 
@@ -188,7 +188,7 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
     // Mock CCV validateReport to fail/revert.
     vm.mockCallRevert(
       s_defaultCCV,
-      abi.encodeCall(ICCVOffRampV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
+      abi.encodeCall(ICCVRampV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
       revertReason
     );
 
