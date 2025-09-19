@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+import {ICCVOnRampV1} from "../../../interfaces/ICCVOnRampV1.sol";
+
+import {RampProxy} from "../../../ccvs/RampProxy.sol";
 import {BaseOnRamp} from "../../../ccvs/components/BaseOnRamp.sol";
+import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CommitRampSetup} from "./CommitRampSetup.t.sol";
 
 contract CommitRamp_forwardToVerifier is CommitRampSetup {
@@ -18,9 +21,18 @@ contract CommitRamp_forwardToVerifier is CommitRampSetup {
       _createMessageV1(DEST_CHAIN_SELECTOR, msg.sender, testData, msg.sender);
 
     vm.prank(s_ccvProxy);
-    s_commitRamp.forwardToVerifier(
-      message, messageId, s_sourceFeeTokens[0], 1000, ""
-    );
+    s_commitRamp.forwardToVerifier(s_ccvProxy, message, messageId, s_sourceFeeTokens[0], 1000, "");
+  }
+
+  function test_forwardToVerifier_ViaRampProxy() public {
+    bytes memory testData = "test data";
+    RampProxy rampProxy = new RampProxy(address(s_commitRamp));
+
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createMessageV1(DEST_CHAIN_SELECTOR, msg.sender, testData, msg.sender);
+
+    vm.prank(s_ccvProxy);
+    ICCVOnRampV1(address(rampProxy)).forwardToVerifier(s_ccvProxy, message, messageId, s_sourceFeeTokens[0], 1000, "");
   }
 
   function test_forwardToVerifier_RevertWhen_CallerIsNotARampOnRouter() public {
@@ -31,6 +43,6 @@ contract CommitRamp_forwardToVerifier is CommitRampSetup {
 
     vm.prank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(BaseOnRamp.CallerIsNotARampOnRouter.selector, STRANGER));
-    s_commitRamp.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 1000, "");
+    s_commitRamp.forwardToVerifier(STRANGER, message, messageId, s_sourceFeeTokens[0], 1000, "");
   }
 }

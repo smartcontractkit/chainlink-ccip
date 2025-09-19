@@ -303,6 +303,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
+          originalCaller: address(this),
           message: message,
           messageId: messageId,
           ccvData: ccvData[ccvDataIndex[i]]

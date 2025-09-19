@@ -7,7 +7,6 @@ import {Client} from "../libraries/Client.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseOnRamp} from "./components/BaseOnRamp.sol";
 import {SignatureQuorumVerifier} from "./components/SignatureQuorumVerifier.sol";
-import {Proxiable} from "./components/Proxiable.sol";
 
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
@@ -16,7 +15,7 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 
 /// @notice The CommitRamp is a contract that handles lane-specific fee logic and message verification.
 /// @dev OnRamp and OffRamp capabilities are combined to enable a single proxy address for a CCV each chain.
-contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVerifier, BaseOnRamp, Proxiable {
+contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVerifier, BaseOnRamp {
   error InvalidConfig();
   error InvalidCCVData();
   error OnlyCallableByOwnerOrAllowlistAdmin();
@@ -54,13 +53,15 @@ contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVeri
   /// @notice Forwards a message from CCV proxy to this verifier for processing and returns verifier-specific data.
   /// @dev This function is called by the CCV proxy to delegate message verification to this specific verifier.
   /// It performs critical validation to ensure message integrity and proper sequencing.
+  /// @param originalCaller The original caller of forwardToVerifier, which is passed as input to enable proxy patterns.
   /// @param message Decoded MessageV1 payload for verification.
-  /// @param 2nd parameter is messageId, unused. Allows the onRamp to use the messageId to enable their offchain components.
-  /// @param 3rd parameter is feeToken, unused. Helps determine verifierReturnData.
-  /// @param 4th parameter is feeTokenAmount, unused. Helps determine verifierReturnData.
-  /// @param 5th parameter, is verifierArgs (opaque verifier-specific args), unused. Helps determine verifierReturnData.
+  /// @param 3rd parameter is messageId, unused. Allows the onRamp to use the messageId to enable their offchain components.
+  /// @param 4th parameter is feeToken, unused. Helps determine verifierReturnData.
+  /// @param 5th parameter is feeTokenAmount, unused. Helps determine verifierReturnData.
+  /// @param 6th parameter, is verifierArgs (opaque verifier-specific args), unused. Helps determine verifierReturnData.
   /// @return verifierReturnData Verifier-specific encoded data.
   function forwardToVerifier(
+    address originalCaller,
     MessageV1Codec.MessageV1 calldata message,
     bytes32, // messageId, unused
     address, // feeToken, unused
@@ -69,13 +70,18 @@ contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVeri
   ) external view returns (bytes memory verifierReturnData) {
     // For EVM, sender is expected to be 20 bytes.
     address senderAddress = address(bytes20(message.sender));
-    _assertSenderIsAllowed(message.destChainSelector, senderAddress, msg.sender);
+    _assertSenderIsAllowed(message.destChainSelector, senderAddress, originalCaller);
 
     // TODO: Process msg & return verifier data
     return "";
   }
 
-  function verifyMessage(MessageV1Codec.MessageV1 calldata, bytes32 messageHash, bytes calldata ccvData) external view {
+  function verifyMessage(
+    address,
+    MessageV1Codec.MessageV1 calldata,
+    bytes32 messageHash,
+    bytes calldata ccvData
+  ) external view {
     if (ccvData.length < SIGNATURE_LENGTH_BYTES) {
       revert InvalidCCVData();
     }
@@ -147,6 +153,7 @@ contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVeri
   // ================================================================
 
   function getFee(
+    address, // originalCaller
     Client.EVM2AnyMessage memory, // message
     bytes memory // extraArgs
   ) external pure returns (uint256) {
@@ -161,17 +168,5 @@ contract CommitRamp is Ownable2StepMsgSender, ICCVOffRampV1, SignatureQuorumVeri
     address[] calldata feeTokens
   ) external {
     _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
-  }
-
-  // ================================================================
-  // │                             Upgrades                         │
-  // ================================================================
-
-  /// @notice Upgrades the implementation address to `newAddress`.
-  /// @param newAddress The new implementation address.
-  function upgradeTo(address newAddress) external onlyOwner {
-    updateCodeAddress(newAddress);
-
-    // TODO: applyStorageUpdates();
   }
 }

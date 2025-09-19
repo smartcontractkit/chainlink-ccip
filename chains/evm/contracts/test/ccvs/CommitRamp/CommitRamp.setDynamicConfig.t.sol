@@ -26,11 +26,8 @@ contract CommitRamp_setDynamicConfig is CommitRampSetup {
 
   function test_setDynamicConfig_RevertWhen_InvalidConfig() public {
     // Zero feeQuoter should revert
-    CommitRamp.DynamicConfig memory badConfig = CommitRamp.DynamicConfig({
-      feeQuoter: address(0),
-      feeAggregator: FEE_AGGREGATOR,
-      allowlistAdmin: ALLOWLIST_ADMIN
-    });
+    CommitRamp.DynamicConfig memory badConfig =
+      CommitRamp.DynamicConfig({feeQuoter: address(0), feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN});
     vm.expectRevert(CommitRamp.InvalidConfig.selector);
     s_commitRamp.setDynamicConfig(badConfig);
   }

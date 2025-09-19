@@ -10,6 +10,7 @@ interface ICCVOffRampV1 is IERC165 {
   /// @notice Verification of the message, in any way the OffRamp wants. This could be using a signature, a quorum
   /// of signatures, using native interop, or some ZK light client. Any proof required for the verification is supplied
   /// through the ccvData parameter.
+  /// @param originalCaller The original caller of verifyMessage, which is passed as input to enable proxy patterns.
   /// @param message The message to be verified. For efficiency, the messageID is also supplied, which acts as a small
   /// payload that once verified means the entire message is verified. Every component of the message is part of the
   /// message ID through hashing the struct. The entire message is provided to be able to act differently for different
@@ -23,5 +24,10 @@ interface ICCVOffRampV1 is IERC165 {
   /// to get the payload that will be verified. In the case of a simple signature verification this means that the CCV
   /// offchain system must sign the concatenated (messageId, ccvMetaData) and not just the messageId. If no metadata
   /// is required, simply signing the messageId is enough.
-  function verifyMessage(MessageV1Codec.MessageV1 memory message, bytes32 messageId, bytes memory ccvData) external;
+  function verifyMessage(
+    address originalCaller,
+    MessageV1Codec.MessageV1 memory message,
+    bytes32 messageId,
+    bytes memory ccvData
+  ) external;
 }

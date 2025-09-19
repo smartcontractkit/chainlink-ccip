@@ -16,6 +16,7 @@ contract MockCCVOnRamp is ICCVOnRampV1 {
   }
 
   function forwardToVerifier(
+    address,
     MessageV1Codec.MessageV1 calldata,
     bytes32,
     address,
@@ -26,7 +27,8 @@ contract MockCCVOnRamp is ICCVOnRampV1 {
   }
 
   function getFee(
-    Client.EVM2AnyMessage memory, // message,
+    address, // originalSender
+    Client.EVM2AnyMessage memory, // message
     bytes memory // extraArgs
   ) external pure returns (uint256) {
     return 0;

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
-import {BaseOnRamp} from "../../../ccvs/components/BaseOnRamp.sol";
 import {CommitRamp} from "../../../ccvs/CommitRamp.sol";
+import {BaseOnRamp} from "../../../ccvs/components/BaseOnRamp.sol";
+import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+
 import {BaseOnRampSetup} from "../components/BaseOnRamp/BaseOnRampSetup.t.sol";
 
 contract CommitRampSetup is BaseOnRampSetup {

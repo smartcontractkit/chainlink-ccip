@@ -27,7 +27,7 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
     bytes memory defaultCcvData = abi.encode("mock ccv data");
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageHash, defaultCcvData)),
+      abi.encodeCall(ICCVOffRampV1.verifyMessage, (address(s_agg), message, messageHash, defaultCcvData)),
       abi.encode(true)
     );
 
@@ -187,7 +187,9 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
 
     // Mock CCV validateReport to fail/revert.
     vm.mockCallRevert(
-      s_defaultCCV, abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0])), revertReason
+      s_defaultCCV,
+      abi.encodeCall(ICCVOffRampV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
+      revertReason
     );
 
     vm.expectRevert(revertReason);

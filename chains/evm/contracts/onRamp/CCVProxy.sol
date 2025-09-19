@@ -278,13 +278,13 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
       receiptBlobs[i] = ICCVOnRampV1(ccv.ccvAddress).forwardToVerifier(
-        newMessage, messageId, feeToken, feeTokenAmount, ccv.args
+        address(this), newMessage, messageId, feeToken, feeTokenAmount, ccv.args
       );
     }
     for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
       Client.CCV memory ccvOpt = resolvedExtraArgs.optionalCCV[i];
       receiptBlobs[resolvedExtraArgs.requiredCCV.length + i] = ICCVOnRampV1(ccvOpt.ccvAddress).forwardToVerifier(
-        newMessage, messageId, feeToken, feeTokenAmount, ccvOpt.args
+        address(this), newMessage, messageId, feeToken, feeTokenAmount, ccvOpt.args
       );
     }
 

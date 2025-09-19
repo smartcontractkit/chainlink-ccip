@@ -55,7 +55,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageHash, abi.encode("mock ccv data"))),
+      abi.encodeCall(ICCVOffRampV1.verifyMessage, (address(s_agg), message, messageHash, abi.encode("mock ccv data"))),
       abi.encode(true)
     );
   }
@@ -262,7 +262,9 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     // Mock validateReport to pass initial checks.
     vm.mockCall(
-      s_defaultCCV, abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0])), abi.encode(true)
+      s_defaultCCV,
+      abi.encodeCall(ICCVOffRampV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
+      abi.encode(true)
     );
 
     // Mock executeSingleMessage to revert with NOT_ENOUGH_GAS_FOR_CALL_SIG.
@@ -331,6 +333,7 @@ contract ReentrantCCV is ICCVOffRampV1 {
   }
 
   function verifyMessage(
+    address, /* originalCaller */
     MessageV1Codec.MessageV1 memory message,
     bytes32, /* messageHash */
     bytes memory ccvData

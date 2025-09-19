@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_ramp_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -62,14 +63,8 @@ type ConfigureChainForLanesInput struct {
 	// The CCVProxy on the EVM chain being configured
 	// Similarly, we assume that all connections will use the same CCVProxy
 	CCVProxy common.Address
-	// The CommitOnRamp on the EVM chain being configured
-	CommitOnRamp common.Address
-	// The CommitOffRamp on the EVM chain being configured
-	CommitOffRamp common.Address
-	// The CommitOnRampProxy on the EVM chain being configured
-	CommitOnRampProxy common.Address
-	// The CommitOffRampProxy on the EVM chain being configured
-	CommitOffRampProxy common.Address
+	// The CommitRamp on the EVM chain being configured
+	CommitRamp common.Address
 	// The FeeQuoter on the EVM chain being configured
 	FeeQuoter common.Address
 	// The CCVAggregator on the EVM chain being configured
@@ -88,8 +83,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// Create inputs for each operation
 		ccvAggregatorArgs := make([]ccv_aggregator.SourceChainConfigArgs, 0, len(input.RemoteChains))
 		ccvProxyArgs := make([]ccv_proxy.DestChainConfigArgs, 0, len(input.RemoteChains))
-		commitOnRampDestConfigArgs := make([]commit_onramp.DestChainConfigArgs, 0, len(input.RemoteChains))
-		commitOnRampAllowlistArgs := make([]commit_onramp.AllowlistConfigArgs, 0, len(input.RemoteChains))
+		commitRampDestConfigArgs := make([]commit_ramp.DestChainConfigArgs, 0, len(input.RemoteChains))
+		commitRampAllowlistArgs := make([]commit_ramp.AllowlistConfigArgs, 0, len(input.RemoteChains))
 		commitOnRampProxyArgs := make([]ccv_ramp_proxy.SetRampArgs, 0, len(input.RemoteChains))
 		commitOffRampProxyArgs := make([]ccv_ramp_proxy.SetRampArgs, 0, len(input.RemoteChains))
 		feeQuoterArgs := make([]fee_quoter_v2.DestChainConfigArgs, 0, len(input.RemoteChains))
@@ -123,16 +118,6 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				AddedAllowlistedSenders:   remoteConfig.CommitOnRampDestChainConfig.AddedAllowlistedSenders,
 				RemovedAllowlistedSenders: remoteConfig.CommitOnRampDestChainConfig.RemovedAllowlistedSenders,
 				DestChainSelector:         remoteSelector,
-			})
-			commitOnRampProxyArgs = append(commitOnRampProxyArgs, ccv_ramp_proxy.SetRampArgs{
-				RemoteChainSelector: remoteSelector,
-				Version:             ccv_ramp_proxy.V1Ramp,
-				RampAddress:         input.CommitOnRamp,
-			})
-			commitOffRampProxyArgs = append(commitOffRampProxyArgs, ccv_ramp_proxy.SetRampArgs{
-				RemoteChainSelector: remoteSelector,
-				Version:             ccv_ramp_proxy.V1Ramp,
-				RampAddress:         input.CommitOffRamp,
 			})
 			feeQuoterArgs = append(feeQuoterArgs, fee_quoter_v2.DestChainConfigArgs{
 				DestChainSelector: remoteSelector,

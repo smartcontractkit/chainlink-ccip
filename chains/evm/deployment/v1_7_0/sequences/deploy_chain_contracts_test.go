@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
@@ -99,8 +99,17 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 						ExecutorOnRamp: sequences.ExecutorOnRampParams{
 							MaxCCVsPerMsg: 10,
 						},
-						CommitOnRamp: sequences.CommitOnRampParams{
+						CommitRamp: sequences.CommitRampParams{
 							FeeAggregator: common.HexToAddress("0x01"),
+							SignatureConfigArgs: commit_ramp.SetSignatureConfigArgs{
+								Threshold: 1,
+								Signers: []common.Address{
+									common.HexToAddress("0x02"),
+									common.HexToAddress("0x03"),
+									common.HexToAddress("0x04"),
+									common.HexToAddress("0x05"),
+								},
+							},
 						},
 						CCVProxy: sequences.CCVProxyParams{
 							FeeAggregator: common.HexToAddress("0x01"),
@@ -112,17 +121,6 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
 							USDPerLINK:                     usdPerLink,
 							USDPerWETH:                     usdPerWeth,
-						},
-						CommitOffRamp: sequences.CommitOffRampParams{
-							SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
-								Threshold: 1,
-								Signers: []common.Address{
-									common.HexToAddress("0x02"),
-									common.HexToAddress("0x03"),
-									common.HexToAddress("0x04"),
-									common.HexToAddress("0x05"),
-								},
-							},
 						},
 					},
 				},
@@ -138,15 +136,13 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				nonce_manager.ContractType:        false,
 				router.ContractType:               false,
 				executor_onramp.ContractType:      false,
-				commit_offramp.ContractType:       false,
 				link.ContractType:                 false,
 				weth.ContractType:                 false,
-				commit_onramp.ContractType:        false,
-				commit_offramp.ProxyType:          false,
-				commit_onramp.ProxyType:           false,
+				commit_ramp.ContractType:          false,
 				ccv_proxy.ContractType:            false,
 				ccv_aggregator.ContractType:       false,
 				fee_quoter_v2.ContractType:        false,
+				commit_ramp.ProxyType:             false,
 				rmn_proxy.ContractType:            false,
 				token_admin_registry.ContractType: false,
 			}
@@ -223,8 +219,17 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 					ExecutorOnRamp: sequences.ExecutorOnRampParams{
 						MaxCCVsPerMsg: 10,
 					},
-					CommitOnRamp: sequences.CommitOnRampParams{
+					CommitRamp: sequences.CommitRampParams{
 						FeeAggregator: common.HexToAddress("0x01"),
+						SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
+							Threshold: 1,
+							Signers: []common.Address{
+								common.HexToAddress("0x02"),
+								common.HexToAddress("0x03"),
+								common.HexToAddress("0x04"),
+								common.HexToAddress("0x05"),
+							},
+						},
 					},
 					CCVProxy: sequences.CCVProxyParams{
 						FeeAggregator: common.HexToAddress("0x01"),
@@ -236,17 +241,6 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 						WETHPremiumMultiplierWeiPerEth: 1e18,       // 1.0 ETH
 						USDPerLINK:                     usdPerLink, // $15
 						USDPerWETH:                     usdPerWeth, // $2000
-					},
-					CommitOffRamp: sequences.CommitOffRampParams{
-						SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
-							Threshold: 1,
-							Signers: []common.Address{
-								common.HexToAddress("0x02"),
-								common.HexToAddress("0x03"),
-								common.HexToAddress("0x04"),
-								common.HexToAddress("0x05"),
-							},
-						},
 					},
 				},
 			}
@@ -325,8 +319,17 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 						ExecutorOnRamp: sequences.ExecutorOnRampParams{
 							MaxCCVsPerMsg: 10,
 						},
-						CommitOnRamp: sequences.CommitOnRampParams{
+						CommitRamp: sequences.CommitRampParams{
 							FeeAggregator: common.HexToAddress("0x01"),
+							SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
+								Threshold: 1,
+								Signers: []common.Address{
+									common.HexToAddress("0x02"),
+									common.HexToAddress("0x03"),
+									common.HexToAddress("0x04"),
+									common.HexToAddress("0x05"),
+								},
+							},
 						},
 						CCVProxy: sequences.CCVProxyParams{
 							FeeAggregator: common.HexToAddress("0x01"),
@@ -338,17 +341,6 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
 							USDPerLINK:                     usdPerLink,
 							USDPerWETH:                     usdPerWeth,
-						},
-						CommitOffRamp: sequences.CommitOffRampParams{
-							SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
-								Threshold: 1,
-								Signers: []common.Address{
-									common.HexToAddress("0x02"),
-									common.HexToAddress("0x03"),
-									common.HexToAddress("0x04"),
-									common.HexToAddress("0x05"),
-								},
-							},
 						},
 					},
 				}

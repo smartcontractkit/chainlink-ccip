@@ -11,37 +11,49 @@ pragma solidity ^0.8.24;
 /// Each of these references should be to a RampProxy contract, not a CCVRamp directly.
 /// @dev On source, the CCVProxy will forward requests (i.e. getFee, forwardToVerifier) through this contract to the required CCVRamp.
 /// The same applies on destination. The CCVAggregator will forward requests (i.e. verifyMessage) through this contract to the required CCVRamp.
-/// This contract follows the Universal Upgradeable Proxy Standard (UUPS) & uses delegatecall so the CCVRamp implementation can access `msg.sender`
-/// without needing to pass it through explicitly and thus modify the function signatures of the ICCVOnRamp and ICCVOffRamp interfaces.
+/// To support this proxy, all future CCVRamp interfaces must have originalCaller defined as the first arg to each method.
 contract RampProxy {
-  constructor(address rampAddress) {
-    // Per UUPS, the address of the implementation is stored @ keccak256("PROXIABLE") = "0xc5f16f0fcc639fa48a6947836d9850f504798523bf8c9a3a87d5876cf622bcf7"
-    assembly {
-        sstore(0xc5f16f0fcc639fa48a6947836d9850f504798523bf8c9a3a87d5876cf622bcf7, rampAddress)
+  error ZeroAddressNotAllowed();
+
+  event RampUpdated(address indexed oldRamp, address indexed newRamp);
+
+  /// @notice The address of the ramp contract.
+  address public s_ramp;
+
+  constructor(
+    address rampAddress
+  ) {
+    _setRamp(rampAddress);
+  }
+
+  function _setRamp(
+    address rampAddress
+  ) internal {
+    if (rampAddress == address(0)) {
+      revert ZeroAddressNotAllowed();
     }
+    address oldRamp = s_ramp;
+    s_ramp = rampAddress;
+    emit RampUpdated(oldRamp, rampAddress);
   }
 
   // The fallback function forwards all calls to the ramp contract via delegatecall.
   // solhint-disable-next-line payable-fallback, no-complex-fallback
   fallback() external {
+    address rampAddress = s_ramp;
     assembly {
-      let rampAddress := sload(0xc5f16f0fcc639fa48a6947836d9850f504798523bf8c9a3a87d5876cf622bcf7)
-      // Store the calldata in memory.
       // We never cede control back to Solidity, so we can overwrite memory starting from index 0.
       calldatacopy(0, 0, calldatasize())
+      // Overwrite calldata with the actual caller.
+      // This prevents an attacker from spoofing a different caller.
+      // The caller must be at calldata index 4 (skip function selector)
+      mstore(4, caller())
 
       // Forward the call to the ramp contract.
-      let result := delegatecall(gas(), rampAddress, 0, calldatasize(), 0, 0)
-      // Copy the returned data to memory.
-      // Revert based on the result of the delegatecall.
+      let success := call(gas(), rampAddress, 0, 0, calldatasize(), 0, 0)
       returndatacopy(0, 0, returndatasize())
-      switch result
-      case 0 {
-        revert(0, returndatasize())
-      }
-      default {
-        return(0, returndatasize())
-      }
+      if success { return(0, returndatasize()) }
+      revert(0, returndatasize())
     }
   }
 }

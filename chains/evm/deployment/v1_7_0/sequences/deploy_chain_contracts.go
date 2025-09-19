@@ -13,12 +13,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
@@ -37,13 +35,10 @@ type CCVAggregatorParams struct {
 	GasForCallExactCheck uint16
 }
 
-type CommitOnRampParams struct {
-	AllowlistAdmin common.Address
-	FeeAggregator  common.Address
-}
-
-type CommitOffRampParams struct {
-	SignatureConfigArgs commit_offramp.SetSignatureConfigArgs
+type CommitRampParams struct {
+	AllowlistAdmin      common.Address
+	FeeAggregator       common.Address
+	SignatureConfigArgs commit_ramp.SetSignatureConfigArgs
 }
 
 type CCVProxyParams struct {
@@ -66,8 +61,7 @@ type ExecutorOnRampParams struct {
 type ContractParams struct {
 	RMNRemote      RMNRemoteParams
 	CCVAggregator  CCVAggregatorParams
-	CommitOnRamp   CommitOnRampParams
-	CommitOffRamp  CommitOffRampParams
+	CommitRamp     CommitRampParams
 	CCVProxy       CCVProxyParams
 	FeeQuoter      FeeQuoterParams
 	ExecutorOnRamp ExecutorOnRampParams
@@ -180,7 +174,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					LinkToken:                    common.HexToAddress(linkRef.Address),
 				},
 				PriceUpdaters: []common.Address{
-					// NOTE: CommitOffRamp not set here in 1.7.0, as price updates are out of scope for launch.
+					// NOTE: CommitRamp not set here in 1.7.0, as price updates are out of scope for launch.
 					// TODO: Add Timelock here when MCMS support is needed.
 					chain.DeployerKey.From,
 				},
@@ -266,39 +260,42 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, ccvProxyRef)
 
-		// Deploy NonceManager
-		nonceManagerRef, err := maybeDeployContract(b, nonce_manager.Deploy, nonce_manager.ContractType, chain, contract.DeployInput[nonce_manager.ConstructorArgs]{
+		// Deploy CommitRamp
+		commitRampRef, err := maybeDeployContract(b, commit_ramp.Deploy, commit_ramp.ContractType, chain, contract.DeployInput[commit_ramp.ConstructorArgs]{
 			ChainSelector: chain.Selector,
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy NonceManager: %w", err)
-		}
-		addresses = append(addresses, nonceManagerRef)
-
-		// Deploy CommitOnRampProxy
-		commitOnRampProxyRef, err := maybeDeployContract(b, commit_onramp.DeployProxy, commit_onramp.ProxyType, chain, contract.DeployInput[any]{
-			ChainSelector: chain.Selector,
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOnRampProxy: %w", err)
-		}
-		addresses = append(addresses, commitOnRampProxyRef)
-
-		// Deploy CommitOnRamp
-		commitOnRampRef, err := maybeDeployContract(b, commit_onramp.Deploy, commit_onramp.ContractType, chain, contract.DeployInput[commit_onramp.ConstructorArgs]{
-			ChainSelector: chain.Selector,
-			Args: commit_onramp.ConstructorArgs{
-				DynamicConfig: commit_onramp.DynamicConfig{
+			Args: commit_ramp.ConstructorArgs{
+				DynamicConfig: commit_ramp.DynamicConfig{
 					FeeQuoter:      common.HexToAddress(feeQuoterRef.Address),
-					FeeAggregator:  input.ContractParams.CommitOnRamp.FeeAggregator,
-					AllowlistAdmin: input.ContractParams.CommitOnRamp.AllowlistAdmin,
+					FeeAggregator:  input.ContractParams.CommitRamp.FeeAggregator,
+					AllowlistAdmin: input.ContractParams.CommitRamp.AllowlistAdmin,
 				},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOnRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitRamp: %w", err)
 		}
-		addresses = append(addresses, commitOnRampRef)
+		addresses = append(addresses, commitRampRef)
+
+		// Set signature config on the CommitRamp
+		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_ramp.SetSignatureConfigs, chain, contract.FunctionInput[commit_ramp.SetSignatureConfigArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(commitRampRef.Address),
+			Args:          input.ContractParams.CommitRamp.SignatureConfigArgs,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitRamp: %w", err)
+		}
+		writes = append(writes, setSignatureConfigReport.Output)
+
+		// Deploy CommitRampProxy
+		commitRampProxyRef, err := maybeDeployContract(b, commit_ramp.DeployProxy, commit_ramp.ProxyType, chain, contract.DeployInput[common.Address]{
+			ChainSelector: chain.Selector,
+			Args:          common.HexToAddress(commitRampRef.Address),
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitRampProxy: %w", err)
+		}
+		addresses = append(addresses, commitRampProxyRef)
 
 		// Deploy ExecutorOnRamp
 		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, executor_onramp.ContractType, chain, contract.DeployInput[executor_onramp.ConstructorArgs]{
@@ -312,25 +309,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, executorOnRampRef)
 
-		// Deploy CommitOffRampProxy
-		commitOffRampProxyRef, err := maybeDeployContract(b, commit_offramp.DeployProxy, commit_offramp.ProxyType, chain, contract.DeployInput[any]{
-			ChainSelector: chain.Selector,
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOffRampProxy: %w", err)
-		}
-		addresses = append(addresses, commitOffRampProxyRef)
-
-		// Deploy CommitOffRamp
-		commitOffRampRef, err := maybeDeployContract(b, commit_offramp.Deploy, commit_offramp.ContractType, chain, contract.DeployInput[commit_offramp.ConstructorArgs]{
-			ChainSelector: chain.Selector,
-			Args:          commit_offramp.ConstructorArgs{},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitOffRamp: %w", err)
-		}
-		addresses = append(addresses, commitOffRampRef)
-
+		// Deploy MockReceiver (defines commit verifier as required)
 		mockReceiver, err := maybeDeployContract(b, mock_receiver.Deploy, mock_receiver.ContractType, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: mock_receiver.ConstructorArgs{
@@ -341,33 +320,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy MockReceiver: %w", err)
 		}
 		addresses = append(addresses, mockReceiver)
-
-		// Set signature config on the CommitOffRamp
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, commit_offramp.SetSignatureConfigs, chain, contract.FunctionInput[commit_offramp.SetSignatureConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(commitOffRampRef.Address),
-			Args:          input.ContractParams.CommitOffRamp.SignatureConfigArgs,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitOffRamp: %w", err)
-		}
-		writes = append(writes, setSignatureConfigReport.Output)
-
-		// Add CommitOnRamp and CommitOffRamp as AuthorizedCallers on NonceManager
-		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, nonce_manager.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[nonce_manager.AuthorizedCallerArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(nonceManagerRef.Address),
-			Args: nonce_manager.AuthorizedCallerArgs{
-				AddedCallers: []common.Address{
-					common.HexToAddress(commitOnRampRef.Address),
-					common.HexToAddress(commitOffRampRef.Address),
-				},
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to add CommitOnRamp and CommitOffRamp as AuthorizedCallers to NonceManager: %w", err)
-		}
-		writes = append(writes, applyAuthorizedCallerUpdatesReport.Output)
 
 		return sequences.OnChainOutput{
 			Addresses: addresses,

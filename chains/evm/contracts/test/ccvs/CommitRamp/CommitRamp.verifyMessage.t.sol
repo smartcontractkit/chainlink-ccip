@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CommitRamp} from "../../../ccvs/CommitRamp.sol";
+import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CommitRampSetup} from "./CommitRampSetup.t.sol";
 
 contract CommitRamp_verifyMessage is CommitRampSetup {
@@ -13,7 +13,7 @@ contract CommitRamp_verifyMessage is CommitRampSetup {
     (bytes32 r, bytes32 s) = _signWithV27(PRIVATE_KEY_0, messageHash);
     bytes memory ccvData = abi.encodePacked(uint16(64), r, s);
 
-    s_commitRamp.verifyMessage(message, messageHash, ccvData);
+    s_commitRamp.verifyMessage(OWNER, message, messageHash, ccvData);
   }
 
   function test_verifyMessage_ForwardCompatibilityWithExtraData() public view {
@@ -26,7 +26,7 @@ contract CommitRamp_verifyMessage is CommitRampSetup {
     (bytes32 r, bytes32 s) = _signWithV27(PRIVATE_KEY_0, messageHash);
     bytes memory ccvData = abi.encodePacked(uint16(64), r, s, extraFutureData);
 
-    s_commitRamp.verifyMessage(message, messageHash, ccvData);
+    s_commitRamp.verifyMessage(OWNER, message, messageHash, ccvData);
   }
 
   // Reverts
@@ -40,7 +40,7 @@ contract CommitRamp_verifyMessage is CommitRampSetup {
 
     // Should revert with InvalidCCVData when ccvData is too short to contain signature length.
     vm.expectRevert(abi.encodeWithSelector(CommitRamp.InvalidCCVData.selector));
-    s_commitRamp.verifyMessage(message, messageHash, ccvData);
+    s_commitRamp.verifyMessage(OWNER, message, messageHash, ccvData);
   }
 
   function test_verifyMessage_RevertWhen_InvalidCCVData_SignatureLengthExceedsCCVData() public {
@@ -52,6 +52,6 @@ contract CommitRamp_verifyMessage is CommitRampSetup {
 
     // Should revert with InvalidCCVData when signature length exceeds available data.
     vm.expectRevert(abi.encodeWithSelector(CommitRamp.InvalidCCVData.selector));
-    s_commitRamp.verifyMessage(message, messageHash, ccvData);
+    s_commitRamp.verifyMessage(OWNER, message, messageHash, ccvData);
   }
 }
