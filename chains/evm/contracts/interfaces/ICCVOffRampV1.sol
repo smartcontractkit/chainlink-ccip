@@ -3,8 +3,7 @@ pragma solidity ^0.8.0;
 
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 interface ICCVOffRampV1 is IERC165 {
   /// @notice Verification of the message, in any way the OffRamp wants. This could be using a signature, a quorum
