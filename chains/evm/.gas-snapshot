@@ -48,7 +48,7 @@ CCTPMessageTransmitterProxy_getCCTPTransmitter:test_getCCTPTransmitter() (gas: 1
 CCTPMessageTransmitterProxy_receiveMessage:test_receiveMessage() (gas: 32098)
 CCVAggregator_applySourceChainConfigUpdates:test_applySourceChainConfigUpdates_multipleChains() (gas: 463438)
 CCVAggregator_applySourceChainConfigUpdates:test_applySourceChainConfigUpdates_updateExistingChain() (gas: 132114)
-CCVAggregator_constructor:test_constructor() (gas: 4243772)
+CCVAggregator_constructor:test_constructor() (gas: 4225330)
 CCVAggregator_ensureCCVQuorumIsReached:test_ensureCCVQuorumIsReached_AllCCVsFound() (gas: 61760)
 CCVAggregator_ensureCCVQuorumIsReached:test_ensureCCVQuorumIsReached_OptionalIsAlsoRequired() (gas: 53809)
 CCVAggregator_ensureCCVQuorumIsReached:test_ensureCCVQuorumIsReached_Success_OptionalCCVsFound() (gas: 52046)
