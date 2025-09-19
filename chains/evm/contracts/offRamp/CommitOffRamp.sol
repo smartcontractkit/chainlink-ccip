@@ -7,8 +7,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {SignatureQuorumVerifier} from "./components/SignatureQuorumVerifier.sol";
 
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract CommitOffRamp is ICCVOffRampV1, SignatureQuorumVerifier, ITypeAndVersion {
   error InvalidCCVData();
