@@ -23,13 +23,11 @@ func ToEVMAddress(ref datastore.AddressRef) (commonAddress common.Address, err e
 
 // ToPaddedEVMAddress formats a datastore.AddressRef into a 32-byte padded ethereum address.
 func ToPaddedEVMAddress(ref datastore.AddressRef) (paddedAddress []byte, err error) {
-	if ref.Address == "" {
-		return []byte{}, fmt.Errorf("address is empty in ref: %s", sprintRef(ref))
+	addr, err := ToEVMAddress(ref)
+	if err != nil {
+		return nil, err
 	}
-	if !common.IsHexAddress(ref.Address) {
-		return []byte{}, fmt.Errorf("address is not a valid hex address in ref: %s", sprintRef(ref))
-	}
-	return common.LeftPadBytes(common.HexToAddress(ref.Address).Bytes(), 32), nil
+	return common.LeftPadBytes(addr.Bytes(), 32), nil
 }
 
 // FindAndFormatEachRef queries the datastore for multiple AddressRefs.
@@ -53,9 +51,33 @@ func FindAndFormatEachRef[T any](ds datastore.DataStore, refs []datastore.Addres
 	return formattedRefs, nil
 }
 
+func FindAndFormatEachRefIfFound[T any](ds datastore.DataStore, refs []datastore.AddressRef, format FormatFn[T]) ([]T, error) {
+	formattedRefs := make([]T, 0, len(refs))
+	for _, ref := range refs {
+		refFromStore := findRef(ds, ref)
+		if len(refFromStore) == 0 {
+			continue
+		}
+		formattedRef, err := format(refFromStore[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to format ref %s: %w", sprintRef(refFromStore[0]), err)
+		}
+		formattedRefs = append(formattedRefs, formattedRef)
+	}
+	return formattedRefs, nil
+}
+
 // findSingleRef queries the datastore for an AddressRef matching a subset of fields provided by AddressRef.
 // It enforces that exactly one match is found.
 func findSingleRef(ds datastore.DataStore, ref datastore.AddressRef) (datastore.AddressRef, error) {
+	refs := findRef(ds, ref)
+	if len(refs) != 1 {
+		return datastore.AddressRef{}, fmt.Errorf("expected to find exactly 1 ref with criteria %s, found %d", sprintRef(ref), len(refs))
+	}
+	return refs[0], nil
+}
+
+func findRef(ds datastore.DataStore, ref datastore.AddressRef) []datastore.AddressRef {
 	filterFns := make([]datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef], 0, 5)
 	// Filter by largest scope (chain) to smallest scope (address)
 	// Address is the smallest scope because there can only be one of each address on a given chain
@@ -75,10 +97,7 @@ func findSingleRef(ds datastore.DataStore, ref datastore.AddressRef) (datastore.
 		filterFns = append(filterFns, datastore.AddressRefByAddress(ref.Address))
 	}
 	refs := ds.Addresses().Filter(filterFns...)
-	if len(refs) != 1 {
-		return datastore.AddressRef{}, fmt.Errorf("expected to find exactly 1 ref with criteria %s, found %d", sprintRef(ref), len(refs))
-	}
-	return refs[0], nil
+	return refs
 }
 
 func sprintRef(ref datastore.AddressRef) string {

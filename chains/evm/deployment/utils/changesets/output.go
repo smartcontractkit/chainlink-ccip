@@ -4,12 +4,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 )
 
 // OutputBuilder helps construct a ChangesetOutput, including building an MCMS proposal if there are write operations.
@@ -20,8 +21,7 @@ type OutputBuilder struct {
 	changesetOutput deployment.ChangesetOutput
 }
 
-// MCMSParams holds configuration for building an MCMS proposal.
-type MCMSParams struct {
+type MCMSConfig struct {
 	// Description is a human-readable description of the proposal.
 	Description string
 	// OverridePreviousRoot indicates whether to override the root of the MCMS contract.
@@ -33,6 +33,11 @@ type MCMSParams struct {
 	TimelockDelay mcms_types.Duration
 	// TimelockAction is the action to perform on the timelock contract (schedule, bypass, or cancel).
 	TimelockAction mcms_types.TimelockAction
+}
+
+// MCMSParams holds configuration for building an MCMS proposal.
+type MCMSParams struct {
+	MCMSConfig
 	// TimelockAddresses is a map of chain selectors to timelock contract addresses.
 	TimelockAddresses map[mcms_types.ChainSelector]string
 	// ChainMetadata is optional metadata to include for each chain in the proposal.
