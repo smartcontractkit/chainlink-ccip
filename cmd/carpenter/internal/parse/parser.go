@@ -40,7 +40,8 @@ import (
 // - message
 //
 // LogTypeMixed is a mixture of log message and fields in JSON format.
-// ENUM(MixedGoTestJSON, JSON, Mixed, CI)
+// LogTypeTimestamped is for logs with two tab-separated timestamp columns followed by JSON log data.
+// ENUM(MixedGoTestJSON, JSON, Mixed, CI, Timestamped)
 type LogType string
 
 var (
@@ -114,6 +115,13 @@ func sanitizeString(s string, logType LogType) string {
 		s = strings.ReplaceAll(s, "\\", "")
 		s = strings.TrimSpace(s)
 		return s
+	case LogTypeTimestamped:
+		// Strip the first two tab-separated columns (timestamps) and keep the JSON part
+		parts := strings.SplitN(s, "\t", 3)
+		if len(parts) < 3 {
+			return ""
+		}
+		return strings.TrimSpace(parts[2])
 	case LogTypeJSON:
 		return s
 	case LogTypeMixedGoTestJSON:
@@ -262,6 +270,48 @@ func ParseLine(line string, logType LogType) (*Data, error) {
 		}
 
 		data.RawLoggerFields = rawFields
+
+		return &data, nil
+	case LogTypeTimestamped:
+		// Parse the JSON wrapper first
+		var wrapper map[string]interface{}
+		dec := json.NewDecoder(strings.NewReader(line))
+		err := dec.Decode(&wrapper)
+		if err != nil {
+			return nil, fmt.Errorf("could not decode timestamped line from JSON (%s): %w", line, err)
+		}
+
+		// Extract the nested log JSON string
+		logStr, ok := wrapper["log"].(string)
+		if !ok {
+			return nil, fmt.Errorf("no log field found in timestamped JSON: %s", line)
+		}
+
+		// Clean up the log string (remove \r\n and other whitespace at the end)
+		logStr = strings.TrimSpace(logStr)
+		logStr = strings.TrimSuffix(logStr, "\r\n")
+		logStr = strings.TrimSuffix(logStr, "\n")
+		logStr = strings.TrimSpace(logStr)
+
+		// Parse the actual log JSON
+		var data Data
+		if err = json.Unmarshal([]byte(logStr), &data); err != nil {
+			// Skip malformed JSON lines (e.g., truncated logs) instead of failing completely
+			return nil, nil
+		}
+
+		// Parse the nested log into a map for raw fields
+		var obj map[string]interface{}
+		if err = json.Unmarshal([]byte(logStr), &obj); err != nil {
+			return nil, fmt.Errorf("could not parse nested log for raw fields: %w", err)
+		}
+
+		// This isn't ours if it's empty
+		if data.IsEmpty() {
+			return nil, nil
+		}
+
+		data.RawLoggerFields = obj
 
 		return &data, nil
 	case LogTypeCI:

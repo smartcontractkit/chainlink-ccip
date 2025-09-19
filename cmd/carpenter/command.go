@@ -39,7 +39,7 @@ func makeCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:             "logType",
-				Usage:            "Specify the type of log to parse, valid options: json, mixed, ci",
+				Usage:            "Specify the type of log to parse, valid options: json, mixed, ci, timestamped",
 				Value:            parse.LogTypeJSON.String(),
 				ValidateDefaults: true, // to make sure default is assigned.
 				Validator: func(s string) error {
@@ -134,6 +134,11 @@ func run(args arguments) error {
 		data, err := parse.ParseLine(line, args.logType)
 		if err != nil {
 			return fmt.Errorf("ParseLine: %w", err)
+		}
+
+		// Skip if data is nil (e.g., malformed lines that were skipped)
+		if data == nil {
+			continue
 		}
 
 		include, err := filter.Filter(data, args.CompiledFilterFields, args.filterOP)
