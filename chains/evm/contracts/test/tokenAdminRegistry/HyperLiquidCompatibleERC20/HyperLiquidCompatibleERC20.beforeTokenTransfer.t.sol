@@ -17,8 +17,7 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
     address recipient = makeAddr("recipient");
     uint256 amount = 100e18;
 
-    // Transfer to a regular address should not trigger the spot balance check
-    // This should succeed without any issues
+    // Transfer to a regular address should not trigger the spot balance check.
     s_hyperLiquidToken.transfer(recipient, amount);
 
     assertEq(s_hyperLiquidToken.balanceOf(recipient), amount);
@@ -32,12 +31,12 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
     SpotBalance memory mockSpotBalance =
       SpotBalance({total: uint64(101e6), hold: uint64(500e6), entryNtl: uint64(200e6)});
 
-    // Mock the staticcall to return success and the mock balance
+    // Mock the staticcall to return success and the mock balance.
     vm.mockCall(
       SPOT_BALANCE_PRECOMPILE, abi.encode(s_hypercoreTokenSystemAddress, s_remoteTokenId), abi.encode(mockSpotBalance)
     );
 
-    // Transfer to spot balance precompile should succeed with sufficient balance
+    // Transfer to spot balance precompile should succeed with sufficient balance.
     s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, amount);
 
     assertEq(s_hyperLiquidToken.balanceOf(s_hypercoreTokenSystemAddress), amount);
@@ -63,7 +62,7 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
   // Reverts
 
   function test_beforeTokenTransfer_RevertWhen_SpotBalancePrecompileCallFails() public {
-    // Set the remote token first so that the second call reverts
+    // Set the remote token first so that the second call reverts.
     s_hyperLiquidToken.setRemoteToken(s_remoteTokenId, 18);
 
     uint256 amount = 100e18;
@@ -80,7 +79,7 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
 
     uint256 amount = 1001e18; // More than available balance
 
-    // Mock the spot balance precompile to return insufficient balance
+    // Mock the spot balance precompile to return insufficient balance.
     SpotBalance memory mockSpotBalance =
       SpotBalance({total: uint64(1000e6), hold: uint64(500e6), entryNtl: uint64(200e6)});
 
@@ -93,7 +92,7 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
   }
 
   function test_beforeTokenTransfer_RevertWhen_ZeroSpotBalance() public {
-    // Set the remote token first so that the second call reverts
+    // Set the remote token first so that the second call reverts.
     s_hyperLiquidToken.setRemoteToken(s_remoteTokenId, 18);
 
     uint256 amount = 100e18;
@@ -110,7 +109,7 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
   }
 
   function test_beforeTokenTransfer_RevertWhen_TransferZeroAmount() public {
-    // Mock the spot balance precompile to return some balance
+    // Mock the spot balance precompile to return some balance.
     SpotBalance memory mockSpotBalance =
       SpotBalance({total: uint64(1000e6), hold: uint64(500e6), entryNtl: uint64(200e6)});
 
@@ -118,7 +117,7 @@ contract HyperLiquidCompatibleERC20_beforeTokenTransfer is HyperLiquidCompatible
       SPOT_BALANCE_PRECOMPILE, abi.encode(s_hypercoreTokenSystemAddress, s_remoteTokenId), abi.encode(mockSpotBalance)
     );
 
-    // Transfer zero amount should succeed
+    // Transfer zero amount should succeed.
     s_hyperLiquidToken.transfer(s_hypercoreTokenSystemAddress, 0);
 
     assertEq(s_hyperLiquidToken.balanceOf(s_hypercoreTokenSystemAddress), 0);
