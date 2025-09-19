@@ -7,10 +7,8 @@ import {Pool} from "../../libraries/Pool.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
 /// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
 /// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
