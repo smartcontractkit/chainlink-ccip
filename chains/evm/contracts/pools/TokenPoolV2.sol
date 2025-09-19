@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 
 import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
+import {IERC20} from
+  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
@@ -36,6 +39,14 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
     return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == type(IPoolV2).interfaceId
       || interfaceId == type(IERC165).interfaceId;
   }
+
+  constructor(
+    IERC20 token,
+    uint8 localTokenDecimals,
+    address[] memory allowlist,
+    address rmnProxy,
+    address router
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   // ================================================================
   // │                        Lock or Burn                          │

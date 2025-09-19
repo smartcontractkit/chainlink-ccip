@@ -597,6 +597,7 @@ TokenPoolFactory_createTokenPool:test_createTokenPool_RemoteTokenHasDifferentDec
 TokenPoolFactory_createTokenPool:test_createTokenPool_WithNoExistingRemoteContracts_predict() (gas: 13415907)
 TokenPoolFactory_createTokenPool:test_createTokenPool_WithNoExistingTokenOnRemoteChain() (gas: 6161592)
 TokenPoolFactory_createTokenPool:test_createTokenPool_WithRemoteTokenAndRemotePool() (gas: 6372367)
+TokenPoolV2_applyCCVConfigUpdates:test_applyCCVConfigUpdate() (gas: 126775)
 TokenPoolWithAllowList_applyAllowListUpdates:test_SetAllowList() (gas: 180617)
 TokenPoolWithAllowList_applyAllowListUpdates:test_SetAllowListSkipsZero() (gas: 24415)
 TokenPoolWithAllowList_getAllowList:test_GetAllowList() (gas: 24486)
