@@ -25,23 +25,23 @@ interface IPoolV2 is IPoolV1 {
   /// @param destChainSelector The chain selector of the destination chain.
   /// @param amount The amount of tokens to be transferred.
   /// @param tokenArgs Additional token arguments.
-  /// @return An array of addresses representing the required outbound CCVs.
+  /// @return requiredCCVs A set of addresses representing the required outbound CCVs.
   function getRequiredOutboundCCVs(
     uint64 destChainSelector,
     uint256 amount,
     bytes calldata tokenArgs
-  ) external view returns (address[] memory);
+  ) external view returns (address[] memory requiredCCVs);
 
   /// @notice Returns the set of required CCVs for incoming messages from a source chain.
   /// @param sourceChainSelector The chain selector of the source chain.
   /// @param amount The amount of tokens to be transferred.
   /// @param tokenArgs Additional token arguments.
-  /// @return An array of addresses representing the required inbound CCVs.
+  /// @return requiredCCVs A set of addresses representing the required inbound CCVs.
   function getRequiredInboundCCVs(
     uint64 sourceChainSelector,
     uint256 amount,
     bytes calldata tokenArgs
-  ) external view returns (address[] memory);
+  ) external view returns (address[] memory requiredCCVs);
 
   /// @notice Returns a fee quote for transferring tokens to a destination chain.
   /// @param destChainSelector The chain selector of the destination chain.

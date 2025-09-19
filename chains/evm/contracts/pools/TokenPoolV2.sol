@@ -94,12 +94,12 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
   /// @dev The second param is the amount and the third param is the tokenArgs.
   /// This implementation assumes the same set of CCVs are used for all transfers on a lane.
   /// Implementers can override this function to define custom logic based on these params.
-  /// @return Set of required CCV addresses.
+  /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredInboundCCVs(
     uint64 sourceChainSelector,
     uint256,
     bytes calldata
-  ) external view virtual returns (address[] memory) {
+  ) external view virtual returns (address[] memory requiredCCVs) {
     return s_verifierConfig[sourceChainSelector].inboundCCVs;
   }
 
@@ -108,12 +108,12 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
   /// @dev The second param is the amount and the third param is the tokenArgs.
   /// This implementation assumes the same set of CCVs are used for all transfers on a lane.
   /// Implementers can override this function to define custom logic based on these params.
-  /// @return Set of required CCV addresses.
+  /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredOutboundCCVs(
     uint64 destChainSelector,
     uint256,
     bytes calldata
-  ) external view virtual returns (address[] memory) {
+  ) external view virtual returns (address[] memory requiredCCVs) {
     return s_verifierConfig[destChainSelector].outboundCCVs;
   }
 
