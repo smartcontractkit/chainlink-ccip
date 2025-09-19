@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
-import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
@@ -61,8 +60,8 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     returns (
       bytes32 messageId,
       bytes memory encodedMessage,
-      Internal.Receipt[] memory verifierReceipts,
-      Internal.Receipt memory executorReceipt,
+      CCVProxy.Receipt[] memory verifierReceipts,
+      CCVProxy.Receipt memory executorReceipt,
       bytes[] memory receiptBlobs
     )
   {
@@ -82,9 +81,9 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       data: message.data
     });
 
-    verifierReceipts = new Internal.Receipt[](destChainConfig.defaultCCVs.length);
+    verifierReceipts = new CCVProxy.Receipt[](destChainConfig.defaultCCVs.length);
     for (uint256 i = 0; i < verifierReceipts.length; ++i) {
-      verifierReceipts[i] = Internal.Receipt({
+      verifierReceipts[i] = CCVProxy.Receipt({
         issuer: destChainConfig.defaultCCVs[i],
         feeTokenAmount: 0,
         destGasLimit: 0,
@@ -93,7 +92,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
         extraArgs: message.extraArgs
       });
     }
-    executorReceipt = Internal.Receipt({
+    executorReceipt = CCVProxy.Receipt({
       issuer: destChainConfig.defaultExecutor,
       feeTokenAmount: 0, // Matches current CCVProxy event behavior
       destGasLimit: 0,

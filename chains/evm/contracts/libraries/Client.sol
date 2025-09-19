@@ -142,9 +142,6 @@ library Client {
   ) internal pure returns (bytes memory bts) {
     return abi.encodeWithSelector(SUI_EXTRA_ARGS_V1_TAG, extraArgs);
   }
-  // ================================================================
-  // │                           ModSec                             │
-  // ================================================================
 
   /// @notice The CCV struct is used to represent a cross-chain verifier.
   struct CCV {
@@ -173,12 +170,5 @@ library Client {
     EVMExtraArgsV3 memory extraArgs
   ) internal pure returns (bytes memory bts) {
     return abi.encodeWithSelector(GENERIC_EXTRA_ARGS_V3_TAG, extraArgs);
-  }
-
-  // TODO milestone 2
-  struct TokenPoolSettings {
-    CCV[] requiredVerifiers; // Token pool can only add required verifiers.
-    uint256 gasLimit; // Token pool gas limit on dest.
-    uint64 destBytesOverhead; // Token pool calldata size on dest.
   }
 }
