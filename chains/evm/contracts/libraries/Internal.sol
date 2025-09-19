@@ -323,28 +323,4 @@ library Internal {
     uint64 maxSeqNr; // ─────────╯ Maximum sequence number, inclusive
     bytes32 merkleRoot; //         Merkle root covering the interval & source chain messages
   }
-
-  // ================================================================
-  // │                            1.7                               │
-  // ================================================================
-
-  /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
-  /// @dev This struct is only used on the source chain and is not part of the message. It is emitted in the same event.
-  struct Receipt {
-    address issuer; // The address of the entity that issued the receipt.
-    uint64 destGasLimit; // The gas limit for the actions taken on the destination chain for this entity.
-    uint32 destBytesOverhead; // The byte overhead for the actions taken on the destination chain for this entity.
-    uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
-    bytes extraArgs; // Extra args that have been passed in on the source chain.
-  }
-
-  struct EVMTokenTransfer {
-    address sourceTokenAddress;
-    // The EVM address of the destination token.
-    // This value is UNTRUSTED as any pool owner can return whatever value they want.
-    bytes destTokenAddress;
-    uint256 amount; // Number of tokens.
-    bytes extraData; // Optional pool data to be transferred to the destination chain.
-    Receipt receipt;
-  }
 }
