@@ -25,6 +25,12 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     bytes memory originalSender = abi.encode(s_sender);
     bytes memory offchainTokenData = "";
 
+    uint64[] memory remoteChainSelectors = new uint64[](1);
+    remoteChainSelectors[0] = SOURCE_CHAIN_SELECTOR;
+    address[] memory lockReleasePools = new address[](1);
+    lockReleasePools[0] = s_lockReleasePool;
+    s_usdcTokenPoolProxy.updateLockReleasePoolAddresses(remoteChainSelectors, lockReleasePools);
+
     // Mock the router's isOffRamp function to return true
     vm.mockCall(
       address(s_router),
@@ -242,8 +248,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory updatedPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: address(0), // Set to zero to indicate no legacy pool
       cctpV1Pool: s_cctpV1Pool,
-      cctpV2Pool: s_cctpV2Pool,
-      lockReleasePool: s_lockReleasePool
+      cctpV2Pool: s_cctpV2Pool
     });
 
     s_usdcTokenPoolProxy.updatePoolAddresses(updatedPools);

@@ -44,12 +44,12 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
+  event LockReleasePoolUpdated(uint64 indexed remoteChainSelector, address lockReleasePool);
 
   struct PoolAddresses {
     address legacyCctpV1Pool; // A v1 token pool that did not utilize a message transmitter proxy.
     address cctpV1Pool;
     address cctpV2Pool;
-    address lockReleasePool;
   }
 
   enum LockOrBurnMechanism {
@@ -60,20 +60,18 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   }
 
   mapping(uint64 remoteChainSelector => LockOrBurnMechanism mechanism) internal s_lockOrBurnMechanism;
+  mapping(uint64 remoteChainSelector => address lockReleasePool) internal s_lockReleasePools;
 
   PoolAddresses internal s_pools;
 
-  string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.3-dev";
-
   IERC20 internal immutable i_token;
+
+  string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.3-dev";
 
   constructor(IERC20 token, PoolAddresses memory pools) {
     // Note: The legacy pool is allowed to be zero, as it is not requireed if this proxy is being deployed
     // on a chain which has already migrated to a pool that utilizes a message transmitter proxy.
-    if (
-      address(token) == address(0) || pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0)
-        || pools.lockReleasePool == address(0)
-    ) {
+    if (address(token) == address(0) || pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0)) {
       revert AddressCannotBeZero();
     }
 
@@ -102,7 +100,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
       destinationPool = pools.cctpV1Pool;
     } else if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      destinationPool = pools.lockReleasePool;
+      destinationPool = s_lockReleasePools[lockOrBurnIn.remoteChainSelector];
     }
 
     // Transfer the tokens to the proper child pool, as this contract is only a proxy and will not perform
@@ -115,9 +113,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual returns (Pool.ReleaseOrMintOutV1 memory) {
-    // If the source pool data is the lock release flag, we use the lock release pool.
+    // If the source pool data is the lock release flag, we use the lock release pool set for the remote chain selector.
     if (bytes4(releaseOrMintIn.sourcePoolData) == LOCK_RELEASE_FLAG) {
-      return USDCTokenPool(s_pools.lockReleasePool).releaseOrMint(releaseOrMintIn);
+      return USDCTokenPool(s_lockReleasePools[releaseOrMintIn.remoteChainSelector]).releaseOrMint(releaseOrMintIn);
     }
 
     // In previous versions of the USDC Token Pool, the sourcePoolData only contained two fields, a uint64 and uint32.
@@ -178,7 +176,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   function updatePoolAddresses(
     PoolAddresses calldata pools
   ) external onlyOwner {
-    if (pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0) || pools.lockReleasePool == address(0)) {
+    if (pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0)) {
       revert AddressCannotBeZero();
     }
 
@@ -218,6 +216,36 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
       s_lockOrBurnMechanism[remoteChainSelectors[i]] = mechanisms[i];
       emit LockOrBurnMechanismUpdated(remoteChainSelectors[i], mechanisms[i]);
     }
+  }
+
+  /// @notice Update the lock release pool addresses for a list of remote chain selectors.
+  /// @param remoteChainSelectors The remote chain selectors to update the lock release pool addresses for.
+  /// @param lockReleasePools The new lock release pool addresses for the given remote chain selectors.
+  function updateLockReleasePoolAddresses(
+    uint64[] calldata remoteChainSelectors,
+    address[] calldata lockReleasePools
+  ) external onlyOwner {
+    if (remoteChainSelectors.length != lockReleasePools.length) {
+      revert MismatchedArrayLengths();
+    }
+
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      // Note: Since the lock release pool is only used for chains that do not have CCTP support, after a successful
+      // migration to CCTP, the lock release pool may no longer be needed, and therefore the zero address is
+      // a valid input and input validation is not required. It is also why no check for the mechanism being
+      // LOCK_RELEASE is performed either, as after a migration this may no longer be the case.
+      s_lockReleasePools[remoteChainSelectors[i]] = lockReleasePools[i];
+      emit LockReleasePoolUpdated(remoteChainSelectors[i], lockReleasePools[i]);
+    }
+  }
+
+  /// @notice Get the lock release pool address for a given remote chain selector.
+  /// @param remoteChainSelector The remote chain selector to get the lock release pool address for.
+  /// @return The lock release pool address for the given remote chain selector.
+  function getLockReleasePoolAddress(
+    uint64 remoteChainSelector
+  ) public view returns (address) {
+    return s_lockReleasePools[remoteChainSelector];
   }
 
   /// @notice Check if the releaseOrMintIn struct is an inflight message from a legacy pool that did not utilize a

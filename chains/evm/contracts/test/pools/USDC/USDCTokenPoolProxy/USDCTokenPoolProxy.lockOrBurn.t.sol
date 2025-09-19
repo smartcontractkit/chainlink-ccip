@@ -113,6 +113,13 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = abi.encode(address(s_lockReleasePool));
 
+    // Set the the s_lockRelease pool for the LockRelease mechanism
+    uint64[] memory selectors = new uint64[](1);
+    selectors[0] = testChainSelector;
+    address[] memory lockReleasePools = new address[](1);
+    lockReleasePools[0] = address(s_lockReleasePool);
+    s_usdcTokenPoolProxy.updateLockReleasePoolAddresses(selectors, lockReleasePools);
+
     vm.mockCall(
       address(s_router),
       abi.encodeWithSelector(bytes4(keccak256("getOnRamp(uint64)")), uint64(testChainSelector)),

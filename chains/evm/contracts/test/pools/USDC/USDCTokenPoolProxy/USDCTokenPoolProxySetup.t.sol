@@ -31,8 +31,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: s_cctpV2Pool,
-        lockReleasePool: s_lockReleasePool
+        cctpV2Pool: s_cctpV2Pool
       })
     );
 

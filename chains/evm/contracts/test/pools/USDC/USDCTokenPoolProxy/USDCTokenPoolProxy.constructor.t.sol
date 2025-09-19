@@ -20,8 +20,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: s_cctpV2Pool,
-        lockReleasePool: s_lockReleasePool
+        cctpV2Pool: s_cctpV2Pool
       })
     );
 
@@ -29,7 +28,6 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     assertEq(pools.legacyCctpV1Pool, s_legacyCctpV1Pool);
     assertEq(pools.cctpV1Pool, s_cctpV1Pool);
     assertEq(pools.cctpV2Pool, s_cctpV2Pool);
-    assertEq(pools.lockReleasePool, s_lockReleasePool);
   }
 
   // Reverts
@@ -40,8 +38,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: address(0),
-        lockReleasePool: s_lockReleasePool
+        cctpV2Pool: address(0)
       })
     );
   }
@@ -53,21 +50,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: address(0),
-        lockReleasePool: s_lockReleasePool
-      })
-    );
-  }
-
-  function test_constructor_RevertWhen_LockReleasePoolIsZero() public {
-    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
-    new USDCTokenPoolProxy(
-      s_USDCToken,
-      USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
-        cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: s_cctpV2Pool,
-        lockReleasePool: address(0)
+        cctpV2Pool: address(0)
       })
     );
   }

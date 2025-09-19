@@ -15,8 +15,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: s_newCctpV2Pool,
-      lockReleasePool: s_newLockReleasePool
+      cctpV2Pool: s_newCctpV2Pool
     });
 
     // Act: Update pool addresses as owner
@@ -28,7 +27,6 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     assertEq(updatedPools.legacyCctpV1Pool, s_legacyCctpV1Pool);
     assertEq(updatedPools.cctpV1Pool, s_newCctpV1Pool);
     assertEq(updatedPools.cctpV2Pool, s_newCctpV2Pool);
-    assertEq(updatedPools.lockReleasePool, s_newLockReleasePool);
   }
 
   // Reverts
@@ -38,8 +36,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: s_newCctpV2Pool,
-      lockReleasePool: s_newLockReleasePool
+      cctpV2Pool: s_newCctpV2Pool
     });
 
     // Act & Assert: Non-owner should not be able to update addresses
@@ -54,8 +51,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: address(0), // Zero address
-      cctpV2Pool: s_newCctpV2Pool,
-      lockReleasePool: s_newLockReleasePool
+      cctpV2Pool: s_newCctpV2Pool
     });
 
     // Act & Assert: Should revert with PoolAddressCannotBeZero error
@@ -70,24 +66,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: address(0), // Zero address
-      lockReleasePool: s_newLockReleasePool
-    });
-
-    // Act & Assert: Should revert with PoolAddressCannotBeZero error
-    changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
-    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
-  }
-
-  // Test that zero address for lock release pool is rejected
-  function test_updatePoolAddresses_RevertWhen_LockReleasePoolIsZero() public {
-    // Arrange: Define test constants
-    USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: s_legacyCctpV1Pool,
-      cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: s_newCctpV2Pool,
-      lockReleasePool: address(0) // Zero address
+      cctpV2Pool: address(0) // Zero address
     });
 
     // Act & Assert: Should revert with PoolAddressCannotBeZero error
@@ -102,8 +81,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: s_newCctpV2Pool,
-      lockReleasePool: s_newLockReleasePool
+      cctpV2Pool: s_newCctpV2Pool
     });
 
     // Act & Assert: Verify PoolAddressesUpdated event is emitted with correct data
