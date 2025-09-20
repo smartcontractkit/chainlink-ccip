@@ -53,7 +53,7 @@ lint: ensure_go_version ensure_golangcilint
 lint-fix: ensure_go_version ensure_golangcilint
 	golangci-lint run -c .golangci.yml --fix
 
-lint-safebigint: ensure_go_version
+lint-safebigint:
 	@echo "Running safebigint linter..."
 	@if command -v safebigint >/dev/null 2>&1; then \
 		safebigint ./... || echo "safebigint found issues. Review the output above."; \
@@ -62,12 +62,16 @@ lint-safebigint: ensure_go_version
 		exit 1; \
 	fi
 
-lint-custom: ensure_go_version
-	@echo "Running custom linters in strict mode..."
-	@if command -v safebigint >/dev/null 2>&1; then safebigint ./...; fi
+lint-goboundcheck:
+	@echo "Running goboundcheck linter..."
+	@if command -v goboundcheck >/dev/null 2>&1; then \
+		goboundcheck ./... || echo "goboundcheck found issues or encountered errors. Review the output above."; \
+	else \
+		echo "goboundcheck not found. Run 'make install-goboundcheck' to install it."; \
+	fi
 
 
-checks: test lint lint-custom
+checks: test lint lint-safebigint
 
 install-protoc:
 	@echo "Downloading and installing protoc for $(ARCH)..."
@@ -86,7 +90,10 @@ install-golangcilint:
 install-safebigint:
 	go install github.com/winder/safebigint/cmd/safebigint@latest
 
-install-custom-linters: install-safebigint
+install-goboundcheck:
+	go install github.com/morgenm/goboundcheck/cmd/goboundcheck@latest
+
+install-custom-linters: install-safebigint install-goboundcheck
 
 install-linters: install-golangcilint install-custom-linters
 
