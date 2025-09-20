@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICCVRampV1} from "../../interfaces/ICCVRampV1.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+
+import {BaseOnRamp} from "../../ccvs/components/BaseOnRamp.sol";
 import {Client} from "../../libraries/Client.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
-import {BaseOnRamp} from "../../onRamp/BaseOnRamp.sol";
 
 /// @notice Test helper contract to expose BaseOnRamp's internal functions for testing
 contract BaseOnRampTestHelper is BaseOnRamp {
@@ -23,11 +26,12 @@ contract BaseOnRampTestHelper is BaseOnRamp {
     _withdrawFeeTokens(feeTokens, feeAggregator);
   }
 
-  function assertSenderIsAllowed(uint64 destChainSelector, address sender) external view {
-    _assertSenderIsAllowed(destChainSelector, sender);
+  function assertSenderIsAllowed(uint64 destChainSelector, address sender, address caller) external view {
+    _assertSenderIsAllowed(destChainSelector, sender, caller);
   }
 
   function forwardToVerifier(
+    address,
     MessageV1Codec.MessageV1 calldata,
     bytes32,
     address,
@@ -37,8 +41,21 @@ contract BaseOnRampTestHelper is BaseOnRamp {
     return "";
   }
 
-  function getFee(uint64, Client.EVM2AnyMessage memory, bytes memory) external pure returns (uint256) {
+  function getFee(address, uint64, Client.EVM2AnyMessage memory, bytes memory) external pure returns (uint256) {
     return 0;
+  }
+
+  function verifyMessage(
+    address originalCaller,
+    MessageV1Codec.MessageV1 memory message,
+    bytes32 messageId,
+    bytes memory ccvData
+  ) external {}
+
+  function supportsInterface(
+    bytes4 interfaceId
+  ) external pure returns (bool) {
+    return interfaceId == type(ICCVRampV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   function typeAndVersion() external pure override returns (string memory) {

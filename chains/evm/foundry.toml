@@ -6,7 +6,7 @@ src = 'contracts'
 test = 'contracts'
 out = 'foundry-artifacts'
 cache_path = 'foundry-cache'
-libs = ['node_modules']
+libs = ["node_modules", "lib"]
 
 bytecode_hash = "none"
 ffi = false
