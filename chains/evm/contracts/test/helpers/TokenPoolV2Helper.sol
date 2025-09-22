@@ -5,8 +5,7 @@ import {Client} from "../../libraries/Client.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPoolV2} from "../../pools/TokenPoolV2.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract TokenPoolV2Helper is TokenPoolV2 {
   constructor(

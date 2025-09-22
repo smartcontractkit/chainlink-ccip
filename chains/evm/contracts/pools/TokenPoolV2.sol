@@ -6,10 +6,8 @@ import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 abstract contract TokenPoolV2 is IPoolV2, TokenPool {
   error DuplicateCCV(address ccv);
@@ -36,7 +34,7 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
     bytes4 interfaceId
   ) public pure virtual override(TokenPool, IERC165) returns (bool) {
     return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == type(IPoolV2).interfaceId
-      || interfaceId == type(IERC165).interfaceId;
+      || super.supportsInterface(interfaceId);
   }
 
   constructor(
