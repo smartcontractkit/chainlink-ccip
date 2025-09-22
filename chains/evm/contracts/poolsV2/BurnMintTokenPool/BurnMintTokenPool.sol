@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {Client} from "../../libraries/Client.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 
@@ -29,12 +28,5 @@ contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
     uint256 amount
   ) internal virtual override {
     IBurnMintERC20(address(i_token)).burn(amount);
-  }
-
-  function getFee(
-    uint64, // destChainSelector
-    Client.EVM2AnyMessage calldata // message
-  ) external view returns (uint256 feeTokenAmount) {
-    return 0;
   }
 }

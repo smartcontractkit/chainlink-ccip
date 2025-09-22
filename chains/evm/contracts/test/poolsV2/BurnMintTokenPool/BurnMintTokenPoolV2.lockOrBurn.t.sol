@@ -93,7 +93,8 @@ contract BurnMintTokenPoolV2_lockOrBurn is BurnMintSetup {
         amount: burnAmount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         localToken: address(s_token)
-      })
+      }),
+      ""
     );
 
     assertEq(s_token.balanceOf(address(s_pool)), 0);

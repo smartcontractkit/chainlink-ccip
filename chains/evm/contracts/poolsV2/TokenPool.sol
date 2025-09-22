@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 
+import {Client} from "../libraries/Client.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {TokenPool as TokenPoolV1} from "../pools/TokenPool.sol";
 
@@ -60,6 +61,8 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   // │                          CCV                                  │
   // ================================================================
 
+  /// @notice Updates the CCV configuration for specified remote chains.
+  /// If the array includes address(0), it indicates that the default CCV should be used alongside any other specified CCVs.
   function applyCCVConfigUpdates(
     CCVConfigArg[] calldata ccvConfigArgs
   ) external virtual onlyOwner {
@@ -88,7 +91,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   function getRequiredInboundCCVs(
     uint64 sourceChainSelector,
     uint256, // amount
-    bytes calldata // tokenArgs
+    bytes calldata // sourcePoolData
   ) external view virtual returns (address[] memory requiredCCVs) {
     return s_verifierConfig[sourceChainSelector].inboundCCVs;
   }
@@ -101,7 +104,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   function getRequiredOutboundCCVs(
     uint64 destChainSelector,
     uint256, // amount
-    bytes calldata // sourcePoolData
+    bytes calldata // tokenArgs
   ) external view virtual returns (address[] memory requiredCCVs) {
     return s_verifierConfig[destChainSelector].outboundCCVs;
   }
@@ -118,5 +121,18 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
         }
       }
     }
+  }
+
+  // ================================================================
+  // │                          Fee                                  │
+  // ================================================================
+
+  // TODO implement fee logic
+
+  function getFee(
+    uint64, // destChainSelector
+    Client.EVM2AnyMessage calldata // message
+  ) external view virtual returns (uint256 feeTokenAmount) {
+    return 0;
   }
 }
