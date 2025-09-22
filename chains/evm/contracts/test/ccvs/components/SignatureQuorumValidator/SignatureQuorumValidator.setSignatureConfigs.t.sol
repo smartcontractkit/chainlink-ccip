@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {SignatureQuorumVerifier} from "../../../../ccvs/components/SignatureQuorumVerifier.sol";
-import {SignatureVerifierSetup} from "./SignatureVerifierSetup.t.sol";
+import {SignatureQuorumValidator} from "../../../../ccvs/components/SignatureQuorumValidator.sol";
+import {SignatureValidatorSetup} from "./SignatureValidatorSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract SignatureQuorumVerifier_setSignatureConfigs is SignatureVerifierSetup {
+contract SignatureQuorumValidator_setSignatureConfigs is SignatureValidatorSetup {
   function test_setSignatureConfig() public {
     address[] memory newSigners = new address[](3);
     newSigners[0] = makeAddr("signer1");
@@ -14,7 +14,7 @@ contract SignatureQuorumVerifier_setSignatureConfigs is SignatureVerifierSetup {
     uint8 newThreshold = 2;
 
     vm.expectEmit();
-    emit SignatureQuorumVerifier.SignatureConfigSet(newSigners, newThreshold);
+    emit SignatureQuorumValidator.SignatureConfigSet(newSigners, newThreshold);
 
     s_sigQuorumVerifier.setSignatureConfig(newSigners, newThreshold);
 
@@ -43,7 +43,7 @@ contract SignatureQuorumVerifier_setSignatureConfigs is SignatureVerifierSetup {
     uint8 newThreshold = 2;
 
     vm.expectEmit();
-    emit SignatureQuorumVerifier.SignatureConfigSet(newSigners, newThreshold);
+    emit SignatureQuorumValidator.SignatureConfigSet(newSigners, newThreshold);
 
     s_sigQuorumVerifier.setSignatureConfig(newSigners, newThreshold);
 
@@ -82,17 +82,17 @@ contract SignatureQuorumVerifier_setSignatureConfigs is SignatureVerifierSetup {
   }
 
   function test_setSignatureConfig_RevertWhen_ThresholdZero() public {
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.InvalidSignatureConfig.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
     s_sigQuorumVerifier.setSignatureConfig(new address[](0), 0);
   }
 
   function test_setSignatureConfig_RevertWhen_ThresholdExceedsSignerCount() public {
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.InvalidSignatureConfig.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
     s_sigQuorumVerifier.setSignatureConfig(new address[](0), 3); // threshold > signers.length
   }
 
   function test_setSignatureConfig_RevertWhen_ZeroAddressSigner() public {
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.OracleCannotBeZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.OracleCannotBeZeroAddress.selector));
     s_sigQuorumVerifier.setSignatureConfig(new address[](1), 1);
   }
 
@@ -103,14 +103,14 @@ contract SignatureQuorumVerifier_setSignatureConfigs is SignatureVerifierSetup {
     signers[1] = duplicateAddress;
     signers[2] = duplicateAddress; // Duplicate.
 
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.InvalidSignatureConfig.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
     s_sigQuorumVerifier.setSignatureConfig(signers, 2);
   }
 
   function test_setSignatureConfig_RevertWhen_EmptySignerArray() public {
     address[] memory signers = new address[](0);
 
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.InvalidSignatureConfig.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
     s_sigQuorumVerifier.setSignatureConfig(signers, 1);
   }
 }

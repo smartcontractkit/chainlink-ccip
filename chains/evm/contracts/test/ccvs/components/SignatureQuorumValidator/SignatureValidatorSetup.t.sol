@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {BaseTest} from "../../../BaseTest.t.sol";
-import {SignatureQuorumVerifierHelper} from "../../../helpers/SignatureQuorumVerifierHelper.sol";
+import {SignatureQuorumValidatorHelper} from "../../../helpers/SignatureQuorumValidatorHelper.sol";
 
-contract SignatureVerifierSetup is BaseTest {
+contract SignatureValidatorSetup is BaseTest {
   // 4 hardcoded private keys that are chosen to work with v=27 ecrecover
   // and have addresses in ascending order after sorting.
   uint256 internal constant PRIVATE_KEY_0 = 0x60b919c82f0b4791a5b7c6a7275970ace1748759ebdaa8a5c3a4b2f5a8b1e8d1;
@@ -18,7 +18,7 @@ contract SignatureVerifierSetup is BaseTest {
   bytes32 internal constant DEFAULT_CONFIG_DIGEST = keccak256(abi.encode("defaultConfigDigest"));
 
   bytes internal constant REPORT = abi.encode("testReport");
-  SignatureQuorumVerifierHelper internal s_sigQuorumVerifier;
+  SignatureQuorumValidatorHelper internal s_sigQuorumVerifier;
 
   function setUp() public virtual override {
     BaseTest.setUp();
@@ -40,7 +40,7 @@ contract SignatureVerifierSetup is BaseTest {
     // Sort signers and keys by address to ensure proper ordering.
     _sortSignersByAddress();
 
-    s_sigQuorumVerifier = new SignatureQuorumVerifierHelper();
+    s_sigQuorumVerifier = new SignatureQuorumValidatorHelper();
     s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 1);
   }
 
@@ -63,7 +63,7 @@ contract SignatureVerifierSetup is BaseTest {
     }
   }
 
-  /// @notice Helper to create a signature with v=27 (required by SignatureQuorumVerifier)
+  /// @notice Helper to create a signature with v=27 (required by SignatureQuorumValidator)
   /// @param privateKey The private key to sign with
   /// @param hash The hash to sign
   /// @return r The r component of the signature
@@ -71,7 +71,7 @@ contract SignatureVerifierSetup is BaseTest {
   function _signWithV27(uint256 privateKey, bytes32 hash) internal pure returns (bytes32 r, bytes32 s) {
     (uint8 v, bytes32 _r, bytes32 _s) = vm.sign(privateKey, hash);
 
-    // SignatureQuorumVerifier only supports sigs with v=27, so adjust if necessary.
+    // SignatureQuorumValidator only supports sigs with v=27, so adjust if necessary.
     // Any valid ECDSA sig (r, s, v) can be "flipped" into (r, s*, v*) without knowing the private key.
     // https://github.com/kadenzipfel/smart-contract-vulnerabilities/blob/master/vulnerabilities/signature-malleability.md
     if (v == 28) {

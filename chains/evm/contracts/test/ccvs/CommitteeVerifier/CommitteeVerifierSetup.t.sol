@@ -103,7 +103,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
     );
   }
 
-  /// @notice Helper to create a signature with v=27 (required by SignatureQuorumVerifier).
+  /// @notice Helper to create a signature with v=27 (required by SignatureQuorumValidator).
   /// @param privateKey The private key to sign with.
   /// @param hash The hash to sign.
   /// @return r The r component of the signature.
@@ -111,7 +111,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
   function _signWithV27(uint256 privateKey, bytes32 hash) internal pure returns (bytes32 r, bytes32 s) {
     (uint8 v, bytes32 _r, bytes32 _s) = vm.sign(privateKey, hash);
 
-    // SignatureQuorumVerifier only supports sigs with v=27, so adjust if necessary.
+    // SignatureQuorumValidator only supports sigs with v=27, so adjust if necessary.
     // Any valid ECDSA sig (r, s, v) can be "flipped" into (r, s*, v*) without knowing the private key.
     // https://github.com/kadenzipfel/smart-contract-vulnerabilities/blob/master/vulnerabilities/signature-malleability.md
     if (v == 28) {

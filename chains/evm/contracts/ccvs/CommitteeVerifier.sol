@@ -6,7 +6,7 @@ import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {Client} from "../libraries/Client.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
-import {SignatureQuorumVerifier} from "./components/SignatureQuorumVerifier.sol";
+import {SignatureQuorumValidator} from "./components/SignatureQuorumValidator.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
@@ -14,7 +14,7 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 
 /// @notice The CommitteeVerifier is a contract that handles lane-specific fee logic and message verification.
 /// @dev Source and destination responsibilities are combined to enable a single proxy address for a CCV on each chain.
-contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, SignatureQuorumVerifier, BaseVerifier {
+contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, SignatureQuorumValidator, BaseVerifier {
   error InvalidConfig();
   error InvalidCCVData();
   error OnlyCallableByOwnerOrAllowlistAdmin();
@@ -41,12 +41,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     DynamicConfig memory dynamicConfig
   ) {
     _setDynamicConfig(dynamicConfig);
-  }
-
-  function supportsInterface(
-    bytes4 interfaceId
-  ) external pure returns (bool) {
-    return interfaceId == type(ICrossChainVerifierV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -161,5 +155,15 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     address[] calldata feeTokens
   ) external {
     _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
+  }
+
+  // ================================================================
+  // │                        Introspection                         │
+  // ================================================================
+
+  function supportsInterface(
+    bytes4 interfaceId
+  ) external pure returns (bool) {
+    return interfaceId == type(ICrossChainVerifierV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 }

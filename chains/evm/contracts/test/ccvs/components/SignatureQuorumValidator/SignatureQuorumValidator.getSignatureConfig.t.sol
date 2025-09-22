@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {SignatureQuorumVerifierHelper} from "../../../helpers/SignatureQuorumVerifierHelper.sol";
-import {SignatureVerifierSetup} from "./SignatureVerifierSetup.t.sol";
+import {SignatureQuorumValidatorHelper} from "../../../helpers/SignatureQuorumValidatorHelper.sol";
+import {SignatureValidatorSetup} from "./SignatureValidatorSetup.t.sol";
 
-contract SignatureQuorumVerifier_getSignatureConfig is SignatureVerifierSetup {
+contract SignatureQuorumValidator_getSignatureConfig is SignatureValidatorSetup {
   function test_getSignatureConfig_InitialState() public view {
     (address[] memory signers, uint8 threshold) = s_sigQuorumVerifier.getSignatureConfig();
 
@@ -37,7 +37,7 @@ contract SignatureQuorumVerifier_getSignatureConfig is SignatureVerifierSetup {
 
   function test_getSignatureConfig_EmptyConfiguration() public {
     // Deploy new verifier with no initial setup.
-    SignatureQuorumVerifierHelper newVerifier = new SignatureQuorumVerifierHelper();
+    SignatureQuorumValidatorHelper newVerifier = new SignatureQuorumValidatorHelper();
 
     (address[] memory signers, uint8 threshold) = newVerifier.getSignatureConfig();
 

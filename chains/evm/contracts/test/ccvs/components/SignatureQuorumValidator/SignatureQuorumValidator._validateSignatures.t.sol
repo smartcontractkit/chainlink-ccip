@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {SignatureQuorumVerifier} from "../../../../ccvs/components/SignatureQuorumVerifier.sol";
-import {SignatureQuorumVerifierHelper} from "../../../helpers/SignatureQuorumVerifierHelper.sol";
-import {SignatureVerifierSetup} from "./SignatureVerifierSetup.t.sol";
+import {SignatureQuorumValidator} from "../../../../ccvs/components/SignatureQuorumValidator.sol";
+import {SignatureQuorumValidatorHelper} from "../../../helpers/SignatureQuorumValidatorHelper.sol";
+import {SignatureValidatorSetup} from "./SignatureValidatorSetup.t.sol";
 
-contract SignatureQuorumVerifier_validateSignatures is SignatureVerifierSetup {
+contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup {
   bytes32 internal constant TEST_HASH = keccak256("test message");
 
   function _createSignatures(uint256[] memory signerKeys, bytes32 hash) internal pure returns (bytes memory) {
@@ -51,9 +51,9 @@ contract SignatureQuorumVerifier_validateSignatures is SignatureVerifierSetup {
 
   function test_validateSignatures_RevertWhen_NoSignersConfigured() public {
     // Deploy new verifier with no signers.
-    SignatureQuorumVerifierHelper newVerifier = new SignatureQuorumVerifierHelper();
+    SignatureQuorumValidatorHelper newVerifier = new SignatureQuorumValidatorHelper();
 
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.InvalidSignatureConfig.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
     newVerifier.validateSignatures(TEST_HASH, "");
   }
 
@@ -69,7 +69,7 @@ contract SignatureQuorumVerifier_validateSignatures is SignatureVerifierSetup {
     uint256 newChainId = originalChainId + 100000;
     vm.chainId(newChainId);
 
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.ForkedChain.selector, originalChainId, newChainId));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.ForkedChain.selector, originalChainId, newChainId));
     s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
   }
 
@@ -83,7 +83,7 @@ contract SignatureQuorumVerifier_validateSignatures is SignatureVerifierSetup {
 
     bytes memory signatures = _createSignatures(signerKeys, TEST_HASH);
 
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.WrongNumberOfSignatures.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.WrongNumberOfSignatures.selector));
     s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
   }
 
@@ -97,7 +97,7 @@ contract SignatureQuorumVerifier_validateSignatures is SignatureVerifierSetup {
 
     bytes memory signatures = _createSignatures(signerKeys, TEST_HASH);
 
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.UnauthorizedSigner.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.UnauthorizedSigner.selector));
     s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
   }
 
@@ -122,7 +122,7 @@ contract SignatureQuorumVerifier_validateSignatures is SignatureVerifierSetup {
     (bytes32 r0, bytes32 s0) = _signWithV27(key0, TEST_HASH);
     bytes memory signatures = abi.encodePacked(r1, s1, r0, s0);
 
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.NonOrderedOrNonUniqueSignatures.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.NonOrderedOrNonUniqueSignatures.selector));
     s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
   }
 
@@ -133,7 +133,7 @@ contract SignatureQuorumVerifier_validateSignatures is SignatureVerifierSetup {
     (bytes32 r, bytes32 s) = _signWithV27(s_validSignerKeys[0], TEST_HASH);
     bytes memory signatures = abi.encodePacked(r, s, r, s); // Same signature twice.
 
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.NonOrderedOrNonUniqueSignatures.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.NonOrderedOrNonUniqueSignatures.selector));
     s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
   }
 
@@ -143,7 +143,7 @@ contract SignatureQuorumVerifier_validateSignatures is SignatureVerifierSetup {
     // Create signature with wrong length (63 bytes instead of 64).
     bytes memory invalidSignature = new bytes(63);
 
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumVerifier.WrongNumberOfSignatures.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.WrongNumberOfSignatures.selector));
     s_sigQuorumVerifier.validateSignatures(TEST_HASH, invalidSignature);
   }
 }

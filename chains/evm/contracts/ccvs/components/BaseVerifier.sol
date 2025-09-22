@@ -94,11 +94,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     }
   }
 
-  function _assertSenderIsAllowed(
-    uint64 destChainSelector,
-    address messageSender,
-    address verifierCaller
-  ) internal view {
+  function _assertSenderIsAllowed(uint64 destChainSelector, address sender, address verifierCaller) internal view {
     DestChainConfig storage destChainConfig = _getDestChainConfig(destChainSelector);
     // CCVs should query the CCVProxy address from the router, this allows for CCVProxy updates without touching CCVs
     // CCVProxy address may be zero intentionally to pause, which should stop all messages.
@@ -107,8 +103,8 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     }
 
     if (destChainConfig.allowlistEnabled) {
-      if (!destChainConfig.allowedSendersList.contains(messageSender)) {
-        revert SenderNotAllowed(messageSender);
+      if (!destChainConfig.allowedSendersList.contains(sender)) {
+        revert SenderNotAllowed(sender);
       }
     }
   }
