@@ -6,6 +6,8 @@ import {IPoolV1} from "./IPool.sol";
 import {Client} from "../libraries/Client.sol";
 import {Pool} from "../libraries/Pool.sol";
 
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+
 // TODO Milestone 2: implement.
 /// @notice Shared public interface for multiple V2 pool types.
 /// Each pool type handles a different child token model e.g. lock/unlock, mint/burn.

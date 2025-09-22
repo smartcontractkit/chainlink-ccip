@@ -6,8 +6,7 @@ import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 
 import {BurnMintFastTransferTokenPoolSetup} from "./BurnMintFastTransferTokenPoolSetup.t.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferTokenPoolSetup {
   uint256 internal constant CCIP_SEND_FEE = 1 ether;

@@ -4,8 +4,7 @@ pragma solidity ^0.8.24;
 import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageReceiverV2.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {BaseTest} from "../../BaseTest.t.sol";

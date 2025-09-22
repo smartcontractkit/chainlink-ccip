@@ -12,8 +12,7 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
 
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
   function setUp() public virtual override {

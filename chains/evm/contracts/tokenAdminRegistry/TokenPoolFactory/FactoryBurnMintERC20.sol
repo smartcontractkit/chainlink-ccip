@@ -5,30 +5,18 @@ import {IGetCCIPAdmin} from "../../interfaces/IGetCCIPAdmin.sol";
 import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {HyperEVMLinker} from "./HyperEVMLinker.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {ERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {ERC20Burnable} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
-import {EnumerableSet} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {ERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {ERC20Burnable} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/ERC20Burnable.sol";
+import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The constructor has been modified to support the deployment pattern used by a factory contract.
 /// @dev The total supply can be limited during deployment.
-contract FactoryBurnMintERC20 is
-  IBurnMintERC20,
-  IGetCCIPAdmin,
-  IERC165,
-  ERC20Burnable,
-  Ownable2StepMsgSender,
-  HyperEVMLinker
-{
+contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Burnable, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error SenderNotMinter(address sender);
@@ -69,6 +57,8 @@ contract FactoryBurnMintERC20 is
     i_maxSupply = maxSupply_;
 
     s_ccipAdmin = newOwner;
+
+    if (preMint > maxSupply_) revert MaxSupplyExceeded(preMint);
 
     // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero
     if (preMint != 0) _mint(newOwner, preMint);
