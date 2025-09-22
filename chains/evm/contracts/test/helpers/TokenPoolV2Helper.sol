@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
-import {TokenPool} from "../../poolsv2/TokenPool.sol";
+import {TokenPool} from "../../poolsV2/TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 

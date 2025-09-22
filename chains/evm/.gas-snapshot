@@ -20,6 +20,7 @@ BurnMintFastTransferTokenPool_withdrawPoolFees_Test:test_withdrawPoolFees_ZeroFe
 BurnMintTokenPoolV2_lockOrBurn:test_constructor() (gas: 16750)
 BurnMintTokenPoolV2_lockOrBurn:test_lockOrBurn() (gas: 243290)
 BurnMintTokenPoolV2_lockOrBurn:test_lockOrBurn_V2() (gas: 243308)
+BurnMintTokenPoolV2_releaseOrMint:test_getFee() (gas: 9787)
 BurnMintTokenPoolV2_releaseOrMint:test_releaseOrMint() (gas: 105102)
 BurnMintTokenPool_lockOrBurn:test_constructor() (gas: 16508)
 BurnMintTokenPool_lockOrBurn:test_lockOrBurn_() (gas: 243286)
