@@ -12,10 +12,9 @@ import {IERC165} from
   "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 abstract contract TokenPoolV2 is IPoolV2, TokenPool {
-  error CCVArrayCannotBeEmpty();
   error DuplicateCCV(address ccv);
 
-  event CCVConfigUpdated(uint64 indexed destChainSelector, CCVConfig ccvConfig);
+  event CCVConfigUpdated(uint64 indexed destChainSelector, address[] outboundCCVs, address[] inboundCCVs);
 
   struct CCVConfigArg {
     uint64 remoteChainSelector;
@@ -54,7 +53,7 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
 
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    bytes calldata /* tokenArgs */
+    bytes calldata // tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
     _lockOrBurn(lockOrBurnIn.amount);
@@ -77,16 +76,12 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
   // ================================================================
 
   function applyCCVConfigUpdates(
-    CCVConfigArg[] calldata verifierConfigArgs
+    CCVConfigArg[] calldata ccvConfigArgs
   ) external virtual onlyOwner {
-    for (uint256 i = 0; i < verifierConfigArgs.length; ++i) {
-      uint64 remoteChainSelector = verifierConfigArgs[i].remoteChainSelector;
-      if (!isSupportedChain(remoteChainSelector)) {
-        revert NonExistentChain(remoteChainSelector);
-      }
-
-      address[] calldata outboundCCVs = verifierConfigArgs[i].outboundCCVs;
-      address[] calldata inboundCCVs = verifierConfigArgs[i].inboundCCVs;
+    for (uint256 i = 0; i < ccvConfigArgs.length; ++i) {
+      uint64 remoteChainSelector = ccvConfigArgs[i].remoteChainSelector;
+      address[] calldata outboundCCVs = ccvConfigArgs[i].outboundCCVs;
+      address[] calldata inboundCCVs = ccvConfigArgs[i].inboundCCVs;
 
       // Validate and check for duplicates in outbound CCVs
       _validateCCVArray(outboundCCVs);
@@ -95,7 +90,7 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
       _validateCCVArray(inboundCCVs);
 
       CCVConfig memory ccvConfig = CCVConfig({outboundCCVs: outboundCCVs, inboundCCVs: inboundCCVs});
-      emit CCVConfigUpdated(remoteChainSelector, ccvConfig);
+      emit CCVConfigUpdated(remoteChainSelector, outboundCCVs, inboundCCVs);
       s_verifierConfig[remoteChainSelector] = ccvConfig;
     }
   }
@@ -108,8 +103,8 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredInboundCCVs(
     uint64 sourceChainSelector,
-    uint256,
-    bytes calldata
+    uint256, // amount
+    bytes calldata // tokenArgs
   ) external view virtual returns (address[] memory requiredCCVs) {
     return s_verifierConfig[sourceChainSelector].inboundCCVs;
   }
@@ -128,21 +123,12 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
     return s_verifierConfig[destChainSelector].outboundCCVs;
   }
 
-  /// @notice Validates a CCV array for zero addresses and duplicates.
+  /// @notice Checks a CCV address array for duplicate entries.
   /// @param ccvs The array of CCV addresses to validate.
   function _validateCCVArray(
     address[] calldata ccvs
   ) private pure {
-    if (ccvs.length == 0) {
-      revert CCVArrayCannotBeEmpty();
-    }
-
     for (uint256 i = 0; i < ccvs.length; ++i) {
-      if (ccvs[i] == address(0)) {
-        revert ZeroAddressInvalid();
-      }
-
-      // Check for duplicates within the array
       for (uint256 j = i + 1; j < ccvs.length; ++j) {
         if (ccvs[i] == ccvs[j]) {
           revert DuplicateCCV(ccvs[i]);

@@ -28,9 +28,7 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     });
 
     vm.expectEmit();
-    emit TokenPoolV2.CCVConfigUpdated(
-      DEST_CHAIN_SELECTOR, TokenPoolV2.CCVConfig({outboundCCVs: outboundCCVs, inboundCCVs: inboundCCVs})
-    );
+    emit TokenPoolV2.CCVConfigUpdated(DEST_CHAIN_SELECTOR, outboundCCVs, inboundCCVs);
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
     // Verify the configuration was stored correctly.
@@ -53,90 +51,6 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     TokenPoolV2.CCVConfigArg[] memory configArgs;
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
-  }
-
-  function test_applyCCVConfigUpdate_RevertWhen_NonExistentChain() public {
-    uint64 nonExistentChain = 99999;
-
-    TokenPoolV2.CCVConfigArg[] memory configArgs = new TokenPoolV2.CCVConfigArg[](1);
-    address[] memory ccvs = new address[](1);
-    ccvs[0] = ccv1;
-
-    configArgs[0] =
-      TokenPoolV2.CCVConfigArg({remoteChainSelector: nonExistentChain, outboundCCVs: ccvs, inboundCCVs: ccvs});
-
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, nonExistentChain));
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
-  }
-
-  function test_applyCCVConfigUpdate_RevertWhen_CCVArrayCannotBeEmpty_Outbound() public {
-    TokenPoolV2.CCVConfigArg[] memory configArgs = new TokenPoolV2.CCVConfigArg[](1);
-    address[] memory emptyCCVs = new address[](0);
-    address[] memory validCCVs = new address[](1);
-    validCCVs[0] = ccv1;
-
-    configArgs[0] = TokenPoolV2.CCVConfigArg({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      outboundCCVs: emptyCCVs, // Empty array
-      inboundCCVs: validCCVs
-    });
-
-    vm.expectRevert(TokenPoolV2.CCVArrayCannotBeEmpty.selector);
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
-  }
-
-  function test_applyCCVConfigUpdate_RevertWhen_CCVArrayCannotBeEmpty_Outbound_Inbound() public {
-    TokenPoolV2.CCVConfigArg[] memory configArgs = new TokenPoolV2.CCVConfigArg[](1);
-    address[] memory emptyCCVs = new address[](0);
-    address[] memory validCCVs = new address[](1);
-    validCCVs[0] = ccv1;
-
-    configArgs[0] = TokenPoolV2.CCVConfigArg({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      outboundCCVs: validCCVs,
-      inboundCCVs: emptyCCVs // Empty array
-    });
-
-    vm.expectRevert(TokenPoolV2.CCVArrayCannotBeEmpty.selector);
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
-  }
-
-  function test_applyCCVConfigUpdate_RevertWhen_ZeroAddressInvalid_OutboundCCVs() public {
-    TokenPoolV2.CCVConfigArg[] memory configArgs = new TokenPoolV2.CCVConfigArg[](1);
-    address[] memory invalidOutbound = new address[](2);
-    invalidOutbound[0] = ccv1;
-    invalidOutbound[1] = address(0); // Zero address
-
-    address[] memory validInbound = new address[](1);
-    validInbound[0] = ccv2;
-
-    configArgs[0] = TokenPoolV2.CCVConfigArg({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      outboundCCVs: invalidOutbound,
-      inboundCCVs: validInbound
-    });
-
-    vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
-  }
-
-  function test_applyCCVConfigUpdate_RevertWhen_ZeroAddressInvalid_InboundCCVs() public {
-    TokenPoolV2.CCVConfigArg[] memory configArgs = new TokenPoolV2.CCVConfigArg[](1);
-    address[] memory validOutbound = new address[](1);
-    validOutbound[0] = ccv1;
-
-    address[] memory invalidInbound = new address[](2);
-    invalidInbound[0] = ccv2;
-    invalidInbound[1] = address(0); // Zero address
-
-    configArgs[0] = TokenPoolV2.CCVConfigArg({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      outboundCCVs: validOutbound,
-      inboundCCVs: invalidInbound
-    });
-
-    vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
     s_tokenPool.applyCCVConfigUpdates(configArgs);
   }
 

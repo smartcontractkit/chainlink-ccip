@@ -23,7 +23,7 @@ contract TokenPoolV2Helper is TokenPoolV2 {
     address,
     Client.EVMTokenAmount[] calldata,
     bytes calldata
-  ) external view returns (Pool.Quote memory quote) {
+  ) external pure returns (Pool.Quote memory quote) {
     return quote;
   }
 }
