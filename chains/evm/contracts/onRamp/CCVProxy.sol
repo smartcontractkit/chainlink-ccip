@@ -12,7 +12,6 @@ import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
-import {Internal} from "../libraries/Internal.sol";
 
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
@@ -60,8 +59,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
     bytes encodedMessage,
-    Internal.Receipt[] verifierReceipts,
-    Internal.Receipt executorReceipt,
+    Receipt[] verifierReceipts,
+    Receipt executorReceipt,
     bytes[] receiptBlobs
   );
 
@@ -104,6 +103,15 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address defaultExecutor;
     bytes ccvAggregator; // Destination ccvAggregator address, NOT abi encoded but raw bytes.
+  }
+
+  /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
+  struct Receipt {
+    address issuer; // The address of the entity that issued the receipt.
+    uint64 destGasLimit; // The gas limit for the actions taken on the destination chain for this entity.
+    uint32 destBytesOverhead; // The byte overhead for the actions taken on the destination chain for this entity.
+    uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
+    bytes extraArgs; // Extra args that have been passed in on the source chain.
   }
 
   // STATIC CONFIG
@@ -212,12 +220,12 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     // 3. getFee on all verifiers & executor.
 
-    Internal.Receipt[] memory verifierReceipts =
-      new Internal.Receipt[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
+    Receipt[] memory verifierReceipts =
+      new Receipt[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
 
     for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory verifier = resolvedExtraArgs.requiredCCV[i];
-      verifierReceipts[i] = Internal.Receipt({
+      verifierReceipts[i] = Receipt({
         issuer: verifier.ccvAddress,
         destGasLimit: 0, // TODO
         destBytesOverhead: 0, // TODO
@@ -228,7 +236,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
       Client.CCV memory verifier = resolvedExtraArgs.optionalCCV[i];
-      verifierReceipts[resolvedExtraArgs.requiredCCV.length + i] = Internal.Receipt({
+      verifierReceipts[resolvedExtraArgs.requiredCCV.length + i] = Receipt({
         issuer: verifier.ccvAddress,
         destGasLimit: 0, // TODO
         destBytesOverhead: 0, // TODO
@@ -237,7 +245,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       });
     }
 
-    Internal.Receipt memory executorReceipt = Internal.Receipt({
+    Receipt memory executorReceipt = Receipt({
       issuer: resolvedExtraArgs.executor,
       destGasLimit: 0, // TODO
       destBytesOverhead: 0, // TODO
@@ -267,19 +275,18 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
     bytes32 messageId = keccak256(encodedMessage);
-    bytes[] memory receiptBlobs =
-      new bytes[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
+    bytes[] memory ccvBlobs = new bytes[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
 
     // 6. call each verifier.
 
     for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
-      receiptBlobs[i] =
+      ccvBlobs[i] =
         ICCVOnRampV1(ccv.ccvAddress).forwardToVerifier(newMessage, messageId, feeToken, feeTokenAmount, ccv.args);
     }
     for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
       Client.CCV memory ccvOpt = resolvedExtraArgs.optionalCCV[i];
-      receiptBlobs[resolvedExtraArgs.requiredCCV.length + i] =
+      ccvBlobs[resolvedExtraArgs.requiredCCV.length + i] =
         ICCVOnRampV1(ccvOpt.ccvAddress).forwardToVerifier(newMessage, messageId, feeToken, feeTokenAmount, ccvOpt.args);
     }
 
@@ -291,7 +298,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       encodedMessage,
       verifierReceipts,
       executorReceipt,
-      receiptBlobs
+      ccvBlobs
     );
 
     s_dynamicConfig.reentrancyGuardEntered = false;
