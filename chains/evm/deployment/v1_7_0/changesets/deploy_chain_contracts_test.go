@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -163,9 +163,9 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 					ExecutorOnRamp: sequences.ExecutorOnRampParams{
 						MaxCCVsPerMsg: 10,
 					},
-					CommitteeRamp: sequences.CommitteeRampParams{
+					CommitteeVerifier: sequences.CommitteeVerifierParams{
 						FeeAggregator: common.HexToAddress("0x01"),
-						SignatureConfigArgs: committee_ramp.SetSignatureConfigArgs{
+						SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
 							Threshold: 1,
 							Signers: []common.Address{
 								common.HexToAddress("0x02"),

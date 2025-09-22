@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
@@ -79,9 +79,9 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 					Params: sequences.ContractParams{
 						RMNRemote:     sequences.RMNRemoteParams{},
 						CCVAggregator: sequences.CCVAggregatorParams{},
-						CommitteeRamp: sequences.CommitteeRampParams{
+						CommitteeVerifier: sequences.CommitteeVerifierParams{
 							FeeAggregator: common.HexToAddress("0x01"),
-							SignatureConfigArgs: committee_ramp.SetSignatureConfigArgs{
+							SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
 								Threshold: 1,
 								Signers: []common.Address{
 									common.HexToAddress("0x02"),
@@ -127,16 +127,16 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 							Version: semver.MustParse("1.7.0"),
 						},
 						DefaultCCVOffRamps: []datastore.AddressRef{
-							{Type: datastore.ContractType(committee_ramp.ContractType), Version: semver.MustParse("1.7.0")},
+							{Type: datastore.ContractType(committee_verifier.ContractType), Version: semver.MustParse("1.7.0")},
 						},
 						DefaultCCVOnRamps: []datastore.AddressRef{
-							{Type: datastore.ContractType(committee_ramp.ContractType), Version: semver.MustParse("1.7.0")},
+							{Type: datastore.ContractType(committee_verifier.ContractType), Version: semver.MustParse("1.7.0")},
 						},
 						DefaultExecutor: datastore.AddressRef{
 							Type:    datastore.ContractType(executor_onramp.ContractType),
 							Version: semver.MustParse("1.7.0"),
 						},
-						CommitteeRampDestChainConfig: sequences.CommitteeRampDestChainConfig{
+						CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{
 							AllowlistEnabled: false,
 						},
 						FeeQuoterDestChainConfig: fee_quoter_v2.DestChainConfig{

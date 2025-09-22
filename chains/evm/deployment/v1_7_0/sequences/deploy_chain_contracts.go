@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
@@ -35,10 +35,10 @@ type CCVAggregatorParams struct {
 	GasForCallExactCheck uint16
 }
 
-type CommitteeRampParams struct {
+type CommitteeVerifierParams struct {
 	AllowlistAdmin      common.Address
 	FeeAggregator       common.Address
-	SignatureConfigArgs committee_ramp.SetSignatureConfigArgs
+	SignatureConfigArgs committee_verifier.SetSignatureConfigArgs
 }
 
 type CCVProxyParams struct {
@@ -59,12 +59,12 @@ type ExecutorOnRampParams struct {
 }
 
 type ContractParams struct {
-	RMNRemote      RMNRemoteParams
-	CCVAggregator  CCVAggregatorParams
-	CommitteeRamp  CommitteeRampParams
-	CCVProxy       CCVProxyParams
-	FeeQuoter      FeeQuoterParams
-	ExecutorOnRamp ExecutorOnRampParams
+	RMNRemote         RMNRemoteParams
+	CCVAggregator     CCVAggregatorParams
+	CommitteeVerifier CommitteeVerifierParams
+	CCVProxy          CCVProxyParams
+	FeeQuoter         FeeQuoterParams
+	ExecutorOnRamp    ExecutorOnRampParams
 }
 
 type DeployChainContractsInput struct {
@@ -260,42 +260,42 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, ccvProxyRef)
 
-		// Deploy CommitteeRamp
-		committeeRampRef, err := maybeDeployContract(b, committee_ramp.Deploy, committee_ramp.ContractType, chain, contract.DeployInput[committee_ramp.ConstructorArgs]{
+		// Deploy CommitteeVerifier
+		committeeVerifierRef, err := maybeDeployContract(b, committee_verifier.Deploy, committee_verifier.ContractType, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
 			ChainSelector: chain.Selector,
-			Args: committee_ramp.ConstructorArgs{
-				DynamicConfig: committee_ramp.DynamicConfig{
+			Args: committee_verifier.ConstructorArgs{
+				DynamicConfig: committee_verifier.DynamicConfig{
 					FeeQuoter:      common.HexToAddress(feeQuoterRef.Address),
-					FeeAggregator:  input.ContractParams.CommitteeRamp.FeeAggregator,
-					AllowlistAdmin: input.ContractParams.CommitteeRamp.AllowlistAdmin,
+					FeeAggregator:  input.ContractParams.CommitteeVerifier.FeeAggregator,
+					AllowlistAdmin: input.ContractParams.CommitteeVerifier.AllowlistAdmin,
 				},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
 		}
-		addresses = append(addresses, committeeRampRef)
+		addresses = append(addresses, committeeVerifierRef)
 
-		// Set signature config on the CommitteeRamp
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_ramp.SetSignatureConfigs, chain, contract.FunctionInput[committee_ramp.SetSignatureConfigArgs]{
+		// Set signature config on the CommitteeVerifier
+		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetSignatureConfigs, chain, contract.FunctionInput[committee_verifier.SetSignatureConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeRampRef.Address),
-			Args:          input.ContractParams.CommitteeRamp.SignatureConfigArgs,
+			Address:       common.HexToAddress(committeeVerifierRef.Address),
+			Args:          input.ContractParams.CommitteeVerifier.SignatureConfigArgs,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitteeRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitteeVerifier: %w", err)
 		}
 		writes = append(writes, setSignatureConfigReport.Output)
 
-		// Deploy CommitteeRampProxy
-		committeeRampProxyRef, err := maybeDeployContract(b, committee_ramp.DeployProxy, committee_ramp.ProxyType, chain, contract.DeployInput[common.Address]{
+		// Deploy CommitteeVerifierProxy
+		committeeVerifierProxyRef, err := maybeDeployContract(b, committee_verifier.DeployProxy, committee_verifier.ProxyType, chain, contract.DeployInput[common.Address]{
 			ChainSelector: chain.Selector,
-			Args:          common.HexToAddress(committeeRampRef.Address),
+			Args:          common.HexToAddress(committeeVerifierRef.Address),
 		}, input.ExistingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeRampProxy: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierProxy: %w", err)
 		}
-		addresses = append(addresses, committeeRampProxyRef)
+		addresses = append(addresses, committeeVerifierProxyRef)
 
 		// Deploy ExecutorOnRamp
 		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, executor_onramp.ContractType, chain, contract.DeployInput[executor_onramp.ConstructorArgs]{
@@ -309,11 +309,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, executorOnRampRef)
 
-		// Deploy MockReceiver (defines committee ramp as required)
+		// Deploy MockReceiver (defines committee verifier as required)
 		mockReceiver, err := maybeDeployContract(b, mock_receiver.Deploy, mock_receiver.ContractType, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
 			ChainSelector: chain.Selector,
 			Args: mock_receiver.ConstructorArgs{
-				RequiredVerifiers: []common.Address{common.HexToAddress(committeeRampRef.Address)},
+				RequiredVerifiers: []common.Address{common.HexToAddress(committeeVerifierRef.Address)},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {

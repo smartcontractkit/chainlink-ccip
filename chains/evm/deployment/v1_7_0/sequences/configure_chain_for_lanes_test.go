@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
@@ -72,9 +72,9 @@ func TestConfigureChainForLanes(t *testing.T) {
 					ContractParams: sequences.ContractParams{
 						RMNRemote:     sequences.RMNRemoteParams{},
 						CCVAggregator: sequences.CCVAggregatorParams{},
-						CommitteeRamp: sequences.CommitteeRampParams{
+						CommitteeVerifier: sequences.CommitteeVerifierParams{
 							FeeAggregator: common.HexToAddress("0x01"),
-							SignatureConfigArgs: committee_ramp.SetSignatureConfigArgs{
+							SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
 								Threshold: 1,
 								Signers: []common.Address{
 									common.HexToAddress("0x02"),
@@ -107,7 +107,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			var ccvProxy common.Address
 			var feeQuoter common.Address
 			var ccvAggregator common.Address
-			var committeeRamp common.Address
+			var committeeVerifier common.Address
 			var executorOnRamp common.Address
 			for _, addr := range deploymentReport.Output.Addresses {
 				switch addr.Type {
@@ -119,8 +119,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 					feeQuoter = common.HexToAddress(addr.Address)
 				case datastore.ContractType(ccv_aggregator.ContractType):
 					ccvAggregator = common.HexToAddress(addr.Address)
-				case datastore.ContractType(committee_ramp.ContractType):
-					committeeRamp = common.HexToAddress(addr.Address)
+				case datastore.ContractType(committee_verifier.ContractType):
+					committeeVerifier = common.HexToAddress(addr.Address)
 				case datastore.ContractType(executor_onramp.ContractType):
 					executorOnRamp = common.HexToAddress(addr.Address)
 				}
@@ -153,21 +153,21 @@ func TestConfigureChainForLanes(t *testing.T) {
 				sequences.ConfigureChainForLanes,
 				evmChain,
 				sequences.ConfigureChainForLanesInput{
-					ChainSelector: chainSelector,
-					Router:        r,
-					CCVProxy:      ccvProxy,
-					CommitteeRamp: committeeRamp,
-					FeeQuoter:     feeQuoter,
-					CCVAggregator: ccvAggregator,
+					ChainSelector:     chainSelector,
+					Router:            r,
+					CCVProxy:          ccvProxy,
+					CommitteeVerifier: committeeVerifier,
+					FeeQuoter:         feeQuoter,
+					CCVAggregator:     ccvAggregator,
 					RemoteChains: map[uint64]sequences.RemoteChainConfig{
 						remoteChainSelector: {
-							AllowTrafficFrom:             true,
-							CCIPMessageSource:            ccipMessageSource,
-							CCIPMessageDest:              ccipMessageDest,
-							DefaultCCVOffRamps:           []common.Address{committeeRamp},
-							DefaultCCVOnRamps:            []common.Address{committeeRamp},
-							DefaultExecutor:              executorOnRamp,
-							CommitteeRampDestChainConfig: sequences.CommitteeRampDestChainConfig{},
+							AllowTrafficFrom:                 true,
+							CCIPMessageSource:                ccipMessageSource,
+							CCIPMessageDest:                  ccipMessageDest,
+							DefaultCCVOffRamps:               []common.Address{committeeVerifier},
+							DefaultCCVOnRamps:                []common.Address{committeeVerifier},
+							DefaultExecutor:                  executorOnRamp,
+							CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{},
 							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
 							FeeQuoterDestChainConfig: fqDestChainConfig,
 						},
@@ -204,7 +204,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, ccipMessageSource, sourceChainConfig.Output.OnRamp, "OnRamp in source chain config should match CCVProxy address")
 			require.Len(t, sourceChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in source chain config")
-			require.Equal(t, committeeRamp.Hex(), sourceChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in source chain config should match CommitteeRamp address")
+			require.Equal(t, committeeVerifier.Hex(), sourceChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in source chain config should match CommitteeVerifier address")
 			require.True(t, sourceChainConfig.Output.IsEnabled, "IsEnabled in source chain config should be true")
 			require.Equal(t, r.Hex(), sourceChainConfig.Output.Router.Hex(), "Router in source chain config should match Router address")
 
@@ -219,17 +219,17 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, ccipMessageDest, destChainConfig.Output.CcvAggregator, "CcvAggregator in dest chain config should match CCIPMessageDest")
 			require.Equal(t, executorOnRamp.Hex(), destChainConfig.Output.DefaultExecutor.Hex(), "DefaultExecutor in dest chain config should match configured DefaultExecutor")
 			require.Len(t, destChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in dest chain config")
-			require.Equal(t, committeeRamp.Hex(), destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitteeRamp address")
+			require.Equal(t, committeeVerifier.Hex(), destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitteeVerifier address")
 
-			// Check destChainConfig on CommitteeRamp
-			committeeRampDestChainConfig, err := operations.ExecuteOperation(bundle, committee_ramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+			// Check destChainConfig on CommitteeVerifier
+			committeeVerifierDestChainConfig, err := operations.ExecuteOperation(bundle, committee_verifier.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
-				Address:       committeeRamp,
+				Address:       committeeVerifier,
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, r.Hex(), committeeRampDestChainConfig.Output.Router.Hex(), "Router in CommitteeRamp dest chain config should match Router address")
-			require.False(t, committeeRampDestChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeRamp dest chain config should be false")
+			require.Equal(t, r.Hex(), committeeVerifierDestChainConfig.Output.Router.Hex(), "Router in CommitteeVerifier dest chain config should match Router address")
+			require.False(t, committeeVerifierDestChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier dest chain config should be false")
 
 			// Check dest chains on ExecutorOnRamp
 			executorOnRampDestChains, err := operations.ExecuteOperation(bundle, executor_onramp.GetDestChains, evmChain, contract.FunctionInput[any]{
@@ -255,7 +255,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				message_hasher.ClientEVMExtraArgsV3{
 					RequiredCCV: []message_hasher.ClientCCV{
 						{
-							CcvAddress: committeeRamp,
+							CcvAddress: committeeVerifier,
 							Args:       []byte{},
 						},
 					},

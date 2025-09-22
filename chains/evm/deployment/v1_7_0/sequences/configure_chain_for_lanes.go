@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -18,7 +18,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-type CommitteeRampDestChainConfig struct {
+type CommitteeVerifierDestChainConfig struct {
 	// Whether or not to allow traffic TO the remote chain
 	AllowlistEnabled bool
 	// Addresses that are allowed to send messages TO the remote chain
@@ -46,8 +46,8 @@ type RemoteChainConfig struct {
 	// The executor that will be used for messages TO this remote chain if none is specified
 	// The address corresponds to the ExecutorOnRamp contract
 	DefaultExecutor common.Address
-	// CommitteeRampDestChainConfig configures the CommitteeRamp for this remote chain
-	CommitteeRampDestChainConfig CommitteeRampDestChainConfig
+	// CommitteeVerifierDestChainConfig configures the CommitteeVerifier for this remote chain
+	CommitteeVerifierDestChainConfig CommitteeVerifierDestChainConfig
 	// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
 	FeeQuoterDestChainConfig fee_quoter_v2.DestChainConfig
 }
@@ -61,8 +61,8 @@ type ConfigureChainForLanesInput struct {
 	// The CCVProxy on the EVM chain being configured
 	// Similarly, we assume that all connections will use the same CCVProxy
 	CCVProxy common.Address
-	// The CommitteeRamp on the EVM chain being configured
-	CommitteeRamp common.Address
+	// The CommitteeVerifier on the EVM chain being configured
+	CommitteeVerifier common.Address
 	// The FeeQuoter on the EVM chain being configured
 	FeeQuoter common.Address
 	// The CCVAggregator on the EVM chain being configured
@@ -81,8 +81,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// Create inputs for each operation
 		ccvAggregatorArgs := make([]ccv_aggregator.SourceChainConfigArgs, 0, len(input.RemoteChains))
 		ccvProxyArgs := make([]ccv_proxy.DestChainConfigArgs, 0, len(input.RemoteChains))
-		committeeRampDestConfigArgs := make([]committee_ramp.DestChainConfigArgs, 0, len(input.RemoteChains))
-		committeeRampAllowlistArgs := make([]committee_ramp.AllowlistConfigArgs, 0, len(input.RemoteChains))
+		committeeVerifierDestConfigArgs := make([]committee_verifier.DestChainConfigArgs, 0, len(input.RemoteChains))
+		committeeVerifierAllowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
 		feeQuoterArgs := make([]fee_quoter_v2.DestChainConfigArgs, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
@@ -104,15 +104,15 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				DefaultExecutor:   remoteConfig.DefaultExecutor,
 				CcvAggregator:     remoteConfig.CCIPMessageDest,
 			})
-			committeeRampDestConfigArgs = append(committeeRampDestConfigArgs, committee_ramp.DestChainConfigArgs{
+			committeeVerifierDestConfigArgs = append(committeeVerifierDestConfigArgs, committee_verifier.DestChainConfigArgs{
 				Router:            input.Router,
 				DestChainSelector: remoteSelector,
-				AllowlistEnabled:  remoteConfig.CommitteeRampDestChainConfig.AllowlistEnabled,
+				AllowlistEnabled:  remoteConfig.CommitteeVerifierDestChainConfig.AllowlistEnabled,
 			})
-			committeeRampAllowlistArgs = append(committeeRampAllowlistArgs, committee_ramp.AllowlistConfigArgs{
-				AllowlistEnabled:          remoteConfig.CommitteeRampDestChainConfig.AllowlistEnabled,
-				AddedAllowlistedSenders:   remoteConfig.CommitteeRampDestChainConfig.AddedAllowlistedSenders,
-				RemovedAllowlistedSenders: remoteConfig.CommitteeRampDestChainConfig.RemovedAllowlistedSenders,
+			committeeVerifierAllowlistArgs = append(committeeVerifierAllowlistArgs, committee_verifier.AllowlistConfigArgs{
+				AllowlistEnabled:          remoteConfig.CommitteeVerifierDestChainConfig.AllowlistEnabled,
+				AddedAllowlistedSenders:   remoteConfig.CommitteeVerifierDestChainConfig.AddedAllowlistedSenders,
+				RemovedAllowlistedSenders: remoteConfig.CommitteeVerifierDestChainConfig.RemovedAllowlistedSenders,
 				DestChainSelector:         remoteSelector,
 			})
 			feeQuoterArgs = append(feeQuoterArgs, fee_quoter_v2.DestChainConfigArgs{
@@ -155,16 +155,16 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 		writes = append(writes, ccvProxyReport.Output)
 
-		// ApplyDestChainConfigUpdates on CommitteeRamp
-		committeeRampReport, err := cldf_ops.ExecuteOperation(b, committee_ramp.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]committee_ramp.DestChainConfigArgs]{
+		// ApplyDestChainConfigUpdates on CommitteeVerifier
+		committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.DestChainConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       input.CommitteeRamp,
-			Args:          committeeRampDestConfigArgs,
+			Address:       input.CommitteeVerifier,
+			Args:          committeeVerifierDestConfigArgs,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CommitteeRamp(%s) on chain %s: %w", input.CommitteeRamp, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CommitteeVerifier(%s) on chain %s: %w", input.CommitteeVerifier, chain, err)
 		}
-		writes = append(writes, committeeRampReport.Output)
+		writes = append(writes, committeeVerifierReport.Output)
 
 		// ApplyDestChainUpdates on each ExecutorOnRamp
 		for executorOnRampAddr, destChainSelectorsToAdd := range destChainSelectorsPerExecutor {
@@ -181,16 +181,16 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			writes = append(writes, executorOnRampReport.Output)
 		}
 
-		// ApplyAllowlistUpdates on CommitteeRamp
-		committeeRampAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_ramp.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_ramp.AllowlistConfigArgs]{
+		// ApplyAllowlistUpdates on CommitteeVerifier
+		committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       input.CommitteeRamp,
-			Args:          committeeRampAllowlistArgs,
+			Address:       input.CommitteeVerifier,
+			Args:          committeeVerifierAllowlistArgs,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allowlist updates to CommitteeRamp(%s) on chain %s: %w", input.CommitteeRamp, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allowlist updates to CommitteeVerifier(%s) on chain %s: %w", input.CommitteeVerifier, chain, err)
 		}
-		writes = append(writes, committeeRampAllowlistReport.Output)
+		writes = append(writes, committeeVerifierAllowlistReport.Output)
 
 		// ApplyDestChainConfigUpdates on FeeQuoter
 		feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter_v2.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter_v2.DestChainConfigArgs]{

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICCVRampV1} from "../../../interfaces/ICCVRampV1.sol";
+import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
@@ -56,7 +56,9 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICCVRampV1.verifyMessage, (address(s_agg), message, messageHash, abi.encode("mock ccv data"))),
+      abi.encodeCall(
+        ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageHash, abi.encode("mock ccv data"))
+      ),
       abi.encode(true)
     );
   }
@@ -264,7 +266,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     // Mock validateReport to pass initial checks.
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICCVRampV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
       abi.encode(true)
     );
 
@@ -324,7 +326,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 }
 
-contract ReentrantCCV is ICCVRampV1 {
+contract ReentrantCCV is ICrossChainVerifierV1 {
   CCVAggregator internal immutable i_aggregator;
 
   constructor(
@@ -372,6 +374,6 @@ contract ReentrantCCV is ICCVRampV1 {
   function supportsInterface(
     bytes4 interfaceId
   ) external pure override returns (bool) {
-    return interfaceId == type(ICCVRampV1).interfaceId;
+    return interfaceId == type(ICrossChainVerifierV1).interfaceId;
   }
 }

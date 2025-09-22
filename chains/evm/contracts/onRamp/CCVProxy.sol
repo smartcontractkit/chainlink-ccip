@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICCVRampV1} from "../interfaces/ICCVRampV1.sol";
+import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IExecutorOnRamp} from "../interfaces/IExecutorOnRamp.sol";
 import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
@@ -273,15 +273,14 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     // 6. call each verifier.
     for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
-      receiptBlobs[i] = ICCVRampV1(ccv.ccvAddress).forwardToVerifier(
+      receiptBlobs[i] = ICrossChainVerifierV1(ccv.ccvAddress).forwardToVerifier(
         address(this), newMessage, messageId, feeToken, feeTokenAmount, ccv.args
       );
     }
     for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
       Client.CCV memory ccvOpt = resolvedExtraArgs.optionalCCV[i];
-      receiptBlobs[resolvedExtraArgs.requiredCCV.length + i] = ICCVRampV1(ccvOpt.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, feeToken, feeTokenAmount, ccvOpt.args
-      );
+      receiptBlobs[resolvedExtraArgs.requiredCCV.length + i] = ICrossChainVerifierV1(ccvOpt.ccvAddress)
+        .forwardToVerifier(address(this), newMessage, messageId, feeToken, feeTokenAmount, ccvOpt.args);
     }
 
     // 7. emit event
