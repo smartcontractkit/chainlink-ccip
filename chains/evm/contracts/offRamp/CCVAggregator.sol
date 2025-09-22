@@ -418,9 +418,30 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       mstore(allRequiredCCVs, index)
     }
 
+    // Remove duplicates between required and optional CCVs.
+    uint256 newOptionalLength = optionalCCVs.length;
+    for (uint256 i = 0; i < newOptionalLength; ++i) {
+      for (uint256 j = 0; j < allRequiredCCVs.length;) {
+        if (optionalCCVs[i] == allRequiredCCVs[j]) {
+          // Remove the duplicate by replacing it with the last element and reducing the length of the array.
+          optionalCCVs[i] = optionalCCVs[--newOptionalLength];
+
+          // Since we moved one CCV from optional to required, we can reduce the threshold by one, but not below zero.
+          if (optionalThreshold > 0) {
+            --optionalThreshold;
+          }
+        } else {
+          ++j;
+        }
+      }
+    }
+
+    assembly {
+      // set the length of the array to the new index which we used to track the number of unique CCVs.
+      mstore(optionalCCVs, newOptionalLength)
+    }
+
     // Return the deduplicated required CCVs, the unchanged optional CCVs and the optional threshold.
-    // There can still be duplicates between the required and optional CCVs, but that is handled in
-    // _ensureCCVQuorumIsReached.
     return (allRequiredCCVs, optionalCCVs, optionalThreshold);
   }
 
@@ -440,7 +461,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     ccvsToQuery = new address[](ccvs.length);
     dataIndexes = new uint256[](ccvs.length);
-    bool[] memory ccvAlreadyIncluded = new bool[](ccvs.length);
     uint256 numCCVsToQuery = 0;
 
     for (uint256 i = 0; i < requiredCCV.length; ++i) {
@@ -448,13 +468,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       for (uint256 j = 0; j < ccvs.length; ++j) {
         if (ccvs[j] == requiredCCV[i]) {
           found = true;
-          // If the CCV is already included, we skip it. _getNeededCCVs should already have deduplicated the required
-          // CCVs, but we do this check here to be safe.
-          if (ccvAlreadyIncluded[j]) break;
-
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
           dataIndexes[numCCVsToQuery++] = j;
-          ccvAlreadyIncluded[j] = true;
           break;
         }
       }
@@ -471,11 +486,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
           // again. This means that if a pool would specify a CCV that is also specified as optional by the receiver,
           // it would count towards the threshold as it's still being queried.
           optionalCCVsToFind--;
-          if (ccvAlreadyIncluded[j]) break;
 
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
           dataIndexes[numCCVsToQuery++] = j;
-          ccvAlreadyIncluded[j] = true;
           break;
         }
       }
