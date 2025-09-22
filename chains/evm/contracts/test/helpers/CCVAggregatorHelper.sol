@@ -14,10 +14,10 @@ contract CCVAggregatorHelper is CCVAggregator {
   function ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,
     address receiver,
-    address[] calldata ccvs,
-    address[] memory tokenRequiredCCVs
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
+    address[] calldata ccvs
   ) external view returns (address[] memory, uint256[] memory) {
-    return _ensureCCVQuorumIsReached(sourceChainSelector, receiver, ccvs, tokenRequiredCCVs);
+    return _ensureCCVQuorumIsReached(sourceChainSelector, receiver, tokenTransfer, ccvs);
   }
 
   function getCCVsFromReceiver(

@@ -273,30 +273,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     address receiver = address(bytes20(message.receiver));
 
     {
-      address[] memory requiredPoolCCVs = new address[](0);
-      if (message.tokenTransfer.length > 0) {
-        if (message.tokenTransfer.length != 1) {
-          revert InvalidNumberOfTokens(message.tokenTransfer.length);
-        }
-
-        if (message.tokenTransfer[0].destTokenAddress.length != 20) {
-          revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
-        }
-        address localTokenAddress = address(bytes20(message.tokenTransfer[0].destTokenAddress));
-
-        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
-        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
-        // that do not support the V2 interface.
-        requiredPoolCCVs = _getCCVsFromPool(
-          localTokenAddress,
-          message.sourceChainSelector,
-          message.tokenTransfer[0].amount,
-          message.tokenTransfer[0].extraData
-        );
-      }
-
       (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
-        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, ccvs, requiredPoolCCVs);
+        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, ccvs);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         ICrossChainVerifierV1(ccvsToQuery[i]).verifyMessage({
@@ -355,21 +333,106 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   // │                            CCVs                              │
   // ================================================================
 
+  function getCCVsRequiredForMessage(
+    bytes calldata encodedMessage
+  ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
+    MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
+
+    return _getNeededCCVs(message.sourceChainSelector, address(bytes20(message.receiver)), message.tokenTransfer);
+  }
+
+  function _getNeededCCVs(
+    uint64 sourceChainSelector,
+    address receiver,
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfer
+  ) internal view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
+    address[] memory requiredPoolCCVs = new address[](0);
+    if (tokenTransfer.length > 0) {
+      if (tokenTransfer.length != 1) {
+        revert InvalidNumberOfTokens(tokenTransfer.length);
+      }
+
+      if (tokenTransfer[0].destTokenAddress.length != 20) {
+        revert Internal.InvalidEVMAddress(tokenTransfer[0].destTokenAddress);
+      }
+      address localTokenAddress = address(bytes20(tokenTransfer[0].destTokenAddress));
+
+      // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
+      // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
+      // that do not support the V2 interface.
+      requiredPoolCCVs =
+        _getCCVsFromPool(localTokenAddress, sourceChainSelector, tokenTransfer[0].amount, tokenTransfer[0].extraData);
+    }
+
+    (address[] memory requiredReceiverCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
+      _getCCVsFromReceiver(sourceChainSelector, receiver);
+    address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
+    address[] memory defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
+
+    address[] memory allRequiredCCVs =
+      new address[](requiredReceiverCCV.length + requiredPoolCCVs.length + laneMandatedCCVs.length + defaultCCVs.length);
+
+    uint256 index = 0;
+    for (uint256 i = 0; i < requiredReceiverCCV.length; ++i) {
+      allRequiredCCVs[index++] = requiredReceiverCCV[i];
+    }
+
+    for (uint256 i = 0; i < requiredPoolCCVs.length; ++i) {
+      allRequiredCCVs[index++] = requiredPoolCCVs[i];
+    }
+
+    for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
+      allRequiredCCVs[index++] = laneMandatedCCVs[i];
+    }
+
+    bool defaultsAdded = false;
+
+    // Remove duplicates and add defaults.
+    for (uint256 i = 0; i < index; ++i) {
+      // Address(0) means to add the defaults.
+      if (allRequiredCCVs[i] == address(0)) {
+        // If the defaults have already been added, skip adding them again.
+        if (!defaultsAdded) {
+          for (uint256 j = 0; j < defaultCCVs.length; ++j) {
+            allRequiredCCVs[index++] = defaultCCVs[j];
+          }
+          defaultsAdded = true;
+        }
+        // Remove the zero address by replacing it with the last element and reducing the index.
+        allRequiredCCVs[i] = allRequiredCCVs[--index];
+        continue;
+      }
+
+      // Remove duplicates by replacing them with the last element and reducing the index.
+      for (uint256 j = i + 1; j < index; ++j) {
+        if (allRequiredCCVs[i] == allRequiredCCVs[j]) {
+          allRequiredCCVs[j] = allRequiredCCVs[--index];
+          j--;
+        }
+      }
+    }
+
+    assembly {
+      // set the length of the array to the new index
+      mstore(allRequiredCCVs, index)
+    }
+
+    return (allRequiredCCVs, optionalCCVs, optionalThreshold);
+  }
+
   /// @notice Ensures that the provided CCVs meet the quorum required by the receiver, pool and lane.
   /// @param sourceChainSelector The source chain selector of the message.
   /// @param receiver The receiver of the message.
+  /// @param tokenTransfer The tokens transferred in the message.
   /// @param ccvs The CCVs that provided data for the message.
-  /// @param tokenRequiredCCVs The CCVs required by the pool of the token being transferred. If no token is being
-  /// transferred, this array is empty.
   function _ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,
     address receiver,
-    address[] calldata ccvs,
-    address[] memory tokenRequiredCCVs
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
+    address[] calldata ccvs
   ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndexes) {
     (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
-      _getCCVsFromReceiver(sourceChainSelector, receiver);
-    address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
+      _getNeededCCVs(sourceChainSelector, receiver, tokenTransfer);
 
     ccvsToQuery = new address[](ccvs.length);
     dataIndexes = new uint256[](ccvs.length);
@@ -381,58 +444,18 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       for (uint256 j = 0; j < ccvs.length; ++j) {
         if (ccvs[j] == requiredCCV[i]) {
           found = true;
-          // If the CCV is already included, we skip it.
+          // If the CCV is already included, we skip it. _getNeededCCVs should already have deduplicated the required
+          // CCVs, but we do this check here to be safe.
           if (ccvAlreadyIncluded[j]) break;
 
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndexes[numCCVsToQuery] = j;
+          dataIndexes[numCCVsToQuery++] = j;
           ccvAlreadyIncluded[j] = true;
-          numCCVsToQuery++;
           break;
         }
       }
       if (!found) {
         revert RequiredCCVMissing(requiredCCV[i], false);
-      }
-    }
-
-    for (uint256 i = 0; i < tokenRequiredCCVs.length; ++i) {
-      bool found = false;
-      for (uint256 j = 0; j < ccvs.length; ++j) {
-        if (ccvs[j] == tokenRequiredCCVs[i]) {
-          found = true;
-          // If the CCV is already included, we skip it.
-          if (ccvAlreadyIncluded[j]) break;
-
-          ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndexes[numCCVsToQuery] = j;
-          ccvAlreadyIncluded[j] = true;
-          numCCVsToQuery++;
-          break;
-        }
-      }
-      if (!found) {
-        revert RequiredCCVMissing(tokenRequiredCCVs[i], true);
-      }
-    }
-
-    for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
-      bool found = false;
-      for (uint256 j = 0; j < ccvs.length; ++j) {
-        if (ccvs[j] == laneMandatedCCVs[i]) {
-          found = true;
-          // If the CCV is already included, we skip it.
-          if (ccvAlreadyIncluded[j]) break;
-
-          ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndexes[numCCVsToQuery] = j;
-          ccvAlreadyIncluded[j] = true;
-          numCCVsToQuery++;
-          break;
-        }
-      }
-      if (!found) {
-        revert RequiredCCVMissing(laneMandatedCCVs[i], false);
       }
     }
 
@@ -447,9 +470,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
           if (ccvAlreadyIncluded[j]) break;
 
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndexes[numCCVsToQuery] = j;
+          dataIndexes[numCCVsToQuery++] = j;
           ccvAlreadyIncluded[j] = true;
-          numCCVsToQuery++;
           break;
         }
       }
