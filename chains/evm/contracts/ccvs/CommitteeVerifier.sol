@@ -8,8 +8,6 @@ import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {SignatureQuorumValidator} from "./components/SignatureQuorumValidator.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
-
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 /// @notice The CommitteeVerifier is a contract that handles lane-specific fee logic and message verification.
@@ -37,9 +35,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   // DYNAMIC CONFIG
   DynamicConfig private s_dynamicConfig;
 
-  constructor(
-    DynamicConfig memory dynamicConfig
-  ) {
+  constructor(DynamicConfig memory dynamicConfig, string memory storageLocation) BaseVerifier(storageLocation) {
     _setDynamicConfig(dynamicConfig);
   }
 
@@ -133,6 +129,16 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     _applyAllowlistUpdates(allowlistConfigArgsItems);
   }
 
+  /// @notice Updates the storage location identifier.
+  /// @param newLocation The new storage location identifier.
+  function updateStorageLocation(
+    string memory newLocation
+  ) external onlyOwner {
+    emit BaseVerifier.StorageLocationUpdated(s_storageLocation, newLocation);
+
+    s_storageLocation = newLocation;
+  }
+
   // ================================================================
   // │                             Fees                             │
   // ================================================================
@@ -155,11 +161,5 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     address[] calldata feeTokens
   ) external {
     _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
-  }
-
-  function supportsInterface(
-    bytes4 interfaceId
-  ) external pure returns (bool) {
-    return interfaceId == type(ICrossChainVerifierV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 }

@@ -18,6 +18,8 @@ contract BaseVerifierSetup is FeeQuoterSetup {
   address internal s_ccvProxy;
   address internal s_ccvAggregatorRemote;
 
+  string internal constant STORAGE_LOCATION = "testStorageLocation";
+
   function setUp() public virtual override {
     super.setUp();
 
@@ -29,7 +31,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
     s_ccvAggregatorRemote = makeAddr("CCVAggregatorRemote");
     s_sourceFeeToken = address(new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0));
 
-    s_baseVerifier = new BaseVerifierTestHelper();
+    s_baseVerifier = new BaseVerifierTestHelper(STORAGE_LOCATION);
 
     // Set up initial destination chain config.
     BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
