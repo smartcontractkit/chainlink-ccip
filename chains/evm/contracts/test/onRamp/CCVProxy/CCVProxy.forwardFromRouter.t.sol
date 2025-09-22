@@ -25,7 +25,6 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
       seqNum: 1,
-      feeTokenAmount: 1e17,
       originalSender: STRANGER
     });
 
@@ -60,7 +59,6 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
       seqNum: destConfig.sequenceNumber,
-      feeTokenAmount: 1e17,
       originalSender: STRANGER
     });
 
@@ -82,7 +80,6 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
       seqNum: destConfig.sequenceNumber,
-      feeTokenAmount: 1e17,
       originalSender: STRANGER
     });
 

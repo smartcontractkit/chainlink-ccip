@@ -44,7 +44,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 sequenceNumber);
   error InvalidVerifierSelector(bytes4 selector);
   error ReentrancyGuardReentrantCall();
-  error RequiredCCVMissing(address requiredCCV, bool isPoolCCV);
+  error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
@@ -333,6 +333,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   // │                            CCVs                              │
   // ================================================================
 
+  /// @notice Returns the CCVs required to execute a message. There can be duplicates between the required and optional
+  // CCVs, but all duplicated within the required CCVs are removed.
   function getCCVsRequiredForMessage(
     bytes calldata encodedMessage
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
@@ -345,7 +347,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer
-  ) internal view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
+  ) internal view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
     address[] memory requiredPoolCCVs = new address[](0);
     if (tokenTransfer.length > 0) {
       if (tokenTransfer.length != 1) {
@@ -363,9 +365,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       requiredPoolCCVs =
         _getCCVsFromPool(localTokenAddress, sourceChainSelector, tokenTransfer[0].amount, tokenTransfer[0].extraData);
     }
-
-    (address[] memory requiredReceiverCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
-      _getCCVsFromReceiver(sourceChainSelector, receiver);
+    address[] memory requiredReceiverCCV;
+    (requiredReceiverCCV, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
     address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
     address[] memory defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
 
@@ -413,10 +414,13 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     assembly {
-      // set the length of the array to the new index
+      // set the length of the array to the new index which we used to track the number of unique CCVs.
       mstore(allRequiredCCVs, index)
     }
 
+    // Return the deduplicated required CCVs, the unchanged optional CCVs and the optional threshold.
+    // There can still be duplicates between the required and optional CCVs, but that is handled in
+    // _ensureCCVQuorumIsReached.
     return (allRequiredCCVs, optionalCCVs, optionalThreshold);
   }
 
@@ -455,7 +459,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         }
       }
       if (!found) {
-        revert RequiredCCVMissing(requiredCCV[i], false);
+        revert RequiredCCVMissing(requiredCCV[i]);
       }
     }
 
