@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {TokenPoolV2} from "../../../pools/TokenPoolV2.sol";
+import {TokenPool} from "../../../poolsv2/TokenPool.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
@@ -19,15 +19,15 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     address[] memory inboundCCVs = new address[](1);
     inboundCCVs[0] = s_ccv2;
 
-    TokenPoolV2.CCVConfigArg[] memory configArgs = new TokenPoolV2.CCVConfigArg[](1);
-    configArgs[0] = TokenPoolV2.CCVConfigArg({
+    TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
+    configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
       inboundCCVs: inboundCCVs
     });
 
     vm.expectEmit();
-    emit TokenPoolV2.CCVConfigUpdated(DEST_CHAIN_SELECTOR, outboundCCVs, inboundCCVs);
+    emit TokenPool.CCVConfigUpdated(DEST_CHAIN_SELECTOR, outboundCCVs, inboundCCVs);
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
     // Verify the configuration was stored correctly.
@@ -47,14 +47,14 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     vm.stopPrank();
     vm.prank(STRANGER);
 
-    TokenPoolV2.CCVConfigArg[] memory configArgs;
+    TokenPool.CCVConfigArg[] memory configArgs;
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_tokenPool.applyCCVConfigUpdates(configArgs);
   }
 
   function test_applyCCVConfigUpdate_RevertWhen_DuplicateCCV_Outbound() public {
-    TokenPoolV2.CCVConfigArg[] memory configArgs = new TokenPoolV2.CCVConfigArg[](1);
+    TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
     address[] memory duplicateOutbound = new address[](3);
     duplicateOutbound[0] = s_ccv1;
     duplicateOutbound[1] = s_ccv2;
@@ -63,18 +63,18 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     address[] memory validInbound = new address[](1);
     validInbound[0] = s_ccv2;
 
-    configArgs[0] = TokenPoolV2.CCVConfigArg({
+    configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: duplicateOutbound,
       inboundCCVs: validInbound
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPoolV2.DuplicateCCV.selector, s_ccv1));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.DuplicateCCV.selector, s_ccv1));
     s_tokenPool.applyCCVConfigUpdates(configArgs);
   }
 
   function test_applyCCVConfigUpdate_RevertWhen_DuplicateCCV_Inbound() public {
-    TokenPoolV2.CCVConfigArg[] memory configArgs = new TokenPoolV2.CCVConfigArg[](1);
+    TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
     address[] memory validOutbound = new address[](1);
     validOutbound[0] = s_ccv1;
 
@@ -83,13 +83,13 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     duplicateInbound[1] = s_ccv1;
     duplicateInbound[2] = s_ccv2; // Duplicate
 
-    configArgs[0] = TokenPoolV2.CCVConfigArg({
+    configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: validOutbound,
       inboundCCVs: duplicateInbound
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPoolV2.DuplicateCCV.selector, s_ccv2));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.DuplicateCCV.selector, s_ccv2));
     s_tokenPool.applyCCVConfigUpdates(configArgs);
   }
 }

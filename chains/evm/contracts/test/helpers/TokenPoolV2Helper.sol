@@ -2,27 +2,24 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
-import {Pool} from "../../libraries/Pool.sol";
-import {TokenPoolV2} from "../../pools/TokenPoolV2.sol";
+import {TokenPool} from "../../poolsv2/TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-contract TokenPoolV2Helper is TokenPoolV2 {
+/// @notice Helper contract for testing TokenPool V2 functionality.
+contract TokenPoolV2Helper is TokenPool {
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) TokenPoolV2(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   function getFee(
-    uint64,
-    address,
-    address,
-    Client.EVMTokenAmount[] calldata,
-    bytes calldata
-  ) external pure returns (Pool.Quote memory quote) {
-    return quote;
+    uint64, // destChainSelector
+    Client.EVM2AnyMessage calldata // message
+  ) external view returns (uint256 feeTokenAmount) {
+    return 0;
   }
 }

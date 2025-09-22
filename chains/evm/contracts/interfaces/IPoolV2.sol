@@ -35,26 +35,20 @@ interface IPoolV2 is IPoolV1 {
   /// @notice Returns the set of required CCVs for incoming messages from a source chain.
   /// @param sourceChainSelector The chain selector of the source chain.
   /// @param amount The amount of tokens to be transferred.
-  /// @param tokenArgs Additional token arguments.
+  /// @param sourcePoolData The data received from the source pool to process the release or mint.
   /// @return requiredCCVs A set of addresses representing the required inbound CCVs.
   function getRequiredInboundCCVs(
     uint64 sourceChainSelector,
     uint256 amount,
-    bytes calldata tokenArgs
+    bytes calldata sourcePoolData
   ) external view returns (address[] memory requiredCCVs);
 
   /// @notice Returns a fee quote for transferring tokens to a destination chain.
   /// @param destChainSelector The chain selector of the destination chain.
-  /// @param sender The address of the sender on the source chain.
-  /// @param feeToken The address of the token to be used for fee payment.
-  /// @param tokenAmounts An array of token amounts to be transferred.
-  /// @param tokenArgs Additional token arguments.
-  /// @return A Pool.Quote struct containing the fee breakdown.
+  /// @param message The message to be sent to the destination chain.
+  /// @return feeTokenAmount The amount of fee token needed for the fee.
   function getFee(
     uint64 destChainSelector,
-    address sender,
-    address feeToken,
-    Client.EVMTokenAmount[] calldata tokenAmounts,
-    bytes calldata tokenArgs
-  ) external view returns (Pool.Quote memory);
+    Client.EVM2AnyMessage calldata message
+  ) external view returns (uint256 feeTokenAmount);
 }

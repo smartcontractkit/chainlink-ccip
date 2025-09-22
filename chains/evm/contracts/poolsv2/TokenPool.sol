@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 
 import {Pool} from "../libraries/Pool.sol";
-import {TokenPool} from "./TokenPool.sol";
+import {TokenPool as TokenPoolV1} from "../pools/TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
-abstract contract TokenPoolV2 is IPoolV2, TokenPool {
+abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   error DuplicateCCV(address ccv);
 
   event CCVConfigUpdated(uint64 indexed destChainSelector, address[] outboundCCVs, address[] inboundCCVs);
@@ -32,7 +32,7 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
   /// @notice Signals which version of the pool interface is supported.
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override(TokenPool, IERC165) returns (bool) {
+  ) public pure virtual override(TokenPoolV1, IERC165) returns (bool) {
     return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == type(IPoolV2).interfaceId
       || super.supportsInterface(interfaceId);
   }
@@ -43,7 +43,7 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+  ) TokenPoolV1(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   // ================================================================
   // │                        Lock or Burn                          │
@@ -53,20 +53,7 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     bytes calldata // tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
-    _lockOrBurn(lockOrBurnIn.amount);
-
-    emit LockedOrBurned({
-      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-      token: address(i_token),
-      sender: msg.sender,
-      amount: lockOrBurnIn.amount
-    });
-
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: _encodeLocalDecimals()
-    });
+    return super.lockOrBurn(lockOrBurnIn);
   }
 
   // ================================================================
@@ -114,7 +101,7 @@ abstract contract TokenPoolV2 is IPoolV2, TokenPool {
   function getRequiredOutboundCCVs(
     uint64 destChainSelector,
     uint256, // amount
-    bytes calldata // tokenArgs
+    bytes calldata // sourcePoolData
   ) external view virtual returns (address[] memory requiredCCVs) {
     return s_verifierConfig[destChainSelector].outboundCCVs;
   }
