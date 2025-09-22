@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
-import {Internal} from "../../../libraries/Internal.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {CCVProxySetup} from "./CCVProxySetup.t.sol";
 
@@ -19,8 +18,8 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
     (
       bytes32 messageId,
       bytes memory encodedMessage,
-      Internal.Receipt[] memory verifierReceipts,
-      Internal.Receipt memory executorReceipt,
+      CCVProxy.Receipt[] memory verifierReceipts,
+      CCVProxy.Receipt memory executorReceipt,
       bytes[] memory receiptBlobs
     ) = _evmMessageToEvent({
       message: message,
@@ -54,8 +53,8 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
     (
       bytes32 messageIdExpected,
       bytes memory encodedMessage,
-      Internal.Receipt[] memory verifierReceipts,
-      Internal.Receipt memory executorReceipt,
+      CCVProxy.Receipt[] memory verifierReceipts,
+      CCVProxy.Receipt memory executorReceipt,
       bytes[] memory receiptBlobs
     ) = _evmMessageToEvent({
       message: message,
