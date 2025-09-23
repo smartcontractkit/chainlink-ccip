@@ -1,5 +1,18 @@
 [NOTES.md](../../../chainlink/contracts/release/ccip/NOTES.md)# @chainlink/contracts-ccip
 
+## 1.6.2
+
+### Patch Changes
+
+- [#1212](https://github.com/smartcontractkit/chainlink-ccip/pull/1212) - Fixes a bug in the FactoryBurnMintERC20 constructor
+that prevents using a `preMint` and a `maxSupply` of `0`
+
+### Minor Changes
+
+- [#1145](https://github.com/smartcontractkit/chainlink-ccip/pull/1145) [`4f2c735`](https://github.com/smartcontractkit/chainlink-ccip/commit/4f2c735bf252ec69be1424647671b956dd159c55) - Add a new BurnMintERC20 compatible with Hyperliquid and changes to the FactoryBurnMintERC20:
+  - Adds a check to the constructor that the `preMint` is less than the `maxSupply` 
+
+
 ## 1.6.1
 
 CCIP 1.6.1 is a minor release that focuses on token pools, adding overall pool improvements.
