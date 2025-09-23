@@ -19,7 +19,7 @@ contract TokenPoolV2_getRequiredInboundCCVs is TokenPoolV2Setup {
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
     // Verify the configuration was stored correctly.
-    address[] memory storedInbound = s_tokenPool.getRequiredInboundCCVs(DEST_CHAIN_SELECTOR, 0, "");
+    address[] memory storedInbound = s_tokenPool.getRequiredInboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, 0, "");
 
     assertEq(storedInbound.length, inboundCCVs.length);
     assertEq(storedInbound[0], inboundCCVs[0]);

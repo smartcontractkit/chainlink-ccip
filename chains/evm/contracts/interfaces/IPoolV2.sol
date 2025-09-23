@@ -22,22 +22,26 @@ interface IPoolV2 is IPoolV1 {
   // TODO add new methods here for V2. Everything below is a placeholder.
 
   /// @notice Returns the set of required CCVs for outgoing messages to a destination chain.
+  /// @param localToken The address of the local token.
   /// @param destChainSelector The chain selector of the destination chain.
   /// @param amount The amount of tokens to be transferred.
   /// @param tokenArgs Additional token arguments.
   /// @return requiredCCVs A set of addresses representing the required outbound CCVs.
   function getRequiredOutboundCCVs(
+    address localToken,
     uint64 destChainSelector,
     uint256 amount,
     bytes calldata tokenArgs
   ) external view returns (address[] memory requiredCCVs);
 
   /// @notice Returns the set of required CCVs for incoming messages from a source chain.
+  /// @param localToken The address of the local token.
   /// @param sourceChainSelector The chain selector of the source chain.
   /// @param amount The amount of tokens to be transferred.
   /// @param sourcePoolData The data received from the source pool to process the release or mint.
   /// @return requiredCCVs A set of addresses representing the required inbound CCVs.
   function getRequiredInboundCCVs(
+    address localToken,
     uint64 sourceChainSelector,
     uint256 amount,
     bytes calldata sourcePoolData

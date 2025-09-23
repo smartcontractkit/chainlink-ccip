@@ -89,6 +89,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   /// Implementers can override this function to define custom logic based on these params.
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredInboundCCVs(
+    address, // localToken
     uint64 sourceChainSelector,
     uint256, // amount
     bytes calldata // sourcePoolData
@@ -102,6 +103,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   /// Implementers can override this function to define custom logic based on these params.
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredOutboundCCVs(
+    address, // localToken
     uint64 destChainSelector,
     uint256, // amount
     bytes calldata // tokenArgs
