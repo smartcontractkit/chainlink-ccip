@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
-import {ICCVOffRampV1} from "../interfaces/ICCVOffRampV1.sol";
+import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
@@ -299,7 +299,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, ccvs, requiredPoolCCVs);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
+        ICrossChainVerifierV1(ccvsToQuery[i]).verifyMessage({
+          originalCaller: address(this),
           message: message,
           messageId: messageId,
           ccvData: ccvData[ccvDataIndex[i]]

@@ -10,8 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
@@ -80,8 +79,17 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 					Params: sequences.ContractParams{
 						RMNRemote:     sequences.RMNRemoteParams{},
 						CCVAggregator: sequences.CCVAggregatorParams{},
-						CommitOnRamp: sequences.CommitOnRampParams{
+						CommitteeVerifier: sequences.CommitteeVerifierParams{
 							FeeAggregator: common.HexToAddress("0x01"),
+							SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
+								Threshold: 1,
+								Signers: []common.Address{
+									common.HexToAddress("0x02"),
+									common.HexToAddress("0x03"),
+									common.HexToAddress("0x04"),
+									common.HexToAddress("0x05"),
+								},
+							},
 						},
 						CCVProxy: sequences.CCVProxyParams{
 							FeeAggregator: common.HexToAddress("0x01"),
@@ -96,17 +104,6 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
 							USDPerLINK:                     usdPerLink,
 							USDPerWETH:                     usdPerWeth,
-						},
-						CommitOffRamp: sequences.CommitOffRampParams{
-							SignatureConfigArgs: commit_offramp.SetSignatureConfigArgs{
-								Threshold: 1,
-								Signers: []common.Address{
-									common.HexToAddress("0x02"),
-									common.HexToAddress("0x03"),
-									common.HexToAddress("0x04"),
-									common.HexToAddress("0x05"),
-								},
-							},
 						},
 					},
 				})
@@ -130,16 +127,16 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 							Version: semver.MustParse("1.7.0"),
 						},
 						DefaultCCVOffRamps: []datastore.AddressRef{
-							{Type: datastore.ContractType(commit_offramp.ContractType), Version: semver.MustParse("1.7.0")},
+							{Type: datastore.ContractType(committee_verifier.ContractType), Version: semver.MustParse("1.7.0")},
 						},
 						DefaultCCVOnRamps: []datastore.AddressRef{
-							{Type: datastore.ContractType(commit_onramp.ContractType), Version: semver.MustParse("1.7.0")},
+							{Type: datastore.ContractType(committee_verifier.ContractType), Version: semver.MustParse("1.7.0")},
 						},
 						DefaultExecutor: datastore.AddressRef{
 							Type:    datastore.ContractType(executor_onramp.ContractType),
 							Version: semver.MustParse("1.7.0"),
 						},
-						CommitOnRampDestChainConfig: sequences.CommitOnRampDestChainConfig{
+						CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{
 							AllowlistEnabled: false,
 						},
 						FeeQuoterDestChainConfig: fee_quoter_v2.DestChainConfig{
