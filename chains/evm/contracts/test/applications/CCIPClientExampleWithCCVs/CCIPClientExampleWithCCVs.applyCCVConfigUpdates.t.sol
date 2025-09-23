@@ -43,6 +43,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is CCIPClientExampleWit
     /////////////////////////
     // Remove a CCV config //
     /////////////////////////
+
     uint64[] memory toRemove = new uint64[](1);
     toRemove[0] = SOURCE_CHAIN_SELECTOR;
 
