@@ -26,6 +26,7 @@ BurnMintWithLockReleaseFlagTokenPool_releaseOrMint:test_releaseOrMint_LockReleas
 BurnToAddressMintTokenPool_lockOrBurn:test_LockOrBurn() (gas: 241000)
 BurnWithFromMintTokenPool_lockOrBurn:test_constructor() (gas: 23404)
 BurnWithFromMintTokenPool_lockOrBurn:test_lockOrBurn() (gas: 245593)
+CCIPClientExampleWithCCVs_applyCCVConfigUpdates:test_applyCCVConfigUpdates() (gas: 119037)
 CCIPClientExample_sanity:test_ImmutableExamples() (gas: 2131887)
 CCIPHome__validateConfig:test__validateConfig() (gas: 302306)
 CCIPHome__validateConfig:test__validateConfigLessTransmittersThanSigners() (gas: 335380)
