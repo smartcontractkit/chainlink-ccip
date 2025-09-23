@@ -9,8 +9,10 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 contract VerifierProxy_setVerifier is VerifierProxySetup {
   function test_setVerifier() public {
     address newVerifier = makeAddr("NewVerifier");
+
     s_verifierProxy.setVerifier(newVerifier);
-    assertEq(s_verifierProxy.s_verifier(), newVerifier);
+
+    assertEq(s_verifierProxy.getVerifier(), newVerifier);
   }
 
   function test_setVerifier_RevertWhen_ZeroAddressNotAllowed() public {
@@ -20,8 +22,7 @@ contract VerifierProxy_setVerifier is VerifierProxySetup {
 
   function test_setVerifier_RevertWhen_NotOwner() public {
     vm.stopPrank();
-    address notOwner = makeAddr("NotOwner");
-    vm.startPrank(notOwner);
+
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_verifierProxy.setVerifier(makeAddr("NewVerifier"));
   }

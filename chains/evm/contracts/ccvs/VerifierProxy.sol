@@ -20,7 +20,7 @@ contract VerifierProxy is Ownable2StepMsgSender {
   event VerifierUpdated(address indexed oldVerifier, address indexed newVerifier);
 
   /// @notice The address of the verifier contract.
-  address public s_verifier;
+  address internal s_verifier;
 
   constructor(
     address verifierAddress
