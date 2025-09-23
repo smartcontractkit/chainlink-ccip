@@ -342,7 +342,7 @@ contract ReentrantCCV is ICrossChainVerifierV1 {
     address,
     uint256,
     bytes calldata
-  ) external view returns (bytes memory) {
+  ) external pure returns (bytes memory) {
     return "";
   }
 

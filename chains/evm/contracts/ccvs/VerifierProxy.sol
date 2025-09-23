@@ -5,8 +5,8 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 
 /// @notice VerifierProxy enables upgrades to Cross-Chain Verifiers (CCVs) without breaking existing references in token pools, receivers, and apps.
 /// The address of this contract will be referenced in the following places:
-///   - Users / apps will specify required and optional CCVs as part of ccipSend extraArgs.
-///   - Token pools will specify required and optional CCVs on both source and destination.
+///   - Senders of messages will specify required and optional CCVs as part of ccipSend extraArgs.
+///   - Token pools will specify required CCVs on both source and destination.
 ///   - Receiver contracts will specify required and optional CCVs on destination.
 ///   - OnRamp will specify default and mandated CCVs for each destination.
 ///   - OffRamp will specify default and mandated CCVs for each source.
@@ -29,27 +29,30 @@ contract VerifierProxy is Ownable2StepMsgSender {
   }
 
   /// @dev Allows for child contracts to modify the access control logic.
-  modifier onlyAllowedCaller(
-    address caller
-  ) virtual {
-    if (caller != owner()) {
+  function _onlyAllowedCaller() internal virtual {
+    if (msg.sender != owner()) {
       revert OnlyCallableByOwner();
     }
-    _;
+  }
+
+  /// @notice Returns the address of the verifier contract.
+  function getVerifier() external view virtual returns (address) {
+    return s_verifier;
   }
 
   /// @notice Sets the address of the verifier contract.
   /// @param verifierAddress The address of the new verifier contract.
   function setVerifier(
     address verifierAddress
-  ) external onlyAllowedCaller(msg.sender) {
+  ) external virtual {
+    _onlyAllowedCaller();
     _setVerifier(verifierAddress);
   }
 
   /// @dev Internal method that allows for reuse in constructor.
   function _setVerifier(
     address verifierAddress
-  ) internal {
+  ) internal virtual {
     if (verifierAddress == address(0)) {
       revert ZeroAddressNotAllowed();
     }
@@ -58,12 +61,12 @@ contract VerifierProxy is Ownable2StepMsgSender {
     emit VerifierUpdated(oldVerifier, verifierAddress);
   }
 
-  // The fallback function forwards all calls to the verifier contract via delegatecall.
-  // The first argument of the calldata is always overwritten with the caller of the proxy.
-  // This ensures that the verifier contract always sees the original caller of the proxy.
-  // It also means originalCaller should be the first argument of any method called via this proxy.
-  // solhint-disable-next-line payable-fallback, no-complex-fallback
-  fallback() external {
+  /// @notice The fallback function forwards all calls to the verifier contract via a call.
+  /// @dev The first argument of the calldata is always overwritten with the caller of the proxy. This ensures that the
+  /// verifier contract always sees the original caller of the proxy. It also means originalCaller should be the first
+  /// argument of any method called via this proxy.
+  /// solhint-disable-next-line payable-fallback, no-complex-fallback
+  fallback() external virtual {
     address verifierAddress = s_verifier;
     assembly {
       // We never cede control back to Solidity, so we can overwrite memory starting from index 0.

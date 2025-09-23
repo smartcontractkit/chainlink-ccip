@@ -47,10 +47,10 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   function forwardToVerifier(
     address originalCaller,
     MessageV1Codec.MessageV1 calldata message,
-    bytes32, // messageId, unused
-    address, // feeToken, unused
-    uint256, // feeTokenAmount, unused
-    bytes calldata // verifierArgs, unused
+    bytes32, // messageId
+    address, // feeToken
+    uint256, // feeTokenAmount
+    bytes calldata // verifierArgs
   ) external view returns (bytes memory verifierReturnData) {
     // For EVM, sender is expected to be 20 bytes.
     address senderAddress = address(bytes20(message.sender));
@@ -62,8 +62,8 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   /// @inheritdoc ICrossChainVerifierV1
   function verifyMessage(
-    address,
-    MessageV1Codec.MessageV1 calldata,
+    address, // originalCaller
+    MessageV1Codec.MessageV1 calldata, // message
     bytes32 messageHash,
     bytes calldata ccvData
   ) external view {
@@ -156,10 +156,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   ) external {
     _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
-
-  // ================================================================
-  // │                        Introspection                         │
-  // ================================================================
 
   function supportsInterface(
     bytes4 interfaceId
