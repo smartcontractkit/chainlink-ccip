@@ -335,7 +335,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Returns the CCVs required to execute a message. There can be duplicates between the required and optional
   // CCVs, but all duplicated within the required CCVs are removed.
-  function getCCVsRequiredForMessage(
+  function getNeededCCVs(
     bytes calldata encodedMessage
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);

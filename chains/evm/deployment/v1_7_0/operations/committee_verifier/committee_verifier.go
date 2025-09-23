@@ -18,7 +18,8 @@ var ProxyType cldf_deployment.ContractType = "CommitteeVerifierProxy"
 type DynamicConfig = committee_verifier.CommitteeVerifierDynamicConfig
 
 type ConstructorArgs struct {
-	DynamicConfig DynamicConfig
+	DynamicConfig   DynamicConfig
+	StorageLocation string
 }
 
 type SetDynamicConfigArgs struct {
@@ -49,7 +50,7 @@ var Deploy = contract.NewDeploy(
 	func(ConstructorArgs) error { return nil },
 	contract.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := committee_verifier.DeployCommitteeVerifier(opts, backend, args.DynamicConfig)
+			address, tx, _, err := committee_verifier.DeployCommitteeVerifier(opts, backend, args.DynamicConfig, args.StorageLocation)
 			return address, tx, err
 		},
 		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)
