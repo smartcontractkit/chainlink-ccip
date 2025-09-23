@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../interfaces/IPool.sol";
+import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {ERC165CheckerReverting} from "../../libraries/ERC165CheckerReverting.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
 
@@ -33,12 +36,16 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
 contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   using SafeERC20 for IERC20;
+  using ERC165CheckerReverting for address;
 
   error AddressCannotBeZero();
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(uint32 version);
   error InvalidMessageLength(uint256 length);
   error MismatchedArrayLengths();
+  error InvalidDestinationPool();
+  error Unauthorized();
+  error TokenPoolUnsupported();
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
@@ -63,23 +70,32 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   PoolAddresses internal s_pools;
 
   IERC20 internal immutable i_token;
+  IRouter internal immutable i_router;
 
   string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.3-dev";
 
-  constructor(IERC20 token, PoolAddresses memory pools) {
+  constructor(IERC20 token, PoolAddresses memory pools, address router) {
     // Note: The legacy pool is allowed to be zero, as it is not requireed if this proxy is being deployed
     // on a chain which has already migrated to a pool that utilizes a message transmitter proxy.
-    if (address(token) == address(0) || pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0)) {
+    if (
+      address(token) == address(0) || pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0)
+        || router == address(0)
+    ) {
       revert AddressCannotBeZero();
     }
 
     i_token = token;
     s_pools = pools;
+    i_router = IRouter(router);
   }
 
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual returns (Pool.LockOrBurnOutV1 memory) {
+    if (i_router.getOnRamp(lockOrBurnIn.remoteChainSelector) != msg.sender) {
+      revert Unauthorized();
+    }
+
     LockOrBurnMechanism mechanism = s_lockOrBurnMechanism[lockOrBurnIn.remoteChainSelector];
 
     // If a mechanism has not been configured for the remote chain selector, revert.
@@ -101,6 +117,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
       destinationPool = s_lockReleasePools[lockOrBurnIn.remoteChainSelector];
     }
 
+    if (destinationPool == address(0)) {
+      revert InvalidDestinationPool();
+    }
+
     // Transfer the tokens to the proper child pool, as this contract is only a proxy and will not perform
     // the lock/burn itself.
     i_token.safeTransfer(destinationPool, lockOrBurnIn.amount);
@@ -111,6 +131,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual returns (Pool.ReleaseOrMintOutV1 memory) {
+    if (!i_router.isOffRamp(releaseOrMintIn.remoteChainSelector, msg.sender)) {
+      revert Unauthorized();
+    }
+
     // If the source pool data is the lock release flag, we use the lock release pool set for the remote chain selector.
     if (bytes4(releaseOrMintIn.sourcePoolData) == LOCK_RELEASE_FLAG) {
       return USDCTokenPool(s_lockReleasePools[releaseOrMintIn.remoteChainSelector]).releaseOrMint(releaseOrMintIn);
@@ -178,6 +202,19 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
       revert AddressCannotBeZero();
     }
 
+    // If the V1 or V2 Pool does not support the IPoolV1 interface, revert.
+    // If the legacy CCTP V1 Pool is being used, then it must support the IPoolV1 interface.
+    if (
+      !pools.cctpV1Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)
+        || !pools.cctpV2Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)
+        || (
+          pools.legacyCctpV1Pool != address(0)
+            && !pools.legacyCctpV1Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)
+        )
+    ) {
+      revert TokenPoolUnsupported();
+    }
+
     s_pools = pools;
 
     emit PoolAddressesUpdated(pools);
@@ -228,6 +265,15 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
     }
 
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      // If the token pool is being added, ensure that it supports the token pool v1 interface. If the pool is the zero address,
+      // then it is being removed, as a migration from L/R to CCTP, and therefore no check is needed, as it was
+      // already performed when originally added.
+      if (
+        lockReleasePools[i] != address(0) && !lockReleasePools[i]._supportsInterfaceReverting(type(IPoolV1).interfaceId)
+      ) {
+        revert TokenPoolUnsupported();
+      }
+
       // Note: Since the lock release pool is only used for chains that do not have CCTP support, after a successful
       // migration to CCTP, the lock release pool may no longer be needed, and therefore the zero address is
       // a valid input and input validation is not required. It is also why no check for the mechanism being

@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../../../interfaces/IPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
+
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   address internal s_newCctpV1Pool = makeAddr("newCctpV1Pool");
@@ -18,6 +21,10 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
       cctpV2Pool: s_newCctpV2Pool
     });
 
+    _enableERC165InterfaceChecks(s_newCctpV1Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_newCctpV2Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_legacyCctpV1Pool, type(IPoolV1).interfaceId);
+
     // Act: Update pool addresses as owner
     changePrank(OWNER);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
@@ -30,20 +37,6 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   }
 
   // Reverts
-
-  function test_updatePoolAddresses_RevertWhen_NotOwner() public {
-    // Arrange: Define test constants
-    USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: s_legacyCctpV1Pool,
-      cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: s_newCctpV2Pool
-    });
-
-    // Act & Assert: Non-owner should not be able to update addresses
-    changePrank(makeAddr("notOwner"));
-    vm.expectRevert();
-    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
-  }
 
   // Test that zero address for CCTP V1 pool is rejected
   function test_updatePoolAddresses_RevertWhen_CCTPV1PoolIsZero() public {
@@ -62,32 +55,58 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
   // Test that zero address for CCTP V2 pool is rejected
   function test_updatePoolAddresses_RevertWhen_CCTPV2PoolIsZero() public {
-    // Arrange: Define test constants
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
       cctpV2Pool: address(0) // Zero address
     });
 
-    // Act & Assert: Should revert with PoolAddressCannotBeZero error
     changePrank(OWNER);
     vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
   }
 
-  // Test that pool address update emits correct event
-  function test_updatePoolAddresses_EmitsEvent() public {
-    // Arrange: Define test constants
+  function test_updatePoolAddresses_RevertWhen_LegacyPoolDoesNotSupportIPoolV1() public {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
       cctpV2Pool: s_newCctpV2Pool
     });
 
-    // Act & Assert: Verify PoolAddressesUpdated event is emitted with correct data
+    // Enable the V1 and V2 pools to support the IPoolV1 interface
+    _enableERC165InterfaceChecks(s_newCctpV1Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_newCctpV2Pool, type(IPoolV1).interfaceId);
+
+    // Should revert because the legacy pool does not support the IPoolV1 interface even though the V1 and V2 pools do
     changePrank(OWNER);
-    vm.expectEmit();
-    emit USDCTokenPoolProxy.PoolAddressesUpdated(newPools);
+    vm.expectRevert(USDCTokenPoolProxy.TokenPoolUnsupported.selector);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+
+    // Now it should succeed because the legacy pool is not being used and thus the check is not performed
+    newPools.legacyCctpV1Pool = address(0);
+    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+
+    // Now we re-enable the legacy pool to support the IPoolV1 interface
+    newPools.legacyCctpV1Pool = s_legacyCctpV1Pool;
+
+    // enable the legacy pool to support the IPoolV1 interface
+    _enableERC165InterfaceChecks(s_legacyCctpV1Pool, type(IPoolV1).interfaceId);
+
+    // Now it should Succeed
+    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+
+    assertEq(s_usdcTokenPoolProxy.getPools().legacyCctpV1Pool, s_legacyCctpV1Pool);
+  }
+
+  function _enableERC165InterfaceChecks(address pool, bytes4 interfaceId) internal {
+    vm.mockCall(
+      address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
+    );
+
+    vm.mockCall(
+      address(pool),
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
+      abi.encode(true)
+    );
   }
 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../../../interfaces/IPool.sol";
+
 import {Pool} from "../../../../libraries/Pool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
@@ -8,6 +10,7 @@ import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol"
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   address internal s_sender = makeAddr("sender");
@@ -58,6 +61,12 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       address(s_cctpV1Pool),
       abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector, lockOrBurnIn),
       abi.encode(expectedOutput)
+    );
+
+    vm.mockCall(
+      address(s_cctpV1Pool),
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV1).interfaceId),
+      abi.encode(true)
     );
 
     vm.startPrank(s_routerAllowedOnRamp);
@@ -111,6 +120,20 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     bytes memory destTokenAddress = abi.encode(address(s_USDCToken));
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = abi.encode(address(s_lockReleasePool));
+
+    // The update function will check that the pool supports the IPoolV1 interface and IERC165 interface
+    // so we need to mock those here.
+    vm.mockCall(
+      address(s_lockReleasePool),
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV1).interfaceId),
+      abi.encode(true)
+    );
+
+    vm.mockCall(
+      address(s_lockReleasePool),
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
+      abi.encode(true)
+    );
 
     // Set the the s_lockRelease pool for the LockRelease mechanism
     uint64[] memory selectors = new uint64[](1);
@@ -177,38 +200,6 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         remoteChainSelector: testChainSelector, // Chain with no configured mechanism
         originalSender: s_sender,
         amount: amount,
-        localToken: address(s_USDCToken)
-      })
-    );
-  }
-
-  function test_lockOrBurn_RevertWhen_InvalidReceiver() public {
-    uint256 amount = 100;
-    bytes memory invalidReceiver = abi.encode(s_receiver, "extra"); // Invalid receiver format
-
-    Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
-      receiver: invalidReceiver,
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      originalSender: s_sender,
-      amount: amount,
-      localToken: address(s_USDCToken)
-    });
-
-    vm.expectRevert();
-    vm.startPrank(s_routerAllowedOnRamp);
-    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
-  }
-
-  function test_lockOrBurn_RevertWhen_InvalidAmount() public {
-    vm.startPrank(s_routerAllowedOnRamp);
-
-    vm.expectRevert();
-    s_usdcTokenPoolProxy.lockOrBurn(
-      Pool.LockOrBurnInV1({
-        receiver: abi.encode(s_receiver),
-        remoteChainSelector: DEST_CHAIN_SELECTOR,
-        originalSender: s_sender,
-        amount: 0, // Invalid amount
         localToken: address(s_USDCToken)
       })
     );

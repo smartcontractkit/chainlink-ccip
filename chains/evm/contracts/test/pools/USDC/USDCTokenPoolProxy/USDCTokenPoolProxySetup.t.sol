@@ -32,7 +32,8 @@ contract USDCTokenPoolProxySetup is USDCSetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool
-      })
+      }),
+      address(s_router)
     );
 
     // Deal some tokens to the proxy to test the transfer to the destination pool

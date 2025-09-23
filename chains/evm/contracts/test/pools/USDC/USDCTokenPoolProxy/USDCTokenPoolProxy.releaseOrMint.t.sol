@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../../../interfaces/IPool.sol";
+
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
+
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   address internal s_sender = makeAddr("sender");
@@ -29,6 +33,9 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     remoteChainSelectors[0] = SOURCE_CHAIN_SELECTOR;
     address[] memory lockReleasePools = new address[](1);
     lockReleasePools[0] = s_lockReleasePool;
+
+    _enableERC165InterfaceChecks(s_lockReleasePool, type(IPoolV1).interfaceId);
+
     s_usdcTokenPoolProxy.updateLockReleasePoolAddresses(remoteChainSelectors, lockReleasePools);
 
     // Mock the router's isOffRamp function to return true
@@ -251,6 +258,9 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       cctpV2Pool: s_cctpV2Pool
     });
 
+    _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
+
     s_usdcTokenPoolProxy.updatePoolAddresses(updatedPools);
 
     // Arrange: Prepare test data for legacy format (64 bytes)
@@ -383,5 +393,17 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     vm.stopPrank();
+  }
+
+  function _enableERC165InterfaceChecks(address pool, bytes4 interfaceId) internal {
+    vm.mockCall(
+      address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
+    );
+
+    vm.mockCall(
+      address(pool),
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
+      abi.encode(true)
+    );
   }
 }

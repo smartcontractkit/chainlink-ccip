@@ -20,7 +20,8 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool
-      })
+      }),
+      address(s_router)
     );
 
     USDCTokenPoolProxy.PoolAddresses memory pools = proxy.getPools();
@@ -38,7 +39,8 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: address(0)
-      })
+      }),
+      address(s_router)
     );
   }
 
@@ -50,7 +52,8 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: address(0)
-      })
+      }),
+      address(s_router)
     );
   }
 }
