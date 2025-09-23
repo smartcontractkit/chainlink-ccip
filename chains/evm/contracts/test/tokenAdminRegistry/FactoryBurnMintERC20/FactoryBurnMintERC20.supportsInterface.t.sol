@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
+
 import {IGetCCIPAdmin} from "../../../interfaces/IGetCCIPAdmin.sol";
 
 import {BurnMintERC20Setup} from "./BurnMintERC20Setup.t.sol";
@@ -13,6 +14,5 @@ contract FactoryBurnMintERC20_supportsInterface is BurnMintERC20Setup {
     assertTrue(s_burnMintERC20.supportsInterface(type(IBurnMintERC20).interfaceId));
     assertTrue(s_burnMintERC20.supportsInterface(type(IERC165).interfaceId));
     assertTrue(s_burnMintERC20.supportsInterface(type(IGetCCIPAdmin).interfaceId));
-
   }
 }
