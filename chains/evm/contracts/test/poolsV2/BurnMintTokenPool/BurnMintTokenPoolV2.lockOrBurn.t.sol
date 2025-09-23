@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
-
 import {TokenPool as TokenPoolV1} from "../../../pools/TokenPool.sol";
 import {BurnMintSetup} from "./BurnMintSetup.t.sol";
 
