@@ -204,4 +204,50 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       })
     );
   }
+
+  function test_lockOrBurn_RevertWhen_InvalidDestinationPool() public {
+    // Configure lock or burn mechanisms for different chains but do not set the lock release pool for the chain
+    uint64[] memory chainSelectors = new uint64[](1);
+    chainSelectors[0] = DEST_CHAIN_SELECTOR;
+
+    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE;
+
+    vm.startPrank(OWNER);
+    s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
+
+    vm.mockCall(
+      address(s_router),
+      abi.encodeWithSelector(bytes4(keccak256("getOnRamp(uint64)")), uint64(DEST_CHAIN_SELECTOR)),
+      abi.encode(s_routerAllowedOnRamp)
+    );
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
+      receiver: abi.encode(s_receiver),
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      originalSender: s_sender,
+      amount: 100,
+      localToken: address(s_USDCToken)
+    });
+
+    vm.startPrank(s_routerAllowedOnRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidDestinationPool.selector));
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
+  }
+
+  function test_lockOrBurn_RevertWhen_Unauthorized() public {
+    vm.startPrank(makeAddr("unauthorized"));
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
+      receiver: abi.encode(s_receiver),
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      originalSender: s_sender,
+      amount: 100,
+      localToken: address(s_USDCToken)
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.Unauthorized.selector));
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
+  }
 }

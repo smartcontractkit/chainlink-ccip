@@ -172,8 +172,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
       }
     }
 
-    // According to the CCTP specification, the first 4 bytes of the message are the version, which we can extract
-    // directly and cast into a uint32.
+    // The first 4 bytes of source pool data are the version which can be extracted directly and cast into a uint32.
     uint32 version = uint32(bytes4(releaseOrMintIn.sourcePoolData[0:4]));
 
     if (version == 0) {

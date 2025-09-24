@@ -31,6 +31,10 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     bytes32 depositHash;
   }
 
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "USDCTokenPoolCCTPV2 1.6.3-dev";
+  }
+
   /// @dev This contract is only used for CCTP V2, which is why the supportedUSDCVersion field of the parent
   /// constructor is set to 1. CCTP V1 used a version number of 0, so the version number is incremented by 1 for V2.
   constructor(

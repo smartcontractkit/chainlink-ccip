@@ -349,4 +349,23 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       abi.encode(true)
     );
   }
+
+  function test_releaseOrMint_RevertWhen_Unauthorized() public {
+    vm.startPrank(makeAddr("unauthorized"));
+
+    // Prepare input with CCTP_V1_FLAG in sourcePoolData (version 0 in offchainTokenData)
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      originalSender: abi.encode(s_sender),
+      receiver: s_receiver,
+      sourceDenominatedAmount: 4321,
+      localToken: address(s_USDCToken),
+      sourcePoolData: "",
+      sourcePoolAddress: s_sourcePoolAddress,
+      offchainTokenData: ""
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.Unauthorized.selector));
+    s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
+  }
 }
