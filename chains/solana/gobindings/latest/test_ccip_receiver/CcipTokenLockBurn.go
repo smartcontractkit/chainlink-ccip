@@ -103,7 +103,7 @@ func (inst *CcipTokenLockBurn) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.Input == nil {
-			return errors.New("MCMSArgs parameter is not set")
+			return errors.New("Input parameter is not set")
 		}
 	}
 
@@ -135,7 +135,7 @@ func (inst *CcipTokenLockBurn) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("MCMSArgs", *inst.Input))
+						paramsBranch.Child(ag_format.Param("Input", *inst.Input))
 					})
 
 					// Accounts of the instruction:
@@ -150,7 +150,7 @@ func (inst *CcipTokenLockBurn) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj CcipTokenLockBurn) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MCMSArgs` param:
+	// Serialize `Input` param:
 	err = encoder.Encode(obj.Input)
 	if err != nil {
 		return err
@@ -158,7 +158,7 @@ func (obj CcipTokenLockBurn) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 func (obj *CcipTokenLockBurn) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MCMSArgs`:
+	// Deserialize `Input`:
 	err = decoder.Decode(&obj.Input)
 	if err != nil {
 		return err
