@@ -58,11 +58,4 @@ library Pool {
     // chain have the same number of decimals.
     uint256 destinationAmount;
   }
-
-  // Pool v2 structs.
-
-  struct Quote {
-    uint256 feeTokenAmount; //The amount of fee token needed for the fee, in smallest denomination of the fee token.
-    uint256 transferTokenFee; // The amount billed in token pool's localToken.
-  }
 }

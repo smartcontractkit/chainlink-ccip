@@ -63,11 +63,11 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
       address[] calldata outboundCCVs = ccvConfigArgs[i].outboundCCVs;
       address[] calldata inboundCCVs = ccvConfigArgs[i].inboundCCVs;
 
-      // Validate and check for duplicates in outbound CCVs.
-      _validateCCVArray(outboundCCVs);
+      // check for duplicates in outbound CCVs.
+      _checkNoDuplicateAddresses(outboundCCVs);
 
-      // Validate and check for duplicates in inbound CCVs.
-      _validateCCVArray(inboundCCVs);
+      // check for duplicates in inbound CCVs.
+      _checkNoDuplicateAddresses(inboundCCVs);
 
       CCVConfig memory ccvConfig = CCVConfig({outboundCCVs: outboundCCVs, inboundCCVs: inboundCCVs});
       emit CCVConfigUpdated(remoteChainSelector, outboundCCVs, inboundCCVs);
@@ -83,7 +83,8 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   function getRequiredInboundCCVs(
     address, // localToken
     uint64 sourceChainSelector,
-    uint256, // amount
+    uint256, // amount,
+    uint16, // finality
     bytes calldata // sourcePoolData
   ) external view virtual returns (address[] memory requiredCCVs) {
     return s_verifierConfig[sourceChainSelector].inboundCCVs;
@@ -98,14 +99,15 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     address, // localToken
     uint64 destChainSelector,
     uint256, // amount
+    uint16, // finality
     bytes calldata // tokenArgs
   ) external view virtual returns (address[] memory requiredCCVs) {
     return s_verifierConfig[destChainSelector].outboundCCVs;
   }
 
   /// @notice Checks a CCV address array for duplicate entries.
-  /// @param ccvs The array of CCV addresses to validate.
-  function _validateCCVArray(
+  /// @param ccvs The array of CCV addresses to check for duplicates.
+  function _checkNoDuplicateAddresses(
     address[] calldata ccvs
   ) private pure {
     for (uint256 i = 0; i < ccvs.length; ++i) {
@@ -125,7 +127,9 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
 
   function getFee(
     uint64, // destChainSelector
-    Client.EVM2AnyMessage calldata // message
+    Client.EVM2AnyMessage calldata, // message
+    uint16, // finality
+    bytes calldata // tokenArgs
   ) external view virtual returns (uint256 feeTokenAmount) {
     return 0;
   }

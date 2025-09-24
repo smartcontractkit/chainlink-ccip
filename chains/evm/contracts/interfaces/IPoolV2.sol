@@ -19,18 +19,18 @@ interface IPoolV2 is IPoolV1 {
     bytes calldata tokenArgs
   ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut);
 
-  // TODO add new methods here for V2. Everything below is a placeholder.
-
   /// @notice Returns the set of required CCVs for outgoing messages to a destination chain.
   /// @param localToken The address of the local token.
   /// @param destChainSelector The chain selector of the destination chain.
   /// @param amount The amount of tokens to be transferred.
+  /// @param finality The finality configuration from the CCIP message.
   /// @param tokenArgs Additional token arguments.
   /// @return requiredCCVs A set of addresses representing the required outbound CCVs.
   function getRequiredOutboundCCVs(
     address localToken,
     uint64 destChainSelector,
     uint256 amount,
+    uint16 finality,
     bytes calldata tokenArgs
   ) external view returns (address[] memory requiredCCVs);
 
@@ -38,21 +38,27 @@ interface IPoolV2 is IPoolV1 {
   /// @param localToken The address of the local token.
   /// @param sourceChainSelector The chain selector of the source chain.
   /// @param amount The amount of tokens to be transferred.
+  /// @param finality The finality configuration from the CCIP message.
   /// @param sourcePoolData The data received from the source pool to process the release or mint.
   /// @return requiredCCVs A set of addresses representing the required inbound CCVs.
   function getRequiredInboundCCVs(
     address localToken,
     uint64 sourceChainSelector,
     uint256 amount,
+    uint16 finality,
     bytes calldata sourcePoolData
   ) external view returns (address[] memory requiredCCVs);
 
   /// @notice Returns a fee quote for transferring tokens to a destination chain.
   /// @param destChainSelector The chain selector of the destination chain.
   /// @param message The message to be sent to the destination chain.
+  /// @param finality The finality configuration from the CCIP message.
+  /// @param tokenArgs Additional token argument from the CCIP message.
   /// @return feeTokenAmount The amount of fee token needed for the fee.
   function getFee(
     uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata message
+    Client.EVM2AnyMessage calldata message,
+    uint16 finality,
+    bytes calldata tokenArgs
   ) external view returns (uint256 feeTokenAmount);
 }
