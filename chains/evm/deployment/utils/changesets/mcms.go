@@ -1,7 +1,6 @@
 package changesets
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -10,15 +9,6 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-)
-
-var (
-	allowedContractTypeToAction = map[mcms_types.TimelockAction]datastore.ContractType{
-		mcms_types.TimelockActionSchedule: "ProposerManyChainMultiSig",
-		mcms_types.TimelockActionBypass:   "BypasserManyChainMultiSig",
-		mcms_types.TimelockActionCancel:   "CancellerManyChainMultiSig",
-	}
-	timelockContractType datastore.ContractType = "RBACTimelock"
 )
 
 // TODO : move this to a common chain agnostic package
@@ -44,40 +34,6 @@ func (c *MCMSInput) Validate() error {
 		c.TimelockAction != mcms_types.TimelockActionBypass &&
 		c.TimelockAction != mcms_types.TimelockActionCancel {
 		return fmt.Errorf("invalid timelock action: %s", c.TimelockAction)
-	}
-	validateAddressRef := func(ref *datastore.AddressRef) error {
-		if ref == nil {
-			return errors.New("address ref is required")
-		}
-		if ref.Type == "" {
-			return errors.New("address ref type is required")
-		}
-		if ref.Version == nil {
-			return errors.New("address ref version is required")
-		}
-		if ref.Qualifier == "" {
-			return errors.New("address ref qualifier is required")
-		}
-		return nil
-	}
-	if err := validateAddressRef(c.MCMSAddressRef); err != nil {
-		return fmt.Errorf("invalid mcms address ref: %w", err)
-	} else {
-		allowedType, ok := allowedContractTypeToAction[c.TimelockAction]
-		if !ok {
-			return fmt.Errorf("no allowed contract type for timelock action: %s", c.TimelockAction)
-		}
-		if c.MCMSAddressRef.Type != allowedType {
-			return fmt.Errorf("mcms address ref type %s does not match expected type %s for timelock action %s",
-				c.MCMSAddressRef.Type, allowedType, c.TimelockAction)
-		}
-	}
-	if err := validateAddressRef(c.TimelockAddressRef); err != nil {
-		return fmt.Errorf("invalid timelock address ref: %w", err)
-	} else {
-		if c.TimelockAddressRef.Type != timelockContractType {
-			return fmt.Errorf("timelock address ref type must be '%s', got '%s'", timelockContractType, c.TimelockAddressRef.Type)
-		}
 	}
 	return nil
 }
