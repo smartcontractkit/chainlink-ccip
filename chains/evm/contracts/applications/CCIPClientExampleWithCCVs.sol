@@ -47,7 +47,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
   /// @param ccvConfigsToSet List of CCV configs to set.
   function applyCCVConfigUpdates(
     CCVConfigArgs[] calldata ccvConfigsToSet
-  ) external onlyOwner {
+  ) external virtual onlyOwner {
     for (uint256 i = 0; i < ccvConfigsToSet.length; ++i) {
       CCVConfigArgs memory args = ccvConfigsToSet[i];
       // If optionalThreshold > optionalCCVs.length, then it's impossible to satisfy the optional CCV requirement.
@@ -90,6 +90,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
   )
     external
     view
+    virtual
     override
     returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold)
   {
