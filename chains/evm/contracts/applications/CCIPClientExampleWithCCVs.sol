@@ -14,8 +14,7 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 contract CCIPClientExampleWithCCVs is CCIPClientExample {
   error DuplicateCCV(uint64 sourceChainSelector, address ccv);
   error InvalidOptionalThreshold(uint64 sourceChainSelector, uint8 optionalThreshold);
-  error NoCCVsProvided(uint64 sourceChainSelector);
-  error ZeroAddressNotAllowed();
+  error ZeroAddressNotAllowedAsOptional();
 
   event CCVConfigSet(
     uint64 indexed sourceChainSelector, address[] requiredCCVs, address[] optionalCCVs, uint8 optionalThreshold
@@ -44,39 +43,35 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
 
   constructor(IRouterClient router, IERC20 feeToken) CCIPClientExample(router, feeToken) {}
 
-  /// @notice Set or remove CCV configurations for source chains.
-  /// @param sourceChainSelectorsToRemove List of source chain selectors for which CCV configs will be removed.
+  /// @notice Set CCV configurations for source chains.
   /// @param ccvConfigsToSet List of CCV configs to set.
   function applyCCVConfigUpdates(
-    uint64[] calldata sourceChainSelectorsToRemove,
     CCVConfigArgs[] calldata ccvConfigsToSet
   ) external onlyOwner {
-    for (uint256 i = 0; i < sourceChainSelectorsToRemove.length; ++i) {
-      delete s_ccvConfigs[sourceChainSelectorsToRemove[i]];
-      emit CCVConfigRemoved(sourceChainSelectorsToRemove[i]);
-    }
-
     for (uint256 i = 0; i < ccvConfigsToSet.length; ++i) {
       CCVConfigArgs memory args = ccvConfigsToSet[i];
-      if (args.requiredCCVs.length == 0 && args.optionalCCVs.length == 0) {
-        revert NoCCVsProvided(args.sourceChainSelector);
-      }
-      if (args.optionalThreshold > args.optionalCCVs.length) {
+      // If optionalThreshold > optionalCCVs.length, then it's impossible to satisfy the optional CCV requirement.
+      // If optionalThreshold == optionalCCVs.length, then optional CCVs are essentially required.
+      // They should instead be defined as required CCVs.
+      if (args.optionalThreshold >= args.optionalCCVs.length) {
         revert InvalidOptionalThreshold(args.sourceChainSelector, args.optionalThreshold);
       }
-      address[] memory allCCVs = new address[](args.requiredCCVs.length + args.optionalCCVs.length);
-      uint256 idx = 0;
-      for (uint256 j = 0; j < args.requiredCCVs.length; ++j) {
-        allCCVs[idx++] = args.requiredCCVs[j];
-      }
-      for (uint256 j = 0; j < args.optionalCCVs.length; ++j) {
-        allCCVs[idx++] = args.optionalCCVs[j];
-      }
-      for (uint256 j = 0; j < allCCVs.length; ++j) {
-        address ccv = allCCVs[j];
-        if (ccv == address(0)) revert ZeroAddressNotAllowed();
-        for (uint256 k = 0; k < j; ++k) {
-          if (allCCVs[k] == ccv) revert DuplicateCCV(args.sourceChainSelector, ccv);
+      uint256 requiredCCVLength = args.requiredCCVs.length;
+      uint256 optionalCCVLength = args.optionalCCVs.length;
+      uint256 totalCCVLength = requiredCCVLength + optionalCCVLength;
+      for (uint256 j = 0; j < totalCCVLength; ++j) {
+        address ccvAddressJ = j < requiredCCVLength ? args.requiredCCVs[j] : args.optionalCCVs[j - requiredCCVLength];
+        // address(0) is a valid required CCV address, but not a valid optional CCV address.
+        // This is because address(0) signals to always enforce the default CCVs for the lane.
+        if (j >= requiredCCVLength && ccvAddressJ == address(0)) {
+          revert ZeroAddressNotAllowedAsOptional();
+        }
+
+        for (uint256 k = j + 1; k < totalCCVLength; ++k) {
+          address ccvAddressK = k < requiredCCVLength ? args.requiredCCVs[k] : args.optionalCCVs[k - requiredCCVLength];
+          if (ccvAddressK == ccvAddressJ) {
+            revert DuplicateCCV(args.sourceChainSelector, ccvAddressK);
+          }
         }
       }
       s_ccvConfigs[args.sourceChainSelector] = CCVConfig({
