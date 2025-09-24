@@ -2,14 +2,14 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
-import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
-import {MockCCVOnRamp} from "../../mocks/MockCCVOnRamp.sol";
+
 import {MockExecutor} from "../../mocks/MockExecutor.sol";
+import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
 contract CCVProxySetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
@@ -34,7 +34,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     );
     s_ccvAggregatorRemote = CCVAggregator(makeAddr("CCVAggregatorRemote"));
     address[] memory defaultCCVs = new address[](1);
-    defaultCCVs[0] = address(new MockCCVOnRamp());
+    defaultCCVs[0] = address(new MockVerifier(""));
     CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
     destChainConfigArgs[0] = CCVProxy.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -61,8 +61,8 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     returns (
       bytes32 messageId,
       bytes memory encodedMessage,
-      Internal.Receipt[] memory verifierReceipts,
-      Internal.Receipt memory executorReceipt,
+      CCVProxy.Receipt[] memory verifierReceipts,
+      CCVProxy.Receipt memory executorReceipt,
       bytes[] memory receiptBlobs
     )
   {
@@ -82,9 +82,9 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       data: message.data
     });
 
-    verifierReceipts = new Internal.Receipt[](destChainConfig.defaultCCVs.length);
+    verifierReceipts = new CCVProxy.Receipt[](destChainConfig.defaultCCVs.length);
     for (uint256 i = 0; i < verifierReceipts.length; ++i) {
-      verifierReceipts[i] = Internal.Receipt({
+      verifierReceipts[i] = CCVProxy.Receipt({
         issuer: destChainConfig.defaultCCVs[i],
         feeTokenAmount: 0,
         destGasLimit: 0,
@@ -93,7 +93,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
         extraArgs: message.extraArgs
       });
     }
-    executorReceipt = Internal.Receipt({
+    executorReceipt = CCVProxy.Receipt({
       issuer: destChainConfig.defaultExecutor,
       feeTokenAmount: 0, // Matches current CCVProxy event behavior
       destGasLimit: 0,

@@ -158,7 +158,7 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     ccvs[2] = s_defaultCCV;
     address[] memory tokenRequiredCCVs = new address[](0);
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, s_laneMandatedCCV, true));
+    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, s_laneMandatedCCV, false));
     s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, ccvs, tokenRequiredCCVs);
   }
 

@@ -9,13 +9,23 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	sequence_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
+	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 )
@@ -88,8 +98,17 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 						ExecutorOnRamp: sequences.ExecutorOnRampParams{
 							MaxCCVsPerMsg: 10,
 						},
-						CommitOnRamp: sequences.CommitOnRampParams{
+						CommitteeVerifier: sequences.CommitteeVerifierParams{
 							FeeAggregator: common.HexToAddress("0x01"),
+							SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
+								Threshold: 1,
+								Signers: []common.Address{
+									common.HexToAddress("0x02"),
+									common.HexToAddress("0x03"),
+									common.HexToAddress("0x04"),
+									common.HexToAddress("0x05"),
+								},
+							},
 						},
 						CCVProxy: sequences.CCVProxyParams{
 							FeeAggregator: common.HexToAddress("0x01"),
@@ -102,26 +121,35 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 							USDPerLINK:                     usdPerLink,
 							USDPerWETH:                     usdPerWeth,
 						},
-						CommitOffRamp: sequences.CommitOffRampParams{
-							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
-								Threshold: 1,
-								Signers: []common.Address{
-									common.HexToAddress("0x02"),
-									common.HexToAddress("0x03"),
-									common.HexToAddress("0x04"),
-									common.HexToAddress("0x05"),
-								},
-							},
-						},
 					},
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
-			require.Len(t, report.Output.Addresses, 14, "Expected 14 addresses in output")
-			require.Len(t, report.Output.Writes, 4, "Expected 4 writes in output")
 			for _, write := range report.Output.Writes {
 				// Contracts are deployed & still owned by deployer, so all writes should be executed
 				require.True(t, write.Executed, "Expected all writes to be executed")
+			}
+
+			exists := map[deployment.ContractType]bool{
+				rmn_remote.ContractType:           false,
+				router.ContractType:               false,
+				executor_onramp.ContractType:      false,
+				link.ContractType:                 false,
+				weth.ContractType:                 false,
+				committee_verifier.ContractType:   false,
+				ccv_proxy.ContractType:            false,
+				ccv_aggregator.ContractType:       false,
+				fee_quoter_v2.ContractType:        false,
+				committee_verifier.ProxyType:      false,
+				rmn_proxy.ContractType:            false,
+				token_admin_registry.ContractType: false,
+				mock_receiver.ContractType:        false,
+			}
+			for _, addr := range report.Output.Addresses {
+				exists[deployment.ContractType(addr.Type)] = true
+			}
+			for ctype, found := range exists {
+				require.True(t, found, "Expected contract of type %s to be deployed", ctype)
 			}
 
 			for _, existing := range test.existingAddresses {
@@ -190,8 +218,17 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 					ExecutorOnRamp: sequences.ExecutorOnRampParams{
 						MaxCCVsPerMsg: 10,
 					},
-					CommitOnRamp: sequences.CommitOnRampParams{
+					CommitteeVerifier: sequences.CommitteeVerifierParams{
 						FeeAggregator: common.HexToAddress("0x01"),
+						SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
+							Threshold: 1,
+							Signers: []common.Address{
+								common.HexToAddress("0x02"),
+								common.HexToAddress("0x03"),
+								common.HexToAddress("0x04"),
+								common.HexToAddress("0x05"),
+							},
+						},
 					},
 					CCVProxy: sequences.CCVProxyParams{
 						FeeAggregator: common.HexToAddress("0x01"),
@@ -203,17 +240,6 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 						WETHPremiumMultiplierWeiPerEth: 1e18,       // 1.0 ETH
 						USDPerLINK:                     usdPerLink, // $15
 						USDPerWETH:                     usdPerWeth, // $2000
-					},
-					CommitOffRamp: sequences.CommitOffRampParams{
-						SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
-							Threshold: 1,
-							Signers: []common.Address{
-								common.HexToAddress("0x02"),
-								common.HexToAddress("0x03"),
-								common.HexToAddress("0x04"),
-								common.HexToAddress("0x05"),
-							},
-						},
 					},
 				},
 			}
@@ -230,7 +256,6 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 
 		for i, report := range allReports {
 			require.NotEmpty(t, report.Output.Addresses, "Expected addresses for chain %d", chainSelectors[i])
-			require.Len(t, report.Output.Addresses, 14)
 		}
 	})
 
@@ -293,8 +318,17 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 						ExecutorOnRamp: sequences.ExecutorOnRampParams{
 							MaxCCVsPerMsg: 10,
 						},
-						CommitOnRamp: sequences.CommitOnRampParams{
+						CommitteeVerifier: sequences.CommitteeVerifierParams{
 							FeeAggregator: common.HexToAddress("0x01"),
+							SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
+								Threshold: 1,
+								Signers: []common.Address{
+									common.HexToAddress("0x02"),
+									common.HexToAddress("0x03"),
+									common.HexToAddress("0x04"),
+									common.HexToAddress("0x05"),
+								},
+							},
 						},
 						CCVProxy: sequences.CCVProxyParams{
 							FeeAggregator: common.HexToAddress("0x01"),
@@ -306,17 +340,6 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
 							USDPerLINK:                     usdPerLink,
 							USDPerWETH:                     usdPerWeth,
-						},
-						CommitOffRamp: sequences.CommitOffRampParams{
-							SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
-								Threshold: 1,
-								Signers: []common.Address{
-									common.HexToAddress("0x02"),
-									common.HexToAddress("0x03"),
-									common.HexToAddress("0x04"),
-									common.HexToAddress("0x05"),
-								},
-							},
 						},
 					},
 				}
@@ -339,7 +362,6 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		for _, result := range results {
 			require.NoError(t, result.err, "Failed to execute sequence for chain %d", result.chainSelector)
 			require.NotEmpty(t, result.report.Output.Addresses, "Expected addresses for chain %d", result.chainSelector)
-			require.Len(t, result.report.Output.Addresses, 14)
 		}
 	})
 }

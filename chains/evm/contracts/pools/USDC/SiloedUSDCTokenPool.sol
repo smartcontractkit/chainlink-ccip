@@ -6,10 +6,8 @@ import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {EnumerableSet} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 /// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
 /// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool

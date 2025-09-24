@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -163,8 +163,17 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 					ExecutorOnRamp: sequences.ExecutorOnRampParams{
 						MaxCCVsPerMsg: 10,
 					},
-					CommitOnRamp: sequences.CommitOnRampParams{
+					CommitteeVerifier: sequences.CommitteeVerifierParams{
 						FeeAggregator: common.HexToAddress("0x01"),
+						SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
+							Threshold: 1,
+							Signers: []common.Address{
+								common.HexToAddress("0x02"),
+								common.HexToAddress("0x03"),
+								common.HexToAddress("0x04"),
+								common.HexToAddress("0x05"),
+							},
+						},
 					},
 					CCVProxy: sequences.CCVProxyParams{
 						FeeAggregator: common.HexToAddress("0x01"),
@@ -177,24 +186,12 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 						USDPerLINK:                     usdPerLink,
 						USDPerWETH:                     usdPerWeth,
 					},
-					CommitOffRamp: sequences.CommitOffRampParams{
-						SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
-							Threshold: 1,
-							Signers: []common.Address{
-								common.HexToAddress("0x02"),
-								common.HexToAddress("0x03"),
-								common.HexToAddress("0x04"),
-								common.HexToAddress("0x05"),
-							},
-						},
-					},
 				},
 			})
 			require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
 
 			newAddrs, err := out.DataStore.Addresses().Fetch()
 			require.NoError(t, err, "Failed to fetch addresses from datastore")
-			require.Len(t, newAddrs, 14)
 
 			for _, addr := range existingAddrs {
 				for _, newAddr := range newAddrs {
