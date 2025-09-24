@@ -185,10 +185,11 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_SourceChainNotEnabled() public {
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = s_defaultCCV;
+
     // Configure source chain as disabled.
-    _applySourceConfig(
-      s_sourceRouter, SOURCE_CHAIN_SELECTOR, abi.encode(makeAddr("onRamp")), false, new address[](1), new address[](0)
-    );
+    _applySourceConfig(abi.encode(makeAddr("onRamp")), false, defaultCCVs, new address[](0));
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.SourceChainNotEnabled.selector, SOURCE_CHAIN_SELECTOR));
     MessageV1Codec.MessageV1 memory message = _getMessage();

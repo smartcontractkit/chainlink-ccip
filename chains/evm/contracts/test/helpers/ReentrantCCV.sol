@@ -37,9 +37,9 @@ contract ReentrantCCV is ICrossChainVerifierV1 {
   }
 
   function verifyMessage(
-    address, /* originalCaller */
+    address, // originalCaller
     MessageV1Codec.MessageV1 memory message,
-    bytes32, /* messageHash */
+    bytes32, // messageHash
     bytes memory ccvData
   ) external override {
     // Create a dummy report to trigger reentrancy.

@@ -335,15 +335,16 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Returns the CCVs required to execute a message. There can be duplicates between the required and optional
   // CCVs, but all duplicated within the required CCVs are removed.
-  function getNeededCCVs(
+  /// @dev This function exists for offchain purposes, calling it onchain might not be gas efficient.
+  function getCCVsForMessage(
     bytes calldata encodedMessage
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
 
-    return _getNeededCCVs(message.sourceChainSelector, address(bytes20(message.receiver)), message.tokenTransfer);
+    return _getCCVsForMessage(message.sourceChainSelector, address(bytes20(message.receiver)), message.tokenTransfer);
   }
 
-  function _getNeededCCVs(
+  function _getCCVsForMessage(
     uint64 sourceChainSelector,
     address receiver,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer
@@ -370,6 +371,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
     address[] memory defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
 
+    // We allocate the memory for all possible CCVs upfront to avoid multiple allocations.
     address[] memory allRequiredCCVs =
       new address[](requiredReceiverCCV.length + requiredPoolCCVs.length + laneMandatedCCVs.length + defaultCCVs.length);
 
@@ -386,36 +388,44 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       allRequiredCCVs[index++] = laneMandatedCCVs[i];
     }
 
-    bool defaultsAdded = false;
-
-    // Remove duplicates and add defaults.
+    // Add defaults if any address(0) was found.
     for (uint256 i = 0; i < index; ++i) {
-      // Address(0) means to add the defaults.
       if (allRequiredCCVs[i] == address(0)) {
-        // If the defaults have already been added, skip adding them again.
-        if (!defaultsAdded) {
-          for (uint256 j = 0; j < defaultCCVs.length; ++j) {
-            allRequiredCCVs[index++] = defaultCCVs[j];
-          }
-          defaultsAdded = true;
+        for (uint256 j = 0; j < defaultCCVs.length; ++j) {
+          allRequiredCCVs[index++] = defaultCCVs[j];
         }
-        // Remove the zero address by replacing it with the last element and reducing the index.
-        allRequiredCCVs[i] = allRequiredCCVs[--index];
+        break;
+      }
+    }
+
+    // Remove duplicates and address(0) entries.
+    uint256 writeIndex = 0;
+    for (uint256 readIndex = 0; readIndex < index; ++readIndex) {
+      address currentCCV = allRequiredCCVs[readIndex];
+
+      // Skip address(0) entries, effectively removing them.
+      if (currentCCV == address(0)) {
         continue;
       }
 
-      // Remove duplicates by replacing them with the last element and reducing the index.
-      for (uint256 j = i + 1; j < index; ++j) {
-        if (allRequiredCCVs[i] == allRequiredCCVs[j]) {
-          allRequiredCCVs[j] = allRequiredCCVs[--index];
-          j--;
+      // Check if this address already exists in the deduplicated portion.
+      bool isDuplicate = false;
+      for (uint256 j = 0; j < writeIndex; ++j) {
+        if (allRequiredCCVs[j] == currentCCV) {
+          isDuplicate = true;
+          break;
         }
+      }
+
+      // If not a duplicate, add it to the deduplicated portion.
+      if (!isDuplicate) {
+        allRequiredCCVs[writeIndex++] = currentCCV;
       }
     }
 
     assembly {
       // set the length of the array to the new index which we used to track the number of unique CCVs.
-      mstore(allRequiredCCVs, index)
+      mstore(allRequiredCCVs, writeIndex)
     }
 
     // Remove duplicates between required and optional CCVs.
@@ -457,7 +467,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     address[] calldata ccvs
   ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndexes) {
     (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
-      _getNeededCCVs(sourceChainSelector, receiver, tokenTransfer);
+      _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer);
 
     ccvsToQuery = new address[](ccvs.length);
     dataIndexes = new uint256[](ccvs.length);
@@ -703,6 +713,17 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       }
       if (address(configUpdate.router) == address(0) || configUpdate.defaultCCV.length == 0) {
         revert ZeroAddressNotAllowed();
+      }
+
+      for (uint256 j = 0; j < configUpdate.defaultCCV.length; ++j) {
+        if (configUpdate.defaultCCV[j] == address(0)) {
+          revert ZeroAddressNotAllowed();
+        }
+      }
+      for (uint256 j = 0; j < configUpdate.laneMandatedCCVs.length; ++j) {
+        if (configUpdate.laneMandatedCCVs[j] == address(0)) {
+          revert ZeroAddressNotAllowed();
+        }
       }
 
       // OnRamp can never be zero.

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageReceiverV2.sol";
-import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
@@ -30,25 +29,22 @@ contract CCVAggregatorSetup is BaseTest {
       })
     );
 
-    _applySourceConfig(
-      s_sourceRouter, SOURCE_CHAIN_SELECTOR, abi.encode(makeAddr("onRamp")), true, new address[](1), new address[](0)
-    );
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = s_defaultCCV;
+
+    _applySourceConfig(abi.encode(makeAddr("onRamp")), true, defaultCCVs, new address[](0));
   }
 
   function _applySourceConfig(
-    IRouter router,
-    uint64 sourceChainSelector,
     bytes memory onRamp,
     bool isEnabled,
     address[] memory defaultCCVs,
     address[] memory laneMandatedCCVs
   ) internal {
-    defaultCCVs[0] = s_defaultCCV;
-
     CCVAggregator.SourceChainConfigArgs[] memory updates = new CCVAggregator.SourceChainConfigArgs[](1);
     updates[0] = CCVAggregator.SourceChainConfigArgs({
-      router: router,
-      sourceChainSelector: sourceChainSelector,
+      router: s_sourceRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: isEnabled,
       onRamp: onRamp,
       defaultCCV: defaultCCVs,

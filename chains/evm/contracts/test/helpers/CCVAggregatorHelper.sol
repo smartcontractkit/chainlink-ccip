@@ -54,4 +54,12 @@ contract CCVAggregatorHelper is CCVAggregator {
   function getBalanceOfReceiver(address receiver, address token) external view returns (uint256) {
     return _getBalanceOfReceiver(receiver, token);
   }
+
+  function __getCCVsForMessage(
+    uint64 sourceChainSelector,
+    address receiver,
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfer
+  ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
+    return _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer);
+  }
 }
