@@ -86,11 +86,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   // Note: Since this struct never exists in storage, only in memory after an ABI-decoding, proper struct-packing
   // is not necessary and field ordering has been defined so as to best support off-chain code.
   // solhint-disable-next-line gas-struct-packing
-  struct SourceTokenDataPayload {
+  struct SourceTokenDataPayloadV0 {
     uint64 nonce; // Nonce of the message (used only in CCTP V1).
     uint32 sourceDomain; // Source domain of the message.
-    CCTPVersion cctpVersion; // CCTP version for acquiring off-chain attestations.
-    bytes32 depositHash; // Hash of the source pool data for offchain validation.
+    CCTPVersion cctpVersion; // CCTP version of the message.
   }
 
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
@@ -214,14 +213,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     // bytes4(0) is used as the version to match the CCTP V1 message format.
     // depositHash is not necessary for CCTP V1, as the nonce is returned by the deposit call itself, but to maintain
     // struct consistency, for compatibility with the CCTP V2 token pool, it is set to 0.
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
       bytes4(0), // version
-      SourceTokenDataPayload({
-        nonce: nonce,
-        sourceDomain: i_localDomainIdentifier,
-        cctpVersion: CCTPVersion.CCTP_V1,
-        depositHash: bytes32(0)
-      })
+      SourceTokenDataPayloadV0({nonce: nonce, sourceDomain: i_localDomainIdentifier, cctpVersion: CCTPVersion.CCTP_V1})
     );
 
     return Pool.LockOrBurnOutV1({
@@ -273,8 +267,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     // version will revert. However, this should never occur, as the USDC Proxy
     // which receives the message first, should never call this pool with that data,
     // instead formatting the message to the new format if necessary.
-    SourceTokenDataPayload memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(releaseOrMintIn.sourcePoolData);
+    SourceTokenDataPayloadV0 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV0(releaseOrMintIn.sourcePoolData);
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
@@ -310,7 +304,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   ///     * messageBody           dynamic    bytes      116
   function _validateMessage(
     bytes memory usdcMessage,
-    SourceTokenDataPayload memory sourceTokenData
+    SourceTokenDataPayloadV0 memory sourceTokenData
   ) internal view virtual {
     // 116 is the minimum length of a valid USDC message. Since destinationCaller must be checked for the
     // previous pool, this ensures it can be parsed correctly and that the message is not too short.

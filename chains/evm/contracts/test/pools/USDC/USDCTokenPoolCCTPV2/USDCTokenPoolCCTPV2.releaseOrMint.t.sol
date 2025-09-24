@@ -8,6 +8,7 @@ import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
+import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
@@ -52,10 +53,9 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
         bytes4(uint32(1)),
-        USDCTokenPool.SourceTokenDataPayload({
-          nonce: 0,
+        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
           sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
           cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
           depositHash: bytes32(0)
@@ -105,17 +105,15 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       hex"000000010000000500000000bc7e669b9f452229fdd08bac21b6617068f2fd023ad6e805d03afa88b4bb79aea65fc81d0fefa8860cb3b83f089b0224be8a6687b7ae49f594c0b9b4d7e9389300000000000000000000000028b5a0e9c621a5badaa536219b3a228c8168cf5d0000000000000000000000000000000000000000000000000000000000000000000007d0000007d000000001c6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d61000000000000000000000000e7492c49f71841d0f55f4f22c2ee22f02437084000000000000000000000000000000000000000000000000000000017491105202c747e9f0b8a0bb74202136e08fb8463bb15d1ab1d6d3f916f547004d7c7522f0000000000000000000000000000000000000000000000000000000000989a720000000000000000000000000000000000000000000000000000000000989a7200000000000000000000000000000000000000000000000000000000015d0d4e";
     bytes memory attestation = bytes("attestation bytes");
 
-    uint32 nonce = 4730;
     uint32 sourceDomain = 5;
     uint256 amount = 100;
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
         bytes4(uint32(1)),
-        USDCTokenPool.SourceTokenDataPayload({
-          nonce: nonce,
+        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
           sourceDomain: sourceDomain,
           cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
           depositHash: bytes32(0)
@@ -179,10 +177,9 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
         bytes4(uint32(1)),
-        USDCTokenPool.SourceTokenDataPayload({
-          nonce: 0,
+        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
           sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
           cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
           depositHash: bytes32(0)
@@ -220,10 +217,9 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
         bytes4(uint32(1)),
-        USDCTokenPool.SourceTokenDataPayload({
-          nonce: 1,
+        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
           sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
           cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
           depositHash: bytes32(0)

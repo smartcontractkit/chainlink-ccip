@@ -26,6 +26,12 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   /// @dev 2000 indicates that finality must be reached before attestation is possible in CCTP V2.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
+  struct SourceTokenDataPayloadV1 {
+    uint32 sourceDomain;
+    CCTPVersion cctpVersion;
+    bytes32 depositHash;
+  }
+
   /// @dev This contract is only used for CCTP V2, which is why the supportedUSDCVersion field of the parent
   /// constructor is set to 1. CCTP V1 used a version number of 0, so the version number is incremented by 1 for V2.
   constructor(
@@ -95,10 +101,9 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       FINALITY_THRESHOLD // minFinalityThreshold
     );
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
       bytes4(uint32(1)),
-      SourceTokenDataPayload({
-        nonce: 0,
+      SourceTokenDataPayloadV1({
         sourceDomain: i_localDomainIdentifier,
         cctpVersion: CCTPVersion.CCTP_V2,
         depositHash: depositHash
@@ -109,6 +114,52 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
       destPoolData: sourcePoolData
     });
+  }
+
+  /// @notice Mint tokens from the pool to the recipient
+  /// * sourceTokenData is part of the verified message and passed directly from
+  /// the offRamp so it is guaranteed to be what the lockOrBurn pool released on the
+  /// source chain. It contains (nonce, sourceDomain) which is guaranteed by CCTP
+  /// to be unique.
+  /// * offchainTokenData is untrusted (can be supplied by manual execution), but we assert
+  /// that (nonce, sourceDomain) is equal to the message's (nonce, sourceDomain) and
+  /// receiveMessage will assert that Attestation contains a valid attestation signature
+  /// for that message, including its (nonce, sourceDomain). This way, the only
+  /// non-reverting offchainTokenData that can be supplied is a valid attestation for the
+  /// specific message that was sent on source.
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
+
+    MessageAndAttestation memory msgAndAttestation =
+      abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
+
+    // Note: This decoding will be done on the new SourceTokenDataPayload struct,
+    // which has been altered to support both CCTP V1 and CCTP V2. Attempting to
+    // call releaseOrMint on this contract, with a sourcePoolData from a previous
+    // version will revert. However, this should never occur, as the USDC Proxy
+    // which receives the message first, should never call this pool with that data,
+    // instead formatting the message to the new format if necessary.
+    SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(releaseOrMintIn.sourcePoolData);
+
+    _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
+
+    // Proxy the message to the message transmitter, which will mint the tokens through CCTP's contracts.
+    if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
+      revert UnlockingUSDCFailed();
+    }
+
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: releaseOrMintIn.sourceDenominatedAmount
+    });
+
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }
 
   /// @notice Validates the USDC encoded message against the given parameters.
@@ -127,10 +178,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ///     * minFinalityThreshold       32         uint32    140
   ///     * finalityThresholdExecuted  32         uint32    144
   ///     * messageBody                dynamic    bytes     148
-  function _validateMessage(
-    bytes memory usdcMessage,
-    SourceTokenDataPayload memory sourceTokenData
-  ) internal view override {
+  function _validateMessage(bytes memory usdcMessage, SourceTokenDataPayloadV1 memory sourceTokenData) internal view {
     // 148 is the minimum length of a valid message where all of the require fields are present and capable of being parsed.
     // correctly below for message validation. Since messageBody is dynamic and not always used, it is not included in this
     // check.

@@ -50,13 +50,12 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
         bytes4(0),
-        USDCTokenPool.SourceTokenDataPayload({
+        USDCTokenPool.SourceTokenDataPayloadV0({
           nonce: usdcMessage.nonce,
           sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          depositHash: bytes32(hex"deadbeef")
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -110,13 +109,12 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
         bytes4(0),
-        USDCTokenPool.SourceTokenDataPayload({
+        USDCTokenPool.SourceTokenDataPayloadV0({
           nonce: nonce,
           sourceDomain: sourceDomain,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          depositHash: bytes32(0)
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -175,13 +173,12 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
         bytes4(0),
-        USDCTokenPool.SourceTokenDataPayload({
+        USDCTokenPool.SourceTokenDataPayloadV0({
           nonce: usdcMessage.nonce,
           sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          depositHash: bytes32(0)
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -216,13 +213,12 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
         bytes4(0),
-        USDCTokenPool.SourceTokenDataPayload({
+        USDCTokenPool.SourceTokenDataPayloadV0({
           nonce: 1,
           sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          depositHash: bytes32(0)
+          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS

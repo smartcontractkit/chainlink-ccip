@@ -7,6 +7,7 @@ import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
+import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
@@ -84,14 +85,9 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     uint256 testAmount = 4321;
     bytes memory originalSender = abi.encode(s_sender);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
       bytes4(0),
-      USDCTokenPool.SourceTokenDataPayload({
-        nonce: 0,
-        sourceDomain: 0,
-        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-        depositHash: bytes32(0)
-      })
+      USDCTokenPool.SourceTokenDataPayloadV0({nonce: 0, sourceDomain: 0, cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1})
     );
     bytes memory offChainTokenData = "";
 
@@ -139,13 +135,12 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
       bytes4(uint32(1)),
-      USDCTokenPool.SourceTokenDataPayload({
-        nonce: 0,
+      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
         sourceDomain: 0,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-        depositHash: bytes32(hex"deadbeef")
+        depositHash: bytes32(hex"deafbeef")
       })
     );
     bytes memory offChainTokenData = "";
@@ -315,15 +310,13 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   function test_releaseOrMint_InvalidVersion() public {
     // Arrange: Prepare test data
     uint256 testAmount = 1234;
-    bytes memory emptyMessageBody = new bytes(0);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
       bytes4(uint32(2)),
-      USDCTokenPool.SourceTokenDataPayload({
-        nonce: 0,
+      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
         sourceDomain: 0,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-        depositHash: bytes32(hex"deadbeef")
+        depositHash: bytes32(hex"deafbeef")
       })
     );
     bytes memory offChainTokenData = "";

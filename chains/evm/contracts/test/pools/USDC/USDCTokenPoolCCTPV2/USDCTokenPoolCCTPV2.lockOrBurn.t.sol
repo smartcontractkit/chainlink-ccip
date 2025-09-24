@@ -8,6 +8,7 @@ import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
+import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -61,9 +62,8 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(poolReturnDataV1.destPoolData);
-    assertEq(sourceTokenDataPayload.nonce, 0, "nonce is incorrect");
+    USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
     assertEq(
       uint8(sourceTokenDataPayload.cctpVersion), uint8(USDCTokenPool.CCTPVersion.CCTP_V2), "cctpVersion is incorrect"
@@ -131,9 +131,10 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(poolReturnDataV1.destPoolData);
-    assertEq(sourceTokenDataPayload.nonce, 0);
+    USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
+
+    assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
   }
 
   function testFuzz_lockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
@@ -183,9 +184,12 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(poolReturnDataV1.destPoolData);
-    assertEq(sourceTokenDataPayload.nonce, 0);
+    USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
+    assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
+    assertEq(
+      uint8(sourceTokenDataPayload.cctpVersion), uint8(USDCTokenPool.CCTPVersion.CCTP_V2), "cctpVersion is incorrect"
+    );
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 

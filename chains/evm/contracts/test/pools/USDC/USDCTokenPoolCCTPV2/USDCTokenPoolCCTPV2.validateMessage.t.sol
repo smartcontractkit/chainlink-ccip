@@ -7,7 +7,7 @@ import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
 contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
   USDCMessageCCTPV2 internal s_validUsdcMessage;
-  USDCTokenPool.SourceTokenDataPayload internal s_validSourceTokenData;
+  USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 internal s_validSourceTokenData;
 
   function setUp() public virtual override {
     super.setUp();
@@ -29,8 +29,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
 
     // Create valid source token data payload that matches the valid USDC message
     // This is used by tests that need to test payload validation failures
-    s_validSourceTokenData = USDCTokenPool.SourceTokenDataPayload({
-      nonce: 0,
+    s_validSourceTokenData = USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
       sourceDomain: s_validUsdcMessage.sourceDomain,
       cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
       depositHash: bytes32(0)
@@ -56,8 +55,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
     vm.resumeGasMetering();
     s_usdcTokenPool.validateMessage(
       encodedUsdcMessage,
-      USDCTokenPool.SourceTokenDataPayload({
-        nonce: 0,
+      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
         sourceDomain: sourceDomain,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
         depositHash: bytes32(0)
@@ -77,8 +75,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
     );
     s_usdcTokenPool.validateMessage(
       _generateUSDCMessageCCTPV2(s_validUsdcMessage),
-      USDCTokenPool.SourceTokenDataPayload({
-        nonce: 0,
+      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
         sourceDomain: expectedSourceDomain,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
         depositHash: bytes32(0)
@@ -147,8 +144,8 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
 
   function test_validateMessage_RevertWhen_InvalidCCTPVersion() public {
     // Create source token data with invalid CCTP version
-    USDCTokenPool.SourceTokenDataPayload memory invalidCCTPVersionData = USDCTokenPool.SourceTokenDataPayload({
-      nonce: 0,
+    USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory invalidCCTPVersionData = USDCTokenPoolCCTPV2
+      .SourceTokenDataPayloadV1({
       sourceDomain: s_validUsdcMessage.sourceDomain,
       cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
       depositHash: bytes32(0)

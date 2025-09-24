@@ -330,14 +330,13 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
     uint32 sourceDomain = uint32(bytes4(releaseOrMintIn.sourcePoolData[4:8]));
 
     // Since this is a legacy message, it should only operate on CCTP V1 messages. As a result it is safe to hard
-    // code the version to 0 and the depositHash to bytes32(0).
-    newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+    // code the version to 0.
+    newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
       bytes4(0),
-      USDCTokenPool.SourceTokenDataPayload({
+      USDCTokenPool.SourceTokenDataPayloadV0({
         nonce: nonce,
         sourceDomain: sourceDomain,
-        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-        depositHash: bytes32(0)
+        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1
       })
     );
 

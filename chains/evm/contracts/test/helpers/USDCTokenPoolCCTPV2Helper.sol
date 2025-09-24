@@ -17,7 +17,7 @@ contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
     address router
   ) USDCTokenPoolCCTPV2(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router) {}
 
-  function validateMessage(bytes memory usdcMessage, SourceTokenDataPayload memory sourceTokenData) external view {
+  function validateMessage(bytes memory usdcMessage, SourceTokenDataPayloadV1 memory sourceTokenData) external view {
     return _validateMessage(usdcMessage, sourceTokenData);
   }
 }
