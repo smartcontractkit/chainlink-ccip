@@ -13,7 +13,7 @@ import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165
 abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   error DuplicateCCV(address ccv);
 
-  event CCVConfigUpdated(uint64 indexed destChainSelector, address[] outboundCCVs, address[] inboundCCVs);
+  event CCVConfigUpdated(uint64 indexed remoteChainSelector, address[] outboundCCVs, address[] inboundCCVs);
 
   struct CCVConfigArg {
     uint64 remoteChainSelector;
@@ -29,14 +29,6 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   //TODO define billing based struct and storage layout
 
   mapping(uint64 remoteChainSelector => CCVConfig) internal s_verifierConfig;
-
-  /// @notice Signals which version of the pool interface is supported.
-  function supportsInterface(
-    bytes4 interfaceId
-  ) public pure virtual override(TokenPoolV1, IERC165) returns (bool) {
-    return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == type(IPoolV2).interfaceId
-      || super.supportsInterface(interfaceId);
-  }
 
   constructor(
     IERC20 token,
@@ -136,5 +128,13 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     Client.EVM2AnyMessage calldata // message
   ) external view virtual returns (uint256 feeTokenAmount) {
     return 0;
+  }
+
+  /// @notice Signals which version of the pool interface is supported.
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure virtual override(TokenPoolV1, IERC165) returns (bool) {
+    return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == type(IPoolV2).interfaceId
+      || super.supportsInterface(interfaceId);
   }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {BurnMintTokenPool} from "../../../poolsV2/BurnMintTokenPool/BurnMintTokenPool.sol";
+import {BurnMintTokenPool} from "../../../poolsV2/BurnMintTokenPool.sol";
 import {TokenPoolV2Setup} from "../TokenPool/TokenPoolV2Setup.t.sol";
 
 contract BurnMintSetup is TokenPoolV2Setup {
