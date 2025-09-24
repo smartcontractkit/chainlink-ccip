@@ -21,23 +21,11 @@ type OutputBuilder struct {
 	changesetOutput deployment.ChangesetOutput
 }
 
-type MCMSConfig struct {
+// MCMSBuildParams holds configuration for building an MCMS proposal.
+type MCMSBuildParams struct {
+	MCMSInput
 	// Description is a human-readable description of the proposal.
 	Description string
-	// OverridePreviousRoot indicates whether to override the root of the MCMS contract.
-	OverridePreviousRoot bool
-	// ValidUntil is a unix timestamp indicating when the proposal expires.
-	// Root can't be set or executed after this time.
-	ValidUntil uint32
-	// TimelockDelay is the amount of time each operation in the proposal must wait before it can be executed.
-	TimelockDelay mcms_types.Duration
-	// TimelockAction is the action to perform on the timelock contract (schedule, bypass, or cancel).
-	TimelockAction mcms_types.TimelockAction
-}
-
-// MCMSParams holds configuration for building an MCMS proposal.
-type MCMSParams struct {
-	MCMSConfig
 	// TimelockAddresses is a map of chain selectors to timelock contract addresses.
 	TimelockAddresses map[mcms_types.ChainSelector]string
 	// ChainMetadata is optional metadata to include for each chain in the proposal.
@@ -71,11 +59,17 @@ func (b *OutputBuilder) WithWriteOutputs(outs []contract.WriteOutput) *OutputBui
 }
 
 // Build constructs the final ChangesetOutput, including building an MCMS proposal if there are write operations that have not been executed.
-func (b *OutputBuilder) Build(params MCMSParams) (deployment.ChangesetOutput, error) {
+func (b *OutputBuilder) Build(params MCMSBuildParams) (deployment.ChangesetOutput, error) {
 	ops := b.convertWriteOutputsToBatchOperations()
 	if ops == nil || len(ops) == 0 {
 		// No write operations to include in MCMS proposal
 		return b.changesetOutput, nil
+	}
+	if params.TimelockAddresses == nil || len(params.TimelockAddresses) == 0 {
+		return deployment.ChangesetOutput{}, errors.New("timelock addresses are required to build MCMS proposal")
+	}
+	if params.ChainMetadata == nil {
+		return deployment.ChangesetOutput{}, errors.New("chain metadata is required to build MCMS proposal")
 	}
 	proposal, err := mcms.NewTimelockProposalBuilder().
 		SetVersion("v1").

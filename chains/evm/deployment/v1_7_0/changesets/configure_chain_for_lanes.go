@@ -33,21 +33,7 @@ type RemoteChainConfig struct {
 type ConfigureChainForLanesCfg struct {
 	ChainSel     uint64
 	RemoteChains map[uint64]RemoteChainConfig
-}
-
-func (c ConfigureChainForLanesCfg) MCMSConfig() *changesets.MCMSConfig {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c ConfigureChainForLanesCfg) TimelockAddressQualifier() string {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c ConfigureChainForLanesCfg) MCMSAddressQualifier() string {
-	//TODO implement me
-	panic("implement me")
+	MCMSArgs     *changesets.MCMSInput
 }
 
 func (c ConfigureChainForLanesCfg) ChainSelector() uint64 {
@@ -168,6 +154,8 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			RemoteChains:  remoteChains,
 		}, nil
 	},
-	ResolveDep:  changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],
-	ResolveMCMS: changesets.ResolveMCMSParams[ConfigureChainForLanesCfg],
+	ResolveDep: changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],
+	ResolveMCMS: func(e cldf_deployment.Environment, cfg ConfigureChainForLanesCfg) (changesets.MCMSBuildParams, error) {
+		return changesets.ResolveMCMS(e, changesets.NewEVMMCMBuilder(cfg.MCMSArgs))
+	},
 })

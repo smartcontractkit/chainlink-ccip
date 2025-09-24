@@ -96,8 +96,6 @@ func NewWrite[ARGS any, C any](
 					Data:             tx.Data(),
 					AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
 				},
-				TimelockAddress: input.TimelockAddress,
-				MCMAddress:      input.MCMAddress,
 			}, nil
 		},
 	)

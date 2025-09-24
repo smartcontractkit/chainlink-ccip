@@ -19,7 +19,7 @@ type NewFromOnChainSequenceParams[IN any, DEP any, CFG any] struct {
 	// ResolveDeps resolves the dependencies for the sequence based on the environment and changeset config.
 	ResolveDep func(e deployment.Environment, cfg CFG) (DEP, error)
 	// ResolveMCMS resolves the MCMS configuration based on the environment and changeset config.
-	ResolveMCMS func(e deployment.Environment, cfg CFG) (MCMSParams, error)
+	ResolveMCMS func(e deployment.Environment, cfg CFG) (MCMSBuildParams, error)
 	// Describe returns a human-readable description of the changeset.
 	Describe func(in IN, dep DEP) string
 }
@@ -27,21 +27,24 @@ type NewFromOnChainSequenceParams[IN any, DEP any, CFG any] struct {
 // NewFromOnChainSequence creates a Changeset from an operations.Sequence that deploys contracts on-chain and performs write operations.
 // It wraps sequence execution with DataStore and MCMS integration.
 func NewFromOnChainSequence[IN any, DEP any, CFG any](params NewFromOnChainSequenceParams[IN, DEP, CFG]) deployment.ChangeSetV2[CFG] {
-	resolve := func(e deployment.Environment, cfg CFG) (IN, DEP, MCMSParams, error) {
+	resolve := func(e deployment.Environment, cfg CFG) (IN, DEP, MCMSBuildParams, error) {
 		var in IN
 		var dep DEP
 		var err error
 		in, err = params.ResolveInput(e, cfg)
 		if err != nil {
-			return in, dep, MCMSParams{}, fmt.Errorf("failed to resolve input for sequence with ID %s: %w", params.Sequence.ID(), err)
+			return in, dep, MCMSBuildParams{}, fmt.Errorf("failed to resolve input for sequence with ID %s: %w", params.Sequence.ID(), err)
 		}
 		dep, err = params.ResolveDep(e, cfg)
 		if err != nil {
-			return in, dep, MCMSParams{}, fmt.Errorf("failed to resolve dependencies for sequence with ID %s: %w", params.Sequence.ID(), err)
+			return in, dep, MCMSBuildParams{}, fmt.Errorf("failed to resolve dependencies for sequence with ID %s: %w", params.Sequence.ID(), err)
+		}
+		if params.ResolveMCMS == nil {
+			return in, dep, MCMSBuildParams{}, nil
 		}
 		mcmsParams, err := params.ResolveMCMS(e, cfg)
 		if err != nil {
-			return in, dep, MCMSParams{}, fmt.Errorf("failed to resolve MCMS config for sequence with ID %s: %w", params.Sequence.ID(), err)
+			return in, dep, MCMSBuildParams{}, fmt.Errorf("failed to resolve MCMS config for sequence with ID %s: %w", params.Sequence.ID(), err)
 		}
 		mcmsParams.Description = params.Describe(in, dep)
 		return in, dep, mcmsParams, nil

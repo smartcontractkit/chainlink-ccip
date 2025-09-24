@@ -1,164 +1,201 @@
 package changesets
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	mcmsevmsdk "github.com/smartcontractkit/mcms/sdk/evm"
-	"github.com/smartcontractkit/mcms/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 )
 
-type MCMSRole string
-
 var (
-	BypasserManyChainMultisig  datastore.ContractType = "BypasserManyChainMultiSig"
-	CancellerManyChainMultisig datastore.ContractType = "CancellerManyChainMultiSig"
-	ProposerManyChainMultisig  datastore.ContractType = "ProposerManyChainMultiSig"
-	ManyChainMultisig          datastore.ContractType = "ManyChainMultiSig"
-	RBACTimelock               datastore.ContractType = "RBACTimelock"
-	CallProxy                  datastore.ContractType = "CallProxy"
-
-	// roles
-	ProposerRole  MCMSRole = "PROPOSER"
-	BypasserRole  MCMSRole = "BYPASSER"
-	CancellerRole MCMSRole = "CANCELLER"
+	allowedContractTypeToAction = map[mcms_types.TimelockAction]datastore.ContractType{
+		mcms_types.TimelockActionSchedule: "ProposerManyChainMultiSig",
+		mcms_types.TimelockActionBypass:   "BypasserManyChainMultiSig",
+		mcms_types.TimelockActionCancel:   "CancellerManyChainMultiSig",
+	}
+	timelockContractType datastore.ContractType = "RBACTimelock"
 )
 
-func (r MCMSRole) String() string {
-	return string(r)
+// TODO : move this to a common chain agnostic package
+type MCMSInput struct {
+	// OverridePreviousRoot indicates whether to override the root of the MCMS contract.
+	OverridePreviousRoot bool
+	// ValidUntil is a unix timestamp indicating when the proposal expires.
+	// Root can't be set or executed after this time.
+	ValidUntil uint32
+	// TimelockDelay is the amount of time each operation in the proposal must wait before it can be executed.
+	TimelockDelay mcms_types.Duration
+	// TimelockAction is the action to perform on the timelock contract (schedule, bypass, or cancel).
+	TimelockAction mcms_types.TimelockAction
+	// MCMSAddressRef is a reference to the MCMS contract address in the datastore.
+	MCMSAddressRef *datastore.AddressRef
+	// TimelockAddressRef is a reference to the timelock contract address in the datastore.
+	TimelockAddressRef *datastore.AddressRef
 }
 
-type WithMCMS interface {
-	MCMSConfig() *MCMSConfig
-	TimelockAddressQualifier() string
-	MCMSAddressQualifier() string
-}
-
-func ResolveMCMSParams[CFG WithMCMS](e cldf_deployment.Environment, cfg CFG) (MCMSParams, error) {
-	if cfg.MCMSConfig() == nil {
-		return MCMSParams{}, nil
+// TODO : need to put more validation here
+func (c *MCMSInput) Validate() error {
+	if c.TimelockAction != mcms_types.TimelockActionSchedule &&
+		c.TimelockAction != mcms_types.TimelockActionBypass &&
+		c.TimelockAction != mcms_types.TimelockActionCancel {
+		return fmt.Errorf("invalid timelock action: %s", c.TimelockAction)
 	}
-	// map of chain selector to timelock address
-	timelockAddresses := make(map[types.ChainSelector]string)
-	chainMetadata := make(map[types.ChainSelector]mcms_types.ChainMetadata)
-	for sel := range e.BlockChains.EVMChains() {
-		// find and format the MCMS related addresses
-		timelockAddrs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{
-			{
+	validateAddressRef := func(ref *datastore.AddressRef) error {
+		if ref == nil {
+			return errors.New("address ref is required")
+		}
+		if ref.Type == "" {
+			return errors.New("address ref type is required")
+		}
+		if ref.Version == nil {
+			return errors.New("address ref version is required")
+		}
+		if ref.Qualifier == "" {
+			return errors.New("address ref qualifier is required")
+		}
+		return nil
+	}
+	if err := validateAddressRef(c.MCMSAddressRef); err != nil {
+		return fmt.Errorf("invalid mcms address ref: %w", err)
+	} else {
+		allowedType, ok := allowedContractTypeToAction[c.TimelockAction]
+		if !ok {
+			return fmt.Errorf("no allowed contract type for timelock action: %s", c.TimelockAction)
+		}
+		if c.MCMSAddressRef.Type != allowedType {
+			return fmt.Errorf("mcms address ref type %s does not match expected type %s for timelock action %s",
+				c.MCMSAddressRef.Type, allowedType, c.TimelockAction)
+		}
+	}
+	if err := validateAddressRef(c.TimelockAddressRef); err != nil {
+		return fmt.Errorf("invalid timelock address ref: %w", err)
+	} else {
+		if c.TimelockAddressRef.Type != timelockContractType {
+			return fmt.Errorf("timelock address ref type must be '%s', got '%s'", timelockContractType, c.TimelockAddressRef.Type)
+		}
+	}
+	return nil
+}
+
+type MCMSBuilder interface {
+	Input() *MCMSInput
+	DeriveTimelocks(e cldf_deployment.Environment) (map[mcms_types.ChainSelector]string, error)
+	DeriveChainMetaData(e cldf_deployment.Environment) (map[mcms_types.ChainSelector]mcms_types.ChainMetadata, error)
+}
+
+func ResolveMCMS(e cldf_deployment.Environment, args MCMSBuilder) (MCMSBuildParams, error) {
+	in := args.Input()
+	if in == nil {
+		return MCMSBuildParams{}, nil
+	}
+	if err := in.Validate(); err != nil {
+		return MCMSBuildParams{}, fmt.Errorf("invalid MCMS input: %w", err)
+	}
+
+	tl, err := args.DeriveTimelocks(e)
+	if err != nil {
+		return MCMSBuildParams{}, fmt.Errorf("derive timelocks: %w", err)
+	}
+	meta, err := args.DeriveChainMetaData(e)
+	if err != nil {
+		return MCMSBuildParams{}, fmt.Errorf("derive chain metadata: %w", err)
+	}
+
+	return MCMSBuildParams{
+		MCMSInput:         *in, // value-copy to discourage later mutation
+		TimelockAddresses: tl,
+		ChainMetadata:     meta,
+	}, nil
+}
+
+type EVMMCMBuilder struct {
+	in *MCMSInput
+}
+
+func (b EVMMCMBuilder) Input() *MCMSInput {
+	return b.in
+}
+
+func (b EVMMCMBuilder) DeriveTimelocks(e cldf_deployment.Environment) (map[mcms_types.ChainSelector]string, error) {
+	in := b.Input()
+	if in == nil {
+		return nil, nil
+	}
+	evm := e.BlockChains.EVMChains()
+	if len(evm) == 0 {
+		return nil, fmt.Errorf("no EVM chains found in environment")
+	}
+	out := make(map[mcms_types.ChainSelector]string, len(evm))
+	for sel := range evm {
+		addrs, err := datastore_utils.FindAndFormatEachRef(
+			e.DataStore,
+			[]datastore.AddressRef{{
 				ChainSelector: sel,
-				Type:          datastore.ContractType(RBACTimelock),
-				Version:       utils.Version1_0_0,
-				Qualifier:     cfg.TimelockAddressQualifier(),
-			},
-		}, datastore_utils.ToEVMAddress)
+				Type:          in.TimelockAddressRef.Type,
+				Version:       in.TimelockAddressRef.Version,
+				Qualifier:     in.TimelockAddressRef.Qualifier,
+				Labels:        in.TimelockAddressRef.Labels,
+			}},
+			datastore_utils.ToEVMAddress,
+		)
 		if err != nil {
-			e.Logger.Errorf("failed to find timelock addresses for chain selector %d: %v", sel, err)
-			return MCMSParams{}, err
+			return nil, fmt.Errorf("chain %d: %w", sel, err)
 		}
-		if len(timelockAddrs) == 0 {
-			e.Logger.Errorf("no timelock address found for chain selector %d with qualifier %s", sel, cfg.TimelockAddressQualifier())
-			return MCMSParams{}, fmt.Errorf("no timelock address found for chain selector %d with qualifier %s", sel, cfg.TimelockAddressQualifier())
+		if len(addrs) != 1 {
+			return nil, fmt.Errorf("chain %d: expected 1 address, got %d", sel, len(addrs))
 		}
-		timelockAddresses[types.ChainSelector(sel)] = timelockAddrs[0].String()
-		var mcmsAddr common.Address
-		switch cfg.MCMSConfig().TimelockAction {
-		case mcms_types.TimelockActionSchedule:
-			mcmsAddr, err = findMCMS(e, sel, ProposerRole, ProposerManyChainMultisig, cfg.MCMSAddressQualifier())
-			if err != nil {
-				return MCMSParams{}, err
-			}
-			e.Logger.Infof("Using proposer MCMS %s to schedule on timelock %s for chain selector %d", mcmsAddr.String(), timelockAddrs[0].String(), sel)
-		case mcms_types.TimelockActionBypass:
-			mcmsAddr, err = findMCMS(e, sel, BypasserRole, BypasserManyChainMultisig, cfg.MCMSAddressQualifier())
-			if err != nil {
-				return MCMSParams{}, err
-			}
-			e.Logger.Infof("Using bypasser MCMS %s to bypass on timelock %s for chain selector %d", mcmsAddr.String(), timelockAddrs[0].String(), sel)
-		case mcms_types.TimelockActionCancel:
-			mcmsAddr, err = findMCMS(e, sel, CancellerRole, CancellerManyChainMultisig, cfg.MCMSAddressQualifier())
-			if err != nil {
-				return MCMSParams{}, err
-			}
-			e.Logger.Infof("Using canceller MCMS %s to cancel on timelock %s for chain selector %d", mcmsAddr.String(), timelockAddrs[0].String(), sel)
-		}
-		chainMetadata[types.ChainSelector(sel)], err = mcmsChainMetadata(e, sel, mcmsAddr)
-		if err != nil {
-			e.Logger.Errorf("failed to get chain metadata for chain selector %d: %v", sel, err)
-			return MCMSParams{}, err
-		}
+		out[mcms_types.ChainSelector(sel)] = addrs[0].String()
 	}
-
-	return MCMSParams{
-		MCMSConfig:        cfg.MCMSConfig(),
-		TimelockAddresses: timelockAddresses,
-		ChainMetadata:     chainMetadata,
-	}, nil
+	return out, nil
 }
 
-// findMCMS finds the MCMS address for the given chain selector, role, and contract type.
-// It first looks for addresses stored with type ManyChainMultisig , label PROPOSER/BYPASSER/CANCELLER and qualifier
-// If not found, it falls back to type ProposerManyChainMultiSig/BypasserManyChainMultiSig/CancellerManyChainMultiSig and qualifier.
-func findMCMS(e cldf_deployment.Environment, sel uint64, role MCMSRole, contractType datastore.ContractType, qualifier string) (common.Address, error) {
-	// addresses could be stored with type ManyChainMultisig and label PROPOSER/BYPASSER/CANCELLER
-	// or with type ProposerManyChainMultiSig/BypasserManyChainMultiSig/CancellerManyChainMultiSig and no label
-	staticAddrs, err := datastore_utils.FindAndFormatEachRefIfFound(e.DataStore, []datastore.AddressRef{
-		{
-			ChainSelector: sel,
-			Type:          ManyChainMultisig,
-			Version:       utils.Version1_0_0,
-			Qualifier:     qualifier,
-			Labels:        datastore.NewLabelSet(role.String()),
-		},
-	}, datastore_utils.ToEVMAddress)
-	if err != nil {
-		e.Logger.Errorf("failed to find and format %s mcms address for chain selector %d: %v", contractType, sel, err)
-		return common.Address{}, err
+func (b EVMMCMBuilder) DeriveChainMetaData(e cldf_deployment.Environment) (map[mcms_types.ChainSelector]mcms_types.ChainMetadata, error) {
+	in := b.Input()
+	if in == nil {
+		return nil, nil
 	}
-	if len(staticAddrs) == 1 {
-		return staticAddrs[0], nil
-	} else if len(staticAddrs) > 1 {
-		e.Logger.Errorf("multiple %s mcms addresses found for chain selector %d with qualifier %s and role %s", contractType, sel, qualifier, role)
-		return common.Address{}, fmt.Errorf("multiple %s mcms addresses found for chain selector %d with qualifier %s and role %s", contractType, sel, qualifier, role)
+	evm := e.BlockChains.EVMChains()
+	if len(evm) == 0 {
+		return nil, fmt.Errorf("no EVM chains found in environment")
 	}
-	// fallback to type ProposerManyChainMultiSig/BypasserManyChainMultiSig/CancellerManyChainMultiSig if not found
-	staticAddrs, err = datastore_utils.FindAndFormatEachRefIfFound(e.DataStore, []datastore.AddressRef{
-		{
-			ChainSelector: sel,
-			Type:          contractType,
-			Version:       utils.Version1_0_0,
-			Qualifier:     qualifier,
-		},
-	}, datastore_utils.ToEVMAddress)
-	if err != nil {
-		e.Logger.Errorf("failed to find and format %s mcms address for chain selector %d: %v", contractType, sel, err)
-		return common.Address{}, err
+	out := make(map[mcms_types.ChainSelector]mcms_types.ChainMetadata, len(evm))
+	for sel, chain := range evm {
+		inspector := mcmsevmsdk.NewInspector(chain.Client)
+		addrs, err := datastore_utils.FindAndFormatEachRef(
+			e.DataStore,
+			[]datastore.AddressRef{{
+				ChainSelector: sel,
+				Type:          in.MCMSAddressRef.Type,
+				Version:       in.MCMSAddressRef.Version,
+				Qualifier:     in.MCMSAddressRef.Qualifier,
+				Labels:        in.MCMSAddressRef.Labels,
+			}},
+			datastore_utils.ToEVMAddress,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("chain %d: %w", sel, err)
+		}
+		if len(addrs) != 1 {
+			return nil, fmt.Errorf("chain %d: expected 1 MCMS address, got %d", sel, len(addrs))
+		}
+		addr := addrs[0].String()
+		opCount, err := inspector.GetOpCount(e.GetContext(), addr)
+		if err != nil {
+			return nil, fmt.Errorf("chain %d: get op count for %s: %w", sel, addr, err)
+		}
+		out[mcms_types.ChainSelector(sel)] = mcms_types.ChainMetadata{
+			StartingOpCount: opCount,
+			MCMAddress:      addr,
+		}
 	}
-	if len(staticAddrs) == 0 {
-		e.Logger.Errorf("no %s mcms address found for chain selector %d with qualifier %s", contractType, sel, qualifier)
-		return common.Address{}, fmt.Errorf("no %s mcms address found for chain selector %d with qualifier %s", contractType, sel, qualifier)
-	}
-	return staticAddrs[0], nil
+	return out, nil
 }
 
-// mcmsChainMetadata retrieves the starting operation count for the given MCMS address on the specified chain.
-func mcmsChainMetadata(e cldf_deployment.Environment, chain uint64, mcmsAddr common.Address) (mcms_types.ChainMetadata, error) {
-	evmChains := e.BlockChains.EVMChains()
-	if evmChains == nil {
-		return mcms_types.ChainMetadata{}, fmt.Errorf("no EVM chains found in environment")
-	}
-	inspectorForChain := mcmsevmsdk.NewInspector(evmChains[chain].Client)
-	opCount, err := inspectorForChain.GetOpCount(e.GetContext(), mcmsAddr.String())
-	if err != nil {
-		return mcms_types.ChainMetadata{}, err
-	}
-	return mcms_types.ChainMetadata{
-		StartingOpCount: opCount,
-		MCMAddress:      mcmsAddr.String(),
-	}, nil
+func NewEVMMCMBuilder(in *MCMSInput) EVMMCMBuilder {
+	return EVMMCMBuilder{in: in}
 }

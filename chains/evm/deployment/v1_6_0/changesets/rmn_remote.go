@@ -17,7 +17,7 @@ type RMNCurseAction struct {
 type CurseAction func() ([]RMNCurseAction, error)
 
 type RMNCurseConfig struct {
-	MCMS         *changeset.MCMSConfig
+	MCMS         *changeset.MCMSInput
 	CurseActions []CurseAction
 	// Use this if you need to include lanes that are not in sourcechain in the offramp. i.e. not yet migrated lane from 1.5
 	IncludeNotConnectedLanes bool
