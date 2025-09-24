@@ -3,7 +3,9 @@ pragma solidity ^0.8.24;
 
 import {Internal} from "../../../../libraries/Internal.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
+
 import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
@@ -48,18 +50,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(
+      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+        bytes4(0),
         USDCTokenPool.SourceTokenDataPayload({
           nonce: usdcMessage.nonce,
           sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
           cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          amount: amount,
-          destinationDomain: DEST_DOMAIN_IDENTIFIER,
-          mintRecipient: bytes32(0),
-          burnToken: address(s_USDCToken),
-          destinationCaller: bytes32(0),
-          maxFee: 0,
-          minFinalityThreshold: 0
+          depositHash: bytes32(hex"deadbeef")
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -113,18 +110,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(
+      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+        bytes4(0),
         USDCTokenPool.SourceTokenDataPayload({
           nonce: nonce,
           sourceDomain: sourceDomain,
           cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          amount: amount,
-          destinationDomain: DEST_DOMAIN_IDENTIFIER,
-          mintRecipient: bytes32(0),
-          burnToken: address(s_USDCToken),
-          destinationCaller: bytes32(0),
-          maxFee: 0,
-          minFinalityThreshold: 0
+          depositHash: bytes32(0)
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -183,18 +175,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(
+      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+        bytes4(0),
         USDCTokenPool.SourceTokenDataPayload({
           nonce: usdcMessage.nonce,
           sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
           cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          amount: amount,
-          destinationDomain: DEST_DOMAIN_IDENTIFIER,
-          mintRecipient: bytes32(0),
-          burnToken: address(s_USDCToken),
-          destinationCaller: bytes32(0),
-          maxFee: 0,
-          minFinalityThreshold: 0
+          depositHash: bytes32(0)
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -229,18 +216,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(
+      extraData: USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+        bytes4(0),
         USDCTokenPool.SourceTokenDataPayload({
           nonce: 1,
           sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
           cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          amount: amount,
-          destinationDomain: DEST_DOMAIN_IDENTIFIER,
-          mintRecipient: bytes32(0),
-          burnToken: address(s_USDCToken),
-          destinationCaller: bytes32(0),
-          maxFee: 0,
-          minFinalityThreshold: 0
+          depositHash: bytes32(0)
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS

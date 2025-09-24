@@ -5,6 +5,7 @@ import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
@@ -61,24 +62,11 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     );
 
     USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
-      abi.decode(poolReturnDataV1.destPoolData, (USDCTokenPool.SourceTokenDataPayload));
+      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(poolReturnDataV1.destPoolData);
     assertEq(sourceTokenDataPayload.nonce, 0, "nonce is incorrect");
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
     assertEq(
       uint8(sourceTokenDataPayload.cctpVersion), uint8(USDCTokenPool.CCTPVersion.CCTP_V2), "cctpVersion is incorrect"
-    );
-    assertEq(sourceTokenDataPayload.amount, amount, "amount is incorrect");
-    assertEq(
-      sourceTokenDataPayload.destinationDomain, expectedDomain.domainIdentifier, "destinationDomain is incorrect"
-    );
-    assertEq(sourceTokenDataPayload.mintRecipient, receiver, "mintRecipient is incorrect");
-    assertEq(sourceTokenDataPayload.burnToken, address(s_USDCToken), "burnToken is incorrect");
-    assertEq(sourceTokenDataPayload.destinationCaller, expectedDomain.allowedCaller, "destinationCaller is incorrect");
-    assertEq(sourceTokenDataPayload.maxFee, s_usdcTokenPool.MAX_FEE(), "maxFee is incorrect");
-    assertEq(
-      sourceTokenDataPayload.minFinalityThreshold,
-      s_usdcTokenPool.FINALITY_THRESHOLD(),
-      "minFinalityThreshold is incorrect"
     );
   }
 
@@ -143,8 +131,9 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(nonce, 0);
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(poolReturnDataV1.destPoolData);
+    assertEq(sourceTokenDataPayload.nonce, 0);
   }
 
   function testFuzz_lockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
@@ -194,8 +183,9 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(nonce, 0);
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(poolReturnDataV1.destPoolData);
+    assertEq(sourceTokenDataPayload.nonce, 0);
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 

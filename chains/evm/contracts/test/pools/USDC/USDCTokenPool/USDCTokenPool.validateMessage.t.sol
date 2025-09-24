@@ -27,13 +27,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
         nonce: nonce,
         sourceDomain: sourceDomain,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-        amount: 0,
-        destinationDomain: DEST_DOMAIN_IDENTIFIER,
-        mintRecipient: bytes32(0),
-        burnToken: address(0),
-        destinationCaller: bytes32(0),
-        maxFee: 0,
-        minFinalityThreshold: 0
+        depositHash: bytes32(0)
       })
     );
   }
@@ -63,13 +57,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
         nonce: usdcMessage.nonce,
         sourceDomain: expectedSourceDomain,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-        amount: 0,
-        destinationDomain: DEST_DOMAIN_IDENTIFIER,
-        mintRecipient: bytes32(0),
-        burnToken: address(0),
-        destinationCaller: bytes32(0),
-        maxFee: 0,
-        minFinalityThreshold: 0
+        depositHash: bytes32(0)
       })
     );
   }
@@ -95,13 +83,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
         nonce: expectedNonce,
         sourceDomain: usdcMessage.sourceDomain,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-        amount: 0,
-        destinationDomain: DEST_DOMAIN_IDENTIFIER,
-        mintRecipient: bytes32(0),
-        burnToken: address(0),
-        destinationCaller: bytes32(0),
-        maxFee: 0,
-        minFinalityThreshold: 0
+        depositHash: bytes32(0)
       })
     );
   }
@@ -130,13 +112,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
         nonce: usdcMessage.nonce,
         sourceDomain: usdcMessage.sourceDomain,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-        amount: 0,
-        destinationDomain: DEST_DOMAIN_IDENTIFIER,
-        mintRecipient: bytes32(0),
-        burnToken: address(0),
-        destinationCaller: bytes32(0),
-        maxFee: 0,
-        minFinalityThreshold: 0
+        depositHash: bytes32(0)
       })
     );
   }
@@ -157,13 +133,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
       nonce: usdcMessage.nonce,
       sourceDomain: usdcMessage.sourceDomain,
       cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-      amount: 0,
-      destinationDomain: DEST_DOMAIN_IDENTIFIER,
-      mintRecipient: bytes32(0),
-      burnToken: address(0),
-      destinationCaller: bytes32(0),
-      maxFee: 0,
-      minFinalityThreshold: 0
+      depositHash: bytes32(0)
     });
 
     bytes memory encodedUsdcMessage = _generateUSDCMessage(usdcMessage);
@@ -178,13 +148,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
       nonce: 387289284924,
       sourceDomain: 1553252,
       cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-      amount: 0,
-      destinationDomain: DEST_DOMAIN_IDENTIFIER,
-      mintRecipient: bytes32(0),
-      burnToken: address(0),
-      destinationCaller: bytes32(0),
-      maxFee: 0,
-      minFinalityThreshold: 0
+      depositHash: bytes32(0)
     });
 
     bytes memory shortMessage = new bytes(100);
@@ -218,13 +182,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
         nonce: usdcMessage.nonce,
         sourceDomain: usdcMessage.sourceDomain + 1, // Use different source domain to avoid other validation errors
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-        amount: 0,
-        destinationDomain: DEST_DOMAIN_IDENTIFIER,
-        mintRecipient: bytes32(0),
-        burnToken: address(0),
-        destinationCaller: bytes32(0),
-        maxFee: 0,
-        minFinalityThreshold: 0
+        depositHash: bytes32(0)
       })
     );
   }

@@ -5,6 +5,7 @@ import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
+import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
@@ -89,13 +90,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     uint64 nonce; // Nonce of the message (used only in CCTP V1).
     uint32 sourceDomain; // Source domain of the message.
     CCTPVersion cctpVersion; // CCTP version for acquiring off-chain attestations.
-    uint256 amount; // Amount of USDC burned/minted via CCTP.
-    uint32 destinationDomain; // Destination domain of the message.
-    bytes32 mintRecipient; // Address to mint to on the destination chain (end-user or pool PDA)
-    address burnToken; // Local USDC token address
-    bytes32 destinationCaller; // TransmitterProxy of the destination chain
-    uint256 maxFee; // Max fee for the message (should be 0; no fast transfers)
-    uint32 minFinalityThreshold; // Minimum confirmation threshold before attestation (should be 2000).
+    bytes32 depositHash; // Hash of the source pool data for offchain validation.
   }
 
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
@@ -216,25 +211,22 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       amount: lockOrBurnIn.amount
     });
 
-    // Since this pool only utilizes CTTP V1, which does not support maxFee or minFinalityThreshold,
-    // we set them to 0. They are maintained in the struct for compatibility with CCTP V2, and ignored in the offchain
-    // code and destination token pool for V1 messages.
-    SourceTokenDataPayload memory sourceTokenDataPayload = SourceTokenDataPayload({
-      nonce: nonce,
-      sourceDomain: i_localDomainIdentifier,
-      cctpVersion: CCTPVersion.CCTP_V1,
-      amount: lockOrBurnIn.amount,
-      destinationDomain: domain.domainIdentifier,
-      mintRecipient: decodedReceiver,
-      burnToken: address(i_token),
-      destinationCaller: domain.allowedCaller,
-      maxFee: 0,
-      minFinalityThreshold: 0
-    });
+    // bytes4(0) is used as the version to match the CCTP V1 message format.
+    // depositHash is not necessary for CCTP V1, as the nonce is returned by the deposit call itself, but to maintain
+    // struct consistency, for compatibility with the CCTP V2 token pool, it is set to 0.
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      bytes4(0), // version
+      SourceTokenDataPayload({
+        nonce: nonce,
+        sourceDomain: i_localDomainIdentifier,
+        cctpVersion: CCTPVersion.CCTP_V1,
+        depositHash: bytes32(0)
+      })
+    );
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(sourceTokenDataPayload)
+      destPoolData: sourcePoolData
     });
   }
 
@@ -282,7 +274,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     // which receives the message first, should never call this pool with that data,
     // instead formatting the message to the new format if necessary.
     SourceTokenDataPayload memory sourceTokenDataPayload =
-      abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
+      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(releaseOrMintIn.sourcePoolData);
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 

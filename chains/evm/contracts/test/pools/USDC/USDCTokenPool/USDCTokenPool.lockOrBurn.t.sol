@@ -5,6 +5,7 @@ import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
@@ -58,8 +59,9 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
 
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, nonce);
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(poolReturnDataV1.destPoolData);
+    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, sourceTokenDataPayload.nonce);
   }
 
   function test_LockOrBurn_MintRecipientOverride() public {
@@ -121,8 +123,9 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
 
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, nonce);
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(poolReturnDataV1.destPoolData);
+    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, sourceTokenDataPayload.nonce);
   }
 
   function testFuzz_LockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
@@ -171,21 +174,9 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     );
 
     USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
-      abi.decode(poolReturnDataV1.destPoolData, (USDCTokenPool.SourceTokenDataPayload));
+      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(poolReturnDataV1.destPoolData);
     assertEq(sourceTokenDataPayload.nonce, s_mockUSDCTokenMessenger.s_nonce() - 1, "nonce is incorrect");
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
-    assertEq(sourceTokenDataPayload.amount, amount, "amount is incorrect");
-    assertEq(
-      sourceTokenDataPayload.destinationDomain, expectedDomain.domainIdentifier, "destinationDomain is incorrect"
-    );
-    assertEq(sourceTokenDataPayload.mintRecipient, destinationReceiver, "mintRecipient is incorrect");
-    assertEq(sourceTokenDataPayload.burnToken, address(s_USDCToken), "burnToken is incorrect");
-    assertEq(sourceTokenDataPayload.destinationCaller, expectedDomain.allowedCaller, "destinationCaller is incorrect");
-    assertEq(sourceTokenDataPayload.maxFee, 0, "maxFee is incorrect");
-
-    // MinFinality threshold is not set in the source token data payload for CCTP V1 since it is not used, and to avoid
-    // confusion with the V2 Pool which does.
-    assertEq(sourceTokenDataPayload.minFinalityThreshold, 0, "minFinalityThreshold is incorrect");
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN), "destTokenAddress is incorrect");
   }
 
@@ -233,8 +224,9 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         localToken: address(s_USDCToken)
       })
     );
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, nonce);
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourcePoolDataWithVersion(poolReturnDataV1.destPoolData);
+    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, sourceTokenDataPayload.nonce);
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 

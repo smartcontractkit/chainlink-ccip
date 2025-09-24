@@ -5,6 +5,7 @@ import {IPoolV1} from "../../../../interfaces/IPool.sol";
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
@@ -82,18 +83,17 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     // Arrange: Prepare test data
     uint256 testAmount = 4321;
     bytes memory originalSender = abi.encode(s_sender);
-    USDCMessage memory usdcMessage = USDCMessage({
-      version: 0,
-      sourceDomain: uint32(0),
-      destinationDomain: uint32(0),
-      nonce: uint64(0),
-      sender: bytes32(0),
-      recipient: bytes32(0),
-      destinationCaller: bytes32(0),
-      messageBody: ""
-    });
-    bytes memory sourcePoolData = "";
-    bytes memory offChainTokenData = _generateUSDCMessage(usdcMessage);
+
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      bytes4(0),
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: 0,
+        sourceDomain: 0,
+        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
+        depositHash: bytes32(0)
+      })
+    );
+    bytes memory offChainTokenData = "";
 
     // Mock the router's isOffRamp function to return true
     vm.mockCall(
@@ -138,18 +138,17 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     // Arrange: Prepare test data
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
-    USDCMessage memory usdcMessage = USDCMessage({
-      version: 1,
-      sourceDomain: uint32(0),
-      destinationDomain: uint32(0),
-      nonce: uint64(0),
-      sender: bytes32(0),
-      recipient: bytes32(0),
-      destinationCaller: bytes32(0),
-      messageBody: ""
-    });
-    bytes memory sourcePoolData = "";
-    bytes memory offChainTokenData = _generateUSDCMessage(usdcMessage);
+
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      bytes4(uint32(1)),
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: 0,
+        sourceDomain: 0,
+        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+        depositHash: bytes32(hex"deadbeef")
+      })
+    );
+    bytes memory offChainTokenData = "";
 
     // Mock the router's isOffRamp function to return true
     vm.mockCall(
@@ -318,19 +317,16 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     uint256 testAmount = 1234;
     bytes memory emptyMessageBody = new bytes(0);
 
-    // Create a USDC message with version = 2 (not 0 or 1)
-    USDCMessage memory usdcMessage = USDCMessage({
-      version: uint32(2),
-      sourceDomain: uint32(0),
-      destinationDomain: uint32(0),
-      nonce: uint64(0),
-      sender: bytes32(0),
-      recipient: bytes32(0),
-      destinationCaller: bytes32(0),
-      messageBody: emptyMessageBody
-    });
-    bytes memory sourcePoolData = "";
-    bytes memory offChainTokenData = _generateUSDCMessage(usdcMessage);
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      bytes4(uint32(2)),
+      USDCTokenPool.SourceTokenDataPayload({
+        nonce: 0,
+        sourceDomain: 0,
+        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
+        depositHash: bytes32(hex"deadbeef")
+      })
+    );
+    bytes memory offChainTokenData = "";
 
     // Mock the router's isOffRamp function to return true
     vm.mockCall(
@@ -353,43 +349,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     });
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, 2));
-    s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
-
-    vm.stopPrank();
-  }
-
-  function test_releaseOrMint_RevertWhen_InvalidMessageLength() public {
-    // Arrange: Prepare test data with offchainTokenData less than 4 bytes
-    uint256 testAmount = 1234;
-
-    // Create offchainTokenData with only 3 bytes (less than the required 4 bytes for version)
-    bytes memory shortOffchainTokenData = new bytes(3);
-    shortOffchainTokenData[0] = 0x01;
-    shortOffchainTokenData[1] = 0x02;
-    shortOffchainTokenData[2] = 0x03;
-
-    // Mock the router's isOffRamp function to return true
-    vm.mockCall(
-      address(s_router),
-      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
-      abi.encode(true)
-    );
-
-    vm.startPrank(s_routerAllowedOffRamp);
-
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      originalSender: abi.encode(s_sender),
-      receiver: s_receiver,
-      sourceDenominatedAmount: testAmount,
-      localToken: address(s_USDCToken),
-      sourcePoolData: "", // Not lock release flag, not legacy format
-      sourcePoolAddress: s_sourcePoolAddress,
-      offchainTokenData: shortOffchainTokenData
-    });
-
-    // Expect revert with InvalidMessageLength error
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageLength.selector, 3));
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     vm.stopPrank();

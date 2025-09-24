@@ -7,6 +7,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {ERC165CheckerReverting} from "../../libraries/ERC165CheckerReverting.sol";
 import {Pool} from "../../libraries/Pool.sol";
+import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
@@ -171,17 +172,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
       }
     }
 
-    // In both version 1 and 2 of CCTP, the version is stored in the first 4 bytes of the message, so this check is
-    // valid for both versions. If this changes in future versions, this will need to be updated.
-    bytes calldata usdcMessage = releaseOrMintIn.offchainTokenData;
-    // Check the first 4 bytes of the message to prevent an out-of-bounds read.
-    if (usdcMessage.length < 4) {
-      revert InvalidMessageLength(usdcMessage.length);
-    }
-
     // According to the CCTP specification, the first 4 bytes of the message are the version, which we can extract
     // directly and cast into a uint32.
-    uint32 version = uint32(bytes4(usdcMessage[0:4]));
+    uint32 version = uint32(bytes4(releaseOrMintIn.sourcePoolData[0:4]));
 
     if (version == 0) {
       return USDCTokenPool(s_pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
@@ -328,35 +321,23 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
   /// @return newReleaseOrMintIn The new releaseOrMintIn struct.
   function _generateNewReleaseOrMintIn(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) internal view returns (Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn) {
+  ) internal pure returns (Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn) {
     // Copy the releaseOrMintIn struct to the newReleaseOrMintIn struct. We do this to avoid having to copy each field
     // individually, which would be more gas intensive, as only the sourcePoolData field is going to be modified.
     newReleaseOrMintIn = releaseOrMintIn;
 
-    // Get the local domain identifier and the transmitter proxy address from the previous pool. The local
-    // domain identifier is not present in the original data, so it must be acquired dynamically, and simplifies this
-    // contract by not having to store it in the state.
-    uint32 localDomain = USDCTokenPool(s_pools.cctpV1Pool).i_localDomainIdentifier();
-    bytes32 allowedCaller =
-      bytes32(uint256(uint160(address(USDCTokenPool(s_pools.cctpV1Pool).i_messageTransmitterProxy()))));
+    uint32 nonce = uint32(bytes4(releaseOrMintIn.sourcePoolData[0:4]));
+    uint32 sourceDomain = uint32(bytes4(releaseOrMintIn.sourcePoolData[4:8]));
 
-    // Decode the legacy sourcePoolData to get the nonce and sourceDomain. The original sourcePoolData was a struct
-    // with two fields, a uint64 and a uint32. We can decode it into two variables directly, nonce and sourceDomain.
-    (uint64 nonce, uint32 sourceDomain) = abi.decode(releaseOrMintIn.sourcePoolData, (uint64, uint32));
-
-    // Create the new payload out of the legacy sourcePoolData.
-    newReleaseOrMintIn.sourcePoolData = abi.encode(
+    // Since this is a legacy message, it should only operate on CCTP V1 messages. As a result it is safe to hard
+    // code the version to 0 and the depositHash to bytes32(0).
+    newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourcePoolDataWithVersion(
+      bytes4(0),
       USDCTokenPool.SourceTokenDataPayload({
         nonce: nonce,
         sourceDomain: sourceDomain,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-        amount: releaseOrMintIn.sourceDenominatedAmount,
-        destinationDomain: localDomain,
-        mintRecipient: bytes32(uint256(uint160(releaseOrMintIn.receiver))), // Cast the receiver address to a bytes32.
-        burnToken: releaseOrMintIn.localToken,
-        destinationCaller: allowedCaller,
-        maxFee: 0, // Since maxFee is not used in CCTP V1, we set it to 0.
-        minFinalityThreshold: 0 // Since minFinalityThreshold is not used in CCTP V1, we set it to 0.
+        depositHash: bytes32(0)
       })
     );
 

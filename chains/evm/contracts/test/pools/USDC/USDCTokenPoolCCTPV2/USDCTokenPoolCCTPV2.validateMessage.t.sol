@@ -33,13 +33,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
       nonce: 0,
       sourceDomain: s_validUsdcMessage.sourceDomain,
       cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-      amount: 0,
-      destinationDomain: DEST_DOMAIN_IDENTIFIER,
-      mintRecipient: bytes32(0),
-      burnToken: address(0),
-      destinationCaller: bytes32(0),
-      maxFee: 0,
-      minFinalityThreshold: 0
+      depositHash: bytes32(0)
     });
   }
 
@@ -66,13 +60,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
         nonce: 0,
         sourceDomain: sourceDomain,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-        amount: 0,
-        destinationDomain: DEST_DOMAIN_IDENTIFIER,
-        mintRecipient: bytes32(0),
-        burnToken: address(0),
-        destinationCaller: bytes32(0),
-        maxFee: 0,
-        minFinalityThreshold: 0
+        depositHash: bytes32(0)
       })
     );
   }
@@ -93,13 +81,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
         nonce: 0,
         sourceDomain: expectedSourceDomain,
         cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-        amount: 0,
-        destinationDomain: DEST_DOMAIN_IDENTIFIER,
-        mintRecipient: bytes32(0),
-        burnToken: address(0),
-        destinationCaller: bytes32(0),
-        maxFee: 0,
-        minFinalityThreshold: 0
+        depositHash: bytes32(0)
       })
     );
   }
@@ -169,13 +151,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
       nonce: 0,
       sourceDomain: s_validUsdcMessage.sourceDomain,
       cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-      amount: 0,
-      destinationDomain: DEST_DOMAIN_IDENTIFIER,
-      mintRecipient: bytes32(0),
-      burnToken: address(0),
-      destinationCaller: bytes32(0),
-      maxFee: 0,
-      minFinalityThreshold: 0
+      depositHash: bytes32(0)
     });
 
     vm.expectRevert(
