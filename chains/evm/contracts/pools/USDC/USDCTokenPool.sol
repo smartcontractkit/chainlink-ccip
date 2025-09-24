@@ -59,7 +59,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   error InvalidTransmitterInProxy();
   error InvalidPreviousPool();
   error InvalidMessageLength(uint256 length);
-  error InvalidCCTPVersion(CCTPVersion expected, CCTPVersion got);
 
   // This data is supplied from offchain and contains everything needed to mint the USDC tokens on the destination chain
   // through CCTP.
@@ -77,19 +76,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     bool enabled; // Whether the domain is enabled
   }
 
-  enum CCTPVersion {
-    UNDEFINED,
-    CCTP_V1,
-    CCTP_V2
-  }
-
   // Note: Since this struct never exists in storage, only in memory after an ABI-decoding, proper struct-packing
   // is not necessary and field ordering has been defined so as to best support off-chain code.
   // solhint-disable-next-line gas-struct-packing
   struct SourceTokenDataPayloadV0 {
     uint64 nonce; // Nonce of the message (used only in CCTP V1).
     uint32 sourceDomain; // Source domain of the message.
-    CCTPVersion cctpVersion; // CCTP version of the message.
   }
 
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
@@ -215,7 +207,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     // struct consistency, for compatibility with the CCTP V2 token pool, it is set to 0.
     bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
       bytes4(0), // version
-      SourceTokenDataPayloadV0({nonce: nonce, sourceDomain: i_localDomainIdentifier, cctpVersion: CCTPVersion.CCTP_V1})
+      SourceTokenDataPayloadV0({nonce: nonce, sourceDomain: i_localDomainIdentifier})
     );
 
     return Pool.LockOrBurnOutV1({
@@ -335,12 +327,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       sourceDomain := mload(add(usdcMessage, 8)) // 4 + 4 = 8
       destinationDomain := mload(add(usdcMessage, 12)) // 8 + 4 = 12
       nonce := mload(add(usdcMessage, 20)) // 12 + 8 = 20
-    }
-
-    // This pool only supports CCTP V1, so we check that the version is correct. In the V2-Compatible
-    // pool, this check will be be for CCTPVersion.CCTP_V2.
-    if (sourceTokenData.cctpVersion != CCTPVersion.CCTP_V1) {
-      revert InvalidCCTPVersion(CCTPVersion.CCTP_V1, sourceTokenData.cctpVersion);
     }
 
     if (sourceDomain != sourceTokenData.sourceDomain) {

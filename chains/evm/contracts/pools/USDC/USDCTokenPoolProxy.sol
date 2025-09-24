@@ -332,12 +332,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, ITypeAndVersion {
     // Since this is a legacy message, it should only operate on CCTP V1 messages. As a result it is safe to hard
     // code the version to 0.
     newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
-      bytes4(0),
-      USDCTokenPool.SourceTokenDataPayloadV0({
-        nonce: nonce,
-        sourceDomain: sourceDomain,
-        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1
-      })
+      bytes4(0), USDCTokenPool.SourceTokenDataPayloadV0({nonce: nonce, sourceDomain: sourceDomain})
     );
 
     return newReleaseOrMintIn;

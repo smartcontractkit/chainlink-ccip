@@ -86,8 +86,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     bytes memory originalSender = abi.encode(s_sender);
 
     bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
-      bytes4(0),
-      USDCTokenPool.SourceTokenDataPayloadV0({nonce: 0, sourceDomain: 0, cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1})
+      bytes4(0), USDCTokenPool.SourceTokenDataPayloadV0({nonce: 0, sourceDomain: 0})
     );
     bytes memory offChainTokenData = "";
 
@@ -137,11 +136,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
       bytes4(uint32(1)),
-      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
-        sourceDomain: 0,
-        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-        depositHash: bytes32(hex"deafbeef")
-      })
+      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: 0, depositHash: bytes32(hex"deafbeef")})
     );
     bytes memory offChainTokenData = "";
 
@@ -313,11 +308,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
       bytes4(uint32(2)),
-      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
-        sourceDomain: 0,
-        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-        depositHash: bytes32(hex"deafbeef")
-      })
+      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: 0, depositHash: bytes32(hex"deafbeef")})
     );
     bytes memory offChainTokenData = "";
 

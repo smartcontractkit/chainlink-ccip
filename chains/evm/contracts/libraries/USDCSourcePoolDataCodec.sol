@@ -18,9 +18,7 @@ library USDCSourcePoolDataCodec {
   ) internal pure returns (bytes memory) {
     // By using encodePacked rather than abi.encode, significant amount of space on the source pool data is saved.
     // since abi.encode pads every field to the nearest 32 bytes.
-    return abi.encodePacked(
-      version, sourceTokenDataPayload.nonce, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.cctpVersion
-    );
+    return abi.encodePacked(version, sourceTokenDataPayload.nonce, sourceTokenDataPayload.sourceDomain);
   }
 
   /// @notice Encodes the source token data payload into a bytes array.
@@ -33,12 +31,7 @@ library USDCSourcePoolDataCodec {
   ) internal pure returns (bytes memory) {
     // By using encodePacked rather than abi.encode, significant amount of space on the source pool data is saved.
     // since abi.encode pads every field to the nearest 32 bytes.
-    return abi.encodePacked(
-      version,
-      sourceTokenDataPayload.sourceDomain,
-      sourceTokenDataPayload.cctpVersion,
-      sourceTokenDataPayload.depositHash
-    );
+    return abi.encodePacked(version, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
   }
 
   /// @notice Decodes the source pool data into its corresponding SourceTokenDataPayload struct.
@@ -51,14 +44,13 @@ library USDCSourcePoolDataCodec {
 
     // Since memory arrays cannot be sliced in the same way as calldata arrays, we need to create new bytes arrays
     // to store the individual fields and then parse into their corresponding types.
+    // Version (uint32)(4 bytes)
     bytes memory versionBytes = new bytes(4);
     for (uint256 i = 0; i < 4; ++i) {
       versionBytes[i] = sourcePoolData[offset + i];
     }
     uint32 version = uint32(bytes4(versionBytes));
-
     if (version != 1) revert InvalidVersion(version);
-
     offset += 4;
 
     // Source Domain (uint32)(4 bytes)
@@ -68,10 +60,6 @@ library USDCSourcePoolDataCodec {
     }
     sourceTokenDataPayload.sourceDomain = uint32(bytes4(domainBytes));
     offset += 4;
-
-    // CCTP Version (uint8)(1 byte)
-    sourceTokenDataPayload.cctpVersion = USDCTokenPool.CCTPVersion(uint8(sourcePoolData[offset]));
-    offset++;
 
     // Deposit Hash (bytes32)(32 bytes)
     bytes memory hashBytes = new bytes(32);
@@ -93,15 +81,14 @@ library USDCSourcePoolDataCodec {
 
     // Since memory arrays cannot be sliced in the same way as calldata arrays, we need to create new bytes arrays
     // to store the individual fields and then parse into their corresponding types.
+    // Version (uint32)(4 bytes)
     bytes memory versionBytes = new bytes(4);
     for (uint256 i = 0; i < 4; ++i) {
       versionBytes[i] = sourcePoolData[offset + i];
     }
     uint32 version = uint32(bytes4(versionBytes));
 
-    // TODO: Comment
     if (version != 0) revert InvalidVersion(version);
-
     offset += 4;
 
     // Nonce (uint64)(8 bytes)
@@ -119,10 +106,6 @@ library USDCSourcePoolDataCodec {
     }
     sourceTokenDataPayload.sourceDomain = uint32(bytes4(domainBytes));
     offset += 4;
-
-    // CCTP Version (uint8)(1 byte)
-    sourceTokenDataPayload.cctpVersion = USDCTokenPool.CCTPVersion(uint8(sourcePoolData[offset]));
-    offset++;
 
     return sourceTokenDataPayload;
   }

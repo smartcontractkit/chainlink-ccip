@@ -31,7 +31,6 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
     // This is used by tests that need to test payload validation failures
     s_validSourceTokenData = USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
       sourceDomain: s_validUsdcMessage.sourceDomain,
-      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
       depositHash: bytes32(0)
     });
   }
@@ -55,11 +54,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
     vm.resumeGasMetering();
     s_usdcTokenPool.validateMessage(
       encodedUsdcMessage,
-      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
-        sourceDomain: sourceDomain,
-        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-        depositHash: bytes32(0)
-      })
+      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: sourceDomain, depositHash: bytes32(0)})
     );
   }
 
@@ -75,11 +70,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
     );
     s_usdcTokenPool.validateMessage(
       _generateUSDCMessageCCTPV2(s_validUsdcMessage),
-      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
-        sourceDomain: expectedSourceDomain,
-        cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-        depositHash: bytes32(0)
-      })
+      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: expectedSourceDomain, depositHash: bytes32(0)})
     );
   }
 
@@ -140,22 +131,5 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
       )
     );
     s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(invalidMessage), s_validSourceTokenData);
-  }
-
-  function test_validateMessage_RevertWhen_InvalidCCTPVersion() public {
-    // Create source token data with invalid CCTP version
-    USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory invalidCCTPVersionData = USDCTokenPoolCCTPV2
-      .SourceTokenDataPayloadV1({
-      sourceDomain: s_validUsdcMessage.sourceDomain,
-      cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-      depositHash: bytes32(0)
-    });
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        USDCTokenPool.InvalidCCTPVersion.selector, USDCTokenPool.CCTPVersion.CCTP_V2, USDCTokenPool.CCTPVersion.CCTP_V1
-      )
-    );
-    s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(s_validUsdcMessage), invalidCCTPVersionData);
   }
 }

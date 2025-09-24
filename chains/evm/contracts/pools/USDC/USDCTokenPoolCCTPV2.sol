@@ -28,7 +28,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
 
   struct SourceTokenDataPayloadV1 {
     uint32 sourceDomain;
-    CCTPVersion cctpVersion;
     bytes32 depositHash;
   }
 
@@ -102,12 +101,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     );
 
     bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-      bytes4(uint32(1)),
-      SourceTokenDataPayloadV1({
-        sourceDomain: i_localDomainIdentifier,
-        cctpVersion: CCTPVersion.CCTP_V2,
-        depositHash: depositHash
-      })
+      bytes4(uint32(1)), SourceTokenDataPayloadV1({sourceDomain: i_localDomainIdentifier, depositHash: depositHash})
     );
 
     return Pool.LockOrBurnOutV1({
@@ -199,7 +193,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // The version is checked prior to loading the rest of the message to avoid unexpected reverts due to out-of-bounds
     // reads if the message format is different.
     // Note: Even though the CCTP Version is V2, it's on-chain version number is 1, since V1 used a version number of 0.
-    // This is different from the CCTPVersion field of sourceTokenData, which is used by off-chain code and the token
+    // This is different from the sourceDomain field of sourceTokenData, which is used by off-chain code and the token
     // pools, rather than being a formal part of the CCTP message format.
     if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(i_supportedUSDCVersion, version);
 
@@ -224,12 +218,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // Check that the destination domain in the CCTP message matches the immutable domain of this pool.
     if (destinationDomain != i_localDomainIdentifier) {
       revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
-    }
-
-    // Check that the CCTP version in the CCTP message matches the expected version. For this token pool,
-    // the only supported version is CCTP_V2.
-    if (sourceTokenData.cctpVersion != CCTPVersion.CCTP_V2) {
-      revert USDCTokenPool.InvalidCCTPVersion(CCTPVersion.CCTP_V2, sourceTokenData.cctpVersion);
     }
 
     // This pool only supports slow transfers on CCTP, so ensure that the message matches the same requirements.

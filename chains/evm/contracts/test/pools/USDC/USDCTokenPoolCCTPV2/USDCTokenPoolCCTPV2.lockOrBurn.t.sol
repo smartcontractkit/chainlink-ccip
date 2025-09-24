@@ -65,9 +65,6 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
       USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
-    assertEq(
-      uint8(sourceTokenDataPayload.cctpVersion), uint8(USDCTokenPool.CCTPVersion.CCTP_V2), "cctpVersion is incorrect"
-    );
   }
 
   function test_lockOrBurn_MintRecipientOverride() public {
@@ -187,9 +184,6 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
       USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
-    assertEq(
-      uint8(sourceTokenDataPayload.cctpVersion), uint8(USDCTokenPool.CCTPVersion.CCTP_V2), "cctpVersion is incorrect"
-    );
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 

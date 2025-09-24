@@ -55,11 +55,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
         bytes4(uint32(1)),
-        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
-          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-          depositHash: bytes32(0)
-        })
+        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: bytes32(0)})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -113,11 +109,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
         bytes4(uint32(1)),
-        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
-          sourceDomain: sourceDomain,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-          depositHash: bytes32(0)
-        })
+        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: sourceDomain, depositHash: bytes32(0)})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -179,11 +171,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
         bytes4(uint32(1)),
-        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
-          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-          depositHash: bytes32(0)
-        })
+        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: bytes32(0)})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -219,11 +207,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
         bytes4(uint32(1)),
-        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
-          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V2,
-          depositHash: bytes32(0)
-        })
+        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: bytes32(0)})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
