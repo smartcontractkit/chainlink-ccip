@@ -21,9 +21,6 @@ block_number = 12345
 # We don't need optimization for CCIP tests, the wrappers are built with the `ccip-compile` profile.
 # Having lower optimization runs speeds up compilation.
 optimizer_runs = 1
-# https://book.getfoundry.sh/config/dynamic-test-linking/
-# This should, under certain conditions, speed up compilation.
-dynamic_test_linking = true
 
 # This profile should be used prior to any release to ensure the tests are passing with via-ir enabled. Enabling via-ir
 # locally or in CI will slow down the compilation process, so it is not recommended to use it for everyday development.
@@ -36,5 +33,8 @@ tab_width = 2
 multiline_func_header = "params_first"
 sort_imports = true
 single_line_statement_blocks = "preserve"
+
+[lint]
+lint_on_build = false
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

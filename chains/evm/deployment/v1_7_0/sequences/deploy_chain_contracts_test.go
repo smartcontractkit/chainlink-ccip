@@ -109,6 +109,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 									common.HexToAddress("0x05"),
 								},
 							},
+							StorageLocation: "https://test.chain.link.fake",
 						},
 						CCVProxy: sequences.CCVProxyParams{
 							FeeAggregator: common.HexToAddress("0x01"),
@@ -229,6 +230,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 								common.HexToAddress("0x05"),
 							},
 						},
+						StorageLocation: "https://test.chain.link.fake",
 					},
 					CCVProxy: sequences.CCVProxyParams{
 						FeeAggregator: common.HexToAddress("0x01"),
@@ -329,6 +331,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 									common.HexToAddress("0x05"),
 								},
 							},
+							StorageLocation: "https://test.chain.link.fake",
 						},
 						CCVProxy: sequences.CCVProxyParams{
 							FeeAggregator: common.HexToAddress("0x01"),

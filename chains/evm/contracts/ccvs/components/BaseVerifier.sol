@@ -8,6 +8,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
@@ -24,6 +25,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   event DestChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
+  event StorageLocationUpdated(string oldLocation, string newLocation);
 
   struct DestChainConfig {
     bool allowlistEnabled; // ─╮ True if the allowlist is enabled.
@@ -50,6 +52,23 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   /// @dev The destination chain specific configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) private s_destChainConfigs;
+
+  /// @dev The storage location for off-chain components to read from. Implementations of the BaseVerifier should
+  /// implement a way to update this value if needed.
+  string internal s_storageLocation;
+
+  constructor(
+    string memory storageLocation
+  ) {
+    s_storageLocation = storageLocation;
+
+    emit StorageLocationUpdated("", storageLocation);
+  }
+
+  /// @inheritdoc ICrossChainVerifierV1
+  function getStorageLocation() external view override returns (string memory) {
+    return s_storageLocation;
+  }
 
   /// @notice get ChainConfig configured for the DestinationChainSelector.
   /// @param destChainSelector The destination chain selector.
@@ -162,5 +181,12 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
         emit FeeTokenWithdrawn(feeAggregator, address(feeToken), feeTokenBalance);
       }
     }
+  }
+
+  /// @inheritdoc IERC165
+  function supportsInterface(
+    bytes4 interfaceId
+  ) external pure virtual override returns (bool) {
+    return interfaceId == type(ICrossChainVerifierV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 }

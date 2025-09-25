@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICrossChainVerifierV1} from "../../interfaces/ICrossChainVerifierV1.sol";
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
-
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
 /// @notice Test helper contract to expose BaseVerifier's internal functions for testing
 contract BaseVerifierTestHelper is BaseVerifier {
+  constructor(
+    string memory storageLocation
+  ) BaseVerifier(storageLocation) {}
+
   function applyDestChainConfigUpdates(
     DestChainConfigArgs[] calldata destChainConfigArgs
   ) external {
@@ -51,12 +52,6 @@ contract BaseVerifierTestHelper is BaseVerifier {
     bytes32 messageId,
     bytes memory ccvData
   ) external {}
-
-  function supportsInterface(
-    bytes4 interfaceId
-  ) external pure returns (bool) {
-    return interfaceId == type(ICrossChainVerifierV1).interfaceId || interfaceId == type(IERC165).interfaceId;
-  }
 
   function typeAndVersion() external pure override returns (string memory) {
     return "BaseVerifierTestHelper 1.0.0";

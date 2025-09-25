@@ -83,6 +83,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 									common.HexToAddress("0x05"),
 								},
 							},
+							StorageLocation: "https://test.chain.link.fake",
 						},
 						ExecutorOnRamp: sequences.ExecutorOnRampParams{
 							MaxCCVsPerMsg: 10,

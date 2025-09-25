@@ -16,7 +16,8 @@ interface ICrossChainVerifierV1 is IERC165 {
   /// message ID through hashing the struct. The entire message is provided to be able to act differently for different
   /// message properties.
   /// @param messageId A convenient 32 byte hash of the entire message. It can be recomputed from the passed in message
-  /// at the cost of a not-insignificant amount of gas. Any CCV MUST verify this as part of this call.
+  /// at the cost of a not-insignificant amount of gas. Any CCV MUST include the messageID or the entire message struct
+  /// as part of its proof.
   /// @param ccvData All the data that is specific to the CCV. This often means it contains some sort of proof, but it
   /// can also contain certain metadata like a nonce that's specific to the CCV. If any metadata like that exists and is
   /// important to the security of the CCV, it MUST be verified as well using the proof. A recommended way to do this is
@@ -64,4 +65,10 @@ interface ICrossChainVerifierV1 is IERC165 {
     uint256 feeTokenAmount,
     bytes calldata verifierArgs
   ) external returns (bytes memory verifierData);
+
+  /// @notice Returns the storage location identifier for this CCV. This is a string that uniquely identifies the
+  /// storage location. This can be an address, a URL, or any other identifier that makes sense for the CCV. The format
+  /// of the string is up to the CCV implementer, but it should be something that can be easily parsed and used by the
+  /// integrator. This is used by the executor(s) to know where to look for the proof data that the CCV has produced.
+  function getStorageLocation() external view returns (string memory);
 }

@@ -53,7 +53,6 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage memory message,
     uint64 destChainSelector,
     uint64 seqNum,
-    uint256 feeTokenAmount,
     address originalSender
   )
     internal

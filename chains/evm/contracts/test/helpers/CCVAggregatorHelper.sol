@@ -14,10 +14,11 @@ contract CCVAggregatorHelper is CCVAggregator {
   function ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,
     address receiver,
-    address[] calldata ccvs,
-    address[] memory tokenRequiredCCVs
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
+    uint16 finality,
+    address[] calldata ccvs
   ) external view returns (address[] memory, uint256[] memory) {
-    return _ensureCCVQuorumIsReached(sourceChainSelector, receiver, ccvs, tokenRequiredCCVs);
+    return _ensureCCVQuorumIsReached(sourceChainSelector, receiver, tokenTransfer, finality, ccvs);
   }
 
   function getCCVsFromReceiver(
@@ -54,5 +55,14 @@ contract CCVAggregatorHelper is CCVAggregator {
 
   function getBalanceOfReceiver(address receiver, address token) external view returns (uint256) {
     return _getBalanceOfReceiver(receiver, token);
+  }
+
+  function __getCCVsForMessage(
+    uint64 sourceChainSelector,
+    address receiver,
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
+    uint16 finality
+  ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
+    return _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer, finality);
   }
 }

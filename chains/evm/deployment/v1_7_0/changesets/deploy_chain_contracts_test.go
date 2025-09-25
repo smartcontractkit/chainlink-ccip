@@ -174,6 +174,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 								common.HexToAddress("0x05"),
 							},
 						},
+						StorageLocation: "https://test.chain.link.fake",
 					},
 					CCVProxy: sequences.CCVProxyParams{
 						FeeAggregator: common.HexToAddress("0x01"),
