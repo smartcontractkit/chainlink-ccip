@@ -4,6 +4,10 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -12,9 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 type RemoteChainConfig struct {
@@ -33,6 +34,7 @@ type RemoteChainConfig struct {
 type ConfigureChainForLanesCfg struct {
 	ChainSel     uint64
 	RemoteChains map[uint64]RemoteChainConfig
+	MCMSArgs     *changesets.MCMSInput
 }
 
 func (c ConfigureChainForLanesCfg) ChainSelector() uint64 {
@@ -157,4 +159,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		}, nil
 	},
 	ResolveDep: changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],
+	ResolveMCMS: func(e cldf_deployment.Environment, cfg ConfigureChainForLanesCfg) (changesets.MCMSBuildParams, error) {
+		return changesets.ResolveMCMS(e, changesets.NewEVMMCMBuilder(cfg.MCMSArgs))
+	},
 })

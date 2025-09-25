@@ -566,12 +566,13 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     address localToken,
     uint64 sourceChainSelector,
     uint256 amount,
+    uint16 finality,
     bytes memory extraData
   ) internal view returns (address[] memory requiredCCV) {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
 
     if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      requiredCCV = IPoolV2(pool).getRequiredCCVs(localToken, sourceChainSelector, amount, extraData);
+      requiredCCV = IPoolV2(pool).getRequiredInboundCCVs(localToken, sourceChainSelector, amount, finality, extraData);
     }
     // If the pool does not specify any CCVs, or the pool does not support the V2 interface, we fall back to the
     // default CCVs. If this wasn't done, any pool not specifying CCVs would allow any arbitrary CCV to mint infinite
