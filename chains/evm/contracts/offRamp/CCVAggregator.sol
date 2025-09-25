@@ -513,9 +513,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     for (uint256 i = 0; i < optionalCCVs.length; ++i) {
       for (uint256 j = 0; j < ccvs.length && optionalCCVsToFind > 0; ++j) {
         if (ccvs[j] == optionalCCVs[i]) {
-          // If the optional CCV is already included, we still count it towards the threshold, but we skip adding it
-          // again. This means that if a pool would specify a CCV that is also specified as optional by the receiver,
-          // it would count towards the threshold as it's still being queried.
           optionalCCVsToFind--;
 
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
@@ -539,6 +536,14 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     return (ccvsToQuery, dataIndexes);
   }
 
+  /// @notice Retrieves the required and optional CCVs from a receiver contract. If the receiver does not specify any
+  /// CCVs, we fall back to the default CCVs.
+  /// @dev This function reverts if the receiver returns duplicates in either the required or optional CCVs.
+  /// @param sourceChainSelector The source chain selector.
+  /// @param receiver The receiver address.
+  /// @return requiredCCV The required CCVs.
+  /// @return optionalCCVs The optional CCVs.
+  /// @return optionalThreshold The threshold of optional CCVs.
   function _getCCVsFromReceiver(
     uint64 sourceChainSelector,
     address receiver
@@ -551,6 +556,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
         (requiredCCV, optionalCCVs, optionalThreshold) =
           IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
+
+        CCVConfigValidation._assertNoDuplicates(requiredCCV);
+        CCVConfigValidation._assertNoDuplicates(optionalCCVs);
 
         // If the user specified empty required and optional CCVs, we fall back to the default CCVs.
         // If they did specify something, we use what they specified.
@@ -581,7 +589,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
       requiredCCV = IPoolV2(pool).getRequiredInboundCCVs(localToken, sourceChainSelector, amount, finality, extraData);
+      CCVConfigValidation._assertNoDuplicates(requiredCCV);
     }
+
     // If the pool does not specify any CCVs, or the pool does not support the V2 interface, we fall back to the
     // default CCVs. If this wasn't done, any pool not specifying CCVs would allow any arbitrary CCV to mint infinite
     // tokens by fabricating messages. Since CCVs are permissionless, this would mean anyone would be able to mint.

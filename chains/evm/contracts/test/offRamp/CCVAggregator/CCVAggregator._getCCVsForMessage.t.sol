@@ -30,23 +30,27 @@ contract CCVAggregator__getCCVsForMessage is CCVAggregatorSetup {
       defaultCCVs[i] = address(uint160(defaults[i]) + 1);
     }
 
-    bool zeroAddressPresent = false;
-
     for (uint256 i = 0; i < receiverRequired.length; i++) {
       receiverCCVs[i] = address(uint160(receiverRequired[i]));
-      if (receiverRequired[i] == 0) {
-        zeroAddressPresent = true;
-      }
     }
 
     for (uint256 i = 0; i < pool.length; i++) {
       poolCCVs[i] = address(uint160(pool[i]));
-      if (pool[i] == 0) {
-        zeroAddressPresent = true;
-      }
+    }
+
+    // Check for address(0) BEFORE removing duplicates
+    bool hadZeroInReceiver = false;
+    bool hadZeroInPool = false;
+    for (uint256 i = 0; i < receiverCCVs.length; i++) {
+      if (receiverCCVs[i] == address(0)) hadZeroInReceiver = true;
+    }
+    for (uint256 i = 0; i < poolCCVs.length; i++) {
+      if (poolCCVs[i] == address(0)) hadZeroInPool = true;
     }
 
     defaultCCVs = _onlyUniques(defaultCCVs);
+    receiverCCVs = _onlyUniquesWithZero(receiverCCVs);
+    poolCCVs = _onlyUniquesWithZero(poolCCVs);
 
     _applySourceConfig(abi.encode(makeAddr("onRamp")), true, defaultCCVs, new address[](0));
 
@@ -54,33 +58,55 @@ contract CCVAggregator__getCCVsForMessage is CCVAggregatorSetup {
 
     _setGetCCVsReturnData(receiver, SOURCE_CHAIN_SELECTOR, receiverCCVs, new address[](0), 0);
 
-    // Populate a mapping as a control for the test.
+    // Populate the expected set based on the function's behavior:
 
-    // Only add defaults if needed.
-    if (zeroAddressPresent || receiverCCVs.length == 0 || poolCCVs.length == 0) {
+    // The function will include defaults in these cases:
+    // 1. If address(0) is found in any arrays (replaced by defaults)
+    // 2. If receiver returns empty CCVs (receiver fallback)
+    // 3. If pool returns empty CCVs (pool fallback)
+
+    // Note: We need to be careful about double-counting defaults
+    // Defaults are added if:
+    // - address(0) was in receiver/pool arrays before deduplication
+    // - receiver returns empty (after deduplication)
+    // - pool returns empty (after deduplication)
+    bool defaultsWillBeAdded = hadZeroInReceiver || hadZeroInPool || receiverCCVs.length == 0 || poolCCVs.length == 0;
+
+    if (defaultsWillBeAdded) {
       for (uint256 i = 0; i < defaultCCVs.length; i++) {
         s_ccvs.add(defaultCCVs[i]);
       }
     }
-    for (uint256 i = 0; i < receiverCCVs.length; i++) {
-      s_ccvs.add(receiverCCVs[i]);
+
+    // For receiver: if empty, _getCCVsFromReceiver returns defaults (already added above)
+    // If not empty, it returns the receiver CCVs
+    if (receiverCCVs.length > 0) {
+      for (uint256 i = 0; i < receiverCCVs.length; i++) {
+        s_ccvs.add(receiverCCVs[i]);
+      }
     }
-    for (uint256 i = 0; i < poolCCVs.length; i++) {
-      s_ccvs.add(poolCCVs[i]);
+
+    // For pool: if empty, _getCCVsFromPool returns defaults (already added above)
+    // If not empty, it returns the pool CCVs
+    if (poolCCVs.length > 0) {
+      for (uint256 i = 0; i < poolCCVs.length; i++) {
+        s_ccvs.add(poolCCVs[i]);
+      }
     }
 
     // Remove address(0) from the set as it will be replaced by the defaults.
     s_ccvs.remove(address(0));
 
-    (address[] memory requiredCCVs,,) =
-      s_agg.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, _setCCVsOnPool(poolCCVs), 0);
+    MessageV1Codec.TokenTransferV1[] memory tokenAmounts = _setCCVsOnPool(poolCCVs);
+
+    (address[] memory requiredCCVs,,) = s_agg.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, tokenAmounts, 0);
 
     assertEq(_onlyUniques(requiredCCVs).length, requiredCCVs.length, "still has duplicates");
 
     for (uint256 i = 0; i < requiredCCVs.length; i++) {
       assertTrue(s_ccvs.contains(requiredCCVs[i]), "requiredCCVs[i] not found in s_ccvs");
     }
-    assertEq(s_ccvs.length(), requiredCCVs.length);
+    assertEq(s_ccvs.length(), requiredCCVs.length, "ccvs length mismatch");
   }
 
   function _onlyUniques(
@@ -93,6 +119,31 @@ contract CCVAggregator__getCCVsForMessage is CCVAggregatorSetup {
       bool isUnique = true;
       for (uint256 j = 0; j < outputIndex; j++) {
         if (output[j] == input[i] || input[i] == address(0)) {
+          isUnique = false;
+          break;
+        }
+      }
+      if (isUnique) {
+        output[outputIndex++] = input[i];
+      }
+    }
+
+    assembly {
+      mstore(output, outputIndex)
+    }
+    return output;
+  }
+
+  function _onlyUniquesWithZero(
+    address[] memory input
+  ) internal pure returns (address[] memory output) {
+    output = new address[](input.length);
+    uint256 outputIndex = 0;
+
+    for (uint256 i = 0; i < input.length; i++) {
+      bool isUnique = true;
+      for (uint256 j = 0; j < outputIndex; j++) {
+        if (output[j] == input[i]) {
           isUnique = false;
           break;
         }
