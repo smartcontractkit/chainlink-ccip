@@ -31,9 +31,10 @@ contract CCVAggregatorHelper is CCVAggregator {
     address localToken,
     uint64 sourceChainSelector,
     uint256 amount,
+    uint16 finality,
     bytes memory extraData
   ) external view returns (address[] memory) {
-    return _getCCVsFromPool(localToken, sourceChainSelector, amount, extraData);
+    return _getCCVsFromPool(localToken, sourceChainSelector, amount, finality, extraData);
   }
 
   function beforeExecuteSingleMessage(

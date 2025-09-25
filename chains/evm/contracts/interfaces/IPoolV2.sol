@@ -1,50 +1,64 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Pool} from "../libraries/Pool.sol";
+import {IPoolV1} from "./IPool.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {Client} from "../libraries/Client.sol";
+import {Pool} from "../libraries/Pool.sol";
 
 // TODO Milestone 2: implement.
 /// @notice Shared public interface for multiple V2 pool types.
 /// Each pool type handles a different child token model e.g. lock/unlock, mint/burn.
-interface IPoolV2 is IERC165 {
+interface IPoolV2 is IPoolV1 {
   /// @notice Lock tokens into the pool or burn the tokens.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @param tokenArgs Additional token arguments.
   /// @return lockOrBurnOut Encoded data fields for the processing of tokens on the destination chain.
   function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    bytes calldata tokenArgs
   ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut);
 
-  /// @notice Releases or mints tokens to the receiver address.
-  /// @param releaseOrMintIn All data required to release or mint tokens.
-  /// @return releaseOrMintOut The amount of tokens released or minted on the local chain, denominated
-  /// in the local token's decimals.
-  /// @dev The offRamp asserts that the balanceOf of the receiver has been incremented by exactly the number
-  /// of tokens that is returned in ReleaseOrMintOutV1.destinationAmount. If the amounts do not match, the tx reverts.
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) external returns (Pool.ReleaseOrMintOutV1 memory);
+  /// @notice Returns the set of required CCVs for outgoing messages to a destination chain.
+  /// @param localToken The address of the local token.
+  /// @param destChainSelector The chain selector of the destination chain.
+  /// @param amount The amount of tokens to be transferred.
+  /// @param finality The finality configuration from the CCIP message.
+  /// @param tokenArgs Additional token arguments.
+  /// @return requiredCCVs A set of addresses representing the required outbound CCVs.
+  function getRequiredOutboundCCVs(
+    address localToken,
+    uint64 destChainSelector,
+    uint256 amount,
+    uint16 finality,
+    bytes calldata tokenArgs
+  ) external view returns (address[] memory requiredCCVs);
 
-  /// @notice Checks whether a remote chain is supported in the token pool.
-  /// @param remoteChainSelector The selector of the remote chain.
-  /// @return true if the given chain is a permissioned remote chain.
-  function isSupportedChain(
-    uint64 remoteChainSelector
-  ) external view returns (bool);
-
-  /// @notice Returns if the token pool supports the given token.
-  /// @param token The address of the token.
-  /// @return true if the token is supported by the pool.
-  function isSupportedToken(
-    address token
-  ) external view returns (bool);
-
-  // TODO add new methods here for V2. Everything below is a placeholder.
-  function getRequiredCCVs(
-    address token,
+  /// @notice Returns the set of required CCVs for incoming messages from a source chain.
+  /// @param localToken The address of the local token.
+  /// @param sourceChainSelector The chain selector of the source chain.
+  /// @param amount The amount of tokens to be transferred.
+  /// @param finality The finality configuration from the CCIP message.
+  /// @param sourcePoolData The data received from the source pool to process the release or mint.
+  /// @return requiredCCVs A set of addresses representing the required inbound CCVs.
+  function getRequiredInboundCCVs(
+    address localToken,
     uint64 sourceChainSelector,
     uint256 amount,
-    bytes memory extraData
+    uint16 finality,
+    bytes calldata sourcePoolData
   ) external view returns (address[] memory requiredCCVs);
+
+  /// @notice Returns a fee quote for transferring tokens to a destination chain.
+  /// @param destChainSelector The chain selector of the destination chain.
+  /// @param message The message to be sent to the destination chain.
+  /// @param finality The finality configuration from the CCIP message.
+  /// @param tokenArgs Additional token argument from the CCIP message.
+  /// @return feeTokenAmount The amount of fee token needed for the fee.
+  function getFee(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message,
+    uint16 finality,
+    bytes calldata tokenArgs
+  ) external view returns (uint256 feeTokenAmount);
 }
