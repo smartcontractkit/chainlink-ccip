@@ -274,7 +274,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
 
     {
       (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
-        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, ccvs);
+        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         ICrossChainVerifierV1(ccvsToQuery[i]).verifyMessage({
@@ -341,7 +341,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
 
-    return _getCCVsForMessage(message.sourceChainSelector, address(bytes20(message.receiver)), message.tokenTransfer);
+    return _getCCVsForMessage(
+      message.sourceChainSelector, address(bytes20(message.receiver)), message.tokenTransfer, message.finality
+    );
   }
 
   /// @notice Returns the CCVs required by the receiver, pool and lane for a message. Duplicates are removed and
@@ -360,7 +362,8 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   function _getCCVsForMessage(
     uint64 sourceChainSelector,
     address receiver,
-    MessageV1Codec.TokenTransferV1[] memory tokenTransfer
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
+    uint16 finality
   ) internal view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
     address[] memory requiredPoolCCVs = new address[](0);
     if (tokenTransfer.length > 0) {
@@ -376,8 +379,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
       // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
       // that do not support the V2 interface.
-      requiredPoolCCVs =
-        _getCCVsFromPool(localTokenAddress, sourceChainSelector, tokenTransfer[0].amount, tokenTransfer[0].extraData);
+      requiredPoolCCVs = _getCCVsFromPool(
+        localTokenAddress, sourceChainSelector, tokenTransfer[0].amount, finality, tokenTransfer[0].extraData
+      );
     }
     address[] memory requiredReceiverCCV;
     (requiredReceiverCCV, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
@@ -473,14 +477,18 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param receiver The receiver of the message.
   /// @param tokenTransfer The tokens transferred in the message.
   /// @param ccvs The CCVs that provided data for the message.
+  /// @param finality The finality requirement of the message.
+  /// @return ccvsToQuery The CCVs that need to be queried to verify the message.
+  /// @return dataIndexes The indexes of the CCVs in the provided ccvs array that correspond to ccvsToQuery.
   function _ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,
     address receiver,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
+    uint16 finality,
     address[] calldata ccvs
   ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndexes) {
     (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
-      _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer);
+      _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer, finality);
 
     ccvsToQuery = new address[](ccvs.length);
     dataIndexes = new uint256[](ccvs.length);

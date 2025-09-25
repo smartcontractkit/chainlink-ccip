@@ -25,6 +25,8 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
   address internal s_destToken;
   address internal s_destTokenPool;
 
+  uint16 internal constant FINALITY = 0;
+
   function setUp() public override {
     super.setUp();
 
@@ -110,10 +112,12 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     );
     address[] memory poolRequiredCCVs = new address[](1);
     poolRequiredCCVs[0] = s_poolRequiredCCV;
-    vm.mockCall(s_destTokenPool, abi.encodeWithSelector(IPoolV2.getRequiredCCVs.selector), abi.encode(poolRequiredCCVs));
+    vm.mockCall(
+      s_destTokenPool, abi.encodeWithSelector(IPoolV2.getRequiredInboundCCVs.selector), abi.encode(poolRequiredCCVs)
+    );
 
     (address[] memory ccvsToQuery, uint256[] memory dataIndexes) =
-      s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, ccvs);
+      s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
 
     // Since we have 1 default, 1 lane mandated, and 1 pool required.
     assertEq(ccvsToQuery.length, 3);
@@ -146,7 +150,7 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     );
 
     (address[] memory ccvsToQuery, uint256[] memory dataIndexes) =
-      s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, ccvs);
+      s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
 
     assertEq(ccvsToQuery.length, 2);
     assertEq(ccvsToQuery[0], s_laneMandatedCCV);
@@ -174,7 +178,7 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     );
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, s_requiredCCV));
-    s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, ccvs);
+    s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
   }
 
   function test_ensureCCVQuorumIsReached_RevertWhen_RequiredCCVMissing_Pool() public {
@@ -194,7 +198,9 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     );
     address[] memory poolRequiredCCVs = new address[](1);
     poolRequiredCCVs[0] = s_poolRequiredCCV;
-    vm.mockCall(s_destTokenPool, abi.encodeWithSelector(IPoolV2.getRequiredCCVs.selector), abi.encode(poolRequiredCCVs));
+    vm.mockCall(
+      s_destTokenPool, abi.encodeWithSelector(IPoolV2.getRequiredInboundCCVs.selector), abi.encode(poolRequiredCCVs)
+    );
 
     // Mock receiver to return required CCVs that are found.
     address[] memory receiverRequired = new address[](1);
@@ -206,7 +212,7 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     );
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, s_poolRequiredCCV));
-    s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, ccvs);
+    s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
   }
 
   function test_ensureCCVQuorumIsReached_RevertWhen_RequiredCCVMissing_LaneMandated() public {
@@ -217,7 +223,7 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](0);
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, s_laneMandatedCCV));
-    s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, ccvs);
+    s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
   }
 
   function test_ensureCCVQuorumIsReached_RevertWhen_OptionalCCVQuorumNotReached() public {
@@ -240,7 +246,9 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     vm.expectRevert(
       abi.encodeWithSelector(CCVAggregator.OptionalCCVQuorumNotReached.selector, receiverOptional.length, 1)
     );
-    s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, new MessageV1Codec.TokenTransferV1[](0), ccvs);
+    s_agg.ensureCCVQuorumIsReached(
+      SOURCE_CHAIN_SELECTOR, s_receiver, new MessageV1Codec.TokenTransferV1[](0), FINALITY, ccvs
+    );
   }
 
   function test_ensureCCVQuorumIsReached_Success_OptionalCCVsFound() public {
@@ -262,7 +270,7 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     );
 
     (address[] memory ccvsToQuery, uint256[] memory dataIndexes) =
-      s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, ccvs);
+      s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
 
     assertEq(ccvsToQuery.length, 2);
     assertEq(ccvsToQuery[0], s_laneMandatedCCV);

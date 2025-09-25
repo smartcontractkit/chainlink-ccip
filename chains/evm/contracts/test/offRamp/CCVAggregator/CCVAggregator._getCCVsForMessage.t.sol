@@ -73,7 +73,7 @@ contract CCVAggregator__getCCVsForMessage is CCVAggregatorSetup {
     s_ccvs.remove(address(0));
 
     (address[] memory requiredCCVs,,) =
-      s_agg.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, _setCCVsOnPool(poolCCVs));
+      s_agg.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, _setCCVsOnPool(poolCCVs), 0);
 
     assertEq(_onlyUniques(requiredCCVs).length, requiredCCVs.length, "still has duplicates");
 
@@ -136,7 +136,8 @@ contract CCVAggregator__getCCVsForMessage is CCVAggregatorSetup {
     vm.mockCall(
       pool,
       abi.encodeCall(
-        IPoolV2.getRequiredCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmounts[0].amount, tokenAmounts[0].extraData)
+        IPoolV2.getRequiredInboundCCVs,
+        (token, SOURCE_CHAIN_SELECTOR, tokenAmounts[0].amount, 0, tokenAmounts[0].extraData)
       ),
       abi.encode(ccvs)
     );
