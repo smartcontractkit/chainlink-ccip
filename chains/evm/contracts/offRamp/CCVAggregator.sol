@@ -344,6 +344,19 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     return _getCCVsForMessage(message.sourceChainSelector, address(bytes20(message.receiver)), message.tokenTransfer);
   }
 
+  /// @notice Returns the CCVs required by the receiver, pool and lane for a message. Duplicates are removed and
+  /// defaults are added if necessary. This function handles all the logic of combining the various sources of CCVs.
+  /// @param sourceChainSelector The source chain selector of the message.
+  /// @param receiver The receiver of the message.
+  /// @param tokenTransfer The tokens transferred in the message.
+  /// @return requiredCCVs The deduplicated list of required CCVs for the message.
+  /// @return optionalCCVs The list of optional CCVs for the message, with duplicates removed against required CCVs.
+  /// @return optionalThreshold The threshold of optional CCVs, adjusted for any duplicates with required CCVs.
+  /// @dev This function is quite complex as it needs to handle multiple sources of CCVs, deduplication and adding of
+  /// defaults. The function looks quite gas intensive, but the expected lengths of the various CCV arrays are small, so
+  /// the gas usage should be acceptable.
+  /// @dev The offchain system relies on this functions logic as well, meaning both onchain and offchain have the same
+  /// source of truth for which CCVs are needed for a message.
   function _getCCVsForMessage(
     uint64 sourceChainSelector,
     address receiver,
