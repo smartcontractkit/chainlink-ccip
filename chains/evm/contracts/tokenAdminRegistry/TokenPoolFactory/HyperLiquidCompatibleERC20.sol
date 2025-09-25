@@ -40,6 +40,11 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
     address newOwner
   ) FactoryBurnMintERC20(name, symbol, decimals, maxSupply, preMint, newOwner) {}
 
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "HyperLiquidCompatibleERC20 1.6.2-dev";
+  }
+
   /// @notice Sets the hyperEVMLinker address.
   /// @param newLinker The address of the hyperEVMLinker.
   function setHyperEVMLinker(
@@ -86,18 +91,16 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
     }
     return hyperEVMLinker;
   }
-  /**
-   * @notice Overrides the standard ERC20 transfer hook to add a balance check before bridging tokens to HyperCore.
-   * @dev This internal hook intercepts transfers to the `hypercoreTokenSystemAddress`. Before allowing the transfer,
-   * it performs a `staticcall` to the `SPOT_BALANCE_PRECOMPILE_ADDRESS` to fetch the system address's current
-   * spot balance on HyperCore. It then compares this remote balance (normalized to local decimals) with the transfer
-   * amount. This check prevents users from losing funds by ensuring the bridge destination on HyperCore has
-   * sufficient liquidity before the HyperEVM-side transfer occurs. The function reverts if the transfer amount
-   * exceeds the available spot balance or if the precompile call fails.
-   * @param to The recipient address of the token transfer.
-   * @param amount The amount of tokens being transferred.
-   */
 
+  /// @notice Overrides the standard ERC20 transfer hook to add a balance check before bridging tokens to HyperCore.
+  /// @dev This internal hook intercepts transfers to the `hypercoreTokenSystemAddress`. Before allowing the transfer,
+  /// it performs a `staticcall` to the `SPOT_BALANCE_PRECOMPILE_ADDRESS` to fetch the system address's current
+  /// spot balance on HyperCore. It then compares this remote balance (normalized to local decimals) with the transfer
+  /// amount. This check prevents users from losing funds by ensuring the bridge destination on HyperCore has
+  /// sufficient liquidity before the HyperEVM-side transfer occurs. The function reverts if the transfer amount
+  /// exceeds the available spot balance or if the precompile call fails.
+  /// @param to The recipient address of the token transfer.
+  /// @param amount The amount of tokens being transferred.
   function _beforeTokenTransfer(address, address to, uint256 amount) internal virtual override {
     if (to == s_hypercoreTokenSystemAddress) {
       (bool success, bytes memory result) =
