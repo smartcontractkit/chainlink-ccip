@@ -5,10 +5,21 @@ import {USDCTokenPool} from "../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2} from "../pools/USDC/USDCTokenPoolCCTPV2.sol";
 
 /// @notice Library for encoding and decoding the source pool data for the USDC token pool based on the CCTP version.
+/// @dev While every version of a CCTP-enabled pool has a different source pool data format, the encoding and decoding
+/// schemes are similar in a few ways. Each source pool data format is prefixed with a version number, in bytes4 format.
+/// It is then encodePacked() with each of the sourceTokenDataPayload fields. Decoding means parsing the bytes array
+/// into the corresponding sourceTokenDataPayload struct by parsing each field individually and then assembling them
+/// into the corresponding struct. This adds some additional gas overhead during decoding, but the benefits of saving
+/// space on the source pool data outweigh the overhead.
+/// @dev Any future versions of CCTP should include in this library a new function for encoding and decoding the source
+/// pool data accordingly.
 library USDCSourcePoolDataCodec {
   error InvalidVersion(uint32 version);
 
   /// @notice Encodes the source token data payload into a bytes array.
+  /// @dev By using abi.encodePacked(), significant amount of space on the source pool data is saved.
+  /// since abi.encode pads every field to the nearest 32 bytes. While it adds some overhead during decoding, the
+  /// benefits of saving space on the source pool data outweigh the overhead.
   /// @param version The version of the source token data payload.
   /// @param sourceTokenDataPayload The source token data payload to encode.
   /// @return The encoded source token data payload.
@@ -16,8 +27,9 @@ library USDCSourcePoolDataCodec {
     bytes4 version,
     USDCTokenPool.SourceTokenDataPayloadV0 memory sourceTokenDataPayload
   ) internal pure returns (bytes memory) {
-    // By using encodePacked rather than abi.encode, significant amount of space on the source pool data is saved.
-    // since abi.encode pads every field to the nearest 32 bytes.
+    /// Using abi.encodePacked() saves ~80 bytes on the source pool data by not using unnecessary padding.
+    /// abi.encode() = 96 bytes (32 + 32 + 32)
+    /// abi.encodePacked() = 16 bytes (4 + 8 + 4)
     return abi.encodePacked(version, sourceTokenDataPayload.nonce, sourceTokenDataPayload.sourceDomain);
   }
 
@@ -29,13 +41,14 @@ library USDCSourcePoolDataCodec {
     bytes4 version,
     USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload
   ) internal pure returns (bytes memory) {
-    // By using encodePacked rather than abi.encode, significant amount of space on the source pool data is saved.
-    // since abi.encode pads every field to the nearest 32 bytes.
+    /// Using abi.encodePacked() saves ~56 bytes on the source pool data by not using unnecessary padding.
+    /// abi.encode() = 96 bytes (32 + 32 + 32)
+    /// abi.encodePacked() = 40 bytes (4 + 4 + 32)
     return abi.encodePacked(version, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
   }
 
-  /// @notice Decodes the source pool data into its corresponding SourceTokenDataPayload struct.
-  /// @param sourcePoolData The source pool data to decode.
+  /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
+  /// @param sourcePoolData The source pool data to decode in raw bytes.
   /// @return sourceTokenDataPayload The decoded source token data payload.
   function _decodeSourceTokenDataPayloadV1(
     bytes memory sourcePoolData
@@ -44,6 +57,7 @@ library USDCSourcePoolDataCodec {
 
     // Since memory arrays cannot be sliced in the same way as calldata arrays, we need to create new bytes arrays
     // to store the individual fields and then parse into their corresponding types.
+
     // Version (uint32)(4 bytes)
     bytes memory versionBytes = new bytes(4);
     for (uint256 i = 0; i < 4; ++i) {
@@ -71,8 +85,8 @@ library USDCSourcePoolDataCodec {
     return sourceTokenDataPayload;
   }
 
-  /// @notice Decodes the source pool data into its corresponding SourceTokenDataPayload struct.
-  /// @param sourcePoolData The source pool data to decode.
+  /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
+  /// @param sourcePoolData The source pool data to decode in raw bytes.
   /// @return sourceTokenDataPayload The decoded source token data payload.
   function _decodeSourceTokenDataPayloadV0(
     bytes memory sourcePoolData
@@ -119,7 +133,7 @@ library USDCSourcePoolDataCodec {
   /// @param destinationCaller The destination caller of the message.
   /// @param maxFee The max fee of the message.
   /// @param minFinalityThreshold The min finality threshold of the message.
-  /// @return depositHash The deposit hash of the source pool data.
+  /// @return depositHash The deposit hash of the source pool data which will be matched off-chain to its CCTP attestation.
   function _calculateDepositHash(
     uint32 sourceDomain,
     uint256 amount,

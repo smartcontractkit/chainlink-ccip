@@ -187,6 +187,8 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       abi.encode(s_routerAllowedOnRamp)
     );
 
+    assertFalse(s_usdcTokenPoolProxy.isSupportedChain(testChainSelector));
+
     vm.expectRevert(
       abi.encodeWithSelector(
         USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism(0)

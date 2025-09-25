@@ -47,7 +47,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 1) {}
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
-  /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.
+  /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurn()`.
   /// The allowedCaller is preconfigured per destination domain and token pool version refer Domain struct.
   /// @dev Emits ITokenMessenger.DepositForBurn event.
   /// @dev Assumes caller has validated the destinationReceiver.
@@ -72,6 +72,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
     }
 
+    // Deposit the tokens for burn into CCTP.
     i_tokenMessenger.depositForBurn(
       lockOrBurnIn.amount,
       domain.domainIdentifier,
@@ -81,13 +82,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       MAX_FEE,
       FINALITY_THRESHOLD
     );
-
-    emit LockedOrBurned({
-      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-      token: address(i_token),
-      sender: msg.sender,
-      amount: lockOrBurnIn.amount
-    });
 
     // In CCTP v2, the nonce is not returned to this contract upon sending the message request, and will instead be
     // acquired off-chain and included in the destination-message's offchainTokenData. However, to ensure that the
@@ -104,9 +98,18 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       FINALITY_THRESHOLD // minFinalityThreshold
     );
 
+    // Encode the source pool data with its version number. The version number is hard-coded to 1 to maintain
+    // parity with the CCTP V2 version number.
     bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
       bytes4(uint32(1)), SourceTokenDataPayloadV1({sourceDomain: i_localDomainIdentifier, depositHash: depositHash})
     );
+
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
@@ -114,17 +117,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     });
   }
 
-  /// @notice Mint tokens from the pool to the recipient
-  /// * sourceTokenData is part of the verified message and passed directly from
-  /// the offRamp so it is guaranteed to be what the lockOrBurn pool released on the
-  /// source chain. It contains (nonce, sourceDomain) which is guaranteed by CCTP
-  /// to be unique.
-  /// * offchainTokenData is untrusted (can be supplied by manual execution), but we assert
-  /// that (nonce, sourceDomain) is equal to the message's (nonce, sourceDomain) and
-  /// receiveMessage will assert that Attestation contains a valid attestation signature
-  /// for that message, including its (nonce, sourceDomain). This way, the only
-  /// non-reverting offchainTokenData that can be supplied is a valid attestation for the
-  /// specific message that was sent on source.
+  /// @inheritdoc USDCTokenPool
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
@@ -133,12 +126,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
-    // Note: This decoding will be done on the new SourceTokenDataPayload struct,
-    // which has been altered to support both CCTP V1 and CCTP V2. Attempting to
-    // call releaseOrMint on this contract, with a sourcePoolData from a previous
-    // version will revert. However, this should never occur, as the USDC Proxy
-    // which receives the message first, should never call this pool with that data,
-    // instead formatting the message to the new format if necessary.
+    // Decode the source pool data from its raw bytes into a SourceTokenDataPayloadV1 struct that can be
+    // more easily validated below.
     SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
       USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(releaseOrMintIn.sourcePoolData);
 

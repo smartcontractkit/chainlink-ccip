@@ -80,14 +80,14 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   // is not necessary and field ordering has been defined so as to best support off-chain code.
   // solhint-disable-next-line gas-struct-packing
   struct SourceTokenDataPayloadV0 {
-    uint64 nonce; // Nonce of the message (used only in CCTP V1).
+    uint64 nonce; // Nonce of the message returned from the depositForBurnWithCaller() call to the CCTP contracts.
     uint32 sourceDomain; // Source domain of the message.
   }
 
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
   uint32 public immutable i_supportedUSDCVersion;
 
-  // The local USDC config
+  // The local USDC config.
   ITokenMessenger public immutable i_tokenMessenger;
   CCTPMessageTransmitterProxy public immutable i_messageTransmitterProxy;
   uint32 public immutable i_localDomainIdentifier;
@@ -203,8 +203,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     });
 
     // bytes4(0) is used as the version to match the CCTP V1 message format.
-    // depositHash is not necessary for CCTP V1, as the nonce is returned by the deposit call itself, but to maintain
-    // struct consistency, for compatibility with the CCTP V2 token pool, it is set to 0.
     bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
       bytes4(0), // version
       SourceTokenDataPayloadV0({nonce: nonce, sourceDomain: i_localDomainIdentifier})
@@ -234,17 +232,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     _validateCaller();
   }
 
-  /// @notice Mint tokens from the pool to the recipient
-  /// * sourceTokenData is part of the verified message and passed directly from
-  /// the offRamp so it is guaranteed to be what the lockOrBurn pool released on the
-  /// source chain. It contains (nonce, sourceDomain) which is guaranteed by CCTP
-  /// to be unique.
-  /// * offchainTokenData is untrusted (can be supplied by manual execution), but we assert
-  /// that (nonce, sourceDomain) is equal to the message's (nonce, sourceDomain) and
-  /// receiveMessage will assert that Attestation contains a valid attestation signature
-  /// for that message, including its (nonce, sourceDomain). This way, the only
-  /// non-reverting offchainTokenData that can be supplied is a valid attestation for the
-  /// specific message that was sent on source.
+  /// @inheritdoc TokenPool
+  /// @dev This function proxies the message to the message transmitter, which will mint the tokens through CCTP's contracts.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
@@ -253,12 +242,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
-    // Note: This decoding will be done on the new SourceTokenDataPayload struct,
-    // which has been altered to support both CCTP V1 and CCTP V2. Attempting to
-    // call releaseOrMint on this contract, with a sourcePoolData from a previous
-    // version will revert. However, this should never occur, as the USDC Proxy
-    // which receives the message first, should never call this pool with that data,
-    // instead formatting the message to the new format if necessary.
+    // Decode the source pool data from its raw bytes into a SourceTokenDataPayloadV0 struct that can be
+    // more easily validated.
     SourceTokenDataPayloadV0 memory sourceTokenDataPayload =
       USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV0(releaseOrMintIn.sourcePoolData);
 

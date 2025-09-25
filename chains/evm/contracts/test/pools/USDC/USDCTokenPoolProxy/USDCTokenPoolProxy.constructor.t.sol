@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../../../interfaces/IPool.sol";
+
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxy_constructor is USDCSetup {
   address internal s_legacyCctpV1Pool = makeAddr("legacyCctpV1Pool");
@@ -28,6 +31,10 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     assertEq(pools.legacyCctpV1Pool, s_legacyCctpV1Pool);
     assertEq(pools.cctpV1Pool, s_cctpV1Pool);
     assertEq(pools.cctpV2Pool, s_cctpV2Pool);
+
+    assertTrue(proxy.supportsInterface(type(IPoolV1).interfaceId));
+    assertTrue(proxy.supportsInterface(type(IERC165).interfaceId));
+    assertTrue(proxy.isSupportedToken(address(s_USDCToken)));
   }
 
   // Reverts
