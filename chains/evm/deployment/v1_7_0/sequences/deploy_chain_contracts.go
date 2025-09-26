@@ -39,6 +39,7 @@ type CommitteeVerifierParams struct {
 	AllowlistAdmin      common.Address
 	FeeAggregator       common.Address
 	SignatureConfigArgs committee_verifier.SetSignatureConfigArgs
+	StorageLocation     string
 }
 
 type CCVProxyParams struct {
@@ -269,6 +270,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					FeeAggregator:  input.ContractParams.CommitteeVerifier.FeeAggregator,
 					AllowlistAdmin: input.ContractParams.CommitteeVerifier.AllowlistAdmin,
 				},
+				StorageLocation: input.ContractParams.CommitteeVerifier.StorageLocation,
 			},
 		}, input.ExistingAddresses)
 		if err != nil {

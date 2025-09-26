@@ -17,7 +17,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_committeeVerifier = new CommitteeVerifier(_createBasicDynamicConfigArgs());
+    s_committeeVerifier = new CommitteeVerifier(_createBasicDynamicConfigArgs(), "testStorageLocation");
 
     address[] memory validSigner = new address[](1);
     validSigner[0] = vm.addr(PRIVATE_KEY_0);

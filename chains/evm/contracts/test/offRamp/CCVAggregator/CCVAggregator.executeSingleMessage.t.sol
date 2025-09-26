@@ -73,7 +73,7 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
     address[] memory ccvs = _arrayOf(s_defaultCCV); // Keep default CCV, but don't include the required CCV.
     bytes[] memory ccvData = new bytes[](1);
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, requiredCCV, false));
+    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, requiredCCV));
 
     s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
@@ -112,11 +112,11 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
     // Mock pool to require a specific CCV.
     vm.mockCall(
       pool,
-      abi.encodeCall(IPoolV2.getRequiredCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, "")),
+      abi.encodeCall(IPoolV2.getRequiredInboundCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, 0, "")),
       abi.encode(_arrayOf(poolRequiredCCV))
     );
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, poolRequiredCCV, true));
+    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, poolRequiredCCV));
 
     s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
@@ -147,7 +147,7 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
 
     vm.startPrank(address(s_agg));
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, laneMandatedCCV, false));
+    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, laneMandatedCCV));
 
     s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
   }

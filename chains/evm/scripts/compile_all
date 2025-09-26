@@ -115,7 +115,6 @@ compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
 
 # Test helpers
-compileContract test/helpers/BurnMintERC677Helper
 compileContract test/helpers/MessageHasher
 compileContract test/helpers/USDCReaderTester
 compileContract test/helpers/ReportCodec
