@@ -72,10 +72,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
   string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.3-dev";
 
   constructor(IERC20 token, PoolAddresses memory pools, address router) {
-    // Note: The legacy pool is allowed to be zero, as it is not requireed if this proxy is being deployed
-    // on a chain which has already migrated to a pool that utilizes a message transmitter proxy.
+    // Note: It is not required that every pool address be set, as this proxy may be deployed on a chain which does not
+    // support a specific version of CCTP. As a result only the token and router are enforced to be non-zero.
     if (
-      address(token) == address(0) || pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0)
+      address(token) == address(0)
         || router == address(0)
     ) {
       revert AddressCannotBeZero();

@@ -51,16 +51,16 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     );
   }
 
-  function test_constructor_RevertWhen_CCTPV2PoolIsZero() public {
+  function test_constructor_RevertWhen_RouterAddressIsZero() public {
     vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
     new USDCTokenPoolProxy(
-      s_USDCToken,
+      IERC20(s_USDCToken), // Token
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: address(0)
       }),
-      address(s_router)
+      address(0) // Router
     );
   }
 }
