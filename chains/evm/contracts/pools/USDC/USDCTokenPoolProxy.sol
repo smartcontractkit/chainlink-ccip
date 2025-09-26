@@ -74,10 +74,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
   constructor(IERC20 token, PoolAddresses memory pools, address router) {
     // Note: It is not required that every pool address be set, as this proxy may be deployed on a chain which does not
     // support a specific version of CCTP. As a result only the token and router are enforced to be non-zero.
-    if (
-      address(token) == address(0)
-        || router == address(0)
-    ) {
+    if (address(token) == address(0) || router == address(0)) {
       revert AddressCannotBeZero();
     }
 
