@@ -3,7 +3,8 @@ pragma solidity ^0.8.24;
 
 import {Internal} from "../../../../libraries/Internal.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
+
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
@@ -48,18 +49,10 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(
-        USDCTokenPool.SourceTokenDataPayload({
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({
           nonce: usdcMessage.nonce,
-          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          amount: amount,
-          destinationDomain: DEST_DOMAIN_IDENTIFIER,
-          mintRecipient: bytes32(0),
-          burnToken: address(s_USDCToken),
-          destinationCaller: bytes32(0),
-          maxFee: 0,
-          minFinalityThreshold: 0
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -113,19 +106,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(
-        USDCTokenPool.SourceTokenDataPayload({
-          nonce: nonce,
-          sourceDomain: sourceDomain,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          amount: amount,
-          destinationDomain: DEST_DOMAIN_IDENTIFIER,
-          mintRecipient: bytes32(0),
-          burnToken: address(s_USDCToken),
-          destinationCaller: bytes32(0),
-          maxFee: 0,
-          minFinalityThreshold: 0
-        })
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: sourceDomain})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -183,18 +165,10 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(
-        USDCTokenPool.SourceTokenDataPayload({
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({
           nonce: usdcMessage.nonce,
-          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          amount: amount,
-          destinationDomain: DEST_DOMAIN_IDENTIFIER,
-          mintRecipient: bytes32(0),
-          burnToken: address(s_USDCToken),
-          destinationCaller: bytes32(0),
-          maxFee: 0,
-          minFinalityThreshold: 0
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -220,48 +194,47 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     );
   }
 
-  function test_releaseOrMint_RevertWhen_TokenMaxCapacityExceeded() public {
-    uint256 capacity = _getInboundRateLimiterConfig().capacity;
-    uint256 amount = 10 * capacity;
-    address recipient = address(1);
-    vm.startPrank(s_routerAllowedOffRamp);
+  function test_releaseOrMint_RevertWhen_InvalidVersion() public {
+    uint256 amount = 1e6;
 
-    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
-      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
-      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(
-        USDCTokenPool.SourceTokenDataPayload({
-          nonce: 1,
-          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          cctpVersion: USDCTokenPool.CCTPVersion.CCTP_V1,
-          amount: amount,
-          destinationDomain: DEST_DOMAIN_IDENTIFIER,
-          mintRecipient: bytes32(0),
-          burnToken: address(s_USDCToken),
-          destinationCaller: bytes32(0),
-          maxFee: 0,
-          minFinalityThreshold: 0
-        })
-      ),
-      destGasAmount: USDC_DEST_TOKEN_GAS
+    USDCMessage memory usdcMessage = USDCMessage({
+      version: 0,
+      sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+      destinationDomain: DEST_DOMAIN_IDENTIFIER,
+      nonce: 0x060606060606,
+      sender: SOURCE_CHAIN_TOKEN_SENDER,
+      recipient: bytes32(uint256(uint160(OWNER))),
+      destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
+      messageBody: _formatMessage(
+        0,
+        bytes32(uint256(uint160(address(s_USDCToken)))),
+        bytes32(uint256(uint160(OWNER))),
+        amount,
+        bytes32(uint256(uint160(OWNER)))
+      )
     });
 
-    bytes memory offchainTokenData =
-      abi.encode(USDCTokenPool.MessageAndAttestation({message: bytes(""), attestation: bytes("")}));
+    bytes memory message = _generateUSDCMessage(usdcMessage);
+    bytes memory attestation = bytes("attestation bytes");
 
-    vm.expectRevert(
-      abi.encodeWithSelector(RateLimiter.TokenMaxCapacityExceeded.selector, capacity, amount, address(s_USDCToken))
-    );
+    bytes memory invalidExtraData = abi.encodePacked(bytes4(uint32(1)), uint32(1), SOURCE_DOMAIN_IDENTIFIER);
+
+    bytes memory offchainTokenData =
+      abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}));
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(USDCSourcePoolDataCodec.InvalidVersion.selector, bytes4(uint32(1))));
 
     s_usdcTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
-        receiver: recipient,
+        receiver: OWNER,
         sourceDenominatedAmount: amount,
         localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        sourcePoolData: sourceTokenData.extraData,
+        sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+        sourcePoolData: invalidExtraData,
         offchainTokenData: offchainTokenData
       })
     );
