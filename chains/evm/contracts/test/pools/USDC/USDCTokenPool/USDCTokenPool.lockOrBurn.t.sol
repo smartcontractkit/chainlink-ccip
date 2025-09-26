@@ -59,8 +59,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
 
-    USDCTokenPool.SourceTokenDataPayloadV0 memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV0(poolReturnDataV1.destPoolData);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
     assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, sourceTokenDataPayload.nonce);
   }
 
@@ -123,8 +123,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
 
-    USDCTokenPool.SourceTokenDataPayloadV0 memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV0(poolReturnDataV1.destPoolData);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
     assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, sourceTokenDataPayload.nonce);
   }
 
@@ -173,8 +173,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
 
-    USDCTokenPool.SourceTokenDataPayloadV0 memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV0(poolReturnDataV1.destPoolData);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
     assertEq(sourceTokenDataPayload.nonce, s_mockUSDCTokenMessenger.s_nonce() - 1, "nonce is incorrect");
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN), "destTokenAddress is incorrect");
@@ -224,8 +224,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         localToken: address(s_USDCToken)
       })
     );
-    USDCTokenPool.SourceTokenDataPayloadV0 memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV0(poolReturnDataV1.destPoolData);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
     assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, sourceTokenDataPayload.nonce);
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }

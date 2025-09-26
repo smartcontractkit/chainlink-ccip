@@ -26,11 +26,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   /// @dev 2000 indicates that finality must be reached before attestation is possible in CCTP V2.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
-  struct SourceTokenDataPayloadV1 {
-    uint32 sourceDomain;
-    bytes32 depositHash;
-  }
-
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "USDCTokenPoolCCTPV2 1.6.3-dev";
   }
@@ -100,8 +95,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
 
     // Encode the source pool data with its version number. The version number is hard-coded to 1 to maintain
     // parity with the CCTP V2 version number.
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-      bytes4(uint32(1)), SourceTokenDataPayloadV1({sourceDomain: i_localDomainIdentifier, depositHash: depositHash})
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: i_localDomainIdentifier, depositHash: depositHash})
     );
 
     emit LockedOrBurned({
@@ -128,8 +123,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
 
     // Decode the source pool data from its raw bytes into a SourceTokenDataPayloadV1 struct that can be
     // more easily validated below.
-    SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(releaseOrMintIn.sourcePoolData);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2(releaseOrMintIn.sourcePoolData);
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
@@ -165,7 +160,10 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ///     * minFinalityThreshold       32         uint32    140
   ///     * finalityThresholdExecuted  32         uint32    144
   ///     * messageBody                dynamic    bytes     148
-  function _validateMessage(bytes memory usdcMessage, SourceTokenDataPayloadV1 memory sourceTokenData) internal view {
+  function _validateMessage(
+    bytes memory usdcMessage,
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenData
+  ) internal view {
     // 148 is the minimum length of a valid message where all of the require fields are present and capable of being parsed.
     // correctly below for message validation. Since messageBody is dynamic and not always used, it is not included in this
     // check.

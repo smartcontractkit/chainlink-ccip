@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 
@@ -22,7 +23,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
 
     vm.resumeGasMetering();
     s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage, USDCTokenPool.SourceTokenDataPayloadV0({nonce: nonce, sourceDomain: sourceDomain})
+      encodedUsdcMessage, USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: sourceDomain})
     );
   }
 
@@ -47,7 +48,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
     );
     s_usdcTokenPool.validateMessage(
       _generateUSDCMessage(usdcMessage),
-      USDCTokenPool.SourceTokenDataPayloadV0({nonce: usdcMessage.nonce, sourceDomain: expectedSourceDomain})
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: usdcMessage.nonce, sourceDomain: expectedSourceDomain})
     );
   }
 
@@ -68,7 +69,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidNonce.selector, expectedNonce, usdcMessage.nonce));
     s_usdcTokenPool.validateMessage(
       _generateUSDCMessage(usdcMessage),
-      USDCTokenPool.SourceTokenDataPayloadV0({nonce: expectedNonce, sourceDomain: usdcMessage.sourceDomain})
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: expectedNonce, sourceDomain: usdcMessage.sourceDomain})
     );
   }
 
@@ -92,7 +93,10 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
 
     s_usdcTokenPool.validateMessage(
       _generateUSDCMessage(usdcMessage),
-      USDCTokenPool.SourceTokenDataPayloadV0({nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain})
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({
+        nonce: usdcMessage.nonce,
+        sourceDomain: usdcMessage.sourceDomain
+      })
     );
   }
 
@@ -108,8 +112,8 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
       messageBody: bytes("")
     });
 
-    USDCTokenPool.SourceTokenDataPayloadV0 memory sourceTokenData =
-      USDCTokenPool.SourceTokenDataPayloadV0({nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain});
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenData = USDCSourcePoolDataCodec
+      .SourceTokenDataPayloadV1({nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain});
 
     bytes memory encodedUsdcMessage = _generateUSDCMessage(usdcMessage);
 
@@ -119,8 +123,8 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
   }
 
   function test_validateMessage_RevertWhen_InvalidMessageLength() public {
-    USDCTokenPool.SourceTokenDataPayloadV0 memory sourceTokenData =
-      USDCTokenPool.SourceTokenDataPayloadV0({nonce: 387289284924, sourceDomain: 1553252});
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenData =
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: 387289284924, sourceDomain: 1553252});
 
     bytes memory shortMessage = new bytes(100);
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageLength.selector, 100));

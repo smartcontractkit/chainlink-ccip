@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {USDCTokenPool} from "../pools/USDC/USDCTokenPool.sol";
-import {USDCTokenPoolCCTPV2} from "../pools/USDC/USDCTokenPoolCCTPV2.sol";
-
 /// @notice Library for encoding and decoding the source pool data for the USDC token pool based on the CCTP version.
 /// @dev While every version of a CCTP-enabled pool has a different source pool data format, the encoding and decoding
 /// schemes are similar in a few ways. Each source pool data format is prefixed with a version number, in bytes4 format.
@@ -14,73 +11,84 @@ import {USDCTokenPoolCCTPV2} from "../pools/USDC/USDCTokenPoolCCTPV2.sol";
 /// @dev Any future versions of CCTP should include in this library a new function for encoding and decoding the source
 /// pool data accordingly.
 library USDCSourcePoolDataCodec {
-  error InvalidVersion(uint32 version);
+  /// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
+  /// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
+  /// data to indicate that the tokens should be released from the lock release pool rather than attempting to be minted
+  /// through CCTP.
+  /// @dev The preimage is bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE")).
+  bytes4 public constant LOCK_RELEASE_FLAG = 0xfa7c07de;
+
+  /// @dev The preimage is bytes4(keccak256("CCTP_V1"))
+  bytes4 public constant CCTP_VERSION_1_TAG = 0xf3567d18;
+
+  /// @dev The preimage is bytes4(keccak256("CCTP_V2"))
+  bytes4 public constant CCTP_VERSION_2_TAG = 0xb148ea5f;
+
+  // Note: Since this struct never exists in storage, only in memory after an ABI-decoding, proper struct-packing
+  // is not necessary and field ordering has been defined so as to best support off-chain code.
+  // solhint-disable-next-line gas-struct-packing
+  struct SourceTokenDataPayloadV1 {
+    uint64 nonce; // Nonce of the message returned from the depositForBurnWithCaller() call to the CCTP contracts.
+    uint32 sourceDomain; // Source domain of the message.
+  }
+
+  struct SourceTokenDataPayloadV2 {
+    uint32 sourceDomain;
+    bytes32 depositHash;
+  }
+
+  error InvalidVersion(bytes4 version);
 
   /// @notice Encodes the source token data payload into a bytes array.
   /// @dev By using abi.encodePacked(), significant amount of space on the source pool data is saved.
   /// since abi.encode pads every field to the nearest 32 bytes. While it adds some overhead during decoding, the
   /// benefits of saving space on the source pool data outweigh the overhead.
-  /// @param version The version of the source token data payload.
   /// @param sourceTokenDataPayload The source token data payload to encode.
   /// @return The encoded source token data payload.
-  function _encodeSourceTokenDataPayloadV0(
-    bytes4 version,
-    USDCTokenPool.SourceTokenDataPayloadV0 memory sourceTokenDataPayload
+  function _encodeSourceTokenDataPayloadV1(
+    SourceTokenDataPayloadV1 memory sourceTokenDataPayload
   ) internal pure returns (bytes memory) {
     /// Using abi.encodePacked() saves ~80 bytes on the source pool data by not using unnecessary padding.
     /// abi.encode() = 96 bytes (32 + 32 + 32)
     /// abi.encodePacked() = 16 bytes (4 + 8 + 4)
-    return abi.encodePacked(version, sourceTokenDataPayload.nonce, sourceTokenDataPayload.sourceDomain);
+    return abi.encodePacked(CCTP_VERSION_1_TAG, sourceTokenDataPayload.nonce, sourceTokenDataPayload.sourceDomain);
   }
 
   /// @notice Encodes the source token data payload into a bytes array.
-  /// @param version The version of the source token data payload.
   /// @param sourceTokenDataPayload The source token data payload to encode.
   /// @return The encoded source token data payload.
-  function _encodeSourceTokenDataPayloadV1(
-    bytes4 version,
-    USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload
+  function _encodeSourceTokenDataPayloadV2(
+    SourceTokenDataPayloadV2 memory sourceTokenDataPayload
   ) internal pure returns (bytes memory) {
     /// Using abi.encodePacked() saves ~56 bytes on the source pool data by not using unnecessary padding.
     /// abi.encode() = 96 bytes (32 + 32 + 32)
     /// abi.encodePacked() = 40 bytes (4 + 4 + 32)
-    return abi.encodePacked(version, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
+    return abi.encodePacked(CCTP_VERSION_2_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
   }
 
   /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
   /// @param sourcePoolData The source pool data to decode in raw bytes.
   /// @return sourceTokenDataPayload The decoded source token data payload.
-  function _decodeSourceTokenDataPayloadV1(
+  function _decodeSourceTokenDataPayloadV2(
     bytes memory sourcePoolData
-  ) internal pure returns (USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload) {
-    uint256 offset = 0;
+  ) internal pure returns (SourceTokenDataPayloadV2 memory sourceTokenDataPayload) {
+    bytes4 version;
+    uint32 sourceDomain;
+    bytes32 depositHash;
 
-    // Since memory arrays cannot be sliced in the same way as calldata arrays, we need to create new bytes arrays
-    // to store the individual fields and then parse into their corresponding types.
-
-    // Version (uint32)(4 bytes)
-    bytes memory versionBytes = new bytes(4);
-    for (uint256 i = 0; i < 4; ++i) {
-      versionBytes[i] = sourcePoolData[offset + i];
+    assembly {
+      // Load version (first 4 bytes of data, offset 32 from start of bytes memory)
+      version := mload(add(sourcePoolData, 32))
+      // Load sourceDomain (next 4 bytes, offset 36) - shift right by 224 bits to get top 4 bytes
+      sourceDomain := shr(224, mload(add(sourcePoolData, 36)))
+      // Load depositHash (next 32 bytes, offset 40)
+      depositHash := mload(add(sourcePoolData, 40))
     }
-    uint32 version = uint32(bytes4(versionBytes));
-    if (version != 1) revert InvalidVersion(version);
-    offset += 4;
 
-    // Source Domain (uint32)(4 bytes)
-    bytes memory domainBytes = new bytes(4);
-    for (uint256 i = 0; i < 4; ++i) {
-      domainBytes[i] = sourcePoolData[offset + i];
-    }
-    sourceTokenDataPayload.sourceDomain = uint32(bytes4(domainBytes));
-    offset += 4;
+    if (version != CCTP_VERSION_2_TAG) revert InvalidVersion(version);
 
-    // Deposit Hash (bytes32)(32 bytes)
-    bytes memory hashBytes = new bytes(32);
-    for (uint256 i = 0; i < 32; i++) {
-      hashBytes[i] = sourcePoolData[offset + i];
-    }
-    sourceTokenDataPayload.depositHash = bytes32(hashBytes);
+    sourceTokenDataPayload.sourceDomain = sourceDomain;
+    sourceTokenDataPayload.depositHash = depositHash;
 
     return sourceTokenDataPayload;
   }
@@ -88,38 +96,26 @@ library USDCSourcePoolDataCodec {
   /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
   /// @param sourcePoolData The source pool data to decode in raw bytes.
   /// @return sourceTokenDataPayload The decoded source token data payload.
-  function _decodeSourceTokenDataPayloadV0(
+  function _decodeSourceTokenDataPayloadV1(
     bytes memory sourcePoolData
-  ) internal pure returns (USDCTokenPool.SourceTokenDataPayloadV0 memory sourceTokenDataPayload) {
-    uint256 offset = 0;
+  ) internal pure returns (SourceTokenDataPayloadV1 memory sourceTokenDataPayload) {
+    bytes4 version;
+    uint64 nonce;
+    uint32 sourceDomain;
 
-    // Since memory arrays cannot be sliced in the same way as calldata arrays, we need to create new bytes arrays
-    // to store the individual fields and then parse into their corresponding types.
-    // Version (uint32)(4 bytes)
-    bytes memory versionBytes = new bytes(4);
-    for (uint256 i = 0; i < 4; ++i) {
-      versionBytes[i] = sourcePoolData[offset + i];
+    assembly {
+      // Load version (first 4 bytes of data, offset 32 from start of bytes memory)
+      version := mload(add(sourcePoolData, 32))
+      // Load nonce (next 8 bytes, offset 36) - shift right by 192 bits to get top 8 bytes
+      nonce := shr(192, mload(add(sourcePoolData, 36)))
+      // Load sourceDomain (next 4 bytes, offset 44) - shift right by 224 bits to get top 4 bytes
+      sourceDomain := shr(224, mload(add(sourcePoolData, 44)))
     }
-    uint32 version = uint32(bytes4(versionBytes));
 
-    if (version != 0) revert InvalidVersion(version);
-    offset += 4;
+    if (version != CCTP_VERSION_1_TAG) revert InvalidVersion(version);
 
-    // Nonce (uint64)(8 bytes)
-    bytes memory nonceBytes = new bytes(8);
-    for (uint256 i = 0; i < 8; ++i) {
-      nonceBytes[i] = sourcePoolData[offset + i];
-    }
-    sourceTokenDataPayload.nonce = uint64(bytes8(nonceBytes));
-    offset += 8;
-
-    // Source Domain (uint32)(4 bytes)
-    bytes memory domainBytes = new bytes(4);
-    for (uint256 i = 0; i < 4; ++i) {
-      domainBytes[i] = sourcePoolData[offset + i];
-    }
-    sourceTokenDataPayload.sourceDomain = uint32(bytes4(domainBytes));
-    offset += 4;
+    sourceTokenDataPayload.nonce = nonce;
+    sourceTokenDataPayload.sourceDomain = sourceDomain;
 
     return sourceTokenDataPayload;
   }

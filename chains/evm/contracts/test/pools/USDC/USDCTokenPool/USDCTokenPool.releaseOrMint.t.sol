@@ -49,9 +49,11 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
-        bytes4(0),
-        USDCTokenPool.SourceTokenDataPayloadV0({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({
+          nonce: usdcMessage.nonce,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER
+        })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -104,8 +106,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
-        bytes4(0), USDCTokenPool.SourceTokenDataPayloadV0({nonce: nonce, sourceDomain: sourceDomain})
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: sourceDomain})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -163,9 +165,11 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
-        bytes4(0),
-        USDCTokenPool.SourceTokenDataPayloadV0({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({
+          nonce: usdcMessage.nonce,
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER
+        })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -213,22 +217,14 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     bytes memory message = _generateUSDCMessage(usdcMessage);
     bytes memory attestation = bytes("attestation bytes");
 
-    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
-      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
-      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
-        bytes4(uint32(1)),
-        USDCTokenPool.SourceTokenDataPayloadV0({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-      ),
-      destGasAmount: USDC_DEST_TOKEN_GAS
-    });
+    bytes memory invalidExtraData = abi.encodePacked(bytes4(uint32(1)), uint32(1), SOURCE_DOMAIN_IDENTIFIER);
 
     bytes memory offchainTokenData =
       abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}));
 
     vm.startPrank(s_routerAllowedOffRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(USDCSourcePoolDataCodec.InvalidVersion.selector, 1));
+    vm.expectRevert(abi.encodeWithSelector(USDCSourcePoolDataCodec.InvalidVersion.selector, bytes4(uint32(1))));
 
     s_usdcTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
@@ -237,8 +233,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
         sourceDenominatedAmount: amount,
         localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        sourcePoolData: sourceTokenData.extraData,
+        sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+        sourcePoolData: invalidExtraData,
         offchainTokenData: offchainTokenData
       })
     );

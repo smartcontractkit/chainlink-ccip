@@ -9,18 +9,11 @@ import {ERC165CheckerReverting} from "../../libraries/ERC165CheckerReverting.sol
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
-
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
-
-/// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
-/// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
-/// data to indicate that the tokens should be released from the lock release pool rather than attempting to be minted
-/// through CCTP.
-/// @dev The preimage is bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE")).
-bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
 /// @notice A token pool proxy for USDC that allows for routing of messages to the correct pool based on the correct
 /// lock or burn mechanism. This includes CCTP v1, CCTP v2, and lock release.
@@ -43,7 +36,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
 
   error AddressCannotBeZero();
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
-  error InvalidMessageVersion(uint32 version);
+  error InvalidMessageVersion(bytes4 version);
   error InvalidMessageLength(uint256 length);
   error MismatchedArrayLengths();
   error InvalidDestinationPool();
@@ -203,20 +196,20 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
     }
 
     // The first 4 bytes of source pool data are the version which can be extracted directly and cast into a uint32.
-    uint32 version = uint32(bytes4(releaseOrMintIn.sourcePoolData[:4]));
+    bytes4 version = bytes4(releaseOrMintIn.sourcePoolData[:4]);
 
     // If the source pool data is the lock release flag, use the lock release pool set for the remote chain selector.
-    if (version == uint32(LOCK_RELEASE_FLAG)) {
+    if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
       return USDCTokenPool(s_lockReleasePools[releaseOrMintIn.remoteChainSelector]).releaseOrMint(releaseOrMintIn);
     }
 
     // If the version is 0, use the CCTP V1 pool.
-    if (version == 0) {
+    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
       return USDCTokenPool(s_pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
     }
 
     // If the version is 1, use the CCTP V2 pool.
-    if (version == 1) {
+    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG) {
       return USDCTokenPool(s_pools.cctpV2Pool).releaseOrMint(releaseOrMintIn);
     }
 
@@ -364,13 +357,25 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
     // individually, which would be more gas intensive, as only the sourcePoolData field is going to be modified.
     newReleaseOrMintIn = releaseOrMintIn;
 
-    uint32 nonce = uint32(bytes4(releaseOrMintIn.sourcePoolData[0:4]));
-    uint32 sourceDomain = uint32(bytes4(releaseOrMintIn.sourcePoolData[4:8]));
+    // TODO: Cleanup after testing.
+    bytes memory sourcePoolData = newReleaseOrMintIn.sourcePoolData;
+
+    bytes4 version;
+    uint32 nonce;
+    uint32 sourceDomain;
+
+    assembly {
+      version := mload(add(sourcePoolData, 4))
+      nonce := mload(add(sourcePoolData, 8))
+      sourceDomain := mload(add(sourcePoolData, 12))
+    }
+
+    if (version != bytes4(0)) revert USDCSourcePoolDataCodec.InvalidVersion(version);
 
     // Since this is a legacy message, it should only operate on CCTP V1 messages. As a result it is safe to hard
     // code the version to 0.
-    newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
-      bytes4(0), USDCTokenPool.SourceTokenDataPayloadV0({nonce: nonce, sourceDomain: sourceDomain})
+    newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: sourceDomain})
     );
 
     return newReleaseOrMintIn;

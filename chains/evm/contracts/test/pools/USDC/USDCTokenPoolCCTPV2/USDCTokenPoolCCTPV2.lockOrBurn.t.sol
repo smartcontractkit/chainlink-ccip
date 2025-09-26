@@ -62,8 +62,8 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2(poolReturnDataV1.destPoolData);
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
   }
 
@@ -128,8 +128,8 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2(poolReturnDataV1.destPoolData);
 
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
   }
@@ -181,8 +181,8 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2(poolReturnDataV1.destPoolData);
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }

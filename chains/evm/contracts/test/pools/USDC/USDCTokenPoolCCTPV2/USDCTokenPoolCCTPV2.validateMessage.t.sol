@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
 contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
   USDCMessageCCTPV2 internal s_validUsdcMessage;
-  USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1 internal s_validSourceTokenData;
+  USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 internal s_validSourceTokenData;
 
   function setUp() public virtual override {
     super.setUp();
@@ -29,7 +30,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
 
     // Create valid source token data payload that matches the valid USDC message
     // This is used by tests that need to test payload validation failures
-    s_validSourceTokenData = USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({
+    s_validSourceTokenData = USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({
       sourceDomain: s_validUsdcMessage.sourceDomain,
       depositHash: bytes32(0)
     });
@@ -54,7 +55,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
     vm.resumeGasMetering();
     s_usdcTokenPool.validateMessage(
       encodedUsdcMessage,
-      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: sourceDomain, depositHash: bytes32(0)})
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: sourceDomain, depositHash: bytes32(0)})
     );
   }
 
@@ -70,7 +71,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
     );
     s_usdcTokenPool.validateMessage(
       _generateUSDCMessageCCTPV2(s_validUsdcMessage),
-      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: expectedSourceDomain, depositHash: bytes32(0)})
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: expectedSourceDomain, depositHash: bytes32(0)})
     );
   }
 

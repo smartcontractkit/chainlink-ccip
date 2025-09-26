@@ -9,7 +9,6 @@ import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataC
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
-import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
@@ -27,7 +26,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   function test_releaseOrMint_LockReleaseFlag() public {
     // Arrange: Prepare test data
     uint256 testAmount = 1234;
-    bytes memory lockReleaseFlag = abi.encodePacked(LOCK_RELEASE_FLAG);
+    bytes memory lockReleaseFlag = abi.encodePacked(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
     bytes memory originalSender = abi.encode(s_sender);
     bytes memory offchainTokenData = "";
 
@@ -85,8 +84,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     uint256 testAmount = 4321;
     bytes memory originalSender = abi.encode(s_sender);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV0(
-      bytes4(0), USDCTokenPool.SourceTokenDataPayloadV0({nonce: 0, sourceDomain: 0})
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: 0, sourceDomain: 0})
     );
     bytes memory offChainTokenData = "";
 
@@ -134,9 +133,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-      bytes4(uint32(1)),
-      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: 0, depositHash: bytes32(hex"deafbeef")})
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: 0, depositHash: bytes32(hex"deafbeef")})
     );
     bytes memory offChainTokenData = "";
 
@@ -306,10 +304,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     // Arrange: Prepare test data
     uint256 testAmount = 1234;
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-      bytes4(uint32(2)),
-      USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: 0, depositHash: bytes32(hex"deafbeef")})
-    );
+    bytes memory invalidSourcePoolData = abi.encodePacked(bytes4(uint32(2)), uint32(0), bytes32(hex"deafbeef"));
+
     bytes memory offChainTokenData = "";
 
     // Mock the router's isOffRamp function to return true
@@ -327,12 +323,12 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       receiver: s_receiver,
       sourceDenominatedAmount: testAmount,
       localToken: address(s_USDCToken),
-      sourcePoolData: sourcePoolData,
+      sourcePoolData: invalidSourcePoolData,
       sourcePoolAddress: s_sourcePoolAddress,
       offchainTokenData: offChainTokenData
     });
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, 2));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, bytes4(uint32(2))));
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     vm.stopPrank();

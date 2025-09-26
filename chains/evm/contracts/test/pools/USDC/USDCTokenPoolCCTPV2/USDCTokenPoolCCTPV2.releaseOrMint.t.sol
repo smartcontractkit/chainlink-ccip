@@ -52,9 +52,8 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-        bytes4(uint32(1)),
-        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: bytes32(0)})
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: bytes32(0)})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -106,9 +105,8 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-        bytes4(uint32(1)),
-        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: sourceDomain, depositHash: bytes32(0)})
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: sourceDomain, depositHash: bytes32(0)})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -168,9 +166,8 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-        bytes4(uint32(1)),
-        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: bytes32(0)})
+      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: bytes32(0)})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -220,22 +217,15 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     bytes memory message = _generateUSDCMessageCCTPV2(usdcMessage);
     bytes memory attestation = bytes("attestation bytes");
 
-    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
-      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
-      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-        bytes4(uint32(2)),
-        USDCTokenPoolCCTPV2.SourceTokenDataPayloadV1({sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: bytes32(0)})
-      ),
-      destGasAmount: USDC_DEST_TOKEN_GAS
-    });
+    bytes memory invalidExtraData =
+      abi.encodePacked(bytes4(uint32(2)), SOURCE_DOMAIN_IDENTIFIER, bytes32(keccak256("0xC11")), bytes32(0));
 
     bytes memory offchainTokenData =
       abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}));
 
     vm.startPrank(s_routerAllowedOffRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(USDCSourcePoolDataCodec.InvalidVersion.selector, 2));
+    vm.expectRevert(abi.encodeWithSelector(USDCSourcePoolDataCodec.InvalidVersion.selector, bytes4(uint32(2))));
     s_usdcTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
@@ -243,8 +233,8 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
         sourceDenominatedAmount: amount,
         localToken: address(s_USDCToken),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        sourcePoolData: sourceTokenData.extraData,
+        sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+        sourcePoolData: invalidExtraData,
         offchainTokenData: offchainTokenData
       })
     );
