@@ -186,7 +186,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
       } else {
         // Since the new pool and the inflight message should utilize the same version of CCTP, and would have the same
         // destinationCaller (the message transmitter proxy), we can route the message to the v1 pool, but we first
-        // need to turn the source pool data into the new format, otherwise abi-decoding will revert. Once there is
+        // need to turn the source pool data into the new format, otherwise the decoding scheme will fail. Once there is
         // confidence that no more messages are inflight, these branches can be safely removed.
 
         // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
@@ -203,13 +203,16 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
       return USDCTokenPool(s_lockReleasePools[releaseOrMintIn.remoteChainSelector]).releaseOrMint(releaseOrMintIn);
     }
 
-    // If the version is 0, use the CCTP V1 pool.
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
       return USDCTokenPool(s_pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
     }
 
-    // If the version is 1, use the CCTP V2 pool.
-    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG) {
+    // Both tags will route to the same CCTP V2 pool, but will allow for pools to have greater granularity in deciding
+    // the type of transfer (slow or fast) to use when depositing into CCTP.
+    if (
+      version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG
+        || version == USDCSourcePoolDataCodec.CCTP_VERSION_2_FAST_TRANSFER_TAG
+    ) {
       return USDCTokenPool(s_pools.cctpV2Pool).releaseOrMint(releaseOrMintIn);
     }
 
@@ -354,28 +357,17 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) internal pure returns (Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn) {
     // Copy the releaseOrMintIn struct to the newReleaseOrMintIn struct. We do this to avoid having to copy each field
-    // individually, which would be more gas intensive, as only the sourcePoolData field is going to be modified.
+    // individually, which would be more gas intensive, as only the sourcePoolData field is going to be modified, as well
+    // as the releaseOrMintIn struct is calldata, which cannot be modified in place.
     newReleaseOrMintIn = releaseOrMintIn;
 
-    // TODO: Cleanup after testing.
-    bytes memory sourcePoolData = newReleaseOrMintIn.sourcePoolData;
-
-    bytes4 version;
-    uint32 nonce;
-    uint32 sourceDomain;
-
-    assembly {
-      version := mload(add(sourcePoolData, 4))
-      nonce := mload(add(sourcePoolData, 8))
-      sourceDomain := mload(add(sourcePoolData, 12))
-    }
-
-    if (version != bytes4(0)) revert USDCSourcePoolDataCodec.InvalidVersion(version);
-
-    // Since this is a legacy message, it should only operate on CCTP V1 messages. As a result it is safe to hard
-    // code the version to 0.
+    // While the legacy source pool data struct uses the same fields as the current source pool data struct, it is
+    // was initially encoded using abi.encode(sourceTokenDataPayload) instead of the encoding scheme used in the
+    // USDCSourcePoolDataCodec library, and without a version tag. Therefore, we need to decode the source pool data
+    // into a SourceTokenDataPayloadV1 struct and then re-encode it into a format that using the proper versioning
+    // scheme whereby the CCTP V1 pool can process the message.
     newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: sourceDomain})
+      abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1))
     );
 
     return newReleaseOrMintIn;

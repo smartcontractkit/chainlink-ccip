@@ -21,17 +21,25 @@ library USDCSourcePoolDataCodec {
   /// @dev The preimage is bytes4(keccak256("CCTP_V1"))
   bytes4 public constant CCTP_VERSION_1_TAG = 0xf3567d18;
 
+  /// @dev There are two different tags for CCTP V2 to allow for CCIP V1.7 Compatibility which will enable fast transfers.
+  /// Both tags will route to the same CCTP V2 pool, but will allow for pools to identify the type of transfer (slow or fast).
+
   /// @dev The preimage is bytes4(keccak256("CCTP_V2"))
   bytes4 public constant CCTP_VERSION_2_TAG = 0xb148ea5f;
 
-  // Note: Since this struct never exists in storage, only in memory after an ABI-decoding, proper struct-packing
-  // is not necessary and field ordering has been defined so as to best support off-chain code.
-  // solhint-disable-next-line gas-struct-packing
+  /// @dev The preimage is bytes4(keccak256("CCTP_V2_FAST_TRANSFER"))
+  bytes4 public constant CCTP_VERSION_2_FAST_TRANSFER_TAG = 0x0458016c;
+
+  /// Note: Since this struct never exists in storage, only in memory after an ABI-decoding, proper struct-packing
+  /// is not necessary and field ordering has been defined so as to best support off-chain code.
+  /// @dev This struct has been titled for version 1 to indicate that it should be used for CCTP V1 messages.
   struct SourceTokenDataPayloadV1 {
     uint64 nonce; // Nonce of the message returned from the depositForBurnWithCaller() call to the CCTP contracts.
     uint32 sourceDomain; // Source domain of the message.
   }
 
+  /// @dev This struct has been titled for version 2 to indicate that it should be used for CCTP V2 messages. Whether
+  /// it is a slow or fast transfer is irrelevant as it will be routed to the same destination CCTP V2 pool regardless.
   struct SourceTokenDataPayloadV2 {
     uint32 sourceDomain;
     bytes32 depositHash;
@@ -54,7 +62,7 @@ library USDCSourcePoolDataCodec {
     return abi.encodePacked(CCTP_VERSION_1_TAG, sourceTokenDataPayload.nonce, sourceTokenDataPayload.sourceDomain);
   }
 
-  /// @notice Encodes the source token data payload into a bytes array.
+  /// @notice Encodes the source token data payload into a bytes array using the CCTP V2 tag.
   /// @param sourceTokenDataPayload The source token data payload to encode.
   /// @return The encoded source token data payload.
   function _encodeSourceTokenDataPayloadV2(
@@ -64,6 +72,20 @@ library USDCSourcePoolDataCodec {
     /// abi.encode() = 96 bytes (32 + 32 + 32)
     /// abi.encodePacked() = 40 bytes (4 + 4 + 32)
     return abi.encodePacked(CCTP_VERSION_2_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
+  }
+
+  /// @notice Encodes the source token data payload into a bytes array using the CCTP V2 fast transfer tag.
+  /// @param sourceTokenDataPayload The source token data payload to encode.
+  /// @return The encoded source token data payload.
+  function _encodeSourceTokenDataPayloadV2FastTransfer(
+    SourceTokenDataPayloadV2 memory sourceTokenDataPayload
+  ) internal pure returns (bytes memory) {
+    /// Using abi.encodePacked() saves ~56 bytes on the source pool data by not using unnecessary padding.
+    /// abi.encode() = 96 bytes (32 + 32 + 32)
+    /// abi.encodePacked() = 40 bytes (4 + 4 + 32)
+    return abi.encodePacked(
+      CCTP_VERSION_2_FAST_TRANSFER_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash
+    );
   }
 
   /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
@@ -77,15 +99,18 @@ library USDCSourcePoolDataCodec {
     bytes32 depositHash;
 
     assembly {
-      // Load version (first 4 bytes of data, offset 32 from start of bytes memory)
+      // Load version (first 4 bytes of data, offset 32 to skip the length slot)
       version := mload(add(sourcePoolData, 32))
-      // Load sourceDomain (next 4 bytes, offset 36) - shift right by 224 bits to get top 4 bytes
+      // Load sourceDomain (next 4 bytes, offset 36 (32 + 4)) - shift right by 224 bits to get left-most 4 bytes
+      // offset 36 = 32 (length slot) + 4 (uint32)
+      // shift right by 224 = 256 - 32 (uint32)
       sourceDomain := shr(224, mload(add(sourcePoolData, 36)))
-      // Load depositHash (next 32 bytes, offset 40)
+      // Load depositHash (next 32 bytes) - Since depositHash is a bytes32, no shifting is needed.
+      // offset 40 = 32 (length slot) + 4 (bytes4) + 4 (uint32)
       depositHash := mload(add(sourcePoolData, 40))
     }
 
-    if (version != CCTP_VERSION_2_TAG) revert InvalidVersion(version);
+    if (version != CCTP_VERSION_2_TAG && version != CCTP_VERSION_2_FAST_TRANSFER_TAG) revert InvalidVersion(version);
 
     sourceTokenDataPayload.sourceDomain = sourceDomain;
     sourceTokenDataPayload.depositHash = depositHash;
@@ -104,11 +129,15 @@ library USDCSourcePoolDataCodec {
     uint32 sourceDomain;
 
     assembly {
-      // Load version (first 4 bytes of data, offset 32 from start of bytes memory)
+      // Load version (first 4 bytes of data, offset 32 to skip the length slot)
       version := mload(add(sourcePoolData, 32))
-      // Load nonce (next 8 bytes, offset 36) - shift right by 192 bits to get top 8 bytes
+      // Load nonce (next 8 bytes, offset 36) - shift right by 192 bits to get left-most 8 bytes
+      // offset 36 = 32 (length slot) + 4 (uint64)
+      // shift right by 192 = 256 - 64 (uint64)
       nonce := shr(192, mload(add(sourcePoolData, 36)))
-      // Load sourceDomain (next 4 bytes, offset 44) - shift right by 224 bits to get top 4 bytes
+      // Load sourceDomain (next 4 bytes, offset 44) - shift right by 224 bits to get leftmost 4 bytes
+      // offset 44 = 32 (length slot) + 4 (bytes4) 8 (uint64)
+      // shift right by 224 = 256 - 32 (uint32)
       sourceDomain := shr(224, mload(add(sourcePoolData, 44)))
     }
 

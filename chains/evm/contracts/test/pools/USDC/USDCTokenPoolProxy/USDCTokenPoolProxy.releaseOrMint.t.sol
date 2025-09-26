@@ -7,7 +7,6 @@ import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
-import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
@@ -123,6 +122,53 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     // Assert: The output matches
+    assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
+
+    vm.stopPrank();
+  }
+
+  function test_releaseOrMint_CCTPV2_FastTransferFlag() public {
+    // Arrange: Prepare test data
+    uint256 testAmount = 5678;
+    bytes memory originalSender = abi.encode(s_sender);
+
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2FastTransfer(
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: 0, depositHash: bytes32(hex"deafbeef")})
+    );
+    bytes memory offChainTokenData = "";
+
+    // Mock the router's isOffRamp function to return true
+    vm.mockCall(
+      address(s_router),
+      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
+      abi.encode(true)
+    );
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    // Prepare input with CCTP_V2_FLAG in sourcePoolData
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      originalSender: originalSender,
+      receiver: s_receiver,
+      sourceDenominatedAmount: testAmount,
+      localToken: address(s_USDCToken),
+      sourcePoolData: sourcePoolData,
+      sourcePoolAddress: s_sourcePoolAddress,
+      offchainTokenData: offChainTokenData
+    });
+
+    Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
+
+    // Expect the cctpV2Pool's releaseOrMint to be called and return expectedOut
+    vm.mockCall(
+      address(s_cctpV2Pool),
+      abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector, releaseOrMintIn),
+      abi.encode(expectedOut)
+    );
+
+    Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
+
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
 
     vm.stopPrank();
