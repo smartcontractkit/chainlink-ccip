@@ -40,6 +40,7 @@ var CCTPDestDomains = map[uint64]uint32{
 	sel.SOLANA_MAINNET.Selector:              5,
 	sel.ETHEREUM_MAINNET_BASE_1.Selector:     6,
 	sel.POLYGON_MAINNET.Selector:             7,
+	sel.SUI_MAINNET.Selector:                 8,
 	// ---------- Testnet Domains ----------
 	sel.ETHEREUM_TESTNET_SEPOLIA.Selector:            0,
 	sel.AVALANCHE_TESTNET_FUJI.Selector:              1,
@@ -48,6 +49,7 @@ var CCTPDestDomains = map[uint64]uint32{
 	sel.SOLANA_DEVNET.Selector:                       5,
 	sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     6,
 	sel.POLYGON_TESTNET_AMOY.Selector:                7,
+	sel.SUI_TESTNET.Selector:                         8,
 }
 
 type eventID [32]byte
@@ -137,6 +139,31 @@ func NewUSDCMessageReader(
 			}
 
 			readers[chainSelector] = solanaUSDCMessageReader{
+				lggr:           lggr,
+				contractReader: contractReaders[chainSelector],
+			}
+		case sel.FamilySui:
+			// Bind the TokenPool contract, the contract re-emits the USDC MessageSent event along with other metadata.
+			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
+			if err != nil {
+				return nil, err
+			}
+
+			// Bind the USDC Token Pool contract, this is where CCTP MessageSent events are emitted for Sui.
+			_, err = bindReaderContract(
+				ctx,
+				lggr,
+				contractReaders,
+				chainSelector,
+				consts.ContractNameUSDCTokenPool,
+				bytesAddress,
+				addrCodec,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			readers[chainSelector] = suiUSDCMessageReader{
 				lggr:           lggr,
 				contractReader: contractReaders[chainSelector],
 			}
