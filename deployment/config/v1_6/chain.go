@@ -28,7 +28,7 @@ type FeeQuoterDestChainConfig struct {
 	DestDataAvailabilityOverheadGas   uint32
 	DestGasPerDataAvailabilityByte    uint16
 	DestDataAvailabilityMultiplierBps uint16
-	ChainFamilySelector               uint32
+	ChainFamilySelector               [4]byte
 	EnforceOutOfOrder                 bool
 	DefaultTokenFeeUSDCents           uint16
 	DefaultTokenDestGasOverhead       uint32

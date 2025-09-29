@@ -1,24 +1,6 @@
 package v1_6
 
-import (
-	changeset_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-)
-
-type ConnectChainsConfig struct {
-	Lanes []LaneConfig
-	MCMS  *changeset_utils.MCMSParams
-}
-type LaneConfig struct {
-	Source       ChainDefinition
-	Dest         ChainDefinition
-	IsDisabled   bool
-	TestRouter   bool
-	ExtraConfigs ExtraConfigs
-}
-
-type ExtraConfigs struct {
-	OnRampVersion []byte
-}
+import "github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 
 type UpdateLanesInput struct {
 	UpdateFeeQuoterDestsConfig map[uint64]FeeQuoterDestChainConfig
@@ -26,7 +8,7 @@ type UpdateLanesInput struct {
 	UpdateOffRampSourcesConfig map[uint64]UpdateOffRampSourcesInput
 	UpdateRouterRampsConfig    map[uint64]UpdateRouterDestInput
 	ExtraConfigs               ExtraConfigs
-	MCMS                       *changeset_utils.MCMSParams
+	MCMS                       *proposalutils.TimelockConfig
 }
 
 type UpdateOnRampDestsInput struct {
