@@ -11,8 +11,8 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
-	changeset "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	changeset "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
 )
 
 func TestWithDatastore(t *testing.T) {

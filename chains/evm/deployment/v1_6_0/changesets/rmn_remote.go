@@ -1,7 +1,7 @@
 package changesets
 
 import (
-	changeset "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
+	changeset "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 )
 

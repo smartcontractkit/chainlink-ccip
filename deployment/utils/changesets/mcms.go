@@ -8,7 +8,7 @@ import (
 	mcmsevmsdk "github.com/smartcontractkit/mcms/sdk/evm"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 // TODO : move this to a common chain agnostic package
