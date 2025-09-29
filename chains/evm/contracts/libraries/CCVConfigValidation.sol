@@ -37,4 +37,15 @@ library CCVConfigValidation {
       }
     }
   }
+
+  function _assertNoDuplicates(
+    address[] memory addresses
+  ) internal pure {
+    uint256 length = addresses.length;
+    for (uint256 i = 0; i < length; ++i) {
+      for (uint256 j = i + 1; j < length; ++j) {
+        if (addresses[i] == addresses[j]) revert DuplicateCCVNotAllowed(addresses[i]);
+      }
+    }
+  }
 }
