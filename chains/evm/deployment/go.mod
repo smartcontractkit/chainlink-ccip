@@ -10,6 +10,9 @@ replace (
 
 	// Make sure we're working with the latest chainlink-ccip
 	github.com/smartcontractkit/chainlink-ccip => ../../../
+
+	// Make sure we're working with the latest chainlink-ccip/deployment
+	github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment
 )
 
 require (
