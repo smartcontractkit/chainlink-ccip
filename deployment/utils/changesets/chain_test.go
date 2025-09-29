@@ -3,7 +3,7 @@ package changesets_test
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
