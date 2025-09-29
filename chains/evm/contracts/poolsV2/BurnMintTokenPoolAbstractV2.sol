@@ -3,9 +3,9 @@ pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {TokenPool} from "./TokenPool.sol";
+import {TokenPoolV2} from "./TokenPoolV2.sol";
 
-abstract contract BurnMintTokenPoolAbstract is TokenPool {
+abstract contract BurnMintTokenPoolAbstractV2 is TokenPoolV2 {
   /// @notice Contains the specific release or mint token logic for a pool.
   /// @dev overriding this method allows us to create pools with different release/mint signatures
   /// without duplicating the underlying logic.

@@ -10,7 +10,7 @@ import {TokenPool as TokenPoolV1} from "../pools/TokenPool.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
-abstract contract TokenPool is IPoolV2, TokenPoolV1 {
+abstract contract TokenPoolV2 is IPoolV2, TokenPoolV1 {
   error DuplicateCCV(address ccv);
 
   event CCVConfigUpdated(uint64 indexed remoteChainSelector, address[] outboundCCVs, address[] inboundCCVs);

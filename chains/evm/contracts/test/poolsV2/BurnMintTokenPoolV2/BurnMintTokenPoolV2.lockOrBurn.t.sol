@@ -3,11 +3,11 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool as TokenPoolV1} from "../../../pools/TokenPool.sol";
-import {BurnMintSetup} from "./BurnMintSetup.t.sol";
+import {BurnMintTokenPoolV2Setup} from "./BurnMintTokenPoolV2Setup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-contract BurnMintTokenPoolV2_lockOrBurn is BurnMintSetup {
+contract BurnMintTokenPoolV2_lockOrBurn is BurnMintTokenPoolV2Setup {
   function test_constructor() public view {
     assertEq(address(s_token), address(s_pool.getToken()));
     assertEq(address(s_mockRMNRemote), s_pool.getRmnProxy());

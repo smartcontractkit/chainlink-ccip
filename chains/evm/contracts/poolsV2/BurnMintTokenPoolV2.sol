@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
-import {TokenPool} from "./TokenPool.sol";
+import {BurnMintTokenPoolAbstractV2} from "./BurnMintTokenPoolAbstractV2.sol";
+import {TokenPoolV2} from "./TokenPoolV2.sol";
 
 /// @notice This pool mints and burns a 3rd-party token.
 /// @dev Pool allowlisting mode is set in the constructor and cannot be modified later.
@@ -13,7 +13,7 @@ import {TokenPool} from "./TokenPool.sol";
 /// The only way to change allowlisting mode is to deploy a new pool.
 /// If that is expected, please make sure the token's burner/minter roles are adjustable.
 /// @dev This contract is a variant of BurnMintTokenPool that uses `burn(amount)`.
-contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
+contract BurnMintTokenPoolV2 is BurnMintTokenPoolAbstractV2, ITypeAndVersion {
   string public constant override typeAndVersion = "BurnMintTokenPoolV2 1.7-dev";
 
   constructor(
@@ -22,7 +22,7 @@ contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+  ) TokenPoolV2(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
   function _lockOrBurn(
     uint256 amount
