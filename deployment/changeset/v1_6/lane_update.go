@@ -6,7 +6,7 @@ import (
 
 type ConnectChainsConfig struct {
 	Lanes []LaneConfig
-	MCMS  *changeset_utils.MCMSParams
+	MCMS  *changeset_utils.MCMSInput
 }
 type LaneConfig struct {
 	Source       ChainDefinition
@@ -26,7 +26,7 @@ type UpdateLanesInput struct {
 	UpdateOffRampSourcesConfig map[uint64]UpdateOffRampSourcesInput
 	UpdateRouterRampsConfig    map[uint64]UpdateRouterDestInput
 	ExtraConfigs               ExtraConfigs
-	MCMS                       *changeset_utils.MCMSParams
+	MCMS                       *changeset_utils.MCMSInput
 }
 
 type UpdateOnRampDestsInput struct {

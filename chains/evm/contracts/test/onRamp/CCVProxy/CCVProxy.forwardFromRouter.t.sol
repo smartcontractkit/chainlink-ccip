@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
-import {Internal} from "../../../libraries/Internal.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {CCVProxySetup} from "./CCVProxySetup.t.sol";
 
@@ -19,14 +18,13 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
     (
       bytes32 messageId,
       bytes memory encodedMessage,
-      Internal.Receipt[] memory verifierReceipts,
-      Internal.Receipt memory executorReceipt,
+      CCVProxy.Receipt[] memory verifierReceipts,
+      CCVProxy.Receipt memory executorReceipt,
       bytes[] memory receiptBlobs
     ) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
       seqNum: 1,
-      feeTokenAmount: 1e17,
       originalSender: STRANGER
     });
 
@@ -54,14 +52,13 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
     (
       bytes32 messageIdExpected,
       bytes memory encodedMessage,
-      Internal.Receipt[] memory verifierReceipts,
-      Internal.Receipt memory executorReceipt,
+      CCVProxy.Receipt[] memory verifierReceipts,
+      CCVProxy.Receipt memory executorReceipt,
       bytes[] memory receiptBlobs
     ) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
       seqNum: destConfig.sequenceNumber,
-      feeTokenAmount: 1e17,
       originalSender: STRANGER
     });
 
@@ -83,7 +80,6 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
       seqNum: destConfig.sequenceNumber,
-      feeTokenAmount: 1e17,
       originalSender: STRANGER
     });
 

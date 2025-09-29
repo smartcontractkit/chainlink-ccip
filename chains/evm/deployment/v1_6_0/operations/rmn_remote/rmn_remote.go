@@ -5,10 +5,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
+
+type Subject = [16]byte
 
 var ContractType cldf_deployment.ContractType = "RMNRemote"
 
@@ -18,7 +21,7 @@ type ConstructorArgs struct {
 }
 
 type CurseArgs struct {
-	Subject [16]byte
+	Subject Subject
 }
 
 var Deploy = contract.NewDeploy(

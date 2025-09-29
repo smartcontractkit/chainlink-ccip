@@ -6,17 +6,18 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	changeset "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
+
+	changeset "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
 )
 
 func TestWithDatastore(t *testing.T) {
 	b := changeset.NewOutputBuilder()
-	out, err := b.WithDataStore(datastore.NewMemoryDataStore()).Build(changeset.MCMSParams{})
+	out, err := b.WithDataStore(datastore.NewMemoryDataStore()).Build(changeset.MCMSBuildParams{})
 	require.NoError(t, err, "Build should not error")
 	require.NotNil(t, out.DataStore, "DataStore should be set in ChangesetOutput")
 }
@@ -26,7 +27,7 @@ func TestWithReports(t *testing.T) {
 	reports := []operations.Report[any, any]{
 		{},
 	}
-	out, err := b.WithReports(reports).Build(changeset.MCMSParams{})
+	out, err := b.WithReports(reports).Build(changeset.MCMSBuildParams{})
 	require.NoError(t, err, "Build should not error")
 	require.Len(t, out.Reports, 1, "Reports should be set in ChangesetOutput")
 }
@@ -59,12 +60,15 @@ func TestWithWriteOutputs(t *testing.T) {
 						AdditionalFields: json.RawMessage{},
 					},
 				},
-			}).Build(changeset.MCMSParams{
-				Description:          "Proposal",
-				OverridePreviousRoot: false,
-				ValidUntil:           2756219818,
-				TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
-				TimelockAction:       mcms_types.TimelockActionSchedule,
+			}).Build(changeset.MCMSBuildParams{
+				Description: "Proposal",
+				MCMSInput: changeset.MCMSInput{
+					OverridePreviousRoot: false,
+					ValidUntil:           2756219818,
+					TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
+					TimelockAction:       mcms_types.TimelockActionSchedule,
+				},
+
 				TimelockAddresses: map[mcms_types.ChainSelector]string{
 					5009297550715157269: common.HexToAddress("0x02").Hex(),
 				},

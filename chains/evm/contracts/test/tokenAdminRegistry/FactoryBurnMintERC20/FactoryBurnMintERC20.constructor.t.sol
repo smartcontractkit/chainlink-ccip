@@ -21,4 +21,18 @@ contract FactoryBurnMintERC20_constructor is BurnMintERC20Setup {
     assertEq(s_burnMintERC20.balanceOf(s_alice), 1e18);
     assertEq(s_burnMintERC20.totalSupply(), 1e18);
   }
+
+  // Reverts
+
+  function test_Constructor_RevertWhen_PreMintIsGreaterThanMaxSupply() public {
+    string memory name = "Chainlink token v2";
+    string memory symbol = "LINK2";
+    uint8 decimals = 19;
+    uint256 maxSupply = 1e33;
+    uint256 preMint = maxSupply + 1;
+
+    vm.expectRevert(abi.encodeWithSelector(FactoryBurnMintERC20.MaxSupplyExceeded.selector, preMint));
+
+    new FactoryBurnMintERC20(name, symbol, decimals, maxSupply, preMint, s_alice);
+  }
 }
