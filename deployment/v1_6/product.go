@@ -6,10 +6,6 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-type Product interface { // introduce generics as needed
-	ConnectChains(env cldf.Environment, cfg ConnectChainsConfig) (cldf.ChangesetOutput, error)
-}
-
 type ChainAdapter interface {
 	ConfigureLaneLeg(env cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
 }
