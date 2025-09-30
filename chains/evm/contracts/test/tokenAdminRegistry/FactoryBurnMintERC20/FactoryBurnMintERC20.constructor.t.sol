@@ -20,7 +20,7 @@ contract FactoryBurnMintERC20_constructor is BurnMintERC20Setup {
 
     assertEq(s_burnMintERC20.balanceOf(s_alice), 1e18);
     assertEq(s_burnMintERC20.totalSupply(), 1e18);
-    assertEq(s_burnMintERC20.typeAndVersion(), "FactoryBurnMintERC20 1.6.2-dev");
+    assertEq(s_burnMintERC20.typeAndVersion(), "FactoryBurnMintERC20 1.6.2");
   }
 
   function test_Constructor_When_MaxSupplyIsZero() public {
