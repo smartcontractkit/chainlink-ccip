@@ -23,6 +23,8 @@ that prevents using a `preMint` and a `maxSupply` of `0`
 - [#1072](https://github.com/smartcontractkit/chainlink-ccip/pull/1072) - Adds the CCTP Message Transmitter Proxy gobindings
 wrapper
 
+- [#1116](https://github.com/smartcontractkit/chainlink-ccip/pull/1116) - Removes the granting of mint and burn permissions from the FactoryBurnMintERC20 constructor to save gas on deplotyment.
+
 ### Minor Changes
 
 - [#1145](https://github.com/smartcontractkit/chainlink-ccip/pull/1145) [`4f2c735`](https://github.com/smartcontractkit/chainlink-ccip/commit/4f2c735bf252ec69be1424647671b956dd159c55) - Add a new BurnMintERC20 compatible with Hyperliquid and changes to the FactoryBurnMintERC20:
