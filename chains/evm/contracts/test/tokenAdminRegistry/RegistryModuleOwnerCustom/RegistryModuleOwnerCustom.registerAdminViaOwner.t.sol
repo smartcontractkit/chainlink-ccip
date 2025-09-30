@@ -9,6 +9,13 @@ import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry
 import {RegistryModuleOwnerCustomSetup} from "./RegistryModuleOwnerCustomSetup.t.sol";
 
 contract RegistryModuleOwnerCustom_registerAdminViaOwner is RegistryModuleOwnerCustomSetup {
+  function setUp() public virtual override {
+    super.setUp();
+
+    // The BurnMintERC20 used to test doesn't have an owner function so we mock it.
+    vm.mockCall(s_token, abi.encodeWithSelector(IOwner.owner.selector), abi.encode(OWNER));
+  }
+
   function test_registerAdminViaOwner() public {
     assertEq(s_tokenAdminRegistry.getTokenConfig(s_token).administrator, address(0));
 

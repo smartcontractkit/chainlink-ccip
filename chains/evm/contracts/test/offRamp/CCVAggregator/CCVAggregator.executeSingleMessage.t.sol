@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 /// forge-config: default.allow_internal_expect_revert = true
 
-import {ICCVOffRampV1} from "../../../interfaces/ICCVOffRampV1.sol";
+import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
@@ -26,7 +26,7 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
     bytes memory defaultCcvData = abi.encode("mock ccv data");
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageHash, defaultCcvData)),
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageHash, defaultCcvData)),
       abi.encode(true)
     );
 
@@ -73,7 +73,7 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
     address[] memory ccvs = _arrayOf(s_defaultCCV); // Keep default CCV, but don't include the required CCV.
     bytes[] memory ccvData = new bytes[](1);
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, requiredCCV, false));
+    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, requiredCCV));
 
     s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
@@ -112,11 +112,11 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
     // Mock pool to require a specific CCV.
     vm.mockCall(
       pool,
-      abi.encodeCall(IPoolV2.getRequiredCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, "")),
+      abi.encodeCall(IPoolV2.getRequiredInboundCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, 0, "")),
       abi.encode(_arrayOf(poolRequiredCCV))
     );
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, poolRequiredCCV, true));
+    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, poolRequiredCCV));
 
     s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
@@ -147,7 +147,7 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
 
     vm.startPrank(address(s_agg));
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, laneMandatedCCV, false));
+    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, laneMandatedCCV));
 
     s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
@@ -186,7 +186,9 @@ contract CCVAggregator_executeSingleMessage is CCVAggregatorSetup {
 
     // Mock CCV validateReport to fail/revert.
     vm.mockCallRevert(
-      s_defaultCCV, abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0])), revertReason
+      s_defaultCCV,
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
+      revertReason
     );
 
     vm.expectRevert(revertReason);

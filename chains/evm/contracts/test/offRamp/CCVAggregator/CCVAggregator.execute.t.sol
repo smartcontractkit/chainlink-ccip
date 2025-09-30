@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICCVOffRampV1} from "../../../interfaces/ICCVOffRampV1.sol";
+import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
+import {ReentrantCCV} from "../../helpers/ReentrantCCV.sol";
 import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
@@ -55,7 +56,9 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageHash, abi.encode("mock ccv data"))),
+      abi.encodeCall(
+        ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageHash, abi.encode("mock ccv data"))
+      ),
       abi.encode(true)
     );
   }
@@ -182,10 +185,11 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   }
 
   function test_execute_RevertWhen_SourceChainNotEnabled() public {
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = s_defaultCCV;
+
     // Configure source chain as disabled.
-    _applySourceConfig(
-      s_sourceRouter, SOURCE_CHAIN_SELECTOR, abi.encode(makeAddr("onRamp")), false, new address[](1), new address[](0)
-    );
+    _applySourceConfig(abi.encode(makeAddr("onRamp")), false, defaultCCVs, new address[](0));
 
     vm.expectRevert(abi.encodeWithSelector(CCVAggregator.SourceChainNotEnabled.selector, SOURCE_CHAIN_SELECTOR));
     MessageV1Codec.MessageV1 memory message = _getMessage();
@@ -262,7 +266,9 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     // Mock validateReport to pass initial checks.
     vm.mockCall(
-      s_defaultCCV, abi.encodeCall(ICCVOffRampV1.verifyMessage, (message, messageId, ccvData[0])), abi.encode(true)
+      s_defaultCCV,
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
+      abi.encode(true)
     );
 
     // Mock executeSingleMessage to revert with NOT_ENOUGH_GAS_FOR_CALL_SIG.
@@ -318,36 +324,5 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
         )
       )
     );
-  }
-}
-
-contract ReentrantCCV is ICCVOffRampV1 {
-  CCVAggregator internal immutable i_aggregator;
-
-  constructor(
-    address aggregator
-  ) {
-    i_aggregator = CCVAggregator(aggregator);
-  }
-
-  function verifyMessage(
-    MessageV1Codec.MessageV1 memory message,
-    bytes32, /* messageHash */
-    bytes memory ccvData
-  ) external override {
-    // Create a dummy report to trigger reentrancy.
-    address[] memory ccvs = new address[](1);
-    ccvs[0] = address(this);
-    bytes[] memory ccvDataArray = new bytes[](1);
-    ccvDataArray[0] = ccvData;
-
-    // This should trigger the reentrancy guard.
-    i_aggregator.execute(MessageV1Codec._encodeMessageV1(message), ccvs, ccvDataArray);
-  }
-
-  function supportsInterface(
-    bytes4 interfaceId
-  ) external pure override returns (bool) {
-    return interfaceId == type(ICCVOffRampV1).interfaceId;
   }
 }
