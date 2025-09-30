@@ -351,7 +351,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     Client.EVM2AnyMessage memory m = _generateEmptyMessage2Sui();
     m.data = bytes("msg");
-    m.receiver = abi.encodePacked(bytes32(uint256(Internal.APTOS_PRECOMPILE_SPACE))); // boundary OK
+    m.receiver = abi.encodePacked(bytes32(uint256(Internal.SUI_PRECOMPILE_SPACE))); // boundary OK
     m.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 1,
@@ -372,7 +372,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.applyDestChainConfigUpdates(a);
 
     Client.EVM2AnyMessage memory m = _generateEmptyMessage2Sui();
-    m.receiver = abi.encodePacked(bytes32(uint256(Internal.APTOS_PRECOMPILE_SPACE))); // valid
+    m.receiver = abi.encodePacked(bytes32(uint256(Internal.SUI_PRECOMPILE_SPACE))); // valid
     m.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 5, // triggers address threshold path
@@ -892,7 +892,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     Client.EVM2AnyMessage memory m = _generateEmptyMessage2Sui();
     m.data = bytes("msg");
-    m.receiver = abi.encodePacked(bytes32(uint256(Internal.APTOS_PRECOMPILE_SPACE - 1))); // in precompile space
+    m.receiver = abi.encodePacked(bytes32(uint256(Internal.SUI_PRECOMPILE_SPACE - 1))); // in precompile space
     m.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 1,
