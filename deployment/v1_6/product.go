@@ -7,7 +7,12 @@ import (
 )
 
 type ChainAdapter interface {
+	// high level API
 	ConfigureLaneLeg(env cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
+
+	// helpers to expose lower level functionality if needed
+	// needed for populating values in chain specific configs
+	GetOnRampAddress(env cldf.Environment) ([]byte, error)
 }
 
 var registeredChainAdapters = make(map[string]ChainAdapter)
