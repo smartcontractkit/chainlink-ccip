@@ -27,6 +27,7 @@ func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
 		[]pluginconfig.TokenDataObserverConfig{},
 		nil,
 		nil,
+		nil,
 		mockAddrCodec,
 	)
 	require.NoError(t, err)
