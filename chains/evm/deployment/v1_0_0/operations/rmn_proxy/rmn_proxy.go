@@ -20,32 +20,28 @@ type SetRMNArgs = struct {
 	RMN common.Address
 }
 
-var Deploy = contract.NewDeploy(
-	"rmn_proxy:deploy",
-	semver.MustParse("1.0.0"),
-	"Deploys the RMNProxy contract",
-	ContractType,
-	rmn_proxy_contract.RMNProxyABI,
-	func(ConstructorArgs) error { return nil },
-	contract.VMDeployers[ConstructorArgs]{
-		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := rmn_proxy_contract.DeployRMNProxy(opts, backend, args.RMN)
-			return address, tx, err
-		},
-		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "rmn_proxy:deploy",
+	Version:          semver.MustParse("1.0.0"),
+	Description:      "Deploys the RMNProxy contract",
+	ContractType:     ContractType,
+	ContractMetadata: rmn_proxy_contract.RMNProxyMetaData,
+	BytecodeByVersion: map[string]contract.Bytecode{
+		semver.MustParse("1.0.0").String(): {EVM: common.FromHex(rmn_proxy_contract.RMNProxyBin)},
 	},
-)
+	Validate: func(ConstructorArgs) error { return nil },
+})
 
-var SetRMN = contract.NewWrite(
-	"rmn_proxy:set-rmn",
-	semver.MustParse("1.0.0"),
-	"Sets the RMN address on the RMNProxy",
-	ContractType,
-	rmn_proxy_contract.RMNProxyABI,
-	rmn_proxy_contract.NewRMNProxy,
-	contract.OnlyOwner,
-	func(SetRMNArgs) error { return nil },
-	func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.TransactOpts, args SetRMNArgs) (*types.Transaction, error) {
+var SetRMN = contract.NewWrite(contract.WriteParams[SetRMNArgs, *rmn_proxy_contract.RMNProxy]{
+	Name:            "rmn_proxy:set-rmn",
+	Version:         semver.MustParse("1.0.0"),
+	Description:     "Sets the RMN address on the RMNProxy",
+	ContractType:    ContractType,
+	ContractABI:     rmn_proxy_contract.RMNProxyABI,
+	NewContract:     rmn_proxy_contract.NewRMNProxy,
+	IsAllowedCaller: contract.OnlyOwner[*rmn_proxy_contract.RMNProxy],
+	Validate:        func(SetRMNArgs) error { return nil },
+	CallContract: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.TransactOpts, args SetRMNArgs) (*types.Transaction, error) {
 		return rmnProxy.SetARM(opts, args.RMN)
 	},
-)
+})

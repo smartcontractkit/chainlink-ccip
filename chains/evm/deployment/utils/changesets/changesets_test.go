@@ -54,7 +54,9 @@ func TestNewFromOnChainSequence(t *testing.T) {
 							Data:             common.Hex2Bytes("0xdeadbeef"),
 							AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
 						},
-						Executed: true,
+						ExecInfo: &contract.ExecInfo{
+							Hash: common.HexToHash("0x02").Hex(),
+						},
 					},
 				},
 			},
@@ -172,7 +174,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 
 			var someNotExecuted bool
 			for _, w := range test.input.Writes {
-				if !w.Executed {
+				if !w.Executed() {
 					someNotExecuted = true
 					break
 				}

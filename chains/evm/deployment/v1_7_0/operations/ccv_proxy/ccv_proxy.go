@@ -33,71 +33,67 @@ type WithdrawFeeTokensArgs struct {
 
 type DestChainConfig = ccv_proxy.CCVProxyDestChainConfig
 
-var Deploy = contract.NewDeploy(
-	"ccv-proxy:deploy",
-	semver.MustParse("1.7.0"),
-	"Deploys the CCVProxy contract",
-	ContractType,
-	ccv_proxy.CCVProxyABI,
-	func(ConstructorArgs) error { return nil },
-	contract.VMDeployers[ConstructorArgs]{
-		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := ccv_proxy.DeployCCVProxy(opts, backend, args.StaticConfig, args.DynamicConfig)
-			return address, tx, err
-		},
-		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, deployInput ConstructorArgs) (common.Address, error)
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "ccv-proxy:deploy",
+	Version:          semver.MustParse("1.7.0"),
+	Description:      "Deploys the CCVProxy contract",
+	ContractType:     ContractType,
+	ContractMetadata: ccv_proxy.CCVProxyMetaData,
+	BytecodeByVersion: map[string]contract.Bytecode{
+		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(ccv_proxy.CCVProxyBin)},
 	},
-)
+	Validate: func(ConstructorArgs) error { return nil },
+})
 
-var SetDestChainConfig = contract.NewWrite(
-	"ccv-proxy:set-dynamic-config",
-	semver.MustParse("1.7.0"),
-	"Sets the dynamic configuration on the CCVProxy",
-	ContractType,
-	ccv_proxy.CCVProxyABI,
-	ccv_proxy.NewCCVProxy,
-	contract.OnlyOwner,
-	func(SetDynamicConfigArgs) error { return nil },
-	func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
+var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigArgs, *ccv_proxy.CCVProxy]{
+	Name:            "ccv-proxy:set-dynamic-config",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Sets the dynamic configuration on the CCVProxy",
+	ContractType:    ContractType,
+	ContractABI:     ccv_proxy.CCVProxyABI,
+	NewContract:     ccv_proxy.NewCCVProxy,
+	IsAllowedCaller: contract.OnlyOwner[*ccv_proxy.CCVProxy],
+	Validate:        func(SetDynamicConfigArgs) error { return nil },
+	CallContract: func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
 		return ccvProxy.SetDynamicConfig(opts, args.DynamicConfig)
 	},
-)
+})
 
-var ApplyDestChainConfigUpdates = contract.NewWrite(
-	"ccv-proxy:apply-dest-chain-config-updates",
-	semver.MustParse("1.7.0"),
-	"Applies updates to destination chain configuration on the CCVProxy",
-	ContractType,
-	ccv_proxy.CCVProxyABI,
-	ccv_proxy.NewCCVProxy,
-	contract.OnlyOwner,
-	func([]DestChainConfigArgs) error { return nil },
-	func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
+var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestChainConfigArgs, *ccv_proxy.CCVProxy]{
+	Name:            "ccv-proxy:apply-dest-chain-config-updates",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Applies updates to destination chain configuration on the CCVProxy",
+	ContractType:    ContractType,
+	ContractABI:     ccv_proxy.CCVProxyABI,
+	NewContract:     ccv_proxy.NewCCVProxy,
+	IsAllowedCaller: contract.OnlyOwner[*ccv_proxy.CCVProxy],
+	Validate:        func([]DestChainConfigArgs) error { return nil },
+	CallContract: func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return ccvProxy.ApplyDestChainConfigUpdates(opts, args)
 	},
-)
+})
 
-var WithdrawFeeTokens = contract.NewWrite(
-	"ccv-proxy:withdraw-fee-tokens",
-	semver.MustParse("1.7.0"),
-	"Withdraws fee tokens from the CCVProxy",
-	ContractType,
-	ccv_proxy.CCVProxyABI,
-	ccv_proxy.NewCCVProxy,
-	contract.OnlyOwner,
-	func(WithdrawFeeTokensArgs) error { return nil },
-	func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
+var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokensArgs, *ccv_proxy.CCVProxy]{
+	Name:            "ccv-proxy:withdraw-fee-tokens",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Withdraws fee tokens from the CCVProxy",
+	ContractType:    ContractType,
+	ContractABI:     ccv_proxy.CCVProxyABI,
+	NewContract:     ccv_proxy.NewCCVProxy,
+	IsAllowedCaller: contract.OnlyOwner[*ccv_proxy.CCVProxy],
+	Validate:        func(WithdrawFeeTokensArgs) error { return nil },
+	CallContract: func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return ccvProxy.WithdrawFeeTokens(opts, args.FeeTokens)
 	},
-)
+})
 
-var GetDestChainConfig = contract.NewRead(
-	"ccv-proxy:get-dest-chain-config",
-	semver.MustParse("1.7.0"),
-	"Gets the destination chain configuration for a given destination chain selector",
-	ContractType,
-	ccv_proxy.NewCCVProxy,
-	func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.CallOpts, destChainSelector uint64) (DestChainConfig, error) {
-		return ccvProxy.GetDestChainConfig(opts, destChainSelector)
+var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainConfig, *ccv_proxy.CCVProxy]{
+	Name:         "ccv-proxy:get-dest-chain-config",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Gets the destination chain configuration for a given destination chain selector",
+	ContractType: ContractType,
+	NewContract:  ccv_proxy.NewCCVProxy,
+	CallContract: func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.CallOpts, args uint64) (DestChainConfig, error) {
+		return ccvProxy.GetDestChainConfig(opts, args)
 	},
-)
+})
