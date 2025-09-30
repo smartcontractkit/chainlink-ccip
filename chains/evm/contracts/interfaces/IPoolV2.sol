@@ -71,8 +71,8 @@ interface IPoolV2 is IPoolV1 {
   ) external view returns (bool isEnabled, uint32 destGasOverhead, uint32 destBytesOverhead, uint32 feeUSDCents);
 
   /// @notice Withdraws all accumulated pool fees to the specified recipient.
-  /// @dev For BURN/MINT pools, this transfers the entire token balance of the pool contract.
-  /// LOCK/RELEASE pools should override this function with their own accounting mechanism.
+  /// @dev For burn/mint pools, this transfers the entire token balance of the pool contract.
+  /// lock/release pools should override this function with their own accounting mechanism.
   /// @param recipient The address to receive the withdrawn fees.
   function withdrawPoolFees(
     address recipient

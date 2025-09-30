@@ -108,9 +108,9 @@ contract TokenPoolV2_lockOrBurn is TokenPoolV2Setup {
     });
 
     // Finality below threshold should revert
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidFinality.selector, 1, 5));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidFinality.selector, config.finalityThreshold - 1, 5));
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.lockOrBurn(lockOrBurnIn, 1, "");
+    s_tokenPool.lockOrBurn(lockOrBurnIn, config.finalityThreshold - 1, "");
   }
 
   function test_lockOrBurn_RevertWhen_AmountExceedsMaxPerRequest() public {
@@ -118,11 +118,11 @@ contract TokenPoolV2_lockOrBurn is TokenPoolV2Setup {
     TokenPool.FastFinalityConfig memory config = TokenPool.FastFinalityConfig({
       finalityThreshold: 8,
       fastTransferFeeBps: 500,
-      maxAmountPerRequest: 500e18 // Lower than our test amount
+      maxAmountPerRequest: 500e18 // Lower than our test amount.
     });
     s_tokenPool.applyFinalityConfigUpdates(config);
 
-    uint256 amount = 1000e18; // Exceeds max
+    uint256 amount = config.maxAmountPerRequest + 1; // Exceeds max.
     s_token.transfer(address(s_tokenPool), amount);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
@@ -137,6 +137,6 @@ contract TokenPoolV2_lockOrBurn is TokenPoolV2Setup {
       abi.encodeWithSelector(TokenPool.AmountExceedsMaxPerRequest.selector, amount, config.maxAmountPerRequest)
     );
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.lockOrBurn(lockOrBurnIn, 8, "");
+    s_tokenPool.lockOrBurn(lockOrBurnIn, config.finalityThreshold, "");
   }
 }

@@ -29,8 +29,9 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
 
   struct FastFinalityConfig {
     uint16 finalityThreshold; // ──╮ Maximum block depth required for token transfers.
-    uint16 fastTransferFeeBps; // ─╯ Fee in basis points for fast transfers.
+    uint16 fastTransferFeeBps; // ─╯ Fee in basis points for fast transfers [0-10_000].
     uint256 maxAmountPerRequest; // Maximum amount allowed per transfer request.
+    // TODO separate rate limit config for fast transfers.
   }
 
   struct CCVConfig {
@@ -82,18 +83,19 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     bytes calldata // tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
     FastFinalityConfig memory finalityConfig = s_finalityConfig;
-    if (finalityConfig.finalityThreshold != 0) {
-      if (finality != 0 && finality < finalityConfig.finalityThreshold) {
+    if (finality != 0 && finalityConfig.finalityThreshold != 0) {
+      if (finality < finalityConfig.finalityThreshold) {
         revert InvalidFinality(finality, finalityConfig.finalityThreshold);
       }
       if (lockOrBurnIn.amount > finalityConfig.maxAmountPerRequest) {
         revert AmountExceedsMaxPerRequest(lockOrBurnIn.amount, finalityConfig.maxAmountPerRequest);
       }
-      // deduct fast transfer fee
+      // deduct fast transfer fee.
       lockOrBurnIn.amount -= (lockOrBurnIn.amount * finalityConfig.fastTransferFeeBps) / BPS_DIVIDER;
     }
 
     _validateLockOrBurn(lockOrBurnIn);
+    // TODO consume fast transfer rate limits not normal rate limits.
 
     _lockOrBurn(lockOrBurnIn.amount);
 
@@ -250,6 +252,8 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   }
 
   // @inheritdoc IPoolV2
+  // Default implementation returns the entire token balance of the pool.
+  // Lock/release pools should override this function with their own accounting mechanism.
   function getAccumulatedPoolFees() public view virtual returns (uint256) {
     return getToken().balanceOf(address(this));
   }
