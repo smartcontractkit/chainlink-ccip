@@ -1223,7 +1223,15 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       return (Client._argsToBytes(parsedExtraArgs), parsedExtraArgs.allowOutOfOrderExecution, messageReceiver);
     }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
-      return (extraArgs, true, messageReceiver);
+      // perform parsing check on the extraArgs
+      return (
+        extraArgs,
+        true,
+        abi.encode(
+          _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder)
+            .tokenReceiver
+        )
+      );
     }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
       // If extraArgs passes the parsing it's valid and can be returned unchanged.
