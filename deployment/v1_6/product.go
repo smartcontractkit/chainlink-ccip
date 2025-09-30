@@ -11,7 +11,7 @@ type Product interface { // introduce generics as needed
 }
 
 type ChainAdapter interface {
-	ConfigureLaneLeg(env cldf.Environment, cfg ConnectChainsConfig) (cldf.ChangesetOutput, error)
+	ConfigureLaneLeg(env cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
 }
 
 var registeredChainAdapters = make(map[string]ChainAdapter)
