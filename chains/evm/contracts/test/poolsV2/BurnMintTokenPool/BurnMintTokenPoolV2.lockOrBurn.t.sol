@@ -93,6 +93,7 @@ contract BurnMintTokenPoolV2_lockOrBurn is BurnMintSetup {
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         localToken: address(s_token)
       }),
+      0,
       ""
     );
 

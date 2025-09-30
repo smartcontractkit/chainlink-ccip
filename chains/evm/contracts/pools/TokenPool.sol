@@ -275,7 +275,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
   function _validateLockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+    Pool.LockOrBurnInV1 memory lockOrBurnIn
   ) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();

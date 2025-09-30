@@ -12,12 +12,15 @@ import {Pool} from "../libraries/Pool.sol";
 interface IPoolV2 is IPoolV1 {
   /// @notice Lock tokens into the pool or burn the tokens.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @param finality The finality configuration from the CCIP message.
   /// @param tokenArgs Additional token arguments.
   /// @return lockOrBurnOut Encoded data fields for the processing of tokens on the destination chain.
+  /// @return destTokenAmount The amount of tokens that will be set in TokenTransferV1.amount to be r/m on destination.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 finality,
     bytes calldata tokenArgs
-  ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut);
+  ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount);
 
   /// @notice Returns the set of required CCVs for outgoing messages to a destination chain.
   /// @param localToken The address of the local token.
@@ -49,16 +52,40 @@ interface IPoolV2 is IPoolV1 {
     bytes calldata sourcePoolData
   ) external view returns (address[] memory requiredCCVs);
 
-  /// @notice Returns a fee quote for transferring tokens to a destination chain.
+  /// @notice Returns the fee overrides for transferring the pool's token to a destination chain.
+  /// @notice localToken The address of the local token.
   /// @param destChainSelector The chain selector of the destination chain.
   /// @param message The message to be sent to the destination chain.
   /// @param finality The finality configuration from the CCIP message.
   /// @param tokenArgs Additional token argument from the CCIP message.
-  /// @return feeTokenAmount The amount of fee token needed for the fee.
-  function getFee(
+  /// @return isEnabled Whether this token has transfer fee overrides.
+  /// @return destGasOverhead Gas charged to execute the token transfer on the destination chain.
+  /// @return destBytesOverhead Data availability bytes.
+  /// @return feeUSDCents Fee to charge per token transfer, multiples of 0.01 USD.
+  function getTokenTransferFeeConfig(
+    address localToken,
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
     uint16 finality,
     bytes calldata tokenArgs
-  ) external view returns (uint256 feeTokenAmount);
+  ) external view returns (bool isEnabled, uint32 destGasOverhead, uint32 destBytesOverhead, uint32 feeUSDCents);
+
+  /// @notice Withdraws all accumulated pool fees to the specified recipient.
+  /// @dev For BURN/MINT pools, this transfers the entire token balance of the pool contract.
+  /// LOCK/RELEASE pools should override this function with their own accounting mechanism.
+  /// @param recipient The address to receive the withdrawn fees.
+  function withdrawPoolFees(
+    address recipient
+  ) external;
+
+  /// @notice Gets the accumulated pool fees that can be withdrawn.
+  /// @dev burn/mint pools should return the contract's token balance since pool fees
+  /// are minted directly to the pool contract (e.g., `return getToken().balanceOf(address(this))`).
+  /// lock/release pools should implement their own accounting mechanism for pool fees
+  /// by adding a storage variable (e.g., `s_accumulatedPoolFees`) since they cannot mint
+  /// additional tokens for pool fee rewards.
+  /// Note: Fee accounting can be obscured by sending tokens directly to the pool.
+  /// This does not introduce security issues but will need to be handled operationally.
+  /// @return The amount of accumulated pool fees available for withdrawal.
+  function getAccumulatedPoolFees() external returns (uint256);
 }
