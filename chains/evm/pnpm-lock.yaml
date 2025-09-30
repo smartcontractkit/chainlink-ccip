@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@chainlink/contracts':
-        specifier: 1.5.0-beta.1
-        version: 1.5.0-beta.1(ethers@5.8.0)
+        specifier: 1.5.0
+        version: 1.5.0(ethers@5.8.0)
       '@changesets/cli':
         specifier: ^2.29.5
         version: 2.29.5
@@ -54,8 +54,8 @@ packages:
     resolution: {integrity: sha512-VtPOkrdPHZsKc/clNqyi9WUA8TINkZ4cGk63UUE3u4pmB2k+ZMQRDuIOagv8UVd6j7k0T3+RRIb7beKTebNbcw==}
     engines: {node: '>=6.9.0'}
 
-  '@chainlink/contracts@1.5.0-beta.1':
-    resolution: {integrity: sha512-RNggPFyV6Y0Jla3nmbJO9nLPhoXkdpEeXzHdOpLAwEYg8PWxWb2QCRje7kk3hnlKkzIhDMH7UVaDKrNC19Z8TQ==}
+  '@chainlink/contracts@1.5.0':
+    resolution: {integrity: sha512-1fGJwjvivqAxvVOTqZUEXGR54CATtg0vjcXgSIk4Cfoad2nUhSG/qaWHXjLg1CkNTeOoteoxGQcpP/HiA5HsUA==}
     engines: {node: '>=22', pnpm: '>=10'}
 
   '@chainlink/solhint-plugin-chainlink-solidity@https://codeload.github.com/smartcontractkit/chainlink-solhint-rules/tar.gz/1b4c0c2663fcd983589d4f33a2e73908624ed43c':
@@ -1219,7 +1219,7 @@ snapshots:
     dependencies:
       regenerator-runtime: 0.14.1
 
-  '@chainlink/contracts@1.5.0-beta.1(ethers@5.8.0)':
+  '@chainlink/contracts@1.5.0(ethers@5.8.0)':
     dependencies:
       '@arbitrum/nitro-contracts': 3.0.0
       '@changesets/cli': 2.29.7
