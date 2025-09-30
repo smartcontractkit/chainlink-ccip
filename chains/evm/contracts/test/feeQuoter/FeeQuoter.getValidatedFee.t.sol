@@ -905,7 +905,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         Internal.Invalid32ByteAddress.selector,
-        abi.encodePacked(bytes32(uint256(10))) // returns `bytes`
+        abi.encodePacked(bytes32(uint256(57064))) // returns `bytes`
       )
     );
 
