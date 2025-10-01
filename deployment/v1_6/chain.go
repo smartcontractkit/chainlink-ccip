@@ -1,12 +1,16 @@
 package v1_6
 
+import "math/big"
+
 type ChainDefinition struct {
 	// ConnectionConfig holds configuration for connection.
 	ConnectionConfig
 	// Selector is the chain selector of this chain.
 	Selector uint64
-	// FeeQuoterDestChainConfig is the configuration to be applied on Source chain when this chain is a destination.
+	// FeeQuoterDestChainConfig is the configuration to be applied on source chain when this chain is a destination.
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
+	// FeeQuoterPriceUpdate is the price update to be applied on source chain when this chain is a destination.
+	FeeQuoterPriceUpdateConfig FeeQuoterPriceUpdatePerSource
 }
 
 type ConnectionConfig struct {
@@ -36,4 +40,9 @@ type FeeQuoterDestChainConfig struct {
 	GasMultiplierWeiPerEth            uint64
 	GasPriceStalenessThreshold        uint32
 	NetworkFeeUSDCents                uint32
+}
+
+type FeeQuoterPriceUpdatePerSource struct {
+	TokenPrices map[string]*big.Int // token address -> price
+	GasPrices   map[uint64]*big.Int // dest chain -> gas price
 }

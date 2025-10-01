@@ -21,10 +21,13 @@ type ExtraConfigs struct {
 }
 
 type UpdateLanesInput struct {
-	UpdateFeeQuoterDestsConfig map[uint64]FeeQuoterDestChainConfig
-	UpdateOnRampDestsConfig    map[uint64]UpdateOnRampDestsInput
-	UpdateOffRampSourcesConfig map[uint64]UpdateOffRampSourcesInput
-	UpdateRouterRampsConfig    map[uint64]UpdateRouterDestInput
+	Selector                   uint64
+	RemoteSelector             uint64
+	UpdateFeeQuoterDestsConfig FeeQuoterDestChainConfig
+	UpdateFeeQuoterPrices      FeeQuoterPriceUpdatePerSource
+	UpdateOnRampDestsConfig    UpdateOnRampDestsInput
+	UpdateOffRampSourcesConfig UpdateOffRampSourcesInput
+	UpdateRouterRampsConfig    UpdateRouterDestInput
 	ExtraConfigs               ExtraConfigs
 	MCMS                       *changeset_utils.MCMSInput
 }
