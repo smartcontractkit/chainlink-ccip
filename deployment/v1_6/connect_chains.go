@@ -55,8 +55,9 @@ func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChain
 			UpdateFeeQuoterDestsConfig: src.FeeQuoterDestChainConfig,
 			UpdateFeeQuoterPrices:      src.FeeQuoterPriceUpdateConfig,
 			UpdateOnRampDestsConfig: UpdateOnRampDestsInput{
-				IsEnabled:  !lane.IsDisabled,
-				TestRouter: lane.TestRouter,
+				IsEnabled:        !lane.IsDisabled,
+				TestRouter:       lane.TestRouter,
+				AllowListEnabled: lane.Source.AllowListEnabled,
 			},
 			UpdateRouterRampsConfig: UpdateRouterDestInput{
 				OnRampUpdates: map[uint64]bool{src.Selector: true},
