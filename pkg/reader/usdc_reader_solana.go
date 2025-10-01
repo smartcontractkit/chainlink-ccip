@@ -19,6 +19,34 @@ type solanaUSDCMessageReader struct {
 	contractReader contractreader.Extended
 }
 
+func NewSolanaUSDCReader(
+	ctx context.Context,
+	lggr logger.Logger,
+	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
+	addrCodec cciptypes.AddressCodec,
+	chainSelector cciptypes.ChainSelector,
+	bytesAddress cciptypes.UnknownAddress,
+) (USDCMessageReader, error) {
+	// Bind the 3rd party MessageTransmitter contract, this is where CCTP MessageSent events are emitted.
+	_, err := bindReaderContract(
+		ctx,
+		lggr,
+		contractReaders,
+		chainSelector,
+		consts.ContractNameUSDCTokenPool,
+		bytesAddress,
+		addrCodec,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return solanaUSDCMessageReader{
+		lggr:           lggr,
+		contractReader: contractReaders[chainSelector],
+	}, nil
+}
+
 // getMessageTokenData extracts token data from the CCTP MessageSent event.
 func (u solanaUSDCMessageReader) getMessageTokenData(
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
