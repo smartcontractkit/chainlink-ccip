@@ -185,7 +185,7 @@ func AggregateProposals(
 		}
 		tlsPerChainID[types.ChainSelector(chain)] = tl
 
-		metadata, err := registeredChainAdapters[family].GetMcmsMetadata(e, chain)
+		metadata, err := registeredChainAdapters[family].GetMCMSMetadata(e, chain)
 		if err != nil {
 			return nil, fmt.Errorf("error getting mcms metadata for chain %d: %w", chain, err)
 		}
