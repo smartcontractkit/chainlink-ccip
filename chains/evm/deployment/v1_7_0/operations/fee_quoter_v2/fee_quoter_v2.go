@@ -30,13 +30,10 @@ type TokenTransferFeeConfigArgs = fee_quoter_v2.FeeQuoterTokenTransferFeeConfigA
 
 type TokenTransferFeeConfigRemoveArgs = fee_quoter_v2.FeeQuoterTokenTransferFeeConfigRemoveArgs
 
-type TokenPriceFeedUpdate = fee_quoter_v2.FeeQuoterTokenPriceFeedUpdate
-
 type ConstructorArgs struct {
 	StaticConfig                   StaticConfig
 	PriceUpdaters                  []common.Address
 	FeeTokens                      []common.Address
-	TokenPriceFeeds                []TokenPriceFeedUpdate
 	TokenTransferFeeConfigArgs     []TokenTransferFeeConfigArgs
 	PremiumMultiplierWeiPerEthArgs []PremiumMultiplierWeiPerEthArgs
 	DestChainConfigArgs            []DestChainConfigArgs
@@ -162,20 +159,6 @@ var UpdatePrices = contract.NewWrite(contract.WriteParams[PriceUpdates, *fee_quo
 	Validate: func(PriceUpdates) error { return nil },
 	CallContract: func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args PriceUpdates) (*types.Transaction, error) {
 		return feeQuoterV2.UpdatePrices(opts, args)
-	},
-})
-
-var UpdateTokenPriceFeeds = contract.NewWrite(contract.WriteParams[[]TokenPriceFeedUpdate, *fee_quoter_v2.FeeQuoterV2]{
-	Name:            "fee-quoter-v2:update-token-price-feeds",
-	Version:         semver.MustParse("1.7.0"),
-	Description:     "Updates the token price feeds on the FeeQuoterV2",
-	ContractType:    ContractType,
-	ContractABI:     fee_quoter_v2.FeeQuoterV2ABI,
-	NewContract:     fee_quoter_v2.NewFeeQuoterV2,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2],
-	Validate:        func([]TokenPriceFeedUpdate) error { return nil },
-	CallContract: func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args []TokenPriceFeedUpdate) (*types.Transaction, error) {
-		return feeQuoterV2.UpdateTokenPriceFeeds(opts, args)
 	},
 })
 
