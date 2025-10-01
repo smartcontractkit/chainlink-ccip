@@ -170,7 +170,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @dev The decimals that Keystone reports prices in.
   uint256 public constant KEYSTONE_PRICE_DECIMALS = 18;
 
-  string public constant override typeAndVersion = "FeeQuoter 1.6.3-dev";
+  string public constant override typeAndVersion = "FeeQuoter 1.6.3";
 
   /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals. Multiple gas prices can
   /// be encoded into the same value. Each price takes {Internal.GAS_PRICE_BITS} bits. For example, if Optimism is the
@@ -897,7 +897,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       return Internal._validateTVMAddress(destAddress);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
-      return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? Internal.APTOS_PRECOMPILE_SPACE : 0);
+      return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? Internal.SUI_PRECOMPILE_SPACE : 0);
     }
     revert InvalidChainFamilySelector(chainFamilySelector);
   }
@@ -1223,7 +1223,15 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       return (Client._argsToBytes(parsedExtraArgs), parsedExtraArgs.allowOutOfOrderExecution, messageReceiver);
     }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
-      return (extraArgs, true, messageReceiver);
+      // perform parsing check on the extraArgs
+      return (
+        extraArgs,
+        true,
+        abi.encode(
+          _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder)
+            .tokenReceiver
+        )
+      );
     }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
       // If extraArgs passes the parsing it's valid and can be returned unchanged.
