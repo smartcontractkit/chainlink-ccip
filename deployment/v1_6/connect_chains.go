@@ -13,6 +13,10 @@ import (
 	"github.com/smartcontractkit/mcms/types"
 )
 
+const (
+	DefaultValidUntil = 72 * time.Hour
+)
+
 var _ cldf.ChangeSetV2[ConnectChainsConfig] = ConnectChainsUnidirectional{}
 
 type ConnectChainsUnidirectional struct{}
