@@ -23,23 +23,15 @@ type ExtraConfigs struct {
 type UpdateLanesInput struct {
 	Selector                   uint64
 	RemoteSelector             uint64
+	IsDisabled                 bool
+	TestRouter                 bool
+	IsRMNVerificationDisabled  bool
+	AllowListEnabled           bool
+	SrcOnRamp                  []byte
+	DestOffRamp                []byte
 	UpdateFeeQuoterDestsConfig FeeQuoterDestChainConfig
 	UpdateFeeQuoterPrices      FeeQuoterPriceUpdatePerSource
-	UpdateOnRampDestsConfig    UpdateOnRampDestsInput
-	UpdateOffRampSourcesConfig UpdateOffRampSourcesInput
 	ExtraConfigs               ExtraConfigs
 	MCMS                       *utils.MCMSInput
 }
 
-type UpdateOnRampDestsInput struct {
-	IsEnabled        bool
-	TestRouter       bool
-	AllowListEnabled bool
-}
-
-type UpdateOffRampSourcesInput struct {
-	IsEnabled                 bool
-	TestRouter                bool
-	IsRMNVerificationDisabled bool
-	OnRamp                    []byte
-}

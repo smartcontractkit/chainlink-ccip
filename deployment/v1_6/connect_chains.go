@@ -13,10 +13,6 @@ import (
 	"github.com/smartcontractkit/mcms/types"
 )
 
-const (
-	DefaultValidUntil = 72 * time.Hour
-)
-
 var _ cldf.ChangeSetV2[ConnectChainsConfig] = ConnectChainsUnidirectional{}
 
 type ConnectChainsUnidirectional struct{}
@@ -53,15 +49,14 @@ func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChain
 		output, err := registeredChainAdapters[srcFamily].ConfigureLaneLegAsSource(e, UpdateLanesInput{
 			Selector:                   src.Selector,
 			RemoteSelector:             dest.Selector,
+			IsDisabled:                 lane.IsDisabled,
+			TestRouter:                 lane.TestRouter,
+			IsRMNVerificationDisabled:  lane.Source.RMNVerificationDisabled,
+			AllowListEnabled:           lane.Source.AllowListEnabled,
 			UpdateFeeQuoterDestsConfig: src.FeeQuoterDestChainConfig,
 			UpdateFeeQuoterPrices: FeeQuoterPriceUpdatePerSource{
 				TokenPrices: src.TokenPrices,
 				GasPrices:   map[uint64]*big.Int{dest.Selector: dest.GasPrice},
-			},
-			UpdateOnRampDestsConfig: UpdateOnRampDestsInput{
-				IsEnabled:        !lane.IsDisabled,
-				TestRouter:       lane.TestRouter,
-				AllowListEnabled: lane.Source.AllowListEnabled,
 			},
 			ExtraConfigs: lane.ExtraConfigs,
 			MCMS:         cfg.MCMS,
@@ -77,16 +72,14 @@ func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChain
 		}
 		// coalesce dest
 		output, err = registeredChainAdapters[destFamily].ConfigureLaneLegAsDest(e, UpdateLanesInput{
-			Selector:       dest.Selector,
-			RemoteSelector: src.Selector,
-			UpdateOffRampSourcesConfig: UpdateOffRampSourcesInput{
-				IsEnabled:                 !lane.IsDisabled,
-				TestRouter:                lane.TestRouter,
-				IsRMNVerificationDisabled: lane.Dest.RMNVerificationDisabled,
-				OnRamp:                    srcOnRamp,
-			},
-			ExtraConfigs: lane.ExtraConfigs,
-			MCMS:         cfg.MCMS,
+			Selector:                  dest.Selector,
+			RemoteSelector:            src.Selector,
+			IsDisabled:                lane.IsDisabled,
+			TestRouter:                lane.TestRouter,
+			IsRMNVerificationDisabled: lane.Dest.RMNVerificationDisabled,
+			SrcOnRamp:                 srcOnRamp,
+			ExtraConfigs:              lane.ExtraConfigs,
+			MCMS:                      cfg.MCMS,
 		})
 		if err != nil {
 			finalOutput.Reports = append(finalOutput.Reports, output.Reports...)
