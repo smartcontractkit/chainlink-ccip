@@ -156,7 +156,7 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
     s_agg.applySourceChainConfigUpdates(configs);
   }
 
-  function test_applySourceChainConfigUpdates_OnlyCallableByOwner() public {
+  function test_applySourceChainConfigUpdates_RevertWhen_OnlyCallableByOwner() public {
     vm.stopPrank();
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
 

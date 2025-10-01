@@ -159,6 +159,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
+		p.chainAccessors,
 		p.extendedReaders,
 		p.addrCodec,
 	)

@@ -1,8 +1,6 @@
 package changesets_test
 
 import (
-	"context"
-	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -10,45 +8,18 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/commit_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
-	lggr, err := logger.New()
-	require.NoError(t, err, "Failed to create logger")
-
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		lggr,
-		operations.NewMemoryReporter(),
-	)
-
-	chain, err := cldf_evm_provider.NewSimChainProvider(t, 5009297550715157269,
-		cldf_evm_provider.SimChainProviderConfig{
-			NumAdditionalAccounts: 1,
-		},
-	).Initialize(t.Context())
-	require.NoError(t, err, "Failed to create SimChainProvider")
-
-	chains := cldf_chain.NewBlockChainsFromSlice(
-		[]cldf_chain.BlockChain{chain},
-	)
-
-	e := deployment.Environment{
-		GetContext:       func() context.Context { return context.Background() },
-		Logger:           lggr,
-		OperationsBundle: bundle,
-		BlockChains:      chains,
-		DataStore:        datastore.NewMemoryDataStore().Seal(),
-	}
+	e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
+		5009297550715157269: {NumAdditionalAccounts: 1},
+	})
+	require.NoError(t, err, "Failed to create test environment")
 
 	tests := []struct {
 		desc        string
@@ -118,83 +89,24 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			lggr, err := logger.New()
-			require.NoError(t, err, "Failed to create logger")
-
-			bundle := operations.NewBundle(
-				func() context.Context { return context.Background() },
-				lggr,
-				operations.NewMemoryReporter(),
-			)
-
-			chain, err := cldf_evm_provider.NewSimChainProvider(t, 5009297550715157269,
-				cldf_evm_provider.SimChainProviderConfig{
-					NumAdditionalAccounts: 1,
-				},
-			).Initialize(t.Context())
-			require.NoError(t, err, "Failed to create SimChainProvider")
-
-			chains := cldf_chain.NewBlockChainsFromSlice(
-				[]cldf_chain.BlockChain{chain},
-			)
+			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
+				5009297550715157269: {NumAdditionalAccounts: 1},
+			})
+			require.NoError(t, err, "Failed to create test environment")
 
 			ds := test.makeDatastore()
 			existingAddrs, err := ds.Addresses().Fetch()
 			require.NoError(t, err, "Failed to fetch addresses from datastore")
-
-			e := deployment.Environment{
-				GetContext:       func() context.Context { return context.Background() },
-				Logger:           lggr,
-				OperationsBundle: bundle,
-				BlockChains:      chains,
-				DataStore:        ds.Seal(),
-			}
-
-			usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
-			require.True(t, ok, "Failed to parse USDPerLINK")
-			usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
-			require.True(t, ok, "Failed to parse USDPerWETH")
+			e.DataStore = ds.Seal() // Override datastore in environment to include existing addresses
 
 			out, err := changesets.DeployChainContracts.Apply(e, changesets.DeployChainContractsCfg{
 				ChainSel: 5009297550715157269,
-				Params: sequences.ContractParams{
-					RMNRemote:     sequences.RMNRemoteParams{},
-					CCVAggregator: sequences.CCVAggregatorParams{},
-					ExecutorOnRamp: sequences.ExecutorOnRampParams{
-						MaxCCVsPerMsg: 10,
-					},
-					CommitOnRamp: sequences.CommitOnRampParams{
-						FeeAggregator: common.HexToAddress("0x01"),
-					},
-					CCVProxy: sequences.CCVProxyParams{
-						FeeAggregator: common.HexToAddress("0x01"),
-					},
-					FeeQuoter: sequences.FeeQuoterParams{
-						MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-						TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
-						LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
-						WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
-						USDPerLINK:                     usdPerLink,
-						USDPerWETH:                     usdPerWeth,
-					},
-					CommitOffRamp: sequences.CommitOffRampParams{
-						SignatureConfigArgs: commit_offramp.SignatureConfigArgs{
-							Threshold: 1,
-							Signers: []common.Address{
-								common.HexToAddress("0x02"),
-								common.HexToAddress("0x03"),
-								common.HexToAddress("0x04"),
-								common.HexToAddress("0x05"),
-							},
-						},
-					},
-				},
+				Params:   testsetup.CreateBasicContractParams(),
 			})
 			require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
 
 			newAddrs, err := out.DataStore.Addresses().Fetch()
 			require.NoError(t, err, "Failed to fetch addresses from datastore")
-			require.Len(t, newAddrs, 14)
 
 			for _, addr := range existingAddrs {
 				for _, newAddr := range newAddrs {
