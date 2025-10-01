@@ -11,8 +11,9 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
-	changeset "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
+	changeset "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 func TestWithDatastore(t *testing.T) {
@@ -35,15 +36,17 @@ func TestWithReports(t *testing.T) {
 func TestWithWriteOutputs(t *testing.T) {
 	tests := []struct {
 		desc     string
-		executed bool
+		execInfo *contract.ExecInfo
 	}{
 		{
-			executed: false,
+			execInfo: nil,
 			desc:     "Tx not executed",
 		},
 		{
-			executed: true,
-			desc:     "Tx executed",
+			execInfo: &contract.ExecInfo{
+				Hash: common.HexToHash("0x02").Hex(),
+			},
+			desc: "Tx executed",
 		},
 	}
 
@@ -53,7 +56,7 @@ func TestWithWriteOutputs(t *testing.T) {
 			out, err := b.WithWriteOutputs([]contract.WriteOutput{
 				{
 					ChainSelector: 5009297550715157269,
-					Executed:      test.executed,
+					ExecInfo:      test.execInfo,
 					Tx: mcms_types.Transaction{
 						To:               common.HexToAddress("0x01").Hex(),
 						Data:             common.Hex2Bytes("0xdeadbeef"),
@@ -62,7 +65,7 @@ func TestWithWriteOutputs(t *testing.T) {
 				},
 			}).Build(changeset.MCMSBuildParams{
 				Description: "Proposal",
-				MCMSInput: changeset.MCMSInput{
+				MCMSInput: common_utils.MCMSInput{
 					OverridePreviousRoot: false,
 					ValidUntil:           2756219818,
 					TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
@@ -80,7 +83,7 @@ func TestWithWriteOutputs(t *testing.T) {
 				},
 			})
 			require.NoError(t, err, "Build should not error")
-			if !test.executed {
+			if test.execInfo == nil {
 				require.Len(t, out.MCMSTimelockProposals, 1, "Proposal should exist")
 			} else {
 				require.Len(t, out.MCMSTimelockProposals, 0, "Proposal should not exist")

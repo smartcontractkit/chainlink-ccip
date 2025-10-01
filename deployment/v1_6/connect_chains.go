@@ -6,7 +6,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	changeset_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	mcmslib "github.com/smartcontractkit/mcms"
 	"github.com/smartcontractkit/mcms/types"
@@ -153,7 +153,7 @@ func AggregateProposals(
 	e cldf.Environment,
 	proposals []mcmslib.TimelockProposal,
 	description string,
-	mcmsConfig *changeset_utils.MCMSInput,
+	mcmsConfig *utils.MCMSInput,
 ) (*mcmslib.TimelockProposal, error) {
 	var batches []types.BatchOperation
 

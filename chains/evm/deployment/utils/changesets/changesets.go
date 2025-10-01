@@ -7,7 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 )
 
 // NewFromOnChainSequenceParams configures NewFromOnChainSequence.

@@ -1,4 +1,4 @@
-package contract_test
+package contract
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -22,12 +21,12 @@ func TestRead(t *testing.T) {
 
 	tests := []struct {
 		desc        string
-		input       contract.FunctionInput[int]
+		input       FunctionInput[int]
 		expectedErr string
 	}{
 		{
 			desc: "valid even input",
-			input: contract.FunctionInput[int]{
+			input: FunctionInput[int]{
 				ChainSelector: validChainSel,
 				Address:       address,
 				Args:          2,
@@ -35,7 +34,7 @@ func TestRead(t *testing.T) {
 		},
 		{
 			desc: "invalid odd input",
-			input: contract.FunctionInput[int]{
+			input: FunctionInput[int]{
 				ChainSelector: validChainSel,
 				Address:       address,
 				Args:          3,
@@ -44,27 +43,35 @@ func TestRead(t *testing.T) {
 		},
 		{
 			desc: "mismatched chain selector",
-			input: contract.FunctionInput[int]{
+			input: FunctionInput[int]{
 				ChainSelector: invalidChainSel,
 				Address:       address,
 				Args:          2,
 			},
 			expectedErr: fmt.Sprintf("mismatch between inputted chain selector and selector defined within dependencies: %d != %d", invalidChainSel, validChainSel),
 		},
+		{
+			desc: "empty address",
+			input: FunctionInput[int]{
+				ChainSelector: validChainSel,
+				Args:          2,
+			},
+			expectedErr: "address must be specified for test-read",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			read := contract.NewRead(
-				"test-read",
-				semver.MustParse("1.0.0"),
-				"Test read operation",
-				testContractType,
-				newTestContract,
-				func(contract *testContract, opts *bind.CallOpts, input int) (string, error) {
+			read := NewRead(ReadParams[int, string, *testContract]{
+				Name:         "test-read",
+				Version:      semver.MustParse("1.0.0"),
+				Description:  "Test read operation",
+				ContractType: testContractType,
+				NewContract:  newTestContract,
+				CallContract: func(contract *testContract, opts *bind.CallOpts, input int) (string, error) {
 					return contract.Read(opts, input)
 				},
-			)
+			})
 
 			lggr, err := logger.New()
 			require.NoError(t, err, "Failed to create logger")

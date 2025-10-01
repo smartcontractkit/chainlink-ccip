@@ -7,9 +7,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -54,7 +54,9 @@ func TestNewFromOnChainSequence(t *testing.T) {
 							Data:             common.Hex2Bytes("0xdeadbeef"),
 							AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
 						},
-						Executed: true,
+						ExecInfo: &contract.ExecInfo{
+							Hash: common.HexToHash("0x02").Hex(),
+						},
 					},
 				},
 			},
@@ -172,7 +174,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 
 			var someNotExecuted bool
 			for _, w := range test.input.Writes {
-				if !w.Executed {
+				if !w.Executed() {
 					someNotExecuted = true
 					break
 				}

@@ -1,13 +1,11 @@
 package sequences_test
 
 import (
-	"context"
-	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
@@ -15,9 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -37,69 +34,19 @@ func TestConfigureChainForLanes(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			chainSelector := uint64(5009297550715157269)
 
-			lggr, err := logger.New()
-			require.NoError(t, err, "Failed to create logger")
-
-			bundle := operations.NewBundle(
-				func() context.Context { return context.Background() },
-				lggr,
-				operations.NewMemoryReporter(),
-			)
-
-			chain, err := cldf_evm_provider.NewSimChainProvider(t, chainSelector,
-				cldf_evm_provider.SimChainProviderConfig{
-					NumAdditionalAccounts: 1,
-				},
-			).Initialize(t.Context())
-			require.NoError(t, err, "Failed to create SimChainProvider")
-
-			chains := cldf_chain.NewBlockChainsFromSlice(
-				[]cldf_chain.BlockChain{chain},
-			)
-			evmChain := chains.EVMChains()[chainSelector]
-
-			usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
-			require.True(t, ok, "Failed to parse USDPerLINK")
-			usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
-			require.True(t, ok, "Failed to parse USDPerWETH")
+			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
+				chainSelector: {NumAdditionalAccounts: 1},
+			})
+			require.NoError(t, err, "Failed to create environment")
+			evmChain := e.BlockChains.EVMChains()[chainSelector]
 
 			deploymentReport, err := operations.ExecuteSequence(
-				bundle,
+				e.OperationsBundle,
 				sequences.DeployChainContracts,
 				evmChain,
 				sequences.DeployChainContractsInput{
-					ChainSelector: chainSelector,
-					ContractParams: sequences.ContractParams{
-						RMNRemote:     sequences.RMNRemoteParams{},
-						CCVAggregator: sequences.CCVAggregatorParams{},
-						CommitteeVerifier: sequences.CommitteeVerifierParams{
-							FeeAggregator: common.HexToAddress("0x01"),
-							SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
-								Threshold: 1,
-								Signers: []common.Address{
-									common.HexToAddress("0x02"),
-									common.HexToAddress("0x03"),
-									common.HexToAddress("0x04"),
-									common.HexToAddress("0x05"),
-								},
-							},
-							StorageLocation: "https://test.chain.link.fake",
-						},
-						ExecutorOnRamp: sequences.ExecutorOnRampParams{
-							MaxCCVsPerMsg: 10,
-						},
-						CCVProxy: sequences.CCVProxyParams{
-							FeeAggregator: common.HexToAddress("0x01"),
-						},
-						FeeQuoter: sequences.FeeQuoterParams{
-							MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-							TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
-							LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
-							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
-							USDPerLINK:                     usdPerLink,
-							USDPerWETH:                     usdPerWeth,
-						},
-					},
+					ChainSelector:  chainSelector,
+					ContractParams: testsetup.CreateBasicContractParams(),
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -128,29 +75,10 @@ func TestConfigureChainForLanes(t *testing.T) {
 			}
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
 			ccipMessageDest := common.HexToAddress("0x11").Bytes()
-			fqDestChainConfig := fee_quoter_v2.DestChainConfig{
-				IsEnabled:                         true,
-				MaxNumberOfTokensPerMsg:           10,
-				MaxDataBytes:                      30_000,
-				MaxPerMsgGasLimit:                 3_000_000,
-				DestGasOverhead:                   300_000,
-				DefaultTokenFeeUSDCents:           25,
-				DestGasPerPayloadByteBase:         16,
-				DestGasPerPayloadByteHigh:         40,
-				DestGasPerPayloadByteThreshold:    3000,
-				DestDataAvailabilityOverheadGas:   100,
-				DestGasPerDataAvailabilityByte:    16,
-				DestDataAvailabilityMultiplierBps: 1,
-				DefaultTokenDestGasOverhead:       90_000,
-				DefaultTxGasLimit:                 200_000,
-				GasMultiplierWeiPerEth:            11e17, // Gas multiplier in wei per eth is scaled by 1e18, so 11e17 is 1.1 = 110%
-				NetworkFeeUSDCents:                10,
-				ChainFamilySelector:               [4]byte{0x28, 0x12, 0xd5, 0x2c}, // EVM
-			}
 			remoteChainSelector := uint64(4356164186791070119)
 
 			_, err = operations.ExecuteSequence(
-				bundle,
+				e.OperationsBundle,
 				sequences.ConfigureChainForLanes,
 				evmChain,
 				sequences.ConfigureChainForLanesInput{
@@ -170,7 +98,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 							DefaultExecutor:                  executorOnRamp,
 							CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{},
 							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
-							FeeQuoterDestChainConfig: fqDestChainConfig,
+							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
 						},
 					},
 				},
@@ -178,7 +106,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 
 			// Check onRamps on router
-			onRampOnRouter, err := operations.ExecuteOperation(bundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+			onRampOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       r,
 				Args:          remoteChainSelector,
@@ -187,7 +115,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, ccvProxy.Hex(), onRampOnRouter.Output.Hex(), "OnRamp address on router should match CCVProxy address")
 
 			// Check offRamps on router
-			offRampsOnRouter, err := operations.ExecuteOperation(bundle, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+			offRampsOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
 				ChainSelector: evmChain.Selector,
 				Address:       r,
 				Args:          nil,
@@ -197,7 +125,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, ccvAggregator.Hex(), offRampsOnRouter.Output[0].OffRamp.Hex(), "OffRamp address on router should match CCVAggregator address")
 
 			// Check sourceChainConfig on CCVAggregator
-			sourceChainConfig, err := operations.ExecuteOperation(bundle, ccv_aggregator.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+			sourceChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, ccv_aggregator.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       ccvAggregator,
 				Args:          remoteChainSelector,
@@ -210,7 +138,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, r.Hex(), sourceChainConfig.Output.Router.Hex(), "Router in source chain config should match Router address")
 
 			// Check destChainConfig on CCVProxy
-			destChainConfig, err := operations.ExecuteOperation(bundle, ccv_proxy.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+			destChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, ccv_proxy.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       ccvProxy,
 				Args:          remoteChainSelector,
@@ -223,7 +151,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, committeeVerifier.Hex(), destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitteeVerifier address")
 
 			// Check destChainConfig on CommitteeVerifier
-			committeeVerifierDestChainConfig, err := operations.ExecuteOperation(bundle, committee_verifier.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+			committeeVerifierDestChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       committeeVerifier,
 				Args:          remoteChainSelector,
@@ -233,7 +161,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.False(t, committeeVerifierDestChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier dest chain config should be false")
 
 			// Check dest chains on ExecutorOnRamp
-			executorOnRampDestChains, err := operations.ExecuteOperation(bundle, executor_onramp.GetDestChains, evmChain, contract.FunctionInput[any]{
+			executorOnRampDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor_onramp.GetDestChains, evmChain, contract.FunctionInput[any]{
 				ChainSelector: evmChain.Selector,
 				Address:       executorOnRamp,
 				Args:          nil,
@@ -280,7 +208,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				},
 			}
 
-			fee, err := operations.ExecuteOperation(bundle, router.GetFee, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
+			fee, err := operations.ExecuteOperation(e.OperationsBundle, router.GetFee, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
 				ChainSelector: evmChain.Selector,
 				Address:       r,
 				Args:          ccipSendArgs,
@@ -289,7 +217,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 
 			// Send CCIP message with value
 			ccipSendArgs.Value = fee.Output
-			_, err = operations.ExecuteOperation(bundle, router.CCIPSend, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
+			_, err = operations.ExecuteOperation(e.OperationsBundle, router.CCIPSend, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
 				ChainSelector: evmChain.Selector,
 				Address:       r,
 				Args:          ccipSendArgs,

@@ -8,38 +8,12 @@ import (
 	mcmsevmsdk "github.com/smartcontractkit/mcms/sdk/evm"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
-// TODO : move this to a common chain agnostic package
-type MCMSInput struct {
-	// OverridePreviousRoot indicates whether to override the root of the MCMS contract.
-	OverridePreviousRoot bool
-	// ValidUntil is a unix timestamp indicating when the proposal expires.
-	// Root can't be set or executed after this time.
-	ValidUntil uint32
-	// TimelockDelay is the amount of time each operation in the proposal must wait before it can be executed.
-	TimelockDelay mcms_types.Duration
-	// TimelockAction is the action to perform on the timelock contract (schedule, bypass, or cancel).
-	TimelockAction mcms_types.TimelockAction
-	// MCMSAddressRef is a reference to the MCMS contract address in the datastore.
-	MCMSAddressRef *datastore.AddressRef
-	// TimelockAddressRef is a reference to the timelock contract address in the datastore.
-	TimelockAddressRef *datastore.AddressRef
-}
-
-// TODO : need to put more validation here
-func (c *MCMSInput) Validate() error {
-	if c.TimelockAction != mcms_types.TimelockActionSchedule &&
-		c.TimelockAction != mcms_types.TimelockActionBypass &&
-		c.TimelockAction != mcms_types.TimelockActionCancel {
-		return fmt.Errorf("invalid timelock action: %s", c.TimelockAction)
-	}
-	return nil
-}
-
 type MCMSBuilder interface {
-	Input() *MCMSInput
+	Input() *common_utils.MCMSInput
 	DeriveTimelocks(e cldf_deployment.Environment) (map[mcms_types.ChainSelector]string, error)
 	DeriveChainMetaData(e cldf_deployment.Environment) (map[mcms_types.ChainSelector]mcms_types.ChainMetadata, error)
 }
@@ -70,10 +44,10 @@ func ResolveMCMS(e cldf_deployment.Environment, args MCMSBuilder) (MCMSBuildPara
 }
 
 type EVMMCMBuilder struct {
-	in *MCMSInput
+	in *common_utils.MCMSInput
 }
 
-func (b EVMMCMBuilder) Input() *MCMSInput {
+func (b EVMMCMBuilder) Input() *common_utils.MCMSInput {
 	return b.in
 }
 
@@ -152,6 +126,6 @@ func (b EVMMCMBuilder) DeriveChainMetaData(e cldf_deployment.Environment) (map[m
 	return out, nil
 }
 
-func NewEVMMCMBuilder(in *MCMSInput) EVMMCMBuilder {
+func NewEVMMCMBuilder(in *common_utils.MCMSInput) EVMMCMBuilder {
 	return EVMMCMBuilder{in: in}
 }

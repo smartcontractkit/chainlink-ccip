@@ -502,9 +502,9 @@ func (_c *MockChainAccessor_GetFeeQuoterDestChainConfig_Call) RunAndReturn(run f
 	return _c
 }
 
-// GetFeeQuoterTokenUpdates provides a mock function with given fields: ctx, tokens, chain
-func (_m *MockChainAccessor) GetFeeQuoterTokenUpdates(ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress, chain ccipocr3.ChainSelector) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error) {
-	ret := _m.Called(ctx, tokens, chain)
+// GetFeeQuoterTokenUpdates provides a mock function with given fields: ctx, tokensBytes
+func (_m *MockChainAccessor) GetFeeQuoterTokenUpdates(ctx context.Context, tokensBytes []ccipocr3.UnknownAddress) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error) {
+	ret := _m.Called(ctx, tokensBytes)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetFeeQuoterTokenUpdates")
@@ -512,19 +512,19 @@ func (_m *MockChainAccessor) GetFeeQuoterTokenUpdates(ctx context.Context, token
 
 	var r0 map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.UnknownEncodedAddress, ccipocr3.ChainSelector) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error)); ok {
-		return rf(ctx, tokens, chain)
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.UnknownAddress) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error)); ok {
+		return rf(ctx, tokensBytes)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.UnknownEncodedAddress, ccipocr3.ChainSelector) map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig); ok {
-		r0 = rf(ctx, tokens, chain)
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.UnknownAddress) map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig); ok {
+		r0 = rf(ctx, tokensBytes)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []ccipocr3.UnknownEncodedAddress, ccipocr3.ChainSelector) error); ok {
-		r1 = rf(ctx, tokens, chain)
+	if rf, ok := ret.Get(1).(func(context.Context, []ccipocr3.UnknownAddress) error); ok {
+		r1 = rf(ctx, tokensBytes)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -539,15 +539,14 @@ type MockChainAccessor_GetFeeQuoterTokenUpdates_Call struct {
 
 // GetFeeQuoterTokenUpdates is a helper method to define mock.On call
 //   - ctx context.Context
-//   - tokens []ccipocr3.UnknownEncodedAddress
-//   - chain ccipocr3.ChainSelector
-func (_e *MockChainAccessor_Expecter) GetFeeQuoterTokenUpdates(ctx interface{}, tokens interface{}, chain interface{}) *MockChainAccessor_GetFeeQuoterTokenUpdates_Call {
-	return &MockChainAccessor_GetFeeQuoterTokenUpdates_Call{Call: _e.mock.On("GetFeeQuoterTokenUpdates", ctx, tokens, chain)}
+//   - tokensBytes []ccipocr3.UnknownAddress
+func (_e *MockChainAccessor_Expecter) GetFeeQuoterTokenUpdates(ctx interface{}, tokensBytes interface{}) *MockChainAccessor_GetFeeQuoterTokenUpdates_Call {
+	return &MockChainAccessor_GetFeeQuoterTokenUpdates_Call{Call: _e.mock.On("GetFeeQuoterTokenUpdates", ctx, tokensBytes)}
 }
 
-func (_c *MockChainAccessor_GetFeeQuoterTokenUpdates_Call) Run(run func(ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress, chain ccipocr3.ChainSelector)) *MockChainAccessor_GetFeeQuoterTokenUpdates_Call {
+func (_c *MockChainAccessor_GetFeeQuoterTokenUpdates_Call) Run(run func(ctx context.Context, tokensBytes []ccipocr3.UnknownAddress)) *MockChainAccessor_GetFeeQuoterTokenUpdates_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]ccipocr3.UnknownEncodedAddress), args[2].(ccipocr3.ChainSelector))
+		run(args[0].(context.Context), args[1].([]ccipocr3.UnknownAddress))
 	})
 	return _c
 }
@@ -557,7 +556,7 @@ func (_c *MockChainAccessor_GetFeeQuoterTokenUpdates_Call) Return(_a0 map[ccipoc
 	return _c
 }
 
-func (_c *MockChainAccessor_GetFeeQuoterTokenUpdates_Call) RunAndReturn(run func(context.Context, []ccipocr3.UnknownEncodedAddress, ccipocr3.ChainSelector) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error)) *MockChainAccessor_GetFeeQuoterTokenUpdates_Call {
+func (_c *MockChainAccessor_GetFeeQuoterTokenUpdates_Call) RunAndReturn(run func(context.Context, []ccipocr3.UnknownAddress) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error)) *MockChainAccessor_GetFeeQuoterTokenUpdates_Call {
 	_c.Call.Return(run)
 	return _c
 }

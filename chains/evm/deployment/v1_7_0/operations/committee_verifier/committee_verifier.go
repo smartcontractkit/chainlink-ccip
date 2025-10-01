@@ -5,7 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/verifier_proxy"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -20,6 +20,10 @@ type DynamicConfig = committee_verifier.CommitteeVerifierDynamicConfig
 type ConstructorArgs struct {
 	DynamicConfig   DynamicConfig
 	StorageLocation string
+}
+
+type ProxyConstructorArgs struct {
+	RampAddress common.Address
 }
 
 type SetDynamicConfigArgs struct {
@@ -41,115 +45,107 @@ type SetSignatureConfigArgs struct {
 	Threshold uint8
 }
 
-var Deploy = contract.NewDeploy(
-	"committee-verifier:deploy",
-	semver.MustParse("1.7.0"),
-	"Deploys the CommitteeVerifier contract",
-	ContractType,
-	committee_verifier.CommitteeVerifierABI,
-	func(ConstructorArgs) error { return nil },
-	contract.VMDeployers[ConstructorArgs]{
-		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := committee_verifier.DeployCommitteeVerifier(opts, backend, args.DynamicConfig, args.StorageLocation)
-			return address, tx, err
-		},
-		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "committee-verifier:deploy",
+	Version:          semver.MustParse("1.7.0"),
+	Description:      "Deploys the CommitteeVerifier contract",
+	ContractType:     ContractType,
+	ContractMetadata: committee_verifier.CommitteeVerifierMetaData,
+	BytecodeByVersion: map[string]contract.Bytecode{
+		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(committee_verifier.CommitteeVerifierBin)},
 	},
-)
+	Validate: func(ConstructorArgs) error { return nil },
+})
 
-var DeployProxy = contract.NewDeploy(
-	"committee-verifier-proxy:deploy",
-	semver.MustParse("1.7.0"),
-	"Deploys the CommitteeVerifierProxy contract",
-	ProxyType,
-	verifier_proxy.VerifierProxyABI,
-	func(common.Address) error { return nil },
-	contract.VMDeployers[common.Address]{
-		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, rampAddress common.Address) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := verifier_proxy.DeployVerifierProxy(opts, backend, rampAddress)
-			return address, tx, err
-		},
-		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, rampAddress common.Address) (common.Address, error)
+var DeployProxy = contract.NewDeploy(contract.DeployParams[ProxyConstructorArgs]{
+	Name:             "committee-verifier-proxy:deploy",
+	Version:          semver.MustParse("1.7.0"),
+	Description:      "Deploys the CommitteeVerifierProxy contract",
+	ContractType:     ProxyType,
+	ContractMetadata: verifier_proxy.VerifierProxyMetaData,
+	BytecodeByVersion: map[string]contract.Bytecode{
+		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(verifier_proxy.VerifierProxyBin)},
 	},
-)
+	Validate: func(ProxyConstructorArgs) error { return nil },
+})
 
-var SetDynamicConfig = contract.NewWrite(
-	"committee-verifier:set-dynamic-config",
-	semver.MustParse("1.7.0"),
-	"Sets the dynamic configuration on the CommitteeVerifier",
-	ContractType,
-	committee_verifier.CommitteeVerifierABI,
-	committee_verifier.NewCommitteeVerifier,
-	contract.OnlyOwner,
-	func(SetDynamicConfigArgs) error { return nil },
-	func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
+var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigArgs, *committee_verifier.CommitteeVerifier]{
+	Name:            "committee-verifier:set-dynamic-config",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Sets the dynamic configuration on the CommitteeVerifier",
+	ContractType:    ContractType,
+	ContractABI:     committee_verifier.CommitteeVerifierABI,
+	NewContract:     committee_verifier.NewCommitteeVerifier,
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier],
+	Validate:        func(SetDynamicConfigArgs) error { return nil },
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.SetDynamicConfig(opts, args.DynamicConfig)
 	},
-)
+})
 
-var ApplyDestChainConfigUpdates = contract.NewWrite(
-	"committee-verifier:apply-dest-chain-config-updates",
-	semver.MustParse("1.7.0"),
-	"Applies updates to destination chain configurations on the CommitteeVerifier",
-	ContractType,
-	committee_verifier.CommitteeVerifierABI,
-	committee_verifier.NewCommitteeVerifier,
-	contract.OnlyOwner,
-	func([]DestChainConfigArgs) error { return nil },
-	func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
+var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestChainConfigArgs, *committee_verifier.CommitteeVerifier]{
+	Name:            "committee-verifier:apply-dest-chain-config-updates",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Applies updates to destination chain configurations on the CommitteeVerifier",
+	ContractType:    ContractType,
+	ContractABI:     committee_verifier.CommitteeVerifierABI,
+	NewContract:     committee_verifier.NewCommitteeVerifier,
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier],
+	Validate:        func([]DestChainConfigArgs) error { return nil },
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.ApplyDestChainConfigUpdates(opts, args)
 	},
-)
+})
 
-var ApplyAllowlistUpdates = contract.NewWrite(
-	"committee-verifier:apply-allowlist-updates",
-	semver.MustParse("1.7.0"),
-	"Applies updates to the allowlist (those authorized to send messages) on the CommitteeVerifier",
-	ContractType,
-	committee_verifier.CommitteeVerifierABI,
-	committee_verifier.NewCommitteeVerifier,
-	contract.OnlyOwner,
-	func([]AllowlistConfigArgs) error { return nil },
-	func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []AllowlistConfigArgs) (*types.Transaction, error) {
+var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[[]AllowlistConfigArgs, *committee_verifier.CommitteeVerifier]{
+	Name:            "committee-verifier:apply-allowlist-updates",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Applies updates to the allowlist (those authorized to send messages) on the CommitteeVerifier",
+	ContractType:    ContractType,
+	ContractABI:     committee_verifier.CommitteeVerifierABI,
+	NewContract:     committee_verifier.NewCommitteeVerifier,
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier],
+	Validate:        func([]AllowlistConfigArgs) error { return nil },
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []AllowlistConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.ApplyAllowlistUpdates(opts, args)
 	},
-)
+})
 
-var WithdrawFeeTokens = contract.NewWrite(
-	"committee-verifier:withdraw-fee-tokens",
-	semver.MustParse("1.7.0"),
-	"Withdraws fee tokens from the CommitteeVerifier",
-	ContractType,
-	committee_verifier.CommitteeVerifierABI,
-	committee_verifier.NewCommitteeVerifier,
-	contract.OnlyOwner,
-	func(WithdrawFeeTokensArgs) error { return nil },
-	func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
+var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokensArgs, *committee_verifier.CommitteeVerifier]{
+	Name:            "committee-verifier:withdraw-fee-tokens",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Withdraws fee tokens from the CommitteeVerifier",
+	ContractType:    ContractType,
+	ContractABI:     committee_verifier.CommitteeVerifierABI,
+	NewContract:     committee_verifier.NewCommitteeVerifier,
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier],
+	Validate:        func(WithdrawFeeTokensArgs) error { return nil },
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return committeeVerifier.WithdrawFeeTokens(opts, args.FeeTokens)
 	},
-)
+})
 
-var GetDestChainConfig = contract.NewRead(
-	"committee-verifier:get-dest-chain-config",
-	semver.MustParse("1.7.0"),
-	"Gets the destination chain configuration for a given destination chain selector",
-	ContractType,
-	committee_verifier.NewCommitteeVerifier,
-	func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, destChainSelector uint64) (DestChainConfig, error) {
-		return committeeVerifier.GetDestChainConfig(opts, destChainSelector)
-	},
-)
-
-var SetSignatureConfigs = contract.NewWrite(
-	"committee-verifier:set-signature-config",
-	semver.MustParse("1.7.0"),
-	"Sets the signature configuration on the CommitteeVerifier",
-	ContractType,
-	committee_verifier.CommitteeVerifierABI,
-	committee_verifier.NewCommitteeVerifier,
-	contract.OnlyOwner,
-	func(SetSignatureConfigArgs) error { return nil },
-	func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SetSignatureConfigArgs) (*types.Transaction, error) {
+var SetSignatureConfigs = contract.NewWrite(contract.WriteParams[SetSignatureConfigArgs, *committee_verifier.CommitteeVerifier]{
+	Name:            "committee-verifier:set-signature-config",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Sets the signature configuration on the CommitteeVerifier",
+	ContractType:    ContractType,
+	ContractABI:     committee_verifier.CommitteeVerifierABI,
+	NewContract:     committee_verifier.NewCommitteeVerifier,
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier],
+	Validate:        func(SetSignatureConfigArgs) error { return nil },
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SetSignatureConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.SetSignatureConfig(opts, args.Signers, args.Threshold)
 	},
-)
+})
+
+var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainConfig, *committee_verifier.CommitteeVerifier]{
+	Name:         "committee-verifier:get-dest-chain-config",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Gets the destination chain configuration for a given destination chain selector",
+	ContractType: ContractType,
+	NewContract:  committee_verifier.NewCommitteeVerifier,
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args uint64) (DestChainConfig, error) {
+		return committeeVerifier.GetDestChainConfig(opts, args)
+	},
+})

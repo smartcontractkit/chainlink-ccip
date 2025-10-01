@@ -247,6 +247,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 		},
 	}
 
+	emptyChainAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	tkReader, err := usdc.NewUSDCTokenDataObserver(
 		t.Context(),
@@ -254,6 +255,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 		baseChain,
 		config,
 		testhelpers.USDCEncoder,
+		emptyChainAccessors,
 		map[cciptypes.ChainSelector]contractreader.Extended{
 			fujiChain:    mockReader(t, fuji),
 			sepoliaChain: mockReader(t, sepolia),
