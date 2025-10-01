@@ -39,83 +39,77 @@ type CCIPSendArgs struct {
 	EVM2AnyMessage    EVM2AnyMessage
 }
 
-var Deploy = contract.NewDeploy(
-	"router:deploy",
-	semver.MustParse("1.2.0"),
-	"Deploys the Router contract",
-	ContractType,
-	router.RouterABI,
-	func(ConstructorArgs) error { return nil },
-	contract.VMDeployers[ConstructorArgs]{
-		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := router.DeployRouter(opts, backend, args.WrappedNative, args.RMNProxy)
-			return address, tx, err
-		},
-		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "router:deploy",
+	Version:          semver.MustParse("1.2.0"),
+	Description:      "Deploys the Router contract",
+	ContractType:     ContractType,
+	ContractMetadata: router.RouterMetaData,
+	BytecodeByVersion: map[string]contract.Bytecode{
+		semver.MustParse("1.2.0").String(): {EVM: common.FromHex(router.RouterBin)},
 	},
-)
+	Validate: func(ConstructorArgs) error { return nil },
+})
 
-var ApplyRampUpdates = contract.NewWrite(
-	"router:apply-ramp-updates",
-	semver.MustParse("1.2.0"),
-	"Applies ramp updates to the Router",
-	ContractType,
-	router.RouterABI,
-	router.NewRouter,
-	contract.OnlyOwner,
-	func(ApplyRampsUpdatesArgs) error { return nil },
-	func(router *router.Router, opts *bind.TransactOpts, args ApplyRampsUpdatesArgs) (*types.Transaction, error) {
+var ApplyRampUpdates = contract.NewWrite(contract.WriteParams[ApplyRampsUpdatesArgs, *router.Router]{
+	Name:            "router:apply-ramp-updates",
+	Version:         semver.MustParse("1.2.0"),
+	Description:     "Applies ramp updates to the Router",
+	ContractType:    ContractType,
+	ContractABI:     router.RouterABI,
+	NewContract:     router.NewRouter,
+	IsAllowedCaller: contract.OnlyOwner[*router.Router],
+	Validate:        func(ApplyRampsUpdatesArgs) error { return nil },
+	CallContract: func(router *router.Router, opts *bind.TransactOpts, args ApplyRampsUpdatesArgs) (*types.Transaction, error) {
 		return router.ApplyRampUpdates(opts, args.OnRampUpdates, args.OffRampRemoves, args.OffRampAdds)
 	},
-)
+})
 
-var CCIPSend = contract.NewWrite(
-	"router:ccip-send",
-	semver.MustParse("1.2.0"),
-	"Sends a CCIP message via the Router",
-	ContractType,
-	router.RouterABI,
-	router.NewRouter,
-	func(contract *router.Router, opts *bind.CallOpts, caller common.Address) (bool, error) {
-		return true, nil
-	},
-	func(args CCIPSendArgs) error { return nil },
-	func(router *router.Router, opts *bind.TransactOpts, args CCIPSendArgs) (*types.Transaction, error) {
+var CCIPSend = contract.NewWrite(contract.WriteParams[CCIPSendArgs, *router.Router]{
+	Name:            "router:ccip-send",
+	Version:         semver.MustParse("1.2.0"),
+	Description:     "Sends a CCIP message via the Router",
+	ContractType:    ContractType,
+	ContractABI:     router.RouterABI,
+	NewContract:     router.NewRouter,
+	IsAllowedCaller: contract.AllCallersAllowed[*router.Router],
+	Validate:        func(CCIPSendArgs) error { return nil },
+	CallContract: func(router *router.Router, opts *bind.TransactOpts, args CCIPSendArgs) (*types.Transaction, error) {
 		opts.Value = args.Value
 		defer func() { opts.Value = nil }()
 		return router.CcipSend(opts, args.DestChainSelector, args.EVM2AnyMessage)
 	},
-)
+})
 
-var GetOffRamps = contract.NewRead(
-	"router:get-off-ramps",
-	semver.MustParse("1.2.0"),
-	"Gets all off ramps on the router",
-	ContractType,
-	router.NewRouter,
-	func(router *router.Router, opts *bind.CallOpts, args any) ([]OffRamp, error) {
+var GetOffRamps = contract.NewRead(contract.ReadParams[any, []OffRamp, *router.Router]{
+	Name:         "router:get-off-ramps",
+	Version:      semver.MustParse("1.2.0"),
+	Description:  "Gets all off ramps on the router",
+	ContractType: ContractType,
+	NewContract:  router.NewRouter,
+	CallContract: func(router *router.Router, opts *bind.CallOpts, args any) ([]OffRamp, error) {
 		return router.GetOffRamps(opts)
 	},
-)
+})
 
-var GetOnRamp = contract.NewRead(
-	"router:get-on-ramp",
-	semver.MustParse("1.2.0"),
-	"Gets the on ramp for a given destination chain selector",
-	ContractType,
-	router.NewRouter,
-	func(router *router.Router, opts *bind.CallOpts, destChainSelector uint64) (common.Address, error) {
+var GetOnRamp = contract.NewRead(contract.ReadParams[uint64, common.Address, *router.Router]{
+	Name:         "router:get-on-ramp",
+	Version:      semver.MustParse("1.2.0"),
+	Description:  "Gets the on ramp for a given destination chain selector",
+	ContractType: ContractType,
+	NewContract:  router.NewRouter,
+	CallContract: func(router *router.Router, opts *bind.CallOpts, destChainSelector uint64) (common.Address, error) {
 		return router.GetOnRamp(opts, destChainSelector)
 	},
-)
+})
 
-var GetFee = contract.NewRead(
-	"router:get-fee",
-	semver.MustParse("1.2.0"),
-	"Gets the fee for a message",
-	ContractType,
-	router.NewRouter,
-	func(router *router.Router, opts *bind.CallOpts, args CCIPSendArgs) (*big.Int, error) {
+var GetFee = contract.NewRead(contract.ReadParams[CCIPSendArgs, *big.Int, *router.Router]{
+	Name:         "router:get-fee",
+	Version:      semver.MustParse("1.2.0"),
+	Description:  "Gets the fee for a message",
+	ContractType: ContractType,
+	NewContract:  router.NewRouter,
+	CallContract: func(router *router.Router, opts *bind.CallOpts, args CCIPSendArgs) (*big.Int, error) {
 		return router.GetFee(opts, args.DestChainSelector, args.EVM2AnyMessage)
 	},
-)
+})

@@ -97,7 +97,7 @@ func (b *OutputBuilder) Build(params MCMSBuildParams) (deployment.ChangesetOutpu
 func (b *OutputBuilder) convertWriteOutputsToBatchOperations() []mcms_types.BatchOperation {
 	batchOps := make(map[uint64]mcms_types.BatchOperation)
 	for _, outs := range b.writeOutputs {
-		if outs.Executed {
+		if outs.Executed() {
 			continue // Skip executed transactions, should not be included in MCMS proposal
 		}
 		batchOp, exists := batchOps[outs.ChainSelector]
