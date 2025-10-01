@@ -24,46 +24,42 @@ type CurseArgs struct {
 	Subject Subject
 }
 
-var Deploy = contract.NewDeploy(
-	"rmn-remote:deploy",
-	semver.MustParse("1.6.0"),
-	"Deploys the RMNRemote contract",
-	ContractType,
-	rmn_remote.RMNRemoteABI,
-	func(ConstructorArgs) error { return nil },
-	contract.VMDeployers[ConstructorArgs]{
-		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := rmn_remote.DeployRMNRemote(opts, backend, args.LocalChainSelector, args.LegacyRMN)
-			return address, tx, err
-		},
-		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "rmn-remote:deploy",
+	Version:          semver.MustParse("1.6.0"),
+	Description:      "Deploys the RMNRemote contract",
+	ContractType:     ContractType,
+	ContractMetadata: rmn_remote.RMNRemoteMetaData,
+	BytecodeByVersion: map[string]contract.Bytecode{
+		semver.MustParse("1.6.0").String(): {EVM: common.FromHex(rmn_remote.RMNRemoteBin)},
 	},
-)
+	Validate: func(ConstructorArgs) error { return nil },
+})
 
-var Curse = contract.NewWrite(
-	"rmn-remote:curse",
-	semver.MustParse("1.6.0"),
-	"Applies a curse to an RMNRemote contract",
-	ContractType,
-	rmn_remote.RMNRemoteABI,
-	rmn_remote.NewRMNRemote,
-	contract.OnlyOwner,
-	func(CurseArgs) error { return nil },
-	func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
+var Curse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_remote.RMNRemote]{
+	Name:            "rmn-remote:curse",
+	Version:         semver.MustParse("1.6.0"),
+	Description:     "Applies a curse to an RMNRemote contract",
+	ContractType:    ContractType,
+	ContractABI:     rmn_remote.RMNRemoteABI,
+	NewContract:     rmn_remote.NewRMNRemote,
+	IsAllowedCaller: contract.OnlyOwner[*rmn_remote.RMNRemote],
+	Validate:        func(CurseArgs) error { return nil },
+	CallContract: func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
 		return rmnRemote.Curse(opts, args.Subject)
 	},
-)
+})
 
-var Uncurse = contract.NewWrite(
-	"rmn-remote:uncurse",
-	semver.MustParse("1.6.0"),
-	"Uncurses an existing curse on an RMNRemote contract",
-	ContractType,
-	rmn_remote.RMNRemoteABI,
-	rmn_remote.NewRMNRemote,
-	contract.OnlyOwner,
-	func(CurseArgs) error { return nil },
-	func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
+var Uncurse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_remote.RMNRemote]{
+	Name:            "rmn-remote:uncurse",
+	Version:         semver.MustParse("1.6.0"),
+	Description:     "Uncurses an existing curse on an RMNRemote contract",
+	ContractType:    ContractType,
+	ContractABI:     rmn_remote.RMNRemoteABI,
+	NewContract:     rmn_remote.NewRMNRemote,
+	IsAllowedCaller: contract.OnlyOwner[*rmn_remote.RMNRemote],
+	Validate:        func(CurseArgs) error { return nil },
+	CallContract: func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
 		return rmnRemote.Uncurse(opts, args.Subject)
 	},
-)
+})

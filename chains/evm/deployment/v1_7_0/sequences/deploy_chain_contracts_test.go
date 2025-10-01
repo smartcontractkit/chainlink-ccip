@@ -1,8 +1,6 @@
 package sequences_test
 
 import (
-	"context"
-	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -21,8 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -59,76 +56,27 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			lggr, err := logger.New()
-			require.NoError(t, err, "Failed to create logger")
-
-			bundle := operations.NewBundle(
-				func() context.Context { return context.Background() },
-				lggr,
-				operations.NewMemoryReporter(),
-			)
-
-			chain, err := cldf_evm_provider.NewSimChainProvider(t, 5009297550715157269,
-				cldf_evm_provider.SimChainProviderConfig{
-					NumAdditionalAccounts: 1,
-				},
-			).Initialize(t.Context())
-			require.NoError(t, err, "Failed to create SimChainProvider")
-
-			chains := cldf_chain.NewBlockChainsFromSlice(
-				[]cldf_chain.BlockChain{chain},
-			)
-			evmChain := chains.EVMChains()[5009297550715157269]
-
-			usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
-			require.True(t, ok, "Failed to parse USDPerLINK")
-			usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
-			require.True(t, ok, "Failed to parse USDPerWETH")
+			chainSelector := uint64(5009297550715157269)
+			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
+				chainSelector: {NumAdditionalAccounts: 1},
+			})
+			require.NoError(t, err, "Failed to create test environment")
+			evmChain := e.BlockChains.EVMChains()[chainSelector]
 
 			report, err := operations.ExecuteSequence(
-				bundle,
+				e.OperationsBundle,
 				sequences.DeployChainContracts,
 				evmChain,
 				sequences.DeployChainContractsInput{
-					ChainSelector:     5009297550715157269,
+					ChainSelector:     chainSelector,
 					ExistingAddresses: test.existingAddresses,
-					ContractParams: sequences.ContractParams{
-						RMNRemote:     sequences.RMNRemoteParams{},
-						CCVAggregator: sequences.CCVAggregatorParams{},
-						ExecutorOnRamp: sequences.ExecutorOnRampParams{
-							MaxCCVsPerMsg: 10,
-						},
-						CommitteeVerifier: sequences.CommitteeVerifierParams{
-							FeeAggregator: common.HexToAddress("0x01"),
-							SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
-								Threshold: 1,
-								Signers: []common.Address{
-									common.HexToAddress("0x02"),
-									common.HexToAddress("0x03"),
-									common.HexToAddress("0x04"),
-									common.HexToAddress("0x05"),
-								},
-							},
-							StorageLocation: "https://test.chain.link.fake",
-						},
-						CCVProxy: sequences.CCVProxyParams{
-							FeeAggregator: common.HexToAddress("0x01"),
-						},
-						FeeQuoter: sequences.FeeQuoterParams{
-							MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-							TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
-							LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
-							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
-							USDPerLINK:                     usdPerLink,
-							USDPerWETH:                     usdPerWeth,
-						},
-					},
+					ContractParams:    testsetup.CreateBasicContractParams(),
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 			for _, write := range report.Output.Writes {
 				// Contracts are deployed & still owned by deployer, so all writes should be executed
-				require.True(t, write.Executed, "Expected all writes to be executed")
+				require.True(t, write.Executed(), "Expected all writes to be executed")
 			}
 
 			exists := map[deployment.ContractType]bool{
@@ -170,127 +118,46 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 
 func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 	t.Run("sequential deployments", func(t *testing.T) {
-		lggr, err := logger.New()
-		require.NoError(t, err, "Failed to create logger")
-
-		bundle := operations.NewBundle(
-			func() context.Context { return context.Background() },
-			lggr,
-			operations.NewMemoryReporter(),
-		)
-
-		// Create multiple chains
-		chainSelectors := []uint64{
-			5009297550715157269, // Chain 1
-			4949039107694359620, // Chain 2
-			6433500567565415381, // Chain 3
-		}
-
-		var allChains []cldf_chain.BlockChain
-		for _, selector := range chainSelectors {
-			chain, err := cldf_evm_provider.NewSimChainProvider(t, selector,
-				cldf_evm_provider.SimChainProviderConfig{
-					NumAdditionalAccounts: 1,
-				},
-			).Initialize(t.Context())
-			require.NoError(t, err, "Failed to create SimChainProvider for chain %d", selector)
-			allChains = append(allChains, chain)
-		}
-
-		chains := cldf_chain.NewBlockChainsFromSlice(allChains)
-		evmChains := chains.EVMChains()
+		e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
+			5009297550715157269: {NumAdditionalAccounts: 1},
+			4949039107694359620: {NumAdditionalAccounts: 1},
+			6433500567565415381: {NumAdditionalAccounts: 1},
+		})
+		require.NoError(t, err, "Failed to create test environment")
+		evmChains := e.BlockChains.EVMChains()
 
 		// Deploy to each chain sequentially using the same bundle
 		var allReports []operations.SequenceReport[sequences.DeployChainContractsInput, sequence_utils.OnChainOutput]
-		for _, selector := range chainSelectors {
-			evmChain := evmChains[selector]
-
-			usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
-			require.True(t, ok, "Failed to parse USDPerLINK")
-			usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
-			require.True(t, ok, "Failed to parse USDPerWETH")
-
+		for _, evmChain := range evmChains {
 			input := sequences.DeployChainContractsInput{
-				ChainSelector:     selector,
+				ChainSelector:     evmChain.Selector,
 				ExistingAddresses: nil,
-				ContractParams: sequences.ContractParams{
-					RMNRemote:     sequences.RMNRemoteParams{},
-					CCVAggregator: sequences.CCVAggregatorParams{},
-					ExecutorOnRamp: sequences.ExecutorOnRampParams{
-						MaxCCVsPerMsg: 10,
-					},
-					CommitteeVerifier: sequences.CommitteeVerifierParams{
-						FeeAggregator: common.HexToAddress("0x01"),
-						SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
-							Threshold: 1,
-							Signers: []common.Address{
-								common.HexToAddress("0x02"),
-								common.HexToAddress("0x03"),
-								common.HexToAddress("0x04"),
-								common.HexToAddress("0x05"),
-							},
-						},
-						StorageLocation: "https://test.chain.link.fake",
-					},
-					CCVProxy: sequences.CCVProxyParams{
-						FeeAggregator: common.HexToAddress("0x01"),
-					},
-					FeeQuoter: sequences.FeeQuoterParams{
-						MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-						TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
-						LINKPremiumMultiplierWeiPerEth: 9e17,       // 0.9 ETH
-						WETHPremiumMultiplierWeiPerEth: 1e18,       // 1.0 ETH
-						USDPerLINK:                     usdPerLink, // $15
-						USDPerWETH:                     usdPerWeth, // $2000
-					},
-				},
+				ContractParams:    testsetup.CreateBasicContractParams(),
 			}
 
-			report, err := operations.ExecuteSequence(bundle, sequences.DeployChainContracts, evmChain, input)
-			require.NoError(t, err, "Failed to execute sequence for chain %d", selector)
-			require.NotEmpty(t, report.Output.Addresses, "Expected operation reports for chain %d", selector)
+			report, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployChainContracts, evmChain, input)
+			require.NoError(t, err, "Failed to execute sequence for chain %d", evmChain.Selector)
+			require.NotEmpty(t, report.Output.Addresses, "Expected operation reports for chain %d", evmChain.Selector)
 
 			allReports = append(allReports, report)
 		}
 
 		// Verify all deployments succeeded
-		require.Len(t, allReports, len(chainSelectors), "Expected reports for all chains")
+		require.Len(t, allReports, len(evmChains), "Expected reports for all chains")
 
-		for i, report := range allReports {
-			require.NotEmpty(t, report.Output.Addresses, "Expected addresses for chain %d", chainSelectors[i])
+		for _, report := range allReports {
+			require.NotEmpty(t, report.Output.Addresses, "Expected addresses")
 		}
 	})
 
 	t.Run("concurrent deployments", func(t *testing.T) {
-		lggr, err := logger.New()
-		require.NoError(t, err, "Failed to create logger")
-
-		bundle := operations.NewBundle(
-			func() context.Context { return context.Background() },
-			lggr,
-			operations.NewMemoryReporter(),
-		)
-
-		// Create multiple chains
-		chainSelectors := []uint64{
-			5009297550715157269, // Chain 1
-			4949039107694359620, // Chain 2
-			6433500567565415381, // Chain 3
-		}
-
-		var allChains []cldf_chain.BlockChain
-		for _, selector := range chainSelectors {
-			chain, err := cldf_evm_provider.NewSimChainProvider(t, selector,
-				cldf_evm_provider.SimChainProviderConfig{
-					NumAdditionalAccounts: 1,
-				},
-			).Initialize(t.Context())
-			require.NoError(t, err, "Failed to create SimChainProvider for chain %d", selector)
-			allChains = append(allChains, chain)
-		}
-
-		chains := cldf_chain.NewBlockChainsFromSlice(allChains)
-		evmChains := chains.EVMChains()
+		e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
+			5009297550715157269: {NumAdditionalAccounts: 1},
+			4949039107694359620: {NumAdditionalAccounts: 1},
+			6433500567565415381: {NumAdditionalAccounts: 1},
+		})
+		require.NoError(t, err, "Failed to create test environment")
+		evmChains := e.BlockChains.EVMChains()
 
 		// Deploy to all chains concurrently using the same bundle
 		type deployResult struct {
@@ -299,68 +166,33 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 			err           error
 		}
 
-		resultChan := make(chan deployResult, len(chainSelectors))
-
-		usdPerLink, ok := new(big.Int).SetString("15000000000000000000", 10) // $15
-		require.True(t, ok, "Failed to parse USDPerLINK")
-		usdPerWeth, ok := new(big.Int).SetString("2000000000000000000000", 10) // $2000
-		require.True(t, ok, "Failed to parse USDPerWETH")
+		resultChan := make(chan deployResult, len(evmChains))
 
 		// Launch concurrent deployments
-		for _, selector := range chainSelectors {
+		for _, evmChain := range evmChains {
 			go func(chainSel uint64) {
 				evmChain := evmChains[chainSel]
 
 				input := sequences.DeployChainContractsInput{
 					ChainSelector:     chainSel,
 					ExistingAddresses: nil,
-					ContractParams: sequences.ContractParams{
-						RMNRemote:     sequences.RMNRemoteParams{},
-						CCVAggregator: sequences.CCVAggregatorParams{},
-						ExecutorOnRamp: sequences.ExecutorOnRampParams{
-							MaxCCVsPerMsg: 10,
-						},
-						CommitteeVerifier: sequences.CommitteeVerifierParams{
-							FeeAggregator: common.HexToAddress("0x01"),
-							SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
-								Threshold: 1,
-								Signers: []common.Address{
-									common.HexToAddress("0x02"),
-									common.HexToAddress("0x03"),
-									common.HexToAddress("0x04"),
-									common.HexToAddress("0x05"),
-								},
-							},
-							StorageLocation: "https://test.chain.link.fake",
-						},
-						CCVProxy: sequences.CCVProxyParams{
-							FeeAggregator: common.HexToAddress("0x01"),
-						},
-						FeeQuoter: sequences.FeeQuoterParams{
-							MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-							TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
-							LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
-							WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
-							USDPerLINK:                     usdPerLink,
-							USDPerWETH:                     usdPerWeth,
-						},
-					},
+					ContractParams:    testsetup.CreateBasicContractParams(),
 				}
 
-				report, execErr := operations.ExecuteSequence(bundle, sequences.DeployChainContracts, evmChain, input)
+				report, execErr := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployChainContracts, evmChain, input)
 				resultChan <- deployResult{chainSel, report, execErr}
-			}(selector)
+			}(evmChain.Selector)
 		}
 
 		// Collect all results
 		var results []deployResult
-		for i := 0; i < len(chainSelectors); i++ {
+		for i := 0; i < len(evmChains); i++ {
 			result := <-resultChan
 			results = append(results, result)
 		}
 
 		// Verify all deployments succeeded
-		require.Len(t, results, len(chainSelectors), "Expected results for all chains")
+		require.Len(t, results, len(evmChains), "Expected results for all chains")
 
 		for _, result := range results {
 			require.NoError(t, result.err, "Failed to execute sequence for chain %d", result.chainSelector)

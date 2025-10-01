@@ -22,5 +22,7 @@ contract HyperLiquidCompatibleERC20Setup is BaseTest {
 
     // Set up HyperEVM linker and remote token
     s_hyperLiquidToken.setHyperEVMLinker(s_hyperEVMLinker);
+
+    assertEq(s_hyperLiquidToken.typeAndVersion(), "HyperLiquidCompatibleERC20 1.6.2");
   }
 }
