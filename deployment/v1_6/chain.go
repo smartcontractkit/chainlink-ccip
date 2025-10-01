@@ -3,8 +3,6 @@ package v1_6
 import "math/big"
 
 type ChainDefinition struct {
-	// ConnectionConfig holds configuration for connection.
-	ConnectionConfig
 	// Selector is the chain selector of this chain.
 	Selector uint64
 	// GasPrice defines the USD price (18 decimals) per unit gas for this chain as a destination.
@@ -13,13 +11,14 @@ type ChainDefinition struct {
 	TokenPrices map[string]*big.Int
 	// FeeQuoterDestChainConfig is the configuration to be applied on source chain when this chain is a destination.
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
-}
-
-type ConnectionConfig struct {
 	// RMNVerificationDisabled is true if we do not want the RMN to bless messages FROM this chain.
 	RMNVerificationDisabled bool
 	// AllowListEnabled is true if we want an allowlist to dictate who can send messages TO this chain.
 	AllowListEnabled bool
+	// OnRamp is the address of the OnRamp contract on this chain.
+	OnRamp []byte
+	// OffRamp is the address of the OffRamp contract on this chain.
+	OffRamp []byte
 }
 
 type FeeQuoterDestChainConfig struct {
