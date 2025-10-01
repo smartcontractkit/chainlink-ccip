@@ -44,7 +44,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   error InvalidStaticConfig();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error UnsupportedNumberOfTokens(uint256 numberOfTokens, uint256 maxNumberOfTokensPerMsg);
-  error InvalidFeeRange(uint256 minFeeUSDCents, uint256 maxFeeUSDCents);
   error InvalidChainFamilySelector(bytes4 chainFamilySelector);
   error InvalidTokenReceiver();
   error TooManySVMExtraArgsAccounts(uint256 numAccounts, uint256 maxAccounts);
@@ -129,7 +128,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @dev Struct with transfer fee configuration for token transfers.
   struct TokenTransferFeeConfig {
     uint32 minFeeUSDCents; // ───╮ Minimum fee to charge per token transfer, multiples of 0.01 USD.
-    uint32 maxFeeUSDCents; //    │ Maximum fee to charge per token transfer, multiples of 0.01 USD.
     uint32 destGasOverhead; //   │ Gas charged to execute the token transfer on the destination chain.
     //                           │ Data availability bytes that are returned from the source pool and sent to the dest
     uint32 destBytesOverhead; // │ pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES. Set as multiple of 32 bytes.
@@ -811,10 +809,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         TokenTransferFeeConfig memory tokenTransferFeeConfig =
           tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
         address token = tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].token;
-
-        if (tokenTransferFeeConfig.minFeeUSDCents >= tokenTransferFeeConfig.maxFeeUSDCents) {
-          revert InvalidFeeRange(tokenTransferFeeConfig.minFeeUSDCents, tokenTransferFeeConfig.maxFeeUSDCents);
-        }
 
         if (tokenTransferFeeConfig.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
           revert InvalidDestBytesOverhead(token, tokenTransferFeeConfig.destBytesOverhead);

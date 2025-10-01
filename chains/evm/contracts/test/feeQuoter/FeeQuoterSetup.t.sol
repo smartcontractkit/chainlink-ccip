@@ -144,7 +144,6 @@ contract FeeQuoterSetup is TokenSetup {
         token: s_sourceFeeToken,
         tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
           minFeeUSDCents: 1_00, // 1 USD
-          maxFeeUSDCents: 1000_00, // 1,000 USD
           destGasOverhead: 100_000,
           destBytesOverhead: 32,
           isEnabled: true
@@ -156,7 +155,6 @@ contract FeeQuoterSetup is TokenSetup {
         token: CUSTOM_TOKEN,
         tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
           minFeeUSDCents: 2_00, // 1 USD
-          maxFeeUSDCents: 2000_00, // 1,000 USD
           destGasOverhead: 95_000,
           destBytesOverhead: 200,
           isEnabled: true
@@ -168,7 +166,6 @@ contract FeeQuoterSetup is TokenSetup {
         token: CUSTOM_TOKEN_2,
         tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
           minFeeUSDCents: 2_00, // 1 USD
-          maxFeeUSDCents: 2000_00, // 1,000 USD
           destGasOverhead: 1,
           destBytesOverhead: 200,
           isEnabled: false
@@ -295,7 +292,6 @@ contract FeeQuoterSetup is TokenSetup {
     FeeQuoter.TokenTransferFeeConfig memory b
   ) internal pure {
     assertEq(a.minFeeUSDCents, b.minFeeUSDCents);
-    assertEq(a.maxFeeUSDCents, b.maxFeeUSDCents);
     assertEq(a.destGasOverhead, b.destGasOverhead);
     assertEq(a.destBytesOverhead, b.destBytesOverhead);
     assertEq(a.isEnabled, b.isEnabled);

@@ -195,26 +195,4 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
       MESSAGE_RECEIVER
     );
   }
-
-  function test_RevertWhen_applyTokensTransferFeeConfigUpdates_InvalidFeeRange() public {
-    address sourceETH = s_sourceTokens[1];
-
-    // Set token config to allow larger data
-    FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 1);
-    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = sourceETH;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 1,
-      maxFeeUSDCents: 0,
-      destGasOverhead: 0,
-      destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
-      isEnabled: true
-    });
-
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidFeeRange.selector, 1, 0));
-
-    s_feeQuoter.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0)
-    );
-  }
 }

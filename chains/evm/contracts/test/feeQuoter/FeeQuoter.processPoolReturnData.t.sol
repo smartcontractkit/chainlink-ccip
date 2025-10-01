@@ -62,7 +62,6 @@ contract FeeQuoter_processPoolReturnData is FeeQuoterFeeSetup {
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = sourceETH;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
       minFeeUSDCents: 0,
-      maxFeeUSDCents: 1,
       destGasOverhead: 0,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
       isEnabled: true

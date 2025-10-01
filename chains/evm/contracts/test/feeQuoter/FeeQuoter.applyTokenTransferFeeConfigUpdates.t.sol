@@ -17,13 +17,6 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     tokenTransferFeeConfigs[1].minFeeUSDCents =
       uint32(bound(tokenTransferFeeConfigs[1].minFeeUSDCents, 0, type(uint8).max));
 
-    tokenTransferFeeConfigs[0].maxFeeUSDCents = uint32(
-      bound(tokenTransferFeeConfigs[0].maxFeeUSDCents, tokenTransferFeeConfigs[0].minFeeUSDCents + 1, type(uint32).max)
-    );
-    tokenTransferFeeConfigs[1].maxFeeUSDCents = uint32(
-      bound(tokenTransferFeeConfigs[1].maxFeeUSDCents, tokenTransferFeeConfigs[1].minFeeUSDCents + 1, type(uint32).max)
-    );
-
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(2, 2);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 1;
@@ -63,17 +56,11 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 2);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 6,
-      maxFeeUSDCents: 7,
-      destGasOverhead: 9,
-      destBytesOverhead: 312,
-      isEnabled: true
-    });
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig =
+      FeeQuoter.TokenTransferFeeConfig({minFeeUSDCents: 6, destGasOverhead: 9, destBytesOverhead: 312, isEnabled: true});
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].token = address(11);
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
       minFeeUSDCents: 12,
-      maxFeeUSDCents: 13,
       destGasOverhead: 15,
       destBytesOverhead: 394,
       isEnabled: true
@@ -167,7 +154,6 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
       minFeeUSDCents: 6,
-      maxFeeUSDCents: 7,
       destGasOverhead: 9,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1),
       isEnabled: true

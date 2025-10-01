@@ -85,7 +85,6 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = s_sourceFeeToken;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
       minFeeUSDCents: 0,
-      maxFeeUSDCents: 1,
       destGasOverhead: 0,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
       isEnabled: true
