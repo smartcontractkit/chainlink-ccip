@@ -59,9 +59,6 @@ func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChain
 				TestRouter:       lane.TestRouter,
 				AllowListEnabled: lane.Source.AllowListEnabled,
 			},
-			UpdateRouterRampsConfig: UpdateRouterDestInput{
-				OnRampUpdates: map[uint64]bool{src.Selector: true},
-			},
 			ExtraConfigs: lane.ExtraConfigs,
 			MCMS:         cfg.MCMS,
 		})
@@ -83,9 +80,6 @@ func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChain
 				TestRouter:                lane.TestRouter,
 				IsRMNVerificationDisabled: lane.Dest.RMNVerificationDisabled,
 				OnRamp:                    srcOnRamp,
-			},
-			UpdateRouterRampsConfig: UpdateRouterDestInput{
-				OffRampUpdates: map[uint64]bool{dest.Selector: true},
 			},
 			ExtraConfigs: lane.ExtraConfigs,
 			MCMS:         cfg.MCMS,

@@ -27,7 +27,6 @@ type UpdateLanesInput struct {
 	UpdateFeeQuoterPrices      FeeQuoterPriceUpdatePerSource
 	UpdateOnRampDestsConfig    UpdateOnRampDestsInput
 	UpdateOffRampSourcesConfig UpdateOffRampSourcesInput
-	UpdateRouterRampsConfig    UpdateRouterDestInput
 	ExtraConfigs               ExtraConfigs
 	MCMS                       *utils.MCMSInput
 }
@@ -43,9 +42,4 @@ type UpdateOffRampSourcesInput struct {
 	TestRouter                bool
 	IsRMNVerificationDisabled bool
 	OnRamp                    []byte
-}
-
-type UpdateRouterDestInput struct {
-	OffRampUpdates map[uint64]bool
-	OnRampUpdates  map[uint64]bool
 }
