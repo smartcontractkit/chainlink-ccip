@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -29,7 +30,7 @@ func TestDeriveMCMAddressesEVM(t *testing.T) {
 		Version:   semver.MustParse("1.0.0"),
 		Qualifier: "main",
 	}
-	input := &MCMSInput{
+	input := &common_utils.MCMSInput{
 		OverridePreviousRoot: false,
 		ValidUntil:           2756219818,
 		TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),

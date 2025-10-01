@@ -28,14 +28,17 @@ import (
 )
 
 type RMNRemoteParams struct {
+	Version   *semver.Version
 	LegacyRMN common.Address
 }
 
 type CCVAggregatorParams struct {
+	Version              *semver.Version
 	GasForCallExactCheck uint16
 }
 
 type CommitteeVerifierParams struct {
+	Version             *semver.Version
 	AllowlistAdmin      common.Address
 	FeeAggregator       common.Address
 	SignatureConfigArgs committee_verifier.SetSignatureConfigArgs
@@ -43,10 +46,12 @@ type CommitteeVerifierParams struct {
 }
 
 type CCVProxyParams struct {
+	Version       *semver.Version
 	FeeAggregator common.Address
 }
 
 type FeeQuoterParams struct {
+	Version                        *semver.Version
 	MaxFeeJuelsPerMsg              *big.Int
 	TokenPriceStalenessThreshold   uint32
 	LINKPremiumMultiplierWeiPerEth uint64
@@ -56,6 +61,7 @@ type FeeQuoterParams struct {
 }
 
 type ExecutorOnRampParams struct {
+	Version       *semver.Version
 	MaxCCVsPerMsg uint8
 }
 
@@ -86,6 +92,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy WETH
 		wethRef, err := maybeDeployContract(b, weth.Deploy, weth.ContractType, chain, contract.DeployInput[weth.ConstructorArgs]{
+			Version:       semver.MustParse("1.0.0"),
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -95,6 +102,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy LINK
 		linkRef, err := maybeDeployContract(b, link.Deploy, link.ContractType, chain, contract.DeployInput[link.ConstructorArgs]{
+			Version:       semver.MustParse("1.0.0"),
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -104,6 +112,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy RMNRemote
 		rmnRemoteRef, err := maybeDeployContract(b, rmn_remote.Deploy, rmn_remote.ContractType, chain, contract.DeployInput[rmn_remote.ConstructorArgs]{
+			Version:       input.ContractParams.RMNRemote.Version,
 			ChainSelector: chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
@@ -117,6 +126,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy RMNProxy
 		rmnProxyRef, err := maybeDeployContract(b, rmn_proxy.Deploy, rmn_proxy.ContractType, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+			Version:       semver.MustParse("1.0.0"),
 			ChainSelector: chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
 				RMN: common.HexToAddress(rmnRemoteRef.Address),
@@ -145,6 +155,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy Router
 		routerRef, err := maybeDeployContract(b, router.Deploy, router.ContractType, chain, contract.DeployInput[router.ConstructorArgs]{
+			Version:       semver.MustParse("1.2.0"),
 			ChainSelector: chain.Selector,
 			Args: router.ConstructorArgs{
 				WrappedNative: common.HexToAddress(wethRef.Address),
@@ -158,6 +169,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy TokenAdminRegistry
 		tokenAdminRegistryRef, err := maybeDeployContract(b, token_admin_registry.Deploy, token_admin_registry.ContractType, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{
+			Version:       semver.MustParse("1.5.0"),
 			ChainSelector: chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -167,6 +179,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy FeeQuoter
 		feeQuoterRef, err := maybeDeployContract(b, fee_quoter_v2.Deploy, fee_quoter_v2.ContractType, chain, contract.DeployInput[fee_quoter_v2.ConstructorArgs]{
+			Version:       input.ContractParams.FeeQuoter.Version,
 			ChainSelector: chain.Selector,
 			Args: fee_quoter_v2.ConstructorArgs{
 				StaticConfig: fee_quoter_v2.StaticConfig{
@@ -228,12 +241,15 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy CCVAggregator
 		ccvAggregatorRef, err := maybeDeployContract(b, ccv_aggregator.Deploy, ccv_aggregator.ContractType, chain, contract.DeployInput[ccv_aggregator.ConstructorArgs]{
+			Version:       input.ContractParams.CCVAggregator.Version,
 			ChainSelector: chain.Selector,
 			Args: ccv_aggregator.ConstructorArgs{
-				LocalChainSelector:   chain.Selector,
-				RmnRemote:            common.HexToAddress(rmnProxyRef.Address),
-				GasForCallExactCheck: input.ContractParams.CCVAggregator.GasForCallExactCheck,
-				TokenAdminRegistry:   common.HexToAddress(tokenAdminRegistryRef.Address),
+				StaticConfig: ccv_aggregator.StaticConfig{
+					LocalChainSelector:   chain.Selector,
+					RmnRemote:            common.HexToAddress(rmnProxyRef.Address),
+					GasForCallExactCheck: input.ContractParams.CCVAggregator.GasForCallExactCheck,
+					TokenAdminRegistry:   common.HexToAddress(tokenAdminRegistryRef.Address),
+				},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -243,6 +259,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy CCVProxy
 		ccvProxyRef, err := maybeDeployContract(b, ccv_proxy.Deploy, ccv_proxy.ContractType, chain, contract.DeployInput[ccv_proxy.ConstructorArgs]{
+			Version:       input.ContractParams.CCVProxy.Version,
 			ChainSelector: chain.Selector,
 			Args: ccv_proxy.ConstructorArgs{
 				StaticConfig: ccv_proxy.StaticConfig{
@@ -263,6 +280,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy CommitteeVerifier
 		committeeVerifierRef, err := maybeDeployContract(b, committee_verifier.Deploy, committee_verifier.ContractType, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
+			Version:       input.ContractParams.CommitteeVerifier.Version,
 			ChainSelector: chain.Selector,
 			Args: committee_verifier.ConstructorArgs{
 				DynamicConfig: committee_verifier.DynamicConfig{
@@ -290,9 +308,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, setSignatureConfigReport.Output)
 
 		// Deploy CommitteeVerifierProxy
-		committeeVerifierProxyRef, err := maybeDeployContract(b, committee_verifier.DeployProxy, committee_verifier.ProxyType, chain, contract.DeployInput[common.Address]{
+		committeeVerifierProxyRef, err := maybeDeployContract(b, committee_verifier.DeployProxy, committee_verifier.ProxyType, chain, contract.DeployInput[committee_verifier.ProxyConstructorArgs]{
+			Version:       semver.MustParse("1.7.0"),
 			ChainSelector: chain.Selector,
-			Args:          common.HexToAddress(committeeVerifierRef.Address),
+			Args: committee_verifier.ProxyConstructorArgs{
+				RampAddress: common.HexToAddress(committeeVerifierRef.Address),
+			},
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierProxy: %w", err)
@@ -301,6 +322,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy ExecutorOnRamp
 		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, executor_onramp.ContractType, chain, contract.DeployInput[executor_onramp.ConstructorArgs]{
+			Version:       input.ContractParams.ExecutorOnRamp.Version,
 			ChainSelector: chain.Selector,
 			Args: executor_onramp.ConstructorArgs{
 				MaxCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxCCVsPerMsg,
@@ -312,7 +334,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, executorOnRampRef)
 
 		// Deploy MockReceiver (defines committee verifier as required)
+		// TODO: Replace with a more configurable receiver contract.
 		mockReceiver, err := maybeDeployContract(b, mock_receiver.Deploy, mock_receiver.ContractType, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
+			Version:       semver.MustParse("1.7.0"),
 			ChainSelector: chain.Selector,
 			Args: mock_receiver.ConstructorArgs{
 				RequiredVerifiers: []common.Address{common.HexToAddress(committeeVerifierRef.Address)},
