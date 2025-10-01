@@ -127,12 +127,12 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     vm.stopPrank();
   }
 
-  function test_releaseOrMint_CCTPV2_FastTransferFlag() public {
+  function test_releaseOrMint_CCTPV2_CCVFlag() public {
     // Arrange: Prepare test data
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2FastTransfer(
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2CCV(
       USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: 0, depositHash: bytes32(hex"deafbeef")})
     );
     bytes memory offChainTokenData = "";

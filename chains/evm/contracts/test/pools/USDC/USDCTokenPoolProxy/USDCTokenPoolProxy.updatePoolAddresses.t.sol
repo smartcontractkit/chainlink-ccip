@@ -38,34 +38,6 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
   // Reverts
 
-  // Test that zero address for CCTP V1 pool is rejected
-  function test_updatePoolAddresses_RevertWhen_CCTPV1PoolIsZero() public {
-    // Arrange: Define test constants
-    USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: s_legacyCctpV1Pool,
-      cctpV1Pool: address(0), // Zero address
-      cctpV2Pool: s_newCctpV2Pool
-    });
-
-    // Act & Assert: Should revert with PoolAddressCannotBeZero error
-    changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
-    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
-  }
-
-  // Test that zero address for CCTP V2 pool is rejected
-  function test_updatePoolAddresses_RevertWhen_CCTPV2PoolIsZero() public {
-    USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: s_legacyCctpV1Pool,
-      cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: address(0) // Zero address
-    });
-
-    changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
-    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
-  }
-
   function test_updatePoolAddresses_RevertWhen_LegacyPoolDoesNotSupportIPoolV1() public {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,
@@ -79,7 +51,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
     // Should revert because the legacy pool does not support the IPoolV1 interface even though the V1 and V2 pools do
     changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.TokenPoolUnsupported.selector);
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_legacyCctpV1Pool));
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
 
     // Now it should succeed because the legacy pool is not being used and thus the check is not performed

@@ -93,13 +93,8 @@ contract USDCTokenPoolProxy_updateLockReleasePoolAddresses is USDCTokenPoolProxy
     lockReleasePools[0] = s_newLockReleasePool1;
 
     changePrank(OWNER);
-    vm.expectRevert(USDCTokenPoolProxy.TokenPoolUnsupported.selector);
-    s_usdcTokenPoolProxy.updateLockReleasePoolAddresses(remoteChainSelectors, lockReleasePools);
-
-    changePrank(OWNER);
-
     // Should revert because the pool does not support the IPoolV1 interface
-    vm.expectRevert(USDCTokenPoolProxy.TokenPoolUnsupported.selector);
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newLockReleasePool1));
     s_usdcTokenPoolProxy.updateLockReleasePoolAddresses(remoteChainSelectors, lockReleasePools);
 
     // Should not revert because the pool supports the IPoolV1 interface

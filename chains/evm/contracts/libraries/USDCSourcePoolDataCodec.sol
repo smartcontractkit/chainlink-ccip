@@ -27,8 +27,8 @@ library USDCSourcePoolDataCodec {
   /// @dev The preimage is bytes4(keccak256("CCTP_V2"))
   bytes4 public constant CCTP_VERSION_2_TAG = 0xb148ea5f;
 
-  /// @dev The preimage is bytes4(keccak256("CCTP_V2_FAST_TRANSFER"))
-  bytes4 public constant CCTP_VERSION_2_FAST_TRANSFER_TAG = 0x0458016c;
+  /// @dev The preimage is bytes4(keccak256("CCTP_V2_CCV"))
+  bytes4 public constant CCTP_VERSION_2_CCV_TAG = 0x3047587c;
 
   /// Note: Since this struct never exists in storage, only in memory after an ABI-decoding, proper struct-packing
   /// is not necessary and field ordering has been defined so as to best support off-chain code.
@@ -56,9 +56,6 @@ library USDCSourcePoolDataCodec {
   function _encodeSourceTokenDataPayloadV1(
     SourceTokenDataPayloadV1 memory sourceTokenDataPayload
   ) internal pure returns (bytes memory) {
-    /// Using abi.encodePacked() saves ~80 bytes on the source pool data by not using unnecessary padding.
-    /// abi.encode() = 96 bytes (32 + 32 + 32)
-    /// abi.encodePacked() = 16 bytes (4 + 8 + 4)
     return abi.encodePacked(CCTP_VERSION_1_TAG, sourceTokenDataPayload.nonce, sourceTokenDataPayload.sourceDomain);
   }
 
@@ -68,24 +65,17 @@ library USDCSourcePoolDataCodec {
   function _encodeSourceTokenDataPayloadV2(
     SourceTokenDataPayloadV2 memory sourceTokenDataPayload
   ) internal pure returns (bytes memory) {
-    /// Using abi.encodePacked() saves ~56 bytes on the source pool data by not using unnecessary padding.
-    /// abi.encode() = 96 bytes (32 + 32 + 32)
-    /// abi.encodePacked() = 40 bytes (4 + 4 + 32)
     return abi.encodePacked(CCTP_VERSION_2_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
   }
 
-  /// @notice Encodes the source token data payload into a bytes array using the CCTP V2 fast transfer tag.
+  /// @notice Encodes the source token data payload into a bytes array using the CCTP V2 CCV tag.
   /// @param sourceTokenDataPayload The source token data payload to encode.
   /// @return The encoded source token data payload.
-  function _encodeSourceTokenDataPayloadV2FastTransfer(
+  function _encodeSourceTokenDataPayloadV2CCV(
     SourceTokenDataPayloadV2 memory sourceTokenDataPayload
   ) internal pure returns (bytes memory) {
-    /// Using abi.encodePacked() saves ~56 bytes on the source pool data by not using unnecessary padding.
-    /// abi.encode() = 96 bytes (32 + 32 + 32)
-    /// abi.encodePacked() = 40 bytes (4 + 4 + 32)
-    return abi.encodePacked(
-      CCTP_VERSION_2_FAST_TRANSFER_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash
-    );
+    return
+      abi.encodePacked(CCTP_VERSION_2_CCV_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
   }
 
   /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
@@ -110,7 +100,7 @@ library USDCSourcePoolDataCodec {
       depositHash := mload(add(sourcePoolData, 40))
     }
 
-    if (version != CCTP_VERSION_2_TAG && version != CCTP_VERSION_2_FAST_TRANSFER_TAG) revert InvalidVersion(version);
+    if (version != CCTP_VERSION_2_TAG && version != CCTP_VERSION_2_CCV_TAG) revert InvalidVersion(version);
 
     sourceTokenDataPayload.sourceDomain = sourceDomain;
     sourceTokenDataPayload.depositHash = depositHash;

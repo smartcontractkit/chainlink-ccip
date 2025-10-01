@@ -39,9 +39,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
   error InvalidMessageVersion(bytes4 version);
   error InvalidMessageLength(uint256 length);
   error MismatchedArrayLengths();
-  error InvalidDestinationPool();
+  error NoLockOrBurnMechanismSet(uint64 remoteChainSelector);
   error Unauthorized();
-  error TokenPoolUnsupported();
+  error TokenPoolUnsupported(address pool);
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
@@ -101,29 +101,28 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
 
     PoolAddresses memory pools = s_pools;
 
-    address destinationPool;
+    // The child pool which will perform the lock/burn operation.
+    address childPool;
 
-    // The order of the branches is based on the expected frequency of each mechanism being used, in order to save
-    // gas on every call.
     if (mechanism == LockOrBurnMechanism.CCTP_V2) {
-      destinationPool = pools.cctpV2Pool;
+      childPool = pools.cctpV2Pool;
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
-      destinationPool = pools.cctpV1Pool;
+      childPool = pools.cctpV1Pool;
     } else if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      destinationPool = s_lockReleasePools[lockOrBurnIn.remoteChainSelector];
+      childPool = s_lockReleasePools[lockOrBurnIn.remoteChainSelector];
     }
 
     // If the destination pool is the zero address, then no mechanism has been configured for the outgoing tokens
-    // and thus the remote chain is not supported and should revert.
-    if (destinationPool == address(0)) {
-      revert InvalidDestinationPool();
+    // and thus the destination chain is not supported and should revert.
+    if (childPool == address(0)) {
+      revert NoLockOrBurnMechanismSet(lockOrBurnIn.remoteChainSelector);
     }
 
     // Transfer the tokens to the proper child pool, as this contract is only a proxy and will not perform
     // the lock/burn itself.
-    i_token.safeTransfer(destinationPool, lockOrBurnIn.amount);
+    i_token.safeTransfer(childPool, lockOrBurnIn.amount);
 
-    return USDCTokenPool(destinationPool).lockOrBurn(lockOrBurnIn);
+    return USDCTokenPool(childPool).lockOrBurn(lockOrBurnIn);
   }
 
   /// @inheritdoc IPoolV1
@@ -156,6 +155,26 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
     // Since this proxy does not inherit from the TokenPool contract, it must manually validate the caller as an offRamp.
     if (!i_router.isOffRamp(releaseOrMintIn.remoteChainSelector, msg.sender)) {
       revert Unauthorized();
+    }
+
+    // The first 4 bytes of source pool data are the version which can be extracted directly and cast into a uint32.
+    bytes4 version = bytes4(releaseOrMintIn.sourcePoolData[:4]);
+
+    // If the source pool data is the lock release flag, use the lock release pool set for the remote chain selector.
+    if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
+      return USDCTokenPool(s_lockReleasePools[releaseOrMintIn.remoteChainSelector]).releaseOrMint(releaseOrMintIn);
+    }
+
+    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
+      return USDCTokenPool(s_pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
+    }
+
+    // Both tags will route to the same CCTP V2 pool, but will allow for pools to have greater granularity in deciding
+    // the type of transfer (slow or fast) to use when depositing into CCTP.
+    if (
+      version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG || version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG
+    ) {
+      return USDCTokenPool(s_pools.cctpV2Pool).releaseOrMint(releaseOrMintIn);
     }
 
     // In previous versions of the USDC Token Pool, the sourcePoolData only contained two fields, a uint64 and uint32.
@@ -192,27 +211,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
       }
     }
 
-    // The first 4 bytes of source pool data are the version which can be extracted directly and cast into a uint32.
-    bytes4 version = bytes4(releaseOrMintIn.sourcePoolData[:4]);
-
-    // If the source pool data is the lock release flag, use the lock release pool set for the remote chain selector.
-    if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
-      return USDCTokenPool(s_lockReleasePools[releaseOrMintIn.remoteChainSelector]).releaseOrMint(releaseOrMintIn);
-    }
-
-    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
-      return USDCTokenPool(s_pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
-    }
-
-    // Both tags will route to the same CCTP V2 pool, but will allow for pools to have greater granularity in deciding
-    // the type of transfer (slow or fast) to use when depositing into CCTP.
-    if (
-      version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG
-        || version == USDCSourcePoolDataCodec.CCTP_VERSION_2_FAST_TRANSFER_TAG
-    ) {
-      return USDCTokenPool(s_pools.cctpV2Pool).releaseOrMint(releaseOrMintIn);
-    }
-
     revert InvalidMessageVersion(version);
   }
 
@@ -222,21 +220,20 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
   function updatePoolAddresses(
     PoolAddresses calldata pools
   ) external onlyOwner {
-    if (pools.cctpV1Pool == address(0) || pools.cctpV2Pool == address(0)) {
-      revert AddressCannotBeZero();
+    if (pools.cctpV1Pool != address(0) && !pools.cctpV1Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)) {
+      revert TokenPoolUnsupported(pools.cctpV1Pool);
     }
 
-    // If the V1 or V2 Pool does not support the IPoolV1 interface, revert.
+    if (pools.cctpV2Pool != address(0) && !pools.cctpV2Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)) {
+      revert TokenPoolUnsupported(pools.cctpV2Pool);
+    }
+
     // If the legacy CCTP V1 Pool is being used, then it must support the IPoolV1 interface. If it is not, don't check it.
     if (
-      !pools.cctpV1Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)
-        || !pools.cctpV2Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)
-        || (
-          pools.legacyCctpV1Pool != address(0)
-            && !pools.legacyCctpV1Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)
-        )
+      pools.legacyCctpV1Pool != address(0)
+        && !pools.legacyCctpV1Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)
     ) {
-      revert TokenPoolUnsupported();
+      revert TokenPoolUnsupported(pools.legacyCctpV1Pool);
     }
 
     s_pools = pools;
@@ -295,7 +292,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
       if (
         lockReleasePools[i] != address(0) && !lockReleasePools[i]._supportsInterfaceReverting(type(IPoolV1).interfaceId)
       ) {
-        revert TokenPoolUnsupported();
+        revert TokenPoolUnsupported(lockReleasePools[i]);
       }
 
       // Note: Since the lock release pool is only used for chains that do not have CCTP support, after a successful

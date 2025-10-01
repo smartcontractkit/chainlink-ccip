@@ -207,7 +207,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     );
   }
 
-  function test_lockOrBurn_RevertWhen_InvalidDestinationPool() public {
+  function test_lockOrBurn_RevertWhen_NoLockOrBurnMechanismSet() public {
     // Configure lock or burn mechanisms for different chains but do not set the lock release pool for the chain
     uint64[] memory chainSelectors = new uint64[](1);
     chainSelectors[0] = DEST_CHAIN_SELECTOR;
@@ -234,7 +234,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.startPrank(s_routerAllowedOnRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidDestinationPool.selector));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, DEST_CHAIN_SELECTOR));
     s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
   }
 
