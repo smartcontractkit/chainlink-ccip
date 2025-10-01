@@ -20,10 +20,10 @@ importers:
       '@changesets/get-github-info':
         specifier: ^0.6.0
         version: 0.6.0
-      '@openzeppelin/contracts-4.8.3/':
+      '@openzeppelin/contracts-4.8.3':
         specifier: npm:@openzeppelin/contracts@4.8.3
         version: '@openzeppelin/contracts@4.8.3'
-      '@openzeppelin/contracts-5.0.2/':
+      '@openzeppelin/contracts-5.0.2':
         specifier: npm:@openzeppelin/contracts@5.0.2
         version: '@openzeppelin/contracts@5.0.2'
       semver:
