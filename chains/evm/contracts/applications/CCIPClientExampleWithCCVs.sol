@@ -91,7 +91,6 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     external
     view
     virtual
-    override
     returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold)
   {
     CCVConfig memory config = s_ccvConfigs[sourceChainSelector];
