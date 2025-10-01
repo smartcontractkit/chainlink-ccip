@@ -2,16 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
-import {IReceiver} from "@chainlink/contracts/src/v0.8/keystone/interfaces/IReceiver.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "./libraries/Client.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
-import {KeystoneFeedsPermissionHandler} from "@chainlink/contracts/src/v0.8/keystone/KeystoneFeedsPermissionHandler.sol";
-import {KeystoneFeedDefaultMetadataLib} from
-  "@chainlink/contracts/src/v0.8/keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/interfaces/IERC165.sol";
@@ -22,15 +18,13 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 ///   - Store the price of a token in USD allowing the owner or priceUpdater to update this value.
 ///   - Manage chain specific fee calculations.
 /// The authorized callers in the contract represent the fee price updaters.
-contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver, KeystoneFeedsPermissionHandler {
+contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
-  using KeystoneFeedDefaultMetadataLib for bytes;
 
   error TokenNotSupported(address token);
   error FeeTokenNotSupported(address token);
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
-  error DataFeedValueOutOfUint224Range();
   error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
   error MessageGasLimitTooHigh();
   error MessageComputeUnitLimitTooHigh();
@@ -53,7 +47,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
-  event PriceFeedPerTokenUpdated(address indexed token, TokenPriceFeedConfig priceFeedConfig);
   event TokenTransferFeeConfigUpdated(
     uint64 indexed destChainSelector, address indexed token, TokenTransferFeeConfig tokenTransferFeeConfig
   );
@@ -61,19 +54,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   event PremiumMultiplierWeiPerEthUpdated(address indexed token, uint64 premiumMultiplierWeiPerEth);
   event DestChainConfigUpdated(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
   event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
-
-  /// @dev Contains token price configuration used in both the keystone price updates and the price feed fallback logic.
-  struct TokenPriceFeedConfig {
-    address dataFeedAddress; // ─╮ Price feed contract. Can be address(0) to indicate no feed is configured.
-    uint8 tokenDecimals; //      │ Decimals of the token, used for both keystone and price feed decimal multiplications.
-    bool isEnabled; // ──────────╯ Whether the token is configured to receive keystone and/or price feed updates.
-  }
-
-  /// @dev Token price data feed update.
-  struct TokenPriceFeedUpdate {
-    address sourceToken; // Source token to update feed for.
-    TokenPriceFeedConfig feedConfig; // Feed config update data.
-  }
 
   /// @dev Struct that contains the static configuration.
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -84,13 +64,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     // The amount of time a token price can be stale before it is considered invalid. Gas price staleness is configured
     // per dest chain.
     uint32 tokenPriceStalenessThreshold;
-  }
-
-  /// @dev The struct representing the received CCIP feed report from keystone IReceiver.onReport().
-  struct ReceivedCCIPFeedReport {
-    address token; //       Token address.
-    uint224 price; // ────╮ Price of the token in USD with 18 decimals.
-    uint32 timestamp; // ─╯ Timestamp of the price update.
   }
 
   /// @dev Struct to hold the fee & validation configs for a destination chain.
@@ -184,9 +157,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   ///     1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18.
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
 
-  /// @dev Stores the price data feed configurations per token.
-  mapping(address token => TokenPriceFeedConfig dataFeedAddress) private s_usdPriceFeedsPerToken;
-
   /// @dev The multiplier for destination chain specific premiums that can be set by the owner or fee admin.
   mapping(address token => uint64 premiumMultiplierWeiPerEth) private s_premiumMultiplierWeiPerEth;
 
@@ -212,7 +182,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
     address[] memory feeTokens,
-    TokenPriceFeedUpdate[] memory tokenPriceFeeds,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
@@ -229,7 +198,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     i_tokenPriceStalenessThreshold = staticConfig.tokenPriceStalenessThreshold;
 
     _applyFeeTokensUpdates(new address[](0), feeTokens);
-    _updateTokenPriceFeeds(tokenPriceFeeds);
     _applyDestChainConfigUpdates(destChainConfigArgs);
     _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
     _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, new TokenTransferFeeConfigRemoveArgs[](0));
@@ -268,15 +236,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       tokenPrices[i] = getTokenPrice(tokens[i]);
     }
     return tokenPrices;
-  }
-
-  /// @notice Returns the token price data feed configuration.
-  /// @param token The token to retrieve the feed config for.
-  /// @return tokenPriceFeedConfig The token price data feed config (if feed address is 0, the feed config is disabled).
-  function getTokenPriceFeedConfig(
-    address token
-  ) external view returns (TokenPriceFeedConfig memory) {
-    return s_usdPriceFeedsPerToken[token];
   }
 
   /// @notice Get an encoded `gasPrice` for a given destination chain ID.
@@ -430,71 +389,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     }
   }
 
-  /// @notice Updates the USD token price feeds for given tokens.
-  /// @param tokenPriceFeedUpdates Token price feed updates to apply.
-  function updateTokenPriceFeeds(
-    TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates
-  ) external onlyOwner {
-    _updateTokenPriceFeeds(tokenPriceFeedUpdates);
-  }
-
-  /// @notice Updates the USD token price feeds for given tokens.
-  /// @param tokenPriceFeedUpdates Token price feed updates to apply.
-  function _updateTokenPriceFeeds(
-    TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates
-  ) private {
-    for (uint256 i; i < tokenPriceFeedUpdates.length; ++i) {
-      TokenPriceFeedUpdate memory update = tokenPriceFeedUpdates[i];
-      address sourceToken = update.sourceToken;
-      TokenPriceFeedConfig memory tokenPriceFeedConfig = update.feedConfig;
-
-      s_usdPriceFeedsPerToken[sourceToken] = tokenPriceFeedConfig;
-      emit PriceFeedPerTokenUpdated(sourceToken, tokenPriceFeedConfig);
-    }
-  }
-
   /// @notice Signals which version of the pool interface is supported
   function supportsInterface(
     bytes4 interfaceId
   ) public pure override returns (bool) {
-    return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IFeeQuoter).interfaceId
-      || interfaceId == type(IERC165).interfaceId;
-  }
-
-  /// @inheritdoc IReceiver
-  /// @notice Handles the report containing price feeds and updates the internal price storage.
-  /// @dev This function is called to process incoming price feed data.
-  /// @param metadata Arbitrary metadata associated with the report (not used in this implementation).
-  /// @param report Encoded report containing an array of `ReceivedCCIPFeedReport` structs.
-  function onReport(bytes calldata metadata, bytes calldata report) external {
-    (bytes10 workflowName, address workflowOwner, bytes2 reportName) = metadata._extractMetadataInfo();
-
-    _validateReportPermission(msg.sender, workflowOwner, workflowName, reportName);
-
-    ReceivedCCIPFeedReport[] memory feeds = abi.decode(report, (ReceivedCCIPFeedReport[]));
-
-    for (uint256 i = 0; i < feeds.length; ++i) {
-      TokenPriceFeedConfig memory feedConfig = s_usdPriceFeedsPerToken[feeds[i].token];
-
-      // If the token is not enabled we revert the entire report as that indicates some type of misconfiguration.
-      if (!feedConfig.isEnabled) {
-        revert TokenNotSupported(feeds[i].token);
-      }
-      // Keystone reports prices in USD with 18 decimals, so we passing it as 18 in the _calculateRebasedValue function.
-      uint224 rebasedValue =
-        _calculateRebasedValue(uint8(KEYSTONE_PRICE_DECIMALS), feedConfig.tokenDecimals, feeds[i].price);
-
-      // If the feed timestamp is older than the current stored price, skip the update.
-      // We do not revert Keystone price feeds deliberately.
-      if (feeds[i].timestamp < s_usdPerToken[feeds[i].token].timestamp) {
-        continue;
-      }
-
-      // Update the token price with the new value and timestamp.
-      s_usdPerToken[feeds[i].token] =
-        Internal.TimestampedPackedUint224({value: rebasedValue, timestamp: feeds[i].timestamp});
-      emit UsdPerTokenUpdated(feeds[i].token, rebasedValue, feeds[i].timestamp);
-    }
+    return interfaceId == type(IFeeQuoter).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================
@@ -661,39 +560,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     }
 
     return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);
-  }
-
-  /// @notice calculates the rebased value for 1e18 smallest token denomination.
-  /// @param dataFeedDecimal decimal of the data feed.
-  /// @param tokenDecimal decimal of the token.
-  /// @param feedValue value of the data feed.
-  /// @return rebasedValue rebased value.
-  function _calculateRebasedValue(
-    uint8 dataFeedDecimal,
-    uint8 tokenDecimal,
-    uint256 feedValue
-  ) internal pure returns (uint224 rebasedValue) {
-    // Rebase formula for units in smallest token denomination: usdValue * (1e18 * 1e18) / 1eTokenDecimals.
-    // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
-    // feedValue * (10 ** ((18 - feedDecimals) + (18 - erc20Decimals)))
-    // feedValue * (10 ** (36 - feedDecimals - erc20Decimals))
-    // feedValue * (10 ** (36 - (feedDecimals + erc20Decimals)))
-    // feedValue * (10 ** (36 - excessDecimals))
-    // If excessDecimals > 36 => flip it to feedValue / (10 ** (excessDecimals - 36)).
-    uint8 excessDecimals = dataFeedDecimal + tokenDecimal;
-    uint256 rebasedVal;
-
-    if (excessDecimals > FEE_BASE_DECIMALS) {
-      rebasedVal = feedValue / (10 ** (excessDecimals - FEE_BASE_DECIMALS));
-    } else {
-      rebasedVal = feedValue * (10 ** (FEE_BASE_DECIMALS - excessDecimals));
-    }
-
-    if (rebasedVal > type(uint224).max) {
-      revert DataFeedValueOutOfUint224Range();
-    }
-
-    return uint224(rebasedVal);
   }
 
   /// @notice Returns the estimated data availability cost of the message.

@@ -9,7 +9,6 @@ contract FeeQuoterHelper is FeeQuoterV2 {
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
     address[] memory feeTokens,
-    TokenPriceFeedUpdate[] memory tokenPriceFeeds,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
@@ -18,7 +17,6 @@ contract FeeQuoterHelper is FeeQuoterV2 {
       staticConfig,
       priceUpdaters,
       feeTokens,
-      tokenPriceFeeds,
       tokenTransferFeeConfigArgs,
       premiumMultiplierWeiPerEthArgs,
       destChainConfigArgs
@@ -92,13 +90,5 @@ contract FeeQuoterHelper is FeeQuoterV2 {
     uint256 gasLimit
   ) external pure {
     _validateDestFamilyAddress(chainFamilySelector, destAddress, gasLimit);
-  }
-
-  function calculateRebasedValue(
-    uint8 dataFeedDecimal,
-    uint8 tokenDecimal,
-    uint256 feedValue
-  ) external pure returns (uint224) {
-    return _calculateRebasedValue(dataFeedDecimal, tokenDecimal, feedValue);
   }
 }

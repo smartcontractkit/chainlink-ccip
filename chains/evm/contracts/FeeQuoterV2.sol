@@ -11,7 +11,6 @@ contract FeeQuoterV2 is IFeeQuoterV2, FeeQuoter {
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
     address[] memory feeTokens,
-    TokenPriceFeedUpdate[] memory tokenPriceFeeds,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
@@ -20,7 +19,6 @@ contract FeeQuoterV2 is IFeeQuoterV2, FeeQuoter {
       staticConfig,
       priceUpdaters,
       feeTokens,
-      tokenPriceFeeds,
       tokenTransferFeeConfigArgs,
       premiumMultiplierWeiPerEthArgs,
       destChainConfigArgs

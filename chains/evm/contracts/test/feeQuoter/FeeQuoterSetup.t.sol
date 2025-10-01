@@ -184,7 +184,6 @@ contract FeeQuoterSetup is TokenSetup {
       }),
       priceUpdaters,
       feeTokens,
-      new FeeQuoter.TokenPriceFeedUpdate[](0),
       s_feeQuoterTokenTransferFeeConfigArgs,
       s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       _generateFeeQuoterDestChainConfigArgs()
@@ -212,29 +211,6 @@ contract FeeQuoterSetup is TokenSetup {
       Internal.PriceUpdates({tokenPriceUpdates: tokenPriceUpdates, gasPriceUpdates: new Internal.GasPriceUpdate[](0)});
 
     return priceUpdates;
-  }
-
-  function _getSingleTokenPriceFeedUpdateStruct(
-    address sourceToken,
-    address dataFeedAddress,
-    uint8 tokenDecimals
-  ) internal pure returns (FeeQuoter.TokenPriceFeedUpdate memory) {
-    return FeeQuoter.TokenPriceFeedUpdate({
-      sourceToken: sourceToken,
-      feedConfig: FeeQuoter.TokenPriceFeedConfig({
-        dataFeedAddress: dataFeedAddress,
-        tokenDecimals: tokenDecimals,
-        isEnabled: true
-      })
-    });
-  }
-
-  function _initialiseSingleTokenPriceFeed() internal returns (address) {
-    FeeQuoter.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new FeeQuoter.TokenPriceFeedUpdate[](1);
-    tokenPriceFeedUpdates[0] =
-      _getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]], 18);
-    s_feeQuoter.updateTokenPriceFeeds(tokenPriceFeedUpdates);
-    return s_sourceTokens[0];
   }
 
   function _generateTokenTransferFeeConfigArgs(
@@ -276,15 +252,6 @@ contract FeeQuoterSetup is TokenSetup {
       })
     });
     return destChainConfigs;
-  }
-
-  function _assertTokenPriceFeedConfigEquality(
-    FeeQuoter.TokenPriceFeedConfig memory config1,
-    FeeQuoter.TokenPriceFeedConfig memory config2
-  ) internal pure virtual {
-    assertEq(config1.dataFeedAddress, config2.dataFeedAddress);
-    assertEq(config1.tokenDecimals, config2.tokenDecimals);
-    assertEq(config1.isEnabled, config2.isEnabled);
   }
 
   function _assertTokenTransferFeeConfigEqual(

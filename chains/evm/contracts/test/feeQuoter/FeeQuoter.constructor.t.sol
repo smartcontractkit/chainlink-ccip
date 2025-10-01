@@ -13,11 +13,6 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     address[] memory feeTokens = new address[](2);
     feeTokens[0] = s_sourceTokens[0];
     feeTokens[1] = s_sourceTokens[1];
-    FeeQuoter.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new FeeQuoter.TokenPriceFeedUpdate[](2);
-    tokenPriceFeedUpdates[0] =
-      _getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[0], s_dataFeedByToken[s_sourceTokens[0]], 18);
-    tokenPriceFeedUpdates[1] =
-      _getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[1], s_dataFeedByToken[s_sourceTokens[1]], 6);
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
 
@@ -30,7 +25,6 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
       staticConfig,
       priceUpdaters,
       feeTokens,
-      tokenPriceFeedUpdates,
       s_feeQuoterTokenTransferFeeConfigArgs,
       s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       destChainConfigArgs
@@ -40,14 +34,6 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     assertEq(feeTokens, s_feeQuoter.getFeeTokens());
     assertEq(priceUpdaters, s_feeQuoter.getAllAuthorizedCallers());
     assertEq(s_feeQuoter.typeAndVersion(), "FeeQuoter 1.6.3-dev");
-
-    _assertTokenPriceFeedConfigEquality(
-      tokenPriceFeedUpdates[0].feedConfig, s_feeQuoter.getTokenPriceFeedConfig(s_sourceTokens[0])
-    );
-
-    _assertTokenPriceFeedConfigEquality(
-      tokenPriceFeedUpdates[1].feedConfig, s_feeQuoter.getTokenPriceFeedConfig(s_sourceTokens[1])
-    );
 
     assertEq(
       s_feeQuoterPremiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth,
@@ -91,7 +77,6 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
       staticConfig,
       new address[](0),
       new address[](0),
-      new FeeQuoter.TokenPriceFeedUpdate[](0),
       s_feeQuoterTokenTransferFeeConfigArgs,
       s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
@@ -111,7 +96,6 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
       staticConfig,
       new address[](0),
       new address[](0),
-      new FeeQuoter.TokenPriceFeedUpdate[](0),
       s_feeQuoterTokenTransferFeeConfigArgs,
       s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
@@ -131,7 +115,6 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
       staticConfig,
       new address[](0),
       new address[](0),
-      new FeeQuoter.TokenPriceFeedUpdate[](0),
       s_feeQuoterTokenTransferFeeConfigArgs,
       s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
