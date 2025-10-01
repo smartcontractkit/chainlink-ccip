@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
-import {ICCVOffRampV1} from "../interfaces/ICCVOffRampV1.sol";
+import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
@@ -18,12 +18,9 @@ import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
-import {EnumerableSet} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC20} from "@openzeppelin/contracts@5.0.2/token/ERC20/IERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   using ERC165CheckerReverting for address;
@@ -44,10 +41,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
   error InsufficientGasToCompleteTx(bytes4 err);
-  error SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
+  error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 sequenceNumber);
   error InvalidVerifierSelector(bytes4 selector);
   error ReentrancyGuardReentrantCall();
-  error RequiredCCVMissing(address requiredCCV, bool isPoolCCV);
+  error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
@@ -60,6 +57,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     bytes returnData
   );
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
+
+  // 5k for updating the state + 5k for the event and misc costs.
+  uint256 internal constant MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
 
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
   // solhint-disable-next-line gas-struct-packing
@@ -174,11 +174,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       _beforeExecuteSingleMessage(MessageV1Codec._decodeMessageV1(encodedMessage));
     bytes32 messageId = keccak256(encodedMessage);
 
-    if (message.receiver.length != 20) {
-      revert Internal.InvalidEVMAddress(message.receiver);
-    }
-    address receiverAddress = address(bytes20(message.receiver));
-
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
     }
@@ -191,11 +186,15 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     if (ccvs.length != ccvData.length) {
       revert InvalidCCVDataLength(ccvs.length, ccvData.length);
     }
+    if (message.receiver.length != 20) {
+      revert Internal.InvalidEVMAddress(message.receiver);
+    }
 
     /////// Original state checks ///////
 
-    bytes32 executionStateKey =
-      _calculateExecutionStateKey(message.sourceChainSelector, message.sequenceNumber, message.sender, receiverAddress);
+    bytes32 executionStateKey = _calculateExecutionStateKey(
+      message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
+    );
 
     Internal.MessageExecutionState originalState = s_executionStates[executionStateKey];
 
@@ -208,84 +207,291 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
           || originalState == Internal.MessageExecutionState.FAILURE
       )
     ) {
-      revert SkippedAlreadyExecutedMessage(message.sourceChainSelector, message.sequenceNumber);
-    }
-
-    /////// SECURITY CRITICAL CHECKS ///////
-
-    {
-      address[] memory requiredPoolCCVs = new address[](0);
-      if (message.tokenTransfer.length > 0) {
-        if (message.tokenTransfer.length != 1) {
-          revert InvalidNumberOfTokens(message.tokenTransfer.length);
-        }
-
-        if (message.tokenTransfer[0].destTokenAddress.length != 20) {
-          revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
-        }
-        address localTokenAddress = address(bytes20(message.tokenTransfer[0].destTokenAddress));
-
-        // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
-        // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
-        // that do not support the V2 interface.
-        requiredPoolCCVs = _getCCVsFromPool(
-          localTokenAddress,
-          message.sourceChainSelector,
-          message.tokenTransfer[0].amount,
-          message.tokenTransfer[0].extraData
-        );
-      }
-
-      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
-        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiverAddress, ccvs, requiredPoolCCVs);
-
-      for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        ICCVOffRampV1(ccvsToQuery[i]).verifyMessage({
-          message: message,
-          messageHash: messageId,
-          ccvData: ccvData[ccvDataIndex[i]],
-          originalState: originalState
-        });
-      }
+      revert SkippedAlreadyExecutedMessage(messageId, message.sourceChainSelector, message.sequenceNumber);
     }
 
     /////// Execution ///////
 
     s_executionStates[executionStateKey] = Internal.MessageExecutionState.IN_PROGRESS;
-    (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, messageId);
+
+    (bool success, bytes memory err) =
+      _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, ccvData)));
+    Internal.MessageExecutionState newState =
+      success ? Internal.MessageExecutionState.SUCCESS : Internal.MessageExecutionState.FAILURE;
+
     s_executionStates[executionStateKey] = newState;
 
-    // The only valid prior states are UNTOUCHED and FAILURE (checked above).
-    // The only valid post states are FAILURE and SUCCESS (checked below).
-    if (newState != Internal.MessageExecutionState.SUCCESS) {
-      if (newState != Internal.MessageExecutionState.FAILURE) {
-        revert InvalidNewState(message.sourceChainSelector, message.sequenceNumber, newState);
+    emit ExecutionStateChanged(message.sourceChainSelector, message.sequenceNumber, messageId, newState, err);
+    s_reentrancyGuardEntered = false;
+  }
+
+  function _callWithGasBuffer(
+    bytes memory payload
+  ) internal returns (bool success, bytes memory retData) {
+    // allocate retData memory ahead of time
+    retData = new bytes(Internal.MAX_RET_BYTES);
+    uint16 maxReturnBytes = Internal.MAX_RET_BYTES;
+
+    uint256 gasLeft = gasleft();
+    if (gasLeft <= MAX_GAS_BUFFER_TO_UPDATE_STATE) {
+      revert InsufficientGasToCompleteTx(bytes4(uint32(gasleft())));
+    }
+
+    uint256 gasLimit = gasLeft - MAX_GAS_BUFFER_TO_UPDATE_STATE;
+
+    assembly {
+      // call and return whether we succeeded. ignore return data
+      // call(gas, addr, value, argsOffset, argsLength, retOffset, retLength)
+      success := call(gasLimit, address(), 0, add(payload, 0x20), mload(payload), 0x0, 0x0)
+
+      // limit our copy to maxReturnBytes bytes
+      let toCopy := returndatasize()
+      if gt(toCopy, maxReturnBytes) { toCopy := maxReturnBytes }
+      // Store the length of the copied bytes
+      mstore(retData, toCopy)
+      // copy the bytes from retData[0:_toCopy]
+      returndatacopy(add(retData, 0x20), 0x0, toCopy)
+    }
+    return (success, retData);
+  }
+
+  /// @notice Executes a single message.
+  /// @param message The message that will be executed.
+  /// @dev We make this external and callable by the contract itself, in order to try/catch
+  /// its execution and enforce atomicity among successful message processing and token transfer.
+  /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
+  /// smart contract wallets, without an associated message.
+  function executeSingleMessage(
+    MessageV1Codec.MessageV1 calldata message,
+    bytes32 messageId,
+    address[] calldata ccvs,
+    bytes[] calldata ccvData
+  ) external {
+    if (msg.sender != address(this)) revert CanOnlySelfCall();
+
+    /////// SECURITY CRITICAL CHECKS ///////
+    address receiver = address(bytes20(message.receiver));
+
+    {
+      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
+        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs);
+
+      for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
+        ICrossChainVerifierV1(ccvsToQuery[i]).verifyMessage({
+          originalCaller: address(this),
+          message: message,
+          messageId: messageId,
+          ccvData: ccvData[ccvDataIndex[i]]
+        });
       }
     }
 
-    emit ExecutionStateChanged(message.sourceChainSelector, message.sequenceNumber, messageId, newState, returnData);
-    s_reentrancyGuardEntered = false;
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
+    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
+      destTokenAmounts[i] =
+        _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, receiver, message.sourceChainSelector);
+    }
+
+    // TODO gaslimit
+    uint256 gasLimit = 200000;
+
+    // There are three cases in which we skip calling the receiver:
+    // 1. If the message data is empty AND the gas limit is 0.
+    //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
+    //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
+    //          receiver without any gas, which would revert the transaction.
+    // 2. If the receiver is not a contract.
+    // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
+    //
+    // The ordering of these checks is important, as the first check is the cheapest to execute.
+    //
+    // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
+    // which checks for sufficient gas before making the external call.
+    if (
+      (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
+        || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
+    ) return;
+
+    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: message.sourceChainSelector,
+        sender: message.sender,
+        data: message.data,
+        destTokenAmounts: destTokenAmounts
+      }),
+      i_gasForCallExactCheck,
+      gasleft() - i_gasForCallExactCheck - 10000,
+      receiver
+    );
+
+    // If CCIP receiver execution is not successful, revert the call including token transfers.
+    if (!success) revert ReceiverError(returnData);
+  }
+
+  // ================================================================
+  // │                            CCVs                              │
+  // ================================================================
+
+  /// @notice Returns the CCVs required to execute a message. There can be duplicates between the required and optional
+  // CCVs, but all duplicated within the required CCVs are removed.
+  /// @dev This function exists for offchain purposes, calling it onchain might not be gas efficient.
+  function getCCVsForMessage(
+    bytes calldata encodedMessage
+  ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
+    MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
+
+    return _getCCVsForMessage(
+      message.sourceChainSelector, address(bytes20(message.receiver)), message.tokenTransfer, message.finality
+    );
+  }
+
+  /// @notice Returns the CCVs required by the receiver, pool and lane for a message. Duplicates are removed and
+  /// defaults are added if necessary. This function handles all the logic of combining the various sources of CCVs.
+  /// @param sourceChainSelector The source chain selector of the message.
+  /// @param receiver The receiver of the message.
+  /// @param tokenTransfer The tokens transferred in the message.
+  /// @return requiredCCVs The deduplicated list of required CCVs for the message.
+  /// @return optionalCCVs The list of optional CCVs for the message, with duplicates removed against required CCVs.
+  /// @return optionalThreshold The threshold of optional CCVs, adjusted for any duplicates with required CCVs.
+  /// @dev This function is quite complex as it needs to handle multiple sources of CCVs, deduplication and adding of
+  /// defaults. The function looks quite gas intensive, but the expected lengths of the various CCV arrays are small, so
+  /// the gas usage should be acceptable.
+  /// @dev The offchain system relies on this functions logic as well, meaning both onchain and offchain have the same
+  /// source of truth for which CCVs are needed for a message.
+  function _getCCVsForMessage(
+    uint64 sourceChainSelector,
+    address receiver,
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
+    uint16 finality
+  ) internal view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
+    address[] memory requiredPoolCCVs = new address[](0);
+    if (tokenTransfer.length > 0) {
+      if (tokenTransfer.length != 1) {
+        revert InvalidNumberOfTokens(tokenTransfer.length);
+      }
+
+      if (tokenTransfer[0].destTokenAddress.length != 20) {
+        revert Internal.InvalidEVMAddress(tokenTransfer[0].destTokenAddress);
+      }
+      address localTokenAddress = address(bytes20(tokenTransfer[0].destTokenAddress));
+
+      // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
+      // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
+      // that do not support the V2 interface.
+      requiredPoolCCVs = _getCCVsFromPool(
+        localTokenAddress, sourceChainSelector, tokenTransfer[0].amount, finality, tokenTransfer[0].extraData
+      );
+    }
+    address[] memory requiredReceiverCCV;
+    (requiredReceiverCCV, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
+    address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
+    address[] memory defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
+
+    // We allocate the memory for all possible CCVs upfront to avoid multiple allocations.
+    address[] memory allRequiredCCVs =
+      new address[](requiredReceiverCCV.length + requiredPoolCCVs.length + laneMandatedCCVs.length + defaultCCVs.length);
+
+    uint256 index = 0;
+    for (uint256 i = 0; i < requiredReceiverCCV.length; ++i) {
+      allRequiredCCVs[index++] = requiredReceiverCCV[i];
+    }
+
+    for (uint256 i = 0; i < requiredPoolCCVs.length; ++i) {
+      allRequiredCCVs[index++] = requiredPoolCCVs[i];
+    }
+
+    for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
+      allRequiredCCVs[index++] = laneMandatedCCVs[i];
+    }
+
+    // Add defaults if any address(0) was found.
+    for (uint256 i = 0; i < index; ++i) {
+      if (allRequiredCCVs[i] == address(0)) {
+        for (uint256 j = 0; j < defaultCCVs.length; ++j) {
+          allRequiredCCVs[index++] = defaultCCVs[j];
+        }
+        break;
+      }
+    }
+
+    // Remove duplicates and address(0) entries.
+    uint256 writeIndex = 0;
+    for (uint256 readIndex = 0; readIndex < index; ++readIndex) {
+      address currentCCV = allRequiredCCVs[readIndex];
+
+      // Skip address(0) entries, effectively removing them.
+      if (currentCCV == address(0)) {
+        continue;
+      }
+
+      // Check if this address already exists in the deduplicated portion.
+      bool isDuplicate = false;
+      for (uint256 j = 0; j < writeIndex; ++j) {
+        if (allRequiredCCVs[j] == currentCCV) {
+          isDuplicate = true;
+          break;
+        }
+      }
+
+      // If not a duplicate, add it to the deduplicated portion.
+      if (!isDuplicate) {
+        allRequiredCCVs[writeIndex++] = currentCCV;
+      }
+    }
+
+    assembly {
+      // set the length of the array to the new index which we used to track the number of unique CCVs.
+      mstore(allRequiredCCVs, writeIndex)
+    }
+
+    // Remove duplicates between required and optional CCVs.
+    uint256 newOptionalLength = optionalCCVs.length;
+    for (uint256 i = 0; i < newOptionalLength; ++i) {
+      for (uint256 j = 0; j < allRequiredCCVs.length;) {
+        if (optionalCCVs[i] == allRequiredCCVs[j]) {
+          // Remove the duplicate by replacing it with the last element and reducing the length of the array.
+          optionalCCVs[i] = optionalCCVs[--newOptionalLength];
+
+          // Since we moved one CCV from optional to required, we can reduce the threshold by one, but not below zero.
+          if (optionalThreshold > 0) {
+            --optionalThreshold;
+          }
+        } else {
+          ++j;
+        }
+      }
+    }
+
+    assembly {
+      // set the length of the array to the new index which we used to track the number of unique CCVs.
+      mstore(optionalCCVs, newOptionalLength)
+    }
+
+    // Return the deduplicated required CCVs, the unchanged optional CCVs and the optional threshold.
+    return (allRequiredCCVs, optionalCCVs, optionalThreshold);
   }
 
   /// @notice Ensures that the provided CCVs meet the quorum required by the receiver, pool and lane.
   /// @param sourceChainSelector The source chain selector of the message.
   /// @param receiver The receiver of the message.
+  /// @param tokenTransfer The tokens transferred in the message.
   /// @param ccvs The CCVs that provided data for the message.
-  /// @param tokenRequiredCCVs The CCVs required by the pool of the token being transferred. If no token is being
-  /// transferred, this array is empty.
+  /// @param finality The finality requirement of the message.
+  /// @return ccvsToQuery The CCVs that need to be queried to verify the message.
+  /// @return dataIndexes The indexes of the CCVs in the provided ccvs array that correspond to ccvsToQuery.
   function _ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,
     address receiver,
-    address[] calldata ccvs,
-    address[] memory tokenRequiredCCVs
+    MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
+    uint16 finality,
+    address[] calldata ccvs
   ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndexes) {
     (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
-      _getCCVsFromReceiver(sourceChainSelector, receiver);
-    address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
+      _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer, finality);
 
     ccvsToQuery = new address[](ccvs.length);
     dataIndexes = new uint256[](ccvs.length);
-    bool[] memory ccvAlreadyIncluded = new bool[](ccvs.length);
     uint256 numCCVsToQuery = 0;
 
     for (uint256 i = 0; i < requiredCCV.length; ++i) {
@@ -293,58 +499,13 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       for (uint256 j = 0; j < ccvs.length; ++j) {
         if (ccvs[j] == requiredCCV[i]) {
           found = true;
-          // If the CCV is already included, we skip it.
-          if (ccvAlreadyIncluded[j]) break;
-
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndexes[numCCVsToQuery] = j;
-          ccvAlreadyIncluded[j] = true;
-          numCCVsToQuery++;
+          dataIndexes[numCCVsToQuery++] = j;
           break;
         }
       }
       if (!found) {
-        revert RequiredCCVMissing(requiredCCV[i], false);
-      }
-    }
-
-    for (uint256 i = 0; i < tokenRequiredCCVs.length; ++i) {
-      bool found = false;
-      for (uint256 j = 0; j < ccvs.length; ++j) {
-        if (ccvs[j] == tokenRequiredCCVs[i]) {
-          found = true;
-          // If the CCV is already included, we skip it.
-          if (ccvAlreadyIncluded[j]) break;
-
-          ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndexes[numCCVsToQuery] = j;
-          ccvAlreadyIncluded[j] = true;
-          numCCVsToQuery++;
-          break;
-        }
-      }
-      if (!found) {
-        revert RequiredCCVMissing(tokenRequiredCCVs[i], true);
-      }
-    }
-
-    for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
-      bool found = false;
-      for (uint256 j = 0; j < ccvs.length; ++j) {
-        if (ccvs[j] == laneMandatedCCVs[i]) {
-          found = true;
-          // If the CCV is already included, we skip it.
-          if (ccvAlreadyIncluded[j]) break;
-
-          ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndexes[numCCVsToQuery] = j;
-          ccvAlreadyIncluded[j] = true;
-          numCCVsToQuery++;
-          break;
-        }
-      }
-      if (!found) {
-        revert RequiredCCVMissing(laneMandatedCCVs[i], true);
+        revert RequiredCCVMissing(requiredCCV[i]);
       }
     }
 
@@ -352,16 +513,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     for (uint256 i = 0; i < optionalCCVs.length; ++i) {
       for (uint256 j = 0; j < ccvs.length && optionalCCVsToFind > 0; ++j) {
         if (ccvs[j] == optionalCCVs[i]) {
-          // If the optional CCV is already included, we still count it towards the threshold, but we skip adding it
-          // again. This means that if a pool would specify a CCV that is also specified as optional by the receiver,
-          // it would count towards the threshold as it's still being queried.
           optionalCCVsToFind--;
-          if (ccvAlreadyIncluded[j]) break;
 
           ccvsToQuery[numCCVsToQuery] = ccvs[j];
-          dataIndexes[numCCVsToQuery] = j;
-          ccvAlreadyIncluded[j] = true;
-          numCCVsToQuery++;
+          dataIndexes[numCCVsToQuery++] = j;
           break;
         }
       }
@@ -381,6 +536,14 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     return (ccvsToQuery, dataIndexes);
   }
 
+  /// @notice Retrieves the required and optional CCVs from a receiver contract. If the receiver does not specify any
+  /// CCVs, we fall back to the default CCVs.
+  /// @dev This function reverts if the receiver returns duplicates in either the required or optional CCVs.
+  /// @param sourceChainSelector The source chain selector.
+  /// @param receiver The receiver address.
+  /// @return requiredCCV The required CCVs.
+  /// @return optionalCCVs The optional CCVs.
+  /// @return optionalThreshold The threshold of optional CCVs.
   function _getCCVsFromReceiver(
     uint64 sourceChainSelector,
     address receiver
@@ -393,6 +556,9 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
         (requiredCCV, optionalCCVs, optionalThreshold) =
           IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
+
+        CCVConfigValidation._assertNoDuplicates(requiredCCV);
+        CCVConfigValidation._assertNoDuplicates(optionalCCVs);
 
         // If the user specified empty required and optional CCVs, we fall back to the default CCVs.
         // If they did specify something, we use what they specified.
@@ -416,13 +582,16 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
     address localToken,
     uint64 sourceChainSelector,
     uint256 amount,
+    uint16 finality,
     bytes memory extraData
   ) internal view returns (address[] memory requiredCCV) {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
 
     if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      requiredCCV = IPoolV2(pool).getRequiredCCVs(localToken, sourceChainSelector, amount, extraData);
+      requiredCCV = IPoolV2(pool).getRequiredInboundCCVs(localToken, sourceChainSelector, amount, finality, extraData);
+      CCVConfigValidation._assertNoDuplicates(requiredCCV);
     }
+
     // If the pool does not specify any CCVs, or the pool does not support the V2 interface, we fall back to the
     // default CCVs. If this wasn't done, any pool not specifying CCVs would allow any arbitrary CCV to mint infinite
     // tokens by fabricating messages. Since CCVs are permissionless, this would mean anyone would be able to mint.
@@ -430,85 +599,6 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       requiredCCV = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
     }
     return requiredCCV;
-  }
-
-  /// @notice Try executing a message.
-  /// @param message Internal.Any2EVMMultiProofMessage memory message.
-  /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
-  /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
-  function _trialExecute(
-    MessageV1Codec.MessageV1 memory message,
-    bytes32 messageId
-  ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-    try this.executeSingleMessage(message, messageId) {}
-    catch (bytes memory err) {
-      if (msg.sender == Internal.GAS_ESTIMATION_SENDER) {
-        if (
-          CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG == bytes4(err)
-            || CallWithExactGas.NO_GAS_FOR_CALL_EXACT_CHECK_SIG == bytes4(err)
-            || ERC165CheckerReverting.InsufficientGasForStaticCall.selector == bytes4(err)
-        ) {
-          revert InsufficientGasToCompleteTx(bytes4(err));
-        }
-      }
-      // return the message execution state as FAILURE and the revert data.
-      // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES.
-      return (Internal.MessageExecutionState.FAILURE, err);
-    }
-    // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
-    return (Internal.MessageExecutionState.SUCCESS, "");
-  }
-
-  /// @notice Executes a single message.
-  /// @param message The message that will be executed.
-  /// @dev We make this external and callable by the contract itself, in order to try/catch
-  /// its execution and enforce atomicity among successful message processing and token transfer.
-  /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
-  /// smart contract wallets, without an associated message.
-  function executeSingleMessage(MessageV1Codec.MessageV1 memory message, bytes32 messageId) external {
-    if (msg.sender != address(this)) revert CanOnlySelfCall();
-    address receiver = address(bytes20(message.receiver));
-
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
-    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
-      destTokenAmounts[i] =
-        _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, receiver, message.sourceChainSelector);
-    }
-
-    Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-      messageId: messageId,
-      sourceChainSelector: message.sourceChainSelector,
-      sender: message.sender,
-      data: message.data,
-      destTokenAmounts: destTokenAmounts
-    });
-
-    // TODO gaslimit
-
-    uint256 gasLimit = 200000;
-
-    // There are three cases in which we skip calling the receiver:
-    // 1. If the message data is empty AND the gas limit is 0.
-    //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
-    //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
-    //          receiver without any gas, which would revert the transaction.
-    // 2. If the receiver is not a contract.
-    // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
-    //
-    // The ordering of these checks is important, as the first check is the cheapest to execute.
-    //
-    // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
-    // which checks for sufficient gas before making the external call.
-    if (
-      (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
-        || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
-    ) return;
-
-    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
-      any2EvmMessage, i_gasForCallExactCheck, gasLimit, receiver
-    );
-    // If CCIP receiver execution is not successful, revert the call including token transfers.
-    if (!success) revert ReceiverError(returnData);
   }
 
   // ================================================================
@@ -655,6 +745,17 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
       }
       if (address(configUpdate.router) == address(0) || configUpdate.defaultCCV.length == 0) {
         revert ZeroAddressNotAllowed();
+      }
+
+      for (uint256 j = 0; j < configUpdate.defaultCCV.length; ++j) {
+        if (configUpdate.defaultCCV[j] == address(0)) {
+          revert ZeroAddressNotAllowed();
+        }
+      }
+      for (uint256 j = 0; j < configUpdate.laneMandatedCCVs.length; ++j) {
+        if (configUpdate.laneMandatedCCVs[j] == address(0)) {
+          revert ZeroAddressNotAllowed();
+        }
       }
 
       // OnRamp can never be zero.

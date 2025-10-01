@@ -113,7 +113,8 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				readers[k] = v
 			}
 
-			r, err := NewUSDCMessageReader(ctx, logger.Test(t), tc.tokensConfig, readers, mockAddrCodec)
+			emptyChainAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
+			r, err := NewUSDCMessageReader(ctx, logger.Test(t), tc.tokensConfig, emptyChainAccessors, readers, mockAddrCodec)
 			if tc.errorMessage != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMessage)
@@ -195,7 +196,9 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	}
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs, contactReaders, mockAddrCodec)
+	emptyChainAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
+	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs,
+		emptyChainAccessors, contactReaders, mockAddrCodec)
 	require.NoError(t, err)
 
 	tt := []struct {

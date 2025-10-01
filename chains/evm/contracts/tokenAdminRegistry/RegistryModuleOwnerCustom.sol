@@ -6,8 +6,7 @@ import {IOwner} from "../interfaces/IOwner.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {AccessControl} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/access/AccessControl.sol";
+import {AccessControl} from "@openzeppelin/contracts@5.0.2/access/AccessControl.sol";
 
 contract RegistryModuleOwnerCustom is ITypeAndVersion {
   error CanOnlySelfRegister(address admin, address token);

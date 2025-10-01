@@ -6,10 +6,8 @@ import {CCIPClientExample} from "../../../applications/CCIPClientExample.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {ERC165Checker} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/ERC165Checker.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {ERC165Checker} from "@openzeppelin/contracts@5.0.2/utils/introspection/ERC165Checker.sol";
 
 contract CCIPClientExample_sanity is OnRampSetup {
   function test_ImmutableExamples() public {
