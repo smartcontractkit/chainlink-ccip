@@ -38,6 +38,44 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
   // Reverts
 
+  function test_updatePoolAddresses_RevertWhen_CCTPV1PoolDoesNotSupportIPoolV1() public {
+    USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
+      legacyCctpV1Pool: address(0),
+      cctpV1Pool: s_newCctpV1Pool,
+      cctpV2Pool: address(0)
+    });
+
+    changePrank(OWNER);
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV1Pool));
+    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+
+    _enableERC165InterfaceChecks(s_newCctpV1Pool, type(IPoolV1).interfaceId);
+
+    changePrank(OWNER);
+    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+
+    assertEq(s_usdcTokenPoolProxy.getPools().cctpV1Pool, s_newCctpV1Pool);
+  }
+
+  function test_updatePoolAddresses_RevertWhen_CCTPV2PoolDoesNotSupportIPoolV1() public {
+    USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
+      legacyCctpV1Pool: address(0),
+      cctpV1Pool: address(0),
+      cctpV2Pool: s_newCctpV2Pool
+    });
+
+    changePrank(OWNER);
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV2Pool));
+    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+
+    _enableERC165InterfaceChecks(s_newCctpV2Pool, type(IPoolV1).interfaceId);
+
+    changePrank(OWNER);
+    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+
+    assertEq(s_usdcTokenPoolProxy.getPools().cctpV2Pool, s_newCctpV2Pool);
+  }
+
   function test_updatePoolAddresses_RevertWhen_LegacyPoolDoesNotSupportIPoolV1() public {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,

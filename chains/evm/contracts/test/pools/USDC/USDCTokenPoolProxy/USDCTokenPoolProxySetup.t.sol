@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
+import {USDCTokenPoolProxyHelper} from "../../../helpers/USDCTokenPoolProxyHelper.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
 contract USDCTokenPoolProxySetup is USDCSetup {
@@ -13,7 +14,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
   address internal s_mockTransmitterProxy = makeAddr("mockTransmitterProxy");
   uint64 internal s_remoteLockReleaseChainSelector = 12345;
 
-  USDCTokenPoolProxy internal s_usdcTokenPoolProxy;
+  USDCTokenPoolProxyHelper internal s_usdcTokenPoolProxy;
 
   function setUp() public virtual override {
     super.setUp();
@@ -26,7 +27,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     );
 
     // Deploy the proxy
-    s_usdcTokenPoolProxy = new USDCTokenPoolProxy(
+    s_usdcTokenPoolProxy = new USDCTokenPoolProxyHelper(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
