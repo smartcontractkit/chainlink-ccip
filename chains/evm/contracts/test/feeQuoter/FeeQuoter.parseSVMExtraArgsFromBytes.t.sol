@@ -17,7 +17,6 @@ contract FeeQuoter_parseSVMExtraArgsFromBytes is FeeQuoterSetup {
   function setUp() public virtual override {
     super.setUp();
     s_destChainConfig = _generateFeeQuoterDestChainConfigArgs()[0].destChainConfig;
-    s_destChainConfig.enforceOutOfOrder = true; // Enforcing out of order execution for messages to SVM
     s_destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigs = new FeeQuoter.DestChainConfigArgs[](1);
@@ -84,22 +83,6 @@ contract FeeQuoter_parseSVMExtraArgsFromBytes is FeeQuoterSetup {
     bytes memory inputExtraArgs = Client._svmArgsToBytes(inputArgs);
 
     vm.expectRevert(FeeQuoter.MessageComputeUnitLimitTooHigh.selector);
-    s_feeQuoter.parseSVMExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
-  }
-
-  function test_RevertWhen_ExtraArgOutOfOrderExecutionIsFalse() public {
-    bytes memory inputExtraArgs = abi.encodeWithSelector(
-      Client.SVM_EXTRA_ARGS_V1_TAG,
-      Client.SVMExtraArgsV1({
-        computeUnits: 1_000_000,
-        accountIsWritableBitmap: 0,
-        tokenReceiver: bytes32(0),
-        allowOutOfOrderExecution: false, // mismatch with enforceOutOfOrder = true
-        accounts: new bytes32[](0)
-      })
-    );
-
-    vm.expectRevert(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
     s_feeQuoter.parseSVMExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
   }
 }

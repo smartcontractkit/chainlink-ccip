@@ -64,21 +64,7 @@ contract FeeQuoterHelper is FeeQuoterV2 {
     return _parseGenericExtraArgsFromBytes(
       extraArgs,
       s_destChainConfigs[destChainSelector].defaultTxGasLimit,
-      s_destChainConfigs[destChainSelector].maxPerMsgGasLimit,
-      s_destChainConfigs[destChainSelector].enforceOutOfOrder
-    );
-  }
-
-  function parseEVMExtraArgsFromBytes(
-    bytes calldata extraArgs,
-    uint64 destChainSelector,
-    bool enforceOutOfOrder
-  ) external view returns (Client.GenericExtraArgsV2 memory) {
-    return _parseGenericExtraArgsFromBytes(
-      extraArgs,
-      s_destChainConfigs[destChainSelector].defaultTxGasLimit,
-      s_destChainConfigs[destChainSelector].maxPerMsgGasLimit,
-      enforceOutOfOrder
+      s_destChainConfigs[destChainSelector].maxPerMsgGasLimit
     );
   }
 
@@ -86,14 +72,14 @@ contract FeeQuoterHelper is FeeQuoterV2 {
     bytes calldata extraArgs,
     DestChainConfig memory destChainConfig
   ) external pure returns (Client.SVMExtraArgsV1 memory) {
-    return _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder);
+    return _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit);
   }
 
   function parseSuiExtraArgsFromBytes(
     bytes calldata extraArgs,
     DestChainConfig memory destChainConfig
   ) external pure returns (Client.SuiExtraArgsV1 memory) {
-    return _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder);
+    return _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit);
   }
 
   function processChainFamilySelector(

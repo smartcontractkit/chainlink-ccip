@@ -69,24 +69,6 @@ contract OnRamp_getFee is OnRampSetup {
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, _generateEmptyMessage());
   }
 
-  function test_RevertWhen_EnforceOutOfOrder() public {
-    // Update dynamic config to enforce allowOutOfOrderExecution = true.
-    vm.stopPrank();
-    vm.startPrank(OWNER);
-
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
-    destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = true;
-    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
-    vm.stopPrank();
-
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    // Empty extraArgs to should revert since it enforceOutOfOrder is true.
-    message.extraArgs = "";
-
-    vm.expectRevert(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
-    s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
-  }
-
   function test_RevertWhen_NotAFeeTokenButPricedToken() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = s_sourceTokens[1];

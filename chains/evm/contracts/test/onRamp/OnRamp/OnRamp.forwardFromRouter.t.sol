@@ -35,7 +35,6 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     super.setUp();
     // setup for SVM chain
     s_svmDestChainConfig = _generateFeeQuoterDestChainConfigArgs()[0].destChainConfig;
-    s_svmDestChainConfig.enforceOutOfOrder = true; // Enforcing out of order execution for messages to SVM
     s_svmDestChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
 
     s_outboundMessageInterceptor = new MessageInterceptorHelper();

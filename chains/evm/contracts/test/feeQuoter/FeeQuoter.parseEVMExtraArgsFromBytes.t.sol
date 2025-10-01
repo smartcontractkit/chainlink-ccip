@@ -65,16 +65,6 @@ contract FeeQuoter_resolveGasLimitForDestination is FeeQuoterSetup {
     s_feeQuoter.parseEVMExtraArgsFromBytes(inputExtraArgs, DEST_CHAIN_SELECTOR);
   }
 
-  function test_RevertWhen_EVMExtraArgsEnforceOutOfOrder() public {
-    Client.GenericExtraArgsV2 memory inputArgs =
-      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
-    bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
-    s_destChainConfig.enforceOutOfOrder = true;
-
-    vm.expectRevert(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
-    s_feeQuoter.parseEVMExtraArgsFromBytes(inputExtraArgs, DEST_CHAIN_SELECTOR, true);
-  }
-
   function test_RevertWhen_EVMExtraArgsGasLimitTooHigh() public {
     Client.GenericExtraArgsV2 memory inputArgs =
       Client.GenericExtraArgsV2({gasLimit: s_destChainConfig.maxPerMsgGasLimit + 1, allowOutOfOrderExecution: true});

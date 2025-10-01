@@ -13,7 +13,6 @@ contract FeeQuoter_parseSuiExtraArgsFromBytes is FeeQuoterSetup {
   function setUp() public virtual override {
     super.setUp();
     s_destChainConfig = _generateFeeQuoterDestChainConfigArgs()[0].destChainConfig;
-    s_destChainConfig.enforceOutOfOrder = true; // Enforcing out of order execution for messages to SUI
     s_destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigs = new FeeQuoter.DestChainConfigArgs[](1);
@@ -66,21 +65,6 @@ contract FeeQuoter_parseSuiExtraArgsFromBytes is FeeQuoterSetup {
     bytes memory inputExtraArgs = Client._suiArgsToBytes(inputArgs);
 
     vm.expectRevert(FeeQuoter.MessageGasLimitTooHigh.selector);
-    s_feeQuoter.parseSuiExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
-  }
-
-  function test_RevertWhen_ExtraArgOutOfOrderExecutionIsFalse() public {
-    bytes memory inputExtraArgs = abi.encodeWithSelector(
-      Client.SUI_EXTRA_ARGS_V1_TAG,
-      Client.SuiExtraArgsV1({
-        gasLimit: GAS_LIMIT,
-        allowOutOfOrderExecution: false,
-        tokenReceiver: bytes32(uint256(0)),
-        receiverObjectIds: new bytes32[](2)
-      })
-    );
-
-    vm.expectRevert(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
     s_feeQuoter.parseSuiExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
   }
 }

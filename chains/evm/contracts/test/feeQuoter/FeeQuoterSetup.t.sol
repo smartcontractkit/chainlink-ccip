@@ -278,7 +278,6 @@ contract FeeQuoterSetup is TokenSetup {
         gasMultiplierWeiPerEth: 5e17,
         networkFeeUSDCents: 1_00,
         gasPriceStalenessThreshold: uint32(TWELVE_HOURS),
-        enforceOutOfOrder: false,
         chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM
       })
     });

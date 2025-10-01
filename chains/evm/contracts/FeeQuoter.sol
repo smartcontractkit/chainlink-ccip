@@ -36,7 +36,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   error MessageGasLimitTooHigh();
   error MessageComputeUnitLimitTooHigh();
   error DestinationChainNotEnabled(uint64 destChainSelector);
-  error ExtraArgOutOfOrderExecutionMustBeTrue();
   error InvalidExtraArgsTag();
   error InvalidExtraArgsData();
   error SourceTokenDataTooLarge(address token);
@@ -109,8 +108,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     uint32 destDataAvailabilityOverheadGas; //  │ Data availability gas charged for overhead costs e.g. for OCR.
     uint16 destGasPerDataAvailabilityByte; //   │ Gas units charged per byte of message data that needs availability.
     uint16 destDataAvailabilityMultiplierBps; //│ Multiplier for data availability gas, multiples of bps, or 0.0001.
-    bytes4 chainFamilySelector; //              │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
-    bool enforceOutOfOrder; // ─────────────────╯ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
+    bytes4 chainFamilySelector; //──────────────╯ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
     uint16 defaultTokenFeeUSDCents; // ────╮ Default token fee charged per token transfer.
     uint32 defaultTokenDestGasOverhead; // │ Default gas charged to execute a token transfer on the destination chain.
@@ -905,8 +903,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @notice Parse and validate the SVM specific Extra Args Bytes.
   function _parseSVMExtraArgsFromBytes(
     bytes calldata extraArgs,
-    uint256 maxPerMsgGasLimit,
-    bool enforceOutOfOrder
+    uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.SVMExtraArgsV1 memory svmExtraArgs) {
     if (extraArgs.length == 0) {
       revert InvalidExtraArgsData();
@@ -919,10 +916,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
     svmExtraArgs = abi.decode(extraArgs[4:], (Client.SVMExtraArgsV1));
 
-    if (enforceOutOfOrder && !svmExtraArgs.allowOutOfOrderExecution) {
-      revert ExtraArgOutOfOrderExecutionMustBeTrue();
-    }
-
     if (svmExtraArgs.computeUnits > maxPerMsgGasLimit) {
       revert MessageComputeUnitLimitTooHigh();
     }
@@ -933,8 +926,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @notice Parse and validate the Sui specific Extra Args Bytes.
   function _parseSuiExtraArgsFromBytes(
     bytes calldata extraArgs,
-    uint256 maxPerMsgGasLimit,
-    bool enforceOutOfOrder
+    uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.SuiExtraArgsV1 memory suiExtraArgs) {
     if (extraArgs.length == 0) {
       revert InvalidExtraArgsData();
@@ -946,10 +938,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     }
 
     suiExtraArgs = abi.decode(extraArgs[4:], (Client.SuiExtraArgsV1));
-
-    if (enforceOutOfOrder && !suiExtraArgs.allowOutOfOrderExecution) {
-      revert ExtraArgOutOfOrderExecutionMustBeTrue();
-    }
 
     if (suiExtraArgs.gasLimit > maxPerMsgGasLimit) {
       revert MessageGasLimitTooHigh();
@@ -964,8 +952,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   function _parseGenericExtraArgsFromBytes(
     bytes calldata extraArgs,
     uint32 defaultTxGasLimit,
-    uint256 maxPerMsgGasLimit,
-    bool enforceOutOfOrder
+    uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.GenericExtraArgsV2 memory) {
     // Since GenericExtraArgs are simply a superset of EVMExtraArgsV1, we can parse them as such. For Aptos, this
     // technically means EVMExtraArgsV1 are processed like they would be valid, but they will always fail on the
@@ -974,13 +961,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, defaultTxGasLimit);
 
     if (parsedExtraArgs.gasLimit > maxPerMsgGasLimit) revert MessageGasLimitTooHigh();
-
-    // If the chain enforces out of order execution, the extra args must allow it, otherwise revert. We cannot assume
-    // the user intended to use OOO on any chain that requires it as it may lead to unexpected behavior. Therefore we
-    // revert instead of assuming the user intended to use OOO.
-    if (enforceOutOfOrder && !parsedExtraArgs.allowOutOfOrderExecution) {
-      revert ExtraArgOutOfOrderExecutionMustBeTrue();
-    }
 
     return parsedExtraArgs;
   }
@@ -1040,17 +1020,13 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
       gasLimit = _parseGenericExtraArgsFromBytes(
-        message.extraArgs,
-        destChainConfig.defaultTxGasLimit,
-        destChainConfig.maxPerMsgGasLimit,
-        destChainConfig.enforceOutOfOrder
+        message.extraArgs, destChainConfig.defaultTxGasLimit, destChainConfig.maxPerMsgGasLimit
       ).gasLimit;
 
       _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
-      Client.SuiExtraArgsV1 memory suiExtraArgsV1 = _parseSuiExtraArgsFromBytes(
-        message.extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder
-      );
+      Client.SuiExtraArgsV1 memory suiExtraArgsV1 =
+        _parseSuiExtraArgsFromBytes(message.extraArgs, destChainConfig.maxPerMsgGasLimit);
 
       gasLimit = suiExtraArgsV1.gasLimit;
 
@@ -1104,9 +1080,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), suiExpandedDataLength);
       }
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      Client.SVMExtraArgsV1 memory svmExtraArgsV1 = _parseSVMExtraArgsFromBytes(
-        message.extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder
-      );
+      Client.SVMExtraArgsV1 memory svmExtraArgsV1 =
+        _parseSVMExtraArgsFromBytes(message.extraArgs, destChainConfig.maxPerMsgGasLimit);
 
       gasLimit = svmExtraArgsV1.computeUnits;
 
@@ -1232,10 +1207,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       return (
         extraArgs,
         true,
-        abi.encode(
-          _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder)
-            .tokenReceiver
-        )
+        abi.encode(_parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit).tokenReceiver)
       );
     }
     revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
