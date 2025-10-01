@@ -10,7 +10,7 @@ import {MockUSDCTokenMessenger} from "../../../mocks/MockUSDCTokenMessenger.sol"
 import {USDCSetup} from "../USDCSetup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract USDCTokenPoolSetup is USDCSetup {
   USDCTokenPoolHelper internal s_usdcTokenPool;
@@ -24,8 +24,8 @@ contract USDCTokenPoolSetup is USDCSetup {
     s_mockUSDCTokenMessenger = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
     s_cctpMessageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockUSDCTokenMessenger);
 
-    BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
-    BurnMintERC677(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDCTokenMessenger));
+    BurnMintERC20(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
+    BurnMintERC20(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockUSDCTokenMessenger));
 
     s_usdcTokenPool = new USDCTokenPoolHelper(
       s_mockUSDCTokenMessenger,

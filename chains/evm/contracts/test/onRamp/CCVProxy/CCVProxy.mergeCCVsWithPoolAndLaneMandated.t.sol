@@ -21,7 +21,8 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
       router: s_sourceRouter,
       laneMandatedCCVs: laneMandatedCCVs,
       defaultCCVs: defaultCCVs,
-      defaultExecutor: makeAddr("defaultExecutor")
+      defaultExecutor: makeAddr("defaultExecutor"),
+      ccvAggregator: abi.encodePacked(address(s_ccvAggregatorRemote))
     });
 
     s_ccvProxyTestHelper.applyDestChainConfigUpdates(destChainConfigArgs);

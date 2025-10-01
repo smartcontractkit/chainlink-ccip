@@ -6,8 +6,7 @@ import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/I
 import {Pool} from "../../libraries/Pool.sol";
 import {MultiTokenPool} from "./MultiTokenPool.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract BurnMintMultiTokenPool is MultiTokenPool {
   constructor(

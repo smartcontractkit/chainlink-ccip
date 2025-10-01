@@ -71,11 +71,11 @@ function getOptimizations() {
 
 
 # Mod sec
+compileContract ccvs/VerifierProxy
+compileContract ccvs/CommitteeVerifier
 compileContract onRamp/CCVProxy
-compileContract onRamp/CommitOnRamp
 compileContract onRamp/ExecutorOnRamp
 compileContract offRamp/CCVAggregator
-compileContract offRamp/CommitOffRamp
 
 # 1.6
 compileContract offRamp/OffRamp
@@ -89,6 +89,7 @@ compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
 compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
 compileContract tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20
+compileContract tokenAdminRegistry/TokenPoolFactory/HyperLiquidCompatibleERC20
 compileContract capability/CCIPHome
 compileContract NonceManager
 compileContract rmn/RMNRemote
@@ -110,9 +111,9 @@ compileContract pools/BurnMintFastTransferTokenPool
 compileContract pools/ERC20LockBox
 compileContract pools/USDC/SiloedUSDCTokenPool
 compileContract pools/USDC/USDCTokenPoolCCTPV2
+compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
 
 # Test helpers
-compileContract test/helpers/BurnMintERC677Helper
 compileContract test/helpers/MessageHasher
 compileContract test/helpers/USDCReaderTester
 compileContract test/helpers/ReportCodec
