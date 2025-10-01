@@ -21,9 +21,10 @@ type ExtraConfigs struct {
 }
 
 type UpdateLanesInput struct {
-	Source                     ChainDefinition
-	Dest                       ChainDefinition
-	IsDisabled                 bool
-	ExtraConfigs               ExtraConfigs
-	MCMS                       *utils.MCMSInput
+	Source       ChainDefinition
+	Dest         ChainDefinition
+	IsDisabled   bool
+	TestRouter   bool
+	ExtraConfigs ExtraConfigs
+	MCMS         *utils.MCMSInput
 }

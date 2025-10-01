@@ -52,6 +52,7 @@ func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChain
 			Source:       src,
 			Dest:         dest,
 			IsDisabled:   lane.IsDisabled,
+			TestRouter:   lane.TestRouter,
 			ExtraConfigs: lane.ExtraConfigs,
 			MCMS:         cfg.MCMS,
 		})
@@ -69,6 +70,7 @@ func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChain
 			Source:       dest,
 			Dest:         src,
 			IsDisabled:   lane.IsDisabled,
+			TestRouter:   lane.TestRouter,
 			ExtraConfigs: lane.ExtraConfigs,
 			MCMS:         cfg.MCMS,
 		})
@@ -139,23 +141,7 @@ func (cs ConnectChainsBidirectional) Apply(e cldf.Environment, cfg ConnectChains
 			Source:       src,
 			Dest:         dest,
 			IsDisabled:   lane.IsDisabled,
-			ExtraConfigs: lane.ExtraConfigs,
-			MCMS:         cfg.MCMS,
-		})
-		if err != nil {
-			finalOutput.Reports = append(finalOutput.Reports, output.Reports...)
-			return cldf.ChangesetOutput{Reports: finalOutput.Reports}, fmt.Errorf("failed to apply changeset at index %d: %w", i, err)
-		}
-		err = MergeChangesetOutput(e, &finalOutput, output)
-		if err != nil {
-			finalOutput.Reports = append(finalOutput.Reports, output.Reports...)
-			return cldf.ChangesetOutput{Reports: finalOutput.Reports}, fmt.Errorf("failed to merge output of changeset at index %d: %w", i, err)
-		}
-		// coalesce dest
-		output, err = registeredChainAdapters[destFamily].ConfigureLaneLegAsDest(e, UpdateLanesInput{
-			Source:       dest,
-			Dest:         src,
-			IsDisabled:   lane.IsDisabled,
+			TestRouter:   lane.TestRouter,
 			ExtraConfigs: lane.ExtraConfigs,
 			MCMS:         cfg.MCMS,
 		})
@@ -173,7 +159,7 @@ func (cs ConnectChainsBidirectional) Apply(e cldf.Environment, cfg ConnectChains
 	proposal, err := AggregateProposals(
 		e,
 		finalOutput.MCMSTimelockProposals,
-		"connect chains unidirectionally",
+		"connect chains bidirectionally",
 		cfg.MCMS,
 	)
 	if err != nil {
