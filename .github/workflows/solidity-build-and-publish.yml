@@ -23,7 +23,7 @@ jobs:
         id: ch
         uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         with:
-          list-files: 'csv'
+          list-files: "csv"
           filters: |
             changes:
               - 'chains/evm/**/*'
@@ -89,11 +89,6 @@ jobs:
         if: ${{ needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true' }}
         working-directory: chains/evm
         run: make wrappers-release
-
-      - name: Install and run forge --zksync, and generate wrappers
-        if: ${{ needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true' }}
-        working-directory: chains/evm
-        run: make wrappers-zksync
 
       - name: Check if Go solidity wrappers are updated
         working-directory: chains/evm
