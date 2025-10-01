@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {FeeQuoter} from "../../../FeeQuoter.sol";
 import {Client} from "../../../libraries/Client.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {USDPriceWith18Decimals} from "../../../libraries/USDPriceWith18Decimals.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
@@ -51,10 +52,15 @@ contract OnRamp_getFee is OnRampSetup {
     tokenMults[0] = FeeQuoter.PremiumMultiplierWeiPerEthArgs({token: message.feeToken, premiumMultiplierWeiPerEth: 0});
     s_feeQuoter.applyPremiumMultiplierWeiPerEthUpdates(tokenMults);
 
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
-    destChainConfigArgs[0].destChainConfig.destDataAvailabilityMultiplierBps = 0;
-    destChainConfigArgs[0].destChainConfig.gasMultiplierWeiPerEth = 0;
-    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
+      gasPriceUpdates: new Internal.GasPriceUpdate[](1)
+    });
+
+    priceUpdates.gasPriceUpdates[0] =
+      Internal.GasPriceUpdate({destChainSelector: DEST_CHAIN_SELECTOR, usdPerUnitGas: 0});
+
+    s_feeQuoter.updatePrices(priceUpdates);
 
     feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 

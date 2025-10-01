@@ -23,22 +23,6 @@ contract FeeQuoterHelper is FeeQuoterV2 {
     )
   {}
 
-  function getDataAvailabilityCost(
-    uint64 destChainSelector,
-    uint112 dataAvailabilityGasPrice,
-    uint256 messageDataLength,
-    uint256 numberOfTokens,
-    uint32 tokenTransferBytesOverhead
-  ) external view returns (uint256) {
-    return _getDataAvailabilityCost(
-      s_destChainConfigs[destChainSelector],
-      dataAvailabilityGasPrice,
-      messageDataLength,
-      numberOfTokens,
-      tokenTransferBytesOverhead
-    );
-  }
-
   function getTokenTransferCost(
     uint64 destChainSelector,
     Client.EVMTokenAmount[] calldata tokenAmounts

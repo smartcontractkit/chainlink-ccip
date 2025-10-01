@@ -16,11 +16,8 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
 
-    FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: s_sourceTokens[0],
-      maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
-      tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
-    });
+    FeeQuoter.StaticConfig memory staticConfig =
+      FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS});
     s_feeQuoter = new FeeQuoterHelper(
       staticConfig,
       priceUpdaters,
@@ -64,31 +61,9 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     }
   }
 
-  function test_RevertWhen_InvalidStalenessThreshold() public {
-    FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: s_sourceTokens[0],
-      maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
-      tokenPriceStalenessThreshold: 0
-    });
-
-    vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);
-
-    s_feeQuoter = new FeeQuoterHelper(
-      staticConfig,
-      new address[](0),
-      new address[](0),
-      s_feeQuoterTokenTransferFeeConfigArgs,
-      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
-      new FeeQuoter.DestChainConfigArgs[](0)
-    );
-  }
-
   function test_RevertWhen_InvalidLinkTokenEqZeroAddress() public {
-    FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: address(0),
-      maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
-      tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
-    });
+    FeeQuoter.StaticConfig memory staticConfig =
+      FeeQuoter.StaticConfig({linkToken: address(0), maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS});
 
     vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);
 
@@ -103,11 +78,8 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
   }
 
   function test_RevertWhen_InvalidMaxFeeJuelsPerMsg() public {
-    FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: s_sourceTokens[0],
-      maxFeeJuelsPerMsg: 0,
-      tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
-    });
+    FeeQuoter.StaticConfig memory staticConfig =
+      FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: 0});
 
     vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);
 

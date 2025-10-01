@@ -61,30 +61,20 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
   struct StaticConfig {
     uint96 maxFeeJuelsPerMsg; // ─╮ Maximum fee that can be charged for a message.
     address linkToken; // ────────╯ LINK token address.
-    // The amount of time a token price can be stale before it is considered invalid. Gas price staleness is configured
-    // per dest chain.
-    uint32 tokenPriceStalenessThreshold;
   }
 
   /// @dev Struct to hold the fee & validation configs for a destination chain.
   struct DestChainConfig {
-    bool isEnabled; // ─────────────────────────╮ Whether this destination chain is enabled.
-    uint32 maxDataBytes; //                     │ Maximum data payload size in bytes.
-    uint32 maxPerMsgGasLimit; //                │ Maximum gas limit for messages targeting EVMs.
-    uint32 destGasOverhead; //                  │ Gas charged on top of the gasLimit to cover destination chain costs.
-    uint8 destGasPerPayloadByteBase; //         │ Default dest-chain gas charged each byte of `data` payload.
-    uint8 destGasPerPayloadByteHigh; //         │ High dest-chain gas charged each byte of `data` payload, used to account for eip-7623.
-    uint16 destGasPerPayloadByteThreshold; //   │ The value at which the billing switches from destGasPerPayloadByteBase to destGasPerPayloadByteHigh.
-    uint32 destDataAvailabilityOverheadGas; //  │ Data availability gas charged for overhead costs e.g. for OCR.
-    uint16 destGasPerDataAvailabilityByte; //   │ Gas units charged per byte of message data that needs availability.
-    uint16 destDataAvailabilityMultiplierBps; //│ Multiplier for data availability gas, multiples of bps, or 0.0001.
-    bytes4 chainFamilySelector; //              │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
+    bool isEnabled; // ────────────────────╮ Whether this destination chain is enabled.
+    uint32 maxDataBytes; //                │ Maximum data payload size in bytes.
+    uint32 maxPerMsgGasLimit; //           │ Maximum gas limit for messages targeting EVMs.
+    uint32 destGasOverhead; //             │ Gas charged on top of the gasLimit to cover destination chain costs.
+    uint8 destGasPerPayloadByteBase; //    │ Default dest-chain gas charged each byte of `data` payload.
+    bytes4 chainFamilySelector; //         │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
-    uint16 defaultTokenFeeUSDCents; // ─────────╯ Default token fee charged per token transfer.
-    uint32 defaultTokenDestGasOverhead; //─╮ Default gas charged to execute a token transfer on the destination chain.
+    uint16 defaultTokenFeeUSDCents; //     │ Default token fee charged per token transfer.
+    uint32 defaultTokenDestGasOverhead; // │ Default gas charged to execute a token transfer on the destination chain.
     uint32 defaultTxGasLimit; //           │ Default gas limit for a tx.
-    uint64 gasMultiplierWeiPerEth; //      │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
-    uint32 gasPriceStalenessThreshold; //  │ The amount of time a gas price can be stale before it is considered invalid (0 means disabled).
     uint32 networkFeeUSDCents; // ─────────╯ Flat network fee to charge for messages, multiples of 0.01 USD.
   }
 
@@ -96,7 +86,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     DestChainConfig destChainConfig; // Config to update for the chain selector.
   }
 
-  /// @dev Struct with transfer fee configuration for token transfers.
+  /// @dev No need to write for future non-EVMs that only support 1.7. This is a legacy struct for pre 1.7 pools.
   struct TokenTransferFeeConfig {
     uint32 feeUSDCents; // ──────╮ Minimum fee to charge per token transfer, multiples of 0.01 USD.
     uint32 destGasOverhead; //   │ Gas charged to execute the token transfer on the destination chain.
@@ -130,11 +120,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     address token; // // ──────────────────╮ Token address.
     uint64 premiumMultiplierWeiPerEth; // ─╯ Multiplier for destination chain specific premiums.
   }
-
-  /// @dev The base decimals for cost calculations.
-  uint256 public constant FEE_BASE_DECIMALS = 36;
-  /// @dev The decimals that Keystone reports prices in.
-  uint256 public constant KEYSTONE_PRICE_DECIMALS = 18;
 
   string public constant override typeAndVersion = "FeeQuoter 1.6.3-dev";
 
@@ -174,8 +159,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
 
   /// @dev Subset of tokens which prices tracked by this registry which are fee tokens.
   EnumerableSet.AddressSet private s_feeTokens;
-  /// @dev The amount of time a token price can be stale before it is considered invalid.
-  uint32 private immutable i_tokenPriceStalenessThreshold;
 
   constructor(
     StaticConfig memory staticConfig,
@@ -185,16 +168,12 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
   ) AuthorizedCallers(priceUpdaters) {
-    if (
-      staticConfig.linkToken == address(0) || staticConfig.maxFeeJuelsPerMsg == 0
-        || staticConfig.tokenPriceStalenessThreshold == 0
-    ) {
+    if (staticConfig.linkToken == address(0) || staticConfig.maxFeeJuelsPerMsg == 0) {
       revert InvalidStaticConfig();
     }
 
     i_linkToken = staticConfig.linkToken;
     i_maxFeeJuelsPerMsg = staticConfig.maxFeeJuelsPerMsg;
-    i_tokenPriceStalenessThreshold = staticConfig.tokenPriceStalenessThreshold;
 
     _applyFeeTokensUpdates(new address[](0), feeTokens);
     _applyDestChainConfigUpdates(destChainConfigArgs);
@@ -261,10 +240,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     uint64 destChainSelector
   ) external view returns (uint224 tokenPrice, uint224 gasPriceValue) {
     if (!s_destChainConfigs[destChainSelector].isEnabled) revert DestinationChainNotEnabled(destChainSelector);
-    return (
-      _getValidatedTokenPrice(token),
-      _getValidatedGasPrice(destChainSelector, s_destChainConfigs[destChainSelector].gasPriceStalenessThreshold)
-    );
+    return (_getValidatedTokenPrice(token), s_usdPerUnitGasByDestChainSelector[destChainSelector].value);
   }
 
   /// @notice Convert a given token amount to target token amount.
@@ -298,27 +274,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     // Token price must be set at least once.
     if (tokenPrice.timestamp == 0 || tokenPrice.value == 0) revert TokenNotSupported(token);
     return tokenPrice.value;
-  }
-
-  /// @dev Gets the fee token price and the gas price, both denominated in dollars.
-  /// @param destChainSelector The destination chain to get the gas price for.
-  /// @param gasPriceStalenessThreshold The amount of time a gas price can be stale before it is considered invalid.
-  /// @return gasPriceValue The price of gas in 1e18 dollars per base unit.
-  function _getValidatedGasPrice(
-    uint64 destChainSelector,
-    uint32 gasPriceStalenessThreshold
-  ) private view returns (uint224 gasPriceValue) {
-    Internal.TimestampedPackedUint224 memory gasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector];
-    // If the staleness threshold is 0, we consider the gas price to be always valid.
-    if (gasPriceStalenessThreshold != 0) {
-      // We do allow a gas price of 0, but no stale or unset gas prices.
-      uint256 timePassed = block.timestamp - gasPrice.timestamp;
-      if (timePassed > gasPriceStalenessThreshold) {
-        revert StaleGasPrice(destChainSelector, gasPriceStalenessThreshold, timePassed);
-      }
-    }
-
-    return gasPrice.value;
   }
 
   // ================================================================
@@ -409,12 +364,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
     if (!s_feeTokens.contains(message.feeToken)) revert FeeTokenNotSupported(message.feeToken);
 
-    uint256 numberOfTokens = message.tokenAmounts.length;
     uint256 gasLimit = _validateMessageAndResolveGasLimitForDestination(destChainSelector, destChainConfig, message);
 
     // The below call asserts that feeToken is a supported token.
     uint224 feeTokenPrice = _getValidatedTokenPrice(message.feeToken);
-    uint224 packedGasPrice = _getValidatedGasPrice(destChainSelector, destChainConfig.gasPriceStalenessThreshold);
 
     // Calculate premiumFee in USD with 18 decimals precision first.
     // If message-only and no token transfers, a flat network fee is charged.
@@ -423,7 +376,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     uint256 premiumFeeUSDWei = 0;
     uint32 tokenTransferGas = 0;
     uint32 tokenTransferBytesOverhead = 0;
-    if (numberOfTokens > 0) {
+    if (message.tokenAmounts.length > 0) {
       (premiumFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead) = _getTokenTransferCost(
         destChainConfig.defaultTokenFeeUSDCents,
         destChainConfig.defaultTokenDestGasOverhead,
@@ -437,53 +390,18 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     // Apply the premium multiplier for the fee token, making it 36 decimals
     premiumFeeUSDWei *= s_premiumMultiplierWeiPerEth[message.feeToken];
 
-    // Calculate data availability cost in USD with 36 decimals. Data availability cost exists on rollups that need to
-    // post transaction calldata onto another storage layer, e.g. Eth mainnet, incurring additional storage gas costs.
-    uint256 dataAvailabilityCostUSD36Decimals = 0;
-
-    // Only calculate data availability cost if data availability multiplier is non-zero.
-    // The multiplier should be set to 0 if destination chain does not charge data availability cost.
-    if (destChainConfig.destDataAvailabilityMultiplierBps > 0) {
-      dataAvailabilityCostUSD36Decimals = _getDataAvailabilityCost(
-        destChainConfig,
-        // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
-        uint112(packedGasPrice >> Internal.GAS_PRICE_BITS),
-        message.data.length,
-        numberOfTokens,
-        tokenTransferBytesOverhead
-      );
-    }
-
-    // Calculate the calldata, taking into account EIP-7623. We charge destGasPerPayloadByteBase for the calldata cost
-    // up to destGasPerPayloadByteThreshold, even when the total calldata length exceeds the threshold. This is safe
-    // because we also charge for execution gas on top of this. When correct values are chosen, the execution gas we
-    // charge is always higher than the difference between the base and high calldata costs for the first
-    // destGasPerPayloadByteThreshold bytes. Since we don't pay for execution gas in EIP-7623, this execution gas is
-    // effectively used to cover the higher calldata costs for the first destGasPerPayloadByteThreshold bytes.
-    // The threshold should be adjusted based on expected execution cost and, potentially, to discourage large payloads.
-    // Example: 16 base, 40 high, 100k execution cost. 100k/(40-16) = max 4.16kb as the threshold. Take 4kb threshold.
-    // Calldata length = 5000
-    // Our calculations: 1000 * 40 + 4000 * 16 = 104k calldata cost + 100k execution cost = 204k calculated cost.
-    // Actual cost: 5000 * 40 = 200k
-    // The difference is 4k in favour of CCIP. The lower the threshold, the more premium is charged for large payloads.
-    uint256 calldataLength = message.data.length + tokenTransferBytesOverhead;
-    uint256 destCallDataCost = calldataLength * destChainConfig.destGasPerPayloadByteBase;
-    if (calldataLength > destChainConfig.destGasPerPayloadByteThreshold) {
-      destCallDataCost = destChainConfig.destGasPerPayloadByteBase * destChainConfig.destGasPerPayloadByteThreshold
-        + (calldataLength - destChainConfig.destGasPerPayloadByteThreshold) * destChainConfig.destGasPerPayloadByteHigh;
-    }
+    uint256 destCallDataCost =
+      (message.data.length + tokenTransferBytesOverhead) * destChainConfig.destGasPerPayloadByteBase;
 
     // We add the destination chain CCIP overhead (commit, exec), the token transfer gas, the calldata cost and the msg
     // gas limit to get the total gas the tx costs to execute on the destination chain.
     uint256 totalDestChainGas = destChainConfig.destGasOverhead + tokenTransferGas + destCallDataCost + gasLimit;
+    uint224 packedGasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector].value;
 
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
     // The result is the fee in the feeTokens smallest denominations (e.g. wei for ETH).
     // uint112(packedGasPrice) = executionGasPrice
-    return (
-      totalDestChainGas * uint112(packedGasPrice) * destChainConfig.gasMultiplierWeiPerEth + premiumFeeUSDWei
-        + dataAvailabilityCostUSD36Decimals
-    ) / feeTokenPrice;
+    return (totalDestChainGas * uint112(packedGasPrice) * 1e18 + premiumFeeUSDWei) / feeTokenPrice;
   }
 
   /// @notice Sets the fee configuration for a token.
@@ -559,36 +477,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     }
 
     return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);
-  }
-
-  /// @notice Returns the estimated data availability cost of the message.
-  /// @dev To save on gas, we use a single destGasPerDataAvailabilityByte value for both zero and non-zero bytes.
-  /// @param destChainConfig the config configured for the destination chain selector.
-  /// @param dataAvailabilityGasPrice USD per data availability gas in 18 decimals.
-  /// @param messageDataLength length of the data field in the message.
-  /// @param numberOfTokens number of distinct token transfers in the message.
-  /// @param tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
-  /// @return dataAvailabilityCostUSD36Decimal total data availability cost in USD with 36 decimals.
-  function _getDataAvailabilityCost(
-    DestChainConfig memory destChainConfig,
-    uint112 dataAvailabilityGasPrice,
-    uint256 messageDataLength,
-    uint256 numberOfTokens,
-    uint32 tokenTransferBytesOverhead
-  ) internal pure returns (uint256 dataAvailabilityCostUSD36Decimal) {
-    // dataAvailabilityLengthBytes sums up byte lengths of fixed message fields and dynamic message fields.
-    // Fixed message fields do account for the offset and length slot of the dynamic fields.
-    uint256 dataAvailabilityLengthBytes = Internal.MESSAGE_FIXED_BYTES + messageDataLength
-      + (numberOfTokens * Internal.MESSAGE_FIXED_BYTES_PER_TOKEN) + tokenTransferBytesOverhead;
-
-    // destDataAvailabilityOverheadGas is a separate config value for flexibility to be updated independently of message
-    // cost. Its value is determined by CCIP lane implementation, e.g. the overhead data posted for OCR.
-    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * destChainConfig.destGasPerDataAvailabilityByte)
-      + destChainConfig.destDataAvailabilityOverheadGas;
-
-    // dataAvailabilityGasPrice is in 18 decimals, destDataAvailabilityMultiplierBps is in 4 decimals.
-    // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
-    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * destChainConfig.destDataAvailabilityMultiplierBps) * 1e14;
   }
 
   /// @notice Gets the transfer fee config for a given token.
@@ -1090,10 +978,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
   /// @dev RMN depends on this function, if updated, please notify the RMN maintainers.
   /// @return staticConfig The static configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({
-      maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg,
-      linkToken: i_linkToken,
-      tokenPriceStalenessThreshold: i_tokenPriceStalenessThreshold
-    });
+    return StaticConfig({maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg, linkToken: i_linkToken});
   }
 }

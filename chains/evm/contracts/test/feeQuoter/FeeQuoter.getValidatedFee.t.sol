@@ -24,13 +24,10 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
       uint256 feeAmount = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
 
       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
-      uint256 gasFeeUSD = gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS;
+      uint256 gasFeeUSD = gasUsed * 1e18 * USD_PER_GAS;
       uint256 messageFeeUSD = _configUSDCentToWei(destChainConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth;
-      uint256 dataAvailabilityFeeUSD = s_feeQuoter.getDataAvailabilityCost(
-        DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, message.data.length, message.tokenAmounts.length, 0
-      );
 
-      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + dataAvailabilityFeeUSD) / feeTokenPrices[i];
+      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD) / feeTokenPrices[i];
       assertEq(totalPriceInFeeToken, feeAmount);
     }
   }
@@ -40,7 +37,6 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     FeeQuoter.DestChainConfig memory destChainConfig = s_feeQuoter.getDestChainConfig(DEST_CHAIN_SELECTOR);
     destChainConfigArgs[0] =
       FeeQuoter.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, destChainConfig: destChainConfig});
-    destChainConfigArgs[0].destChainConfig.destDataAvailabilityMultiplierBps = 0;
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -49,7 +45,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     uint256 feeAmount = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
 
     uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
-    uint256 gasFeeUSD = gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS;
+    uint256 gasFeeUSD = gasUsed * 1e18 * USD_PER_GAS;
     uint256 messageFeeUSD = _configUSDCentToWei(destChainConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth;
 
     uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD) / s_feeTokenPrice;
@@ -76,17 +72,13 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
       uint256 feeAmount = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
 
-      uint256 callDataCostHigh = (customDataSize - DEST_GAS_PER_PAYLOAD_BYTE_THRESHOLD) * DEST_GAS_PER_PAYLOAD_BYTE_HIGH
-        + DEST_GAS_PER_PAYLOAD_BYTE_THRESHOLD * DEST_GAS_PER_PAYLOAD_BYTE_BASE;
+      uint256 callDataCostHigh = customDataSize * DEST_GAS_PER_PAYLOAD_BYTE_BASE;
 
       uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + callDataCostHigh;
-      uint256 gasFeeUSD = gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS;
+      uint256 gasFeeUSD = gasUsed * 1e18 * USD_PER_GAS;
       uint256 messageFeeUSD = _configUSDCentToWei(destChainConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth;
-      uint256 dataAvailabilityFeeUSD = s_feeQuoter.getDataAvailabilityCost(
-        DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, message.data.length, message.tokenAmounts.length, 0
-      );
 
-      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + dataAvailabilityFeeUSD) / feeTokenPrices[i];
+      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD) / feeTokenPrices[i];
       assertEq(totalPriceInFeeToken, feeAmount);
     }
   }
@@ -109,18 +101,11 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD + tokenBytesOverhead * DEST_GAS_PER_PAYLOAD_BYTE_BASE
         + s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destGasOverhead;
-      uint256 gasFeeUSD = gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS;
+      uint256 gasFeeUSD = gasUsed * 1e18 * USD_PER_GAS;
       (uint256 transferFeeUSD,,) = s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.tokenAmounts);
       uint256 messageFeeUSD = transferFeeUSD * s_feeQuoter.getPremiumMultiplierWeiPerEth(message.feeToken);
-      uint256 dataAvailabilityFeeUSD = s_feeQuoter.getDataAvailabilityCost(
-        DEST_CHAIN_SELECTOR,
-        USD_PER_DATA_AVAILABILITY_GAS,
-        message.data.length,
-        message.tokenAmounts.length,
-        tokenBytesOverhead
-      );
 
-      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + dataAvailabilityFeeUSD) / feeTokenPrices[i];
+      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD) / feeTokenPrices[i];
       assertEq(totalPriceInFeeToken, feeAmount);
     }
   }
@@ -163,20 +148,12 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
         uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD
           + (message.data.length + tokenTransferBytesOverhead) * DEST_GAS_PER_PAYLOAD_BYTE_BASE + tokenGasOverhead;
 
-        gasFeeUSD = gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS;
+        gasFeeUSD = gasUsed * 1e18 * USD_PER_GAS;
       }
 
       uint256 messageFeeUSD = transferFeeUSD * premiumMultiplierWeiPerEth;
 
-      uint256 dataAvailabilityFeeUSD = s_feeQuoter.getDataAvailabilityCost(
-        DEST_CHAIN_SELECTOR,
-        USD_PER_DATA_AVAILABILITY_GAS,
-        message.data.length,
-        message.tokenAmounts.length,
-        tokenBytesOverhead
-      );
-
-      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + dataAvailabilityFeeUSD) / feeTokenPrices[i];
+      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD) / feeTokenPrices[i];
       assertEq(totalPriceInFeeToken, s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message));
     }
   }

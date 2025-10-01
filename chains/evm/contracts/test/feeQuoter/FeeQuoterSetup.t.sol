@@ -24,8 +24,6 @@ contract FeeQuoterSetup is TokenSetup {
   uint96 internal constant MAX_MSG_FEES_JUELS = 1_000e18;
   uint32 internal constant DEST_GAS_OVERHEAD = 300_000;
   uint8 internal constant DEST_GAS_PER_PAYLOAD_BYTE_BASE = 16;
-  uint8 internal constant DEST_GAS_PER_PAYLOAD_BYTE_HIGH = 40;
-  uint16 internal constant DEST_GAS_PER_PAYLOAD_BYTE_THRESHOLD = 3000;
 
   uint16 internal constant DEFAULT_TOKEN_FEE_USD_CENTS = 50;
   uint32 internal constant DEFAULT_TOKEN_BYTES_OVERHEAD = 32;
@@ -176,11 +174,7 @@ contract FeeQuoterSetup is TokenSetup {
     s_destTokenBySourceToken[CUSTOM_TOKEN_2] = address(bytes20(keccak256("CUSTOM_TOKEN_2_DEST")));
 
     s_feeQuoter = new FeeQuoterHelper(
-      FeeQuoter.StaticConfig({
-        linkToken: s_sourceTokens[0],
-        maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
-        tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
-      }),
+      FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
       priceUpdaters,
       feeTokens,
       s_feeQuoterTokenTransferFeeConfigArgs,
@@ -233,19 +227,12 @@ contract FeeQuoterSetup is TokenSetup {
         isEnabled: true,
         destGasOverhead: DEST_GAS_OVERHEAD,
         destGasPerPayloadByteBase: DEST_GAS_PER_PAYLOAD_BYTE_BASE,
-        destGasPerPayloadByteHigh: DEST_GAS_PER_PAYLOAD_BYTE_HIGH,
-        destGasPerPayloadByteThreshold: DEST_GAS_PER_PAYLOAD_BYTE_THRESHOLD,
-        destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
-        destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
-        destDataAvailabilityMultiplierBps: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER_BPS,
         maxDataBytes: MAX_DATA_SIZE,
         maxPerMsgGasLimit: MAX_GAS_LIMIT,
         defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
         defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
         defaultTxGasLimit: GAS_LIMIT,
-        gasMultiplierWeiPerEth: 5e17,
         networkFeeUSDCents: 1_00,
-        gasPriceStalenessThreshold: uint32(TWELVE_HOURS),
         chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM
       })
     });
@@ -271,11 +258,6 @@ contract FeeQuoterSetup is TokenSetup {
     assertEq(a.maxPerMsgGasLimit, b.maxPerMsgGasLimit);
     assertEq(a.destGasOverhead, b.destGasOverhead);
     assertEq(a.destGasPerPayloadByteBase, b.destGasPerPayloadByteBase);
-    assertEq(a.destGasPerPayloadByteHigh, b.destGasPerPayloadByteHigh);
-    assertEq(a.destGasPerPayloadByteThreshold, b.destGasPerPayloadByteThreshold);
-    assertEq(a.destDataAvailabilityOverheadGas, b.destDataAvailabilityOverheadGas);
-    assertEq(a.destGasPerDataAvailabilityByte, b.destGasPerDataAvailabilityByte);
-    assertEq(a.destDataAvailabilityMultiplierBps, b.destDataAvailabilityMultiplierBps);
     assertEq(a.defaultTokenFeeUSDCents, b.defaultTokenFeeUSDCents);
     assertEq(a.defaultTokenDestGasOverhead, b.defaultTokenDestGasOverhead);
     assertEq(a.defaultTxGasLimit, b.defaultTxGasLimit);

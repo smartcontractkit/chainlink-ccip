@@ -15,17 +15,6 @@ contract FeeQuoter_getValidatedTokenPrice is FeeQuoterSetup {
     assertEq(priceUpdates.tokenPriceUpdates[0].usdPerToken, tokenPrice);
   }
 
-  function test_StaleFeeToken() public {
-    vm.warp(block.timestamp + TWELVE_HOURS + 1);
-
-    Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
-    address token = priceUpdates.tokenPriceUpdates[0].sourceToken;
-
-    uint224 tokenPrice = s_feeQuoter.getValidatedTokenPrice(token);
-
-    assertEq(priceUpdates.tokenPriceUpdates[0].usdPerToken, tokenPrice);
-  }
-
   // Reverts
 
   function test_RevertWhen_TokenNotSupported() public {
