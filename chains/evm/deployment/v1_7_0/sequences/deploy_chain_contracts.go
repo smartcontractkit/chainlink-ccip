@@ -53,7 +53,6 @@ type CCVProxyParams struct {
 type FeeQuoterParams struct {
 	Version                        *semver.Version
 	MaxFeeJuelsPerMsg              *big.Int
-	TokenPriceStalenessThreshold   uint32
 	LINKPremiumMultiplierWeiPerEth uint64
 	WETHPremiumMultiplierWeiPerEth uint64
 	USDPerLINK                     *big.Int
@@ -183,9 +182,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 			Args: fee_quoter_v2.ConstructorArgs{
 				StaticConfig: fee_quoter_v2.StaticConfig{
-					MaxFeeJuelsPerMsg:            input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
-					TokenPriceStalenessThreshold: input.ContractParams.FeeQuoter.TokenPriceStalenessThreshold,
-					LinkToken:                    common.HexToAddress(linkRef.Address),
+					MaxFeeJuelsPerMsg: input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
+					LinkToken:         common.HexToAddress(linkRef.Address),
 				},
 				PriceUpdaters: []common.Address{
 					// Price updates via protocol are out of scope for initial launch.

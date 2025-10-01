@@ -22,22 +22,16 @@ import (
 // CreateBasicFeeQuoterDestChainConfig creates a basic fee quoter dest chain config with reasonable defaults for testing
 func CreateBasicFeeQuoterDestChainConfig() fee_quoter_v2.DestChainConfig {
 	return fee_quoter_v2.DestChainConfig{
-		IsEnabled:                         true,
-		MaxDataBytes:                      30_000,
-		MaxPerMsgGasLimit:                 3_000_000,
-		DestGasOverhead:                   300_000,
-		DefaultTokenFeeUSDCents:           25,
-		DestGasPerPayloadByteBase:         16,
-		DestGasPerPayloadByteHigh:         40,
-		DestGasPerPayloadByteThreshold:    3000,
-		DestDataAvailabilityOverheadGas:   100,
-		DestGasPerDataAvailabilityByte:    16,
-		DestDataAvailabilityMultiplierBps: 1,
-		DefaultTokenDestGasOverhead:       90_000,
-		DefaultTxGasLimit:                 200_000,
-		GasMultiplierWeiPerEth:            11e17, // Gas multiplier in wei per eth is scaled by 1e18, so 11e17 is 1.1 = 110%
-		NetworkFeeUSDCents:                10,
-		ChainFamilySelector:               [4]byte{0x28, 0x12, 0xd5, 0x2c}, // EVM
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DefaultTokenFeeUSDCents:     25,
+		DestGasPerPayloadByteBase:   16,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c}, // EVM
 	}
 }
 
@@ -78,7 +72,6 @@ func CreateBasicContractParams() sequences.ContractParams {
 		FeeQuoter: sequences.FeeQuoterParams{
 			Version:                        semver.MustParse("1.7.0"),
 			MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-			TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
 			LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
 			WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
 			USDPerLINK:                     usdPerLink,
