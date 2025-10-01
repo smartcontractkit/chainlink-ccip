@@ -35,15 +35,17 @@ func TestWithReports(t *testing.T) {
 func TestWithWriteOutputs(t *testing.T) {
 	tests := []struct {
 		desc     string
-		executed bool
+		execInfo *contract.ExecInfo
 	}{
 		{
-			executed: false,
+			execInfo: nil,
 			desc:     "Tx not executed",
 		},
 		{
-			executed: true,
-			desc:     "Tx executed",
+			execInfo: &contract.ExecInfo{
+				Hash: common.HexToHash("0x02").Hex(),
+			},
+			desc: "Tx executed",
 		},
 	}
 
@@ -53,7 +55,7 @@ func TestWithWriteOutputs(t *testing.T) {
 			out, err := b.WithWriteOutputs([]contract.WriteOutput{
 				{
 					ChainSelector: 5009297550715157269,
-					Executed:      test.executed,
+					ExecInfo:      test.execInfo,
 					Tx: mcms_types.Transaction{
 						To:               common.HexToAddress("0x01").Hex(),
 						Data:             common.Hex2Bytes("0xdeadbeef"),
@@ -80,7 +82,7 @@ func TestWithWriteOutputs(t *testing.T) {
 				},
 			})
 			require.NoError(t, err, "Build should not error")
-			if !test.executed {
+			if test.execInfo == nil {
 				require.Len(t, out.MCMSTimelockProposals, 1, "Proposal should exist")
 			} else {
 				require.Len(t, out.MCMSTimelockProposals, 0, "Proposal should not exist")

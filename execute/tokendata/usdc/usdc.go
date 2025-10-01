@@ -35,6 +35,7 @@ func NewUSDCTokenDataObserver(
 	destChainSelector cciptypes.ChainSelector,
 	usdcConfig pluginconfig.USDCCCTPObserverConfig,
 	attestationEncoder AttestationEncoder,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	readers map[cciptypes.ChainSelector]contractreader.Extended,
 	addrCodec cciptypes.AddressCodec,
 ) (*USDCTokenDataObserver, error) {
@@ -43,6 +44,7 @@ func NewUSDCTokenDataObserver(
 		ctx,
 		lggr,
 		usdcConfig.Tokens,
+		chainAccessors,
 		readers,
 		addrCodec,
 	)

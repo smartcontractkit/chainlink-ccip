@@ -1,4 +1,4 @@
-package contract_test
+package contract
 
 import (
 	"context"
@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -25,49 +25,73 @@ func TestDeploy(t *testing.T) {
 	validChainSel := uint64(5009297550715157269)
 	invalidChainSel := uint64(12345)
 
+	type ConstructorArgs struct {
+		Value int
+	}
+
 	tests := []struct {
 		desc        string
-		input       contract.DeployInput[int]
+		input       DeployInput[ConstructorArgs]
 		isZkSyncVM  bool
 		expectedErr string
 	}{
 		{
 			desc: "args validation failure",
-			input: contract.DeployInput[int]{
+			input: DeployInput[ConstructorArgs]{
 				ChainSelector: validChainSel,
-				Args:          3,
+				Args:          ConstructorArgs{Value: 3},
 			},
 			expectedErr: "invalid constructor args for test-deployment: input must be even",
 		},
 		{
-			desc: "revert from contract",
-			input: contract.DeployInput[int]{
-				ChainSelector: validChainSel,
-				Args:          10,
-			},
-			expectedErr: "due to error -`InvalidValue` args [1]: 6072742c0000000000000000000000000000000000000000000000000000000000000001",
-		},
-		{
 			desc: "mismatched chain selector",
-			input: contract.DeployInput[int]{
+			input: DeployInput[ConstructorArgs]{
 				ChainSelector: invalidChainSel,
-				Args:          2,
+				Args:          ConstructorArgs{Value: 2},
 			},
 			expectedErr: fmt.Sprintf("mismatch between inputted chain selector and selector defined within dependencies: %d != %d", invalidChainSel, validChainSel),
 		},
 		{
-			desc: "zkSyncVM deployment",
-			input: contract.DeployInput[int]{
+			desc: "version not specified",
+			input: DeployInput[ConstructorArgs]{
 				ChainSelector: validChainSel,
-				Args:          2,
+				Args:          ConstructorArgs{Value: 2},
+			},
+			expectedErr: fmt.Sprintf("version must be specified for %s", testContractType),
+		},
+		{
+			desc: "bytecode not defined for version",
+			input: DeployInput[ConstructorArgs]{
+				ChainSelector: validChainSel,
+				Args:          ConstructorArgs{Value: 2},
+				Version:       semver.MustParse("1.1.0"),
+			},
+			expectedErr: fmt.Sprintf("no bytecode defined for %s %s", testContractType, "1.1.0"),
+		},
+		{
+			desc: "revert from contract",
+			input: DeployInput[ConstructorArgs]{
+				ChainSelector: validChainSel,
+				Args:          ConstructorArgs{Value: 10},
+				Version:       semver.MustParse("1.0.0"),
+			},
+			expectedErr: "due to error -`InvalidValue` args [1]: 6072742c0000000000000000000000000000000000000000000000000000000000000001",
+		},
+		{
+			desc: "zkSyncVM deployment",
+			input: DeployInput[ConstructorArgs]{
+				ChainSelector: validChainSel,
+				Args:          ConstructorArgs{Value: 2},
+				Version:       semver.MustParse("1.0.0"),
 			},
 			isZkSyncVM: true,
 		},
 		{
 			desc: "evm deployment",
-			input: contract.DeployInput[int]{
+			input: DeployInput[ConstructorArgs]{
 				ChainSelector: validChainSel,
-				Args:          2,
+				Args:          ConstructorArgs{Value: 2},
+				Version:       semver.MustParse("1.0.0"),
 			},
 			isZkSyncVM: false,
 		},
@@ -81,40 +105,24 @@ func TestDeploy(t *testing.T) {
 				"type": "error"
 			}]`
 
-			op := contract.NewDeploy(
-				"test-deployment",
-				semver.MustParse("1.0.0"),
-				"Test deployment operation",
-				testContractType,
-				contractABI,
-				func(input int) error {
-					if input%2 != 0 {
+			op := NewDeploy(DeployParams[ConstructorArgs]{
+				Name:         "test-deployment",
+				Version:      semver.MustParse("1.0.0"),
+				Description:  "Test deployment operation",
+				ContractType: testContractType,
+				ContractMetadata: &bind.MetaData{
+					ABI: contractABI,
+				},
+				BytecodeByVersion: map[string]Bytecode{
+					semver.MustParse("1.0.0").String(): {EVM: []byte{}},
+				},
+				Validate: func(input ConstructorArgs) error {
+					if input.Value%2 != 0 {
 						return fmt.Errorf("input must be even")
 					}
 					return nil
 				},
-				contract.VMDeployers[int]{
-					DeployEVM: func(auth *bind.TransactOpts, client bind.ContractBackend, args int) (common.Address, *types.Transaction, error) {
-						// Not caught by operation validation, revert reason should be surfaced
-						if args == 10 {
-							return address, &types.Transaction{}, &rpcError{
-								Data: common.Bytes2Hex(append(
-									crypto.Keccak256([]byte("InvalidValue(uint256)"))[:4],
-									common.LeftPadBytes([]byte{1}, 32)...,
-								)),
-							}
-						}
-
-						return address, types.NewTx(&types.LegacyTx{
-							To:   &address,
-							Data: []byte{0xDE, 0xAD, 0xBE, 0xEF},
-						}), nil
-					},
-					DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args int) (common.Address, error) {
-						return address, nil
-					},
-				},
-			)
+			})
 
 			lggr, err := logger.New()
 			require.NoError(t, err, "Failed to create logger")
@@ -133,6 +141,39 @@ func TestDeploy(t *testing.T) {
 					return 1, nil
 				},
 				IsZkSyncVM: test.isZkSyncVM,
+			}
+
+			deployZkContract = func(
+				_ *accounts.TransactOpts,
+				_ []byte,
+				_ *clients.Client,
+				_ *accounts.Wallet,
+				_ *abi.ABI,
+				_ ...interface{},
+			) (common.Address, error) {
+				return address, nil
+			}
+			deployEVMContract = func(
+				_ *bind.TransactOpts,
+				_ abi.ABI,
+				_ []byte,
+				_ bind.ContractBackend,
+				params ...interface{},
+			) (common.Address, *types.Transaction, *bind.BoundContract, error) {
+				// Not caught by operation validation, revert reason should be surfaced
+				if params[0] == 10 {
+					return address, &types.Transaction{}, nil, &rpcError{
+						Data: common.Bytes2Hex(append(
+							crypto.Keccak256([]byte("InvalidValue(uint256)"))[:4],
+							common.LeftPadBytes([]byte{1}, 32)...,
+						)),
+					}
+				}
+
+				return address, types.NewTx(&types.LegacyTx{
+					To:   &address,
+					Data: []byte{0xDE, 0xAD, 0xBE, 0xEF},
+				}), nil, nil
 			}
 
 			report, err := operations.ExecuteOperation(bundle, op, chain, test.input)
