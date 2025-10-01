@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 type RemoteChainConfig struct {
@@ -34,7 +35,7 @@ type RemoteChainConfig struct {
 type ConfigureChainForLanesCfg struct {
 	ChainSel     uint64
 	RemoteChains map[uint64]RemoteChainConfig
-	MCMSArgs     *changesets.MCMSInput
+	MCMSArgs     *common_utils.MCMSInput
 }
 
 func (c ConfigureChainForLanesCfg) ChainSelector() uint64 {
