@@ -51,7 +51,7 @@ type WriteParams[ARGS any, C any] struct {
 	// NewContract is a function that creates a new instance of the contract binding.
 	NewContract func(address common.Address, backend bind.ContractBackend) (C, error)
 	// IsAllowedCaller is a function that checks if the caller is allowed to call the function.
-	IsAllowedCaller func(contract C, opts *bind.CallOpts, caller common.Address) (bool, error)
+	IsAllowedCaller func(contract C, opts *bind.CallOpts, caller common.Address, input ARGS) (bool, error)
 	// Validate is a function that validates the input arguments.
 	Validate func(input ARGS) error
 	// CallContract is a function that calls the desired write method on the contract.
@@ -98,7 +98,7 @@ func NewWrite[ARGS any, C any](params WriteParams[ARGS, C]) *operations.Operatio
 			if err != nil {
 				return WriteOutput{}, fmt.Errorf("failed to create contract instance for %s at %s on %s: %w", params.Name, input.Address, chain, err)
 			}
-			allowed, err := params.IsAllowedCaller(contract, &bind.CallOpts{Context: b.GetContext()}, chain.DeployerKey.From)
+			allowed, err := params.IsAllowedCaller(contract, &bind.CallOpts{Context: b.GetContext()}, chain.DeployerKey.From, input.Args)
 			if err != nil {
 				return WriteOutput{}, fmt.Errorf("failed to check if %s is an allowed caller of %s against %s on %s: %w", chain.DeployerKey.From, params.Name, input.Address, chain, err)
 			}
@@ -144,7 +144,7 @@ type ownableContract interface {
 	Owner(opts *bind.CallOpts) (common.Address, error)
 }
 
-func OnlyOwner[C ownableContract](contract C, opts *bind.CallOpts, caller common.Address) (bool, error) {
+func OnlyOwner[C ownableContract, ARGS any](contract C, opts *bind.CallOpts, caller common.Address, args ARGS) (bool, error) {
 	owner, err := contract.Owner(opts)
 	if err != nil {
 		return false, fmt.Errorf("failed to get owner of %s: %w", contract.Address(), err)
@@ -152,6 +152,6 @@ func OnlyOwner[C ownableContract](contract C, opts *bind.CallOpts, caller common
 	return owner == caller, nil
 }
 
-func AllCallersAllowed[C any](contract C, opts *bind.CallOpts, caller common.Address) (bool, error) {
+func AllCallersAllowed[C any, ARGS any](contract C, opts *bind.CallOpts, caller common.Address, args ARGS) (bool, error) {
 	return true, nil
 }

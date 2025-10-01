@@ -64,10 +64,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "fee-quoter-v2:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys the FeeQuoterV2 contract",
-	ContractType:     ContractType,
 	ContractMetadata: fee_quoter_v2.FeeQuoterV2MetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(fee_quoter_v2.FeeQuoterV2Bin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(fee_quoter_v2.FeeQuoterV2Bin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
@@ -79,7 +80,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter_v2.FeeQuoterV2ABI,
 	NewContract:     fee_quoter_v2.NewFeeQuoterV2,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2],
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return feeQuoterV2.ApplyAuthorizedCallerUpdates(opts, args)
@@ -93,7 +94,7 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter_v2.FeeQuoterV2ABI,
 	NewContract:     fee_quoter_v2.NewFeeQuoterV2,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2],
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2, []DestChainConfigArgs],
 	Validate:        func([]DestChainConfigArgs) error { return nil },
 	CallContract: func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return feeQuoterV2.ApplyDestChainConfigUpdates(opts, transformDestChainConfigArgs(args))
@@ -107,7 +108,7 @@ var ApplyFeeTokensUpdates = contract.NewWrite(contract.WriteParams[ApplyFeeToken
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter_v2.FeeQuoterV2ABI,
 	NewContract:     fee_quoter_v2.NewFeeQuoterV2,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2],
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2, ApplyFeeTokensUpdatesArgs],
 	Validate:        func(ApplyFeeTokensUpdatesArgs) error { return nil },
 	CallContract: func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args ApplyFeeTokensUpdatesArgs) (*types.Transaction, error) {
 		return feeQuoterV2.ApplyFeeTokensUpdates(opts, args.FeeTokensToRemove, args.FeeTokensToAdd)
@@ -121,7 +122,7 @@ var ApplyPremiumMultiplierWeiPerEthUpdates = contract.NewWrite(contract.WritePar
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter_v2.FeeQuoterV2ABI,
 	NewContract:     fee_quoter_v2.NewFeeQuoterV2,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2],
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2, []PremiumMultiplierWeiPerEthArgs],
 	Validate:        func([]PremiumMultiplierWeiPerEthArgs) error { return nil },
 	CallContract: func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args []PremiumMultiplierWeiPerEthArgs) (*types.Transaction, error) {
 		return feeQuoterV2.ApplyPremiumMultiplierWeiPerEthUpdates(opts, args)
@@ -135,7 +136,7 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter_v2.FeeQuoterV2ABI,
 	NewContract:     fee_quoter_v2.NewFeeQuoterV2,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2],
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2, ApplyTokenTransferFeeConfigUpdatesArgs],
 	Validate:        func(ApplyTokenTransferFeeConfigUpdatesArgs) error { return nil },
 	CallContract: func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesArgs) (*types.Transaction, error) {
 		return feeQuoterV2.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
@@ -149,7 +150,7 @@ var UpdatePrices = contract.NewWrite(contract.WriteParams[PriceUpdates, *fee_quo
 	ContractType: ContractType,
 	ContractABI:  fee_quoter_v2.FeeQuoterV2ABI,
 	NewContract:  fee_quoter_v2.NewFeeQuoterV2,
-	IsAllowedCaller: func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.CallOpts, caller common.Address) (bool, error) {
+	IsAllowedCaller: func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.CallOpts, caller common.Address, args PriceUpdates) (bool, error) {
 		priceUpdaters, err := feeQuoterV2.GetAllAuthorizedCallers(opts)
 		if err != nil {
 			return false, fmt.Errorf("failed to get authorized callers from FeeQuoterV2 (%s): %w", feeQuoterV2.Address(), err)
@@ -172,7 +173,7 @@ var UpdateTokenPriceFeeds = contract.NewWrite(contract.WriteParams[[]TokenPriceF
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter_v2.FeeQuoterV2ABI,
 	NewContract:     fee_quoter_v2.NewFeeQuoterV2,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2],
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter_v2.FeeQuoterV2, []TokenPriceFeedUpdate],
 	Validate:        func([]TokenPriceFeedUpdate) error { return nil },
 	CallContract: func(feeQuoterV2 *fee_quoter_v2.FeeQuoterV2, opts *bind.TransactOpts, args []TokenPriceFeedUpdate) (*types.Transaction, error) {
 		return feeQuoterV2.UpdateTokenPriceFeeds(opts, args)

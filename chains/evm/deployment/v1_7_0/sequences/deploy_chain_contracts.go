@@ -22,6 +22,7 @@ import (
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -92,8 +93,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy WETH
 		wethRef, err := maybeDeployContract(b, weth.Deploy, weth.ContractType, chain, contract.DeployInput[weth.ConstructorArgs]{
-			Version:       semver.MustParse("1.0.0"),
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(weth.ContractType), *semver.MustParse("1.0.0")),
+			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
@@ -102,8 +103,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy LINK
 		linkRef, err := maybeDeployContract(b, link.Deploy, link.ContractType, chain, contract.DeployInput[link.ConstructorArgs]{
-			Version:       semver.MustParse("1.0.0"),
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(link.ContractType), *semver.MustParse("1.0.0")),
+			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
@@ -111,9 +112,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, linkRef)
 
 		// Deploy RMNRemote
+		if input.ContractParams.RMNRemote.Version == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("rmnRemote version must be specified")
+		}
 		rmnRemoteRef, err := maybeDeployContract(b, rmn_remote.Deploy, rmn_remote.ContractType, chain, contract.DeployInput[rmn_remote.ConstructorArgs]{
-			Version:       input.ContractParams.RMNRemote.Version,
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(rmn_remote.ContractType), *input.ContractParams.RMNRemote.Version),
+			ChainSelector:  chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
 				LegacyRMN:          input.ContractParams.RMNRemote.LegacyRMN,
@@ -126,8 +130,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy RMNProxy
 		rmnProxyRef, err := maybeDeployContract(b, rmn_proxy.Deploy, rmn_proxy.ContractType, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
-			Version:       semver.MustParse("1.0.0"),
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(rmn_proxy.ContractType), *semver.MustParse("1.0.0")),
+			ChainSelector:  chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
 				RMN: common.HexToAddress(rmnRemoteRef.Address),
 			},
@@ -155,8 +159,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy Router
 		routerRef, err := maybeDeployContract(b, router.Deploy, router.ContractType, chain, contract.DeployInput[router.ConstructorArgs]{
-			Version:       semver.MustParse("1.2.0"),
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(router.ContractType), *semver.MustParse("1.2.0")),
+			ChainSelector:  chain.Selector,
 			Args: router.ConstructorArgs{
 				WrappedNative: common.HexToAddress(wethRef.Address),
 				RMNProxy:      common.HexToAddress(rmnProxyRef.Address),
@@ -169,8 +173,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy TokenAdminRegistry
 		tokenAdminRegistryRef, err := maybeDeployContract(b, token_admin_registry.Deploy, token_admin_registry.ContractType, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{
-			Version:       semver.MustParse("1.5.0"),
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(token_admin_registry.ContractType), *semver.MustParse("1.5.0")),
+			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
@@ -178,9 +182,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, tokenAdminRegistryRef)
 
 		// Deploy FeeQuoter
+		if input.ContractParams.FeeQuoter.Version == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("feeQuoter version must be specified")
+		}
 		feeQuoterRef, err := maybeDeployContract(b, fee_quoter_v2.Deploy, fee_quoter_v2.ContractType, chain, contract.DeployInput[fee_quoter_v2.ConstructorArgs]{
-			Version:       input.ContractParams.FeeQuoter.Version,
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(fee_quoter_v2.ContractType), *input.ContractParams.FeeQuoter.Version),
+			ChainSelector:  chain.Selector,
 			Args: fee_quoter_v2.ConstructorArgs{
 				StaticConfig: fee_quoter_v2.StaticConfig{
 					MaxFeeJuelsPerMsg:            input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
@@ -240,9 +247,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, updatePricesReport.Output)
 
 		// Deploy CCVAggregator
+		if input.ContractParams.CCVAggregator.Version == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("ccvAggregator version must be specified")
+		}
 		ccvAggregatorRef, err := maybeDeployContract(b, ccv_aggregator.Deploy, ccv_aggregator.ContractType, chain, contract.DeployInput[ccv_aggregator.ConstructorArgs]{
-			Version:       input.ContractParams.CCVAggregator.Version,
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(ccv_aggregator.ContractType), *input.ContractParams.CCVAggregator.Version),
+			ChainSelector:  chain.Selector,
 			Args: ccv_aggregator.ConstructorArgs{
 				StaticConfig: ccv_aggregator.StaticConfig{
 					LocalChainSelector:   chain.Selector,
@@ -258,9 +268,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, ccvAggregatorRef)
 
 		// Deploy CCVProxy
+		if input.ContractParams.CCVProxy.Version == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("ccvProxy version must be specified")
+		}
 		ccvProxyRef, err := maybeDeployContract(b, ccv_proxy.Deploy, ccv_proxy.ContractType, chain, contract.DeployInput[ccv_proxy.ConstructorArgs]{
-			Version:       input.ContractParams.CCVProxy.Version,
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(ccv_proxy.ContractType), *input.ContractParams.CCVProxy.Version),
+			ChainSelector:  chain.Selector,
 			Args: ccv_proxy.ConstructorArgs{
 				StaticConfig: ccv_proxy.StaticConfig{
 					ChainSelector:      chain.Selector,
@@ -279,9 +292,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, ccvProxyRef)
 
 		// Deploy CommitteeVerifier
+		if input.ContractParams.CommitteeVerifier.Version == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("committeeVerifier version must be specified")
+		}
 		committeeVerifierRef, err := maybeDeployContract(b, committee_verifier.Deploy, committee_verifier.ContractType, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
-			Version:       input.ContractParams.CommitteeVerifier.Version,
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(committee_verifier.ContractType), *input.ContractParams.CommitteeVerifier.Version),
+			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ConstructorArgs{
 				DynamicConfig: committee_verifier.DynamicConfig{
 					FeeQuoter:      common.HexToAddress(feeQuoterRef.Address),
@@ -309,8 +325,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy CommitteeVerifierProxy
 		committeeVerifierProxyRef, err := maybeDeployContract(b, committee_verifier.DeployProxy, committee_verifier.ProxyType, chain, contract.DeployInput[committee_verifier.ProxyConstructorArgs]{
-			Version:       semver.MustParse("1.7.0"),
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(committee_verifier.ProxyType), *semver.MustParse("1.7.0")),
+			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ProxyConstructorArgs{
 				RampAddress: common.HexToAddress(committeeVerifierRef.Address),
 			},
@@ -321,9 +337,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, committeeVerifierProxyRef)
 
 		// Deploy ExecutorOnRamp
+		if input.ContractParams.ExecutorOnRamp.Version == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("executorOnRamp version must be specified")
+		}
 		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, executor_onramp.ContractType, chain, contract.DeployInput[executor_onramp.ConstructorArgs]{
-			Version:       input.ContractParams.ExecutorOnRamp.Version,
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(executor_onramp.ContractType), *input.ContractParams.ExecutorOnRamp.Version),
+			ChainSelector:  chain.Selector,
 			Args: executor_onramp.ConstructorArgs{
 				MaxCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxCCVsPerMsg,
 			},
@@ -336,8 +355,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Deploy MockReceiver (defines committee verifier as required)
 		// TODO: Replace with a more configurable receiver contract.
 		mockReceiver, err := maybeDeployContract(b, mock_receiver.Deploy, mock_receiver.ContractType, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
-			Version:       semver.MustParse("1.7.0"),
-			ChainSelector: chain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(deployment.ContractType(mock_receiver.ContractType), *semver.MustParse("1.7.0")),
+			ChainSelector:  chain.Selector,
 			Args: mock_receiver.ConstructorArgs{
 				RequiredVerifiers: []common.Address{common.HexToAddress(committeeVerifierRef.Address)},
 			},

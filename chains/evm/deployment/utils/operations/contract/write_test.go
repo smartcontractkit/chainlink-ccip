@@ -89,7 +89,7 @@ func TestWrite(t *testing.T) {
 				ContractType:    testContractType,
 				ContractABI:     contractABI,
 				NewContract:     newTestContract,
-				IsAllowedCaller: OnlyOwner[*testContract],
+				IsAllowedCaller: OnlyOwner[*testContract, int],
 				Validate: func(input int) error {
 					if input%2 != 0 {
 						return fmt.Errorf("input must be even")
