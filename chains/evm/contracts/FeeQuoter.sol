@@ -64,6 +64,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
   }
 
   /// @dev Struct to hold the fee & validation configs for a destination chain.
+  // solhint-disable gas-struct-packing
   struct DestChainConfig {
     bool isEnabled; // ────────────────────╮ Whether this destination chain is enabled.
     uint32 maxDataBytes; //                │ Maximum data payload size in bytes.

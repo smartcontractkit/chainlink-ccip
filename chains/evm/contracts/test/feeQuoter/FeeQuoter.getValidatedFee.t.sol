@@ -91,7 +91,6 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
       message.feeToken = testTokens[i];
-      FeeQuoter.DestChainConfig memory destChainConfig = s_feeQuoter.getDestChainConfig(DEST_CHAIN_SELECTOR);
       uint32 destBytesOverhead =
         s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destBytesOverhead;
       uint32 tokenBytesOverhead =
@@ -124,7 +123,6 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: customGasLimit}))
       });
       uint64 premiumMultiplierWeiPerEth = s_feeQuoter.getPremiumMultiplierWeiPerEth(message.feeToken);
-      FeeQuoter.DestChainConfig memory destChainConfig = s_feeQuoter.getDestChainConfig(DEST_CHAIN_SELECTOR);
 
       message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 10000e18}); // feeTokenAmount
       message.data = "random bits and bytes that should be factored into the cost of the message";
