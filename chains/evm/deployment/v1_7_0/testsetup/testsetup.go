@@ -23,7 +23,6 @@ import (
 func CreateBasicFeeQuoterDestChainConfig() fee_quoter_v2.DestChainConfig {
 	return fee_quoter_v2.DestChainConfig{
 		IsEnabled:                         true,
-		MaxNumberOfTokensPerMsg:           10,
 		MaxDataBytes:                      30_000,
 		MaxPerMsgGasLimit:                 3_000_000,
 		DestGasOverhead:                   300_000,

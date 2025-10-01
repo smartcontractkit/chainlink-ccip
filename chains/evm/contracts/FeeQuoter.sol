@@ -69,7 +69,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
   /// @dev Struct to hold the fee & validation configs for a destination chain.
   struct DestChainConfig {
     bool isEnabled; // ─────────────────────────╮ Whether this destination chain is enabled.
-    uint16 maxNumberOfTokensPerMsg; //          │ Maximum number of distinct ERC20 tokens transferred per message.
     uint32 maxDataBytes; //                     │ Maximum data payload size in bytes.
     uint32 maxPerMsgGasLimit; //                │ Maximum gas limit for messages targeting EVMs.
     uint32 destGasOverhead; //                  │ Gas charged on top of the gasLimit to cover destination chain costs.
@@ -79,10 +78,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     uint32 destDataAvailabilityOverheadGas; //  │ Data availability gas charged for overhead costs e.g. for OCR.
     uint16 destGasPerDataAvailabilityByte; //   │ Gas units charged per byte of message data that needs availability.
     uint16 destDataAvailabilityMultiplierBps; //│ Multiplier for data availability gas, multiples of bps, or 0.0001.
-    bytes4 chainFamilySelector; //──────────────╯ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
+    bytes4 chainFamilySelector; //              │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
-    uint16 defaultTokenFeeUSDCents; // ────╮ Default token fee charged per token transfer.
-    uint32 defaultTokenDestGasOverhead; // │ Default gas charged to execute a token transfer on the destination chain.
+    uint16 defaultTokenFeeUSDCents; // ─────────╯ Default token fee charged per token transfer.
+    uint32 defaultTokenDestGasOverhead; //─╮ Default gas charged to execute a token transfer on the destination chain.
     uint32 defaultTxGasLimit; //           │ Default gas limit for a tx.
     uint64 gasMultiplierWeiPerEth; //      │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
     uint32 gasPriceStalenessThreshold; //  │ The amount of time a gas price can be stale before it is considered invalid (0 means disabled).
@@ -541,8 +540,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     uint256 numberOfTokens = tokenAmounts.length;
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      Client.EVMTokenAmount memory tokenAmount = tokenAmounts[i];
-      TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector][tokenAmount.token];
+      TokenTransferFeeConfig memory transferFeeConfig =
+        s_tokenTransferFeeConfig[destChainSelector][tokenAmounts[i].token];
 
       // If the token has no specific overrides configured, we use the global defaults.
       if (!transferFeeConfig.isEnabled) {
@@ -787,8 +786,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
     if (dataLength > uint256(destChainConfig.maxDataBytes)) {
       revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), dataLength);
     }
-    if (numberOfTokens > uint256(destChainConfig.maxNumberOfTokensPerMsg)) {
-      revert UnsupportedNumberOfTokens(numberOfTokens, destChainConfig.maxNumberOfTokensPerMsg);
+    if (numberOfTokens > 1) {
+      revert UnsupportedNumberOfTokens(numberOfTokens, 1);
     }
 
     // resolve gas limit and validate chainFamilySelector

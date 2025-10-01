@@ -106,31 +106,6 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
     assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
   }
 
-  function testFuzz_TokenTransferFeeDuplicateTokens_Success(uint256 transfers, uint256 amount) public view {
-    // It shouldn't be possible to pay materially lower fees by splitting up the transfers.
-    // Note it is possible to pay higher fees since the minimum fees are added.
-    FeeQuoter.DestChainConfig memory destChainConfig = s_feeQuoter.getDestChainConfig(DEST_CHAIN_SELECTOR);
-    transfers = bound(transfers, 1, destChainConfig.maxNumberOfTokensPerMsg);
-    // Cap amount to avoid overflow
-    amount = bound(amount, 0, 1e36);
-    Client.EVMTokenAmount[] memory multiple = new Client.EVMTokenAmount[](transfers);
-    for (uint256 i = 0; i < transfers; ++i) {
-      multiple[i] = Client.EVMTokenAmount({token: s_sourceTokens[0], amount: amount});
-    }
-    Client.EVMTokenAmount[] memory single = new Client.EVMTokenAmount[](1);
-    single[0] = Client.EVMTokenAmount({token: s_sourceTokens[0], amount: amount * transfers});
-
-    (uint256 feeSingleUSDWei, uint32 gasOverheadSingle, uint32 bytesOverheadSingle) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, single);
-    (uint256 feeMultipleUSDWei, uint32 gasOverheadMultiple, uint32 bytesOverheadMultiple) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, multiple);
-
-    // Note that there can be a rounding error once per split.
-    assertGe(feeMultipleUSDWei, (feeSingleUSDWei - destChainConfig.maxNumberOfTokensPerMsg));
-    assertEq(gasOverheadMultiple, gasOverheadSingle * transfers);
-    assertEq(bytesOverheadMultiple, bytesOverheadSingle * transfers);
-  }
-
   function test_MixedTokenTransferFee() public view {
     address[3] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative(), CUSTOM_TOKEN];
     FeeQuoter.TokenTransferFeeConfig[3] memory tokenTransferFeeConfigs = [
