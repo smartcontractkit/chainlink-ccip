@@ -2,6 +2,7 @@ package v1_6
 
 import (
 	"fmt"
+	"math/big"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -53,7 +54,10 @@ func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChain
 			Selector:                   src.Selector,
 			RemoteSelector:             dest.Selector,
 			UpdateFeeQuoterDestsConfig: src.FeeQuoterDestChainConfig,
-			UpdateFeeQuoterPrices:      src.FeeQuoterPriceUpdateConfig,
+			UpdateFeeQuoterPrices: FeeQuoterPriceUpdatePerSource{
+				TokenPrices: src.TokenPrices,
+				GasPrices:   map[uint64]*big.Int{dest.Selector: dest.GasPrice},
+			},
 			UpdateOnRampDestsConfig: UpdateOnRampDestsInput{
 				IsEnabled:        !lane.IsDisabled,
 				TestRouter:       lane.TestRouter,

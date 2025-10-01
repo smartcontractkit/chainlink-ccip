@@ -7,10 +7,12 @@ type ChainDefinition struct {
 	ConnectionConfig
 	// Selector is the chain selector of this chain.
 	Selector uint64
+	// GasPrice defines the USD price (18 decimals) per unit gas for this chain as a destination.
+	GasPrice *big.Int
+	// TokenPrices define the USD price (18 decimals) per 1e18 of the smallest token denomination for various tokens on this chain.
+	TokenPrices map[string]*big.Int
 	// FeeQuoterDestChainConfig is the configuration to be applied on source chain when this chain is a destination.
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
-	// FeeQuoterPriceUpdate is the price update to be applied on source chain when this chain is a destination.
-	FeeQuoterPriceUpdateConfig FeeQuoterPriceUpdatePerSource
 }
 
 type ConnectionConfig struct {
