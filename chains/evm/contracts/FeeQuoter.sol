@@ -130,7 +130,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   struct TokenTransferFeeConfig {
     uint32 minFeeUSDCents; // ───╮ Minimum fee to charge per token transfer, multiples of 0.01 USD.
     uint32 maxFeeUSDCents; //    │ Maximum fee to charge per token transfer, multiples of 0.01 USD.
-    uint16 deciBps; //           │ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5.
     uint32 destGasOverhead; //   │ Gas charged to execute the token transfer on the destination chain.
     //                           │ Data availability bytes that are returned from the source pool and sent to the dest
     uint32 destBytesOverhead; // │ pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES. Set as multiple of 32 bytes.
@@ -706,42 +705,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         continue;
       }
 
-      uint256 bpsFeeUSDWei = 0;
-      // Only calculate bps fee if ratio is greater than 0. Ratio of 0 means no bps fee for a token.
-      // Useful for when the FeeQuoter cannot return a valid price for the token.
-      if (transferFeeConfig.deciBps > 0) {
-        uint224 tokenPrice = 0;
-        if (tokenAmount.token != feeToken) {
-          tokenPrice = _getValidatedTokenPrice(tokenAmount.token);
-        } else {
-          tokenPrice = feeTokenPrice;
-        }
-
-        // Calculate token transfer value, then apply fee ratio.
-        // ratio represents multiples of 0.1bps, or 1e-5.
-        bpsFeeUSDWei = (tokenPrice._calcUSDValueFromTokenAmount(tokenAmount.amount) * transferFeeConfig.deciBps) / 1e5;
-      }
-
       tokenTransferGas += transferFeeConfig.destGasOverhead;
       tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead;
 
-      // Bps fees should be kept within range of [minFeeUSD, maxFeeUSD].
       // Convert USD values with 2 decimals to 18 decimals.
-      uint256 minFeeUSDWei = uint256(transferFeeConfig.minFeeUSDCents) * 1e16;
-      if (bpsFeeUSDWei < minFeeUSDWei) {
-        tokenTransferFeeUSDWei += minFeeUSDWei;
-        continue;
-      }
-
-      uint256 maxFeeUSDWei = uint256(transferFeeConfig.maxFeeUSDCents) * 1e16;
-      if (bpsFeeUSDWei > maxFeeUSDWei) {
-        tokenTransferFeeUSDWei += maxFeeUSDWei;
-        continue;
-      }
-
-      // In the case where bpsFeeUSDWei, minFeeUSDWei, and maxFeeUSDWei are all 0, we skip the fee. This is intended
-      // to allow for a fee of 0 to be set.
-      tokenTransferFeeUSDWei += bpsFeeUSDWei;
+      tokenTransferFeeUSDWei += uint256(transferFeeConfig.minFeeUSDCents) * 1e16;
     }
 
     return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);

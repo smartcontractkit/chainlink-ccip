@@ -66,7 +66,6 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
       minFeeUSDCents: 6,
       maxFeeUSDCents: 7,
-      deciBps: 8,
       destGasOverhead: 9,
       destBytesOverhead: 312,
       isEnabled: true
@@ -75,7 +74,6 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
       minFeeUSDCents: 12,
       maxFeeUSDCents: 13,
-      deciBps: 14,
       destGasOverhead: 15,
       destBytesOverhead: 394,
       isEnabled: true
@@ -170,7 +168,6 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
       minFeeUSDCents: 6,
       maxFeeUSDCents: 7,
-      deciBps: 8,
       destGasOverhead: 9,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1),
       isEnabled: true
