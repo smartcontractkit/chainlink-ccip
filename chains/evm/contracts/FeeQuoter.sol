@@ -13,7 +13,6 @@ import {KeystoneFeedsPermissionHandler} from "@chainlink/contracts/src/v0.8/keys
 import {KeystoneFeedDefaultMetadataLib} from
   "@chainlink/contracts/src/v0.8/keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/interfaces/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
@@ -241,27 +240,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // ================================================================
 
   /// @inheritdoc IFeeQuoter
+  /// @dev returns the price even if it's stale or zero.
   function getTokenPrice(
     address token
   ) public view override returns (Internal.TimestampedPackedUint224 memory) {
-    Internal.TimestampedPackedUint224 memory tokenPrice = s_usdPerToken[token];
-
-    // If the token price is not stale, return it.
-    if (block.timestamp - tokenPrice.timestamp < i_tokenPriceStalenessThreshold) {
-      return tokenPrice;
-    }
-
-    // When we have a stale price we should check if there is a more up to date source. If not, return the stale price.
-    TokenPriceFeedConfig memory priceFeedConfig = s_usdPriceFeedsPerToken[token];
-    if (!priceFeedConfig.isEnabled || priceFeedConfig.dataFeedAddress == address(0)) {
-      return tokenPrice;
-    }
-
-    // If the token price feed is set, retrieve the price from the feed.
-    Internal.TimestampedPackedUint224 memory feedPrice = _getTokenPriceFromDataFeed(priceFeedConfig);
-
-    // We check if the feed price isn't more stale than the stored price. Return the most recent one.
-    return feedPrice.timestamp >= tokenPrice.timestamp ? feedPrice : tokenPrice;
+    return s_usdPerToken[token];
   }
 
   /// @notice Get the `tokenPrice` for a given token, checks if the price is valid.
@@ -357,33 +340,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     // Token price must be set at least once.
     if (tokenPrice.timestamp == 0 || tokenPrice.value == 0) revert TokenNotSupported(token);
     return tokenPrice.value;
-  }
-
-  /// @notice Gets the token price from a data feed address, rebased to the same units as s_usdPerToken.
-  /// @param priceFeedConfig token data feed configuration with valid data feed address (used to retrieve price & timestamp).
-  /// @return tokenPrice data feed price answer rebased to s_usdPerToken units, with latest block timestamp.
-  function _getTokenPriceFromDataFeed(
-    TokenPriceFeedConfig memory priceFeedConfig
-  ) internal view returns (Internal.TimestampedPackedUint224 memory tokenPrice) {
-    AggregatorV3Interface dataFeedContract = AggregatorV3Interface(priceFeedConfig.dataFeedAddress);
-    (
-      // uint80 roundID
-      ,
-      int256 dataFeedAnswer,
-      // uint startedAt
-      ,
-      uint256 updatedAt,
-      // uint80 answeredInRound
-    ) = dataFeedContract.latestRoundData();
-
-    if (dataFeedAnswer < 0) {
-      revert DataFeedValueOutOfUint224Range();
-    }
-    uint224 rebasedValue =
-      _calculateRebasedValue(dataFeedContract.decimals(), priceFeedConfig.tokenDecimals, uint256(dataFeedAnswer));
-
-    // Data feed staleness is unchecked to decouple the FeeQuoter from data feed delay issues.
-    return Internal.TimestampedPackedUint224({value: rebasedValue, timestamp: uint32(updatedAt)});
   }
 
   /// @dev Gets the fee token price and the gas price, both denominated in dollars.
