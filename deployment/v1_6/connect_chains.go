@@ -57,7 +57,7 @@ func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChain
 			TestRouter:                 lane.TestRouter,
 			IsRMNVerificationDisabled:  lane.Source.RMNVerificationDisabled,
 			AllowListEnabled:           lane.Source.AllowListEnabled,
-			UpdateFeeQuoterDestsConfig: src.FeeQuoterDestChainConfig,
+			UpdateFeeQuoterDestsConfig: dest.FeeQuoterDestChainConfig,
 			UpdateFeeQuoterPrices: FeeQuoterPriceUpdatePerSource{
 				TokenPrices: src.TokenPrices,
 				GasPrices:   map[uint64]*big.Int{dest.Selector: dest.GasPrice},
