@@ -58,7 +58,7 @@ func NewDefaultAccessor(
 func (l *DefaultAccessor) GetContractAddress(contractName string) ([]byte, error) {
 	bindings := l.contractReader.GetBindings(contractName)
 	if len(bindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
+		return nil, fmt.Errorf("expected one binding for the %s contract, got %d, for accessor on chain %d", contractName, len(bindings), l.chainSelector)
 	}
 
 	addressBytes, err := l.addrCodec.AddressStringToBytes(bindings[0].Binding.Address, l.chainSelector)
@@ -84,11 +84,11 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 	var standardOffRampRequestCount int
 	if l.chainSelector == destChainSelector {
 		lggr.Debugw("getting ChainConfigSnapshot and and OffRamp SourceChainConfigs for destination chain",
-			"chainSelector", l.chainSelector)
+			"accessorSelector", l.chainSelector)
 		configRequests, standardOffRampRequestCount = prepareDestChainRequest(sourceChainSelectors)
 	} else {
 		lggr.Debugw("getting ChainConfigSnapshot for a source chain",
-			"chainSelector", l.chainSelector)
+			"accessorSelector", l.chainSelector)
 		configRequests = prepareSourceChainRequest(destChainSelector)
 	}
 
@@ -99,7 +99,9 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 	}
 
 	if len(skipped) > 0 {
-		lggr.Warnw("chain reader skipped some config requests", "skipped", skipped)
+		lggr.Warnw("chain reader skipped some config requests",
+			"skipped", skipped, "accessorSelector", l.chainSelector, "destChainSelector", destChainSelector,
+			"sourceChainSelectors", sourceChainSelectors)
 	}
 
 	// Process standard results (ChainConfigSnapshot)
@@ -107,16 +109,22 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 	standardConfigs, err := processConfigResults(lggr, l.chainSelector, destChainSelector, standardResultsCopy)
 	if err != nil {
 		// Log error but don't return yet and attempt to process source chain configs
-		lggr.Errorw("failed to process standard chain config results", "err", err)
+		lggr.Errorw("failed to process standard chain config results", "accessorSelector", l.chainSelector,
+			"destChainSelector", destChainSelector, "sourceChainSelectors", sourceChainSelectors, "err", err)
 		standardConfigs = cciptypes.ChainConfigSnapshot{}
 	}
 
 	// Process source chain config results
-	sourceChainConfigs := processSourceChainConfigResults(
-		lggr,
+	sourceChainConfigs := l.processSourceChainConfigResults(
 		batchResult,
 		standardOffRampRequestCount,
 		sourceChainSelectors,
+	)
+	l.lggr.Debugw("processed all chain config results",
+		"accessorSelector", l.chainSelector,
+		"destChainSelector", destChainSelector,
+		"sourceChainSelectors", sourceChainSelectors,
+		"numSourceChainConfigs", len(sourceChainConfigs),
 	)
 	return standardConfigs, sourceChainConfigs, nil
 }
@@ -823,7 +831,7 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 	)
 
 	if err != nil {
-		lggr.Errorw("failed to batch get chain fee price updates", "err", err)
+		lggr.Errorw("failed to batch get chain fee price updates", "accessorSelector", l.chainSelector, "err", err)
 		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig), nil // Return a new empty map
 	}
 
@@ -834,12 +842,13 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 		if contract.Name == consts.ContractNameFeeQuoter {
 			feeQuoterResults = results
 			found = true
+			lggr.Debugw("found fee quoter results")
 			break // Found the results, exit loop
 		}
 	}
 
 	if !found {
-		lggr.Errorw("FeeQuoter results missing from batch response")
+		lggr.Errorw("FeeQuoter results missing from batch response", "accessorSelector", l.chainSelector)
 		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig), nil // Return a new empty map
 	}
 
@@ -867,6 +876,7 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 		if i >= len(results) {
 			// Log error if we have fewer results than requested selectors
 			lggr.Errorw("Skipping selector due to missing result",
+				"accessorSelector", l.chainSelector,
 				"selectorIndex", i,
 				"chain", chain,
 				"lenFeeQuoterResults", len(results))
@@ -877,6 +887,7 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 		val, err := readResult.GetResult()
 		if err != nil {
 			lggr.Warnw("failed to get chain fee price update from batch result",
+				"accessorSelector", l.chainSelector,
 				"chain", chain,
 				"err", err)
 			continue
@@ -886,6 +897,7 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 		update, ok := val.(*cciptypes.TimestampedUnixBig)
 		if !ok || update == nil {
 			lggr.Warnw("Invalid type or nil value received for chain fee price update",
+				"accessorSelector", l.chainSelector,
 				"chain", chain,
 				"type", fmt.Sprintf("%T", val),
 				"ok", ok)
@@ -895,6 +907,7 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 		// Check if the update is empty
 		if update.Timestamp == 0 || update.Value == nil {
 			lggr.Debugw("chain fee price update is empty",
+				"accessorSelector", l.chainSelector,
 				"chain", chain,
 				"update", update)
 			continue
@@ -918,7 +931,7 @@ func (l *DefaultAccessor) GetLatestPriceSeqNr(ctx context.Context) (cciptypes.Se
 		&latestSeqNr,
 	)
 	if err != nil {
-		return 0, fmt.Errorf("get latest price sequence number: %w", err)
+		return 0, fmt.Errorf("get latest price sequence number for accessor %d: %w", l.chainSelector, err)
 	}
 	return cciptypes.SeqNum(latestSeqNr), nil
 }

@@ -54,8 +54,7 @@ func processConfigResults(
 }
 
 // processSourceChainConfigResults extracts and processes source chain config results from the batch
-func processSourceChainConfigResults(
-	lggr logger.Logger,
+func (l *DefaultAccessor) processSourceChainConfigResults(
 	batchResult types.BatchGetLatestValuesResult,
 	standardOffRampRequestCount int,
 	filteredSourceChains []cciptypes.ChainSelector,
@@ -69,7 +68,8 @@ func processSourceChainConfigResults(
 			sourceChainResults := results[standardOffRampRequestCount:]
 
 			if len(sourceChainResults) != len(filteredSourceChains) {
-				lggr.Warnw("Source chain result count mismatch",
+				l.lggr.Warnw("Source chain result count mismatch",
+					"accessorSelector", l.chainSelector,
 					"expected", len(filteredSourceChains),
 					"got", len(sourceChainResults))
 			} else {
@@ -81,16 +81,17 @@ func processSourceChainConfigResults(
 
 					v, err := sourceChainResults[i].GetResult()
 					if err != nil {
-						lggr.Errorw("Failed to get source chain config from result",
-							"chain", chain,
+						l.lggr.Errorw("Failed to get source chain config from result",
+							"accessorSelector", l.chainSelector,
+							"sourceChain", chain,
 							"error", err)
 						continue
 					}
 
 					cfg, ok := v.(*cciptypes.SourceChainConfig)
 					if !ok {
-						lggr.Errorw("Invalid result type from GetSourceChainConfig",
-							"chain", chain,
+						l.lggr.Errorw("Invalid result type from GetSourceChainConfig",
+							"sourceChain", chain,
 							"type", fmt.Sprintf("%T", v))
 						continue
 					}

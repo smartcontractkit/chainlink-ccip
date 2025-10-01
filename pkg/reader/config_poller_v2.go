@@ -344,7 +344,7 @@ func (c *configPollerV2) refreshAllKnownChains() {
 	for _, chain := range chainsToRefresh {
 		ctx, cancel := context.WithTimeout(context.Background(), bgRefreshTimeout)
 		c.lggr.Debugw("Issuing background refresh for known chain",
-			"chain", chain, "destChain", c.destChainSelector)
+			"chain", chain, "destChain", c.destChainSelector, "trackedSourceChains", c.knownSourceChains)
 		if err := c.batchRefreshChainAndSourceConfigs(ctx, chain); err != nil {
 			refreshFailed = true
 			c.lggr.Warnw("Failed to batch refresh configs", "chain", chain, "error", err)
@@ -381,6 +381,8 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	if fetchingForDestChain {
 		// Acquires read lock on 'c'
 		sourceChainSelectors = c.getKnownSourceChainsForDestChain()
+		c.lggr.Debugw("Issuing batch refresh for dest chain",
+			"destChainSelector", c.destChainSelector, "sourceChains", sourceChainSelectors)
 	}
 
 	// Use chainAccessor to fetch ChainConfigSnapshot (and SourceChainConfigs if destChain)
@@ -397,7 +399,8 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 		sourceChainSelectors,
 	)
 	if err != nil {
-		c.lggr.Errorw("Failed batch fetch via chainAccessor", "chain", chainSel, "error", err)
+		c.lggr.Errorw("Failed batch fetch via chainAccessor",
+			"chain", chainSel, "destChainSelector", c.destChainSelector, "error", err)
 		return err
 	}
 
@@ -420,6 +423,12 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 		}
 		cache.sourceChainRefresh = time.Now()
 		cache.sourceChainMu.Unlock()
+		c.lggr.Debugw("Batch refreshed for dest chain",
+			"destChainSelector", c.destChainSelector,
+			"sourceChainsFetched", len(sourceChainConfigs),
+			"chainSel", chainSel,
+			"latency", time.Since(start))
+
 	} else if !fetchingForDestChain && len(sourceChainConfigs) > 0 {
 		c.lggr.Errorw("OffRamp SourceChainConfigs were returned when fetching configs from a source chain, "+
 			"this is not expected",
@@ -489,6 +498,7 @@ func (c *configPollerV2) trackSourceChainForDest(sourceChain cciptypes.ChainSele
 	defer c.Unlock()
 
 	// Add the source chain to the knownSourceChains map for the destination chain
+	c.lggr.Debugw("Tracking source chain", "destChain", c.destChainSelector, "sourceChain", sourceChain)
 	c.knownSourceChains[sourceChain] = struct{}{}
 	return true
 }
