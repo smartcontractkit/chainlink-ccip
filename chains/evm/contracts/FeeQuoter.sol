@@ -127,7 +127,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
   /// @dev Struct with transfer fee configuration for token transfers.
   struct TokenTransferFeeConfig {
-    uint32 minFeeUSDCents; // ───╮ Minimum fee to charge per token transfer, multiples of 0.01 USD.
+    uint32 feeUSDCents; // ──────╮ Minimum fee to charge per token transfer, multiples of 0.01 USD.
     uint32 destGasOverhead; //   │ Gas charged to execute the token transfer on the destination chain.
     //                           │ Data availability bytes that are returned from the source pool and sent to the dest
     uint32 destBytesOverhead; // │ pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES. Set as multiple of 32 bytes.
@@ -574,8 +574,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         destChainConfig.defaultTokenFeeUSDCents,
         destChainConfig.defaultTokenDestGasOverhead,
         destChainSelector,
-        message.feeToken,
-        feeTokenPrice,
         message.tokenAmounts
       );
     } else {
@@ -675,8 +673,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @param defaultTokenFeeUSDCents the default token fee in USD cents.
   /// @param defaultTokenDestGasOverhead the default token destination gas overhead.
   /// @param destChainSelector the destination chain selector.
-  /// @param feeToken address of the feeToken.
-  /// @param feeTokenPrice price of feeToken in USD with 18 decimals.
   /// @param tokenAmounts token transfers in the message.
   /// @return tokenTransferFeeUSDWei total token transfer bps fee in USD with 18 decimals.
   /// @return tokenTransferGas total execution gas of the token transfers.
@@ -685,8 +681,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     uint256 defaultTokenFeeUSDCents,
     uint32 defaultTokenDestGasOverhead,
     uint64 destChainSelector,
-    address feeToken,
-    uint224 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) internal view returns (uint256 tokenTransferFeeUSDWei, uint32 tokenTransferGas, uint32 tokenTransferBytesOverhead) {
     uint256 numberOfTokens = tokenAmounts.length;
@@ -707,7 +701,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead;
 
       // Convert USD values with 2 decimals to 18 decimals.
-      tokenTransferFeeUSDWei += uint256(transferFeeConfig.minFeeUSDCents) * 1e16;
+      tokenTransferFeeUSDWei += uint256(transferFeeConfig.feeUSDCents) * 1e16;
     }
 
     return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);

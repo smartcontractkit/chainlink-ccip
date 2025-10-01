@@ -12,10 +12,8 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
   ) public {
     // To prevent Invalid Fee Range error from the fuzzer, bound the results to a valid range that
     // where minFee < maxFee
-    tokenTransferFeeConfigs[0].minFeeUSDCents =
-      uint32(bound(tokenTransferFeeConfigs[0].minFeeUSDCents, 0, type(uint8).max));
-    tokenTransferFeeConfigs[1].minFeeUSDCents =
-      uint32(bound(tokenTransferFeeConfigs[1].minFeeUSDCents, 0, type(uint8).max));
+    tokenTransferFeeConfigs[0].feeUSDCents = uint32(bound(tokenTransferFeeConfigs[0].feeUSDCents, 0, type(uint8).max));
+    tokenTransferFeeConfigs[1].feeUSDCents = uint32(bound(tokenTransferFeeConfigs[1].feeUSDCents, 0, type(uint8).max));
 
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(2, 2);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
@@ -57,14 +55,10 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig =
-      FeeQuoter.TokenTransferFeeConfig({minFeeUSDCents: 6, destGasOverhead: 9, destBytesOverhead: 312, isEnabled: true});
+      FeeQuoter.TokenTransferFeeConfig({feeUSDCents: 6, destGasOverhead: 9, destBytesOverhead: 312, isEnabled: true});
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].token = address(11);
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 12,
-      destGasOverhead: 15,
-      destBytesOverhead: 394,
-      isEnabled: true
-    });
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig =
+      FeeQuoter.TokenTransferFeeConfig({feeUSDCents: 12, destGasOverhead: 15, destBytesOverhead: 394, isEnabled: true});
 
     vm.expectEmit();
     emit FeeQuoter.TokenTransferFeeConfigUpdated(
@@ -153,7 +147,7 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 6,
+      feeUSDCents: 6,
       destGasOverhead: 9,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1),
       isEnabled: true

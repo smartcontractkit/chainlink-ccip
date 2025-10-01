@@ -15,7 +15,7 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
   function test_NoTokenTransferChargesZeroFee() public view {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
+      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.tokenAmounts);
 
     assertEq(0, feeUSDWei);
     assertEq(0, destGasOverhead);
@@ -32,7 +32,7 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
     assertFalse(transferFeeConfig.isEnabled);
 
     (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
+      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.tokenAmounts);
 
     // Assert that the default values are used
     assertEq(uint256(DEFAULT_TOKEN_FEE_USD_CENTS) * 1e16, feeUSDWei);
@@ -46,9 +46,9 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
       s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
 
     (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
+      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.tokenAmounts);
 
-    assertEq(_configUSDCentToWei(transferFeeConfig.minFeeUSDCents), feeUSDWei);
+    assertEq(_configUSDCentToWei(transferFeeConfig.feeUSDCents), feeUSDWei);
     assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
     assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
   }
@@ -59,9 +59,9 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
       s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
 
     (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
+      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.tokenAmounts);
 
-    assertEq(_configUSDCentToWei(transferFeeConfig.minFeeUSDCents), feeUSDWei);
+    assertEq(_configUSDCentToWei(transferFeeConfig.feeUSDCents), feeUSDWei);
     assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
     assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
   }
@@ -72,9 +72,9 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
       s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token);
 
     (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
+      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.tokenAmounts);
 
-    assertEq(_configUSDCentToWei(transferFeeConfig.minFeeUSDCents), feeUSDWei);
+    assertEq(_configUSDCentToWei(transferFeeConfig.feeUSDCents), feeUSDWei);
     assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
     assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
   }
@@ -84,7 +84,7 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = s_sourceFeeToken;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 0,
+      feeUSDCents: 0,
       destGasOverhead: 0,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
       isEnabled: true
@@ -95,13 +95,11 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
 
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
     (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_feeTokenPrice, message.tokenAmounts);
+      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.tokenAmounts);
 
     // if token charges 0 bps, it should cost minFee to transfer
     assertEq(
-      _configUSDCentToWei(
-        tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.minFeeUSDCents
-      ),
+      _configUSDCentToWei(tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.feeUSDCents),
       feeUSDWei
     );
     assertEq(0, destGasOverhead);
@@ -122,12 +120,10 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
     Client.EVMTokenAmount[] memory single = new Client.EVMTokenAmount[](1);
     single[0] = Client.EVMTokenAmount({token: s_sourceTokens[0], amount: amount * transfers});
 
-    address feeToken = s_sourceRouter.getWrappedNative();
-
     (uint256 feeSingleUSDWei, uint32 gasOverheadSingle, uint32 bytesOverheadSingle) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, feeToken, s_wrappedTokenPrice, single);
+      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, single);
     (uint256 feeMultipleUSDWei, uint32 gasOverheadMultiple, uint32 bytesOverheadMultiple) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, feeToken, s_wrappedTokenPrice, multiple);
+      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, multiple);
 
     // Note that there can be a rounding error once per split.
     assertGe(feeMultipleUSDWei, (feeSingleUSDWei - destChainConfig.maxNumberOfTokensPerMsg));
@@ -137,7 +133,6 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
 
   function test_MixedTokenTransferFee() public view {
     address[3] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative(), CUSTOM_TOKEN];
-    uint224[3] memory tokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice, CUSTOM_TOKEN_PRICE];
     FeeQuoter.TokenTransferFeeConfig[3] memory tokenTransferFeeConfigs = [
       s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, testTokens[0]),
       s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, testTokens[1]),
@@ -167,14 +162,14 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
         : tokenTransferFeeConfig.destBytesOverhead;
     }
     (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
+      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.tokenAmounts);
 
     uint256 expectedFeeUSDWei = 0;
     for (uint256 i = 0; i < testTokens.length; ++i) {
       expectedFeeUSDWei += _configUSDCentToWei(
-        tokenTransferFeeConfigs[i].minFeeUSDCents == 0
+        tokenTransferFeeConfigs[i].feeUSDCents == 0
           ? DEFAULT_TOKEN_FEE_USD_CENTS
-          : tokenTransferFeeConfigs[i].minFeeUSDCents
+          : tokenTransferFeeConfigs[i].feeUSDCents
       );
     }
 

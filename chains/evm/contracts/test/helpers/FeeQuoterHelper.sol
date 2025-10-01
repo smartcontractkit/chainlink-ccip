@@ -43,16 +43,12 @@ contract FeeQuoterHelper is FeeQuoterV2 {
 
   function getTokenTransferCost(
     uint64 destChainSelector,
-    address feeToken,
-    uint224 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) external view returns (uint256, uint32, uint32) {
     return _getTokenTransferCost(
       s_destChainConfigs[destChainSelector].defaultTokenFeeUSDCents,
       s_destChainConfigs[destChainSelector].defaultTokenDestGasOverhead,
       destChainSelector,
-      feeToken,
-      feeTokenPrice,
       tokenAmounts
     );
   }
