@@ -10,20 +10,10 @@ contract FeeQuoterV2 is IFeeQuoterV2, FeeQuoter {
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
-    address[] memory feeTokens,
+    PremiumMultiplierWeiPerEthArgs[] memory feeTokens,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
-    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
-  )
-    FeeQuoter(
-      staticConfig,
-      priceUpdaters,
-      feeTokens,
-      tokenTransferFeeConfigArgs,
-      premiumMultiplierWeiPerEthArgs,
-      destChainConfigArgs
-    )
-  {}
+  ) FeeQuoter(staticConfig, priceUpdaters, feeTokens, tokenTransferFeeConfigArgs, destChainConfigArgs) {}
 
   function resolveTokenReceiver(
     bytes calldata extraArgs

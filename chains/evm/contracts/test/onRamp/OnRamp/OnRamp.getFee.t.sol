@@ -50,7 +50,7 @@ contract OnRamp_getFee is OnRampSetup {
 
     FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory tokenMults = new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](1);
     tokenMults[0] = FeeQuoter.PremiumMultiplierWeiPerEthArgs({token: message.feeToken, premiumMultiplierWeiPerEth: 0});
-    s_feeQuoter.applyPremiumMultiplierWeiPerEthUpdates(tokenMults);
+    s_feeQuoter.applyFeeTokensUpdates(new address[](0), tokenMults);
 
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IMessageInterceptor} from "../../../interfaces/IMessageInterceptor.sol";
-
 import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
@@ -41,7 +40,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
 
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
-    s_feeQuoter.applyFeeTokensUpdates(feeTokens, new address[](0));
+    s_feeQuoter.applyFeeTokensUpdates(feeTokens, new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](0));
 
     uint64[] memory destinationChainSelectors = new uint64[](1);
     destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;

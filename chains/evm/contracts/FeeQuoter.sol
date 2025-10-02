@@ -42,7 +42,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   error InvalidSVMExtraArgsWritableBitmap(uint64 accountIsWritableBitmap, uint256 numAccounts);
   error TooManySuiExtraArgsReceiverObjectIds(uint256 numReceiverObjectIds, uint256 maxReceiverObjectIds);
 
-  event FeeTokenAdded(address indexed feeToken);
+  event FeeTokenAdded(address indexed feeToken, uint256 feemMultiplierWeiPerEth);
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
@@ -121,7 +121,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     uint64 premiumMultiplierWeiPerEth; // ─╯ Multiplier for destination chain specific premiums.
   }
 
-  string public constant override typeAndVersion = "FeeQuoter 1.6.3-dev";
+  string public constant override typeAndVersion = "FeeQuoter 1.7.0-dev";
 
   /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals. Multiple gas prices can
   /// be encoded into the same value. Each price takes {Internal.GAS_PRICE_BITS} bits. For example, if Optimism is the
@@ -163,9 +163,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
-    address[] memory feeTokens,
+    PremiumMultiplierWeiPerEthArgs[] memory feeTokens,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
-    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
   ) AuthorizedCallers(priceUpdaters) {
     if (staticConfig.linkToken == address(0) || staticConfig.maxFeeJuelsPerMsg == 0) {
@@ -177,7 +176,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
 
     _applyFeeTokensUpdates(new address[](0), feeTokens);
     _applyDestChainConfigUpdates(destChainConfigArgs);
-    _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
     _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, new TokenTransferFeeConfigRemoveArgs[](0));
   }
 
@@ -230,40 +228,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
 
-  /// @notice Gets the fee token price and the gas price, both denominated in dollars.
-  /// @param token The source token to get the price for.
-  /// @param destChainSelector The destination chain to get the gas price for.
-  /// @return tokenPrice The price of the feeToken in 1e18 dollars per base unit.
-  /// @return gasPriceValue The price of gas in 1e18 dollars per base unit.
-  function getTokenAndGasPrices(
-    address token,
-    uint64 destChainSelector
-  ) external view returns (uint224 tokenPrice, uint224 gasPriceValue) {
-    if (!s_destChainConfigs[destChainSelector].isEnabled) revert DestinationChainNotEnabled(destChainSelector);
-    return (_getValidatedTokenPrice(token), s_usdPerUnitGasByDestChainSelector[destChainSelector].value);
-  }
-
-  /// @notice Convert a given token amount to target token amount.
-  /// @dev this function assumes that no more than 1e59 dollars are sent as payment.
-  /// If more is sent, the multiplication of feeTokenAmount and feeTokenValue will overflow.
-  /// Since there isn't even close to 1e59 dollars in the world economy this is safe.
-  /// @param fromToken The given token address.
-  /// @param fromTokenAmount The given token amount.
-  /// @param toToken The target token address.
-  /// @return toTokenAmount The target token amount.
-  function convertTokenAmount(
-    address fromToken,
-    uint256 fromTokenAmount,
-    address toToken
-  ) public view returns (uint256) {
-    /// Example:
-    /// fromTokenAmount:   1e18      // 1 ETH
-    /// ETH:               2_000e18
-    /// LINK:              5e18
-    /// return:            1e18 * 2_000e18 / 5e18 = 400e18 (400 LINK)
-    return (fromTokenAmount * _getValidatedTokenPrice(fromToken)) / _getValidatedTokenPrice(toToken);
-  }
-
   /// @notice Gets the token price for a given token and reverts if the token is not supported.
   /// @param token The address of the token to get the price for.
   /// @return tokenPriceValue The token price.
@@ -285,13 +249,22 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     return s_feeTokens.values();
   }
 
+  /// @notice Gets the fee configuration for a token.
+  /// @param token The token to get the fee configuration for.
+  /// @return premiumMultiplierWeiPerEth The multiplier for destination chain specific premiums.
+  function getPremiumMultiplierWeiPerEth(
+    address token
+  ) external view returns (uint64 premiumMultiplierWeiPerEth) {
+    return s_premiumMultiplierWeiPerEth[token];
+  }
+
   /// @notice Add and remove tokens from feeTokens set.
   /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens and can be used
   /// to calculate fees.
   function applyFeeTokensUpdates(
     address[] memory feeTokensToRemove,
-    address[] memory feeTokensToAdd
+    PremiumMultiplierWeiPerEthArgs[] memory feeTokensToAdd
   ) external onlyOwner {
     _applyFeeTokensUpdates(feeTokensToRemove, feeTokensToAdd);
   }
@@ -300,16 +273,28 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens.
   /// and can be used to calculate fees.
-  function _applyFeeTokensUpdates(address[] memory feeTokensToRemove, address[] memory feeTokensToAdd) private {
+  function _applyFeeTokensUpdates(
+    address[] memory feeTokensToRemove,
+    PremiumMultiplierWeiPerEthArgs[] memory feeTokensToAdd
+  ) private {
     for (uint256 i = 0; i < feeTokensToRemove.length; ++i) {
       if (s_feeTokens.remove(feeTokensToRemove[i])) {
         emit FeeTokenRemoved(feeTokensToRemove[i]);
       }
     }
     for (uint256 i = 0; i < feeTokensToAdd.length; ++i) {
-      if (s_feeTokens.add(feeTokensToAdd[i])) {
-        emit FeeTokenAdded(feeTokensToAdd[i]);
+      PremiumMultiplierWeiPerEthArgs memory update = feeTokensToAdd[i];
+
+      // Emit the event if either the fee token is new, or the premium multiplier changed.
+      if (
+        s_feeTokens.add(update.token) || s_premiumMultiplierWeiPerEth[update.token] != update.premiumMultiplierWeiPerEth
+      ) {
+        emit FeeTokenAdded(update.token, update.premiumMultiplierWeiPerEth);
       }
+
+      s_premiumMultiplierWeiPerEth[update.token] = update.premiumMultiplierWeiPerEth;
+
+      emit PremiumMultiplierWeiPerEthUpdated(update.token, update.premiumMultiplierWeiPerEth);
     }
   }
 
@@ -395,37 +380,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     // The result is the fee in the feeTokens smallest denominations (e.g. wei for ETH).
     // uint112(packedGasPrice) = executionGasPrice
     return (totalDestChainGas * uint112(packedGasPrice) * 1e18 + premiumFeeUSDWei) / feeTokenPrice;
-  }
-
-  /// @notice Sets the fee configuration for a token.
-  /// @param premiumMultiplierWeiPerEthArgs Array of PremiumMultiplierWeiPerEthArgs structs.
-  function applyPremiumMultiplierWeiPerEthUpdates(
-    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs
-  ) external onlyOwner {
-    _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
-  }
-
-  /// @dev Sets the fee config.
-  /// @param premiumMultiplierWeiPerEthArgs The multiplier for destination chain specific premiums.
-  function _applyPremiumMultiplierWeiPerEthUpdates(
-    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs
-  ) internal {
-    for (uint256 i = 0; i < premiumMultiplierWeiPerEthArgs.length; ++i) {
-      address token = premiumMultiplierWeiPerEthArgs[i].token;
-      uint64 premiumMultiplierWeiPerEth = premiumMultiplierWeiPerEthArgs[i].premiumMultiplierWeiPerEth;
-      s_premiumMultiplierWeiPerEth[token] = premiumMultiplierWeiPerEth;
-
-      emit PremiumMultiplierWeiPerEthUpdated(token, premiumMultiplierWeiPerEth);
-    }
-  }
-
-  /// @notice Gets the fee configuration for a token.
-  /// @param token The token to get the fee configuration for.
-  /// @return premiumMultiplierWeiPerEth The multiplier for destination chain specific premiums.
-  function getPremiumMultiplierWeiPerEth(
-    address token
-  ) external view returns (uint64 premiumMultiplierWeiPerEth) {
-    return s_premiumMultiplierWeiPerEth[token];
   }
 
   /// @notice Returns the token transfer cost parameters.
@@ -972,5 +926,45 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   /// @return staticConfig The static configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
     return StaticConfig({maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg, linkToken: i_linkToken});
+  }
+
+  // ================================================================
+  // │                       Legacy functions                       │
+  // ================================================================
+
+  // Legacy functions are still required for pre-1.7 CCIP but can be removed once all lanes are migrated to 1.7+.
+
+  /// @notice Gets the fee token price and the gas price, both denominated in dollars.
+  /// @param token The source token to get the price for.
+  /// @param destChainSelector The destination chain to get the gas price for.
+  /// @return tokenPrice The price of the feeToken in 1e18 dollars per base unit.
+  /// @return gasPriceValue The price of gas in 1e18 dollars per base unit.
+  function getTokenAndGasPrices(
+    address token,
+    uint64 destChainSelector
+  ) external view returns (uint224 tokenPrice, uint224 gasPriceValue) {
+    if (!s_destChainConfigs[destChainSelector].isEnabled) revert DestinationChainNotEnabled(destChainSelector);
+    return (_getValidatedTokenPrice(token), s_usdPerUnitGasByDestChainSelector[destChainSelector].value);
+  }
+
+  /// @notice Convert a given token amount to target token amount.
+  /// @dev this function assumes that no more than 1e59 dollars are sent as payment.
+  /// If more is sent, the multiplication of feeTokenAmount and feeTokenValue will overflow.
+  /// Since there isn't even close to 1e59 dollars in the world economy this is safe.
+  /// @param fromToken The given token address.
+  /// @param fromTokenAmount The given token amount.
+  /// @param toToken The target token address.
+  /// @return toTokenAmount The target token amount.
+  function convertTokenAmount(
+    address fromToken,
+    uint256 fromTokenAmount,
+    address toToken
+  ) public view returns (uint256) {
+    /// Example:
+    /// fromTokenAmount:   1e18      // 1 ETH
+    /// ETH:               2_000e18
+    /// LINK:              5e18
+    /// return:            1e18 * 2_000e18 / 5e18 = 400e18 (400 LINK)
+    return (fromTokenAmount * _getValidatedTokenPrice(fromToken)) / _getValidatedTokenPrice(toToken);
   }
 }

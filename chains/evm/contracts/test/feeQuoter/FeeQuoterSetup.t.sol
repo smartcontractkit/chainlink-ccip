@@ -107,9 +107,6 @@ contract FeeQuoterSetup is TokenSetup {
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = OWNER;
-    address[] memory feeTokens = new address[](2);
-    feeTokens[0] = s_sourceTokens[0];
-    feeTokens[1] = s_weth;
 
     s_feeQuoterPremiumMultiplierWeiPerEthArgs.push(
       FeeQuoter.PremiumMultiplierWeiPerEthArgs({
@@ -166,9 +163,8 @@ contract FeeQuoterSetup is TokenSetup {
     s_feeQuoter = new FeeQuoterHelper(
       FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
       priceUpdaters,
-      feeTokens,
-      s_feeQuoterTokenTransferFeeConfigArgs,
       s_feeQuoterPremiumMultiplierWeiPerEthArgs,
+      s_feeQuoterTokenTransferFeeConfigArgs,
       _generateFeeQuoterDestChainConfigArgs()
     );
     s_feeQuoter.updatePrices(priceUpdates);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {FeeQuoter} from "../../../FeeQuoter.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
@@ -35,14 +36,21 @@ contract OnRamp_withdrawFeeTokens is OnRampSetup {
     uint256[5] memory amounts
   ) public {
     vm.startPrank(OWNER);
+    FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory feeTokenUpdates =
+      new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](amounts.length);
     address[] memory feeTokens = new address[](amounts.length);
+
     for (uint256 i = 0; i < amounts.length; ++i) {
       vm.assume(amounts[i] > 0);
-      feeTokens[i] = _deploySourceToken("", amounts[i], 18);
+      feeTokenUpdates[i].token = _deploySourceToken("", amounts[i], 18);
+      feeTokenUpdates[i].premiumMultiplierWeiPerEth = 1e18;
+
+      feeTokens[i] = feeTokenUpdates[i].token;
+
       IERC20(feeTokens[i]).transfer(address(s_onRamp), amounts[i]);
     }
 
-    s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
+    s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokenUpdates);
 
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       vm.expectEmit();

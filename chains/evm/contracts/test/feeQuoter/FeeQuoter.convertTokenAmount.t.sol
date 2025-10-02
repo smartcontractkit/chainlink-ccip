@@ -30,7 +30,7 @@ contract FeeQuoter_convertTokenAmount is FeeQuoterSetup {
     address linkToken = address(2);
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = feeToken;
-    s_feeQuoter.applyFeeTokensUpdates(feeTokens, new address[](0));
+    s_feeQuoter.applyFeeTokensUpdates(feeTokens, new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](0));
 
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](2);
     tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: feeToken, usdPerToken: usdPerFeeToken});

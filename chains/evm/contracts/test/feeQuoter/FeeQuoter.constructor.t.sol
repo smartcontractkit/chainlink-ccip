@@ -10,9 +10,6 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     address[] memory priceUpdaters = new address[](2);
     priceUpdaters[0] = STRANGER;
     priceUpdaters[1] = OWNER;
-    address[] memory feeTokens = new address[](2);
-    feeTokens[0] = s_sourceTokens[0];
-    feeTokens[1] = s_sourceTokens[1];
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
 
@@ -21,16 +18,14 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     s_feeQuoter = new FeeQuoterHelper(
       staticConfig,
       priceUpdaters,
-      feeTokens,
-      s_feeQuoterTokenTransferFeeConfigArgs,
       s_feeQuoterPremiumMultiplierWeiPerEthArgs,
+      s_feeQuoterTokenTransferFeeConfigArgs,
       destChainConfigArgs
     );
 
     assertEq(s_feeQuoter.getStaticConfig().linkToken, staticConfig.linkToken);
     assertEq(s_feeQuoter.getStaticConfig().maxFeeJuelsPerMsg, staticConfig.maxFeeJuelsPerMsg);
 
-    assertEq(feeTokens, s_feeQuoter.getFeeTokens());
     assertEq(priceUpdaters, s_feeQuoter.getAllAuthorizedCallers());
 
     assertEq(
@@ -68,9 +63,8 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     s_feeQuoter = new FeeQuoterHelper(
       FeeQuoter.StaticConfig({linkToken: address(0), maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
       new address[](0),
-      new address[](0),
-      s_feeQuoterTokenTransferFeeConfigArgs,
       s_feeQuoterPremiumMultiplierWeiPerEthArgs,
+      s_feeQuoterTokenTransferFeeConfigArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
     );
   }
@@ -81,9 +75,8 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     s_feeQuoter = new FeeQuoterHelper(
       FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: 0}),
       new address[](0),
-      new address[](0),
-      s_feeQuoterTokenTransferFeeConfigArgs,
       s_feeQuoterPremiumMultiplierWeiPerEthArgs,
+      s_feeQuoterTokenTransferFeeConfigArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
     );
   }
