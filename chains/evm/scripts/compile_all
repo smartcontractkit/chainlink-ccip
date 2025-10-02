@@ -76,7 +76,6 @@ compileContract offRamp/CCVAggregator
 # 1.6
 compileContract offRamp/OffRamp
 compileContract FeeQuoter
-compileContract FeeQuoterV2
 compileContract onRamp/OnRamp
 compileContract applications/PingPongDemo
 compileContract applications/EtherSenderReceiver

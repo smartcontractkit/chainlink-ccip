@@ -841,6 +841,16 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     return destExecDataPerToken;
   }
 
+  function resolveTokenReceiver(
+    bytes calldata extraArgs
+  ) external pure returns (bytes memory tokenReceiver) {
+    if (extraArgs.length < 4 || bytes4(extraArgs[:4]) != Client.SVM_EXTRA_ARGS_V1_TAG) {
+      return (bytes(""));
+    }
+
+    return abi.encode(abi.decode(extraArgs[4:], (Client.SVMExtraArgsV1)).tokenReceiver);
+  }
+
   // ================================================================
   // │                           Configs                            │
   // ================================================================

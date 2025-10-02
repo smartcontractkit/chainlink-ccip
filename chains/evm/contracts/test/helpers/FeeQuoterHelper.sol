@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {FeeQuoterV2} from "../../FeeQuoterV2.sol";
+import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Client} from "../../libraries/Client.sol";
 
-contract FeeQuoterHelper is FeeQuoterV2 {
+contract FeeQuoterHelper is FeeQuoter {
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
     FeeTokenArgs[] memory feeTokens,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
-  ) FeeQuoterV2(staticConfig, priceUpdaters, feeTokens, tokenTransferFeeConfigArgs, destChainConfigArgs) {}
+  ) FeeQuoter(staticConfig, priceUpdaters, feeTokens, tokenTransferFeeConfigArgs, destChainConfigArgs) {}
 
   function getTokenTransferCost(
     uint64 destChainSelector,

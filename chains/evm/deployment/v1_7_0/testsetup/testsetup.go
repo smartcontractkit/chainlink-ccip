@@ -9,7 +9,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -20,8 +20,8 @@ import (
 )
 
 // CreateBasicFeeQuoterDestChainConfig creates a basic fee quoter dest chain config with reasonable defaults for testing
-func CreateBasicFeeQuoterDestChainConfig() fee_quoter_v2.DestChainConfig {
-	return fee_quoter_v2.DestChainConfig{
+func CreateBasicFeeQuoterDestChainConfig() fee_quoter.DestChainConfig {
+	return fee_quoter.DestChainConfig{
 		IsEnabled:                   true,
 		MaxDataBytes:                30_000,
 		MaxPerMsgGasLimit:           3_000_000,
