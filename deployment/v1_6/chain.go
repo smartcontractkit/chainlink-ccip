@@ -4,20 +4,28 @@ import "math/big"
 
 type ChainDefinition struct {
 	// Selector is the chain selector of this chain.
+	// This is provided by the user
 	Selector uint64
 	// GasPrice defines the USD price (18 decimals) per unit gas for this chain as a destination.
+	// This is provided by the user
 	GasPrice *big.Int
 	// TokenPrices define the USD price (18 decimals) per 1e18 of the smallest token denomination for various tokens on this chain.
+	// This is provided by the user
 	TokenPrices map[string]*big.Int
 	// FeeQuoterDestChainConfig is the configuration to be applied on source chain when this chain is a destination.
+	// This is provided by the user
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
 	// RMNVerificationEnabled is true if we want the RMN to bless messages FROM this chain.
+	// This is provided by the user
 	RMNVerificationEnabled bool
 	// AllowListEnabled is true if we want an allowlist to dictate who can send messages TO this chain.
+	// This is provided by the user
 	AllowListEnabled bool
 	// OnRamp is the address of the OnRamp contract on this chain.
+	// This is populated programmatically
 	OnRamp []byte
 	// OffRamp is the address of the OffRamp contract on this chain.
+	// This is populated programmatically
 	OffRamp []byte
 }
 
@@ -41,9 +49,4 @@ type FeeQuoterDestChainConfig struct {
 	GasMultiplierWeiPerEth            uint64
 	GasPriceStalenessThreshold        uint32
 	NetworkFeeUSDCents                uint32
-}
-
-type FeeQuoterPriceUpdatePerSource struct {
-	TokenPrices map[string]*big.Int // token address -> price
-	GasPrices   map[uint64]*big.Int // dest chain -> gas price
 }

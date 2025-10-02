@@ -18,7 +18,7 @@ type ChainAdapter interface {
 	GetOnRampAddress(e cldf.Environment, chainSelector uint64) ([]byte, error)
 	GetOffRampAddress(e cldf.Environment, chainSelector uint64) ([]byte, error)
 	GetTimelockAddress(e cldf.Environment, chainSelector uint64) (string, error)
-	GetMCMSMetadata(e cldf.Environment, chainSelector uint64) (types.ChainMetadata, error)
+	GetMCMSMetadata(e cldf.Environment, chainSelector uint64, action types.TimelockAction) (types.ChainMetadata, error)
 }
 
 var registeredChainAdapters = make(map[string]ChainAdapter)
