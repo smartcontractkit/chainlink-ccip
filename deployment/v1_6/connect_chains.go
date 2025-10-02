@@ -26,7 +26,6 @@ func (cs ConnectChainsUnidirectional) VerifyPreconditions(env cldf.Environment, 
 func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChainsConfig) (cldf.ChangesetOutput, error) {
 	finalOutput := cldf.ChangesetOutput{}
 	for i, lane := range cfg.Lanes {
-		// todo: fill this in for dest
 		src, dest := lane.Source, lane.Dest
 		srcFamily, err := chain_selectors.GetSelectorFamily(src.Selector)
 		if err != nil {
@@ -115,7 +114,6 @@ func (cs ConnectChainsBidirectional) VerifyPreconditions(env cldf.Environment, c
 func (cs ConnectChainsBidirectional) Apply(e cldf.Environment, cfg ConnectChainsConfig) (cldf.ChangesetOutput, error) {
 	finalOutput := cldf.ChangesetOutput{}
 	for i, lane := range cfg.Lanes {
-		// todo: fill this in for dest
 		src, dest := lane.Source, lane.Dest
 		srcFamily, err := chain_selectors.GetSelectorFamily(src.Selector)
 		if err != nil {
