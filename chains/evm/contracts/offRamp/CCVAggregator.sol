@@ -312,6 +312,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
+    uint256 g = gasleft();
     (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
       Client.Any2EVMMessage({
         messageId: messageId,
@@ -321,7 +322,10 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         destTokenAmounts: destTokenAmounts
       }),
       i_gasForCallExactCheck,
-      gasLimit,
+      // We subtract the gas required to check whether or not gasLimit is within bound,
+      // the proportion of gas discluded by EIP-150 (2x because there are 2 calls: this-->router and router-->receiver),
+      // and an additional buffer for routeMessage logic prior to the receiver call.
+      g - 2 * (g / 64) - i_gasForCallExactCheck - 10000,
       receiver
     );
 
