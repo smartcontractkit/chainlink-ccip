@@ -48,8 +48,8 @@ contract OnRamp_getFee is OnRampSetup {
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
     assertTrue(feeAmount > 0);
 
-    FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory tokenMults = new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](1);
-    tokenMults[0] = FeeQuoter.PremiumMultiplierWeiPerEthArgs({token: message.feeToken, premiumMultiplierWeiPerEth: 0});
+    FeeQuoter.FeeTokenArgs[] memory tokenMults = new FeeQuoter.FeeTokenArgs[](1);
+    tokenMults[0] = FeeQuoter.FeeTokenArgs({token: message.feeToken, premiumMultiplierWeiPerEth: 0});
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), tokenMults);
 
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({

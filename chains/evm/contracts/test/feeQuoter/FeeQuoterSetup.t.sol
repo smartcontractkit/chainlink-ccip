@@ -53,7 +53,7 @@ contract FeeQuoterSetup is TokenSetup {
   address[] internal s_sourceFeeTokens;
   uint224[] internal s_sourceTokenPrices;
 
-  FeeQuoter.PremiumMultiplierWeiPerEthArgs[] internal s_feeQuoterPremiumMultiplierWeiPerEthArgs;
+  FeeQuoter.FeeTokenArgs[] internal s_feeQuoterPremiumMultiplierWeiPerEthArgs;
   FeeQuoter.TokenTransferFeeConfigArgs[] internal s_feeQuoterTokenTransferFeeConfigArgs;
 
   mapping(address token => address dataFeedAddress) internal s_dataFeedByToken;
@@ -109,13 +109,13 @@ contract FeeQuoterSetup is TokenSetup {
     priceUpdaters[0] = OWNER;
 
     s_feeQuoterPremiumMultiplierWeiPerEthArgs.push(
-      FeeQuoter.PremiumMultiplierWeiPerEthArgs({
+      FeeQuoter.FeeTokenArgs({
         token: s_sourceFeeToken,
         premiumMultiplierWeiPerEth: 5e17 // 0.5x
       })
     );
     s_feeQuoterPremiumMultiplierWeiPerEthArgs.push(
-      FeeQuoter.PremiumMultiplierWeiPerEthArgs({
+      FeeQuoter.FeeTokenArgs({
         token: s_sourceRouter.getWrappedNative(),
         premiumMultiplierWeiPerEth: 2e18 // 2x
       })

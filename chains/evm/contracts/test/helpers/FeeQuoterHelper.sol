@@ -8,7 +8,7 @@ contract FeeQuoterHelper is FeeQuoterV2 {
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
-    PremiumMultiplierWeiPerEthArgs[] memory feeTokens,
+    FeeTokenArgs[] memory feeTokens,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
   ) FeeQuoterV2(staticConfig, priceUpdaters, feeTokens, tokenTransferFeeConfigArgs, destChainConfigArgs) {}

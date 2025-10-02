@@ -7,14 +7,13 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 
 contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
   function testFuzz_applyFeeTokensUpdates_SetPremiumMultiplier(
-    FeeQuoter.PremiumMultiplierWeiPerEthArgs memory feeTokenAdds
+    FeeQuoter.FeeTokenArgs memory feeTokenAdds
   ) public {
-    FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs =
-      new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](1);
+    FeeQuoter.FeeTokenArgs[] memory premiumMultiplierWeiPerEthArgs = new FeeQuoter.FeeTokenArgs[](1);
     premiumMultiplierWeiPerEthArgs[0] = feeTokenAdds;
 
     vm.expectEmit();
-    emit FeeQuoter.PremiumMultiplierWeiPerEthUpdated(feeTokenAdds.token, feeTokenAdds.premiumMultiplierWeiPerEth);
+    emit FeeQuoter.FeeTokenAddedOrFeeUpdated(feeTokenAdds.token, feeTokenAdds.premiumMultiplierWeiPerEth);
 
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), premiumMultiplierWeiPerEthArgs);
 
@@ -22,12 +21,12 @@ contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
   }
 
   function test_applyFeeTokensUpdates_singleToken() public {
-    FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory feeTokenAdds = new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](1);
+    FeeQuoter.FeeTokenArgs[] memory feeTokenAdds = new FeeQuoter.FeeTokenArgs[](1);
     feeTokenAdds[0] = s_feeQuoterPremiumMultiplierWeiPerEthArgs[0];
     feeTokenAdds[0].token = vm.addr(1);
 
     vm.expectEmit();
-    emit FeeQuoter.PremiumMultiplierWeiPerEthUpdated(vm.addr(1), feeTokenAdds[0].premiumMultiplierWeiPerEth);
+    emit FeeQuoter.FeeTokenAddedOrFeeUpdated(vm.addr(1), feeTokenAdds[0].premiumMultiplierWeiPerEth);
 
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokenAdds);
 
@@ -38,15 +37,15 @@ contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
   }
 
   function test_applyFeeTokensUpdates_multipleTokens() public {
-    FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory feeTokenAdds = new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](2);
+    FeeQuoter.FeeTokenArgs[] memory feeTokenAdds = new FeeQuoter.FeeTokenArgs[](2);
     feeTokenAdds[0] = s_feeQuoterPremiumMultiplierWeiPerEthArgs[0];
     feeTokenAdds[0].token = vm.addr(1);
     feeTokenAdds[1].token = vm.addr(2);
 
     vm.expectEmit();
-    emit FeeQuoter.PremiumMultiplierWeiPerEthUpdated(vm.addr(1), feeTokenAdds[0].premiumMultiplierWeiPerEth);
+    emit FeeQuoter.FeeTokenAddedOrFeeUpdated(vm.addr(1), feeTokenAdds[0].premiumMultiplierWeiPerEth);
     vm.expectEmit();
-    emit FeeQuoter.PremiumMultiplierWeiPerEthUpdated(vm.addr(2), feeTokenAdds[1].premiumMultiplierWeiPerEth);
+    emit FeeQuoter.FeeTokenAddedOrFeeUpdated(vm.addr(2), feeTokenAdds[1].premiumMultiplierWeiPerEth);
 
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokenAdds);
 
@@ -55,7 +54,7 @@ contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
   }
 
   function test_applyFeeTokensUpdates() public {
-    FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory feeTokens = new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](1);
+    FeeQuoter.FeeTokenArgs[] memory feeTokens = new FeeQuoter.FeeTokenArgs[](1);
     feeTokens[0].token = s_sourceTokens[1];
     feeTokens[0].premiumMultiplierWeiPerEth = 1e18;
 
@@ -63,7 +62,7 @@ contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
     feeTokenAddresses[0] = feeTokens[0].token;
 
     vm.expectEmit();
-    emit FeeQuoter.FeeTokenAdded(feeTokens[0].token, feeTokens[0].premiumMultiplierWeiPerEth);
+    emit FeeQuoter.FeeTokenAddedOrFeeUpdated(feeTokens[0].token, feeTokens[0].premiumMultiplierWeiPerEth);
 
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
     assertEq(s_feeQuoter.getFeeTokens().length, 3);
@@ -77,13 +76,13 @@ contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
     vm.expectEmit();
     emit FeeQuoter.FeeTokenRemoved(feeTokenAddresses[0]);
 
-    s_feeQuoter.applyFeeTokensUpdates(feeTokenAddresses, new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](0));
+    s_feeQuoter.applyFeeTokensUpdates(feeTokenAddresses, new FeeQuoter.FeeTokenArgs[](0));
     assertEq(s_feeQuoter.getFeeTokens().length, 2);
 
     // removing already removed feeToken is no-op and does not emit an event
     vm.recordLogs();
 
-    s_feeQuoter.applyFeeTokensUpdates(feeTokenAddresses, new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](0));
+    s_feeQuoter.applyFeeTokensUpdates(feeTokenAddresses, new FeeQuoter.FeeTokenArgs[](0));
     assertEq(s_feeQuoter.getFeeTokens().length, 2);
 
     vm.assertEq(vm.getRecordedLogs().length, 0);
@@ -95,7 +94,7 @@ contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
     vm.expectEmit();
     emit FeeQuoter.FeeTokenRemoved(feeTokenAddresses[0]);
     vm.expectEmit();
-    emit FeeQuoter.FeeTokenAdded(feeTokens[0].token, feeTokens[0].premiumMultiplierWeiPerEth);
+    emit FeeQuoter.FeeTokenAddedOrFeeUpdated(feeTokens[0].token, feeTokens[0].premiumMultiplierWeiPerEth);
 
     s_feeQuoter.applyFeeTokensUpdates(feeTokenAddresses, feeTokens);
   }
@@ -107,6 +106,6 @@ contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
 
-    s_feeQuoter.applyFeeTokensUpdates(new address[](0), new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](0));
+    s_feeQuoter.applyFeeTokensUpdates(new address[](0), new FeeQuoter.FeeTokenArgs[](0));
   }
 }

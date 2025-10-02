@@ -36,8 +36,7 @@ contract OnRamp_withdrawFeeTokens is OnRampSetup {
     uint256[5] memory amounts
   ) public {
     vm.startPrank(OWNER);
-    FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory feeTokenUpdates =
-      new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](amounts.length);
+    FeeQuoter.FeeTokenArgs[] memory feeTokenUpdates = new FeeQuoter.FeeTokenArgs[](amounts.length);
     address[] memory feeTokens = new address[](amounts.length);
 
     for (uint256 i = 0; i < amounts.length; ++i) {

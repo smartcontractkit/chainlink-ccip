@@ -10,7 +10,7 @@ contract FeeQuoterV2 is IFeeQuoterV2, FeeQuoter {
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
-    PremiumMultiplierWeiPerEthArgs[] memory feeTokens,
+    FeeTokenArgs[] memory feeTokens,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
   ) FeeQuoter(staticConfig, priceUpdaters, feeTokens, tokenTransferFeeConfigArgs, destChainConfigArgs) {}

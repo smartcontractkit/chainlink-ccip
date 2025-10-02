@@ -149,7 +149,7 @@ contract Router_ccipSend is OnRampSetup {
   }
 
   function test_NonLinkFeeToken() public {
-    FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory feeTokens = new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](1);
+    FeeQuoter.FeeTokenArgs[] memory feeTokens = new FeeQuoter.FeeTokenArgs[](1);
     feeTokens[0].token = s_sourceTokens[1];
     feeTokens[0].premiumMultiplierWeiPerEth = 1e18;
 
