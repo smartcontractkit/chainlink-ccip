@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {IGetCCIPAdmin} from "../../interfaces/IGetCCIPAdmin.sol";
 import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
+
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
@@ -16,7 +18,14 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The constructor has been modified to support the deployment pattern used by a factory contract.
 /// @dev The total supply can be limited during deployment.
-contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Burnable, Ownable2StepMsgSender {
+contract FactoryBurnMintERC20 is
+  IBurnMintERC20,
+  IGetCCIPAdmin,
+  IERC165,
+  ERC20Burnable,
+  Ownable2StepMsgSender,
+  ITypeAndVersion
+{
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error SenderNotMinter(address sender);
@@ -58,10 +67,16 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
 
     s_ccipAdmin = newOwner;
 
-    if (preMint > maxSupply_) revert MaxSupplyExceeded(preMint);
+    if (preMint > maxSupply_ && maxSupply_ != 0) revert MaxSupplyExceeded(preMint);
 
     // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero
     if (preMint != 0) _mint(newOwner, preMint);
+  }
+
+  /// @inheritdoc ITypeAndVersion
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "FactoryBurnMintERC20 1.6.2";
   }
 
   /// @inheritdoc IERC165
