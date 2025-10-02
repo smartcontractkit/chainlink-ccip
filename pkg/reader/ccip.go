@@ -635,7 +635,11 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	lggr logger.Logger,
 	chains []cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
+	lggr = logger.With(lggr, "function", "discoverOffRampContracts",
+		"destChain", r.destChain, "offRamp", r.offrampAddress, "chains", chains)
+
 	// Get from cache
+	lggr.Debugw("fetching offramp dest chain config")
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
@@ -645,9 +649,10 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 	// OnRamps are in the offRamp SourceChainConfig.
 	{
+		lggr.Debugw("fetching offramp source chain configs")
 		sourceConfigs, err := r.getOffRampSourceChainsConfig(ctx, lggr, chains, false)
-
 		if err != nil {
+			lggr.Debugw("unable to get SourceChainsConfig", "err", err)
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 		}
 
@@ -932,6 +937,8 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 		return nil, fmt.Errorf("get source chain configs: %w", err)
 	}
 
+	lggr.Debugw("fetched offramp source chain configs from config poller", "count", len(configs), "configs", configs)
+
 	// Filter out disabled chains if needed
 	if !includeDisabled {
 		for chain, cfg := range configs {
@@ -949,6 +956,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 		}
 	}
 
+	lggr.Debugw("returning offramp source chain configs", "count", len(configs))
 	return configs, nil
 }
 

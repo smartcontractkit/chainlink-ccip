@@ -233,14 +233,20 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 				destChain, c.destChainSelector)
 	}
 
+	lggr := logger.With(c.lggr, "function", "config_poller_v2 GetOfframpSourceChainConfigs", "destChain", destChain, "sourceChains", sourceChains)
+
 	// Ensure we're not trying to fetch source chain configs for the destination chain itself
+	lggr.Debugw("filtering out destination chain from source chains")
 	filteredSourceChains := filterOutChainSelector(sourceChains, c.destChainSelector)
+	lggr.Debugw("filtered source chains", "filteredSourceChains", filteredSourceChains)
 	if len(filteredSourceChains) == 0 {
+		lggr.Debugw("No source chains to fetch after filtering out destination chain, returning empty map")
 		return make(map[cciptypes.ChainSelector]StaticSourceChainConfig), nil
 	}
 
 	// Add any new source chains to list of tracked source chains for background refreshing
 	for _, chain := range filteredSourceChains {
+		lggr.Debugw("adding source chain to tracking list for dest chain")
 		if !c.trackSourceChainForDest(chain) {
 			c.lggr.Warnw("Could not track source chain for background refreshing",
 				"destChain", c.destChainSelector,
@@ -250,8 +256,12 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 
 	destChainCache := c.getOrCreateChainCache(c.destChainSelector)
 	if destChainCache == nil {
+		lggr.Debugw("failed to get or create chain cache for destination chain")
 		return nil, fmt.Errorf("failed to get chain cache for destination chain %s", c.destChainSelector)
 	}
+
+	lggr.Debugw("got cache for destination chain, checking for cached source chain configs",
+		"cacheAge", time.Since(destChainCache.sourceChainRefresh))
 
 	destChainCache.sourceChainMu.RLock()
 
@@ -263,9 +273,11 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 	for _, chain := range filteredSourceChains {
 		staticSourceChainConfig, exists := destChainCache.staticSourceChainConfigs[chain]
 		if exists {
+			lggr.Debugw("found source chain config in cache", "sourceChain", chain, "staticSourceChainConfig", staticSourceChainConfig)
 			cachedSourceConfigs[chain] = staticSourceChainConfig
 		} else {
 			// This chain isn't in cache yet
+			lggr.Debugw("source chain config not found in cache", "sourceChain", chain)
 			missingChains = append(missingChains, chain)
 		}
 	}
@@ -282,19 +294,28 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 	// Release lock before issuing batch refresh
 	destChainCache.sourceChainMu.RUnlock()
 
+	lggr.Debugw("issuing batch refresh since we had some missing chains in the cache", "missingChains", missingChains)
 	if err := c.batchRefreshChainAndSourceConfigs(ctx, c.destChainSelector); err != nil {
 		return nil, err
 	}
 
+	lggr.Debugw("looping through requested source chains to build result set after batch refresh")
+
 	// Re-acquire the lock to return only the cached configs that were requested
 	destChainCache.sourceChainMu.RLock()
 	defer destChainCache.sourceChainMu.RUnlock()
+
 	result := make(map[cciptypes.ChainSelector]StaticSourceChainConfig)
 	for _, chain := range filteredSourceChains {
+		lggr.Debugw("attempting to add source chain config to result set", "sourceChain", chain)
 		if cfg, exists := destChainCache.staticSourceChainConfigs[chain]; exists {
 			result[chain] = cfg
+		} else {
+			lggr.Warnw("Source chain config still not found in cache after batch refresh", "sourceChain", chain)
 		}
 	}
+
+	lggr.Debugw("returning source chain configs after batch refresh", "result", result)
 	return result, nil
 }
 
@@ -374,6 +395,7 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
 ) error {
+	lggr := logger.With(c.lggr, "function", "config_poller_v2 batchRefreshChainAndSourceConfigs", "chain", chainSel, "destChain", c.destChainSelector)
 	start := time.Now()
 	fetchingForDestChain := chainSel == c.destChainSelector
 
@@ -381,16 +403,18 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	if fetchingForDestChain {
 		// Acquires read lock on 'c'
 		sourceChainSelectors = c.getKnownSourceChainsForDestChain()
-		c.lggr.Debugw("Issuing batch refresh for dest chain",
+		lggr.Debugw("Issuing batch refresh for dest chain",
 			"destChainSelector", c.destChainSelector, "sourceChains", sourceChainSelectors)
 	}
 
 	// Use chainAccessor to fetch ChainConfigSnapshot (and SourceChainConfigs if destChain)
 	accessor, err := getChainAccessor(c.chainAccessors, chainSel)
 	if err != nil {
-		c.lggr.Errorw("Failed to get chain accessor", "chain", chainSel, "error", err)
+		lggr.Errorw("Failed to get chain accessor", "chain", chainSel, "error", err)
 		return fmt.Errorf("failed to get chain accessor for %s: %w", chainSel, err)
 	}
+
+	lggr.Debugw("calling accessor.GetAllConfigsLegacy", "sourceChainSelectors", sourceChainSelectors)
 
 	// NO LOCKING DURING IO
 	chainConfigSnapshot, sourceChainConfigs, err := accessor.GetAllConfigsLegacy(
@@ -399,7 +423,7 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 		sourceChainSelectors,
 	)
 	if err != nil {
-		c.lggr.Errorw("Failed batch fetch via chainAccessor",
+		lggr.Errorw("Failed batch fetch via chainAccessor",
 			"chain", chainSel, "destChainSelector", c.destChainSelector, "error", err)
 		return err
 	}
@@ -413,6 +437,7 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	cache.chainConfigMu.Lock()
 	cache.chainConfigData = chainConfigSnapshot
 	cache.chainConfigRefresh = time.Now()
+	lggr.Debugw("fetched chainConfigSnapshot via chainAccessor", "chainConfigSnapshot", chainConfigSnapshot)
 	cache.chainConfigMu.Unlock()
 
 	// Acquire StaticSourceChainConfigs lock and update
