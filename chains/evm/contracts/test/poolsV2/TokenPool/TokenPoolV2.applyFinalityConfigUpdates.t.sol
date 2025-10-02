@@ -1,23 +1,48 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../poolsV2/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
   function test_applyFinalityConfigUpdates() public {
-    TokenPool.FastFinalityConfig memory config = TokenPool.FastFinalityConfig({
-      finalityThreshold: 100,
-      fastTransferFeeBps: 500, // 5%
-      maxAmountPerRequest: 1000e18
+    uint16 finalityThreshold = 100;
+    uint16 fastTransferFeeBps = 500; // 5%
+    uint256 maxAmountPerRequest = 1000e18;
+    RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
+    RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
+    TokenPool.FastTransferRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.FastTransferRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.FastTransferRateLimitConfigArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      outboundRateLimiterConfig: outboundFastConfig,
+      inboundRateLimiterConfig: inboundFastConfig
     });
 
     vm.expectEmit();
-    emit TokenPool.FinalityConfigUpdated(
-      config.finalityThreshold, config.fastTransferFeeBps, config.maxAmountPerRequest
-    );
-    s_tokenPool.applyFinalityConfigUpdates(config);
+    emit TokenPool.FinalityConfigUpdated(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest);
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitArgs);
+
+    (uint16 storedFinalityThreshold, uint16 storedFeeBps, uint256 storedMaxAmount) = s_tokenPool.getFastFinalityConfig();
+    assertEq(storedFinalityThreshold, finalityThreshold);
+    assertEq(storedFeeBps, fastTransferFeeBps);
+    assertEq(storedMaxAmount, maxAmountPerRequest);
+
+    RateLimiter.TokenBucket memory outboundBucket = s_tokenPool.getFastOutboundBucket(DEST_CHAIN_SELECTOR);
+    assertTrue(outboundBucket.isEnabled);
+    assertEq(outboundBucket.capacity, outboundFastConfig.capacity);
+    assertEq(outboundBucket.rate, outboundFastConfig.rate);
+    assertEq(outboundBucket.tokens, outboundFastConfig.capacity);
+    assertEq(outboundBucket.lastUpdated, uint32(block.timestamp));
+
+    RateLimiter.TokenBucket memory inboundBucket = s_tokenPool.getFastInboundBucket(DEST_CHAIN_SELECTOR);
+    assertTrue(inboundBucket.isEnabled);
+    assertEq(inboundBucket.capacity, inboundFastConfig.capacity);
+    assertEq(inboundBucket.rate, inboundFastConfig.rate);
+    assertEq(inboundBucket.tokens, inboundFastConfig.capacity);
+    assertEq(inboundBucket.lastUpdated, uint32(block.timestamp));
   }
 
   // Reverts
@@ -25,10 +50,15 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
     vm.stopPrank();
     vm.prank(STRANGER);
 
-    TokenPool.FastFinalityConfig memory config =
-      TokenPool.FastFinalityConfig({finalityThreshold: 100, fastTransferFeeBps: 500, maxAmountPerRequest: 1000e18});
+    uint16 finalityThreshold = 100;
+    uint16 fastTransferFeeBps = 500; // 5%
+    uint256 maxAmountPerRequest = 1000e18;
+    TokenPool.FastTransferRateLimitConfigArgs[] memory emptyRateLimitArgs =
+      new TokenPool.FastTransferRateLimitConfigArgs[](0);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_tokenPool.applyFinalityConfigUpdates(config);
+    s_tokenPool.applyFinalityConfigUpdates(
+      finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
+    );
   }
 }

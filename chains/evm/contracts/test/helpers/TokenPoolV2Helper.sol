@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../poolsV2/TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -14,4 +15,25 @@ contract TokenPoolV2Helper is TokenPool {
     address rmnProxy,
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+
+  function getFastFinalityConfig()
+    external
+    view
+    returns (uint16 finalityThreshold, uint16 fastTransferFeeBps, uint256 maxAmountPerRequest)
+  {
+    FastFinalityConfig storage config = s_finalityConfig;
+    return (config.finalityThreshold, config.fastTransferFeeBps, config.maxAmountPerRequest);
+  }
+
+  function getFastOutboundBucket(
+    uint64 remoteChainSelector
+  ) external view returns (RateLimiter.TokenBucket memory bucket) {
+    return s_finalityConfig.outboundRateLimiterConfig[remoteChainSelector];
+  }
+
+  function getFastInboundBucket(
+    uint64 remoteChainSelector
+  ) external view returns (RateLimiter.TokenBucket memory bucket) {
+    return s_finalityConfig.inboundRateLimiterConfig[remoteChainSelector];
+  }
 }

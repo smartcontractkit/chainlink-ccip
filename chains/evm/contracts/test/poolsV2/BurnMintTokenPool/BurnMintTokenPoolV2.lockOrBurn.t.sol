@@ -45,7 +45,7 @@ contract BurnMintTokenPoolV2_lockOrBurn is BurnMintSetup {
 
     s_pool.lockOrBurn(
       Pool.LockOrBurnInV1({
-        originalSender: OWNER,
+        originalSender: s_sender,
         receiver: bytes(""),
         amount: burnAmount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -87,7 +87,7 @@ contract BurnMintTokenPoolV2_lockOrBurn is BurnMintSetup {
 
     s_pool.lockOrBurn(
       Pool.LockOrBurnInV1({
-        originalSender: OWNER,
+        originalSender: s_sender,
         receiver: bytes(""),
         amount: burnAmount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
