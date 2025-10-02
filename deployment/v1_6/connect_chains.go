@@ -67,8 +67,8 @@ func (cs ConnectChainsUnidirectional) Apply(e cldf.Environment, cfg ConnectChain
 		}
 		// coalesce dest
 		output, err = registeredChainAdapters[destFamily].ConfigureLaneLegAsDest(e, UpdateLanesInput{
-			Source:       dest,
-			Dest:         src,
+			Source:       src,
+			Dest:         dest,
 			IsDisabled:   lane.IsDisabled,
 			TestRouter:   lane.TestRouter,
 			ExtraConfigs: lane.ExtraConfigs,
@@ -136,10 +136,28 @@ func (cs ConnectChainsBidirectional) Apply(e cldf.Environment, cfg ConnectChains
 			return cldf.ChangesetOutput{}, fmt.Errorf("error fetching onramp address for src chain %d: %w", src.Selector, err)
 		}
 		src.OnRamp = srcOnRamp
-		// coalesce src
-		output, err := registeredChainAdapters[srcFamily].ConfigureLaneBidirectionally(e, UpdateLanesInput{
+		// coalesce src -> dest
+		output, err := registeredChainAdapters[srcFamily].ConfigureLaneAsSourceAndDest(e, UpdateLanesInput{
 			Source:       src,
 			Dest:         dest,
+			IsDisabled:   lane.IsDisabled,
+			TestRouter:   lane.TestRouter,
+			ExtraConfigs: lane.ExtraConfigs,
+			MCMS:         cfg.MCMS,
+		})
+		if err != nil {
+			finalOutput.Reports = append(finalOutput.Reports, output.Reports...)
+			return cldf.ChangesetOutput{Reports: finalOutput.Reports}, fmt.Errorf("failed to apply changeset at index %d: %w", i, err)
+		}
+		err = MergeChangesetOutput(e, &finalOutput, output)
+		if err != nil {
+			finalOutput.Reports = append(finalOutput.Reports, output.Reports...)
+			return cldf.ChangesetOutput{Reports: finalOutput.Reports}, fmt.Errorf("failed to merge output of changeset at index %d: %w", i, err)
+		}
+		// coalesce dest -> src
+		output, err = registeredChainAdapters[destFamily].ConfigureLaneAsSourceAndDest(e, UpdateLanesInput{
+			Source:       dest,
+			Dest:         src,
 			IsDisabled:   lane.IsDisabled,
 			TestRouter:   lane.TestRouter,
 			ExtraConfigs: lane.ExtraConfigs,

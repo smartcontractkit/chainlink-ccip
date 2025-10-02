@@ -11,7 +11,7 @@ type ChainAdapter interface {
 	// high level API
 	ConfigureLaneLegAsSource(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
 	ConfigureLaneLegAsDest(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
-	ConfigureLaneBidirectionally(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
+	ConfigureLaneAsSourceAndDest(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
 
 	// helpers to expose lower level functionality if needed
 	// needed for populating values in chain specific configs
