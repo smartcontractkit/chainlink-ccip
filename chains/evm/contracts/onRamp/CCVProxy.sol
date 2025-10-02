@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IExecutorOnRamp} from "../interfaces/IExecutorOnRamp.sol";
-import {IFeeQuoterV2} from "../interfaces/IFeeQuoterV2.sol";
+import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
@@ -182,7 +182,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
     // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
     bytes memory tokenReceiver =
-      IFeeQuoterV2(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
+      IFeeQuoter(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
     if (tokenReceiver.length == 0) {
       tokenReceiver = abi.encode(message.receiver);
     }

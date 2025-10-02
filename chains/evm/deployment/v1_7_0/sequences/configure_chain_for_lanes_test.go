@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
@@ -63,7 +63,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 					r = common.HexToAddress(addr.Address)
 				case datastore.ContractType(ccv_proxy.ContractType):
 					ccvProxy = common.HexToAddress(addr.Address)
-				case datastore.ContractType(fee_quoter_v2.ContractType):
+				case datastore.ContractType(fee_quoter.ContractType):
 					feeQuoter = common.HexToAddress(addr.Address)
 				case datastore.ContractType(ccv_aggregator.ContractType):
 					ccvAggregator = common.HexToAddress(addr.Address)

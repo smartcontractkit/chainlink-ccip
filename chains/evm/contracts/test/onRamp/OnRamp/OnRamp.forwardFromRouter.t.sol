@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IMessageInterceptor} from "../../../interfaces/IMessageInterceptor.sol";
-
 import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
@@ -35,14 +34,13 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     super.setUp();
     // setup for SVM chain
     s_svmDestChainConfig = _generateFeeQuoterDestChainConfigArgs()[0].destChainConfig;
-    s_svmDestChainConfig.enforceOutOfOrder = true; // Enforcing out of order execution for messages to SVM
     s_svmDestChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
 
     s_outboundMessageInterceptor = new MessageInterceptorHelper();
 
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
-    s_feeQuoter.applyFeeTokensUpdates(feeTokens, new address[](0));
+    s_feeQuoter.applyFeeTokensUpdates(feeTokens, new FeeQuoter.FeeTokenArgs[](0));
 
     uint64[] memory destinationChainSelectors = new uint64[](1);
     destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
@@ -520,9 +518,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = sourceETH;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 0,
-      maxFeeUSDCents: 1,
-      deciBps: 0,
+      feeUSDCents: 0,
       destGasOverhead: 0,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
       isEnabled: true

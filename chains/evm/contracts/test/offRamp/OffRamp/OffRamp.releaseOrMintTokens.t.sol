@@ -96,31 +96,37 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
   }
 
   function test_releaseOrMintTokens_destDenominatedDecimals() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     uint256 amount = 100;
     uint256 destinationDenominationMultiplier = 1000;
-    srcTokenAmounts[1].amount = amount;
 
-    bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
+    Client.EVMTokenAmount[] memory srcTokenAmounts = new Client.EVMTokenAmount[](1);
+    srcTokenAmounts[0].token = s_sourceTokens[1];
+    srcTokenAmounts[0].amount = amount;
 
     Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
 
-    address pool = s_destPoolBySourceToken[srcTokenAmounts[1].token];
-    address destToken = s_destTokenBySourceToken[srcTokenAmounts[1].token];
+    address pool = s_destPoolBySourceToken[srcTokenAmounts[0].token];
+    address destToken = s_destTokenBySourceToken[srcTokenAmounts[0].token];
 
     MaybeRevertingBurnMintTokenPool(pool).setReleaseOrMintMultiplier(destinationDenominationMultiplier);
 
     Client.EVMTokenAmount[] memory destTokenAmounts = s_offRamp.releaseOrMintTokens(
-      sourceTokenAmounts, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, offchainTokenData, new uint32[](0)
+      sourceTokenAmounts,
+      abi.encode(OWNER),
+      OWNER,
+      SOURCE_CHAIN_SELECTOR_1,
+      new bytes[](srcTokenAmounts.length),
+      new uint32[](0)
     );
-    assertEq(destTokenAmounts[1].amount, amount * destinationDenominationMultiplier);
-    assertEq(destTokenAmounts[1].token, destToken);
+    assertEq(destTokenAmounts[0].amount, amount * destinationDenominationMultiplier);
+    assertEq(destTokenAmounts[0].token, destToken);
   }
 
   // Revert
 
   function test_RevertWhen_releaseOrMintTokensWhen_TokenHandlingError() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = new Client.EVMTokenAmount[](1);
+    srcTokenAmounts[0].token = s_sourceTokens[1];
 
     bytes memory unknownError = bytes("unknown error");
     s_maybeRevertingPool.setShouldRevert(unknownError);

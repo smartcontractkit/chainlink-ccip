@@ -191,9 +191,7 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     uint256[] memory amounts
   ) internal view returns (Internal.Any2EVMRampMessage memory) {
     Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
-    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-      tokenAmounts[i].amount = amounts[i];
-    }
+    tokenAmounts[0].amount = amounts[0];
     return _generateAny2EVMMessage(sourceChainSelector, onRamp, sequenceNumber, tokenAmounts, false);
   }
 
@@ -267,7 +265,6 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](2);
     Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = 1e18;
-    tokenAmounts[1].amount = 5e18;
     messages[0] = _generateAny2EVMMessage(sourceChainSelector, onRamp, 1, tokenAmounts, false);
     messages[1] = _generateAny2EVMMessage(sourceChainSelector, onRamp, 2, tokenAmounts, false);
 
@@ -279,10 +276,8 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     view
     returns (Client.EVMTokenAmount[] memory tokenAmounts)
   {
-    tokenAmounts = new Client.EVMTokenAmount[](s_sourceTokens.length);
-    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-      tokenAmounts[i].token = s_sourceTokens[i];
-    }
+    tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0].token = s_sourceTokens[0];
     return tokenAmounts;
   }
 

@@ -86,9 +86,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
   }
 
   function test_executeSingleMessage_NonContractWithTokens() public {
-    uint256[] memory amounts = new uint256[](2);
+    uint256[] memory amounts = new uint256[](1);
     amounts[0] = 1000;
-    amounts[1] = 50;
 
     Internal.Any2EVMRampMessage memory message =
       _generateAny2EVMMessageWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1, amounts);
@@ -102,14 +101,6 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       sender: address(s_offRamp),
       recipient: STRANGER,
       amount: amounts[0]
-    });
-    vm.expectEmit();
-    emit TokenPool.ReleasedOrMinted({
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      token: message.tokenAmounts[1].destTokenAddress,
-      sender: address(s_offRamp),
-      recipient: STRANGER,
-      amount: amounts[1]
     });
 
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));

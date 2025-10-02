@@ -21,28 +21,24 @@ contract FeeQuoter_processChainFamilySelector is FeeQuoterSetup {
     evmConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
     evmConfig.defaultTxGasLimit = 500_000;
     evmConfig.maxPerMsgGasLimit = 1_000_000;
-    evmConfig.enforceOutOfOrder = false;
 
     // 2. Configure an SVM chain
     FeeQuoter.DestChainConfig memory svmConfig;
     svmConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
     svmConfig.defaultTxGasLimit = 2_000_000;
     svmConfig.maxPerMsgGasLimit = 3_000_000;
-    svmConfig.enforceOutOfOrder = true;
 
     // 2. Configure an SVM chain
     FeeQuoter.DestChainConfig memory aptosConfig;
     aptosConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_APTOS;
     aptosConfig.defaultTxGasLimit = 2_000_000;
     aptosConfig.maxPerMsgGasLimit = 3_000_000;
-    aptosConfig.enforceOutOfOrder = true;
 
     // 3. Configure an SUI chain
     FeeQuoter.DestChainConfig memory suiConfig;
     suiConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
     suiConfig.defaultTxGasLimit = 2_000_000;
     suiConfig.maxPerMsgGasLimit = 3_000_000;
-    suiConfig.enforceOutOfOrder = true;
 
     // Apply both configs
     FeeQuoter.DestChainConfigArgs[] memory configs = new FeeQuoter.DestChainConfigArgs[](4);
@@ -111,7 +107,7 @@ contract FeeQuoter_processChainFamilySelector is FeeQuoterSetup {
     });
     bytes memory encodedSuiArgs = Client._suiArgsToBytes(suiArgs);
 
-    (bytes memory resultBytes, bool outOfOrder, bytes memory msgReciever) =
+    (bytes memory resultBytes, bool outOfOrder, bytes memory msgReceiver) =
       s_feeQuoter.processChainFamilySelector(SUI_SELECTOR, MESSAGE_RECEIVER, encodedSuiArgs);
 
     // The function should NOT revert since tokenReceiver != 0
@@ -119,7 +115,7 @@ contract FeeQuoter_processChainFamilySelector is FeeQuoterSetup {
     assertEq(resultBytes, encodedSuiArgs, "Should return the same Sui-encoded bytes");
     // The function always returns `true` for outOfOrder on Sui
     assertTrue(outOfOrder, "Out-of-order for Sui must be true");
-    assertEq(msgReciever, MESSAGE_RECEIVER);
+    assertEq(msgReceiver, MESSAGE_RECEIVER);
   }
 
   function test_processChainFamilySelector_Sui_NoTokenTransfer() public view {

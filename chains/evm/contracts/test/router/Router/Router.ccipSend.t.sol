@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
+import {FeeQuoter} from "../../../FeeQuoter.sol";
 import {Router} from "../../../Router.sol";
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 import {IWrappedNative} from "../../../interfaces/IWrappedNative.sol";
@@ -148,8 +149,10 @@ contract Router_ccipSend is OnRampSetup {
   }
 
   function test_NonLinkFeeToken() public {
-    address[] memory feeTokens = new address[](1);
-    feeTokens[0] = s_sourceTokens[1];
+    FeeQuoter.FeeTokenArgs[] memory feeTokens = new FeeQuoter.FeeTokenArgs[](1);
+    feeTokens[0].token = s_sourceTokens[1];
+    feeTokens[0].premiumMultiplierWeiPerEth = 1e18;
+
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();

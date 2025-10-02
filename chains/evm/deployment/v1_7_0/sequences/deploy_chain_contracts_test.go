@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
@@ -88,7 +88,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				committee_verifier.ContractType:   false,
 				ccv_proxy.ContractType:            false,
 				ccv_aggregator.ContractType:       false,
-				fee_quoter_v2.ContractType:        false,
+				fee_quoter.ContractType:           false,
 				committee_verifier.ProxyType:      false,
 				rmn_proxy.ContractType:            false,
 				token_admin_registry.ContractType: false,

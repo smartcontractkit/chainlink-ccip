@@ -9,7 +9,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
   bytes4[] internal s_validChainFamilySelector =
     [Internal.CHAIN_FAMILY_SELECTOR_EVM, Internal.CHAIN_FAMILY_SELECTOR_SVM];
 
-  function testFuzz_applyDestChainConfigUpdates_Success(
+  function testFuzz_applyDestChainConfigUpdates(
     FeeQuoter.DestChainConfigArgs memory destChainConfigArgs
   ) public {
     vm.assume(destChainConfigArgs.destChainSelector != 0);
@@ -77,7 +77,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
     _assertFeeQuoterDestChainConfigsEqual(destChainConfigArgs[3].destChainConfig, gotDestChainConfig3);
   }
 
-  function test_applyDestChainConfigUpdatesZeroInput() public {
+  function test_applyDestChainConfigUpdates_ZeroInputDoesNotEmitLog() public {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = new FeeQuoter.DestChainConfigArgs[](0);
 
     vm.recordLogs();
@@ -88,7 +88,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
 
   // Reverts
 
-  function test_RevertWhen_applyDestChainConfigUpdatesDefaultTxGasLimitEqZero() public {
+  function test_applyDestChainConfigUpdates_RevertWhen_DefaultTxGasLimitEqZero() public {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
@@ -99,7 +99,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
-  function test_RevertWhen_applyDestChainConfigUpdatesDefaultTxGasLimitGtMaxPerMessageGasLimit() public {
+  function test_applyDestChainConfigUpdates_RevertWhen_DefaultTxGasLimitGtMaxPerMessageGasLimit() public {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
@@ -115,7 +115,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
-  function test_RevertWhen_InvalidDestChainConfigDestChainSelectorEqZero() public {
+  function test_applyDestChainConfigUpdates_RevertWhen_InvalidDestChainConfigDestChainSelectorEqZero() public {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
@@ -126,7 +126,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
-  function test_RevertWhen_InvalidChainFamilySelector() public {
+  function test_applyDestChainConfigUpdates_RevertWhen_InvalidChainFamilySelector() public {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 

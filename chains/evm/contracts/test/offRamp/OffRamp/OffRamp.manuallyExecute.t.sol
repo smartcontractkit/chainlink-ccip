@@ -419,26 +419,24 @@ contract OffRamp_manuallyExecute is OffRampSetup {
   }
 
   function test_RevertWhen_manuallyExecute_InvalidTokenGasOverride() public {
-    uint256[] memory amounts = new uint256[](2);
+    uint256[] memory amounts = new uint256[](1);
     amounts[0] = 1000;
-    amounts[1] = 1000;
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
     messages[0] = _generateAny2EVMMessageWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1, amounts);
 
     OffRamp.GasLimitOverride[][] memory gasLimitOverrides = new OffRamp.GasLimitOverride[][](1);
     gasLimitOverrides[0] = _getGasLimitsFromMessages(messages);
-    uint32[] memory tokenGasOverrides = new uint32[](2);
-    tokenGasOverrides[0] = DEFAULT_TOKEN_DEST_GAS_OVERHEAD;
-    tokenGasOverrides[1] = DEFAULT_TOKEN_DEST_GAS_OVERHEAD - 1; //invalid token gas override value
+    uint32[] memory tokenGasOverrides = new uint32[](1);
+    tokenGasOverrides[0] = DEFAULT_TOKEN_DEST_GAS_OVERHEAD - 1; //invalid token gas override value
     gasLimitOverrides[0][0].tokenGasOverrides = tokenGasOverrides;
 
     vm.expectRevert(
       abi.encodeWithSelector(
         OffRamp.InvalidManualExecutionTokenGasOverride.selector,
         messages[0].header.messageId,
-        1,
+        0,
         DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-        tokenGasOverrides[1]
+        tokenGasOverrides[0]
       )
     );
     s_offRamp.manuallyExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), gasLimitOverrides);

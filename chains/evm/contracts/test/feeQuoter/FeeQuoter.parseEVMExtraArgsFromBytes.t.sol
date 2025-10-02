@@ -6,13 +6,6 @@ import {Client} from "../../libraries/Client.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 
 contract FeeQuoter_resolveGasLimitForDestination is FeeQuoterSetup {
-  FeeQuoter.DestChainConfig private s_destChainConfig;
-
-  function setUp() public virtual override {
-    super.setUp();
-    s_destChainConfig = _generateFeeQuoterDestChainConfigArgs()[0].destChainConfig;
-  }
-
   function test_EVMExtraArgsV1TagSelector() public pure {
     assertEq(Client.EVM_EXTRA_ARGS_V1_TAG, bytes4(keccak256("CCIP EVMExtraArgsV1")));
   }
@@ -21,7 +14,7 @@ contract FeeQuoter_resolveGasLimitForDestination is FeeQuoterSetup {
     assertEq(Client.GENERIC_EXTRA_ARGS_V2_TAG, bytes4(keccak256("CCIP EVMExtraArgsV2")));
   }
 
-  function test_EVMExtraArgsV1() public view {
+  function test_parseEVMExtraArgsFromBytes_EVMExtraArgsV1() public view {
     Client.EVMExtraArgsV1 memory inputArgs = Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT});
     bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
     Client.GenericExtraArgsV2 memory expectedOutputArgs =
@@ -33,7 +26,7 @@ contract FeeQuoter_resolveGasLimitForDestination is FeeQuoterSetup {
     );
   }
 
-  function test_EVMExtraArgsV2() public view {
+  function test_parseEVMExtraArgsFromBytes_EVMExtraArgsV2() public view {
     Client.GenericExtraArgsV2 memory inputArgs =
       Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: true});
     bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
@@ -43,9 +36,9 @@ contract FeeQuoter_resolveGasLimitForDestination is FeeQuoterSetup {
     );
   }
 
-  function test_EVMExtraArgsDefault() public view {
+  function test_parseEVMExtraArgsFromBytes_EVMExtraArgsDefault() public view {
     Client.GenericExtraArgsV2 memory expectedOutputArgs =
-      Client.GenericExtraArgsV2({gasLimit: s_destChainConfig.defaultTxGasLimit, allowOutOfOrderExecution: false});
+      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
 
     vm.assertEq(
       abi.encode(s_feeQuoter.parseEVMExtraArgsFromBytes("", DEST_CHAIN_SELECTOR)), abi.encode(expectedOutputArgs)
@@ -54,7 +47,7 @@ contract FeeQuoter_resolveGasLimitForDestination is FeeQuoterSetup {
 
   // Reverts
 
-  function test_RevertWhen_EVMExtraArgsInvalidExtraArgsTag() public {
+  function test_parseEVMExtraArgsFromBytes_RevertWhen_EVMExtraArgsInvalidExtraArgsTag() public {
     Client.GenericExtraArgsV2 memory inputArgs =
       Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: true});
     bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
@@ -65,19 +58,9 @@ contract FeeQuoter_resolveGasLimitForDestination is FeeQuoterSetup {
     s_feeQuoter.parseEVMExtraArgsFromBytes(inputExtraArgs, DEST_CHAIN_SELECTOR);
   }
 
-  function test_RevertWhen_EVMExtraArgsEnforceOutOfOrder() public {
+  function test_parseEVMExtraArgsFromBytes_RevertWhen_EVMExtraArgsGasLimitTooHigh() public {
     Client.GenericExtraArgsV2 memory inputArgs =
-      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
-    bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
-    s_destChainConfig.enforceOutOfOrder = true;
-
-    vm.expectRevert(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
-    s_feeQuoter.parseEVMExtraArgsFromBytes(inputExtraArgs, DEST_CHAIN_SELECTOR, true);
-  }
-
-  function test_RevertWhen_EVMExtraArgsGasLimitTooHigh() public {
-    Client.GenericExtraArgsV2 memory inputArgs =
-      Client.GenericExtraArgsV2({gasLimit: s_destChainConfig.maxPerMsgGasLimit + 1, allowOutOfOrderExecution: true});
+      Client.GenericExtraArgsV2({gasLimit: MAX_GAS_LIMIT + 1, allowOutOfOrderExecution: true});
     bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
 
     vm.expectRevert(FeeQuoter.MessageGasLimitTooHigh.selector);
