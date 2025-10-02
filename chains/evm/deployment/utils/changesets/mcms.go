@@ -8,46 +8,48 @@ import (
 	mcmsevmsdk "github.com/smartcontractkit/mcms/sdk/evm"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 type MCMSBuilder interface {
-	Input() *common_utils.MCMSInput
+	Input() *mcms.Input
 	DeriveTimelocks(e cldf_deployment.Environment) (map[mcms_types.ChainSelector]string, error)
 	DeriveChainMetaData(e cldf_deployment.Environment) (map[mcms_types.ChainSelector]mcms_types.ChainMetadata, error)
 }
 
-func ResolveMCMS(e cldf_deployment.Environment, args MCMSBuilder) (MCMSBuildParams, error) {
+func ResolveMCMS(e cldf_deployment.Environment, args MCMSBuilder) (changesets.MCMSBuildParams, error) {
 	in := args.Input()
 	if in == nil {
-		return MCMSBuildParams{}, nil
+		return changesets.MCMSBuildParams{}, nil
 	}
 	if err := in.Validate(); err != nil {
-		return MCMSBuildParams{}, fmt.Errorf("invalid MCMS input: %w", err)
+		return changesets.MCMSBuildParams{}, fmt.Errorf("invalid MCMS input: %w", err)
 	}
 
 	tl, err := args.DeriveTimelocks(e)
 	if err != nil {
-		return MCMSBuildParams{}, fmt.Errorf("derive timelocks: %w", err)
+		return changesets.MCMSBuildParams{}, fmt.Errorf("derive timelocks: %w", err)
 	}
 	meta, err := args.DeriveChainMetaData(e)
 	if err != nil {
-		return MCMSBuildParams{}, fmt.Errorf("derive chain metadata: %w", err)
+		return changesets.MCMSBuildParams{}, fmt.Errorf("derive chain metadata: %w", err)
 	}
 
-	return MCMSBuildParams{
-		MCMSInput:         *in, // value-copy to discourage later mutation
+	return changesets.MCMSBuildParams{
+		Input:             *in, // value-copy to discourage later mutation
 		TimelockAddresses: tl,
 		ChainMetadata:     meta,
 	}, nil
 }
 
 type EVMMCMBuilder struct {
-	in *common_utils.MCMSInput
+	in *mcms.Input
 }
 
-func (b EVMMCMBuilder) Input() *common_utils.MCMSInput {
+func (b EVMMCMBuilder) Input() *mcms.Input {
 	return b.in
 }
 
@@ -71,7 +73,7 @@ func (b EVMMCMBuilder) DeriveTimelocks(e cldf_deployment.Environment) (map[mcms_
 				Qualifier:     in.TimelockAddressRef.Qualifier,
 				Labels:        in.TimelockAddressRef.Labels,
 			}},
-			datastore_utils.ToEVMAddress,
+			evm_datastore_utils.ToEVMAddress,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("chain %d: %w", sel, err)
@@ -105,7 +107,7 @@ func (b EVMMCMBuilder) DeriveChainMetaData(e cldf_deployment.Environment) (map[m
 				Qualifier:     in.MCMSAddressRef.Qualifier,
 				Labels:        in.MCMSAddressRef.Labels,
 			}},
-			datastore_utils.ToEVMAddress,
+			evm_datastore_utils.ToEVMAddress,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("chain %d: %w", sel, err)
@@ -126,6 +128,6 @@ func (b EVMMCMBuilder) DeriveChainMetaData(e cldf_deployment.Environment) (map[m
 	return out, nil
 }
 
-func NewEVMMCMBuilder(in *common_utils.MCMSInput) EVMMCMBuilder {
+func NewEVMMCMBuilder(in *mcms.Input) EVMMCMBuilder {
 	return EVMMCMBuilder{in: in}
 }

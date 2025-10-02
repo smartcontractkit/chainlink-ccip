@@ -5,14 +5,15 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
+	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -134,7 +135,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 
 		// ApplySourceChainConfigUpdates on CCVAggregator
-		ccvAggregatorReport, err := cldf_ops.ExecuteOperation(b, ccv_aggregator.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]ccv_aggregator.SourceChainConfigArgs]{
+		ccvAggregatorReport, err := cldf_ops.ExecuteOperation(b, ccv_aggregator.ApplySourceChainConfigUpdates, chain, evm_contract.FunctionInput[[]ccv_aggregator.SourceChainConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       input.CCVAggregator,
 			Args:          ccvAggregatorArgs,
@@ -145,7 +146,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		writes = append(writes, ccvAggregatorReport.Output)
 
 		// ApplyDestChainConfigUpdates on CCVProxy
-		ccvProxyReport, err := cldf_ops.ExecuteOperation(b, ccv_proxy.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]ccv_proxy.DestChainConfigArgs]{
+		ccvProxyReport, err := cldf_ops.ExecuteOperation(b, ccv_proxy.ApplyDestChainConfigUpdates, chain, evm_contract.FunctionInput[[]ccv_proxy.DestChainConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       input.CCVProxy,
 			Args:          ccvProxyArgs,
@@ -156,7 +157,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		writes = append(writes, ccvProxyReport.Output)
 
 		// ApplyDestChainConfigUpdates on CommitteeVerifier
-		committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.DestChainConfigArgs]{
+		committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyDestChainConfigUpdates, chain, evm_contract.FunctionInput[[]committee_verifier.DestChainConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       input.CommitteeVerifier,
 			Args:          committeeVerifierDestConfigArgs,
@@ -168,7 +169,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 
 		// ApplyDestChainUpdates on each ExecutorOnRamp
 		for executorOnRampAddr, destChainSelectorsToAdd := range destChainSelectorsPerExecutor {
-			executorOnRampReport, err := cldf_ops.ExecuteOperation(b, executor_onramp.ApplyDestChainUpdates, chain, contract.FunctionInput[executor_onramp.ApplyDestChainUpdatesArgs]{
+			executorOnRampReport, err := cldf_ops.ExecuteOperation(b, executor_onramp.ApplyDestChainUpdates, chain, evm_contract.FunctionInput[executor_onramp.ApplyDestChainUpdatesArgs]{
 				ChainSelector: chain.Selector,
 				Address:       executorOnRampAddr,
 				Args: executor_onramp.ApplyDestChainUpdatesArgs{
@@ -182,7 +183,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 
 		// ApplyAllowlistUpdates on CommitteeVerifier
-		committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
+		committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, evm_contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       input.CommitteeVerifier,
 			Args:          committeeVerifierAllowlistArgs,
@@ -193,7 +194,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		writes = append(writes, committeeVerifierAllowlistReport.Output)
 
 		// ApplyDestChainConfigUpdates on FeeQuoter
-		feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter_v2.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter_v2.DestChainConfigArgs]{
+		feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter_v2.ApplyDestChainConfigUpdates, chain, evm_contract.FunctionInput[[]fee_quoter_v2.DestChainConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       input.FeeQuoter,
 			Args:          feeQuoterArgs,
@@ -204,7 +205,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		writes = append(writes, feeQuoterReport.Output)
 
 		// ApplyRampUpdates on Router
-		routerReport, err := cldf_ops.ExecuteOperation(b, router.ApplyRampUpdates, chain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
+		routerReport, err := cldf_ops.ExecuteOperation(b, router.ApplyRampUpdates, chain, evm_contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
 			ChainSelector: chain.Selector,
 			Address:       input.Router,
 			Args: router.ApplyRampsUpdatesArgs{

@@ -6,7 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -20,17 +20,17 @@ func TestDeriveMCMAddressesEVM(t *testing.T) {
 	chains := []chain.BlockChain{
 		evm.Chain{Selector: 1},
 	}
-	mcmAddressRef := &datastore.AddressRef{
+	mcmAddressRef := datastore.AddressRef{
 		Type:      "ProposerManyChainMultiSig",
 		Version:   semver.MustParse("1.0.0"),
 		Qualifier: "main",
 	}
-	timelockAddressRef := &datastore.AddressRef{
+	timelockAddressRef := datastore.AddressRef{
 		Type:      "RBACTimelock",
 		Version:   semver.MustParse("1.0.0"),
 		Qualifier: "main",
 	}
-	input := &common_utils.MCMSInput{
+	input := &mcms.Input{
 		OverridePreviousRoot: false,
 		ValidUntil:           2756219818,
 		TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
@@ -45,7 +45,7 @@ func TestDeriveMCMAddressesEVM(t *testing.T) {
 	timelockAddressRef.Address = common.HexToAddress("0x0000000000000000000000000000000000000001").Hex()
 	timelockAddressRef.ChainSelector = 1
 
-	err = ds.Addresses().Add(*timelockAddressRef)
+	err = ds.Addresses().Add(timelockAddressRef)
 	require.NoError(t, err)
 
 	e := deployment.Environment{DataStore: ds.Seal(), Logger: lggr, BlockChains: chain.NewBlockChainsFromSlice(chains)}

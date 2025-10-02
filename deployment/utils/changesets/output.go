@@ -10,8 +10,8 @@ import (
 	"github.com/smartcontractkit/mcms"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
 )
 
 // OutputBuilder helps construct a ChangesetOutput, including building an MCMS proposal if there are write operations.
@@ -24,7 +24,7 @@ type OutputBuilder struct {
 
 // MCMSBuildParams holds configuration for building an MCMS proposal.
 type MCMSBuildParams struct {
-	common_utils.MCMSInput
+	mcms_utils.Input
 	// Description is a human-readable description of the proposal.
 	Description string
 	// TimelockAddresses is a map of chain selectors to timelock contract addresses.

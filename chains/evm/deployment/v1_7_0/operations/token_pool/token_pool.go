@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/token_pool_v2"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -24,7 +25,13 @@ type ConstructorArgs struct {
 	Router             common.Address
 }
 
-type ChainUpdate = token_pool_v2.TokenPoolChainUpdate
+type ChainUpdate struct {
+	RemoteChainSelector       uint64
+	RemotePoolAddresses       [][]byte
+	RemoteTokenAddress        []byte
+	OutboundRateLimiterConfig tokens.RateLimiterConfig
+	InboundRateLimiterConfig  tokens.RateLimiterConfig
+}
 
 type CCVConfigArg = token_pool_v2.TokenPoolV2CCVConfigArg
 
@@ -40,12 +47,10 @@ type RemotePoolArgs struct {
 
 type RateLimiterBucket = token_pool_v2.RateLimiterTokenBucket
 
-type RateLimiterConfig = token_pool_v2.RateLimiterConfig
-
 type SetChainRateLimiterConfigArg struct {
 	RemoteChainSelector       uint64
-	InboundRateLimiterConfig  RateLimiterConfig
-	OutboundRateLimiterConfig RateLimiterConfig
+	InboundRateLimiterConfig  tokens.RateLimiterConfig
+	OutboundRateLimiterConfig tokens.RateLimiterConfig
 }
 
 type ApplyAllowListUpdatesArgs struct {
@@ -57,7 +62,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "token-pool:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys various TokenPool contracts (i.e. BurnMint, LockRelease)",
-	ContractMetadata: token_pool_v2.TokenPoolV2MetaData,
+	ContractMetadata: burn_mint_token_pool_v2.BurnMintTokenPoolV2MetaData, // Just to get the expected constructor args
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(burn_mint_token_pool.ContractType, *semver.MustParse("1.7.0")).String(): {
 			EVM: common.FromHex(burn_mint_token_pool_v2.BurnMintTokenPoolV2Bin),
@@ -76,7 +81,17 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 	IsAllowedCaller: contract.OnlyOwner[*token_pool_v2.TokenPoolV2, ApplyChainUpdatesArgs],
 	Validate:        func(ApplyChainUpdatesArgs) error { return nil },
 	CallContract: func(tokenPoolV2 *token_pool_v2.TokenPoolV2, opts *bind.TransactOpts, args ApplyChainUpdatesArgs) (*types.Transaction, error) {
-		return tokenPoolV2.ApplyChainUpdates(opts, args.RemoteChainSelectorsToRemove, args.ChainsToAdd)
+		chainsToAdd := make([]token_pool_v2.TokenPoolChainUpdate, len(args.ChainsToAdd))
+		for i, chain := range args.ChainsToAdd {
+			chainsToAdd[i] = token_pool_v2.TokenPoolChainUpdate{
+				RemoteChainSelector:       chain.RemoteChainSelector,
+				RemotePoolAddresses:       chain.RemotePoolAddresses,
+				RemoteTokenAddress:        chain.RemoteTokenAddress,
+				OutboundRateLimiterConfig: token_pool_v2.RateLimiterConfig(chain.OutboundRateLimiterConfig),
+				InboundRateLimiterConfig:  token_pool_v2.RateLimiterConfig(chain.InboundRateLimiterConfig),
+			}
+		}
+		return tokenPoolV2.ApplyChainUpdates(opts, args.RemoteChainSelectorsToRemove, chainsToAdd)
 	},
 })
 
@@ -157,12 +172,12 @@ var SetChainRateLimiterConfigs = contract.NewWrite(contract.WriteParams[[]SetCha
 	Validate: func([]SetChainRateLimiterConfigArg) error { return nil },
 	CallContract: func(tokenPoolV2 *token_pool_v2.TokenPoolV2, opts *bind.TransactOpts, args []SetChainRateLimiterConfigArg) (*types.Transaction, error) {
 		var remoteChainSelectors []uint64
-		var inboundConfigs []RateLimiterConfig
-		var outboundConfigs []RateLimiterConfig
+		var inboundConfigs []token_pool_v2.RateLimiterConfig
+		var outboundConfigs []token_pool_v2.RateLimiterConfig
 		for _, arg := range args {
 			remoteChainSelectors = append(remoteChainSelectors, arg.RemoteChainSelector)
-			inboundConfigs = append(inboundConfigs, arg.InboundRateLimiterConfig)
-			outboundConfigs = append(outboundConfigs, arg.OutboundRateLimiterConfig)
+			inboundConfigs = append(inboundConfigs, token_pool_v2.RateLimiterConfig(arg.InboundRateLimiterConfig))
+			outboundConfigs = append(outboundConfigs, token_pool_v2.RateLimiterConfig(arg.OutboundRateLimiterConfig))
 		}
 		return tokenPoolV2.SetChainRateLimiterConfigs(opts, remoteChainSelectors, inboundConfigs, outboundConfigs)
 	},
@@ -292,5 +307,16 @@ var GetRemoteToken = contract.NewRead(contract.ReadParams[uint64, []byte, *token
 	NewContract:  token_pool_v2.NewTokenPoolV2,
 	CallContract: func(tokenPoolV2 *token_pool_v2.TokenPoolV2, opts *bind.CallOpts, args uint64) ([]byte, error) {
 		return tokenPoolV2.GetRemoteToken(opts, args)
+	},
+})
+
+var GetToken = contract.NewRead(contract.ReadParams[any, common.Address, *token_pool_v2.TokenPoolV2]{
+	Name:         "token-pool:get-token",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Gets the local token address for a TokenPool",
+	ContractType: ContractType,
+	NewContract:  token_pool_v2.NewTokenPoolV2,
+	CallContract: func(tokenPoolV2 *token_pool_v2.TokenPoolV2, opts *bind.CallOpts, args any) (common.Address, error) {
+		return tokenPoolV2.GetToken(opts)
 	},
 })
