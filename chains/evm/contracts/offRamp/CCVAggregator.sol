@@ -321,7 +321,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
         destTokenAmounts: destTokenAmounts
       }),
       i_gasForCallExactCheck,
-      gasleft() - i_gasForCallExactCheck - 10000,
+      gasLimit,
       receiver
     );
 
