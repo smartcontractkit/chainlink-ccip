@@ -37,22 +37,36 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
       finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
       messageBody: _formatMessage(
-        1,
-        bytes32(uint256(uint160(address(s_USDCToken)))),
-        bytes32(uint256(uint160(recipient))),
-        amount,
-        bytes32(uint256(uint160(OWNER)))
+        1, // version
+        bytes32(abi.encode(s_USDCToken)), // burnToken
+        bytes32(uint256(uint160(recipient))), // mintRecipient
+        amount, // amount
+        bytes32(uint256(uint160(OWNER))) // messageSender
       )
     });
 
     bytes memory message = _generateUSDCMessageCCTPV2(usdcMessage);
     bytes memory attestation = bytes("attestation bytes");
 
+    bytes32 calculatedDepositHash = USDCSourcePoolDataCodec._calculateDepositHash(
+      SOURCE_DOMAIN_IDENTIFIER,
+      amount,
+      DEST_DOMAIN_IDENTIFIER,
+      bytes32(uint256(uint160(recipient))),
+      bytes32(abi.encode(s_USDCToken)),
+      bytes32(uint256(uint160(address(s_usdcTokenPool)))),
+      s_usdcTokenPool.MAX_FEE(),
+      s_usdcTokenPool.FINALITY_THRESHOLD()
+    );
+
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
-        USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: bytes32(0)})
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          depositHash: calculatedDepositHash
+        })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -101,11 +115,14 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     uint32 sourceDomain = 5;
     uint256 amount = 100;
 
+    // The Deposit hash extracted from the real transaction off-chain.
+    bytes32 depositHash = 0x0dba99ea6b5ae8c13a6d620f6349f729f7da3aa93a6fef3c857e009a5d142ad6;
+
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
-        USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: sourceDomain, depositHash: bytes32(0)})
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: sourceDomain, depositHash: depositHash})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -154,19 +171,29 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
       finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
       messageBody: _formatMessage(
-        1,
-        bytes32(uint256(uint160(address(s_USDCToken)))),
-        bytes32(uint256(uint160(OWNER))),
-        amount,
-        bytes32(uint256(uint160(OWNER)))
+        1, bytes32(abi.encode(s_USDCToken)), bytes32(uint256(uint160(OWNER))), amount, bytes32(uint256(uint160(OWNER)))
       )
     });
+
+    bytes32 depositHash = USDCSourcePoolDataCodec._calculateDepositHash(
+      SOURCE_DOMAIN_IDENTIFIER,
+      amount,
+      DEST_DOMAIN_IDENTIFIER,
+      bytes32(uint256(uint160(OWNER))),
+      bytes32(abi.encode(s_USDCToken)),
+      bytes32(uint256(uint160(address(s_usdcTokenPool)))),
+      s_usdcTokenPool.MAX_FEE(),
+      s_usdcTokenPool.FINALITY_THRESHOLD()
+    );
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
-        USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: bytes32(0)})
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
+          depositHash: depositHash
+        })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
@@ -205,11 +232,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
       finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
       messageBody: _formatMessage(
-        1,
-        bytes32(uint256(uint160(address(s_USDCToken)))),
-        bytes32(uint256(uint160(OWNER))),
-        amount,
-        bytes32(uint256(uint160(OWNER)))
+        1, bytes32(abi.encode(s_USDCToken)), bytes32(uint256(uint160(OWNER))), amount, bytes32(uint256(uint160(OWNER)))
       )
     });
 

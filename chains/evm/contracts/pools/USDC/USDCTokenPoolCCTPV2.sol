@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
+
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
@@ -19,12 +20,17 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   error InvalidMinFinalityThreshold(uint32 expected, uint32 got);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 got);
+  error InvalidDepositHash(bytes32 expected, bytes32 got);
+  error InvalidBurnToken(address expected, address got);
 
   /// @dev CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;
 
   /// @dev 2000 indicates that finality must be reached before attestation is possible in CCTP V2.
   uint32 public constant FINALITY_THRESHOLD = 2000;
+
+  /// @dev The minimum length of a valid USDC message where all the required fields are present and capable of being parsed
+  uint256 public constant MIN_USDC_MESSAGE_LENGTH = 280;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "USDCTokenPoolCCTPV2 1.6.3-dev";
@@ -87,7 +93,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       lockOrBurnIn.amount, // amount
       domain.domainIdentifier, // destinationDomain
       decodedReceiver, // mintRecipient
-      address(i_token), // burnToken
+      bytes32(uint256(uint160(address(i_token)))), // burnToken
       domain.allowedCaller, // destinationCaller
       MAX_FEE, // maxFee
       FINALITY_THRESHOLD // minFinalityThreshold
@@ -164,10 +170,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     bytes memory usdcMessage,
     USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenData
   ) internal view {
-    // 148 is the minimum length of a valid message where all of the require fields are present and capable of being parsed.
-    // correctly below for message validation. Since messageBody is dynamic and not always used, it is not included in this
-    // check.
-    if (usdcMessage.length < 148) revert InvalidMessageLength(usdcMessage.length);
+    if (usdcMessage.length < MIN_USDC_MESSAGE_LENGTH) revert InvalidMessageLength(usdcMessage.length);
 
     uint32 version;
     // solhint-disable-next-line no-inline-assembly
@@ -180,25 +183,36 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
 
-    // This token pool only supports version V2 of the CCTP message format.
-    // The version is checked prior to loading the rest of the message to avoid unexpected reverts due to out-of-bounds
-    // reads if the message format is different.
     // Note: Even though the CCTP Version is V2, it's on-chain version number is 1, since V1 used a version number of 0.
     // This is different from the sourceDomain field of sourceTokenData, which is used by off-chain code and the token
     // pools, rather than being a formal part of the CCTP message format.
     if (version != i_supportedUSDCVersion) revert InvalidMessageVersion(i_supportedUSDCVersion, version);
 
+    // Fields from the message header
     uint32 messageSourceDomain;
     uint32 destinationDomain;
     uint32 minFinalityThreshold;
     uint32 finalityThresholdExecuted;
+    bytes32 destinationCaller;
+
+    // Fields from the message body
+    uint256 amount;
+    bytes32 burnToken;
+    bytes32 mintRecipient;
 
     // solhint-disable-next-line no-inline-assembly
     assembly {
       messageSourceDomain := mload(add(usdcMessage, 8)) // 4 + 4 = 8
       destinationDomain := mload(add(usdcMessage, 12)) // 8 + 4 = 12
+      destinationCaller := mload(add(usdcMessage, 140)) // 32 + 108 = 140
       minFinalityThreshold := mload(add(usdcMessage, 144)) // 140 + 4 = 144
       finalityThresholdExecuted := mload(add(usdcMessage, 148)) // 144 + 4 = 148
+
+      // The message body starts at index 148 and because it is dynamic contains a 32-byte
+      // length field prefixing the data.
+      amount := mload(add(usdcMessage, 248)) // 148 + 32 + 68 = 248
+      burnToken := mload(add(usdcMessage, 184)) // 148 + 32 + 4 = 184
+      mintRecipient := mload(add(usdcMessage, 216)) // 148 + 32 + 36 = 216
     }
 
     // Check that the source domain included in the CCTP Message matches the one forwarded by the source pool.
@@ -218,6 +232,26 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
 
     if (finalityThresholdExecuted != FINALITY_THRESHOLD) {
       revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
+    }
+
+    // Calculate the deposit hash for the message, extracting the necessary fields
+    bytes32 derivedDepositHash = USDCSourcePoolDataCodec._calculateDepositHash(
+      messageSourceDomain,
+      amount,
+      destinationDomain,
+      mintRecipient,
+      burnToken,
+      destinationCaller,
+      MAX_FEE,
+      minFinalityThreshold
+    );
+
+    // Check that the locally calculated deposit hash matches the one provided by the source pool. This is critical to
+    // ensuring that the correct attestation is used for the given message. Without it, a user may be able to use an
+    // attestation for a different message to mint the tokens, thus preventing the legitimate user from minting the
+    // tokens on destination.
+    if (derivedDepositHash != sourceTokenData.depositHash) {
+      revert InvalidDepositHash(sourceTokenData.depositHash, derivedDepositHash);
     }
   }
 }

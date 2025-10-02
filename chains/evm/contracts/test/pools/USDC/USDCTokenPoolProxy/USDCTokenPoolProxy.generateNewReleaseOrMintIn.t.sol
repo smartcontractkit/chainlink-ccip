@@ -11,7 +11,6 @@ contract USDCTokenPoolProxy_generateNewReleaseOrMintIn is USDCTokenPoolProxySetu
     uint32 sourceDomain = 67890;
 
     bytes memory originalSender = abi.encode(makeAddr("sender"));
-    address receiver = makeAddr("receiver");
     bytes memory sourcePoolAddress = abi.encode(makeAddr("sourcePoolAddress"));
     bytes memory offchainTokenData = "";
 

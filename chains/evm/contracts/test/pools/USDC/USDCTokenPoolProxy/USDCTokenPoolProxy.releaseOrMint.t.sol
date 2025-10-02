@@ -5,6 +5,7 @@ import {IPoolV1} from "../../../../interfaces/IPool.sol";
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
+
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
@@ -393,7 +394,9 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   }
 
   function test_releaseOrMint_RevertWhen_Unauthorized() public {
-    vm.startPrank(makeAddr("unauthorized"));
+    address unauthorized = makeAddr("unauthorized");
+
+    vm.startPrank(unauthorized);
 
     // Prepare input with CCTP_V1_FLAG in sourcePoolData (version 0 in offchainTokenData)
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
@@ -407,7 +410,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       offchainTokenData: ""
     });
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.Unauthorized.selector));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
   }
 }

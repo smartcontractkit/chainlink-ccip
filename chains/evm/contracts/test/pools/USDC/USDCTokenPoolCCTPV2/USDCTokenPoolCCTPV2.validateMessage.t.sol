@@ -25,7 +25,13 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
       finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
-      messageBody: bytes("")
+      messageBody: abi.encodePacked(
+        uint32(1), // version
+        bytes32(uint256(uint160(address(s_USDCToken)))), // burnToken
+        bytes32(uint256(uint160(299999))), // mintRecipient
+        uint256(1e6), // amount
+        bytes32(SOURCE_CHAIN_TOKEN_SENDER) // messageSender
+      )
     });
 
     // Create valid source token data payload that matches the valid USDC message
@@ -37,6 +43,8 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
   }
 
   function testFuzz_validateMessage_Success(uint32 sourceDomain, bytes32 nonce) public {
+    uint256 amount = 100;
+
     vm.pauseGasMetering();
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
       version: 1,
@@ -48,14 +56,31 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
       finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
-      messageBody: bytes("")
+      messageBody: abi.encodePacked(
+        uint32(1), // version
+        bytes32(uint256(uint160(address(s_USDCToken)))), // burnToken
+        bytes32(uint256(uint160(299999))), // mintRecipient
+        amount, // amount
+        bytes32(SOURCE_CHAIN_TOKEN_SENDER) // messageSender
+      )
     });
     bytes memory encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
+
+    bytes32 depositHash = USDCSourcePoolDataCodec._calculateDepositHash(
+      sourceDomain,
+      amount,
+      DEST_DOMAIN_IDENTIFIER,
+      bytes32(uint256(uint160(299999))),
+      bytes32(abi.encode(s_USDCToken)),
+      bytes32(uint256(uint160(address(s_usdcTokenPool)))),
+      s_usdcTokenPool.MAX_FEE(),
+      s_usdcTokenPool.FINALITY_THRESHOLD()
+    );
 
     vm.resumeGasMetering();
     s_usdcTokenPool.validateMessage(
       encodedUsdcMessage,
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: sourceDomain, depositHash: bytes32(0)})
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: sourceDomain, depositHash: depositHash})
     );
   }
 

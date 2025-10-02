@@ -239,7 +239,9 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   }
 
   function test_lockOrBurn_RevertWhen_Unauthorized() public {
-    vm.startPrank(makeAddr("unauthorized"));
+    address unauthorized = makeAddr("unauthorized");
+
+    vm.startPrank(unauthorized);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(s_receiver),
@@ -249,7 +251,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       localToken: address(s_USDCToken)
     });
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.Unauthorized.selector));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
     s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
   }
 }

@@ -14,7 +14,7 @@ contract USDCTokenPoolProxyHelper is USDCTokenPoolProxy {
 
   function generateNewReleaseOrMintIn(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public returns (Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn) {
+  ) public pure returns (Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn) {
     return _generateNewReleaseOrMintIn(releaseOrMintIn);
   }
 }

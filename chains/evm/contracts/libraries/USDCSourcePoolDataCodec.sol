@@ -11,6 +11,8 @@ pragma solidity ^0.8.24;
 /// @dev Any future versions of CCTP should include in this library a new function for encoding and decoding the source
 /// pool data accordingly.
 library USDCSourcePoolDataCodec {
+  error InvalidVersion(bytes4 version);
+
   /// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
   /// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
   /// data to indicate that the tokens should be released from the lock release pool rather than attempting to be minted
@@ -44,8 +46,6 @@ library USDCSourcePoolDataCodec {
     uint32 sourceDomain;
     bytes32 depositHash;
   }
-
-  error InvalidVersion(bytes4 version);
 
   /// @notice Encodes the source token data payload into a bytes array.
   /// @dev By using abi.encodePacked(), significant amount of space on the source pool data is saved.
@@ -154,7 +154,7 @@ library USDCSourcePoolDataCodec {
     uint256 amount,
     uint32 destinationDomain,
     bytes32 mintRecipient,
-    address burnToken,
+    bytes32 burnToken,
     bytes32 destinationCaller,
     uint256 maxFee,
     uint32 minFinalityThreshold

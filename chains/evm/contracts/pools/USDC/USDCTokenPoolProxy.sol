@@ -7,6 +7,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {ERC165CheckerReverting} from "../../libraries/ERC165CheckerReverting.sol";
 import {Pool} from "../../libraries/Pool.sol";
+
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
@@ -40,7 +41,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
   error InvalidMessageLength(uint256 length);
   error MismatchedArrayLengths();
   error NoLockOrBurnMechanismSet(uint64 remoteChainSelector);
-  error Unauthorized();
+  error CallerIsNotARampOnRouter(address caller);
   error TokenPoolUnsupported(address pool);
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
@@ -60,14 +61,14 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
     LOCK_RELEASE
   }
 
+  IERC20 internal immutable i_token;
+  IRouter internal immutable i_router;
+
   mapping(uint64 remoteChainSelector => LockOrBurnMechanism mechanism) internal s_lockOrBurnMechanism;
   mapping(uint64 remoteChainSelector => address lockReleasePool) internal s_lockReleasePools;
 
-  /// @dev The legacy CCTP V1, Current CCTP V1, and Current CCTP V2 pools which interact with CCTP contracts.
+  /// @dev The legacy CCTP V1, CCTP V1, and CCTP V2 pools which interact with CCTP contracts.
   PoolAddresses internal s_pools;
-
-  IERC20 internal immutable i_token;
-  IRouter internal immutable i_router;
 
   string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.3-dev";
 
@@ -89,7 +90,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
   ) public virtual returns (Pool.LockOrBurnOutV1 memory) {
     // Since this contract does not inherit from the TokenPool contract, it must manually validate the caller as an onRamp.
     if (i_router.getOnRamp(lockOrBurnIn.remoteChainSelector) != msg.sender) {
-      revert Unauthorized();
+      revert CallerIsNotARampOnRouter(msg.sender);
     }
 
     LockOrBurnMechanism mechanism = s_lockOrBurnMechanism[lockOrBurnIn.remoteChainSelector];
@@ -154,7 +155,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
   ) public virtual returns (Pool.ReleaseOrMintOutV1 memory) {
     // Since this proxy does not inherit from the TokenPool contract, it must manually validate the caller as an offRamp.
     if (!i_router.isOffRamp(releaseOrMintIn.remoteChainSelector, msg.sender)) {
-      revert Unauthorized();
+      revert CallerIsNotARampOnRouter(msg.sender);
     }
 
     // The first 4 bytes of source pool data are the version which can be extracted directly and cast into a uint32.
