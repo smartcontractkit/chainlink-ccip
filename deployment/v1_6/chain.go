@@ -11,8 +11,8 @@ type ChainDefinition struct {
 	TokenPrices map[string]*big.Int
 	// FeeQuoterDestChainConfig is the configuration to be applied on source chain when this chain is a destination.
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
-	// RMNVerificationDisabled is true if we do not want the RMN to bless messages FROM this chain.
-	RMNVerificationDisabled bool
+	// RMNVerificationEnabled is true if we want the RMN to bless messages FROM this chain.
+	RMNVerificationEnabled bool
 	// AllowListEnabled is true if we want an allowlist to dictate who can send messages TO this chain.
 	AllowListEnabled bool
 	// OnRamp is the address of the OnRamp contract on this chain.
