@@ -10,7 +10,6 @@ import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/interfaces/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 /// @notice The FeeQuoter contract responsibility is to:
@@ -18,7 +17,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 ///   - Store the price of a token in USD allowing the owner or priceUpdater to update this value.
 ///   - Manage chain specific fee calculations.
 /// The authorized callers in the contract represent the fee price updaters.
-contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
+contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
@@ -342,13 +341,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IERC165 {
         Internal.TimestampedPackedUint224({value: update.usdPerUnitGas, timestamp: uint32(block.timestamp)});
       emit UsdPerUnitGasUpdated(update.destChainSelector, update.usdPerUnitGas, block.timestamp);
     }
-  }
-
-  /// @notice Signals which version of the pool interface is supported
-  function supportsInterface(
-    bytes4 interfaceId
-  ) public pure override returns (bool) {
-    return interfaceId == type(IFeeQuoter).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================

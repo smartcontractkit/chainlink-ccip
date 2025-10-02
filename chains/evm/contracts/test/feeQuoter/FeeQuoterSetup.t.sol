@@ -7,7 +7,6 @@ import {Internal} from "../../libraries/Internal.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {FeeQuoterHelper} from "../helpers/FeeQuoterHelper.sol";
-import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/shared/mocks/MockV3Aggregator.sol";
 
 contract FeeQuoterSetup is TokenSetup {
   uint112 internal constant USD_PER_GAS = 1e6; // 0.001 gwei
@@ -26,7 +25,6 @@ contract FeeQuoterSetup is TokenSetup {
   uint8 internal constant DEST_GAS_PER_PAYLOAD_BYTE_BASE = 16;
 
   uint16 internal constant DEFAULT_TOKEN_FEE_USD_CENTS = 50;
-  uint32 internal constant DEFAULT_TOKEN_BYTES_OVERHEAD = 32;
 
   // Use 16 gas per data availability byte in our tests.
   // This is an overestimation in OP stack, it ignores 4 gas per 0 byte rule.
@@ -39,8 +37,6 @@ contract FeeQuoterSetup is TokenSetup {
   uint32 internal constant DEST_DATA_AVAILABILITY_OVERHEAD_GAS = 188 // Fixed data availability overhead in OP stack.
     + (32 * 31 + 4) * DEST_GAS_PER_DATA_AVAILABILITY_BYTE // CommitStore single-root transmission takes up about 31 slots, plus selector.
     + (32 * 34 + 4) * DEST_GAS_PER_DATA_AVAILABILITY_BYTE; // OffRamp transmission excluding EVM2EVMMessage takes up about 34 slots, plus selector.
-
-  uint224 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
 
   // Encode L1 gas price and L2 gas price into a packed price.
   // L1 gas price is left-shifted to the higher-order bits.
@@ -262,7 +258,7 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
     s_feeTokenPrice = s_sourceTokenPrices[0];
     s_wrappedTokenPrice = s_sourceTokenPrices[2];
 
-    s_feeQuoter.updatePrices(_getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, CUSTOM_TOKEN_PRICE));
+    s_feeQuoter.updatePrices(_getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, 1e17));
   }
 
   function _generateEmptyMessage() public view returns (Client.EVM2AnyMessage memory) {

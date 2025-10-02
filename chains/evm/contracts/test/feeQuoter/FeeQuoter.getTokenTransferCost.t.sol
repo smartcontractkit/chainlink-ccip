@@ -49,7 +49,7 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
     // Assert that the default values are used
     assertEq(uint256(DEFAULT_TOKEN_FEE_USD_CENTS) * 1e16, feeUSDWei);
     assertEq(DEFAULT_TOKEN_DEST_GAS_OVERHEAD, destGasOverhead);
-    assertEq(DEFAULT_TOKEN_BYTES_OVERHEAD, destBytesOverhead);
+    assertEq(Pool.CCIP_POOL_V1_RET_BYTES, destBytesOverhead);
   }
 
   function test_getTokenTransferCost_ZeroFeeConfigChargesMinFee() public {
