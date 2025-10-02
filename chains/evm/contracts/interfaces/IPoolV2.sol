@@ -6,9 +6,8 @@ import {IPoolV1} from "./IPool.sol";
 import {Client} from "../libraries/Client.sol";
 import {Pool} from "../libraries/Pool.sol";
 
-// TODO Milestone 2: implement.
 /// @notice Shared public interface for multiple V2 pool types.
-/// Each pool type handles a different child token model e.g. lock/unlock, mint/burn.
+/// Each pool type handles a different child token model e.g. lock/release, mint/burn.
 interface IPoolV2 is IPoolV1 {
   /// @notice Lock tokens into the pool or burn the tokens.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
@@ -21,6 +20,15 @@ interface IPoolV2 is IPoolV1 {
     uint16 finality,
     bytes calldata tokenArgs
   ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount);
+
+  /// @notice Releases or mints tokens on the destination chain.
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
+  /// @param finality The finality configuration from the CCIP message.
+  /// @return releaseOrMintOut Encoded data fields describing the result of the release or mint.
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 finality
+  ) external returns (Pool.ReleaseOrMintOutV1 memory releaseOrMintOut);
 
   /// @notice Returns the set of required CCVs for outgoing messages to a destination chain.
   /// @param localToken The address of the local token.

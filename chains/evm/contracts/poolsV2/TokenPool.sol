@@ -2,9 +2,11 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
+import {IRMN} from "../interfaces/IRMN.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {Pool} from "../libraries/Pool.sol";
+import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {TokenPool as TokenPoolV1} from "../pools/TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -14,6 +16,7 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 
 abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   using SafeERC20 for IERC20;
+  using RateLimiter for RateLimiter.TokenBucket;
 
   error DuplicateCCV(address ccv);
   error InvalidDestBytesOverhead(uint32 destBytesOverhead);
@@ -26,12 +29,21 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector);
   /// @notice Emitted when pool fees are withdrawn.
   event PoolFeeWithdrawn(address indexed recipient, uint256 amount);
+  event FastTransferOutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
+  event FastTransferInboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
 
   struct FastFinalityConfig {
     uint16 finalityThreshold; // ──╮ Maximum block depth required for token transfers.
     uint16 fastTransferFeeBps; // ─╯ Fee in basis points for fast transfers [0-10_000].
     uint256 maxAmountPerRequest; // Maximum amount allowed per transfer request.
-    // TODO separate rate limit config for fast transfers.
+    mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) outboundRateLimiterConfig;
+    mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketInbound) inboundRateLimiterConfig;
+  }
+
+  struct FastTransferRateLimitConfigArgs {
+    uint64 remoteChainSelector; // Remote chain selector.
+    RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limiter configuration.
+    RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limiter configuration.
   }
 
   struct CCVConfig {
@@ -82,7 +94,14 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     uint16 finality,
     bytes calldata // tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    FastFinalityConfig memory finalityConfig = s_finalityConfig;
+    // validate
+    if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
+    _checkAllowList(lockOrBurnIn.originalSender);
+    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
+
+    // handle finality
+    FastFinalityConfig storage finalityConfig = s_finalityConfig;
     if (finality != 0 && finalityConfig.finalityThreshold != 0) {
       if (finality < finalityConfig.finalityThreshold) {
         revert InvalidFinality(finality, finalityConfig.finalityThreshold);
@@ -92,10 +111,15 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
       }
       // deduct fast transfer fee.
       lockOrBurnIn.amount -= (lockOrBurnIn.amount * finalityConfig.fastTransferFeeBps) / BPS_DIVIDER;
+      finalityConfig.outboundRateLimiterConfig[lockOrBurnIn.remoteChainSelector]._consume(
+        lockOrBurnIn.amount, address(lockOrBurnIn.localToken)
+      );
+      emit FastTransferOutboundRateLimitConsumed(
+        lockOrBurnIn.remoteChainSelector, address(lockOrBurnIn.localToken), lockOrBurnIn.amount
+      );
+    } else {
+      _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
     }
-
-    _validateLockOrBurn(lockOrBurnIn);
-    // TODO consume fast transfer rate limits not normal rate limits.
 
     _lockOrBurn(lockOrBurnIn.amount);
 
@@ -115,17 +139,103 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     );
   }
 
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 finality
+  ) public virtual override(IPoolV2) returns (Pool.ReleaseOrMintOutV1 memory) {
+    uint256 localAmount = _calculateLocalAmount(
+      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
+    );
+
+    if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
+    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+
+    if (!isRemotePool(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress)) {
+      revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
+    }
+
+    FastFinalityConfig storage finalityConfig = s_finalityConfig;
+    if (finality != 0) {
+      finalityConfig.inboundRateLimiterConfig[releaseOrMintIn.remoteChainSelector]._consume(
+        localAmount, releaseOrMintIn.localToken
+      );
+      emit FastTransferInboundRateLimitConsumed(
+        releaseOrMintIn.remoteChainSelector, address(releaseOrMintIn.localToken), localAmount
+      );
+    } else {
+      _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
+    }
+
+    _releaseOrMint(releaseOrMintIn.receiver, localAmount);
+
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: localAmount
+    });
+
+    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+  }
+
   // ================================================================
   // │                          Finality                             │
   // ================================================================
   /// @notice Updates the finality configuration for token transfers.
   function applyFinalityConfigUpdates(
-    FastFinalityConfig calldata finalityConfig
+    uint16 finalityThreshold,
+    uint16 fastTransferFeeBps,
+    uint256 maxAmountPerRequest,
+    FastTransferRateLimitConfigArgs[] calldata rateLimitConfigArgs
   ) external virtual onlyOwner {
-    s_finalityConfig = finalityConfig;
-    emit FinalityConfigUpdated(
-      finalityConfig.finalityThreshold, finalityConfig.fastTransferFeeBps, finalityConfig.maxAmountPerRequest
-    );
+    FastFinalityConfig storage finalityConfig = s_finalityConfig;
+    finalityConfig.finalityThreshold = finalityThreshold;
+    finalityConfig.fastTransferFeeBps = fastTransferFeeBps;
+    finalityConfig.maxAmountPerRequest = maxAmountPerRequest;
+    _setFastTransferRateLimitConfig(rateLimitConfigArgs);
+    emit FinalityConfigUpdated(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest);
+  }
+
+  function setFastTransferRateLimitConfig(
+    FastTransferRateLimitConfigArgs[] calldata rateLimitConfigArgs
+  ) external virtual onlyOwner {
+    _setFastTransferRateLimitConfig(rateLimitConfigArgs);
+  }
+
+  function _setFastTransferRateLimitConfig(
+    FastTransferRateLimitConfigArgs[] calldata rateLimitConfigArgs
+  ) internal {
+    FastFinalityConfig storage finalityConfig = s_finalityConfig;
+    for (uint256 i = 0; i < rateLimitConfigArgs.length; ++i) {
+      FastTransferRateLimitConfigArgs calldata configArgs = rateLimitConfigArgs[i];
+      if (!isSupportedChain(configArgs.remoteChainSelector)) revert NonExistentChain(configArgs.remoteChainSelector);
+      RateLimiter._validateTokenBucketConfig(configArgs.outboundRateLimiterConfig);
+      _initializeFastBucketIfNeeded(
+        finalityConfig.outboundRateLimiterConfig[configArgs.remoteChainSelector], configArgs.outboundRateLimiterConfig
+      );
+      finalityConfig.outboundRateLimiterConfig[configArgs.remoteChainSelector]._setTokenBucketConfig(
+        configArgs.outboundRateLimiterConfig
+      );
+      RateLimiter._validateTokenBucketConfig(configArgs.inboundRateLimiterConfig);
+      _initializeFastBucketIfNeeded(
+        finalityConfig.inboundRateLimiterConfig[configArgs.remoteChainSelector], configArgs.inboundRateLimiterConfig
+      );
+      finalityConfig.inboundRateLimiterConfig[configArgs.remoteChainSelector]._setTokenBucketConfig(
+        configArgs.inboundRateLimiterConfig
+      );
+    }
+  }
+
+  function _initializeFastBucketIfNeeded(
+    RateLimiter.TokenBucket storage bucket,
+    RateLimiter.Config memory config
+  ) private {
+    if (config.isEnabled && !bucket.isEnabled) {
+      bucket.tokens = config.capacity;
+      bucket.lastUpdated = uint32(block.timestamp);
+    }
   }
 
   // ================================================================
