@@ -13,6 +13,7 @@ import (
 
 	changeset "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 func TestWithDatastore(t *testing.T) {
@@ -64,7 +65,7 @@ func TestWithWriteOutputs(t *testing.T) {
 				},
 			}).Build(changeset.MCMSBuildParams{
 				Description: "Proposal",
-				MCMSInput: changeset.MCMSInput{
+				MCMSInput: common_utils.MCMSInput{
 					OverridePreviousRoot: false,
 					ValidUntil:           2756219818,
 					TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
