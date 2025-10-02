@@ -94,40 +94,15 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     uint16 finality,
     bytes calldata // tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    // validate
-    if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
-    _checkAllowList(lockOrBurnIn.originalSender);
-    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
+    uint256 amountAfterValidation = _validateLockOrBurn(lockOrBurnIn, finality);
 
-    // handle finality
-    FastFinalityConfig storage finalityConfig = s_finalityConfig;
-    if (finality != 0 && finalityConfig.finalityThreshold != 0) {
-      if (finality < finalityConfig.finalityThreshold) {
-        revert InvalidFinality(finality, finalityConfig.finalityThreshold);
-      }
-      if (lockOrBurnIn.amount > finalityConfig.maxAmountPerRequest) {
-        revert AmountExceedsMaxPerRequest(lockOrBurnIn.amount, finalityConfig.maxAmountPerRequest);
-      }
-      // deduct fast transfer fee.
-      lockOrBurnIn.amount -= (lockOrBurnIn.amount * finalityConfig.fastTransferFeeBps) / BPS_DIVIDER;
-      finalityConfig.outboundRateLimiterConfig[lockOrBurnIn.remoteChainSelector]._consume(
-        lockOrBurnIn.amount, address(lockOrBurnIn.localToken)
-      );
-      emit FastTransferOutboundRateLimitConsumed(
-        lockOrBurnIn.remoteChainSelector, address(lockOrBurnIn.localToken), lockOrBurnIn.amount
-      );
-    } else {
-      _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
-    }
-
-    _lockOrBurn(lockOrBurnIn.amount);
+    _lockOrBurn(amountAfterValidation);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
       token: address(i_token),
       sender: msg.sender,
-      amount: lockOrBurnIn.amount
+      amount: amountAfterValidation
     });
 
     return (
@@ -135,7 +110,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
         destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
         destPoolData: _encodeLocalDecimals()
       }),
-      lockOrBurnIn.amount
+      amountAfterValidation
     );
   }
 
@@ -147,25 +122,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
       releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
     );
 
-    if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
-    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
-
-    if (!isRemotePool(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress)) {
-      revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
-    }
-
-    FastFinalityConfig storage finalityConfig = s_finalityConfig;
-    if (finality != 0) {
-      finalityConfig.inboundRateLimiterConfig[releaseOrMintIn.remoteChainSelector]._consume(
-        localAmount, releaseOrMintIn.localToken
-      );
-      emit FastTransferInboundRateLimitConsumed(
-        releaseOrMintIn.remoteChainSelector, address(releaseOrMintIn.localToken), localAmount
-      );
-    } else {
-      _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
-    }
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, finality);
 
     _releaseOrMint(releaseOrMintIn.receiver, localAmount);
 
@@ -178,6 +135,87 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+  }
+
+  // ================================================================
+  // │                         Validation                           │
+  // ================================================================
+  /// @notice Validates the lock or burn request, applies any fast-finality fee, and enforces rate limits.
+  /// @dev The validation covers token support, RMN curse status, allowlist membership, onRamp access, and
+  /// rate limiting for both standard and fast-transfer lanes.
+  /// @param lockOrBurnIn The input to validate. Must reference a supported token, onRamp, and remote chain.
+  /// @param finality The finality depth requested by the message. A value of zero uses the standard lane.
+  /// @return amountAfterFee The amount that should be locked or burned after fees and validations are applied.
+  function _validateLockOrBurn(
+    Pool.LockOrBurnInV1 memory lockOrBurnIn,
+    uint16 finality
+  ) internal returns (uint256 amountAfterFee) {
+    if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
+    _checkAllowList(lockOrBurnIn.originalSender);
+
+    _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
+    FastFinalityConfig storage finalityConfig = s_finalityConfig;
+    uint256 amount = lockOrBurnIn.amount;
+    if (finality != 0 && finalityConfig.finalityThreshold != 0) {
+      if (finality < finalityConfig.finalityThreshold) {
+        revert InvalidFinality(finality, finalityConfig.finalityThreshold);
+      }
+      if (amount > finalityConfig.maxAmountPerRequest) {
+        revert AmountExceedsMaxPerRequest(amount, finalityConfig.maxAmountPerRequest);
+      }
+
+      amount -= (amount * finalityConfig.fastTransferFeeBps) / BPS_DIVIDER;
+
+      finalityConfig.outboundRateLimiterConfig[lockOrBurnIn.remoteChainSelector]._consume(
+        amount, lockOrBurnIn.localToken
+      );
+      emit FastTransferOutboundRateLimitConsumed(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.localToken, amount);
+    } else {
+      _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
+    }
+
+    return amount;
+  }
+
+  /// @notice Validates a release or mint request and enforces the appropriate inbound rate limits.
+  /// @dev The validation checks token support, RMN curse status, offRamp access, remote pool configuration,
+  /// finality requirements, and consumes either the fast-transfer inbound bucket or the standard bucket.
+  /// @param releaseOrMintIn The input to validate. The remote chain, pool, and token must all be configured.
+  /// @param localAmount The amount to release or mint on the local chain after any decimal conversion.
+  /// @param finality The finality depth requested by the message. A value of zero uses the standard lane.
+  function _validateReleaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint256 localAmount,
+    uint16 finality
+  ) internal {
+    if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
+    _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
+
+    // Validates that the source pool address is configured on this pool.
+    if (!isRemotePool(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress)) {
+      revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
+    }
+
+    FastFinalityConfig storage finalityConfig = s_finalityConfig;
+    if (finality != 0 && finalityConfig.finalityThreshold != 0) {
+      if (finality < finalityConfig.finalityThreshold) {
+        revert InvalidFinality(finality, finalityConfig.finalityThreshold);
+      }
+      if (localAmount > finalityConfig.maxAmountPerRequest) {
+        revert AmountExceedsMaxPerRequest(localAmount, finalityConfig.maxAmountPerRequest);
+      }
+
+      finalityConfig.inboundRateLimiterConfig[releaseOrMintIn.remoteChainSelector]._consume(
+        localAmount, releaseOrMintIn.localToken
+      );
+      emit FastTransferInboundRateLimitConsumed(
+        releaseOrMintIn.remoteChainSelector, releaseOrMintIn.localToken, localAmount
+      );
+    } else {
+      _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
+    }
   }
 
   // ================================================================

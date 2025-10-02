@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../poolsV2/TokenPool.sol";
 
@@ -35,5 +36,20 @@ contract TokenPoolV2Helper is TokenPool {
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory bucket) {
     return s_finalityConfig.inboundRateLimiterConfig[remoteChainSelector];
+  }
+
+  function validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn, uint16 finality) external returns (uint256) {
+    return _validateLockOrBurn(lockOrBurnIn, finality);
+  }
+
+  function validateReleaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 finality
+  ) external returns (uint256) {
+    uint256 localAmount = _calculateLocalAmount(
+      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
+    );
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, finality);
+    return localAmount;
   }
 }
