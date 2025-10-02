@@ -20,8 +20,8 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
 
   error DuplicateCCV(address ccv);
   error InvalidDestBytesOverhead(uint32 destBytesOverhead);
-  error InvalidFinality(uint16 userSuppliedFinality, uint16 tokenConfigFinality);
-  error AmountExceedsMaxPerRequest(uint256 userSuppliedAmount, uint256 max);
+  error InvalidFinality(uint16 requested, uint16 finalityThreshold);
+  error AmountExceedsMaxPerRequest(uint256 requested, uint256 maximum);
 
   event CCVConfigUpdated(uint64 indexed remoteChainSelector, address[] outboundCCVs, address[] inboundCCVs);
   event FinalityConfigUpdated(uint16 finalityConfig, uint16 fastTransferFeeBps, uint256 maxAmountPerRequest);
@@ -199,14 +199,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     }
 
     FastFinalityConfig storage finalityConfig = s_finalityConfig;
-    if (finality != 0 && finalityConfig.finalityThreshold != 0) {
-      if (finality < finalityConfig.finalityThreshold) {
-        revert InvalidFinality(finality, finalityConfig.finalityThreshold);
-      }
-      if (localAmount > finalityConfig.maxAmountPerRequest) {
-        revert AmountExceedsMaxPerRequest(localAmount, finalityConfig.maxAmountPerRequest);
-      }
-
+    if (finality != 0) {
       finalityConfig.inboundRateLimiterConfig[releaseOrMintIn.remoteChainSelector]._consume(
         localAmount, releaseOrMintIn.localToken
       );
@@ -356,11 +349,6 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       uint64 destChainSelector = tokenTransferFeeConfigArgs[i].destChainSelector;
       TokenTransferFeeConfig memory tokenTransferFeeConfig = tokenTransferFeeConfigArgs[i].tokenTransferFeeConfig;
-
-      if (tokenTransferFeeConfig.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
-        revert InvalidDestBytesOverhead(tokenTransferFeeConfig.destBytesOverhead);
-      }
-
       s_tokenTransferFeeConfig[destChainSelector] = tokenTransferFeeConfig;
       emit TokenTransferFeeConfigUpdated(destChainSelector, tokenTransferFeeConfig);
     }
@@ -389,10 +377,10 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   }
 
   // @inheritdoc IPoolV2
-  function withdrawPoolFees(
+  function withdrawFees(
     address recipient
   ) external virtual onlyOwner {
-    uint256 amount = getAccumulatedPoolFees();
+    uint256 amount = getAccumulatedFees();
     if (amount > 0) {
       getToken().safeTransfer(recipient, amount);
       emit PoolFeeWithdrawn(recipient, amount);
@@ -402,7 +390,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   // @inheritdoc IPoolV2
   // Default implementation returns the entire token balance of the pool.
   // Lock/release pools should override this function with their own accounting mechanism.
-  function getAccumulatedPoolFees() public view virtual returns (uint256) {
+  function getAccumulatedFees() public view virtual returns (uint256) {
     return getToken().balanceOf(address(this));
   }
 

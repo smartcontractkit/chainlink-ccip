@@ -64,26 +64,4 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, destToUseDefaultFeeConfigs);
   }
-
-  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidDestBytesOverhead() public {
-    TokenPool.TokenTransferFeeConfig memory invalidFeeConfig = TokenPool.TokenTransferFeeConfig({
-      destGasOverhead: 50000,
-      destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1, // Invalid - too small.
-      feeUSDCents: 100,
-      isEnabled: true
-    });
-
-    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
-    feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      tokenTransferFeeConfig: invalidFeeConfig
-    });
-
-    uint64[] memory destToUseDefaultFeeConfigs = new uint64[](0);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.InvalidDestBytesOverhead.selector, invalidFeeConfig.destBytesOverhead)
-    );
-    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, destToUseDefaultFeeConfigs);
-  }
 }

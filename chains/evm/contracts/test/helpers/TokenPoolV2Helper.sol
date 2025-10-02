@@ -44,11 +44,9 @@ contract TokenPoolV2Helper is TokenPool {
 
   function validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint256 localAmount,
     uint16 finality
   ) external returns (uint256) {
-    uint256 localAmount = _calculateLocalAmount(
-      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
-    );
     _validateReleaseOrMint(releaseOrMintIn, localAmount, finality);
     return localAmount;
   }

@@ -82,7 +82,7 @@ interface IPoolV2 is IPoolV1 {
   /// @dev For burn/mint pools, this transfers the entire token balance of the pool contract.
   /// lock/release pools should override this function with their own accounting mechanism.
   /// @param recipient The address to receive the withdrawn fees.
-  function withdrawPoolFees(
+  function withdrawFees(
     address recipient
   ) external;
 
@@ -95,5 +95,5 @@ interface IPoolV2 is IPoolV1 {
   /// Note: Fee accounting can be obscured by sending tokens directly to the pool.
   /// This does not introduce security issues but will need to be handled operationally.
   /// @return The amount of accumulated pool fees available for withdrawal.
-  function getAccumulatedPoolFees() external returns (uint256);
+  function getAccumulatedFees() external returns (uint256);
 }
