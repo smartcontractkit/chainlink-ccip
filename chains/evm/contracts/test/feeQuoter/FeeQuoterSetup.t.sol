@@ -40,9 +40,6 @@ contract FeeQuoterSetup is TokenSetup {
     + (32 * 31 + 4) * DEST_GAS_PER_DATA_AVAILABILITY_BYTE // CommitStore single-root transmission takes up about 31 slots, plus selector.
     + (32 * 34 + 4) * DEST_GAS_PER_DATA_AVAILABILITY_BYTE; // OffRamp transmission excluding EVM2EVMMessage takes up about 34 slots, plus selector.
 
-  // Multiples of bps, or 0.0001, use 6840 to be same as OP mainnet compression factor of 0.684.
-  uint16 internal constant DEST_GAS_DATA_AVAILABILITY_MULTIPLIER_BPS = 6840;
-
   uint224 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
 
   // Encode L1 gas price and L2 gas price into a packed price.
@@ -68,10 +65,7 @@ contract FeeQuoterSetup is TokenSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    _deployTokenPriceDataFeed(s_sourceFeeToken, 8, 1e8);
-
     s_weth = s_sourceRouter.getWrappedNative();
-    _deployTokenPriceDataFeed(s_weth, 8, 1e11);
 
     address[] memory sourceFeeTokens = new address[](3);
     sourceFeeTokens[0] = s_sourceTokens[0];
@@ -184,12 +178,6 @@ contract FeeQuoterSetup is TokenSetup {
     s_feeQuoter.updatePrices(priceUpdates);
   }
 
-  function _deployTokenPriceDataFeed(address token, uint8 decimals, int256 initialAnswer) internal returns (address) {
-    MockV3Aggregator dataFeed = new MockV3Aggregator(decimals, initialAnswer);
-    s_dataFeedByToken[token] = address(dataFeed);
-    return address(dataFeed);
-  }
-
   function _getPriceUpdatesStruct(
     address[] memory tokens,
     uint224[] memory prices
@@ -284,43 +272,6 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: s_sourceFeeToken,
       extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
-    });
-  }
-
-  // Used to generate a message with a specific extraArgs tag for SVM
-  function _generateEmptyMessage2SVM() public view returns (Client.EVM2AnyMessage memory) {
-    return Client.EVM2AnyMessage({
-      receiver: abi.encode(OWNER),
-      data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      feeToken: s_sourceFeeToken,
-      extraArgs: Client._svmArgsToBytes(
-        Client.SVMExtraArgsV1({
-          computeUnits: GAS_LIMIT,
-          accountIsWritableBitmap: 0,
-          allowOutOfOrderExecution: true,
-          tokenReceiver: bytes32(0),
-          accounts: new bytes32[](0)
-        })
-      )
-    });
-  }
-
-  // Used to generate a message with a specific extraArgs tag for Sui
-  function _generateEmptyMessage2Sui() public view returns (Client.EVM2AnyMessage memory) {
-    return Client.EVM2AnyMessage({
-      receiver: abi.encode(OWNER),
-      data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      feeToken: s_sourceFeeToken,
-      extraArgs: Client._suiArgsToBytes(
-        Client.SuiExtraArgsV1({
-          gasLimit: GAS_LIMIT,
-          allowOutOfOrderExecution: true,
-          tokenReceiver: bytes32(0),
-          receiverObjectIds: new bytes32[](0)
-        })
-      )
     });
   }
 

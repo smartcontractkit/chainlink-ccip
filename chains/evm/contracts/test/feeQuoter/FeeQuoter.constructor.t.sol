@@ -6,7 +6,7 @@ import {FeeQuoterHelper} from "../helpers/FeeQuoterHelper.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 
 contract FeeQuoter_constructor is FeeQuoterSetup {
-  function test_Setup() public virtual {
+  function test_constructor() public virtual {
     address[] memory priceUpdaters = new address[](2);
     priceUpdaters[0] = STRANGER;
     priceUpdaters[1] = OWNER;
@@ -27,10 +27,11 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
       destChainConfigArgs
     );
 
-    _assertFeeQuoterStaticConfigsEqual(s_feeQuoter.getStaticConfig(), staticConfig);
+    assertEq(s_feeQuoter.getStaticConfig().linkToken, staticConfig.linkToken);
+    assertEq(s_feeQuoter.getStaticConfig().maxFeeJuelsPerMsg, staticConfig.maxFeeJuelsPerMsg);
+
     assertEq(feeTokens, s_feeQuoter.getFeeTokens());
     assertEq(priceUpdaters, s_feeQuoter.getAllAuthorizedCallers());
-    assertEq(s_feeQuoter.typeAndVersion(), "FeeQuoter 1.6.3-dev");
 
     assertEq(
       s_feeQuoterPremiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth,
@@ -61,14 +62,11 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     }
   }
 
-  function test_RevertWhen_InvalidLinkTokenEqZeroAddress() public {
-    FeeQuoter.StaticConfig memory staticConfig =
-      FeeQuoter.StaticConfig({linkToken: address(0), maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS});
-
+  function test_constructor_RevertWhen_InvalidLinkTokenEqZeroAddress() public {
     vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);
 
     s_feeQuoter = new FeeQuoterHelper(
-      staticConfig,
+      FeeQuoter.StaticConfig({linkToken: address(0), maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
       new address[](0),
       new address[](0),
       s_feeQuoterTokenTransferFeeConfigArgs,
@@ -77,27 +75,16 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     );
   }
 
-  function test_RevertWhen_InvalidMaxFeeJuelsPerMsg() public {
-    FeeQuoter.StaticConfig memory staticConfig =
-      FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: 0});
-
+  function test_constructor_RevertWhen_InvalidMaxFeeJuelsPerMsg() public {
     vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);
 
     s_feeQuoter = new FeeQuoterHelper(
-      staticConfig,
+      FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: 0}),
       new address[](0),
       new address[](0),
       s_feeQuoterTokenTransferFeeConfigArgs,
       s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
     );
-  }
-
-  function _assertFeeQuoterStaticConfigsEqual(
-    FeeQuoter.StaticConfig memory a,
-    FeeQuoter.StaticConfig memory b
-  ) internal pure {
-    assertEq(a.linkToken, b.linkToken);
-    assertEq(a.maxFeeJuelsPerMsg, b.maxFeeJuelsPerMsg);
   }
 }

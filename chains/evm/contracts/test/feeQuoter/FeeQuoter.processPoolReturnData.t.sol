@@ -25,7 +25,6 @@ contract FeeQuoter_processPoolReturnData is FeeQuoterFeeSetup {
     );
     expectedDestExecData[1] = abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD); //expected return data should be abi.encoded  default as isEnabled is false
 
-    // No revert - successful
     bytes[] memory destExecData =
       s_feeQuoter.processPoolReturnData(DEST_CHAIN_SELECTOR, tokenAmounts, sourceTokenAmounts);
 

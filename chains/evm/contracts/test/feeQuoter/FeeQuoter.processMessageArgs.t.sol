@@ -10,19 +10,8 @@ import {FeeQuoterFeeSetup} from "./FeeQuoterSetup.t.sol";
 contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
   using USDPriceWith18Decimals for uint224;
 
-  function setUp() public virtual override {
-    super.setUp();
-  }
-
   function test_processMessageArgs_WithLinkTokenAmount() public view {
-    (
-      uint256 msgFeeJuels,
-      /* bool isOutOfOrderExecution */
-      ,
-      /* bytes memory convertedExtraArgs */
-      ,
-      /* bytes memory tokenReceiver */
-    ) = s_feeQuoter.processMessageArgs(
+    (uint256 msgFeeJuels,,,) = s_feeQuoter.processMessageArgs(
       DEST_CHAIN_SELECTOR,
       // LINK
       s_sourceTokens[0],
@@ -39,26 +28,15 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
     uint256 feeTokenAmount = 10_000 gwei;
     uint256 expectedConvertedAmount = s_feeQuoter.convertTokenAmount(feeToken, feeTokenAmount, s_sourceTokens[0]);
 
-    (
-      uint256 msgFeeJuels,
-      /* bool isOutOfOrderExecution */
-      ,
-      /* bytes memory convertedExtraArgs */
-      ,
-      /* tokenReceiver */
-    ) = s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, feeToken, feeTokenAmount, "", MESSAGE_RECEIVER);
+    (uint256 msgFeeJuels,,,) =
+      s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, feeToken, feeTokenAmount, "", MESSAGE_RECEIVER);
 
     assertEq(msgFeeJuels, expectedConvertedAmount);
   }
 
   function test_processMessageArgs_WithEmptyEVMExtraArgs() public view {
-    (
-      /* uint256 msgFeeJuels */
-      ,
-      bool isOutOfOrderExecution,
-      bytes memory convertedExtraArgs,
-      /* tokenReceiver */
-    ) = s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, "", MESSAGE_RECEIVER);
+    (, bool isOutOfOrderExecution, bytes memory convertedExtraArgs,) =
+      s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, "", MESSAGE_RECEIVER);
 
     assertEq(isOutOfOrderExecution, false);
     assertEq(convertedExtraArgs, Client._argsToBytes(s_feeQuoter.parseEVMExtraArgsFromBytes("", DEST_CHAIN_SELECTOR)));
@@ -67,13 +45,8 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
   function test_processMessageArgs_WithEVMExtraArgsV1() public view {
     bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 1000}));
 
-    (
-      /* uint256 msgFeeJuels */
-      ,
-      bool isOutOfOrderExecution,
-      bytes memory convertedExtraArgs,
-      /* tokenReceiver */
-    ) = s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs, MESSAGE_RECEIVER);
+    (, bool isOutOfOrderExecution, bytes memory convertedExtraArgs,) =
+      s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs, MESSAGE_RECEIVER);
 
     assertEq(isOutOfOrderExecution, false);
     assertEq(
@@ -85,13 +58,8 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
     bytes memory extraArgs =
       Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 0, allowOutOfOrderExecution: true}));
 
-    (
-      /* uint256 msgFeeJuels */
-      ,
-      bool isOutOfOrderExecution,
-      bytes memory convertedExtraArgs,
-      /* tokenReceiver */
-    ) = s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs, MESSAGE_RECEIVER);
+    (, bool isOutOfOrderExecution, bytes memory convertedExtraArgs,) =
+      s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs, MESSAGE_RECEIVER);
 
     assertEq(isOutOfOrderExecution, true);
     assertEq(
@@ -119,13 +87,8 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
       })
     );
 
-    (
-      /* uint256 msgFeeJuels */
-      ,
-      bool isOutOfOrderExecution,
-      bytes memory convertedExtraArgs,
-      /* tokenReceiver */
-    ) = s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs, MESSAGE_RECEIVER);
+    (, bool isOutOfOrderExecution, bytes memory convertedExtraArgs,) =
+      s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs, MESSAGE_RECEIVER);
 
     assertTrue(isOutOfOrderExecution);
     assertEq(
@@ -152,13 +115,8 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
       })
     );
 
-    (
-      /* uint256 msgFeeJuels */
-      ,
-      bool isOutOfOrderExecution,
-      bytes memory convertedExtraArgs,
-      /* tokenReceiver */
-    ) = s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs, MESSAGE_RECEIVER);
+    (, bool isOutOfOrderExecution, bytes memory convertedExtraArgs,) =
+      s_feeQuoter.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs, MESSAGE_RECEIVER);
 
     assertTrue(isOutOfOrderExecution);
     assertEq(

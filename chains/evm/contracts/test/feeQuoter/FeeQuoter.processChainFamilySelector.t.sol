@@ -107,7 +107,7 @@ contract FeeQuoter_processChainFamilySelector is FeeQuoterSetup {
     });
     bytes memory encodedSuiArgs = Client._suiArgsToBytes(suiArgs);
 
-    (bytes memory resultBytes, bool outOfOrder, bytes memory msgReciever) =
+    (bytes memory resultBytes, bool outOfOrder, bytes memory msgReceiver) =
       s_feeQuoter.processChainFamilySelector(SUI_SELECTOR, MESSAGE_RECEIVER, encodedSuiArgs);
 
     // The function should NOT revert since tokenReceiver != 0
@@ -115,7 +115,7 @@ contract FeeQuoter_processChainFamilySelector is FeeQuoterSetup {
     assertEq(resultBytes, encodedSuiArgs, "Should return the same Sui-encoded bytes");
     // The function always returns `true` for outOfOrder on Sui
     assertTrue(outOfOrder, "Out-of-order for Sui must be true");
-    assertEq(msgReciever, MESSAGE_RECEIVER);
+    assertEq(msgReceiver, MESSAGE_RECEIVER);
   }
 
   function test_processChainFamilySelector_Sui_NoTokenTransfer() public view {

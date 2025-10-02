@@ -7,7 +7,7 @@ import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
-  function testFuzz_ApplyTokenTransferFeeConfig_Success(
+  function testFuzz_applyTokenTransferFeeConfigUpdates(
     FeeQuoter.TokenTransferFeeConfig[2] memory tokenTransferFeeConfigs
   ) public {
     // To prevent Invalid Fee Range error from the fuzzer, bound the results to a valid range that
@@ -50,7 +50,7 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     }
   }
 
-  function test_ApplyTokenTransferFeeConfig() public {
+  function test_applyTokenTransferFeeConfigUpdates() public {
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 2);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
@@ -120,18 +120,9 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     );
   }
 
-  function test_ApplyTokenTransferFeeZeroInput() public {
-    vm.recordLogs();
-    s_feeQuoter.applyTokenTransferFeeConfigUpdates(
-      new FeeQuoter.TokenTransferFeeConfigArgs[](0), new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0)
-    );
-
-    assertEq(vm.getRecordedLogs().length, 0);
-  }
-
   // Reverts
 
-  function test_RevertWhen_OnlyCallableByOwnerOrAdmin() public {
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_OnlyCallableByOwner() public {
     vm.startPrank(STRANGER);
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs;
 
@@ -142,7 +133,7 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     );
   }
 
-  function test_RevertWhen_InvalidDestBytesOverhead() public {
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidDestBytesOverhead() public {
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 1);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);

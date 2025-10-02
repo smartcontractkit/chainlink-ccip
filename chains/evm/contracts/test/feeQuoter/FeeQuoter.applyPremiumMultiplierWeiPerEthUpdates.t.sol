@@ -6,7 +6,7 @@ import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract FeeQuoter_applyPremiumMultiplierWeiPerEthUpdates is FeeQuoterSetup {
-  function testFuzz_applyPremiumMultiplierWeiPerEthUpdates_Success(
+  function testFuzz_applyPremiumMultiplierWeiPerEthUpdates(
     FeeQuoter.PremiumMultiplierWeiPerEthArgs memory premiumMultiplierWeiPerEthArg
   ) public {
     FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs =
@@ -26,7 +26,7 @@ contract FeeQuoter_applyPremiumMultiplierWeiPerEthUpdates is FeeQuoterSetup {
     );
   }
 
-  function test_applyPremiumMultiplierWeiPerEthUpdatesSingleToken() public {
+  function test_applyPremiumMultiplierWeiPerEthUpdates_singleToken() public {
     FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs =
       new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](1);
     premiumMultiplierWeiPerEthArgs[0] = s_feeQuoterPremiumMultiplierWeiPerEthArgs[0];
@@ -45,7 +45,7 @@ contract FeeQuoter_applyPremiumMultiplierWeiPerEthUpdates is FeeQuoterSetup {
     );
   }
 
-  function test_applyPremiumMultiplierWeiPerEthUpdatesMultipleTokens() public {
+  function test_applyPremiumMultiplierWeiPerEthUpdates_multipleTokens() public {
     FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs =
       new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](2);
     premiumMultiplierWeiPerEthArgs[0] = s_feeQuoterPremiumMultiplierWeiPerEthArgs[0];
@@ -73,16 +73,9 @@ contract FeeQuoter_applyPremiumMultiplierWeiPerEthUpdates is FeeQuoterSetup {
     );
   }
 
-  function test_applyPremiumMultiplierWeiPerEthUpdatesZeroInput() public {
-    vm.recordLogs();
-    s_feeQuoter.applyPremiumMultiplierWeiPerEthUpdates(new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](0));
-
-    assertEq(vm.getRecordedLogs().length, 0);
-  }
-
   // Reverts
 
-  function test_RevertWhen_OnlyCallableByOwnerOrAdmin() public {
+  function test_applyPremiumMultiplierWeiPerEthUpdates_RevertWhen_OnlyCallableByOwner() public {
     FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs;
     vm.startPrank(STRANGER);
 

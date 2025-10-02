@@ -6,7 +6,7 @@ import {Internal} from "../../libraries/Internal.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 
 contract FeeQuoter_getValidatedTokenPrice is FeeQuoterSetup {
-  function test_GetValidatedTokenPrice() public view {
+  function test_getValidatedTokenPrice() public view {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
     address token = priceUpdates.tokenPriceUpdates[0].sourceToken;
 
@@ -17,7 +17,7 @@ contract FeeQuoter_getValidatedTokenPrice is FeeQuoterSetup {
 
   // Reverts
 
-  function test_RevertWhen_TokenNotSupported() public {
+  function test_getValidatedTokenPrice_RevertWhen_TokenNotSupported() public {
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
     s_feeQuoter.getValidatedTokenPrice(DUMMY_CONTRACT_ADDRESS);
   }

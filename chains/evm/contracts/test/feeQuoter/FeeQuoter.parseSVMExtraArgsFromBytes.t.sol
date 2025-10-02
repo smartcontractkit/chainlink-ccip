@@ -29,7 +29,7 @@ contract FeeQuoter_parseSVMExtraArgsFromBytes is FeeQuoterSetup {
     assertEq(Client.SVM_EXTRA_ARGS_V1_TAG, bytes4(keccak256("CCIP SVMExtraArgsV1")));
   }
 
-  function test_SVMExtraArgsV1() public view {
+  function test_parseSuiExtraArgsFromBytes_SVMExtraArgsV1() public view {
     bytes32[] memory solAccounts = new bytes32[](1);
     solAccounts[0] = VALID_SOL_PUBKEY;
 
@@ -58,20 +58,20 @@ contract FeeQuoter_parseSVMExtraArgsFromBytes is FeeQuoterSetup {
   }
 
   // Reverts
-  function test_RevertWhen_ExtraArgsAreEmpty() public {
+  function test_parseSuiExtraArgsFromBytes_RevertWhen_ExtraArgsAreEmpty() public {
     bytes memory inputExtraArgs = new bytes(0);
     vm.expectRevert(FeeQuoter.InvalidExtraArgsData.selector);
     s_feeQuoter.parseSVMExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
   }
 
-  function test_RevertWhen_InvalidExtraArgsTag() public {
+  function test_parseSuiExtraArgsFromBytes_RevertWhen_InvalidExtraArgsTag() public {
     bytes memory inputExtraArgs = abi.encodeWithSelector(bytes4(0));
 
     vm.expectRevert(FeeQuoter.InvalidExtraArgsTag.selector);
     s_feeQuoter.parseSVMExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
   }
 
-  function test_RevertWhen_SVMMessageGasLimitTooHigh() public {
+  function test_parseSuiExtraArgsFromBytes_RevertWhen_SVMMessageGasLimitTooHigh() public {
     Client.SVMExtraArgsV1 memory inputArgs = Client.SVMExtraArgsV1({
       computeUnits: s_destChainConfig.maxPerMsgGasLimit + 1,
       accountIsWritableBitmap: 0,

@@ -25,7 +25,7 @@ contract FeeQuoter_parseSuiExtraArgsFromBytes is FeeQuoterSetup {
     assertEq(Client.SUI_EXTRA_ARGS_V1_TAG, bytes4(keccak256("CCIP SuiExtraArgsV1")));
   }
 
-  function test_SuiExtraArgsV1() public view {
+  function test_parseSuiExtraArgsFromBytes_SuiExtraArgsV1() public view {
     Client.SuiExtraArgsV1 memory extraArgs = Client.SuiExtraArgsV1({
       gasLimit: GAS_LIMIT,
       allowOutOfOrderExecution: true,
@@ -41,20 +41,20 @@ contract FeeQuoter_parseSuiExtraArgsFromBytes is FeeQuoterSetup {
   }
 
   // Reverts
-  function test_RevertWhen_ExtraArgsAreEmpty() public {
+  function test_parseSuiExtraArgsFromBytes_RevertWhen_ExtraArgsAreEmpty() public {
     bytes memory inputExtraArgs = new bytes(0);
     vm.expectRevert(FeeQuoter.InvalidExtraArgsData.selector);
     s_feeQuoter.parseSuiExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
   }
 
-  function test_RevertWhen_InvalidExtraArgsTag() public {
+  function test_parseSuiExtraArgsFromBytes_RevertWhen_InvalidExtraArgsTag() public {
     bytes memory inputExtraArgs = new bytes(4);
 
     vm.expectRevert(FeeQuoter.InvalidExtraArgsTag.selector);
     s_feeQuoter.parseSuiExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
   }
 
-  function test_RevertWhen_SuiMessageGasLimitTooHigh() public {
+  function test_parseSuiExtraArgsFromBytes_RevertWhen_SuiMessageGasLimitTooHigh() public {
     Client.SuiExtraArgsV1 memory inputArgs = Client.SuiExtraArgsV1({
       gasLimit: s_destChainConfig.maxPerMsgGasLimit + 1,
       allowOutOfOrderExecution: true,

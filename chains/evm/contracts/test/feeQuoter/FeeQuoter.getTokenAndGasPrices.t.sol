@@ -6,7 +6,7 @@ import {Internal} from "../../libraries/Internal.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 
 contract FeeQuoter_getTokenAndGasPrices is FeeQuoterSetup {
-  function test_GetFeeTokenAndGasPrices() public view {
+  function test_getTokenAndGasPrices() public view {
     (uint224 feeTokenPrice, uint224 gasPrice) = s_feeQuoter.getTokenAndGasPrices(s_sourceFeeToken, DEST_CHAIN_SELECTOR);
 
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
@@ -15,7 +15,7 @@ contract FeeQuoter_getTokenAndGasPrices is FeeQuoterSetup {
     assertEq(gasPrice, priceUpdates.gasPriceUpdates[0].usdPerUnitGas);
   }
 
-  function test_ZeroGasPrice() public {
+  function test_getTokenAndGasPrices_ZeroGasPrice() public {
     uint64 zeroGasDestChainSelector = 345678;
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainSelector = zeroGasDestChainSelector;
@@ -33,7 +33,7 @@ contract FeeQuoter_getTokenAndGasPrices is FeeQuoterSetup {
     assertEq(gasPrice, 0);
   }
 
-  function test_RevertWhen_UnsupportedChain() public {
+  function test_getTokenAndGasPrices_RevertWhen_UnsupportedChain() public {
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.DestinationChainNotEnabled.selector, DEST_CHAIN_SELECTOR + 1));
     s_feeQuoter.getTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_SELECTOR + 1);
   }

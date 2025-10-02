@@ -6,7 +6,7 @@ import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
-  function test_ApplyFeeTokensUpdates() public {
+  function test_applyFeeTokensUpdates() public {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
@@ -48,7 +48,7 @@ contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
     s_feeQuoter.applyFeeTokensUpdates(feeTokens, feeTokens);
   }
 
-  function test_RevertWhen_OnlyCallableByOwner() public {
+  function test_applyFeeTokensUpdates_RevertWhen_OnlyCallableByOwner() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
