@@ -75,6 +75,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     uint32 domainIdentifier; // Unique domain ID
     uint64 destChainSelector; // The destination chain for this domain
     bool enabled; // Whether the domain is enabled
+    bool useLegacySourcePoolDataFormat; // Whether to use the legacy source pool data format
   }
 
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
@@ -93,10 +94,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   /// pool version 1.5.1, this is the destination chain's token pool.
   // solhint-disable-next-line gas-struct-packing
   struct Domain {
-    bytes32 allowedCaller; //      Address allowed to mint on the domain
-    bytes32 mintRecipient; //      Address to mint to on the destination chain
-    uint32 domainIdentifier; // ──╮ Unique domain ID
-    bool enabled; // ─────────────╯ Whether the domain is enabled
+    bytes32 allowedCaller; //                 Address allowed to mint on the domain
+    bytes32 mintRecipient; //                 Address to mint to on the destination chain
+    uint32 domainIdentifier; // ────────────╮ Unique domain ID
+    bool enabled; //                        | Whether the domain is enabled
+    bool useLegacySourcePoolDataFormat; // ─╯ Whether to use the legacy source pool data format for chains that
+      // have not yet been updated to the new source pool data format.
   }
 
   // A mapping of CCIP chain identifiers to destination domains
@@ -195,10 +198,24 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       amount: lockOrBurnIn.amount
     });
 
-    // bytes4(0) is used as the version to match the CCTP V1 message format.
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: i_localDomainIdentifier})
-    );
+    bytes memory sourcePoolData;
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: i_localDomainIdentifier});
+
+    // The useLegacySourcePoolDataFormat flag is set to false for chains that have been updated to the new source pool
+    // data format. When the lane is updated, the flag should be set to false.
+    if (domain.useLegacySourcePoolDataFormat) {
+      // Since not all lanes will be updated to the new source pool data format simultaneously, it is important to support
+      // the legacy format until such a time as the lane can support it. Otherwise, the destination pool would not be able
+      // to parse the source pool data and all messages originating from this updated token pool would be rejected.
+
+      // It is safe to have the legacy format still be supported temporarily, as the USDCTokenPoolProxy will convert
+      // the legacy format to the new format before releaseOrMint() is called. Once all lanes in CCIP are updated to
+      // the new format and CCTP V2, this branch can be safely removed.
+      sourcePoolData = abi.encode(sourceTokenDataPayload);
+    } else {
+      sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(sourceTokenDataPayload);
+    }
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
@@ -235,7 +252,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
     // Decode the source pool data from its raw bytes into a SourceTokenDataPayloadV0 struct that can be
-    // more easily validated.
+    // more easily validated. Since the USDCTokenPoolProxy that sits between this pool and the offRamp will convert
+    // the legacy format to the new format, this operation is safe to perform, as a message originating from a legacy
+    // pool will be converted to the new format before this decoding function is called.
     USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
       USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(releaseOrMintIn.sourcePoolData);
 
@@ -344,7 +363,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
         allowedCaller: domain.allowedCaller,
         mintRecipient: domain.mintRecipient,
         domainIdentifier: domain.domainIdentifier,
-        enabled: domain.enabled
+        enabled: domain.enabled,
+        useLegacySourcePoolDataFormat: domain.useLegacySourcePoolDataFormat
       });
     }
     emit DomainsSet(domains);

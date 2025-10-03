@@ -18,11 +18,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   address internal s_receiver = makeAddr("receiver");
   bytes internal s_sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
 
-  struct LegacySourcePoolData {
-    uint64 nonce;
-    uint32 sourceDomain;
-  }
-
   function test_releaseOrMint_LockReleaseFlag() public {
     // Arrange: Prepare test data
     uint256 testAmount = 1234;
@@ -226,9 +221,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   function test_releaseOrMint_LegacyFormat_MessageTransmitterProxyNotSupported() public {
     uint256 testAmount = 1e6;
 
-    LegacySourcePoolData memory legacySourcePoolData = LegacySourcePoolData({nonce: 12345, sourceDomain: 67890});
-
-    bytes memory legacySourcePoolDataBytes = abi.encode(legacySourcePoolData);
+    bytes memory legacySourcePoolDataBytes =
+      abi.encode(USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: 12345, sourceDomain: 67890}));
 
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,
@@ -300,7 +294,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     // Arrange: Prepare test data for legacy format (64 bytes)
     uint256 testAmount = 1e6;
 
-    LegacySourcePoolData memory legacySourcePoolData = LegacySourcePoolData({nonce: 12345, sourceDomain: 67890});
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory legacySourcePoolData =
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: 12345, sourceDomain: 67890});
 
     bytes memory legacySourcePoolDataBytes = abi.encode(legacySourcePoolData);
 
