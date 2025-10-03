@@ -665,7 +665,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			// The local router is located in each source sourceChain config. Add it once.
 			if len(resp[consts.ContractNameRouter][r.destChain]) == 0 {
 				resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
-				lggr.Infow("appending router contract address", "address", cfg.Router)
+				lggr.Infow("appending router contract address", "address", cfg.Router, "sourceChain", sourceChain)
 			}
 		}
 	}

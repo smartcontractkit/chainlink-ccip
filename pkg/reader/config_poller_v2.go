@@ -188,7 +188,8 @@ func (c *configPollerV2) GetChainConfig(
 		lggr.Debugw("Returning cached chain config",
 			"chain", chainSel,
 			"cacheAge", time.Since(cache.chainConfigRefresh),
-			"cachedChainConfigSnapshot", cache.chainConfigData)
+			"cachedChainConfigSnapshot", cache.chainConfigData,
+			"chainConfigData", cache.chainConfigData)
 		return cache.chainConfigData, nil
 	}
 	cache.chainConfigMu.RUnlock()
@@ -293,7 +294,8 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 		destChainCache.sourceChainMu.RUnlock()
 		c.lggr.Debugw("All source chain configs found in cache",
 			"destChain", c.destChainSelector,
-			"sourceChains", filteredSourceChains)
+			"sourceChains", filteredSourceChains,
+			"cachedSourceConfigs", cachedSourceConfigs)
 		return cachedSourceConfigs, nil
 	}
 
@@ -401,7 +403,8 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
 ) error {
-	lggr := logger.With(c.lggr, "function", "config_poller_v2 batchRefreshChainAndSourceConfigs", "chain", chainSel, "destChain", c.destChainSelector)
+	lggr := logger.With(c.lggr, "function", "config_poller_v2 batchRefreshChainAndSourceConfigs",
+		"chain", chainSel, "destChain", c.destChainSelector)
 	start := time.Now()
 	fetchingForDestChain := chainSel == c.destChainSelector
 
@@ -458,7 +461,8 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 			"destChainSelector", c.destChainSelector,
 			"sourceChainsFetched", len(sourceChainConfigs),
 			"chainSel", chainSel,
-			"latency", time.Since(start))
+			"latency", time.Since(start),
+			"cache.staticSourceChainConfigs", cache.staticSourceChainConfigs)
 
 	} else if !fetchingForDestChain && len(sourceChainConfigs) > 0 {
 		c.lggr.Errorw("OffRamp SourceChainConfigs were returned when fetching configs from a source chain, "+
@@ -468,7 +472,9 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 			"sourceChainSelectors", sourceChainSelectors,
 		)
 	}
-	c.lggr.Debugw("Batch refreshed configs via chainAccessor", "chain", chainSel, "latency", time.Since(start))
+	c.lggr.Debugw("Batch refreshed configs via chainAccessor", "chain", chainSel, "latency", time.Since(start),
+		"chainConfigSnapshot", chainConfigSnapshot,
+		"sourceChainConfigs", sourceChainConfigs)
 	return nil
 }
 
