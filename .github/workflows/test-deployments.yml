@@ -35,6 +35,7 @@ jobs:
       run:
         working-directory: ./chains/evm/deployment
     steps:
+      - uses: actions/checkout@v4
       - name: Determine Go version
         id: go_version
         run: echo "GO_VERSION=$(cat go.mod |grep "^go"|cut -d' ' -f 2)" >> $GITHUB_ENV
