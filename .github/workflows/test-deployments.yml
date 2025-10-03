@@ -13,8 +13,8 @@ jobs:
   detect_deployments_changes:
     runs-on: ubuntu-latest
     outputs:
-      run_evm_deployment: ${{ steps.filter.outputs.evm_deployment }}
-      run_deployment: ${{ steps.filter.outputs.deployment }}
+      run_evm_deployment: ${{ steps.filter.outputs.run_evm_deployment }}
+      run_deployment: ${{ steps.filter.outputs.run_deployment }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect changes
@@ -23,9 +23,9 @@ jobs:
         with:
           list-files: "shell"
           filters: |
-            deployment:
+            run_deployment:
               - 'deployment/**'
-            evm_deployment:
+            run_evm_deployment:
               - 'chains/evm/gobindings/generated/**'
               - 'chains/evm/deployment/**'
 
