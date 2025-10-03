@@ -24,9 +24,9 @@ type MockReader struct{}
 
 const OP_COUNT = 42
 
-func (m *MockReader) GetChainMetadata(e deployment.Environment, mcmRef datastore.AddressRef) (mcms_types.ChainMetadata, error) {
+func (m *MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
 	return mcms_types.ChainMetadata{
-		MCMAddress:      mcmRef.Address,
+		MCMAddress:      input.MCMSAddressRef.Address,
 		StartingOpCount: OP_COUNT,
 	}, nil
 }
