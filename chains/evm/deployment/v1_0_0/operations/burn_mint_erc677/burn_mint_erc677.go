@@ -51,6 +51,48 @@ var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Addres
 	},
 })
 
+var GrantMintRole = contract.NewWrite(contract.WriteParams[common.Address, *burn_mint_erc677_helper.BurnMintERC677Helper]{
+	Name:            "burn-mint-erc677:grant-mint-role",
+	Version:         semver.MustParse("1.0.0"),
+	Description:     "Grants the mint role on the token to an account",
+	ContractType:    ContractType,
+	ContractABI:     burn_mint_erc677_helper.BurnMintERC677HelperABI,
+	NewContract:     burn_mint_erc677_helper.NewBurnMintERC677Helper,
+	IsAllowedCaller: contract.OnlyOwner[*burn_mint_erc677_helper.BurnMintERC677Helper, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(token *burn_mint_erc677_helper.BurnMintERC677Helper, opts *bind.TransactOpts, account common.Address) (*types.Transaction, error) {
+		return token.GrantMintRole(opts, account)
+	},
+})
+
+var RevokeBurnRole = contract.NewWrite(contract.WriteParams[common.Address, *burn_mint_erc677_helper.BurnMintERC677Helper]{
+	Name:            "burn-mint-erc677:revoke-burn-role",
+	Version:         semver.MustParse("1.0.0"),
+	Description:     "Revokes the burn role on the token from an account",
+	ContractType:    ContractType,
+	ContractABI:     burn_mint_erc677_helper.BurnMintERC677HelperABI,
+	NewContract:     burn_mint_erc677_helper.NewBurnMintERC677Helper,
+	IsAllowedCaller: contract.OnlyOwner[*burn_mint_erc677_helper.BurnMintERC677Helper, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(token *burn_mint_erc677_helper.BurnMintERC677Helper, opts *bind.TransactOpts, account common.Address) (*types.Transaction, error) {
+		return token.RevokeBurnRole(opts, account)
+	},
+})
+
+var RevokeMintRole = contract.NewWrite(contract.WriteParams[common.Address, *burn_mint_erc677_helper.BurnMintERC677Helper]{
+	Name:            "burn-mint-erc677:revoke-mint-role",
+	Version:         semver.MustParse("1.0.0"),
+	Description:     "Revokes the mint role on the token from an account",
+	ContractType:    ContractType,
+	ContractABI:     burn_mint_erc677_helper.BurnMintERC677HelperABI,
+	NewContract:     burn_mint_erc677_helper.NewBurnMintERC677Helper,
+	IsAllowedCaller: contract.OnlyOwner[*burn_mint_erc677_helper.BurnMintERC677Helper, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(token *burn_mint_erc677_helper.BurnMintERC677Helper, opts *bind.TransactOpts, account common.Address) (*types.Transaction, error) {
+		return token.RevokeMintRole(opts, account)
+	},
+})
+
 var Mint = contract.NewWrite(contract.WriteParams[MintArgs, *burn_mint_erc677_helper.BurnMintERC677Helper]{
 	Name:            "burn-mint-erc677:mint",
 	Version:         semver.MustParse("1.0.0"),

@@ -7,7 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -19,43 +19,36 @@ type NewFromOnChainSequenceParams[IN any, DEP any, CFG any] struct {
 	ResolveInput func(e deployment.Environment, cfg CFG) (IN, error)
 	// ResolveDeps resolves the dependencies for the sequence based on the environment and changeset config.
 	ResolveDep func(e deployment.Environment, cfg CFG) (DEP, error)
-	// ResolveMCMS resolves the MCMS configuration based on the environment and changeset config.
-	ResolveMCMS func(e deployment.Environment, cfg CFG) (changesets.MCMSBuildParams, error)
-	// Describe returns a human-readable description of the changeset.
-	Describe func(in IN, dep DEP) string
+}
+
+type WithMCMS[CFG any] struct {
+	MCMS mcms.Input
+	Cfg  CFG
 }
 
 // NewFromOnChainSequence creates a Changeset from an operations.Sequence that deploys contracts on-chain and performs write operations.
 // It wraps sequence execution with DataStore and MCMS integration.
-func NewFromOnChainSequence[IN any, DEP any, CFG any](params NewFromOnChainSequenceParams[IN, DEP, CFG]) deployment.ChangeSetV2[CFG] {
-	resolve := func(e deployment.Environment, cfg CFG) (IN, DEP, changesets.MCMSBuildParams, error) {
+func NewFromOnChainSequence[IN any, DEP any, CFG any](params NewFromOnChainSequenceParams[IN, DEP, CFG]) deployment.ChangeSetV2[WithMCMS[CFG]] {
+	resolve := func(e deployment.Environment, cfg CFG) (IN, DEP, error) {
 		var in IN
 		var dep DEP
 		var err error
 		in, err = params.ResolveInput(e, cfg)
 		if err != nil {
-			return in, dep, changesets.MCMSBuildParams{}, fmt.Errorf("failed to resolve input for sequence with ID %s: %w", params.Sequence.ID(), err)
+			return in, dep, fmt.Errorf("failed to resolve input for sequence with ID %s: %w", params.Sequence.ID(), err)
 		}
 		dep, err = params.ResolveDep(e, cfg)
 		if err != nil {
-			return in, dep, changesets.MCMSBuildParams{}, fmt.Errorf("failed to resolve dependencies for sequence with ID %s: %w", params.Sequence.ID(), err)
+			return in, dep, fmt.Errorf("failed to resolve dependencies for sequence with ID %s: %w", params.Sequence.ID(), err)
 		}
-		if params.ResolveMCMS == nil {
-			return in, dep, changesets.MCMSBuildParams{}, nil
-		}
-		mcmsParams, err := params.ResolveMCMS(e, cfg)
-		if err != nil {
-			return in, dep, changesets.MCMSBuildParams{}, fmt.Errorf("failed to resolve MCMS config for sequence with ID %s: %w", params.Sequence.ID(), err)
-		}
-		mcmsParams.Description = params.Describe(in, dep)
-		return in, dep, mcmsParams, nil
+		return in, dep, nil
 	}
-	validate := func(e deployment.Environment, cfg CFG) error {
-		_, _, _, err := resolve(e, cfg)
+	validate := func(e deployment.Environment, cfg WithMCMS[CFG]) error {
+		_, _, err := resolve(e, cfg.Cfg)
 		return err
 	}
-	apply := func(e deployment.Environment, cfg CFG) (deployment.ChangesetOutput, error) {
-		input, deps, mcmsParams, err := resolve(e, cfg)
+	apply := func(e deployment.Environment, cfg WithMCMS[CFG]) (deployment.ChangesetOutput, error) {
+		input, deps, err := resolve(e, cfg.Cfg)
 		if err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
@@ -70,11 +63,11 @@ func NewFromOnChainSequence[IN any, DEP any, CFG any](params NewFromOnChainSeque
 			}
 		}
 
-		return changesets.NewOutputBuilder().
+		return NewOutputBuilder(e).
 			WithReports(report.ExecutionReports).
 			WithDataStore(ds).
 			WithWriteOutputs(report.Output.Writes).
-			Build(mcmsParams)
+			Build(cfg.MCMS)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)

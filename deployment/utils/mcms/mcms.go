@@ -21,6 +21,8 @@ type Input struct {
 	MCMSAddressRef datastore.AddressRef
 	// TimelockAddressRef is a reference to the timelock contract address in the datastore.
 	TimelockAddressRef datastore.AddressRef
+	// Description is a human-readable description of the proposal.
+	Description string
 }
 
 // TODO : need to put more validation here

@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -60,7 +59,6 @@ type ConfigureTokenForTransfersInput struct {
 
 type TokenAdapter interface {
 	ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	GetCurrentOpCount(e deployment.Environment, chainSelector uint64, mcmAddress string) (uint64, error)
 	ConvertRefToBytes(ref datastore.AddressRef) ([]byte, error)
 }
 

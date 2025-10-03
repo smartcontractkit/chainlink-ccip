@@ -1,10 +1,9 @@
 package changesets
 
 import (
-	"fmt"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
+	evm_changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -25,9 +24,6 @@ var DeployChainContracts = changesets.NewFromOnChainSequence(changesets.NewFromO
 	DeployChainContractsCfg,
 ]{
 	Sequence: sequences.DeployChainContracts,
-	Describe: func(in sequences.DeployChainContractsInput, dep evm.Chain) string {
-		return fmt.Sprintf("Deploy & configure 1.7.0 contracts on %s", dep)
-	},
 	ResolveInput: func(e cldf_deployment.Environment, cfg DeployChainContractsCfg) (sequences.DeployChainContractsInput, error) {
 		addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(cfg.ChainSel))
 		return sequences.DeployChainContractsInput{
@@ -36,5 +32,5 @@ var DeployChainContracts = changesets.NewFromOnChainSequence(changesets.NewFromO
 			ContractParams:    cfg.Params,
 		}, nil
 	},
-	ResolveDep: changesets.ResolveEVMChainDep[DeployChainContractsCfg],
+	ResolveDep: evm_changesets.ResolveEVMChainDep[DeployChainContractsCfg],
 })

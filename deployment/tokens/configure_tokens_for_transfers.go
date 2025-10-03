@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 var ConfigureTokensForTransfers = cldf.CreateChangeSet(apply, verify)
@@ -48,6 +47,8 @@ func apply(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) (cldf.Chan
 	reports := make([]cldf_ops.Report[any, any], 0)
 
 	for _, token := range cfg.Tokens {
+		token.TokenPoolRef.ChainSelector = token.ChainSelector
+		token.RegistryAddress.ChainSelector = token.ChainSelector
 		refs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{
 			token.TokenPoolRef,
 			token.RegistryAddress,
@@ -90,77 +91,10 @@ func apply(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) (cldf.Chan
 		reports = append(reports, configureTokenReport.ExecutionReports...)
 	}
 
-	timelockAddresses, err := getTimelockAddresses(e, cfg)
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock addresses: %w", err)
-	}
-	chainMetadata, err := getChainMetadata(e, cfg)
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain metadata: %w", err)
-	}
-
-	return changesets.NewOutputBuilder().
+	return changesets.NewOutputBuilder(e).
 		WithReports(reports).
 		WithWriteOutputs(writes).
-		Build(changesets.MCMSBuildParams{
-			Input:             cfg.MCMS,
-			Description:       "Configure tokens for transfers",
-			TimelockAddresses: timelockAddresses,
-			ChainMetadata:     chainMetadata,
-		})
-}
-
-func getTimelockAddresses(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) (map[mcms_types.ChainSelector]string, error) {
-	timelocks := make(map[mcms_types.ChainSelector]string)
-	for _, token := range cfg.Tokens {
-		chainSel := mcms_types.ChainSelector(token.ChainSelector)
-		if _, exists := timelocks[chainSel]; exists {
-			continue // Already have timelock for this chain
-		}
-		refs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{cfg.MCMS.TimelockAddressRef}, datastore_utils.FullRef)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve timelock ref on chain with selector %d: %w", token.ChainSelector, err)
-		}
-		timelocks[chainSel] = refs[0].Address
-	}
-
-	return timelocks, nil
-}
-
-func getChainMetadata(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) (map[mcms_types.ChainSelector]mcms_types.ChainMetadata, error) {
-	metadata := make(map[mcms_types.ChainSelector]mcms_types.ChainMetadata)
-	for _, token := range cfg.Tokens {
-		chainSel := mcms_types.ChainSelector(token.ChainSelector)
-		if _, exists := metadata[chainSel]; exists {
-			continue // Already have metadata for this chain
-		}
-		refs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{cfg.MCMS.MCMSAddressRef}, datastore_utils.FullRef)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve mcm ref on chain with selector %d: %w", token.ChainSelector, err)
-		}
-		mcmAddress := refs[0].Address
-
-		family, err := chain_selectors.GetSelectorFamily(token.ChainSelector)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", token.ChainSelector, err)
-		}
-		adapterID := newTokenAdapterID(family, token.TokenPoolRef.Version)
-		adapter, ok := registeredTokenAdapters[adapterID]
-		if !ok {
-			return nil, fmt.Errorf("no token adapter registered for chain family '%s' and token pool version '%s'", family, token.TokenPoolRef.Version)
-		}
-
-		opCount, err := adapter.GetCurrentOpCount(e, token.ChainSelector, mcmAddress)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get current op count from MCMS at address %s on chain with selector %d: %w", mcmAddress, token.ChainSelector, err)
-		}
-		metadata[chainSel] = mcms_types.ChainMetadata{
-			MCMAddress:      mcmAddress,
-			StartingOpCount: opCount,
-		}
-	}
-
-	return metadata, nil
+		Build(cfg.MCMS)
 }
 
 func convertRemoteChainConfig(
@@ -199,7 +133,7 @@ func convertRemoteChainConfig(
 		outCfg.OutboundCCVs = append(outCfg.OutboundCCVs, fullCCVRef[0].Address)
 	}
 	for _, ccvRef := range inCfg.InboundCCVs {
-		ccvRef.ChainSelector = remoteChainSelector
+		ccvRef.ChainSelector = chainSelector
 		fullCCVRef, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{ccvRef}, datastore_utils.FullRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to resolve inbound CCV ref %s: %w", datastore_utils.SprintRef(ccvRef), err)

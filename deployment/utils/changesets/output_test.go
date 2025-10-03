@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
@@ -17,18 +19,18 @@ import (
 )
 
 func TestWithDatastore(t *testing.T) {
-	b := changesets.NewOutputBuilder()
-	out, err := b.WithDataStore(datastore.NewMemoryDataStore()).Build(changesets.MCMSBuildParams{})
+	b := changesets.NewOutputBuilder(deployment.Environment{})
+	out, err := b.WithDataStore(datastore.NewMemoryDataStore()).Build(mcms.Input{})
 	require.NoError(t, err, "Build should not error")
 	require.NotNil(t, out.DataStore, "DataStore should be set in ChangesetOutput")
 }
 
 func TestWithReports(t *testing.T) {
-	b := changesets.NewOutputBuilder()
+	b := changesets.NewOutputBuilder(deployment.Environment{})
 	reports := []operations.Report[any, any]{
 		{},
 	}
-	out, err := b.WithReports(reports).Build(changesets.MCMSBuildParams{})
+	out, err := b.WithReports(reports).Build(mcms.Input{})
 	require.NoError(t, err, "Build should not error")
 	require.Len(t, out.Reports, 1, "Reports should be set in ChangesetOutput")
 }
@@ -52,7 +54,25 @@ func TestWithWriteOutputs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			b := changesets.NewOutputBuilder()
+			ds := datastore.NewMemoryDataStore()
+			err := ds.Addresses().Add(datastore.AddressRef{
+				ChainSelector: 5009297550715157269,
+				Type:          "Timelock",
+				Version:       semver.MustParse("1.0.0"),
+				Address:       common.HexToAddress("0x01").Hex(),
+			})
+			require.NoError(t, err)
+			err = ds.Addresses().Add(datastore.AddressRef{
+				ChainSelector: 5009297550715157269,
+				Type:          "MCM",
+				Version:       semver.MustParse("1.0.0"),
+				Address:       common.HexToAddress("0x02").Hex(),
+			})
+			require.NoError(t, err)
+
+			b := changesets.NewOutputBuilder(deployment.Environment{
+				DataStore: ds.Seal(),
+			})
 			out, err := b.WithWriteOutputs([]contract.WriteOutput{
 				{
 					ChainSelector: 5009297550715157269,
@@ -63,28 +83,25 @@ func TestWithWriteOutputs(t *testing.T) {
 						AdditionalFields: json.RawMessage{},
 					},
 				},
-			}).Build(changesets.MCMSBuildParams{
-				Description: "Proposal",
-				Input: mcms.Input{
-					OverridePreviousRoot: false,
-					ValidUntil:           2756219818,
-					TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
-					TimelockAction:       mcms_types.TimelockActionSchedule,
+			}).Build(mcms.Input{
+				OverridePreviousRoot: false,
+				ValidUntil:           2756219818,
+				TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
+				TimelockAction:       mcms_types.TimelockActionSchedule,
+				Description:          "Proposal",
+				MCMSAddressRef: datastore.AddressRef{
+					Type:    "MCM",
+					Version: semver.MustParse("1.0.0"),
 				},
-
-				TimelockAddresses: map[mcms_types.ChainSelector]string{
-					5009297550715157269: common.HexToAddress("0x02").Hex(),
-				},
-				ChainMetadata: map[mcms_types.ChainSelector]mcms_types.ChainMetadata{
-					5009297550715157269: {
-						StartingOpCount: 5,
-						MCMAddress:      common.HexToAddress("0x03").Hex(),
-					},
+				TimelockAddressRef: datastore.AddressRef{
+					Type:    "Timelock",
+					Version: semver.MustParse("1.0.0"),
 				},
 			})
 			require.NoError(t, err, "Build should not error")
 			if test.execInfo == nil {
 				require.Len(t, out.MCMSTimelockProposals, 1, "Proposal should exist")
+				require.Equal(t, uint64(OP_COUNT), out.MCMSTimelockProposals[0].ChainMetadata[5009297550715157269].StartingOpCount)
 			} else {
 				require.Len(t, out.MCMSTimelockProposals, 0, "Proposal should not exist")
 			}

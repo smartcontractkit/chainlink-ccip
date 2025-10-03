@@ -44,19 +44,12 @@ func (c ConfigureChainForLanesCfg) ChainSelector() uint64 {
 	return c.ChainSel
 }
 
-var ConfigureChainForLanes = evm_changesets.NewFromOnChainSequence(evm_changesets.NewFromOnChainSequenceParams[
+var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[
 	sequences.ConfigureChainForLanesInput,
 	evm.Chain,
 	ConfigureChainForLanesCfg,
 ]{
 	Sequence: sequences.ConfigureChainForLanes,
-	Describe: func(in sequences.ConfigureChainForLanesInput, dep evm.Chain) string {
-		remoteChains := make([]uint64, 0, len(in.RemoteChains))
-		for chainSel := range in.RemoteChains {
-			remoteChains = append(remoteChains, chainSel)
-		}
-		return fmt.Sprintf("Configure remote chain connnections on %s: %v", dep, remoteChains)
-	},
 	ResolveInput: func(e cldf_deployment.Environment, cfg ConfigureChainForLanesCfg) (sequences.ConfigureChainForLanesInput, error) {
 		staticAddrs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{
 			{
@@ -162,7 +155,4 @@ var ConfigureChainForLanes = evm_changesets.NewFromOnChainSequence(evm_changeset
 		}, nil
 	},
 	ResolveDep: evm_changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],
-	ResolveMCMS: func(e cldf_deployment.Environment, cfg ConfigureChainForLanesCfg) (changesets.MCMSBuildParams, error) {
-		return evm_changesets.ResolveMCMS(e, evm_changesets.NewEVMMCMBuilder(cfg.MCMSArgs))
-	},
 })

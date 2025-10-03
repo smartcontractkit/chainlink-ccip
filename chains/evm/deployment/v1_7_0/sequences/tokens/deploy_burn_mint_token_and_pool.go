@@ -35,7 +35,7 @@ var DeployBurnMintTokenAndPool = cldf_ops.NewSequence(
 		addresses := make([]datastore.AddressRef, 0, 2)                  // We expect to deploy 2 contracts, token and pool.
 		writes := make([]contract.WriteOutput, 0, 1+len(input.Accounts)) // One write for granting roles, one for each mint.
 
-		// Deploy burn mint token
+		// Deploy burn mint token.
 		deployTokenReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc677.Deploy, chain, evm_contract.DeployInput[burn_mint_erc677.ConstructorArgs]{
 			ChainSelector:  input.DeployTokenPoolInput.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc677.ContractType, *semver.MustParse("1.0.0")),
@@ -50,7 +50,7 @@ var DeployBurnMintTokenAndPool = cldf_ops.NewSequence(
 		deployTokenReport.Output.Qualifier = input.DeployTokenPoolInput.TokenSymbol // Use the token symbol as the qualifier.
 		addresses = append(addresses, deployTokenReport.Output)
 
-		// Deploy token pool
+		// Deploy token pool.
 		input.DeployTokenPoolInput.ConstructorArgs.Token = common.HexToAddress(deployTokenReport.Output.Address) // Set the token address to the deployed token.
 		deployTokenPoolReport, err := cldf_ops.ExecuteSequence(b, DeployTokenPool, chain, input.DeployTokenPoolInput)
 		if err != nil {
@@ -69,6 +69,17 @@ var DeployBurnMintTokenAndPool = cldf_ops.NewSequence(
 		}
 		writes = append(writes, grantRolesReport.Output)
 
+		// Grant mint role to the deployer key so we can mint initial supply.
+		grantMintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc677.GrantMintRole, chain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: input.DeployTokenPoolInput.ChainSel,
+			Address:       common.HexToAddress(deployTokenReport.Output.Address),
+			Args:          chain.DeployerKey.From,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint role to deployer on %s: %w", chain, err)
+		}
+		writes = append(writes, grantMintReport.Output)
+
 		// Mint initial supply to each account.
 		for account, amount := range input.Accounts {
 			mintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc677.Mint, chain, evm_contract.FunctionInput[burn_mint_erc677.MintArgs]{
@@ -84,6 +95,17 @@ var DeployBurnMintTokenAndPool = cldf_ops.NewSequence(
 			}
 			writes = append(writes, mintReport.Output)
 		}
+
+		// Revoke mint role from the deployer key for safety.
+		revokeMintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc677.RevokeBurnRole, chain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: input.DeployTokenPoolInput.ChainSel,
+			Address:       common.HexToAddress(deployTokenReport.Output.Address),
+			Args:          chain.DeployerKey.From,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to revoke mint role from deployer on %s: %w", chain, err)
+		}
+		writes = append(writes, revokeMintReport.Output)
 
 		return sequences.OnChainOutput{
 			Addresses: addresses,

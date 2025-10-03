@@ -61,8 +61,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			Args: []token_pool.CCVConfigArg{
 				{
 					RemoteChainSelector: input.RemoteChainSelector,
-					OutboundCCVs:        inboundCCVs,
-					InboundCCVs:         outboundCCVs,
+					OutboundCCVs:        outboundCCVs,
+					InboundCCVs:         inboundCCVs,
 				},
 			},
 		})
