@@ -15,9 +15,9 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     emit TokenPoolV1.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
 
     vm.startPrank(s_allowedOnRamp);
-    uint256 validatedAmount = s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0);
-
-    assertEq(validatedAmount, lockOrBurnIn.amount);
+    uint16 fastTransferFeeBps = s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0);
+    (, uint16 bps,) = s_tokenPool.getFastFinalityConfig();
+    assertEq(fastTransferFeeBps, bps);
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
@@ -38,18 +38,16 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
-    uint256 expectedAmount = lockOrBurnIn.amount - (lockOrBurnIn.amount * fastTransferFeeBps / BPS_DEVIDER);
-
     vm.expectEmit();
-    emit TokenPool.FastTransferOutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), expectedAmount);
+    emit TokenPool.FastTransferOutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
 
     vm.startPrank(s_allowedOnRamp);
-    uint256 validatedAmount = s_tokenPool.validateLockOrBurn(lockOrBurnIn, finalityThreshold);
+    uint16 feeBps = s_tokenPool.validateLockOrBurn(lockOrBurnIn, finalityThreshold);
 
-    assertEq(validatedAmount, expectedAmount);
+    assertEq(feeBps, fastTransferFeeBps);
 
     RateLimiter.TokenBucket memory bucket = s_tokenPool.getFastOutboundBucket(DEST_CHAIN_SELECTOR);
-    assertEq(bucket.tokens, outboundFastConfig.capacity - expectedAmount);
+    assertEq(bucket.tokens, outboundFastConfig.capacity - lockOrBurnIn.amount);
   }
 
   function test_validateLockOrBurn_RevertWhen_InvalidFinality() public {

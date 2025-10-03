@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+
 import {Client} from "../../../libraries/Client.sol";
-import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../poolsV2/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
 contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
   function test_getTokenTransferFeeConfig() public {
     // Set up a fee config first.
-    TokenPool.TokenTransferFeeConfig memory feeConfig = TokenPool.TokenTransferFeeConfig({
+    IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50000,
-      destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+      destBytesOverhead: 32,
       feeUSDCents: 100, // $1.00
       isEnabled: true
     });
@@ -24,25 +25,13 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
 
     // Test getting the config
     Client.EVM2AnyMessage memory message;
-    (bool isEnabled, uint32 destGasOverhead, uint32 destBytesOverhead, uint32 feeUSDCents) =
+    IPoolV2.TokenTransferFeeConfig memory returnedFeeConfig =
       s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
 
-    assertEq(isEnabled, true);
-    assertEq(destGasOverhead, feeConfig.destGasOverhead);
-    assertEq(destBytesOverhead, Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES);
-    assertEq(feeUSDCents, feeConfig.feeUSDCents);
-  }
-
-  function test_getTokenTransferFeeConfig_DefaultConfig() public {
-    // Test getting config when none is set (should return default values).
-    Client.EVM2AnyMessage memory message;
-    (bool isEnabled, uint32 destGasOverhead, uint32 destBytesOverhead, uint32 feeUSDCents) =
-      s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
-
-    assertEq(isEnabled, false);
-    assertEq(destGasOverhead, 0);
-    assertEq(destBytesOverhead, 0);
-    assertEq(feeUSDCents, 0);
+    assertEq(returnedFeeConfig.isEnabled, feeConfig.isEnabled);
+    assertEq(returnedFeeConfig.destGasOverhead, feeConfig.destGasOverhead);
+    assertEq(returnedFeeConfig.destBytesOverhead, feeConfig.destBytesOverhead);
+    assertEq(returnedFeeConfig.feeUSDCents, feeConfig.feeUSDCents);
   }
 
   function test_getTokenTransferFeeConfig_DeleteConfig() public {
@@ -54,12 +43,13 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
 
     // Test getting the disabled config
     Client.EVM2AnyMessage memory message;
-    (bool isEnabled, uint32 destGasOverhead, uint32 destBytesOverhead, uint32 feeUSDCents) =
+    IPoolV2.TokenTransferFeeConfig memory tokenTransferFeeConfig =
       s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
 
-    assertEq(isEnabled, false);
-    assertEq(destGasOverhead, 0);
-    assertEq(destBytesOverhead, 0);
-    assertEq(feeUSDCents, 0);
+    // assert default values are returned
+    assertEq(tokenTransferFeeConfig.isEnabled, false);
+    assertEq(tokenTransferFeeConfig.destGasOverhead, 0);
+    assertEq(tokenTransferFeeConfig.destBytesOverhead, 0);
+    assertEq(tokenTransferFeeConfig.feeUSDCents, 0);
   }
 }

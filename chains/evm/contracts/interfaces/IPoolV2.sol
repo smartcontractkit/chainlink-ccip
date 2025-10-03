@@ -9,12 +9,19 @@ import {Pool} from "../libraries/Pool.sol";
 /// @notice Shared public interface for multiple V2 pool types.
 /// Each pool type handles a different child token model e.g. lock/release, mint/burn.
 interface IPoolV2 is IPoolV1 {
+  struct TokenTransferFeeConfig {
+    uint32 destGasOverhead; // ──╮ Gas charged to execute the token transfer on the destination chain.
+    uint32 destBytesOverhead; // │ Data availability bytes.
+    uint32 feeUSDCents; //       │ Fee to charge per token transfer, multiples of 0.01 USD.
+    bool isEnabled; // ──────────╯ Whether this token has custom transfer fees.
+  }
+
   /// @notice Lock tokens into the pool or burn the tokens.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
   /// @param finality The finality configuration from the CCIP message.
   /// @param tokenArgs Additional token arguments.
   /// @return lockOrBurnOut Encoded data fields for the processing of tokens on the destination chain.
-  /// @return destTokenAmount The amount of tokens that will be set in TokenTransferV1.amount to be r/m on destination.
+  /// @return destTokenAmount The amount of tokens that will be set in TokenTransferV1.amount to be released/mint on destination.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 finality,
@@ -66,34 +73,12 @@ interface IPoolV2 is IPoolV1 {
   /// @param message The message to be sent to the destination chain.
   /// @param finality The finality configuration from the CCIP message.
   /// @param tokenArgs Additional token argument from the CCIP message.
-  /// @return isEnabled Whether this token has transfer fee overrides.
-  /// @return destGasOverhead Gas charged to execute the token transfer on the destination chain.
-  /// @return destBytesOverhead Data availability bytes.
-  /// @return feeUSDCents Fee to charge per token transfer, multiples of 0.01 USD.
+  /// @return feeConfig the fee configuration for transferring the token to the destination chain.
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
     uint16 finality,
     bytes calldata tokenArgs
-  ) external view returns (bool isEnabled, uint32 destGasOverhead, uint32 destBytesOverhead, uint32 feeUSDCents);
-
-  /// @notice Withdraws all accumulated pool fees to the specified recipient.
-  /// @dev For burn/mint pools, this transfers the entire token balance of the pool contract.
-  /// lock/release pools should override this function with their own accounting mechanism.
-  /// @param recipient The address to receive the withdrawn fees.
-  function withdrawFees(
-    address recipient
-  ) external;
-
-  /// @notice Gets the accumulated pool fees that can be withdrawn.
-  /// @dev burn/mint pools should return the contract's token balance since pool fees
-  /// are minted directly to the pool contract (e.g., `return getToken().balanceOf(address(this))`).
-  /// lock/release pools should implement their own accounting mechanism for pool fees
-  /// by adding a storage variable (e.g., `s_accumulatedPoolFees`) since they cannot mint
-  /// additional tokens for pool fee rewards.
-  /// Note: Fee accounting can be obscured by sending tokens directly to the pool.
-  /// This does not introduce security issues but will need to be handled operationally.
-  /// @return The amount of accumulated pool fees available for withdrawal.
-  function getAccumulatedFees() external returns (uint256);
+  ) external view returns (TokenTransferFeeConfig memory feeConfig);
 }

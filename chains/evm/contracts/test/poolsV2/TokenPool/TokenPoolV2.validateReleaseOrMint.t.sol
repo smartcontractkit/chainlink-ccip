@@ -13,18 +13,22 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
   uint256 internal constant AMOUNT = 100e18;
 
   function test_validateReleaseOrMint() public {
+    vm.stopPrank();
+
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     vm.expectEmit();
     emit TokenPoolV1.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
-    vm.startPrank(s_allowedOffRamp);
+    vm.prank(s_allowedOffRamp);
     uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
 
     assertEq(localAmount, AMOUNT);
   }
 
   function test_validateReleaseOrMint_WithFastFinality() public {
+    vm.stopPrank();
+
     uint16 finalityThreshold = 8;
     uint16 fastTransferFeeBps = 500;
     uint256 maxAmountPerRequest = 1000e18;
@@ -37,7 +41,7 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
       outboundRateLimiterConfig: outboundConfig,
       inboundRateLimiterConfig: inboundConfig
     });
-    vm.startPrank(OWNER);
+    vm.prank(OWNER);
     s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitArgs);
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
@@ -45,7 +49,7 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
     vm.expectEmit();
     emit TokenPool.FastTransferInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
-    vm.startPrank(s_allowedOffRamp);
+    vm.prank(s_allowedOffRamp);
     uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, finalityThreshold);
 
     assertEq(localAmount, AMOUNT);
@@ -55,6 +59,8 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
   }
 
   function test_validateReleaseOrMint_RateLimitLocalAmount() public {
+    vm.stopPrank();
+
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     // Pretend the local amount is 10x the source amount and assert the rate limit is applied on the local amount.
@@ -67,11 +73,13 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
       amount: localAmount
     });
 
-    vm.startPrank(s_allowedOffRamp);
+    vm.prank(s_allowedOffRamp);
     s_tokenPool.validateReleaseOrMint(releaseOrMintIn, localAmount, 0);
   }
 
   function test_validateReleaseOrMint_InvalidToken() public {
+    vm.stopPrank();
+
     address wrongToken = address(0x456);
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
@@ -82,6 +90,8 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
   }
 
   function test_validateReleaseOrMint_CursedByRMN() public {
+    vm.stopPrank();
+
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     // Mock RMN to be cursed
@@ -112,13 +122,15 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
   }
 
   function test_validateReleaseOrMint_InvalidSourcePool() public {
+    vm.stopPrank();
+
     address invalidPool = address(0x789);
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
     releaseOrMintIn.sourcePoolAddress = abi.encode(invalidPool);
 
     vm.expectRevert(abi.encodeWithSelector(TokenPoolV1.InvalidSourcePoolAddress.selector, abi.encode(invalidPool)));
-    vm.startPrank(s_allowedOffRamp);
+    vm.prank(s_allowedOffRamp);
     s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
   }
 
@@ -134,7 +146,7 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24})
     });
-    vm.startPrank(OWNER);
+    vm.prank(OWNER);
     s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitArgs);
   }
 

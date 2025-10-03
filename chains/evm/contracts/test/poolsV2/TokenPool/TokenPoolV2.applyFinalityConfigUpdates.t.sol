@@ -61,4 +61,17 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
       finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
     );
   }
+
+  function test_applyFinalityConfigUpdates_RevertWhen_InvalidFastTransferFeeBps() public {
+    uint16 finalityThreshold = 100;
+    uint16 fastTransferFeeBps = BPS_DIVIDER;
+    uint256 maxAmountPerRequest = 1000e18;
+    TokenPool.FastTransferRateLimitConfigArgs[] memory emptyRateLimitArgs =
+      new TokenPool.FastTransferRateLimitConfigArgs[](0);
+
+    vm.expectRevert(TokenPool.InvalidFastTransferFeeBps.selector);
+    s_tokenPool.applyFinalityConfigUpdates(
+      finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
+    );
+  }
 }

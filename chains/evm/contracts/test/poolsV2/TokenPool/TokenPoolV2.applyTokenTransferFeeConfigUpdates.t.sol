@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../poolsV2/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
@@ -8,7 +10,7 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 
 contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
   function test_applyTokenTransferFeeConfigUpdates() public {
-    TokenPool.TokenTransferFeeConfig memory feeConfig = TokenPool.TokenTransferFeeConfig({
+    IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
       feeUSDCents: 100, // $1.00
@@ -28,7 +30,7 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
 
   function test_applyTokenTransferFeeConfigUpdates_DeleteConfig() public {
     // First set a config
-    TokenPool.TokenTransferFeeConfig memory feeConfig = TokenPool.TokenTransferFeeConfig({
+    IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
       feeUSDCents: 100,

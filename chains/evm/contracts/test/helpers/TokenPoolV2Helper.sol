@@ -38,7 +38,7 @@ contract TokenPoolV2Helper is TokenPool {
     return s_finalityConfig.inboundRateLimiterConfig[remoteChainSelector];
   }
 
-  function validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn, uint16 finality) external returns (uint256) {
+  function validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn, uint16 finality) external returns (uint16) {
     return _validateLockOrBurn(lockOrBurnIn, finality);
   }
 

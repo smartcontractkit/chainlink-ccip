@@ -10,7 +10,7 @@ import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/Bu
 contract TokenPoolV2Setup is BaseTest {
   BurnMintERC20 internal s_token;
   TokenPoolV2Helper internal s_tokenPool;
-  uint256 internal constant BPS_DEVIDER = 10_000;
+  uint16 internal constant BPS_DIVIDER = 10_000;
   address public s_sender = makeAddr("sender");
   bytes public s_receiver = abi.encode(makeAddr("receiver"));
 
