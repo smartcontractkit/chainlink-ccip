@@ -1,17 +1,29 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Router} from "../../../Router.sol";
 import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
-
-import {Router} from "../../../Router.sol";
 import {Client} from "../../../libraries/Client.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
-import {OffRampSetup} from "../../offRamp/OffRamp/OffRampSetup.t.sol";
 
-contract Router_routeMessage is OffRampSetup {
+contract Router_routeMessage is BaseTest {
+  IAny2EVMMessageReceiver internal s_receiver;
+  MaybeRevertMessageReceiver internal s_reverting_receiver;
+
+  address internal s_offRamp = makeAddr("offRamp");
+
   function setUp() public virtual override {
     super.setUp();
+
+    s_receiver = new MaybeRevertMessageReceiver(false);
+    s_reverting_receiver = new MaybeRevertMessageReceiver(true);
+
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
+    s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+
     vm.startPrank(address(s_offRamp));
   }
 
