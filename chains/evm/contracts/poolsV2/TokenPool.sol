@@ -33,7 +33,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   event FastTransferInboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
 
   struct FastFinalityConfig {
-    uint16 finalityThreshold; // ──╮ Maximum block depth required for token transfers.
+    uint16 finalityThreshold; // ──╮ Minimum block depth on the source chain that token issuers consider sufficiently secure.
     uint16 fastTransferFeeBps; // ─╯ Fee in basis points for fast transfers [0-10_000].
     uint256 maxAmountPerRequest; // Maximum amount allowed per transfer request.
     mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) outboundRateLimiterConfig;
@@ -241,7 +241,9 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     FastFinalityConfig storage finalityConfig = s_finalityConfig;
     for (uint256 i = 0; i < rateLimitConfigArgs.length; ++i) {
       FastTransferRateLimitConfigArgs calldata configArgs = rateLimitConfigArgs[i];
+
       if (!isSupportedChain(configArgs.remoteChainSelector)) revert NonExistentChain(configArgs.remoteChainSelector);
+
       RateLimiter._validateTokenBucketConfig(configArgs.outboundRateLimiterConfig);
       _initializeFastBucketIfNeeded(
         finalityConfig.outboundRateLimiterConfig[configArgs.remoteChainSelector], configArgs.outboundRateLimiterConfig
@@ -249,6 +251,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
       finalityConfig.outboundRateLimiterConfig[configArgs.remoteChainSelector]._setTokenBucketConfig(
         configArgs.outboundRateLimiterConfig
       );
+
       RateLimiter._validateTokenBucketConfig(configArgs.inboundRateLimiterConfig);
       _initializeFastBucketIfNeeded(
         finalityConfig.inboundRateLimiterConfig[configArgs.remoteChainSelector], configArgs.inboundRateLimiterConfig

@@ -41,7 +41,7 @@ contract TokenPoolV2_setFastTransferRateLimitConfig is TokenPoolV2Setup {
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1, rate: 1})
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPoolV1.NonExistentChain.selector, uint64(999)));
+    vm.expectRevert(abi.encodeWithSelector(TokenPoolV1.NonExistentChain.selector, args[0].remoteChainSelector));
     s_tokenPool.setFastTransferRateLimitConfig(args);
   }
 
