@@ -12,6 +12,7 @@ type ChainAdapter interface {
 	ConfigureLaneLegAsSource(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
 	ConfigureLaneLegAsDest(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
 	ConfigureLaneBidirectionally(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
+	SetOCR3Config(e cldf.Environment, cfg SetOCR3ConfigInput) (cldf.ChangesetOutput, error)
 
 	// helpers to expose lower level functionality if needed
 	// needed for populating values in chain specific configs
