@@ -1,8 +1,14 @@
 package v1_6
 
 import (
+	"fmt"
+
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	ccipocr3 "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/globals"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/internal"
 )
 
 type SetOCR3ConfigInput struct {
@@ -22,8 +28,8 @@ type OCR3ConfigArgs struct {
 type SetOCR3Config struct{}
 
 func (cs SetOCR3Config) VerifyPreconditions(env cldf.Environment, config SetOCR3ConfigArgs) error {
-	// NOTE: this is a workaround and it only validates RemoteChainSelectors
-	return ops.SetOCR3Config{}.VerifyPreconditions(env, ops.SetOCR3OffRampConfig{RemoteChainSels: config.RemoteChainSels})
+	// TODO: do we pass through to the chain Adapter?
+	return nil
 }
 
 // NOTE: this should become the new standard function that returns generic OCR3ConfigArgs
@@ -47,7 +53,7 @@ func ocr3ConfigArgs(e cldf.Environment, homeChainSelector uint64, chainSelector 
 		configType = globals.ConfigTypeActive
 	}
 
-	ocr3Args, err := internal.BuildSetOCR3ConfigArgsAptos(
+	ocr3Args, err := internal.BuildSetOCR3ConfigArgs(
 		donID,
 		state.Chains[homeChainSelector].CCIPHome,
 		chainSelector,
@@ -79,21 +85,37 @@ type SetOCR3ConfigArgs struct {
 }
 
 func (cs SetOCR3Config) Apply(env cldf.Environment, config SetOCR3ConfigArgs) (cldf.ChangesetOutput, error) {
-	// TODO: loop over tonChains
-	args, err := ocr3ConfigArgs(env, config.HomeChainSel, config.RemoteChainSels[0], config.ConfigType)
-	if err != nil {
-		return cldf.ChangesetOutput{}, err
+	finalOutput := cldf.ChangesetOutput{}
+	for _, chainSel := range config.RemoteChainSels {
+		family, err := chain_selectors.GetSelectorFamily(chainSel)
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+		adapter, exists := registeredChainAdapters[family]
+		if !exists {
+			return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", family)
+		}
+		args, err := ocr3ConfigArgs(env, config.HomeChainSel, chainSel, config.ConfigType)
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+		configs := make(map[ccipocr3.PluginType]OCR3ConfigArgs, 2)
+		for _, arg := range args {
+			configs[arg.PluginType] = arg
+		}
+		output, err := adapter.SetOCR3Config(env, SetOCR3ConfigInput{
+			ChainSelector: chainSel,
+			Configs:       configs,
+		})
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+		err = MergeChangesetOutput(env, &finalOutput, output)
+		if err != nil {
+			finalOutput.Reports = append(finalOutput.Reports, output.Reports...)
+			return cldf.ChangesetOutput{Reports: finalOutput.Reports}, fmt.Errorf("failed to merge output of changeset for chain selector %d: %w", chainSel, err)
+		}
 	}
-
-	configs := make(map[ccipocr3.PluginType]OCR3ConfigArgs, 2)
-	for _, arg := range args {
-		configs[arg.PluginType] = arg
-	}
-
-	// TODO: don't only wrap TON
-	return ops.SetOCR3Config{}.Apply(env, ops.SetOCR3OffRampConfig{
-		// TODO: map[remoteChainSels => configs]
-		RemoteChainSels: config.RemoteChainSels,
-		Configs:         configs,
-	})
+	// TODO: aggregate timelock stuff
+	return finalOutput, nil
 }
