@@ -18,7 +18,9 @@ import (
 
 // MCMSReader is an interface for reading MCMS state from a chain type.
 type MCMSReader interface {
-	OpCount(e deployment.Environment, chainSelector uint64, mcmAddress string) (uint64, error)
+	// GetChainMetadata returns the chain metadata for a given MCM contract reference.
+	// Each chain family defines its own implementation of this method.
+	GetChainMetadata(e deployment.Environment, mcmRef datastore.AddressRef) (mcms_types.ChainMetadata, error)
 }
 
 var registeredMCMSReaders map[string]MCMSReader
@@ -139,12 +141,16 @@ func (b *OutputBuilder) getTimelockAddresses(
 ) (map[mcms_types.ChainSelector]string, error) {
 	timelocks := make(map[mcms_types.ChainSelector]string)
 	for _, op := range ops {
-		timelockRef.ChainSelector = uint64(op.ChainSelector)
-		refs, err := datastore_utils.FindAndFormatEachRef(b.environment.DataStore, []datastore.AddressRef{timelockRef}, datastore_utils.FullRef)
+		fullTimelockRef, err := datastore_utils.FindAndFormatRef(
+			b.environment.DataStore,
+			timelockRef,
+			uint64(op.ChainSelector),
+			datastore_utils.FullRef,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve timelock ref on chain with selector %d: %w", op.ChainSelector, err)
 		}
-		timelocks[op.ChainSelector] = refs[0].Address
+		timelocks[op.ChainSelector] = fullTimelockRef.Address
 	}
 
 	return timelocks, nil
@@ -156,12 +162,15 @@ func (b *OutputBuilder) getChainMetadata(
 ) (map[mcms_types.ChainSelector]mcms_types.ChainMetadata, error) {
 	metadata := make(map[mcms_types.ChainSelector]mcms_types.ChainMetadata)
 	for _, op := range ops {
-		mcmRef.ChainSelector = uint64(op.ChainSelector)
-		refs, err := datastore_utils.FindAndFormatEachRef(b.environment.DataStore, []datastore.AddressRef{mcmRef}, datastore_utils.FullRef)
+		fullMCMRef, err := datastore_utils.FindAndFormatRef(
+			b.environment.DataStore,
+			mcmRef,
+			uint64(op.ChainSelector),
+			datastore_utils.FullRef,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve mcm ref on chain with selector %d: %w", op.ChainSelector, err)
 		}
-		mcmAddress := refs[0].Address
 
 		family, err := chain_selectors.GetSelectorFamily(uint64(op.ChainSelector))
 		if err != nil {
@@ -172,14 +181,11 @@ func (b *OutputBuilder) getChainMetadata(
 			return nil, fmt.Errorf("no MCMS reader registered for chain family '%s'", family)
 		}
 
-		opCount, err := reader.OpCount(b.environment, uint64(op.ChainSelector), mcmAddress)
+		chainMetadata, err := reader.GetChainMetadata(b.environment, fullMCMRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get current op count from MCMS at address %s on chain with selector %d: %w", mcmAddress, op.ChainSelector, err)
+			return nil, fmt.Errorf("failed to get current op count from MCMS at address %s on chain with selector %d: %w", fullMCMRef.Address, op.ChainSelector, err)
 		}
-		metadata[op.ChainSelector] = mcms_types.ChainMetadata{
-			MCMAddress:      mcmAddress,
-			StartingOpCount: opCount,
-		}
+		metadata[op.ChainSelector] = chainMetadata
 	}
 
 	return metadata, nil

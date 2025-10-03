@@ -5,6 +5,7 @@ import (
 )
 
 // ExecInfo contains information about an executed transaction.
+// Defined as a struct in case we want to add more fields in the future without breaking existing usage.
 type ExecInfo struct {
 	// Hash is the transaction hash.
 	Hash string
