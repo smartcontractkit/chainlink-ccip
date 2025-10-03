@@ -3,10 +3,12 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 
+import {Router} from "../../../Router.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
 import {ReentrantCCV} from "../../helpers/ReentrantCCV.sol";
+import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
 import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
@@ -91,6 +93,40 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
   function test_execute() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+
+    // Expect execution state change event.
+    vm.expectEmit();
+    emit CCVAggregator.ExecutionStateChanged(
+      message.sourceChainSelector,
+      message.sequenceNumber,
+      keccak256(encodedMessage),
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
+
+    // Verify final state is SUCCESS.
+    assertEq(
+      uint256(Internal.MessageExecutionState.SUCCESS),
+      uint256(
+        s_agg.getExecutionState(
+          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
+        )
+      )
+    );
+  }
+
+  function test_execute_WithReceiver() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    MockReceiverV2 mock = new MockReceiverV2(_arrayOf(s_defaultCCV), new address[](0), 0);
+    message.receiver = abi.encodePacked(address(mock)); // Add receiver to message.
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+
+    // Set CCVAggregator as a valid OffRamp on the Router.
+    Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
+    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_agg)});
+    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
 
     // Expect execution state change event.
     vm.expectEmit();
