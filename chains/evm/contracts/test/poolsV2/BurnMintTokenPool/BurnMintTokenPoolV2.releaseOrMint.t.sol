@@ -33,6 +33,32 @@ contract BurnMintTokenPoolV2_releaseOrMint is BurnMintSetup {
     assertEq(s_token.balanceOf(receiver), amount);
   }
 
+  function test_releaseOrMint_Finality() public {
+    uint256 amount = 1e19;
+    address receiver = makeAddr("receiver_address");
+
+    vm.startPrank(s_allowedOffRamp);
+
+    vm.expectEmit();
+    emit IERC20.Transfer(address(0), receiver, amount);
+
+    s_pool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: receiver,
+        sourceDenominatedAmount: amount,
+        localToken: address(s_token),
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        sourcePoolAddress: abi.encode(s_initialRemotePool),
+        sourcePoolData: "",
+        offchainTokenData: ""
+      }),
+      12
+    );
+
+    assertEq(s_token.balanceOf(receiver), amount);
+  }
+
   function test_RevertWhen_CursedByRMN() public {
     // Should not mint tokens if cursed.
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
