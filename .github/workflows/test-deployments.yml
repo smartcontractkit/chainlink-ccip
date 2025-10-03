@@ -31,9 +31,6 @@ jobs:
 
   setup-go:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./chains/evm/deployment
     steps:
       - uses: actions/checkout@v4
       - name: Determine Go version
@@ -52,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./chains/evm/deployment
+        working-directory: chains/evm/deployment
     steps:
       - name: Run tests
         run: go test ./...
@@ -63,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./deployment
+        working-directory: deployment
     steps:
       - name: Run tests
         run: go test ./...
