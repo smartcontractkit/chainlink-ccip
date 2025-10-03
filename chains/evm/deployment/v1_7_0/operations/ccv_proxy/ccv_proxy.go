@@ -37,10 +37,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "ccv-proxy:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys the CCVProxy contract",
-	ContractType:     ContractType,
 	ContractMetadata: ccv_proxy.CCVProxyMetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(ccv_proxy.CCVProxyBin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(ccv_proxy.CCVProxyBin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
@@ -52,7 +53,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigAr
 	ContractType:    ContractType,
 	ContractABI:     ccv_proxy.CCVProxyABI,
 	NewContract:     ccv_proxy.NewCCVProxy,
-	IsAllowedCaller: contract.OnlyOwner[*ccv_proxy.CCVProxy],
+	IsAllowedCaller: contract.OnlyOwner[*ccv_proxy.CCVProxy, SetDynamicConfigArgs],
 	Validate:        func(SetDynamicConfigArgs) error { return nil },
 	CallContract: func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
 		return ccvProxy.SetDynamicConfig(opts, args.DynamicConfig)
@@ -66,7 +67,7 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	ContractType:    ContractType,
 	ContractABI:     ccv_proxy.CCVProxyABI,
 	NewContract:     ccv_proxy.NewCCVProxy,
-	IsAllowedCaller: contract.OnlyOwner[*ccv_proxy.CCVProxy],
+	IsAllowedCaller: contract.OnlyOwner[*ccv_proxy.CCVProxy, []DestChainConfigArgs],
 	Validate:        func([]DestChainConfigArgs) error { return nil },
 	CallContract: func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return ccvProxy.ApplyDestChainConfigUpdates(opts, args)
@@ -80,7 +81,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 	ContractType:    ContractType,
 	ContractABI:     ccv_proxy.CCVProxyABI,
 	NewContract:     ccv_proxy.NewCCVProxy,
-	IsAllowedCaller: contract.OnlyOwner[*ccv_proxy.CCVProxy],
+	IsAllowedCaller: contract.OnlyOwner[*ccv_proxy.CCVProxy, WithdrawFeeTokensArgs],
 	Validate:        func(WithdrawFeeTokensArgs) error { return nil },
 	CallContract: func(ccvProxy *ccv_proxy.CCVProxy, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return ccvProxy.WithdrawFeeTokens(opts, args.FeeTokens)

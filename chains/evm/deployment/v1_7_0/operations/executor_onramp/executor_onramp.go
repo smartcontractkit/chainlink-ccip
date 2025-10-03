@@ -31,10 +31,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "executor-onramp:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys the ExecutorOnRamp contract",
-	ContractType:     ContractType,
 	ContractMetadata: executor_onramp.ExecutorOnRampMetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(executor_onramp.ExecutorOnRampBin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(executor_onramp.ExecutorOnRampBin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
@@ -46,7 +47,7 @@ var SetMaxCCVsPerMsg = contract.NewWrite(contract.WriteParams[uint8, *executor_o
 	ContractType:    ContractType,
 	ContractABI:     executor_onramp.ExecutorOnRampABI,
 	NewContract:     executor_onramp.NewExecutorOnRamp,
-	IsAllowedCaller: contract.OnlyOwner[*executor_onramp.ExecutorOnRamp],
+	IsAllowedCaller: contract.OnlyOwner[*executor_onramp.ExecutorOnRamp, uint8],
 	Validate:        func(uint8) error { return nil },
 	CallContract: func(executorOnRamp *executor_onramp.ExecutorOnRamp, opts *bind.TransactOpts, args uint8) (*types.Transaction, error) {
 		return executorOnRamp.SetMaxCCVsPerMsg(opts, args)
@@ -60,7 +61,7 @@ var ApplyDestChainUpdates = contract.NewWrite(contract.WriteParams[ApplyDestChai
 	ContractType:    ContractType,
 	ContractABI:     executor_onramp.ExecutorOnRampABI,
 	NewContract:     executor_onramp.NewExecutorOnRamp,
-	IsAllowedCaller: contract.OnlyOwner[*executor_onramp.ExecutorOnRamp],
+	IsAllowedCaller: contract.OnlyOwner[*executor_onramp.ExecutorOnRamp, ApplyDestChainUpdatesArgs],
 	Validate:        func(ApplyDestChainUpdatesArgs) error { return nil },
 	CallContract: func(executorOnRamp *executor_onramp.ExecutorOnRamp, opts *bind.TransactOpts, args ApplyDestChainUpdatesArgs) (*types.Transaction, error) {
 		return executorOnRamp.ApplyDestChainUpdates(opts, args.DestChainSelectorsToRemove, args.DestChainSelectorsToAdd)
@@ -74,7 +75,7 @@ var ApplyAllowedCCVUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowed
 	ContractType:    ContractType,
 	ContractABI:     executor_onramp.ExecutorOnRampABI,
 	NewContract:     executor_onramp.NewExecutorOnRamp,
-	IsAllowedCaller: contract.OnlyOwner[*executor_onramp.ExecutorOnRamp],
+	IsAllowedCaller: contract.OnlyOwner[*executor_onramp.ExecutorOnRamp, ApplyAllowedCCVUpdatesArgs],
 	Validate:        func(ApplyAllowedCCVUpdatesArgs) error { return nil },
 	CallContract: func(executorOnRamp *executor_onramp.ExecutorOnRamp, opts *bind.TransactOpts, args ApplyAllowedCCVUpdatesArgs) (*types.Transaction, error) {
 		return executorOnRamp.ApplyAllowedCCVUpdates(opts, args.CCVsToRemove, args.CCVsToAdd, args.AllowlistEnabled)

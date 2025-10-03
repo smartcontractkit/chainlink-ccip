@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 	"github.com/zksync-sdk/zksync2-go/accounts"
@@ -52,46 +53,38 @@ func TestDeploy(t *testing.T) {
 			expectedErr: fmt.Sprintf("mismatch between inputted chain selector and selector defined within dependencies: %d != %d", invalidChainSel, validChainSel),
 		},
 		{
-			desc: "version not specified",
-			input: DeployInput[ConstructorArgs]{
-				ChainSelector: validChainSel,
-				Args:          ConstructorArgs{Value: 2},
-			},
-			expectedErr: fmt.Sprintf("version must be specified for %s", testContractType),
-		},
-		{
 			desc: "bytecode not defined for version",
 			input: DeployInput[ConstructorArgs]{
-				ChainSelector: validChainSel,
-				Args:          ConstructorArgs{Value: 2},
-				Version:       semver.MustParse("1.1.0"),
+				ChainSelector:  validChainSel,
+				Args:           ConstructorArgs{Value: 2},
+				TypeAndVersion: deployment.NewTypeAndVersion(testContractType, *semver.MustParse("1.1.0")),
 			},
 			expectedErr: fmt.Sprintf("no bytecode defined for %s %s", testContractType, "1.1.0"),
 		},
 		{
 			desc: "revert from contract",
 			input: DeployInput[ConstructorArgs]{
-				ChainSelector: validChainSel,
-				Args:          ConstructorArgs{Value: 10},
-				Version:       semver.MustParse("1.0.0"),
+				ChainSelector:  validChainSel,
+				Args:           ConstructorArgs{Value: 10},
+				TypeAndVersion: deployment.NewTypeAndVersion(testContractType, *semver.MustParse("1.0.0")),
 			},
 			expectedErr: "due to error -`InvalidValue` args [1]: 6072742c0000000000000000000000000000000000000000000000000000000000000001",
 		},
 		{
 			desc: "zkSyncVM deployment",
 			input: DeployInput[ConstructorArgs]{
-				ChainSelector: validChainSel,
-				Args:          ConstructorArgs{Value: 2},
-				Version:       semver.MustParse("1.0.0"),
+				ChainSelector:  validChainSel,
+				Args:           ConstructorArgs{Value: 2},
+				TypeAndVersion: deployment.NewTypeAndVersion(testContractType, *semver.MustParse("1.0.0")),
 			},
 			isZkSyncVM: true,
 		},
 		{
 			desc: "evm deployment",
 			input: DeployInput[ConstructorArgs]{
-				ChainSelector: validChainSel,
-				Args:          ConstructorArgs{Value: 2},
-				Version:       semver.MustParse("1.0.0"),
+				ChainSelector:  validChainSel,
+				Args:           ConstructorArgs{Value: 2},
+				TypeAndVersion: deployment.NewTypeAndVersion(testContractType, *semver.MustParse("1.0.0")),
 			},
 			isZkSyncVM: false,
 		},
@@ -106,15 +99,14 @@ func TestDeploy(t *testing.T) {
 			}]`
 
 			op := NewDeploy(DeployParams[ConstructorArgs]{
-				Name:         "test-deployment",
-				Version:      semver.MustParse("1.0.0"),
-				Description:  "Test deployment operation",
-				ContractType: testContractType,
+				Name:        "test-deployment",
+				Version:     semver.MustParse("1.0.0"),
+				Description: "Test deployment operation",
 				ContractMetadata: &bind.MetaData{
 					ABI: contractABI,
 				},
-				BytecodeByVersion: map[string]Bytecode{
-					semver.MustParse("1.0.0").String(): {EVM: []byte{}},
+				BytecodeByTypeAndVersion: map[string]Bytecode{
+					deployment.NewTypeAndVersion(testContractType, *semver.MustParse("1.0.0")).String(): {EVM: []byte{}},
 				},
 				Validate: func(input ConstructorArgs) error {
 					if input.Value%2 != 0 {

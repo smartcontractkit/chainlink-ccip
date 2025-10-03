@@ -49,10 +49,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "committee-verifier:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys the CommitteeVerifier contract",
-	ContractType:     ContractType,
 	ContractMetadata: committee_verifier.CommitteeVerifierMetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(committee_verifier.CommitteeVerifierBin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(committee_verifier.CommitteeVerifierBin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
@@ -61,10 +62,11 @@ var DeployProxy = contract.NewDeploy(contract.DeployParams[ProxyConstructorArgs]
 	Name:             "committee-verifier-proxy:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys the CommitteeVerifierProxy contract",
-	ContractType:     ProxyType,
 	ContractMetadata: verifier_proxy.VerifierProxyMetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(verifier_proxy.VerifierProxyBin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ProxyType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(verifier_proxy.VerifierProxyBin),
+		},
 	},
 	Validate: func(ProxyConstructorArgs) error { return nil },
 })
@@ -76,7 +78,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigAr
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
 	NewContract:     committee_verifier.NewCommitteeVerifier,
-	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier],
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, SetDynamicConfigArgs],
 	Validate:        func(SetDynamicConfigArgs) error { return nil },
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.SetDynamicConfig(opts, args.DynamicConfig)
@@ -90,7 +92,7 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
 	NewContract:     committee_verifier.NewCommitteeVerifier,
-	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier],
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, []DestChainConfigArgs],
 	Validate:        func([]DestChainConfigArgs) error { return nil },
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.ApplyDestChainConfigUpdates(opts, args)
@@ -104,7 +106,7 @@ var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[[]AllowlistCo
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
 	NewContract:     committee_verifier.NewCommitteeVerifier,
-	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier],
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, []AllowlistConfigArgs],
 	Validate:        func([]AllowlistConfigArgs) error { return nil },
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []AllowlistConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.ApplyAllowlistUpdates(opts, args)
@@ -118,7 +120,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
 	NewContract:     committee_verifier.NewCommitteeVerifier,
-	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier],
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, WithdrawFeeTokensArgs],
 	Validate:        func(WithdrawFeeTokensArgs) error { return nil },
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return committeeVerifier.WithdrawFeeTokens(opts, args.FeeTokens)
@@ -132,7 +134,7 @@ var SetSignatureConfigs = contract.NewWrite(contract.WriteParams[SetSignatureCon
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
 	NewContract:     committee_verifier.NewCommitteeVerifier,
-	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier],
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, SetSignatureConfigArgs],
 	Validate:        func(SetSignatureConfigArgs) error { return nil },
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SetSignatureConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.SetSignatureConfig(opts, args.Signers, args.Threshold)
