@@ -66,51 +66,54 @@ const (
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	baseLggr         logger.Logger
-	donID            plugintypes.DonID
-	ocrConfig        reader.OCR3ConfigWithMeta
-	execCodec        cciptypes.ExecutePluginCodec
-	msgHasher        cciptypes.MessageHasher
-	addrCodec        cciptypes.AddressCodec
-	homeChainReader  reader.HomeChain
-	estimateProvider cciptypes.EstimateProvider
-	tokenDataEncoder cciptypes.TokenDataEncoder
-	chainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
-	extendedReaders  map[cciptypes.ChainSelector]contractreader.Extended
-	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
+	baseLggr                   logger.Logger
+	donID                      plugintypes.DonID
+	ocrConfig                  reader.OCR3ConfigWithMeta
+	execCodec                  cciptypes.ExecutePluginCodec
+	msgHasher                  cciptypes.MessageHasher
+	addrCodec                  cciptypes.AddressCodec
+	homeChainReader            reader.HomeChain
+	estimateProvider           cciptypes.EstimateProvider
+	tokenDataEncoder           cciptypes.TokenDataEncoder
+	looppCCIPProviderSupported map[string]bool // chainFamily -> supported
+	chainAccessors             map[cciptypes.ChainSelector]cciptypes.ChainAccessor
+	extendedReaders            map[cciptypes.ChainSelector]contractreader.Extended
+	chainWriters               map[cciptypes.ChainSelector]types.ContractWriter
 }
 
 type PluginFactoryParams struct {
-	Lggr             logger.Logger
-	DonID            plugintypes.DonID
-	OcrConfig        reader.OCR3ConfigWithMeta
-	ExecCodec        cciptypes.ExecutePluginCodec
-	MsgHasher        cciptypes.MessageHasher
-	AddrCodec        cciptypes.AddressCodec
-	HomeChainReader  reader.HomeChain
-	TokenDataEncoder cciptypes.TokenDataEncoder
-	ChainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
-	EstimateProvider cciptypes.EstimateProvider
-	ExtendedReaders  map[cciptypes.ChainSelector]contractreader.Extended
-	ContractWriters  map[cciptypes.ChainSelector]types.ContractWriter
+	Lggr                       logger.Logger
+	DonID                      plugintypes.DonID
+	OcrConfig                  reader.OCR3ConfigWithMeta
+	ExecCodec                  cciptypes.ExecutePluginCodec
+	MsgHasher                  cciptypes.MessageHasher
+	AddrCodec                  cciptypes.AddressCodec
+	HomeChainReader            reader.HomeChain
+	TokenDataEncoder           cciptypes.TokenDataEncoder
+	LOOPPCCIPProviderSupported map[string]bool // chainFamily -> supported
+	ChainAccessors             map[cciptypes.ChainSelector]cciptypes.ChainAccessor
+	EstimateProvider           cciptypes.EstimateProvider
+	ExtendedReaders            map[cciptypes.ChainSelector]contractreader.Extended
+	ContractWriters            map[cciptypes.ChainSelector]types.ContractWriter
 }
 
 // NewExecutePluginFactory creates a new PluginFactory instance. For execute plugin, oracle instances are not managed by
 // the factory. It is safe to assume that a factory instance will create exactly one plugin instance.
 func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 	return &PluginFactory{
-		baseLggr:         params.Lggr,
-		donID:            params.DonID,
-		ocrConfig:        params.OcrConfig,
-		execCodec:        params.ExecCodec,
-		msgHasher:        params.MsgHasher,
-		addrCodec:        params.AddrCodec,
-		homeChainReader:  params.HomeChainReader,
-		estimateProvider: params.EstimateProvider,
-		tokenDataEncoder: params.TokenDataEncoder,
-		chainAccessors:   params.ChainAccessors,
-		extendedReaders:  params.ExtendedReaders,
-		chainWriters:     params.ContractWriters,
+		baseLggr:                   params.Lggr,
+		donID:                      params.DonID,
+		ocrConfig:                  params.OcrConfig,
+		execCodec:                  params.ExecCodec,
+		msgHasher:                  params.MsgHasher,
+		addrCodec:                  params.AddrCodec,
+		homeChainReader:            params.HomeChainReader,
+		estimateProvider:           params.EstimateProvider,
+		tokenDataEncoder:           params.TokenDataEncoder,
+		looppCCIPProviderSupported: params.LOOPPCCIPProviderSupported,
+		chainAccessors:             params.ChainAccessors,
+		extendedReaders:            params.ExtendedReaders,
+		chainWriters:               params.ContractWriters,
 	}
 }
 
@@ -159,6 +162,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
+		p.looppCCIPProviderSupported,
 		p.chainAccessors,
 		p.extendedReaders,
 		p.addrCodec,

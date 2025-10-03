@@ -255,6 +255,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 		baseChain,
 		config,
 		testhelpers.USDCEncoder,
+		make(map[string]bool),
 		emptyChainAccessors,
 		map[cciptypes.ChainSelector]contractreader.Extended{
 			fujiChain:    mockReader(t, fuji),

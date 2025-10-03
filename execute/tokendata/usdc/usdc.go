@@ -35,6 +35,7 @@ func NewUSDCTokenDataObserver(
 	destChainSelector cciptypes.ChainSelector,
 	usdcConfig pluginconfig.USDCCCTPObserverConfig,
 	attestationEncoder AttestationEncoder,
+	looppCCIPProviderSupported map[string]bool, // chainFamily -> supported
 	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	readers map[cciptypes.ChainSelector]contractreader.Extended,
 	addrCodec cciptypes.AddressCodec,
@@ -44,6 +45,7 @@ func NewUSDCTokenDataObserver(
 		ctx,
 		lggr,
 		usdcConfig.Tokens,
+		looppCCIPProviderSupported,
 		chainAccessors,
 		readers,
 		addrCodec,

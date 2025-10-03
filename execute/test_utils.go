@@ -266,7 +266,6 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		})
 	}
 
-	emptyChainAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 	homeChain := setupHomeChainPoller(it.t, it.lggr, chainConfigInfos)
 	ctx := it.t.Context()
 	err := homeChain.Start(ctx)
@@ -278,7 +277,8 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		it.dstSelector,
 		it.tokenObserverConfig,
 		testhelpers.TokenDataEncoderInstance,
-		emptyChainAccessors,
+		make(map[string]bool),
+		make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor),
 		it.tokenChainReader,
 		mockAddrCodec,
 	)

@@ -76,6 +76,7 @@ func NewUSDCMessageReader(
 	ctx context.Context,
 	lggr logger.Logger,
 	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
+	looppCCIPProviderSupported map[string]bool, // chainFamily -> supported
 	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	addrCodec cciptypes.AddressCodec,
@@ -125,14 +126,27 @@ func NewUSDCMessageReader(
 			}
 
 			// TODO: feature flag usdcReader via CR or ChainAccessor using NewSolanaUSDCReaderAccessor()
-			sr, err := NewSolanaUSDCReader(
-				ctx,
-				lggr,
-				contractReaders,
-				addrCodec,
-				chainSelector,
-				bytesAddress,
-			)
+			var sr USDCMessageReader
+			if looppCCIPProviderSupported[sel.FamilySolana] {
+				sr, err = NewSolanaUSDCReaderAccessor(
+					ctx,
+					lggr,
+					chainAccessors,
+					addrCodec,
+					chainSelector,
+					bytesAddress,
+				)
+			} else {
+				sr, err = NewSolanaUSDCReader(
+					ctx,
+					lggr,
+					contractReaders,
+					addrCodec,
+					chainSelector,
+					bytesAddress,
+				)
+			}
+
 			if err != nil {
 				return nil, err
 			}
