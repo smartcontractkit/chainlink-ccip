@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
-
 /// @notice Library for CCIP internal definitions common to multiple contracts.
 /// @dev The following is a non-exhaustive list of "known issues" for CCIP:
 /// - We could implement yield claiming for Blast. This is not worth the custom code path on non-blast chains.
@@ -104,6 +102,8 @@ library Internal {
   bytes32 internal constant ANY_2_EVM_MESSAGE_HASH = keccak256("Any2EVMMessageHashV1");
   bytes32 internal constant EVM_2_ANY_MESSAGE_HASH = keccak256("EVM2AnyMessageHashV1");
 
+  bytes32 internal constant LEAF_DOMAIN_SEPARATOR = 0x0000000000000000000000000000000000000000000000000000000000000000;
+
   /// @dev Used to hash messages for multi-lane family-agnostic OffRamps.
   /// OnRamp hash(EVM2AnyMessage) != Any2EVMRampMessage.messageId.
   /// OnRamp hash(EVM2AnyMessage) != OffRamp hash(Any2EVMRampMessage).
@@ -115,7 +115,7 @@ library Internal {
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
       abi.encode(
-        MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+        LEAF_DOMAIN_SEPARATOR,
         metadataHash,
         keccak256(
           abi.encode(
@@ -138,7 +138,7 @@ library Internal {
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
       abi.encode(
-        MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+        LEAF_DOMAIN_SEPARATOR,
         metadataHash,
         keccak256(
           abi.encode(
