@@ -10,4 +10,4 @@
 .github/workflows/solana.yml @smartcontractkit/ccip-onchain-solana
 
 # Deployment tooling
-/deployment @smartcontractkit/cld-ccip
+/deployment @smartcontractkit/ccip-tooling
