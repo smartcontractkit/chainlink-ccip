@@ -142,33 +142,4 @@ library Client {
   ) internal pure returns (bytes memory bts) {
     return abi.encodeWithSelector(SUI_EXTRA_ARGS_V1_TAG, extraArgs);
   }
-
-  /// @notice The CCV struct is used to represent a cross-chain verifier.
-  struct CCV {
-    /// @param The ccvAddress is the address of the verifier contract on the source chain
-    address ccvAddress;
-    /// @param args The args are the arguments that the verifier contract expects. They are opaque to CCIP and are only
-    /// used in the CCV.
-    bytes args;
-  }
-
-  bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
-
-  struct EVMExtraArgsV3 {
-    CCV[] requiredCCV;
-    CCV[] optionalCCV;
-    uint8 optionalThreshold;
-    /// @notice The finality config, 0 means the default finality that the CCV considers final. Any non-zero value means
-    /// a block depth.
-    uint16 finalityConfig;
-    address executor;
-    bytes executorArgs;
-    bytes tokenArgs;
-  }
-
-  function _argsToBytes(
-    EVMExtraArgsV3 memory extraArgs
-  ) internal pure returns (bytes memory bts) {
-    return abi.encodeWithSelector(GENERIC_EXTRA_ARGS_V3_TAG, extraArgs);
-  }
 }
