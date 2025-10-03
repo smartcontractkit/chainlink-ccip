@@ -8,15 +8,17 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	mcms "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 type RemoteChainConfig struct {
@@ -35,7 +37,7 @@ type RemoteChainConfig struct {
 type ConfigureChainForLanesCfg struct {
 	ChainSel     uint64
 	RemoteChains map[uint64]RemoteChainConfig
-	MCMSArgs     *common_utils.MCMSInput
+	MCMSArgs     *mcms.Input
 }
 
 func (c ConfigureChainForLanesCfg) ChainSelector() uint64 {
@@ -48,13 +50,6 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 	ConfigureChainForLanesCfg,
 ]{
 	Sequence: sequences.ConfigureChainForLanes,
-	Describe: func(in sequences.ConfigureChainForLanesInput, dep evm.Chain) string {
-		remoteChains := make([]uint64, 0, len(in.RemoteChains))
-		for chainSel := range in.RemoteChains {
-			remoteChains = append(remoteChains, chainSel)
-		}
-		return fmt.Sprintf("Configure remote chain connnections on %s: %v", dep, remoteChains)
-	},
 	ResolveInput: func(e cldf_deployment.Environment, cfg ConfigureChainForLanesCfg) (sequences.ConfigureChainForLanesInput, error) {
 		staticAddrs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{
 			{
@@ -82,7 +77,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 				Type:          datastore.ContractType(ccv_aggregator.ContractType),
 				Version:       semver.MustParse("1.7.0"),
 			},
-		}, datastore_utils.ToEVMAddress)
+		}, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
 			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve contract refs: %w", err)
 		}
@@ -111,7 +106,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 				refs[i].ChainSelector = cfg.ChainSel
 			}
 
-			addrs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, refs, datastore_utils.ToEVMAddress)
+			addrs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, refs, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve contract refs: %w", err)
 			}
@@ -130,7 +125,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			remoteAddrs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{
 				remoteConfig.CCIPMessageSource,
 				remoteConfig.CCIPMessageDest,
-			}, datastore_utils.ToPaddedEVMAddress)
+			}, evm_datastore_utils.ToPaddedEVMAddress)
 			if err != nil {
 				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve CCIPMessageSource and CCIPMessageDest ref: %w", err)
 			}
@@ -159,8 +154,5 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			RemoteChains:      remoteChains,
 		}, nil
 	},
-	ResolveDep: changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],
-	ResolveMCMS: func(e cldf_deployment.Environment, cfg ConfigureChainForLanesCfg) (changesets.MCMSBuildParams, error) {
-		return changesets.ResolveMCMS(e, changesets.NewEVMMCMBuilder(cfg.MCMSArgs))
-	},
+	ResolveDep: evm_sequences.ResolveEVMChainDep[ConfigureChainForLanesCfg],
 })

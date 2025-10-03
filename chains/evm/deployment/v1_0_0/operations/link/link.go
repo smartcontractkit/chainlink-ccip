@@ -16,10 +16,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "link:deploy",
 	Version:          semver.MustParse("1.0.0"),
 	Description:      "Deploys the LINK token contract",
-	ContractType:     ContractType,
 	ContractMetadata: link_token.LinkTokenMetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.0.0").String(): {EVM: common.FromHex(link_token.LinkTokenBin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.0.0")).String(): {
+			EVM: common.FromHex(link_token.LinkTokenBin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })

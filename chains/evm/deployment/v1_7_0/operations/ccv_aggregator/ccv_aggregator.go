@@ -26,10 +26,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "ccv-aggregator:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys the CCVAggregator contract",
-	ContractType:     ContractType,
 	ContractMetadata: ccv_aggregator.CCVAggregatorMetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(ccv_aggregator.CCVAggregatorBin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(ccv_aggregator.CCVAggregatorBin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
@@ -41,7 +42,7 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Sou
 	ContractType:    ContractType,
 	ContractABI:     ccv_aggregator.CCVAggregatorABI,
 	NewContract:     ccv_aggregator.NewCCVAggregator,
-	IsAllowedCaller: contract.OnlyOwner[*ccv_aggregator.CCVAggregator],
+	IsAllowedCaller: contract.OnlyOwner[*ccv_aggregator.CCVAggregator, []SourceChainConfigArgs],
 	Validate:        func([]SourceChainConfigArgs) error { return nil },
 	CallContract: func(ccvAggregator *ccv_aggregator.CCVAggregator, opts *bind.TransactOpts, args []SourceChainConfigArgs) (*types.Transaction, error) {
 		return ccvAggregator.ApplySourceChainConfigUpdates(opts, args)
