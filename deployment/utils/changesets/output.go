@@ -13,7 +13,6 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
 )
 
 // MCMSReader is an interface for reading MCMS state from a chain type.
@@ -36,12 +35,10 @@ func RegisterMCMSReader(chainFamily string, reader MCMSReader) {
 	registeredMCMSReaders[chainFamily] = reader
 }
 
-// OutputBuilder helps construct a ChangesetOutput, including building an MCMS proposal if there are write operations.
-// Should be kept chain-family agnostic in case we want to move it out of evm-specific package later.
-// Even call.WriteOutput is not EVM-specific, could potentially extract as a standard.
+// OutputBuilder helps construct a ChangesetOutput, including building an MCMS proposal if there are batch operations.
 type OutputBuilder struct {
 	environment     deployment.Environment
-	writeOutputs    []contract.WriteOutput
+	batchOps        []mcms_types.BatchOperation
 	changesetOutput deployment.ChangesetOutput
 }
 
@@ -65,25 +62,32 @@ func (b *OutputBuilder) WithDataStore(ds datastore.MutableDataStore) *OutputBuil
 	return b
 }
 
-// WithWriteOutputs sets the write outputs on the OutputBuilder.
-func (b *OutputBuilder) WithWriteOutputs(outs []contract.WriteOutput) *OutputBuilder {
-	b.writeOutputs = outs
+// WithBatchOps sets the batch operations on the OutputBuilder.
+func (b *OutputBuilder) WithBatchOps(ops []mcms_types.BatchOperation) *OutputBuilder {
+	// Filter out any batch operations that have no transactions.
+	filteredOps := make([]mcms_types.BatchOperation, 0, len(ops))
+	for _, op := range ops {
+		if len(op.Transactions) > 0 {
+			filteredOps = append(filteredOps, op)
+		}
+	}
+
+	b.batchOps = filteredOps
 	return b
 }
 
 // Build constructs the final ChangesetOutput, including building an MCMS proposal if there are write operations that have not been executed.
 func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutput, error) {
-	ops := b.convertWriteOutputsToBatchOperations()
-	if ops == nil || len(ops) == 0 {
+	if len(b.batchOps) == 0 {
 		// No write operations to include in MCMS proposal
 		return b.changesetOutput, nil
 	}
 
-	timelockAddresses, err := b.getTimelockAddresses(input.TimelockAddressRef, ops)
+	timelockAddresses, err := b.getTimelockAddresses(input.TimelockAddressRef, b.batchOps)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get timelock addresses: %w", err)
 	}
-	chainMetadata, err := b.getChainMetadata(input.MCMSAddressRef, ops)
+	chainMetadata, err := b.getChainMetadata(input.MCMSAddressRef, b.batchOps)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain metadata: %w", err)
 	}
@@ -95,7 +99,7 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 		SetValidUntil(input.ValidUntil).
 		SetDelay(input.TimelockDelay).
 		SetAction(input.TimelockAction).
-		SetOperations(ops).
+		SetOperations(b.batchOps).
 		SetTimelockAddresses(timelockAddresses).
 		SetChainMetadata(chainMetadata).
 		Build()
@@ -108,31 +112,6 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 	b.changesetOutput.MCMSTimelockProposals = []mcms.TimelockProposal{*proposal}
 
 	return b.changesetOutput, nil
-}
-
-// TODO: Incorporate batch size?
-func (b *OutputBuilder) convertWriteOutputsToBatchOperations() []mcms_types.BatchOperation {
-	batchOps := make(map[uint64]mcms_types.BatchOperation)
-	for _, outs := range b.writeOutputs {
-		if outs.Executed() {
-			continue // Skip executed transactions, should not be included in MCMS proposal
-		}
-		batchOp, exists := batchOps[outs.ChainSelector]
-		if !exists {
-			batchOps[outs.ChainSelector] = mcms_types.BatchOperation{
-				ChainSelector: mcms_types.ChainSelector(outs.ChainSelector),
-				Transactions:  []mcms_types.Transaction{outs.Tx},
-			}
-		} else {
-			batchOp.Transactions = append(batchOp.Transactions, outs.Tx)
-			batchOps[outs.ChainSelector] = batchOp
-		}
-	}
-	var batchOpsSlice []mcms_types.BatchOperation
-	for _, batchOps := range batchOps {
-		batchOpsSlice = append(batchOpsSlice, batchOps)
-	}
-	return batchOpsSlice
 }
 
 func (b *OutputBuilder) getTimelockAddresses(

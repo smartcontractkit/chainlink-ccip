@@ -73,7 +73,7 @@ func TestWithWriteOutputs(t *testing.T) {
 			b := changesets.NewOutputBuilder(deployment.Environment{
 				DataStore: ds.Seal(),
 			})
-			out, err := b.WithWriteOutputs([]contract.WriteOutput{
+			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{
 				{
 					ChainSelector: 5009297550715157269,
 					ExecInfo:      test.execInfo,
@@ -83,7 +83,9 @@ func TestWithWriteOutputs(t *testing.T) {
 						AdditionalFields: json.RawMessage{},
 					},
 				},
-			}).Build(mcms.Input{
+			})
+			require.NoError(t, err, "NewBatchOperationFromWrites should not error")
+			out, err := b.WithBatchOps([]mcms_types.BatchOperation{batchOp}).Build(mcms.Input{
 				OverridePreviousRoot: false,
 				ValidUntil:           2756219818,
 				TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),

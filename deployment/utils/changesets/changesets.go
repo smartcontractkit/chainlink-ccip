@@ -66,7 +66,7 @@ func NewFromOnChainSequence[IN any, DEP any, CFG any](params NewFromOnChainSeque
 		return NewOutputBuilder(e).
 			WithReports(report.ExecutionReports).
 			WithDataStore(ds).
-			WithWriteOutputs(report.Output.Writes).
+			WithBatchOps(report.Output.BatchOps).
 			Build(cfg.MCMS)
 	}
 

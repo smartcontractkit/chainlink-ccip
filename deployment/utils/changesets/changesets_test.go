@@ -47,32 +47,31 @@ var mockSequence = operations.NewSequence(
 func TestNewFromOnChainSequence(t *testing.T) {
 	tests := []struct {
 		desc         string
-		input        sequences.OnChainOutput
+		addresses    []datastore.AddressRef
+		writes       []contract.WriteOutput
 		resolveInput func(e deployment.Environment, cfg sequences.OnChainOutput) (sequences.OnChainOutput, error)
 		resolveDep   func(e deployment.Environment, cfg sequences.OnChainOutput) (int, error)
 	}{
 		{
 			desc: "happy path - all executed",
-			input: sequences.OnChainOutput{
-				Addresses: []datastore.AddressRef{
-					{
-						ChainSelector: 4340886533089894000,
-						Address:       common.HexToAddress("0x01").String(),
-						Type:          datastore.ContractType("TestContract"),
-						Version:       semver.MustParse("1.0.0"),
-					},
+			addresses: []datastore.AddressRef{
+				{
+					ChainSelector: 4340886533089894000,
+					Address:       common.HexToAddress("0x01").String(),
+					Type:          datastore.ContractType("TestContract"),
+					Version:       semver.MustParse("1.0.0"),
 				},
-				Writes: []contract.WriteOutput{
-					{
-						ChainSelector: 4340886533089894000,
-						Tx: mcms_types.Transaction{
-							To:               common.HexToAddress("0x01").Hex(),
-							Data:             common.Hex2Bytes("0xdeadbeef"),
-							AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
-						},
-						ExecInfo: &contract.ExecInfo{
-							Hash: common.HexToHash("0x02").Hex(),
-						},
+			},
+			writes: []contract.WriteOutput{
+				{
+					ChainSelector: 4340886533089894000,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x01").Hex(),
+						Data:             common.Hex2Bytes("0xdeadbeef"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+					ExecInfo: &contract.ExecInfo{
+						Hash: common.HexToHash("0x02").Hex(),
 					},
 				},
 			},
@@ -85,23 +84,21 @@ func TestNewFromOnChainSequence(t *testing.T) {
 		},
 		{
 			desc: "happy path - not executed",
-			input: sequences.OnChainOutput{
-				Addresses: []datastore.AddressRef{
-					{
-						ChainSelector: 4340886533089894000,
-						Address:       common.HexToAddress("0x01").String(),
-						Type:          datastore.ContractType("TestContract"),
-						Version:       semver.MustParse("1.0.0"),
-					},
+			addresses: []datastore.AddressRef{
+				{
+					ChainSelector: 4340886533089894000,
+					Address:       common.HexToAddress("0x01").String(),
+					Type:          datastore.ContractType("TestContract"),
+					Version:       semver.MustParse("1.0.0"),
 				},
-				Writes: []contract.WriteOutput{
-					{
-						ChainSelector: 4340886533089894000,
-						Tx: mcms_types.Transaction{
-							To:               common.HexToAddress("0x01").Hex(),
-							Data:             common.Hex2Bytes("0xdeadbeef"),
-							AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
-						},
+			},
+			writes: []contract.WriteOutput{
+				{
+					ChainSelector: 4340886533089894000,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x01").Hex(),
+						Data:             common.Hex2Bytes("0xdeadbeef"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
 					},
 				},
 			},
@@ -113,8 +110,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			},
 		},
 		{
-			desc:  "validation error in resolveInput",
-			input: sequences.OnChainOutput{},
+			desc: "validation error in resolveInput",
 			resolveInput: func(e deployment.Environment, cfg sequences.OnChainOutput) (sequences.OnChainOutput, error) {
 				return cfg, errors.New("")
 			},
@@ -123,8 +119,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			},
 		},
 		{
-			desc:  "validation error in resolveDep",
-			input: sequences.OnChainOutput{},
+			desc: "validation error in resolveDep",
 			resolveInput: func(e deployment.Environment, cfg sequences.OnChainOutput) (sequences.OnChainOutput, error) {
 				return cfg, nil
 			},
@@ -169,15 +164,23 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			})
 
 			var expectErr bool
-			if _, err := test.resolveInput(e, test.input); err != nil {
+			batchOp, err := contract.NewBatchOperationFromWrites(test.writes)
+			require.NoError(t, err)
+			input := sequences.OnChainOutput{
+				Addresses: test.addresses,
+				BatchOps:  []mcms_types.BatchOperation{batchOp},
+			}
+			// Pre-check that the input can be resolved outside of the changeset flow.
+			// This ensures that any errors in resolveInput or resolveDep are from the changeset flow.
+			if _, err := test.resolveInput(e, input); err != nil {
 				expectErr = true
 			}
-			if _, err := test.resolveDep(e, test.input); err != nil {
+			if _, err := test.resolveDep(e, input); err != nil {
 				expectErr = true
 			}
 
 			err = changeset.VerifyPreconditions(e, changesets.WithMCMS[sequences.OnChainOutput]{
-				Cfg: test.input,
+				Cfg: input,
 			})
 			if expectErr {
 				require.Error(t, err)
@@ -186,7 +189,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			require.NoError(t, err)
 
 			out, err := changeset.Apply(e, changesets.WithMCMS[sequences.OnChainOutput]{
-				Cfg: test.input,
+				Cfg: input,
 				MCMS: mcms.Input{
 					OverridePreviousRoot: true,
 					ValidUntil:           4126214326,
@@ -206,16 +209,9 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			require.NoError(t, err)
 
 			dsAddrs, err := out.DataStore.Addresses().Fetch()
-			require.Len(t, dsAddrs, len(test.input.Addresses))
+			require.Len(t, dsAddrs, len(input.Addresses))
 
-			var someNotExecuted bool
-			for _, w := range test.input.Writes {
-				if !w.Executed() {
-					someNotExecuted = true
-					break
-				}
-			}
-			if len(test.input.Writes) > 0 && someNotExecuted {
+			if len(batchOp.Transactions) > 0 {
 				require.Len(t, out.MCMSTimelockProposals, 1)
 				require.Len(t, out.MCMSTimelockProposals[0].Operations, 1)
 				require.Equal(t, out.MCMSTimelockProposals[0].OverridePreviousRoot, true)
