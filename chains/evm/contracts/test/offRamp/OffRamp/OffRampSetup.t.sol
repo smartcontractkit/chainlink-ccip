@@ -12,7 +12,6 @@ import {MultiOCR3Base} from "../../../ocr/MultiOCR3Base.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {FeeQuoterSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../../helpers/MaybeRevertingBurnMintTokenPool.sol";
-import {MessageInterceptorHelper} from "../../helpers/MessageInterceptorHelper.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MultiOCR3BaseSetup} from "../../ocr/MultiOCR3Base/MultiOCR3BaseSetup.t.sol";
@@ -37,7 +36,6 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
   MaybeRevertingBurnMintTokenPool internal s_maybeRevertingPool;
 
   OffRampHelper internal s_offRamp;
-  MessageInterceptorHelper internal s_inboundMessageInterceptor;
   NonceManager internal s_inboundNonceManager;
 
   bytes32 internal s_configDigestExec;
@@ -52,7 +50,6 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     FeeQuoterSetup.setUp();
     MultiOCR3BaseSetup.setUp();
 
-    s_inboundMessageInterceptor = new MessageInterceptorHelper();
     s_receiver = new MaybeRevertMessageReceiver(false);
     s_secondary_receiver = new MaybeRevertMessageReceiver(false);
     s_reverting_receiver = new MaybeRevertMessageReceiver(true);
@@ -334,12 +331,6 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     assertEq(config1.minSeqNr, config2.minSeqNr);
     assertEq(config1.onRamp, config2.onRamp);
     assertEq(address(config1.router), address(config2.router));
-  }
-
-  function _enableInboundMessageInterceptor() internal {
-    OffRamp.DynamicConfig memory dynamicConfig = s_offRamp.getDynamicConfig();
-    dynamicConfig.messageInterceptor = address(s_inboundMessageInterceptor);
-    s_offRamp.setDynamicConfig(dynamicConfig);
   }
 
   function _redeployOffRampWithNoOCRConfigs() internal {
