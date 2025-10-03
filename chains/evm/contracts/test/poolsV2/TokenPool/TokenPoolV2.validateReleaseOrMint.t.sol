@@ -34,9 +34,9 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
     uint256 maxAmountPerRequest = 1000e18;
     RateLimiter.Config memory outboundConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
-    TokenPool.FastTransferRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.FastTransferRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.FastTransferRateLimitConfigArgs({
+    TokenPool.FastFinalityRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.FastFinalityRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.FastFinalityRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: outboundConfig,
       inboundRateLimiterConfig: inboundConfig
@@ -139,9 +139,9 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
     uint16 fastTransferFeeBps,
     uint256 maxAmountPerRequest
   ) internal {
-    TokenPool.FastTransferRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.FastTransferRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.FastTransferRateLimitConfigArgs({
+    TokenPool.FastFinalityRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.FastFinalityRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.FastFinalityRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24})

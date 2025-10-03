@@ -13,9 +13,9 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
     uint256 maxAmountPerRequest = 1000e18;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
-    TokenPool.FastTransferRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.FastTransferRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.FastTransferRateLimitConfigArgs({
+    TokenPool.FastFinalityRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.FastFinalityRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.FastFinalityRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
@@ -53,8 +53,8 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
     uint16 finalityThreshold = 100;
     uint16 fastTransferFeeBps = 500; // 5%
     uint256 maxAmountPerRequest = 1000e18;
-    TokenPool.FastTransferRateLimitConfigArgs[] memory emptyRateLimitArgs =
-      new TokenPool.FastTransferRateLimitConfigArgs[](0);
+    TokenPool.FastFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
+      new TokenPool.FastFinalityRateLimitConfigArgs[](0);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_tokenPool.applyFinalityConfigUpdates(
@@ -66,8 +66,8 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
     uint16 finalityThreshold = 100;
     uint16 fastTransferFeeBps = BPS_DIVIDER;
     uint256 maxAmountPerRequest = 1000e18;
-    TokenPool.FastTransferRateLimitConfigArgs[] memory emptyRateLimitArgs =
-      new TokenPool.FastTransferRateLimitConfigArgs[](0);
+    TokenPool.FastFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
+      new TokenPool.FastFinalityRateLimitConfigArgs[](0);
 
     vm.expectRevert(TokenPool.InvalidFastTransferFeeBps.selector);
     s_tokenPool.applyFinalityConfigUpdates(

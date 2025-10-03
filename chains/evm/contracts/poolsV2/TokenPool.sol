@@ -45,7 +45,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketInbound) inboundRateLimiterConfig;
   }
 
-  struct FastTransferRateLimitConfigArgs {
+  struct FastFinalityRateLimitConfigArgs {
     uint64 remoteChainSelector; // Remote chain selector.
     RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limiter configuration.
     RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limiter configuration.
@@ -227,7 +227,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     uint16 finalityThreshold,
     uint16 fastTransferFeeBps,
     uint256 maxAmountPerRequest,
-    FastTransferRateLimitConfigArgs[] calldata rateLimitConfigArgs
+    FastFinalityRateLimitConfigArgs[] calldata rateLimitConfigArgs
   ) external virtual onlyOwner {
     FastFinalityConfig storage finalityConfig = s_finalityConfig;
     finalityConfig.finalityThreshold = finalityThreshold;
@@ -236,24 +236,24 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     }
     finalityConfig.fastTransferFeeBps = fastTransferFeeBps;
     finalityConfig.maxAmountPerRequest = maxAmountPerRequest;
-    _setFastTransferRateLimitConfig(rateLimitConfigArgs);
+    _setFastFinalityRateLimitConfig(rateLimitConfigArgs);
     emit FinalityConfigUpdated(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest);
   }
 
-  /// @notice Sets the fast transfer rate limit configurations for specified remote chains.
+  /// @notice Sets the fast finality based rate limit configurations for specified remote chains.
   /// @param rateLimitConfigArgs Array of structs containing remote chain selectors and their rate limiter configs.
-  function setFastTransferRateLimitConfig(
-    FastTransferRateLimitConfigArgs[] calldata rateLimitConfigArgs
+  function setFastFinalityRateLimitConfig(
+    FastFinalityRateLimitConfigArgs[] calldata rateLimitConfigArgs
   ) external virtual onlyOwner {
-    _setFastTransferRateLimitConfig(rateLimitConfigArgs);
+    _setFastFinalityRateLimitConfig(rateLimitConfigArgs);
   }
 
-  function _setFastTransferRateLimitConfig(
-    FastTransferRateLimitConfigArgs[] calldata rateLimitConfigArgs
+  function _setFastFinalityRateLimitConfig(
+    FastFinalityRateLimitConfigArgs[] calldata rateLimitConfigArgs
   ) internal {
     FastFinalityConfig storage finalityConfig = s_finalityConfig;
     for (uint256 i = 0; i < rateLimitConfigArgs.length; ++i) {
-      FastTransferRateLimitConfigArgs calldata configArgs = rateLimitConfigArgs[i];
+      FastFinalityRateLimitConfigArgs calldata configArgs = rateLimitConfigArgs[i];
       uint64 remoteChainSelector = configArgs.remoteChainSelector;
       if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
