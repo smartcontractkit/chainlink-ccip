@@ -1,9 +1,9 @@
-package changesets_test
+package sequences_test
 
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -23,7 +23,7 @@ func TestResolveEVMChainDep(t *testing.T) {
 		desc        string
 		expectedErr string
 		chains      []chain.BlockChain
-		cfg         changesets.WithChainSelector
+		cfg         sequences.WithChainSelector
 	}{
 		{
 			desc: "happy path",
@@ -47,7 +47,7 @@ func TestResolveEVMChainDep(t *testing.T) {
 			e := deployment.Environment{}
 			e.BlockChains = chain.NewBlockChainsFromSlice(test.chains)
 
-			chain, err := changesets.ResolveEVMChainDep(e, test.cfg)
+			chain, err := sequences.ResolveEVMChainDep(e, test.cfg)
 			if test.expectedErr == "" {
 				require.NoError(t, err)
 				require.Equal(t, uint64(1), chain.Selector)

@@ -16,10 +16,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "weth:deploy",
 	Version:          semver.MustParse("1.0.0"),
 	Description:      "Deploys the WETH9 contract",
-	ContractType:     ContractType,
 	ContractMetadata: weth9.WETH9MetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.0.0").String(): {EVM: common.FromHex(weth9.WETH9Bin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.0.0")).String(): {
+			EVM: common.FromHex(weth9.WETH9Bin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })

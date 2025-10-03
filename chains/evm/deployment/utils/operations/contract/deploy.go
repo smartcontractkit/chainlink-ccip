@@ -33,9 +33,9 @@ type DeployInput[ARGS any] struct {
 	// ChainSelector is the selector for the chain on which the contract will be deployed.
 	// Required to differentiate between operation runs with the same data targeting different chains.
 	ChainSelector uint64 `json:"chainSelector"`
-	// Version is the version of the contract to deploy.
-	// The deployment operation must define bytecode for this version.
-	Version *semver.Version `json:"version"`
+	// TypeAndVersion is the desired type and version of the contract to deploy.
+	// The deployment operation must define bytecode for this type and version.
+	TypeAndVersion deployment.TypeAndVersion `json:"typeAndVersion"`
 	// Args are the parameters passed to the contract constructor.
 	Args ARGS `json:"args"`
 }
@@ -66,12 +66,11 @@ type DeployParams[ARGS any] struct {
 	Version *semver.Version
 	// Description is a brief description of the operation.
 	Description string
-	// ContractType is the type of contract being deployed (e.g., "Router", "TokenPool").
-	ContractType deployment.ContractType
 	// ContractMetadata is the metadata from which the ABI is parsed.
 	ContractMetadata *bind.MetaData
-	// BytecodeByVersion is a map of bytecodes for different versions of the contract.
-	BytecodeByVersion map[string]Bytecode
+	// BytecodeByTypeAndVersion is a map of bytecodes for different types and versions of the contract.
+	// The key is the string representation of the type and version.
+	BytecodeByTypeAndVersion map[string]Bytecode
 	// Validate is an optional function to validate the constructor arguments before deployment.
 	Validate func(input ARGS) error
 }
@@ -93,32 +92,25 @@ func NewDeploy[ARGS any](params DeployParams[ARGS]) *operations.Operation[Deploy
 			if input.ChainSelector != chain.Selector {
 				return datastore.AddressRef{}, fmt.Errorf("mismatch between inputted chain selector and selector defined within dependencies: %d != %d", input.ChainSelector, chain.Selector)
 			}
-			if params.ContractType == "" {
-				return datastore.AddressRef{}, fmt.Errorf("contract type must be specified for %s", params.Name)
-			}
 			if params.ContractMetadata == nil {
-				return datastore.AddressRef{}, fmt.Errorf("contract metadata must be defined for %s", params.ContractType)
+				return datastore.AddressRef{}, fmt.Errorf("contract metadata must be defined for %s", params.Name)
 			}
-			if input.Version == nil {
-				return datastore.AddressRef{}, fmt.Errorf("version must be specified for %s", params.ContractType)
-			}
-			typeAndVersion := deployment.NewTypeAndVersion(params.ContractType, *input.Version)
-			bytecode, ok := params.BytecodeByVersion[input.Version.String()]
+			bytecode, ok := params.BytecodeByTypeAndVersion[input.TypeAndVersion.String()]
 			if !ok {
-				return datastore.AddressRef{}, fmt.Errorf("no bytecode defined for %s", typeAndVersion)
+				return datastore.AddressRef{}, fmt.Errorf("no bytecode defined for %s", input.TypeAndVersion)
 			}
 			// END Validation
 
 			parsedABI, err := params.ContractMetadata.GetAbi()
 			if err != nil {
-				return datastore.AddressRef{}, fmt.Errorf("failed to parse ABI for %s: %w", typeAndVersion, err)
+				return datastore.AddressRef{}, fmt.Errorf("failed to parse ABI for %s: %w", input.TypeAndVersion, err)
 			}
 			if parsedABI == nil {
-				return datastore.AddressRef{}, fmt.Errorf("abi is nil for %s", typeAndVersion)
+				return datastore.AddressRef{}, fmt.Errorf("abi is nil for %s", input.TypeAndVersion)
 			}
 			args, err := arrayify(input.Args)
 			if err != nil {
-				return datastore.AddressRef{}, fmt.Errorf("failed to arrayify constructor args for %s: %w", typeAndVersion, err)
+				return datastore.AddressRef{}, fmt.Errorf("failed to arrayify constructor args for %s: %w", input.TypeAndVersion, err)
 			}
 
 			var (
@@ -149,20 +141,20 @@ func NewDeploy[ARGS any](params DeployParams[ARGS]) *operations.Operation[Deploy
 				// We attempt to decode any errors with the provided ABI.
 				_, confirmErr := deployment.ConfirmIfNoErrorWithABI(chain, tx, params.ContractMetadata.ABI, deployErr)
 				if confirmErr != nil {
-					return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s to %s with args %+v: %w", typeAndVersion, chain, input.Args, confirmErr)
+					return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s to %s with args %+v: %w", input.TypeAndVersion, chain, input.Args, confirmErr)
 				}
 				b.Logger.Debugw(fmt.Sprintf("Confirmed %s tx on %s", params.Name, chain), "hash", tx.Hash().Hex())
 			} else if deployErr != nil {
 				// For ZkSyncVM chains, if an error is returned from initial deployment, we return it here.
-				return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s to %s with args %+v: %w", typeAndVersion, chain, input.Args, deployErr)
+				return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s to %s with args %+v: %w", input.TypeAndVersion, chain, input.Args, deployErr)
 			}
-			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", typeAndVersion, chain), "args", input.Args)
+			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", input.TypeAndVersion, chain), "args", input.Args)
 
 			return datastore.AddressRef{
 				Address:       addr.Hex(),
 				ChainSelector: input.ChainSelector,
-				Type:          datastore.ContractType(typeAndVersion.Type),
-				Version:       &typeAndVersion.Version,
+				Type:          datastore.ContractType(input.TypeAndVersion.Type),
+				Version:       &input.TypeAndVersion.Version,
 			}, nil
 		},
 	)
