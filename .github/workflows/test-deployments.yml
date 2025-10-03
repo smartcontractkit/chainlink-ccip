@@ -1,4 +1,4 @@
-name: "Test EVM Deployments"
+name: "Test Deployments"
 permissions:
   contents: read
 
@@ -48,7 +48,7 @@ jobs:
 
   test-evm-deployments:
     needs: [detect_deployments_changes, setup-go]
-    if: ${{ needs.changes.outputs.run_evm_deployment == 'true' }}
+    if: ${{ needs.detect_deployments_changes.outputs.run_evm_deployment == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -59,7 +59,7 @@ jobs:
 
   test-deployments:
     needs: [detect_deployments_changes, setup-go]
-    if: ${{ needs.changes.outputs.run_deployment == 'true' }}
+    if: ${{ needs.detect_deployments_changes.outputs.run_deployment == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
