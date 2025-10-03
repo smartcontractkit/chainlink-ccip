@@ -29,7 +29,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   /// @dev 2000 indicates that finality must be reached before attestation is possible in CCTP V2.
   uint32 public constant FINALITY_THRESHOLD = 2000;
 
-  /// @dev The minimum length of a valid USDC message where all the required fields are present and capable of being parsed
+  /// @dev The minimum length of a valid USDC message where all the required fields are present and capable of being parsed. While a real USDC message will be longer, only the first 280 bytes are needed to be parsed to extract the required fields.
   uint256 public constant MIN_USDC_MESSAGE_LENGTH = 280;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
@@ -154,6 +154,9 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   /// @param usdcMessage The USDC encoded message
   /// @param sourceTokenData The expected source chain CCTP identifier as provided by the CCIP-Source-Pool.
   /// @dev Only supports version SUPPORTED_USDC_VERSION of the CCTP V2 message format
+  /// which is documented at https://developers.circle.com/cctp/technical-guide#cctp-v2-message-format.
+  /// @dev The circle documentation clarifies that this top level message header format is standard for all messages passing
+  /// through CCTP.
   /// @dev Message format for USDC:
   ///     * Field                      Bytes      Type       Index
   ///     * version                    4          uint32     0
@@ -166,6 +169,21 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ///     * minFinalityThreshold       32         uint32    140
   ///     * finalityThresholdExecuted  32         uint32    144
   ///     * messageBody                dynamic    bytes     148
+
+  /// @dev Message Body for USDC.
+  ///     * Field                 Bytes      Type       Index
+  ///     * version               4          uint32     0
+  ///     * burnToken             32         bytes32    4
+  ///     * mintRecipient         32         bytes32    36
+  ///     * amount                32         uint256    68
+  ///     * messageSender         32         bytes32    100
+  ///     * maxFee                32         uint256    132
+  ///     * feeExecuted           32         uint256    164
+  ///     * expirationBlock       32         uint256    196
+  ///     * hookData              dynamic    bytes      228
+  /// @dev The CCTP documentation does not explicitly state that this message body format will be used for all messages passing
+  /// through CCTP, including for Non-EVM chains. As a result if in the future this format is not used, parsing logic may
+  /// need to be modified accordingly.
   function _validateMessage(
     bytes memory usdcMessage,
     USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenData
@@ -208,11 +226,11 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       minFinalityThreshold := mload(add(usdcMessage, 144)) // 140 + 4 = 144
       finalityThresholdExecuted := mload(add(usdcMessage, 148)) // 144 + 4 = 148
 
-      // The message body starts at index 148 and because it is dynamic contains a 32-byte
+      // The message body starts at index 148 and because it is a dynamic byte array, contains a 32-byte
       // length field prefixing the data.
-      amount := mload(add(usdcMessage, 248)) // 148 + 32 + 68 = 248
       burnToken := mload(add(usdcMessage, 184)) // 148 + 32 + 4 = 184
       mintRecipient := mload(add(usdcMessage, 216)) // 148 + 32 + 36 = 216
+      amount := mload(add(usdcMessage, 248)) // 148 + 32 + 68 = 248
     }
 
     // Check that the source domain included in the CCTP Message matches the one forwarded by the source pool.
@@ -234,7 +252,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       revert InvalidExecutionFinalityThreshold(FINALITY_THRESHOLD, finalityThresholdExecuted);
     }
 
-    // Calculate the deposit hash for the message, extracting the necessary fields
+    // Calculate the deposit hash for the message using the locally parsed fields.
     bytes32 derivedDepositHash = USDCSourcePoolDataCodec._calculateDepositHash(
       messageSourceDomain,
       amount,

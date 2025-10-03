@@ -42,8 +42,14 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
     });
   }
 
-  function testFuzz_validateMessage_Success(uint32 sourceDomain, bytes32 nonce) public {
-    uint256 amount = 100;
+  function testFuzz_validateMessage_Success(
+    uint32 sourceDomain,
+    bytes32 nonce,
+    uint256 amount,
+    bytes32 mintRecipient
+  ) public {
+    vm.assume(amount != 0);
+    vm.assume(mintRecipient != bytes32(0));
 
     vm.pauseGasMetering();
     USDCMessageCCTPV2 memory usdcMessage = USDCMessageCCTPV2({
@@ -52,26 +58,27 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
       destinationDomain: DEST_DOMAIN_IDENTIFIER,
       nonce: nonce,
       sender: SOURCE_CHAIN_TOKEN_SENDER,
-      recipient: bytes32(uint256(299999)),
+      recipient: mintRecipient,
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       minFinalityThreshold: s_usdcTokenPool.FINALITY_THRESHOLD(),
       finalityThresholdExecuted: s_usdcTokenPool.FINALITY_THRESHOLD(),
       messageBody: abi.encodePacked(
         uint32(1), // version
         bytes32(uint256(uint160(address(s_USDCToken)))), // burnToken
-        bytes32(uint256(uint160(299999))), // mintRecipient
+        mintRecipient, // mintRecipient
         amount, // amount
         bytes32(SOURCE_CHAIN_TOKEN_SENDER) // messageSender
       )
     });
+
     bytes memory encodedUsdcMessage = _generateUSDCMessageCCTPV2(usdcMessage);
 
     bytes32 depositHash = USDCSourcePoolDataCodec._calculateDepositHash(
       sourceDomain,
       amount,
       DEST_DOMAIN_IDENTIFIER,
-      bytes32(uint256(uint160(299999))),
-      bytes32(abi.encode(s_USDCToken)),
+      mintRecipient,
+      bytes32(uint256(uint160(address(s_USDCToken)))),
       bytes32(uint256(uint160(address(s_usdcTokenPool)))),
       s_usdcTokenPool.MAX_FEE(),
       s_usdcTokenPool.FINALITY_THRESHOLD()
@@ -157,5 +164,66 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
       )
     );
     s_usdcTokenPool.validateMessage(_generateUSDCMessageCCTPV2(invalidMessage), s_validSourceTokenData);
+  }
+
+  function testFuzz_validateMessage_RevertWhen_InvalidDepositHash(
+    uint256 seed
+  ) public {
+    // Generate 280 pseudo-random bytes using the seed which will become the message body
+    bytes memory randomBytes = new bytes(260);
+    for (uint256 i = 0; i < 260; i++) {
+      randomBytes[i] = bytes1(uint8(uint256(keccak256(abi.encodePacked(seed, i))) % 256));
+    }
+
+    // Set the message body to the pseudo-random bytes but preserving the rest of the
+    // message header to pass the validation checks
+    s_validUsdcMessage.messageBody = randomBytes;
+    bytes memory usdcMessage = _generateUSDCMessageCCTPV2(s_validUsdcMessage);
+
+    // Define the fields from the message header and body so that we can calculate the invalid deposit hash based on the message
+    uint32 messageSourceDomain;
+    uint32 destinationDomain;
+    uint32 minFinalityThreshold;
+    uint32 finalityThresholdExecuted;
+    bytes32 destinationCaller;
+    uint256 amount;
+    bytes32 burnToken;
+    bytes32 mintRecipient;
+
+    // solhint-disable-next-line no-inline-assembly
+    assembly {
+      // Parse the message header and body into the fields
+      messageSourceDomain := mload(add(usdcMessage, 8)) // 4 + 4 = 8
+      destinationDomain := mload(add(usdcMessage, 12)) // 8 + 4 = 12
+      destinationCaller := mload(add(usdcMessage, 140)) // 32 + 108 = 140
+      minFinalityThreshold := mload(add(usdcMessage, 144)) // 140 + 4 = 144
+      finalityThresholdExecuted := mload(add(usdcMessage, 148)) // 144 + 4 = 148
+
+      // The message body starts at index 148 and because it is a dynamic byte array, contains a 32-byte
+      // length field prefixing the data.
+      burnToken := mload(add(usdcMessage, 184)) // 148 + 32 + 4 = 184
+      mintRecipient := mload(add(usdcMessage, 216)) // 148 + 32 + 36 = 216
+      amount := mload(add(usdcMessage, 248)) // 148 + 32 + 68 = 248
+    }
+
+    // Calculate the invalid deposit hash based on the message contents
+    bytes32 invalidDepositHash = USDCSourcePoolDataCodec._calculateDepositHash(
+      messageSourceDomain,
+      amount,
+      destinationDomain,
+      mintRecipient,
+      burnToken,
+      destinationCaller,
+      s_usdcTokenPool.MAX_FEE(),
+      minFinalityThreshold
+    );
+
+    // Expect the revert with the invalid deposit hash because the message data does not match
+    // the deposit hash provided by the source pool
+    vm.expectRevert(
+      abi.encodeWithSelector(USDCTokenPoolCCTPV2.InvalidDepositHash.selector, bytes32(0), invalidDepositHash)
+    );
+
+    s_usdcTokenPool.validateMessage(usdcMessage, s_validSourceTokenData);
   }
 }
