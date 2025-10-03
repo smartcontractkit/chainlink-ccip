@@ -125,6 +125,8 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 		"destChainSelector", destChainSelector,
 		"sourceChainSelectors", sourceChainSelectors,
 		"numSourceChainConfigs", len(sourceChainConfigs),
+		"standardConfigs", standardConfigs,
+		"sourceChainConfigs", sourceChainConfigs,
 	)
 	return standardConfigs, sourceChainConfigs, nil
 }

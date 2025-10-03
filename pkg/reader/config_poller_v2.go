@@ -165,15 +165,18 @@ func (c *configPollerV2) GetChainConfig(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
 ) (cciptypes.ChainConfigSnapshot, error) {
+	lggr := logger.With(c.lggr, "function", "config_poller_v2 GetChainConfig", "chain", chainSel, "destChain", c.destChainSelector)
+
 	// Confirm we have an accessor for this chain
 	_, err := getChainAccessor(c.chainAccessors, chainSel)
 	if err != nil {
-		c.lggr.Errorw("No chain accessor for chain", "chain", chainSel, "error", err)
+		lggr.Errorw("No chain accessor for chain", "chain", chainSel, "error", err)
 		return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("no chain accessor for %s: %w", chainSel, err)
 	}
 
 	cache := c.getOrCreateChainCache(chainSel)
 	if cache == nil {
+		lggr.Debugw("failed to get or create chain cache for chain")
 		return cciptypes.ChainConfigSnapshot{},
 			fmt.Errorf("failed to get or create chain cache for chain %s", chainSel)
 	}
@@ -182,9 +185,10 @@ func (c *configPollerV2) GetChainConfig(
 	cache.chainConfigMu.RLock()
 	if !cache.chainConfigRefresh.IsZero() {
 		defer cache.chainConfigMu.RUnlock()
-		c.lggr.Debugw("Returning cached chain config",
+		lggr.Debugw("Returning cached chain config",
 			"chain", chainSel,
-			"cacheAge", time.Since(cache.chainConfigRefresh))
+			"cacheAge", time.Since(cache.chainConfigRefresh),
+			"cachedChainConfigSnapshot", cache.chainConfigData)
 		return cache.chainConfigData, nil
 	}
 	cache.chainConfigMu.RUnlock()
@@ -192,6 +196,7 @@ func (c *configPollerV2) GetChainConfig(
 	// Cache miss: batch fetch all configs for this chain. Don't hold the lock while fetching.
 	// TODO: alternatively, if we want to prevent multiple goroutines from fetching the same chain config (especially
 	//     during node startup), we could block on this fetch if the cache is empty.
+	lggr.Debugw("Cache miss - fetching chain config via batch refresh")
 	if err := c.batchRefreshChainAndSourceConfigs(ctx, chainSel); err != nil {
 		return cciptypes.ChainConfigSnapshot{}, err
 	}
@@ -199,6 +204,7 @@ func (c *configPollerV2) GetChainConfig(
 	// Re-acquire read lock to return the data
 	cache.chainConfigMu.RLock()
 	defer cache.chainConfigMu.RUnlock()
+	lggr.Debugw("Returning freshly fetched chain config after cache miss", "freshlyFetchedChainConfigSnapshot", cache.chainConfigData)
 	return cache.chainConfigData, nil
 }
 
