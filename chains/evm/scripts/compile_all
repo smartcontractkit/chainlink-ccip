@@ -103,6 +103,8 @@ compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
 compileContract test/helpers/USDCReaderTester
 compileContract test/helpers/receivers/MaybeRevertMessageReceiver
 compileContract test/helpers/receivers/LogMessageDataReceiver
+compileContract test/helpers/MessageHasher
+
 compileContract test/mocks/MockE2EUSDCTokenMessenger
 compileContract test/mocks/MockE2EUSDCTransmitter
 compileContract test/mocks/MockE2ELBTCTokenPool
