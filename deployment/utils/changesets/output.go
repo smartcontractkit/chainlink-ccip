@@ -17,7 +17,7 @@ import (
 
 // MCMSReader is an interface for reading MCMS state from a chain type.
 type MCMSReader interface {
-	// GetChainMetadata returns the chain metadata for a given MCM contract reference.
+	// GetChainMetadata returns the chain metadata for a given MCMS input.
 	// Each chain family defines its own implementation of this method.
 	GetChainMetadata(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (mcms_types.ChainMetadata, error)
 }
@@ -114,12 +114,16 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 	return b.changesetOutput, nil
 }
 
+// getTimelockAddresses resolves the timelock contract addresses for each chain selector in the list of batch operations.
 func (b *OutputBuilder) getTimelockAddresses(
 	timelockRef datastore.AddressRef,
 	ops []mcms_types.BatchOperation,
 ) (map[mcms_types.ChainSelector]string, error) {
 	timelocks := make(map[mcms_types.ChainSelector]string)
 	for _, op := range ops {
+		if _, exists := timelocks[op.ChainSelector]; exists {
+			continue // Already resolved timelock for this chain selector
+		}
 		fullTimelockRef, err := datastore_utils.FindAndFormatRef(
 			b.environment.DataStore,
 			timelockRef,
@@ -135,6 +139,7 @@ func (b *OutputBuilder) getTimelockAddresses(
 	return timelocks, nil
 }
 
+// getChainMetadata fetches the current chain metadata (e.g. starting op count, mcm address) for each chain selector in the list of batch operations.
 func (b *OutputBuilder) getChainMetadata(
 	input mcms_utils.Input,
 	ops []mcms_types.BatchOperation,
@@ -142,8 +147,7 @@ func (b *OutputBuilder) getChainMetadata(
 	metadata := make(map[mcms_types.ChainSelector]mcms_types.ChainMetadata)
 	for _, op := range ops {
 		if _, ok := metadata[op.ChainSelector]; ok {
-			// Already fetched metadata for this chain selector
-			continue
+			continue // Already fetched metadata for this chain selector
 		}
 		family, err := chain_selectors.GetSelectorFamily(uint64(op.ChainSelector))
 		if err != nil {
@@ -155,7 +159,7 @@ func (b *OutputBuilder) getChainMetadata(
 		}
 		chainMetadata, err := reader.GetChainMetadata(b.environment, uint64(op.ChainSelector), input)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get current op count from MCMS at address %s on chain with selector %d: %w", input.MCMSAddressRef.Address, op.ChainSelector, err)
+			return nil, fmt.Errorf("failed to get MCMS chain metadata for chain with selector %d: %w", op.ChainSelector, err)
 		}
 		metadata[op.ChainSelector] = chainMetadata
 	}
