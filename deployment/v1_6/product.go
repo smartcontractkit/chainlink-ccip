@@ -11,14 +11,14 @@ type ChainAdapter interface {
 	// high level API
 	ConfigureLaneLegAsSource(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
 	ConfigureLaneLegAsDest(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
-	ConfigureLaneBidirectionally(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
+	ConfigureLaneAsSourceAndDest(e cldf.Environment, cfg UpdateLanesInput) (cldf.ChangesetOutput, error)
 
 	// helpers to expose lower level functionality if needed
 	// needed for populating values in chain specific configs
 	GetOnRampAddress(e cldf.Environment, chainSelector uint64) ([]byte, error)
 	GetOffRampAddress(e cldf.Environment, chainSelector uint64) ([]byte, error)
 	GetTimelockAddress(e cldf.Environment, chainSelector uint64) (string, error)
-	GetMCMSMetadata(e cldf.Environment, chainSelector uint64) (types.ChainMetadata, error)
+	GetMCMSMetadata(e cldf.Environment, chainSelector uint64, action types.TimelockAction) (types.ChainMetadata, error)
 }
 
 var registeredChainAdapters = make(map[string]ChainAdapter)
