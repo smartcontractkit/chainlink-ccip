@@ -645,6 +645,8 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
 	}
 
+	lggr.Debugw("fetched offramp dest chain config from cache", "config", config)
+
 	resp := make(ContractAddresses)
 
 	// OnRamps are in the offRamp SourceChainConfig.
@@ -1125,20 +1127,31 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	ctx context.Context,
 	chain cciptypes.ChainSelector,
 	rmnRemoteProxyAddress []byte) ([]byte, error) {
+	lggr := logger.With(r.lggr,
+		"function", "getRMNRemoteAddress",
+		"chain", chain,
+		"rmnRemoteProxyAddress", hex.EncodeToString(rmnRemoteProxyAddress),
+		"destChain", r.destChain)
+
 	chainAccessor, err := getChainAccessor(r.accessors, chain)
 	if err != nil {
+		lggr.Debugw("failed to get chain accessor", "err", err)
 		return nil, fmt.Errorf("unable to getChainAccessor: %w", err)
 	}
 	err = chainAccessor.Sync(ctx, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
 	if err != nil {
+		lggr.Debugw("failed to sync RMN proxy contract", "err", err)
 		return nil, fmt.Errorf("sync RMN proxy contract: %w", err)
 	}
 
 	// Get the address from cache instead of making a contract call
 	config, err := r.configPoller.GetChainConfig(ctx, chain)
 	if err != nil {
+		lggr.Debugw("failed to get chain config from cache", "err", err)
 		return nil, fmt.Errorf("get chain config: %w", err)
 	}
+
+	lggr.Debugw("got chain config snapshot from cache", "config", config)
 
 	return config.RMNProxy.RemoteAddress, nil
 }
