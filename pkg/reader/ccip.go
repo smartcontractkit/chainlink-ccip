@@ -635,19 +635,26 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	lggr logger.Logger,
 	chains []cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
+	lggr = logger.With(lggr, "function", "discoverOffRampContracts",
+		"destChain", r.destChain, "offRamp", r.offrampAddress, "chains", chains)
+
 	// Get from cache
+	lggr.Debugw("fetching offramp dest chain config")
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
 	}
 
+	lggr.Debugw("fetched offramp dest chain config from cache", "config", config)
+
 	resp := make(ContractAddresses)
 
 	// OnRamps are in the offRamp SourceChainConfig.
 	{
+		lggr.Debugw("fetching offramp source chain configs")
 		sourceConfigs, err := r.getOffRampSourceChainsConfig(ctx, lggr, chains, false)
-
 		if err != nil {
+			lggr.Debugw("unable to get SourceChainsConfig", "err", err)
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 		}
 
@@ -660,12 +667,13 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			// The local router is located in each source sourceChain config. Add it once.
 			if len(resp[consts.ContractNameRouter][r.destChain]) == 0 {
 				resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
-				lggr.Infow("appending router contract address", "address", cfg.Router)
+				lggr.Infow("appending router contract address", "address", cfg.Router, "sourceChain", sourceChain)
 			}
 		}
 	}
 
 	// Add static config contracts
+	lggr.Debugw("checking offramp static config contracts")
 	if len(config.Offramp.StaticConfig.RmnRemote) > 0 {
 		lggr.Infow("appending RMN remote contract address",
 			"address", hex.EncodeToString(config.Offramp.StaticConfig.RmnRemote),
@@ -674,6 +682,9 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	}
 
 	if len(config.Offramp.StaticConfig.NonceManager) > 0 {
+		lggr.Infow("appending nonce manager contract address",
+			"address", hex.EncodeToString(config.Offramp.StaticConfig.NonceManager),
+			"chain", r.destChain)
 		resp = resp.Append(consts.ContractNameNonceManager, r.destChain, config.Offramp.StaticConfig.NonceManager)
 	}
 
@@ -685,6 +696,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		resp = resp.Append(consts.ContractNameFeeQuoter, r.destChain, config.Offramp.DynamicConfig.FeeQuoter)
 	}
 
+	lggr.Debugw("returning discovered contracts", "contracts", resp)
 	return resp, nil
 }
 
@@ -694,14 +706,21 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 	var resp ContractAddresses
 	var err error
 	lggr := logutil.WithContextValues(ctx, r.lggr)
+	lggr = logger.With(lggr, "function", "DiscoverContracts",
+		"destChain", r.destChain, "offRamp", r.offrampAddress,
+		"supportedChains", supportedChains, "allChains", allChains)
 
 	if slices.Contains(supportedChains, r.destChain) {
+		lggr.Debugw("dest chain is supported, calling discoverOffRampContracts")
 		resp, err = r.discoverOffRampContracts(ctx, lggr, allChains)
 		// Can't continue with discovery if the destination chain is not available.
 		// We read source chains OnRamps from there, and onRamps are essential for feeQuoter and Router discovery.
 		if err != nil {
+			lggr.Debugw("failed to discover destination contracts", "err", err)
 			return nil, fmt.Errorf("discover destination contracts: %w", err)
 		}
+	} else {
+		lggr.Debugw("dest chain is not supported, skipping discoverOffRampContracts")
 	}
 
 	// The following calls are on dynamically configured chains which may not
@@ -739,6 +758,7 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 					"err", err)
 				return
 			}
+			lggr.Debugw("got chain config for chainSel", "chainSel", chainSel, "config", config)
 
 			// Use mutex to safely update the shared resp
 			mu.Lock()
@@ -746,18 +766,30 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 
 			// Add FeeQuoter from dynamic config
 			if !cciptypes.UnknownAddress(config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter).IsZeroOrEmpty() {
+				lggr.Debugw("appending fee quoter contract address",
+					"address", hex.EncodeToString(config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter))
 				resp = resp.Append(
 					consts.ContractNameFeeQuoter,
 					chainSel,
 					config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter)
+			} else {
+				lggr.Warnw("FeeQuoter address is zero or empty. Ignore for disabled chains otherwise "+
+					"check for onRamp misconfiguration", "chain", chainSel,
+					"address", hex.EncodeToString(config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter))
 			}
 
 			// Add Router from dest chain config
 			if !cciptypes.UnknownAddress(config.OnRamp.DestChainConfig.Router).IsZeroOrEmpty() {
+				lggr.Debugw("appending router contract address",
+					"address", hex.EncodeToString(config.OnRamp.DestChainConfig.Router))
 				resp = resp.Append(
 					consts.ContractNameRouter,
 					chainSel,
 					config.OnRamp.DestChainConfig.Router)
+			} else {
+				lggr.Warnw("Router address is zero or empty. Ignore for disabled chains otherwise "+
+					"check for onRamp misconfiguration", "chain", chainSel,
+					"address", hex.EncodeToString(config.OnRamp.DestChainConfig.Router))
 			}
 		}(chainCopy)
 	}
@@ -765,6 +797,7 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 	// Wait for all goroutines to complete
 	wg.Wait()
 
+	lggr.Debugw("returning discovered contracts", "contracts", resp)
 	return resp, nil
 }
 
@@ -932,6 +965,8 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 		return nil, fmt.Errorf("get source chain configs: %w", err)
 	}
 
+	lggr.Debugw("fetched offramp source chain configs from config poller", "count", len(configs), "configs", configs)
+
 	// Filter out disabled chains if needed
 	if !includeDisabled {
 		for chain, cfg := range configs {
@@ -949,6 +984,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 		}
 	}
 
+	lggr.Debugw("returning offramp source chain configs", "count", len(configs))
 	return configs, nil
 }
 
@@ -1091,20 +1127,31 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	ctx context.Context,
 	chain cciptypes.ChainSelector,
 	rmnRemoteProxyAddress []byte) ([]byte, error) {
+	lggr := logger.With(r.lggr,
+		"function", "getRMNRemoteAddress",
+		"chain", chain,
+		"rmnRemoteProxyAddress", hex.EncodeToString(rmnRemoteProxyAddress),
+		"destChain", r.destChain)
+
 	chainAccessor, err := getChainAccessor(r.accessors, chain)
 	if err != nil {
+		lggr.Debugw("failed to get chain accessor", "err", err)
 		return nil, fmt.Errorf("unable to getChainAccessor: %w", err)
 	}
 	err = chainAccessor.Sync(ctx, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
 	if err != nil {
+		lggr.Debugw("failed to sync RMN proxy contract", "err", err)
 		return nil, fmt.Errorf("sync RMN proxy contract: %w", err)
 	}
 
 	// Get the address from cache instead of making a contract call
 	config, err := r.configPoller.GetChainConfig(ctx, chain)
 	if err != nil {
+		lggr.Debugw("failed to get chain config from cache", "err", err)
 		return nil, fmt.Errorf("get chain config: %w", err)
 	}
+
+	lggr.Debugw("got chain config snapshot from cache", "config", config)
 
 	return config.RMNProxy.RemoteAddress, nil
 }
