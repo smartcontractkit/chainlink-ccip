@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 )
 
@@ -28,7 +28,7 @@ type RemoteChainConfig struct {
 	LaneMandatedCCVOnRamps           []datastore.AddressRef
 	DefaultExecutor                  datastore.AddressRef
 	CommitteeVerifierDestChainConfig sequences.CommitteeVerifierDestChainConfig
-	FeeQuoterDestChainConfig         fee_quoter_v2.DestChainConfig
+	FeeQuoterDestChainConfig         fee_quoter.DestChainConfig
 }
 
 type ConfigureChainForLanesCfg struct {
@@ -73,7 +73,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			},
 			{
 				ChainSelector: cfg.ChainSel,
-				Type:          datastore.ContractType(fee_quoter_v2.ContractType),
+				Type:          datastore.ContractType(fee_quoter.ContractType),
 				Version:       semver.MustParse("1.7.0"),
 			},
 			{

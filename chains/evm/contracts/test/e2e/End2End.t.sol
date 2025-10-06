@@ -129,10 +129,7 @@ contract E2E is OnRampSetup, OffRampSetup {
     // Scoped to sending to reduce stack pressure
     {
       IERC20 token0 = IERC20(s_sourceTokens[0]);
-      IERC20 token1 = IERC20(s_sourceTokens[1]);
-
       uint256 balance0Pre = token0.balanceOf(OWNER);
-      uint256 balance1Pre = token1.balanceOf(OWNER);
 
       // Send messages
       messages1[0] = _sendRequest(1, SOURCE_CHAIN_SELECTOR, 1, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
@@ -145,7 +142,6 @@ contract E2E is OnRampSetup, OffRampSetup {
       assertEq(
         balance0Pre - (messages1.length + messages2.length) * (TOKEN_AMOUNT_1 + expectedFee), token0.balanceOf(OWNER)
       );
-      assertEq(balance1Pre - (messages1.length + messages2.length) * TOKEN_AMOUNT_2, token1.balanceOf(OWNER));
     }
 
     // Commit
@@ -308,7 +304,6 @@ contract E2E is OnRampSetup, OffRampSetup {
   function _generateTokenMessage() public view returns (Client.EVM2AnyMessage memory) {
     Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = TOKEN_AMOUNT_1;
-    tokenAmounts[1].amount = TOKEN_AMOUNT_2;
     return Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
       data: "",
