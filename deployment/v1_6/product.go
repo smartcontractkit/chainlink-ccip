@@ -3,6 +3,7 @@ package v1_6
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/mcms/types"
 )
@@ -23,10 +24,15 @@ type ChainAdapter interface {
 
 var registeredChainAdapters = make(map[string]ChainAdapter)
 
+func newAdapterID(chainFamily string, version *semver.Version) string {
+	return fmt.Sprintf("%s-%s", chainFamily, version.String())
+}
+
 // RegisterChainAdapter allows chains to register their changeset logic.
-func RegisterChainAdapter(chainFamily string, adapter ChainAdapter) {
-	if _, exists := registeredChainAdapters[chainFamily]; exists {
+func RegisterChainAdapter(chainFamily string, version *semver.Version, adapter ChainAdapter) {
+	id := newAdapterID(chainFamily, version)
+	if _, exists := registeredChainAdapters[id]; exists {
 		panic(fmt.Sprintf("ChainAdapter '%s' already registered", chainFamily))
 	}
-	registeredChainAdapters[chainFamily] = adapter
+	registeredChainAdapters[id] = adapter
 }
