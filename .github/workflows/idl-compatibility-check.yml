@@ -10,7 +10,7 @@ on:
       - "chains/solana/contracts/target/idl/cctp_token_pool.json"
       - "chains/solana/contracts/target/idl/fee_quoter.json"
       - "chains/solana/contracts/target/idl/rmn_remote.json"
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
   check-idl-changes:
