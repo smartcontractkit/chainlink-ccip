@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -53,7 +53,6 @@ type CCVProxyParams struct {
 type FeeQuoterParams struct {
 	Version                        *semver.Version
 	MaxFeeJuelsPerMsg              *big.Int
-	TokenPriceStalenessThreshold   uint32
 	LINKPremiumMultiplierWeiPerEth uint64
 	WETHPremiumMultiplierWeiPerEth uint64
 	USDPerLINK                     *big.Int
@@ -178,21 +177,20 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, tokenAdminRegistryRef)
 
 		// Deploy FeeQuoter
-		feeQuoterRef, err := maybeDeployContract(b, fee_quoter_v2.Deploy, fee_quoter_v2.ContractType, chain, contract.DeployInput[fee_quoter_v2.ConstructorArgs]{
+		feeQuoterRef, err := maybeDeployContract(b, fee_quoter.Deploy, fee_quoter.ContractType, chain, contract.DeployInput[fee_quoter.ConstructorArgs]{
 			Version:       input.ContractParams.FeeQuoter.Version,
 			ChainSelector: chain.Selector,
-			Args: fee_quoter_v2.ConstructorArgs{
-				StaticConfig: fee_quoter_v2.StaticConfig{
-					MaxFeeJuelsPerMsg:            input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
-					TokenPriceStalenessThreshold: input.ContractParams.FeeQuoter.TokenPriceStalenessThreshold,
-					LinkToken:                    common.HexToAddress(linkRef.Address),
+			Args: fee_quoter.ConstructorArgs{
+				StaticConfig: fee_quoter.StaticConfig{
+					MaxFeeJuelsPerMsg: input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
+					LinkToken:         common.HexToAddress(linkRef.Address),
 				},
 				PriceUpdaters: []common.Address{
 					// Price updates via protocol are out of scope for initial launch.
 					// TODO: Add Timelock here when MCMS support is needed.
 					chain.DeployerKey.From,
 				},
-				PremiumMultiplierWeiPerEthArgs: []fee_quoter_v2.PremiumMultiplierWeiPerEthArgs{
+				FeeTokens: []fee_quoter.FeeTokenArgs{
 					{
 						Token:                      common.HexToAddress(linkRef.Address),
 						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoter.LINKPremiumMultiplierWeiPerEth,
@@ -201,10 +199,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 						Token:                      common.HexToAddress(wethRef.Address),
 						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoter.WETHPremiumMultiplierWeiPerEth,
 					},
-				},
-				FeeTokens: []common.Address{
-					common.HexToAddress(linkRef.Address),
-					common.HexToAddress(wethRef.Address),
 				},
 				// Skipped fields:
 				// - TokenPriceFeeds (will not be used in 1.7.0)
@@ -218,11 +212,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, feeQuoterRef)
 
 		// Set initial prices on FeeQuoter
-		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter_v2.UpdatePrices, chain, contract.FunctionInput[fee_quoter_v2.PriceUpdates]{
+		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract.FunctionInput[fee_quoter.PriceUpdates]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(feeQuoterRef.Address),
-			Args: fee_quoter_v2.PriceUpdates{
-				TokenPriceUpdates: []fee_quoter_v2.TokenPriceUpdate{
+			Args: fee_quoter.PriceUpdates{
+				TokenPriceUpdates: []fee_quoter.TokenPriceUpdate{
 					{
 						SourceToken: common.HexToAddress(linkRef.Address),
 						UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,

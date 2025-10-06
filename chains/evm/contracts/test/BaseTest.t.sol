@@ -18,7 +18,6 @@ contract BaseTest is Test {
 
   // Timing
   uint256 internal constant BLOCK_TIME = 1234567890;
-  uint32 internal constant TWELVE_HOURS = 60 * 60 * 12;
 
   // Message info
   uint64 internal constant SOURCE_CHAIN_SELECTOR = 1;
