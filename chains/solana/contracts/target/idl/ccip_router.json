@@ -1973,7 +1973,7 @@
       ]
     },
     {
-      "name": "OwnershipTransferred",
+      "name": "OwnershipTransferred ",
       "fields": [
         {
           "name": "from",
