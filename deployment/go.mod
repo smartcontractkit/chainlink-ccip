@@ -2,6 +2,8 @@ module github.com/smartcontractkit/chainlink-ccip/deployment
 
 go 1.24.6
 
+replace github.com/smartcontractkit/chainlink-ccip => ../
+
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/smartcontractkit/chain-selectors v1.0.71
@@ -126,8 +128,8 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250911201806-5a095deaeb52 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250908144012-8184001834b5 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250908144012-8184001834b5 // indirect
-	github.com/smartcontractkit/chainlink-common v0.9.5-0.20250912150129-4e42c90b532e // indirect
-	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.1 // indirect
+	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250929154511-1f5fbda7ae76 // indirect
+	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.4 // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250908203554-5bd9d2fe9513 // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e // indirect
