@@ -56,7 +56,7 @@ contract BurnMintTokenPoolV2_lockOrBurn is BurnMintSetup {
     assertEq(s_token.balanceOf(address(s_pool)), 0);
   }
 
-  function test_lockOrBurn_V2() public {
+  function test_lockOrBurn_WithFinalityParam() public {
     uint256 burnAmount = 20_000e18;
 
     deal(address(s_token), address(s_pool), burnAmount);

@@ -33,7 +33,7 @@ contract BurnMintTokenPoolV2_releaseOrMint is BurnMintSetup {
     assertEq(s_token.balanceOf(receiver), amount);
   }
 
-  function test_releaseOrMint_Finality() public {
+  function test_releaseOrMint_WithFinalityParam() public {
     uint256 amount = 1e19;
     address receiver = makeAddr("receiver_address");
 
@@ -53,7 +53,7 @@ contract BurnMintTokenPoolV2_releaseOrMint is BurnMintSetup {
         sourcePoolData: "",
         offchainTokenData: ""
       }),
-      12
+      0
     );
 
     assertEq(s_token.balanceOf(receiver), amount);
@@ -76,7 +76,8 @@ contract BurnMintTokenPoolV2_releaseOrMint is BurnMintSetup {
         sourcePoolAddress: _generateSourceTokenData().sourcePoolAddress,
         sourcePoolData: _generateSourceTokenData().extraData,
         offchainTokenData: ""
-      })
+      }),
+      0
     );
 
     assertEq(s_token.balanceOf(OWNER), before);
@@ -96,7 +97,8 @@ contract BurnMintTokenPoolV2_releaseOrMint is BurnMintSetup {
         sourcePoolAddress: _generateSourceTokenData().sourcePoolAddress,
         sourcePoolData: _generateSourceTokenData().extraData,
         offchainTokenData: ""
-      })
+      }),
+      0
     );
   }
 }
