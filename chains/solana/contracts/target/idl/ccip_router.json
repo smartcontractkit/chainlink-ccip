@@ -13,7 +13,7 @@
   ],
   "instructions": [
     {
-      "name": "initialize ",
+      "name": "initialize",
       "docs": [
         "Initialization Flow //",
         "Initializes the CCIP Router.",
