@@ -109,7 +109,7 @@
   ],
   "accounts": [
     {
-      "name": "AccessController asdsad",
+      "name": "AccessController",
       "type": {
         "kind": "struct",
         "fields": [
