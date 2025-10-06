@@ -14,8 +14,6 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-var ConfigureTokensForTransfers = cldf.CreateChangeSet(apply, verify)
-
 type TokenTransferConfig struct {
 	// ChainSelector identifies the chain on which the token lives.
 	ChainSelector uint64
@@ -37,61 +35,69 @@ type ConfigureTokensForTransfersConfig struct {
 	MCMS   mcms.Input
 }
 
-func verify(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) error {
-	// TODO: implement
-	return nil
+// ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
+func ConfigureTokensForTransfers(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ConfigureTokensForTransfersConfig] {
+	return cldf.CreateChangeSet(makeApply(tokenRegistry, mcmsRegistry), makeVerify(tokenRegistry, mcmsRegistry))
 }
 
-func apply(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
-	batchOps := make([]mcms_types.BatchOperation, 0)
-	reports := make([]cldf_ops.Report[any, any], 0)
-
-	for _, token := range cfg.Tokens {
-		tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, token.TokenPoolRef, token.ChainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool refs on chain with selector %d: %w", token.ChainSelector, err)
-		}
-		registry, err := datastore_utils.FindAndFormatRef(e.DataStore, token.RegistryRef, token.ChainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve registry ref on chain with selector %d: %w", token.ChainSelector, err)
-		}
-
-		family, err := chain_selectors.GetSelectorFamily(token.ChainSelector)
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", token.ChainSelector, err)
-		}
-		adapterID := newTokenAdapterID(family, tokenPool.Version)
-		adapter, ok := registeredTokenAdapters[adapterID]
-		if !ok {
-			return cldf.ChangesetOutput{}, fmt.Errorf("no token adapter registered for chain family '%s' and token pool version '%s'", family, tokenPool.Version)
-		}
-
-		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
-		for remoteChainSelector, inCfg := range token.RemoteChains {
-			remoteChains[remoteChainSelector], err = convertRemoteChainConfig(e, adapter, token.ChainSelector, remoteChainSelector, inCfg)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
-			}
-		}
-		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-			ChainSelector:    token.ChainSelector,
-			TokenPoolAddress: tokenPool.Address,
-			RemoteChains:     remoteChains,
-			ExternalAdmin:    token.ExternalAdmin,
-			RegistryAddress:  registry.Address,
-		})
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)
-		}
-
-		batchOps = append(batchOps, configureTokenReport.Output.BatchOps...)
-		reports = append(reports, configureTokenReport.ExecutionReports...)
+func makeVerify(_ *TokenAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) error {
+	return func(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) error {
+		// TODO: implement
+		return nil
 	}
+}
 
-	return changesets.NewOutputBuilder(e).
-		WithReports(reports).
-		WithBatchOps(batchOps).
-		Build(cfg.MCMS)
+func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
+	return func(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
+		batchOps := make([]mcms_types.BatchOperation, 0)
+		reports := make([]cldf_ops.Report[any, any], 0)
+
+		for _, token := range cfg.Tokens {
+			tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, token.TokenPoolRef, token.ChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", token.ChainSelector, err)
+			}
+			registry, err := datastore_utils.FindAndFormatRef(e.DataStore, token.RegistryRef, token.ChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve registry ref on chain with selector %d: %w", token.ChainSelector, err)
+			}
+
+			family, err := chain_selectors.GetSelectorFamily(token.ChainSelector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", token.ChainSelector, err)
+			}
+			adapter, ok := tokenRegistry.GetTokenAdapter(family, tokenPool.Version)
+			if !ok {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no token adapter registered for chain family '%s' and token pool version '%s'", family, tokenPool.Version)
+			}
+
+			remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
+			for remoteChainSelector, inCfg := range token.RemoteChains {
+				remoteChains[remoteChainSelector], err = convertRemoteChainConfig(e, adapter, token.ChainSelector, remoteChainSelector, inCfg)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
+				}
+			}
+			configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
+				ChainSelector:    token.ChainSelector,
+				TokenPoolAddress: tokenPool.Address,
+				RemoteChains:     remoteChains,
+				ExternalAdmin:    token.ExternalAdmin,
+				RegistryAddress:  registry.Address,
+			})
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)
+			}
+
+			batchOps = append(batchOps, configureTokenReport.Output.BatchOps...)
+			reports = append(reports, configureTokenReport.ExecutionReports...)
+		}
+
+		return changesets.NewOutputBuilder(e, mcmsRegistry).
+			WithReports(reports).
+			WithBatchOps(batchOps).
+			Build(cfg.MCMS)
+	}
 }
 
 func convertRemoteChainConfig(
@@ -106,16 +112,22 @@ func convertRemoteChainConfig(
 		OutboundRateLimiterConfig: inCfg.OutboundRateLimiterConfig,
 	}
 	var err error
-	if inCfg.RemoteToken != nil {
-		outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemoteToken, remoteChainSelector, adapter.ConvertRefToBytes)
-		if err != nil {
-			return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
-		}
-	}
 	if inCfg.RemotePool != nil {
 		outCfg.RemotePool, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, adapter.ConvertRefToBytes)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
+		}
+		// Can either provide the token reference directly or derive it from the pool reference.
+		if inCfg.RemoteToken != nil {
+			outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemoteToken, remoteChainSelector, adapter.ConvertRefToBytes)
+			if err != nil {
+				return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
+			}
+		} else {
+			outCfg.RemoteToken, err = adapter.DeriveRemoteTokenAddress(e, remoteChainSelector, *inCfg.RemotePool)
+			if err != nil {
+				return outCfg, fmt.Errorf("failed to get remote token address via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(*inCfg.RemotePool), remoteChainSelector, err)
+			}
 		}
 	}
 	for _, ccvRef := range inCfg.OutboundCCVs {

@@ -3,6 +3,7 @@ package changesets
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -22,29 +23,52 @@ type MCMSReader interface {
 	GetChainMetadata(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (mcms_types.ChainMetadata, error)
 }
 
-var registeredMCMSReaders map[string]MCMSReader
+// MCMSReaderRegistry maintains a registry of MCMS readers.
+type MCMSReaderRegistry struct {
+	mu sync.Mutex
+	m  map[string]MCMSReader
+}
+
+func NewMCMSReaderRegistry() *MCMSReaderRegistry {
+	return &MCMSReaderRegistry{
+		m: make(map[string]MCMSReader),
+	}
+}
 
 // RegisterMCMSReader registers an MCMSReader for a specific chain family.
-func RegisterMCMSReader(chainFamily string, reader MCMSReader) {
-	if registeredMCMSReaders == nil {
-		registeredMCMSReaders = make(map[string]MCMSReader)
+func (r *MCMSReaderRegistry) RegisterMCMSReader(chainFamily string, reader MCMSReader) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.m == nil {
+		r.m = make(map[string]MCMSReader)
 	}
-	if _, exists := registeredMCMSReaders[chainFamily]; exists {
+	if _, exists := r.m[chainFamily]; exists {
 		panic(fmt.Sprintf("MCMS reader already registered for chain family: %s", chainFamily))
 	}
-	registeredMCMSReaders[chainFamily] = reader
+	r.m[chainFamily] = reader
+}
+
+// GetMCMSReader retrieves an MCMSReader for a specific chain family.
+func (r *MCMSReaderRegistry) GetMCMSReader(chainFamily string) (MCMSReader, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	reader, ok := r.m[chainFamily]
+	return reader, ok
 }
 
 // OutputBuilder helps construct a ChangesetOutput, including building an MCMS proposal if there are batch operations.
 type OutputBuilder struct {
+	registry        *MCMSReaderRegistry
 	environment     deployment.Environment
 	batchOps        []mcms_types.BatchOperation
 	changesetOutput deployment.ChangesetOutput
 }
 
 // NewOutputBuilder creates a new OutputBuilder.
-func NewOutputBuilder(e deployment.Environment) *OutputBuilder {
+func NewOutputBuilder(e deployment.Environment, registry *MCMSReaderRegistry) *OutputBuilder {
 	return &OutputBuilder{
+		registry:        registry,
 		environment:     e,
 		changesetOutput: deployment.ChangesetOutput{},
 	}
@@ -153,7 +177,7 @@ func (b *OutputBuilder) getChainMetadata(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", op.ChainSelector, err)
 		}
-		reader, ok := registeredMCMSReaders[family]
+		reader, ok := b.registry.GetMCMSReader(family)
 		if !ok {
 			return nil, fmt.Errorf("no MCMS reader registered for chain family '%s'", family)
 		}

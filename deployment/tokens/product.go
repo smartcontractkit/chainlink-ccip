@@ -3,18 +3,22 @@ package tokens
 import (
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 type tokenAdapterID string
 
-func newTokenAdapterID(chainFamily string, version *semver.Version) tokenAdapterID {
-	return tokenAdapterID(fmt.Sprintf("%s-%s", chainFamily, version.String()))
+type TokenAdapter interface {
+	ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	ConvertRefToBytes(ref datastore.AddressRef) ([]byte, error)
+	DeriveRemoteTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
@@ -30,6 +34,7 @@ type RateLimiterConfig struct {
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
 type RemoteChainConfig[R any, CCV any] struct {
 	// The token on the remote chain.
+	// If not provided, the token will be derived from the pool reference.
 	RemoteToken R
 	// The token pool on the remote chain.
 	RemotePool R
@@ -57,22 +62,43 @@ type ConfigureTokenForTransfersInput struct {
 	RegistryAddress string
 }
 
-type TokenAdapter interface {
-	ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	ConvertRefToBytes(ref datastore.AddressRef) ([]byte, error)
+// TokenAdapterRegistry maintains a registry of TokenAdapters.
+type TokenAdapterRegistry struct {
+	mu sync.Mutex
+	m  map[tokenAdapterID]TokenAdapter
 }
 
-var registeredTokenAdapters = make(map[tokenAdapterID]TokenAdapter)
+func NewTokenAdapterRegistry() *TokenAdapterRegistry {
+	return &TokenAdapterRegistry{
+		m: make(map[tokenAdapterID]TokenAdapter),
+	}
+}
 
 // RegisterTokenAdapter allows chains to register their changeset logic.
 // Configuration logic not only differs by chain family, but also by version.
 // For example, 1.7.0 token pools require CCV configuration, while earlier versions do not.
 // 1.5.0 pools require remote pool addresses to be set, while earlier versions do not.
 // Thus each version of a token pool on a chain family should have its own adapter implementation.
-func RegisterTokenAdapter(chainFamily string, version *semver.Version, adapter TokenAdapter) {
+func (r *TokenAdapterRegistry) RegisterTokenAdapter(chainFamily string, version *semver.Version, adapter TokenAdapter) {
 	id := newTokenAdapterID(chainFamily, version)
-	if _, exists := registeredTokenAdapters[id]; exists {
-		panic(fmt.Sprintf("TokenAdapter '%s' already registered", chainFamily))
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.m[id]; exists {
+		panic(fmt.Errorf("TokenAdapter '%s %s' already registered", chainFamily, version))
 	}
-	registeredTokenAdapters[id] = adapter
+	r.m[id] = adapter
+}
+
+// GetTokenAdapter retrieves a registered TokenAdapter for the given chain family and version.
+// The boolean return value indicates whether an adapter was found.
+func (r *TokenAdapterRegistry) GetTokenAdapter(chainFamily string, version *semver.Version) (TokenAdapter, bool) {
+	id := newTokenAdapterID(chainFamily, version)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	adapter, ok := r.m[id]
+	return adapter, ok
+}
+
+func newTokenAdapterID(chainFamily string, version *semver.Version) tokenAdapterID {
+	return tokenAdapterID(fmt.Sprintf("%s-%s", chainFamily, version.String()))
 }

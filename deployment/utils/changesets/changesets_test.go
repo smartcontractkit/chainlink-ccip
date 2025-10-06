@@ -30,10 +30,6 @@ func (m *MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input 
 	}, nil
 }
 
-func init() {
-	changesets.RegisterMCMSReader("evm", &MockReader{})
-}
-
 var mockSequence = operations.NewSequence(
 	"mock-sequence",
 	semver.MustParse("1.0.0"),
@@ -128,11 +124,13 @@ func TestNewFromOnChainSequence(t *testing.T) {
 				DataStore:        ds.Seal(),
 			}
 
+			registry := changesets.NewMCMSReaderRegistry()
+			registry.RegisterMCMSReader("evm", &MockReader{})
 			changeset := changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[sequences.OnChainOutput, int, sequences.OnChainOutput]{
 				Sequence:     mockSequence,
 				ResolveInput: test.resolveInput,
 				ResolveDep:   test.resolveDep,
-			})
+			})(registry)
 
 			var expectErr bool
 			require.NoError(t, err)
