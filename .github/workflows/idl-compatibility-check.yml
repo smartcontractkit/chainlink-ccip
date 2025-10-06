@@ -3,7 +3,13 @@ name: IDL Compatibility Check
 on:
   pull_request:
     paths:
-      - "chains/solana/contracts/target/idl/**"
+      - "chains/solana/contracts/target/idl/base_token_pool.json"
+      - "chains/solana/contracts/target/idl/ccip_common.json"
+      - "chains/solana/contracts/target/idl/ccip_offramp.json"
+      - "chains/solana/contracts/target/idl/ccip_router.json"
+      - "chains/solana/contracts/target/idl/cctp_token_pool.json"
+      - "chains/solana/contracts/target/idl/fee_quoter.json"
+      - "chains/solana/contracts/target/idl/rmn_remote.json"
     types: [opened, synchronize, reopened, labeled]
 
 jobs:
@@ -40,8 +46,16 @@ jobs:
       - name: List changed IDL files
         id: changed-files
         run: |
-          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }} HEAD -- chains/solana/contracts/target/idl/)
-          echo "::set-output name=files::$CHANGED_FILES"
+          # Only check specific files that impact observability
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }} HEAD -- \
+            chains/solana/contracts/target/idl/base_token_pool.json \
+            chains/solana/contracts/target/idl/ccip_common.json \
+            chains/solana/contracts/target/idl/ccip_offramp.json \
+            chains/solana/contracts/target/idl/ccip_router.json \
+            chains/solana/contracts/target/idl/cctp_token_pool.json \
+            chains/solana/contracts/target/idl/fee_quoter.json \
+            chains/solana/contracts/target/idl/rmn_remote.json)
+          echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
@@ -52,6 +66,12 @@ jobs:
           script: |
             // Get changed files from the previous step
             const changedFiles = `${{ steps.changed-files.outputs.files }}`.trim().split('\n');
+
+            // Skip empty results (no files changed)
+            if (changedFiles.length === 0 || (changedFiles.length === 1 && changedFiles[0] === '')) {
+              console.log('No monitored IDL files changed');
+              return;
+            }
 
             // Build list of changed files
             const filesList = changedFiles.map(file => `- \`${file}\``).join('\n');
@@ -76,7 +96,7 @@ jobs:
             });
 
       - name: Fail if no bypass
-        if: steps.check-bypass.outputs.result != 'true'
+        if: steps.check-bypass.outputs.result != 'true' && steps.changed-files.outputs.files != ''
         run: |
           echo "::error::IDL changes detected - Please confirm compatibility with observability pipeline"
           exit 1
