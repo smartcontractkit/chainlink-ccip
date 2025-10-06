@@ -7,7 +7,7 @@ import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract FeeQuoter_updatePrices is FeeQuoterSetup {
-  function test_OnlyTokenPrice() public {
+  function test_updatePrices_onlyTokenPrice() public {
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
       gasPriceUpdates: new Internal.GasPriceUpdate[](0)
@@ -24,7 +24,7 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
     assertEq(s_feeQuoter.getTokenPrice(s_sourceTokens[0]).value, update.tokenPriceUpdates[0].usdPerToken);
   }
 
-  function test_OnlyGasPrice() public {
+  function test_updatePrices_onlyGasPrice() public {
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
       gasPriceUpdates: new Internal.GasPriceUpdate[](1)
@@ -44,7 +44,7 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
     );
   }
 
-  function test_UpdateMultiplePrices() public {
+  function test_updatePrices_updateMultiplePrices() public {
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](3);
     tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
     tokenPriceUpdates[1] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[1], usdPerToken: 1800e18});
@@ -86,7 +86,7 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
     }
   }
 
-  function test_UpdatableByAuthorizedCaller() public {
+  function test_updatePrices_updatableByAuthorizedCaller() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
       gasPriceUpdates: new Internal.GasPriceUpdate[](0)
@@ -127,7 +127,7 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
 
   // Reverts
 
-  function test_RevertWhen_OnlyCallableByUpdater() public {
+  function test_updatePrices_RevertWhen_UnauthorizedCaller() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
       gasPriceUpdates: new Internal.GasPriceUpdate[](0)

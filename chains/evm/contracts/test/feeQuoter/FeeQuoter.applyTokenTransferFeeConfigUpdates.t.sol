@@ -7,22 +7,13 @@ import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
-  function testFuzz_ApplyTokenTransferFeeConfig_Success(
+  function testFuzz_applyTokenTransferFeeConfigUpdates(
     FeeQuoter.TokenTransferFeeConfig[2] memory tokenTransferFeeConfigs
   ) public {
     // To prevent Invalid Fee Range error from the fuzzer, bound the results to a valid range that
     // where minFee < maxFee
-    tokenTransferFeeConfigs[0].minFeeUSDCents =
-      uint32(bound(tokenTransferFeeConfigs[0].minFeeUSDCents, 0, type(uint8).max));
-    tokenTransferFeeConfigs[1].minFeeUSDCents =
-      uint32(bound(tokenTransferFeeConfigs[1].minFeeUSDCents, 0, type(uint8).max));
-
-    tokenTransferFeeConfigs[0].maxFeeUSDCents = uint32(
-      bound(tokenTransferFeeConfigs[0].maxFeeUSDCents, tokenTransferFeeConfigs[0].minFeeUSDCents + 1, type(uint32).max)
-    );
-    tokenTransferFeeConfigs[1].maxFeeUSDCents = uint32(
-      bound(tokenTransferFeeConfigs[1].maxFeeUSDCents, tokenTransferFeeConfigs[1].minFeeUSDCents + 1, type(uint32).max)
-    );
+    tokenTransferFeeConfigs[0].feeUSDCents = uint32(bound(tokenTransferFeeConfigs[0].feeUSDCents, 0, type(uint8).max));
+    tokenTransferFeeConfigs[1].feeUSDCents = uint32(bound(tokenTransferFeeConfigs[1].feeUSDCents, 0, type(uint8).max));
 
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(2, 2);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
@@ -59,27 +50,15 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     }
   }
 
-  function test_ApplyTokenTransferFeeConfig() public {
+  function test_applyTokenTransferFeeConfigUpdates() public {
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 2);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 6,
-      maxFeeUSDCents: 7,
-      deciBps: 8,
-      destGasOverhead: 9,
-      destBytesOverhead: 312,
-      isEnabled: true
-    });
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig =
+      FeeQuoter.TokenTransferFeeConfig({feeUSDCents: 6, destGasOverhead: 9, destBytesOverhead: 312, isEnabled: true});
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].token = address(11);
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 12,
-      maxFeeUSDCents: 13,
-      deciBps: 14,
-      destGasOverhead: 15,
-      destBytesOverhead: 394,
-      isEnabled: true
-    });
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig =
+      FeeQuoter.TokenTransferFeeConfig({feeUSDCents: 12, destGasOverhead: 15, destBytesOverhead: 394, isEnabled: true});
 
     vm.expectEmit();
     emit FeeQuoter.TokenTransferFeeConfigUpdated(
@@ -141,18 +120,9 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     );
   }
 
-  function test_ApplyTokenTransferFeeZeroInput() public {
-    vm.recordLogs();
-    s_feeQuoter.applyTokenTransferFeeConfigUpdates(
-      new FeeQuoter.TokenTransferFeeConfigArgs[](0), new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0)
-    );
-
-    assertEq(vm.getRecordedLogs().length, 0);
-  }
-
   // Reverts
 
-  function test_RevertWhen_OnlyCallableByOwnerOrAdmin() public {
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_OnlyCallableByOwner() public {
     vm.startPrank(STRANGER);
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs;
 
@@ -163,14 +133,12 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     );
   }
 
-  function test_RevertWhen_InvalidDestBytesOverhead() public {
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidDestBytesOverhead() public {
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 1);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = address(5);
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 6,
-      maxFeeUSDCents: 7,
-      deciBps: 8,
+      feeUSDCents: 6,
       destGasOverhead: 9,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1),
       isEnabled: true
