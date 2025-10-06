@@ -29,7 +29,6 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            // Check if PR has bypass label
             const { data: labels } = await github.rest.issues.listLabelsOnIssue({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -46,7 +45,7 @@ jobs:
       - name: List changed IDL files
         id: changed-files
         run: |
-          # Only check specific files that impact observability
+          # Only check specific files to reduce noise
           CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }} HEAD -- \
             chains/solana/contracts/target/idl/base_token_pool.json \
             chains/solana/contracts/target/idl/ccip_common.json \
@@ -64,18 +63,14 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            // Get changed files from the previous step (now space-separated)
             const changedFiles = `${{ steps.changed-files.outputs.files }}`.trim().split(' ').filter(Boolean);
 
-            // Skip empty results (no files changed)
             if (changedFiles.length === 0) {
               console.log('No monitored IDL files changed');
               return;
             }
 
-            // Build list of changed files
             const filesList = changedFiles.map(file => `- \`${file}\``).join('\n');
-
             const commentBody = [
               '## ⚠️ IDL Compatibility Check Required ⚠️',
               '',
