@@ -54,7 +54,7 @@ jobs:
             chains/solana/contracts/target/idl/ccip_router.json \
             chains/solana/contracts/target/idl/cctp_token_pool.json \
             chains/solana/contracts/target/idl/fee_quoter.json \
-            chains/solana/contracts/target/idl/rmn_remote.json)
+            chains/solana/contracts/target/idl/rmn_remote.json | tr '\n' ' ')
           echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "Changed files:"
           echo "$CHANGED_FILES"
@@ -64,11 +64,11 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            // Get changed files from the previous step
-            const changedFiles = `${{ steps.changed-files.outputs.files }}`.trim().split('\n');
+            // Get changed files from the previous step (now space-separated)
+            const changedFiles = `${{ steps.changed-files.outputs.files }}`.trim().split(' ').filter(Boolean);
 
             // Skip empty results (no files changed)
-            if (changedFiles.length === 0 || (changedFiles.length === 1 && changedFiles[0] === '')) {
+            if (changedFiles.length === 0) {
               console.log('No monitored IDL files changed');
               return;
             }
