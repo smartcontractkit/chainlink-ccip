@@ -38,8 +38,8 @@ contract TokenPoolV2Helper is TokenPool {
     return s_finalityConfig.inboundRateLimiterConfig[remoteChainSelector];
   }
 
-  function validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn, uint16 finality) external returns (uint16) {
-    return _validateLockOrBurn(lockOrBurnIn, finality);
+  function validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn, uint16 finality) external {
+    _validateLockOrBurn(lockOrBurnIn, finality);
   }
 
   function validateReleaseOrMint(
@@ -49,5 +49,9 @@ contract TokenPoolV2Helper is TokenPool {
   ) external returns (uint256) {
     _validateReleaseOrMint(releaseOrMintIn, localAmount, finality);
     return localAmount;
+  }
+
+  function applyFee(Pool.LockOrBurnInV1 memory lockOrBurnIn, uint16 finality) external view returns (uint256) {
+    return _applyFee(lockOrBurnIn, finality);
   }
 }

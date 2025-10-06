@@ -96,8 +96,8 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     uint16 finality,
     bytes calldata // tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    uint16 fastTransferFeeBps = _validateLockOrBurn(lockOrBurnIn, finality);
-    destTokenAmount = lockOrBurnIn.amount - (lockOrBurnIn.amount * fastTransferFeeBps) / BPS_DIVIDER;
+    _validateLockOrBurn(lockOrBurnIn, finality);
+    destTokenAmount = _applyFee(lockOrBurnIn, finality);
     _lockOrBurn(destTokenAmount);
 
     emit LockedOrBurned({
@@ -148,16 +148,12 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   // │                         Validation                           │
   // ================================================================
 
-  /// @notice Validates the lock or burn request, applies any fast-finality fee, and enforces rate limits.
+  /// @notice Validates the lock or burn request, and enforces rate limits.
   /// @dev The validation covers token support, RMN curse status, allowlist membership, onRamp access, and
   /// rate limiting for both standard and fast-transfer lanes.
   /// @param lockOrBurnIn The input to validate. Must reference a supported token, onRamp, and remote chain.
   /// @param finality The finality depth requested by the message. A value of zero uses the standard lane.
-  /// @return fastTransferFeeBps The fee in basis points for fast transfers, or zero if standard transfer is used.
-  function _validateLockOrBurn(
-    Pool.LockOrBurnInV1 memory lockOrBurnIn,
-    uint16 finality
-  ) internal returns (uint16 fastTransferFeeBps) {
+  function _validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn, uint16 finality) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
     _checkAllowList(lockOrBurnIn.originalSender);
@@ -177,12 +173,9 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
         amount, lockOrBurnIn.localToken
       );
       emit FastTransferOutboundRateLimitConsumed(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.localToken, amount);
-      return finalityConfig.fastTransferFeeBps;
     } else {
       _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     }
-
-    return 0;
   }
 
   /// @notice Validates a release or mint request and enforces the appropriate inbound rate limits.
@@ -205,9 +198,8 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
 
-    FastFinalityConfig storage finalityConfig = s_finalityConfig;
     if (finality != 0) {
-      finalityConfig.inboundRateLimiterConfig[releaseOrMintIn.remoteChainSelector]._consume(
+      s_finalityConfig.inboundRateLimiterConfig[releaseOrMintIn.remoteChainSelector]._consume(
         localAmount, releaseOrMintIn.localToken
       );
       emit FastTransferInboundRateLimitConsumed(
@@ -218,9 +210,9 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     }
   }
 
-  // ========================================================
-  // │                          Finality                     │
-  // ==============================================+=========
+  // ================================================================
+  // │                     Finality                                 │
+  // ================================================================
 
   /// @notice Updates the finality configuration for token transfers.
   function applyFinalityConfigUpdates(
@@ -280,7 +272,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   }
 
   // ================================================================
-  // │                          CCV                                  │
+  // │                          CCV                                 │
   // ================================================================
 
   /// @notice Updates the CCV configuration for specified remote chains.
@@ -349,9 +341,9 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     }
   }
 
-  // ===========================================================
-  // │                           Fee                            │
-  // ===========================================================
+  // ================================================================
+  // │                          Fee                                 │
+  // ================================================================
 
   /// @notice Updates the token transfer fee configurations for specified destination chains.
   /// @param tokenTransferFeeConfigArgs Array of structs containing destination chain selectors and their fee.
@@ -418,6 +410,22 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   /// @return The amount of accumulated pool fees available for withdrawal.
   function getAccumulatedFees() public view virtual returns (uint256) {
     return getToken().balanceOf(address(this));
+  }
+
+  // @notice Applies any applicable fees to the lock or burn amount.
+  /// @param lockOrBurnIn The original lock or burn request.
+  /// @param finality The finality depth requested by the message. A value of zero
+  function _applyFee(
+    Pool.LockOrBurnInV1 memory lockOrBurnIn,
+    uint16 finality
+  ) internal view virtual returns (uint256 destAmount) {
+    destAmount = lockOrBurnIn.amount;
+    if (finality != 0) {
+      // deduct fast transfer fee
+      destAmount -= (lockOrBurnIn.amount * s_finalityConfig.fastTransferFeeBps) / BPS_DIVIDER;
+    }
+    // TODO : normal transfer fee
+    return destAmount;
   }
 
   /// @notice Signals which version of the pool interface is supported.
