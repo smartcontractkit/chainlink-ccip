@@ -117,7 +117,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     uint256 amount = 100;
 
     // The Deposit hash extracted from the real transaction off-chain.
-    bytes32 depositHash = 0x0dba99ea6b5ae8c13a6d620f6349f729f7da3aa93a6fef3c857e009a5d142ad6;
+    bytes32 depositHash = 0x8abcb5b7f5b5102d91b843d2190b1deb09b8fde4743ae3c10f3ba5636b1b9a97;
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),

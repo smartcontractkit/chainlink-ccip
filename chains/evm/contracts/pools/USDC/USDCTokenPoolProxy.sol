@@ -186,6 +186,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
     // This branch must come before a version check, because the first field would be a uint64 and thus if a version
     // was attempted to be extracted from the first 4-bytes of a uint64, it would be 0, and thus the message would be
     // routed to the CCTP V1 pool without first sanitizing the source pool data for proper formatting.
+    // Note: It is possible for a future version of the source pool data to also be 64 bytes long. However, any future
+    // version will have a version number in the first 4 bytes and will be routed to the proper pool before this check
+    // is reached. Therefore this branch will only be triggerd for messages using the legacy source pool data format.
     if (releaseOrMintIn.sourcePoolData.length == 64) {
       // There are two possible scenarios for the legacy inflight messages:
       // 1. The legacy pool did not utilize a message transmitter proxy.

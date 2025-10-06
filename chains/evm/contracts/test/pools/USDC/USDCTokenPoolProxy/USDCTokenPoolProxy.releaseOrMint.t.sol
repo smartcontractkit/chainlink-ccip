@@ -376,19 +376,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     vm.stopPrank();
   }
 
-  function _enableERC165InterfaceChecks(address pool, bytes4 interfaceId) internal {
-    vm.mockCall(
-      address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
-    );
-
-    vm.mockCall(
-      address(pool),
-      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
-      abi.encode(true)
-    );
-  }
-
-  function test_releaseOrMint_RevertWhen_Unauthorized() public {
+  function test_releaseOrMint_RevertWhen_CallerIsNotARampOnRouter() public {
     address unauthorized = makeAddr("unauthorized");
 
     vm.startPrank(unauthorized);
@@ -407,5 +395,17 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
+  }
+
+  function _enableERC165InterfaceChecks(address pool, bytes4 interfaceId) internal {
+    vm.mockCall(
+      address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
+    );
+
+    vm.mockCall(
+      address(pool),
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
+      abi.encode(true)
+    );
   }
 }

@@ -160,7 +160,7 @@ library USDCSourcePoolDataCodec {
     uint32 minFinalityThreshold
   ) internal pure returns (bytes32) {
     return keccak256(
-      abi.encodePacked(
+      abi.encode(
         sourceDomain,
         amount,
         destinationDomain,
