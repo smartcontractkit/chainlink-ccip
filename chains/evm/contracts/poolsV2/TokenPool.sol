@@ -355,12 +355,6 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       uint64 destChainSelector = tokenTransferFeeConfigArgs[i].destChainSelector;
       TokenTransferFeeConfig calldata tokenTransferFeeConfig = tokenTransferFeeConfigArgs[i].tokenTransferFeeConfig;
-      if (
-        tokenTransferFeeConfig.isEnabled
-          && tokenTransferFeeConfig.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
-      ) {
-        revert InvalidDestBytesOverhead(tokenTransferFeeConfig.destBytesOverhead);
-      }
       s_tokenTransferFeeConfig[destChainSelector] = tokenTransferFeeConfig;
       emit TokenTransferFeeConfigUpdated(destChainSelector, tokenTransferFeeConfig);
     }
