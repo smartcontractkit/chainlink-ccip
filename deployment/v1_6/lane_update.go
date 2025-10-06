@@ -1,12 +1,10 @@
 package v1_6
 
-import (
-	utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-)
+import "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 
 type ConnectChainsConfig struct {
 	Lanes []LaneConfig
-	MCMS  *utils.MCMSInput
+	MCMS  *mcms.Input
 }
 type LaneConfig struct {
 	Source       ChainDefinition
@@ -26,5 +24,5 @@ type UpdateLanesInput struct {
 	IsDisabled   bool
 	TestRouter   bool
 	ExtraConfigs ExtraConfigs
-	MCMS         *utils.MCMSInput
+	MCMS         *mcms.Input
 }

@@ -1,12 +1,5 @@
 package ccip
 
-// Mod sec
-//go:generate go run generation/generate/wrap.go ccip VerifierProxy verifier_proxy latest
-//go:generate go run generation/generate/wrap.go ccip CommitteeVerifier committee_verifier latest
-//go:generate go run generation/generate/wrap.go ccip CCVProxy ccv_proxy latest
-//go:generate go run generation/generate/wrap.go ccip ExecutorOnRamp executor_onramp latest
-//go:generate go run generation/generate/wrap.go ccip CCVAggregator ccv_aggregator latest
-
 //go:generate go run generation/generate/wrap.go ccip Router router latest
 //go:generate go run generation/generate/wrap.go ccip CCIPHome ccip_home latest
 //go:generate go run generation/generate/wrap.go ccip OnRamp onramp latest
@@ -14,7 +7,6 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip OnRampWithMessageTransformer onramp_with_message_transformer latest
 //go:generate go run generation/generate/wrap.go ccip OffRampWithMessageTransformer offramp_with_message_transformer latest
 //go:generate go run generation/generate/wrap.go ccip FeeQuoter fee_quoter latest
-//go:generate go run generation/generate/wrap.go ccip FeeQuoterV2 fee_quoter_v2 latest
 //go:generate go run generation/generate/wrap.go ccip NonceManager nonce_manager latest
 //go:generate go run generation/generate/wrap.go ccip TokenAdminRegistry token_admin_registry latest
 //go:generate go run generation/generate/wrap.go ccip TokenPoolFactory token_pool_factory latest
@@ -51,7 +43,6 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip ReportCodec report_codec latest
 //go:generate go run generation/generate/wrap.go ccip EtherSenderReceiver ether_sender_receiver latest
 //go:generate go run generation/generate/wrap.go ccip MockE2EUSDCTokenMessenger mock_usdc_token_messenger latest
-//go:generate go run generation/generate/wrap.go ccip MockReceiverV2 mock_receiver_v2 latest
 //go:generate go run generation/generate/wrap.go ccip MockE2EUSDCTransmitter mock_usdc_token_transmitter latest
 //go:generate go run generation/generate/wrap.go ccip MockE2ELBTCTokenPool mock_lbtc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip CCIPReaderTester ccip_reader_tester latest
