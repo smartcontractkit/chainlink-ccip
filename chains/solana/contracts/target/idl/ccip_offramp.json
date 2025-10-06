@@ -12,7 +12,7 @@
   ],
   "instructions": [
     {
-      "name": "initialize ",
+      "name": "initialize",
       "docs": [
         "Initialization Flow //",
         "Initializes the CCIP Offramp, except for the config account (due to stack size limitations).",
