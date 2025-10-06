@@ -39,21 +39,19 @@ jobs:
 
       - name: List changed IDL files
         id: changed-files
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { execSync } = require('child_process');
-            const changedFiles = execSync('git diff --name-only origin/${{ github.base_ref }} HEAD -- chains/solana/contracts/target/idl/').toString().trim().split('\n');
-            console.log('Changed IDL files:');
-            changedFiles.forEach(file => console.log(`- ${file}`));
-            return { changedFiles };
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }} HEAD -- chains/solana/contracts/target/idl/)
+          echo "::set-output name=files::$CHANGED_FILES"
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
 
       - name: Comment on PR
-        if: steps.check-bypass.outputs.result == 'false'
+        if: steps.check-bypass.outputs.result != 'true'
         uses: actions/github-script@v6
         with:
           script: |
-            const changedFiles = JSON.parse(steps.changed-files.outputs.result).changedFiles;
+            // Get changed files from the previous step
+            const changedFiles = `${{ steps.changed-files.outputs.files }}`.trim().split('\n');
 
             // Build list of changed files
             const filesList = changedFiles.map(file => `- \`${file}\``).join('\n');
@@ -78,7 +76,7 @@ jobs:
             });
 
       - name: Fail if no bypass
-        if: steps.check-bypass.outputs.result == 'false'
+        if: steps.check-bypass.outputs.result != 'true'
         run: |
           echo "::error::IDL changes detected - Please confirm compatibility with observability pipeline"
           exit 1
