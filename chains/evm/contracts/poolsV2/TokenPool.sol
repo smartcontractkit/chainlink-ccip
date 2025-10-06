@@ -92,7 +92,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
 
   /// @inheritdoc IPoolV2
   function lockOrBurn(
-    Pool.LockOrBurnInV1 memory lockOrBurnIn,
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 finality,
     bytes calldata // tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
@@ -153,7 +153,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   /// rate limiting for both standard and fast-transfer lanes.
   /// @param lockOrBurnIn The input to validate. Must reference a supported token, onRamp, and remote chain.
   /// @param finality The finality depth requested by the message. A value of zero uses the standard lane.
-  function _validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn, uint16 finality) internal {
+  function _validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
     _checkAllowList(lockOrBurnIn.originalSender);
@@ -416,7 +416,7 @@ abstract contract TokenPool is IPoolV2, TokenPoolV1 {
   /// @param lockOrBurnIn The original lock or burn request.
   /// @param finality The finality depth requested by the message. A value of zero
   function _applyFee(
-    Pool.LockOrBurnInV1 memory lockOrBurnIn,
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 finality
   ) internal view virtual returns (uint256 destAmount) {
     destAmount = lockOrBurnIn.amount;
