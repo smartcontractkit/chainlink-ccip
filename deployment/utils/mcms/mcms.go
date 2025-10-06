@@ -1,4 +1,4 @@
-package changesets
+package mcms
 
 import (
 	"fmt"
@@ -7,8 +7,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-// TODO : move this to a common chain agnostic package
-type MCMSInput struct {
+type Input struct {
 	// OverridePreviousRoot indicates whether to override the root of the MCMS contract.
 	OverridePreviousRoot bool
 	// ValidUntil is a unix timestamp indicating when the proposal expires.
@@ -19,13 +18,15 @@ type MCMSInput struct {
 	// TimelockAction is the action to perform on the timelock contract (schedule, bypass, or cancel).
 	TimelockAction mcms_types.TimelockAction
 	// MCMSAddressRef is a reference to the MCMS contract address in the datastore.
-	MCMSAddressRef *datastore.AddressRef
+	MCMSAddressRef datastore.AddressRef
 	// TimelockAddressRef is a reference to the timelock contract address in the datastore.
-	TimelockAddressRef *datastore.AddressRef
+	TimelockAddressRef datastore.AddressRef
+	// Description is a human-readable description of the proposal.
+	Description string
 }
 
 // TODO : need to put more validation here
-func (c *MCMSInput) Validate() error {
+func (c *Input) Validate() error {
 	if c.TimelockAction != mcms_types.TimelockActionSchedule &&
 		c.TimelockAction != mcms_types.TimelockActionBypass &&
 		c.TimelockAction != mcms_types.TimelockActionCancel {
