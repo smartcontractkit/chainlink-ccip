@@ -35,7 +35,7 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
+    _validateLockOrBurn(lockOrBurnIn, 0);
 
     IBurnMintERC20(address(i_token)).burn(lockOrBurnIn.amount);
 
@@ -59,7 +59,7 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     uint256 amount = releaseOrMintIn.sourceDenominatedAmount;
-    _validateReleaseOrMint(releaseOrMintIn, amount);
+    _validateReleaseOrMint(releaseOrMintIn, amount, 0);
 
     if (s_destPoolData.length == 32) {
       (bytes memory payload,) = abi.decode(releaseOrMintIn.offchainTokenData, (bytes, bytes));

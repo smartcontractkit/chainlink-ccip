@@ -80,7 +80,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Calculate the local amount. Since USDC is always 6 decimals, we can hard code the decimals to 6.
     uint256 localAmount = _calculateLocalAmount(releaseOrMintIn.sourceDenominatedAmount, 6);
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, 0);
 
     // Save gas by using storage instead of memory as a value may need to be updated.
     SiloConfig storage remoteConfig = s_chainConfigs[releaseOrMintIn.remoteChainSelector];

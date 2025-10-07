@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {IMessageInterceptor} from "../../../interfaces/IMessageInterceptor.sol";
+
+import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {Client} from "../../../libraries/Client.sol";
@@ -51,7 +53,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     vm.expectCall(
       s_destPoolByToken[s_destTokens[0]],
       abi.encodeWithSelector(
-        TokenPool.releaseOrMint.selector,
+        IPoolV1.releaseOrMint.selector,
         Pool.ReleaseOrMintInV1({
           originalSender: message.sender,
           receiver: message.receiver,
