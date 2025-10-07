@@ -2,11 +2,14 @@ name: "Run CCIP OCR3 Integration Test"
 
 on:
   pull_request:
+    branches-ignore:
+      - 'develop'
   merge_group:
+    branches-ignore:
+      - 'develop'
   push:
     branches:
       - 'main'
-      - 'develop'
 
 jobs:
   changes:
