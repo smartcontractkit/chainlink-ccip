@@ -14,6 +14,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
+// TokenTransferConfig specifies configuration for a token on one chain to enable transfers with other chains.
 type TokenTransferConfig struct {
 	// ChainSelector identifies the chain on which the token lives.
 	ChainSelector uint64
@@ -30,9 +31,12 @@ type TokenTransferConfig struct {
 	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]
 }
 
+// ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
 type ConfigureTokensForTransfersConfig struct {
+	// Tokens specifies the tokens to configure for cross-chain transfers.
 	Tokens []TokenTransferConfig
-	MCMS   mcms.Input
+	// MCMS configures the resulting proposal.
+	MCMS mcms.Input
 }
 
 // ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
@@ -113,18 +117,18 @@ func convertRemoteChainConfig(
 	}
 	var err error
 	if inCfg.RemotePool != nil {
-		outCfg.RemotePool, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, adapter.ConvertRefToBytes)
+		outCfg.RemotePool, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, adapter.AddressRefToBytes)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
 		}
 		// Can either provide the token reference directly or derive it from the pool reference.
 		if inCfg.RemoteToken != nil {
-			outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemoteToken, remoteChainSelector, adapter.ConvertRefToBytes)
+			outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemoteToken, remoteChainSelector, adapter.AddressRefToBytes)
 			if err != nil {
 				return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
 			}
 		} else {
-			outCfg.RemoteToken, err = adapter.DeriveRemoteTokenAddress(e, remoteChainSelector, *inCfg.RemotePool)
+			outCfg.RemoteToken, err = adapter.DeriveTokenAddress(e, remoteChainSelector, *inCfg.RemotePool)
 			if err != nil {
 				return outCfg, fmt.Errorf("failed to get remote token address via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(*inCfg.RemotePool), remoteChainSelector, err)
 			}

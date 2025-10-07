@@ -15,10 +15,17 @@ import (
 
 type tokenAdapterID string
 
+// TokenAdapter defines the interface that each chain family + token pool version combo must implement to support cross-chain token configuration.
 type TokenAdapter interface {
+	// ConfigureTokenForTransfersSequence returns a sequence that configures a token pool for cross-chain transfers.
+	// The sequence should target a single chain, performing anything required on that chain to enable the token for CCIP transfers.
 	ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	ConvertRefToBytes(ref datastore.AddressRef) ([]byte, error)
-	DeriveRemoteTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
+	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
+	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
+	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
+	// DeriveTokenAddress derives the token address (in bytes) from the given token pool reference.
+	// For example, if this address is stored on the pool, this method should fetch it.
+	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.

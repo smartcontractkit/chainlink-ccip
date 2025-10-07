@@ -15,7 +15,7 @@ import (
 
 type productTest_MockTokenAdapter struct{}
 
-func (ma *productTest_MockTokenAdapter) ConvertRefToBytes(ref datastore.AddressRef) ([]byte, error) {
+func (ma *productTest_MockTokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
 	return []byte{}, nil
 }
 
@@ -23,7 +23,7 @@ func (ma *productTest_MockTokenAdapter) ConfigureTokenForTransfersSequence() *cl
 	return &cldf_ops.Sequence[tokens.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
-func (ma *productTest_MockTokenAdapter) DeriveRemoteTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
+func (ma *productTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
 	return []byte{}, nil
 }
 

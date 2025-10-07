@@ -41,7 +41,7 @@ type transfersTest_MockTokenAdapter struct {
 	sequenceErrorMsg    string
 }
 
-func (ma *transfersTest_MockTokenAdapter) ConvertRefToBytes(ref datastore.AddressRef) ([]byte, error) {
+func (ma *transfersTest_MockTokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
 	return []byte(ref.Address), nil
 }
 
@@ -94,7 +94,7 @@ func (ma *transfersTest_MockTokenAdapter) ConfigureTokenForTransfersSequence() *
 	)
 }
 
-func (ma *transfersTest_MockTokenAdapter) DeriveRemoteTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
+func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
 	if ma.deriveTokenErrorMsg != "" {
 		return nil, errors.New(ma.deriveTokenErrorMsg)
 	}
