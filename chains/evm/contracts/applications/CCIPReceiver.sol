@@ -2,14 +2,13 @@
 pragma solidity ^0.8.4;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
-import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
 
 import {Client} from "../libraries/Client.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
-abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
+abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
   address internal immutable i_ccipRouter;
 
   constructor(
@@ -32,8 +31,7 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
   function supportsInterface(
     bytes4 interfaceId
   ) public pure virtual override returns (bool) {
-    return interfaceId == type(IAny2EVMMessageReceiver).interfaceId
-      || interfaceId == type(IAny2EVMMessageReceiverV2).interfaceId || interfaceId == type(IERC165).interfaceId;
+    return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   /// @inheritdoc IAny2EVMMessageReceiver
@@ -53,21 +51,6 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
   /// @return CCIP router address
   function getRouter() public view virtual returns (address) {
     return address(i_ccipRouter);
-  }
-
-  /// @notice Return the CCVs required/optional for a source chain.
-  /// @dev this can be overridden to specify different CCVs per source chain. The current implementation means the
-  /// default CCV is used.
-  function getCCVs(
-    uint64
-  )
-    external
-    view
-    virtual
-    returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold)
-  {
-    // By default no specific CCVs are required or optional. This means the default CCV is chosen.
-    return (new address[](0), new address[](0), 0);
   }
 
   error InvalidRouter(address router);

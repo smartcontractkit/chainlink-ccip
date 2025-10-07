@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	mockChainAccessor "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -114,7 +115,15 @@ func Test_USDCMessageReader_New(t *testing.T) {
 			}
 
 			emptyChainAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
-			r, err := NewUSDCMessageReader(ctx, logger.Test(t), tc.tokensConfig, emptyChainAccessors, readers, mockAddrCodec)
+			r, err := NewUSDCMessageReader(
+				ctx,
+				logger.Test(t),
+				tc.tokensConfig,
+				make(map[string]bool),
+				emptyChainAccessors,
+				readers,
+				mockAddrCodec,
+			)
 			if tc.errorMessage != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMessage)
@@ -197,8 +206,15 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	emptyChainAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
-	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs,
-		emptyChainAccessors, contactReaders, mockAddrCodec)
+	usdcReader, err := NewUSDCMessageReader(
+		ctx,
+		logger.Test(t),
+		tokensConfigs,
+		make(map[string]bool),
+		emptyChainAccessors,
+		contactReaders,
+		mockAddrCodec,
+	)
 	require.NoError(t, err)
 
 	tt := []struct {
@@ -382,4 +398,61 @@ func Test_extractABIPayload_FromBytes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_USDCMessageReader_New_SolanaAccessor(t *testing.T) {
+	ctx := t.Context()
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
+
+	solanaChain := cciptypes.ChainSelector(sel.SOLANA_DEVNET.Selector)
+	tokenAddress := "0x1234567890abcdef1234567890abcdef12345678"
+
+	// Mock the address codec to handle the conversion
+	mockAddrCodec.EXPECT().AddressStringToBytes(tokenAddress, solanaChain).Return([]byte(tokenAddress), nil)
+	mockAddrCodec.EXPECT().AddressBytesToString(mock.Anything, solanaChain).Return(tokenAddress, nil)
+
+	// Create mock chain accessor
+	mockAccessor := mockChainAccessor.NewMockChainAccessor(t)
+	mockAccessor.EXPECT().Sync(ctx, consts.ContractNameUSDCTokenPool, mock.Anything).Return(nil)
+
+	chainAccessors := map[cciptypes.ChainSelector]cciptypes.ChainAccessor{
+		solanaChain: mockAccessor,
+	}
+
+	tokensConfig := map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+		solanaChain: {
+			SourcePoolAddress:            tokenAddress,
+			SourceMessageTransmitterAddr: tokenAddress,
+		},
+	}
+
+	// Set looppCCIPProviderSupported to true for Solana
+	looppCCIPProviderSupported := map[string]bool{
+		sel.FamilySolana: true,
+	}
+
+	emptyContractReaders := make(map[cciptypes.ChainSelector]contractreader.Extended)
+
+	r, err := NewUSDCMessageReader(
+		ctx,
+		logger.Test(t),
+		tokensConfig,
+		looppCCIPProviderSupported,
+		chainAccessors,
+		emptyContractReaders,
+		mockAddrCodec,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	compositeReader, ok := r.(compositeUSDCMessageReader)
+	require.True(t, ok)
+
+	solanaReader, exists := compositeReader.readers[solanaChain]
+	require.True(t, exists)
+	require.NotNil(t, solanaReader)
+
+	// Verify it created a reader of type solanaUSDCMessageReaderAccessor
+	_, ok = solanaReader.(solanaUSDCMessageReaderAccessor)
+	require.True(t, ok)
 }

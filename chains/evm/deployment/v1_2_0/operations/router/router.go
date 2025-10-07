@@ -43,10 +43,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "router:deploy",
 	Version:          semver.MustParse("1.2.0"),
 	Description:      "Deploys the Router contract",
-	ContractType:     ContractType,
 	ContractMetadata: router.RouterMetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.2.0").String(): {EVM: common.FromHex(router.RouterBin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.2.0")).String(): {
+			EVM: common.FromHex(router.RouterBin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
@@ -58,7 +59,7 @@ var ApplyRampUpdates = contract.NewWrite(contract.WriteParams[ApplyRampsUpdatesA
 	ContractType:    ContractType,
 	ContractABI:     router.RouterABI,
 	NewContract:     router.NewRouter,
-	IsAllowedCaller: contract.OnlyOwner[*router.Router],
+	IsAllowedCaller: contract.OnlyOwner[*router.Router, ApplyRampsUpdatesArgs],
 	Validate:        func(ApplyRampsUpdatesArgs) error { return nil },
 	CallContract: func(router *router.Router, opts *bind.TransactOpts, args ApplyRampsUpdatesArgs) (*types.Transaction, error) {
 		return router.ApplyRampUpdates(opts, args.OnRampUpdates, args.OffRampRemoves, args.OffRampAdds)
@@ -72,7 +73,7 @@ var CCIPSend = contract.NewWrite(contract.WriteParams[CCIPSendArgs, *router.Rout
 	ContractType:    ContractType,
 	ContractABI:     router.RouterABI,
 	NewContract:     router.NewRouter,
-	IsAllowedCaller: contract.AllCallersAllowed[*router.Router],
+	IsAllowedCaller: contract.AllCallersAllowed[*router.Router, CCIPSendArgs],
 	Validate:        func(CCIPSendArgs) error { return nil },
 	CallContract: func(router *router.Router, opts *bind.TransactOpts, args CCIPSendArgs) (*types.Transaction, error) {
 		opts.Value = args.Value
