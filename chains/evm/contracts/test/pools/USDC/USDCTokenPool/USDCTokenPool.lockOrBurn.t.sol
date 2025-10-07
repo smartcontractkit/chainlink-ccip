@@ -5,6 +5,8 @@ import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
+
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
@@ -58,8 +60,76 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
 
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, nonce);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
+    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, sourceTokenDataPayload.nonce);
+  }
+
+  function test_LockOrBurn_LegacySourcePoolDataFormat() public {
+    bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
+    uint256 amount = 1;
+    s_USDCToken.transfer(address(s_usdcTokenPool), amount);
+
+    USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
+
+    USDCTokenPool.DomainUpdate[] memory updates = new USDCTokenPool.DomainUpdate[](1);
+    updates[0] = USDCTokenPool.DomainUpdate({
+      allowedCaller: expectedDomain.allowedCaller,
+      mintRecipient: expectedDomain.mintRecipient,
+      domainIdentifier: expectedDomain.domainIdentifier,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      enabled: expectedDomain.enabled,
+      useLegacySourcePoolDataFormat: true
+    });
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.setDomains(updates);
+
+    vm.expectEmit();
+    emit TokenPool.OutboundRateLimitConsumed({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_USDCToken),
+      amount: amount
+    });
+
+    vm.expectEmit();
+    emit ITokenMessenger.DepositForBurn(
+      s_mockUSDCTokenMessenger.s_nonce(),
+      address(s_USDCToken),
+      amount,
+      address(s_usdcTokenPool),
+      receiver,
+      expectedDomain.domainIdentifier,
+      s_mockUSDCTokenMessenger.DESTINATION_TOKEN_MESSENGER(),
+      expectedDomain.allowedCaller
+    );
+
+    vm.expectEmit();
+    emit TokenPool.LockedOrBurned({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_USDCToken),
+      sender: address(s_routerAllowedOnRamp),
+      amount: amount
+    });
+
+    vm.startPrank(s_routerAllowedOnRamp);
+
+    Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: abi.encodePacked(receiver),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_USDCToken)
+      })
+    );
+
+    // Since the source pool data is encoded using abi.encode(sourceTokenDataPayload), we need to decode it using abi.decode
+    // rather than the _decodeSourceTokenDataPayloadV1 function.
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      abi.decode(poolReturnDataV1.destPoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1));
+    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, sourceTokenDataPayload.nonce, "nonce is incorrect");
+    assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
+    vm.stopPrank();
   }
 
   function test_LockOrBurn_MintRecipientOverride() public {
@@ -77,7 +147,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       mintRecipient: extraMintRecipient,
       domainIdentifier: expectedDomain.domainIdentifier,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      enabled: expectedDomain.enabled
+      enabled: expectedDomain.enabled,
+      useLegacySourcePoolDataFormat: false
     });
     vm.startPrank(OWNER);
     s_usdcTokenPool.setDomains(updates);
@@ -121,8 +192,10 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
 
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, nonce);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
+    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, sourceTokenDataPayload.nonce);
+    assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
   }
 
   function testFuzz_LockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
@@ -170,22 +243,10 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
 
-    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
-      abi.decode(poolReturnDataV1.destPoolData, (USDCTokenPool.SourceTokenDataPayload));
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
     assertEq(sourceTokenDataPayload.nonce, s_mockUSDCTokenMessenger.s_nonce() - 1, "nonce is incorrect");
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
-    assertEq(sourceTokenDataPayload.amount, amount, "amount is incorrect");
-    assertEq(
-      sourceTokenDataPayload.destinationDomain, expectedDomain.domainIdentifier, "destinationDomain is incorrect"
-    );
-    assertEq(sourceTokenDataPayload.mintRecipient, destinationReceiver, "mintRecipient is incorrect");
-    assertEq(sourceTokenDataPayload.burnToken, address(s_USDCToken), "burnToken is incorrect");
-    assertEq(sourceTokenDataPayload.destinationCaller, expectedDomain.allowedCaller, "destinationCaller is incorrect");
-    assertEq(sourceTokenDataPayload.maxFee, 0, "maxFee is incorrect");
-
-    // MinFinality threshold is not set in the source token data payload for CCTP V1 since it is not used, and to avoid
-    // confusion with the V2 Pool which does.
-    assertEq(sourceTokenDataPayload.minFinalityThreshold, 0, "minFinalityThreshold is incorrect");
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN), "destTokenAddress is incorrect");
   }
 
@@ -233,8 +294,9 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         localToken: address(s_USDCToken)
       })
     );
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, nonce);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(poolReturnDataV1.destPoolData);
+    assertEq(s_mockUSDCTokenMessenger.s_nonce() - 1, sourceTokenDataPayload.nonce);
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 
