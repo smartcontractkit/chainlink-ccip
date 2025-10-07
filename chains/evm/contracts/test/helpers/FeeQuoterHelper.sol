@@ -8,51 +8,19 @@ contract FeeQuoterHelper is FeeQuoter {
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
-    address[] memory feeTokens,
-    TokenPriceFeedUpdate[] memory tokenPriceFeeds,
+    FeeTokenArgs[] memory feeTokens,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
-    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
-  )
-    FeeQuoter(
-      staticConfig,
-      priceUpdaters,
-      feeTokens,
-      tokenPriceFeeds,
-      tokenTransferFeeConfigArgs,
-      premiumMultiplierWeiPerEthArgs,
-      destChainConfigArgs
-    )
-  {}
-
-  function getDataAvailabilityCost(
-    uint64 destChainSelector,
-    uint112 dataAvailabilityGasPrice,
-    uint256 messageDataLength,
-    uint256 numberOfTokens,
-    uint32 tokenTransferBytesOverhead
-  ) external view returns (uint256) {
-    return _getDataAvailabilityCost(
-      s_destChainConfigs[destChainSelector],
-      dataAvailabilityGasPrice,
-      messageDataLength,
-      numberOfTokens,
-      tokenTransferBytesOverhead
-    );
-  }
+  ) FeeQuoter(staticConfig, priceUpdaters, feeTokens, tokenTransferFeeConfigArgs, destChainConfigArgs) {}
 
   function getTokenTransferCost(
     uint64 destChainSelector,
-    address feeToken,
-    uint224 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) external view returns (uint256, uint32, uint32) {
     return _getTokenTransferCost(
       s_destChainConfigs[destChainSelector].defaultTokenFeeUSDCents,
       s_destChainConfigs[destChainSelector].defaultTokenDestGasOverhead,
       destChainSelector,
-      feeToken,
-      feeTokenPrice,
       tokenAmounts
     );
   }
@@ -64,21 +32,7 @@ contract FeeQuoterHelper is FeeQuoter {
     return _parseGenericExtraArgsFromBytes(
       extraArgs,
       s_destChainConfigs[destChainSelector].defaultTxGasLimit,
-      s_destChainConfigs[destChainSelector].maxPerMsgGasLimit,
-      s_destChainConfigs[destChainSelector].enforceOutOfOrder
-    );
-  }
-
-  function parseEVMExtraArgsFromBytes(
-    bytes calldata extraArgs,
-    uint64 destChainSelector,
-    bool enforceOutOfOrder
-  ) external view returns (Client.GenericExtraArgsV2 memory) {
-    return _parseGenericExtraArgsFromBytes(
-      extraArgs,
-      s_destChainConfigs[destChainSelector].defaultTxGasLimit,
-      s_destChainConfigs[destChainSelector].maxPerMsgGasLimit,
-      enforceOutOfOrder
+      s_destChainConfigs[destChainSelector].maxPerMsgGasLimit
     );
   }
 
@@ -86,14 +40,14 @@ contract FeeQuoterHelper is FeeQuoter {
     bytes calldata extraArgs,
     DestChainConfig memory destChainConfig
   ) external pure returns (Client.SVMExtraArgsV1 memory) {
-    return _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder);
+    return _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit);
   }
 
   function parseSuiExtraArgsFromBytes(
     bytes calldata extraArgs,
     DestChainConfig memory destChainConfig
   ) external pure returns (Client.SuiExtraArgsV1 memory) {
-    return _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder);
+    return _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit);
   }
 
   function processChainFamilySelector(
@@ -110,13 +64,5 @@ contract FeeQuoterHelper is FeeQuoter {
     uint256 gasLimit
   ) external pure {
     _validateDestFamilyAddress(chainFamilySelector, destAddress, gasLimit);
-  }
-
-  function calculateRebasedValue(
-    uint8 dataFeedDecimal,
-    uint8 tokenDecimal,
-    uint256 feedValue
-  ) external pure returns (uint224) {
-    return _calculateRebasedValue(dataFeedDecimal, tokenDecimal, feedValue);
   }
 }

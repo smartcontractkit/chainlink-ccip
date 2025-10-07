@@ -9,7 +9,6 @@ echo " └───────────────────────�
 # The offRamp uses a specific lower optimization runs value. All other contracts use the default value
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_OFFRAMP=800
-OPTIMIZE_RUNS_FEE_QUOTER=3000
 OPTIMIZE_RUNS_LARGE_TOKEN_POOL=5000
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
@@ -58,9 +57,6 @@ function getOptimizations() {
       "OffRamp" | "OffRampOverSuperchainInterop" | "OffRampWithMessageTransformer")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
-      "FeeQuoter")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
-        ;;
       "BurnMintFastTransferTokenPool" | "HybridLockReleaseUSDCTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
         ;;
@@ -68,6 +64,14 @@ function getOptimizations() {
 
     echo "$optimize_runs_override"
 }
+
+
+# Mod sec
+compileContract ccvs/VerifierProxy
+compileContract ccvs/CommitteeVerifier
+compileContract onRamp/CCVProxy
+compileContract onRamp/ExecutorOnRamp
+compileContract offRamp/CCVAggregator
 
 # 1.6
 compileContract offRamp/OffRamp
@@ -114,6 +118,7 @@ compileContract test/helpers/MultiOCR3Helper
 compileContract test/mocks/MockE2EUSDCTokenMessenger
 compileContract test/mocks/MockE2EUSDCTransmitter
 compileContract test/mocks/MockE2ELBTCTokenPool
+compileContract test/mocks/MockReceiverV2
 compileContract test/helpers/CCIPReaderTester
 # Offchain test encoding utils
 compileContract test/helpers/EncodingUtils
