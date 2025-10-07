@@ -1,4 +1,4 @@
-package v012
+package v160
 
 import (
 	"github.com/Masterminds/semver/v3"
@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	v, err := semver.NewVersion("0.1.2")
+	v, err := semver.NewVersion("1.6.0")
 	if err != nil {
 		panic(err)
 	}
