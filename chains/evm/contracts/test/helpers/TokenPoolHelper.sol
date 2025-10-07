@@ -35,11 +35,11 @@ contract TokenPoolHelper is TokenPool {
   function validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) external {
-    _validateLockOrBurn(lockOrBurnIn);
+    _validateLockOrBurn(lockOrBurnIn, 0);
   }
 
   function validateReleaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn, uint256 localAmount) external {
-    _validateReleaseOrMint(releaseOrMintIn, localAmount);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, 0);
   }
 
   function onlyOnRampModifier(

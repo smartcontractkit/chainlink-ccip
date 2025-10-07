@@ -2,9 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
-
-import {TokenPool as TokenPoolV1} from "../../../pools/TokenPool.sol";
-import {TokenPool} from "../../../poolsV2/TokenPool.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
 contract TokenPoolV2_setFastFinalityRateLimitConfig is TokenPoolV2Setup {
@@ -41,7 +39,7 @@ contract TokenPoolV2_setFastFinalityRateLimitConfig is TokenPoolV2Setup {
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1, rate: 1})
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPoolV1.NonExistentChain.selector, args[0].remoteChainSelector));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, args[0].remoteChainSelector));
     s_tokenPool.setFastFinalityRateLimitConfig(args);
   }
 
