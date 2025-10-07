@@ -450,6 +450,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	// 2. Call chain's FeeQuoter to get native tokens price  https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L229-L229
 	//
 	//nolint:lll
+	lggr = logger.With(r.lggr, "method", "GetWrappedNativeTokenPriceUSD", "destChain", r.destChain, "selectors", selectors)
 	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
 
 	var wg sync.WaitGroup
@@ -474,15 +475,19 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 				lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
 				return
 			}
+
+			lggr.Debugw("fetched chain config for native token address", "chain", chain, "config", config)
 			nativeTokenAddress := config.Router.WrappedNativeAddress
+			lggr.Debugw("casted native token address", "chain", chain, "address", nativeTokenAddress.String(), "hex", hex.EncodeToString(nativeTokenAddress))
 
 			if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
 				lggr.Warnw("Native token address is zero or empty. Ignore for disabled chains otherwise "+
-					"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
+					"check for router misconfiguration", "chain", chain, "address", cciptypes.UnknownAddress(nativeTokenAddress), "hexCast", hex.EncodeToString(cciptypes.UnknownAddress(nativeTokenAddress)))
 				return
 			}
 
 			price, err := chainAccessor.GetTokenPriceUSD(ctx, cciptypes.UnknownAddress(nativeTokenAddress))
+			lggr.Debugw("fetched native token price", "chain", chain, "address", nativeTokenAddress.String(), "price", price)
 			if err != nil {
 				lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
 				return
@@ -498,6 +503,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			}
 
 			mu.Lock()
+			lggr.Debugw("setting native token price", "chain", chain, "price", price.Value, "timestamp", price.Timestamp)
 			prices[chain] = cciptypes.NewBigInt(price.Value)
 			mu.Unlock()
 		}()
