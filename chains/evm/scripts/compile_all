@@ -57,7 +57,7 @@ function getOptimizations() {
       "OffRamp" | "OffRampOverSuperchainInterop" | "OffRampWithMessageTransformer")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
-      "BurnMintFastTransferTokenPool" | "HybridLockReleaseUSDCTokenPool")
+      "HybridLockReleaseUSDCTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
         ;;
     esac
