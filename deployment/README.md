@@ -89,7 +89,7 @@ mrr.RegisterMCMSReader("solana", solana.MCMSReader{})
 // ... and so on
 
 tar.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), evm1_7_0.TokensAdapter{})
-tar.RegisterTokenAdapter("solana", semver.MustParse("1.6.2"), evm1_7_0.TokensAdapter{})
+tar.RegisterTokenAdapter("solana", semver.MustParse("1.6.2"), solana1_6_2.TokensAdapter{})
 // ... and so on
 
 registry.Add("configure-tokens-for-transfers",
