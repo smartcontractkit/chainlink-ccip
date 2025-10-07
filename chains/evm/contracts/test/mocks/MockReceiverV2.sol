@@ -20,7 +20,7 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
   // From IAny2EVMMessageReceiver
   function ccipReceive(
     Client.Any2EVMMessage calldata /* message */
-  ) external {}
+  ) external virtual {}
 
   // From IAny2EVMMessageReceiverV2
   function getCCVs(

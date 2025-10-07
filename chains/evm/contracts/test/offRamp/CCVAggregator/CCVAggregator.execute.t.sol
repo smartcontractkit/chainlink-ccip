@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 
 import {Router} from "../../../Router.sol";
+
+import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
@@ -11,6 +13,9 @@ import {ReentrantCCV} from "../../helpers/ReentrantCCV.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
 import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
+
+import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract GasBoundedExecuteCaller {
   CCVAggregator internal immutable i_aggregator;
@@ -37,6 +42,22 @@ contract GasBoundedExecuteCaller {
         revert(0, returndatasize())
       }
     }
+  }
+}
+
+contract GasRecordingReceiver is MockReceiverV2, Test {
+  event GasReceived(uint256 gas);
+
+  constructor(
+    address[] memory required,
+    address[] memory optional,
+    uint8 threshold
+  ) MockReceiverV2(required, optional, threshold) {}
+
+  function ccipReceive(
+    Client.Any2EVMMessage calldata
+  ) external override {
+    emit GasReceived(gasleft());
   }
 }
 
@@ -117,7 +138,10 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     );
   }
 
-  function test_execute_WithReceiver() public {
+  function testFuzz_execute_WithReceiver(
+    uint256 gasForCall
+  ) public {
+    vm.assume(gasForCall > 200_000);
     MessageV1Codec.MessageV1 memory message = _getMessage();
     MockReceiverV2 mock = new MockReceiverV2(_arrayOf(s_defaultCCV), new address[](0), 0);
     message.receiver = abi.encodePacked(address(mock)); // Add receiver to message.
@@ -149,6 +173,39 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
         )
       )
     );
+  }
+
+  function test_routeMessage() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    GasRecordingReceiver mock = new GasRecordingReceiver(_arrayOf(s_defaultCCV), new address[](0), 0);
+    message.receiver = abi.encodePacked(address(mock)); // Add receiver to message.
+    (bytes memory encodedMessage,,) = _getReportComponents(message);
+    Client.Any2EVMMessage memory any2EVMMessage = Client.Any2EVMMessage({
+      messageId: keccak256(encodedMessage),
+      sourceChainSelector: message.sourceChainSelector,
+      sender: message.sender,
+      data: message.data,
+      destTokenAmounts: new Client.EVMTokenAmount[](0)
+    });
+
+    // Set CCVAggregator as a valid OffRamp on the Router.
+    Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
+    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_agg)});
+    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
+    // Prank as the CCVAggregator to call routeMessage.
+    vm.startPrank(address(s_agg));
+
+    uint256 g = gasleft();
+    g = g - 2 * (g / 64) - 5_000 - 10_000;
+
+    vm.recordLogs();
+    s_sourceRouter.routeMessage(any2EVMMessage, 5_000, g, address(mock));
+
+    // Verify that the gas received equals the expected gas (within a tolerance)
+    uint256 tolerance = g / 2000; // 0.05% tolerance
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+    uint256 actualGasReceived = abi.decode(logs[0].data, (uint256));
+    assertApproxEqAbs(actualGasReceived, g, tolerance);
   }
 
   function test_execute_RunsOutOfGasAndSetsStateToFailure() public {
