@@ -23,6 +23,18 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
     assertEq(localAmount, AMOUNT);
   }
 
+  function test_validateReleaseOrMint_NonZeroFinality() public {
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
+
+    vm.expectEmit();
+    emit TokenPool.FastTransferInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
+
+    vm.startPrank(s_allowedOffRamp);
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 2);
+
+    assertEq(localAmount, AMOUNT);
+  }
+
   function test_validateReleaseOrMint_RateLimitLocalAmount() public {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
