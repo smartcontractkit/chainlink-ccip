@@ -26,14 +26,16 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
         mintRecipient: bytes32(0),
         domainIdentifier: domainIdentifiers[i],
         destChainSelector: destChainSelectors[i],
-        enabled: true
+        enabled: true,
+        useLegacySourcePoolDataFormat: false
       });
 
       s_chainToDomain[destChainSelectors[i]] = USDCTokenPool.Domain({
         domainIdentifier: domainIdentifiers[i],
         mintRecipient: bytes32(0),
         allowedCaller: allowedCallers[i],
-        enabled: true
+        enabled: true,
+        useLegacySourcePoolDataFormat: false
       });
     }
 
@@ -70,7 +72,8 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
       mintRecipient: bytes32(0),
       domainIdentifier: 0, // ensures 0 is valid, as this is eth mainnet
       destChainSelector: 45690,
-      enabled: true
+      enabled: true,
+      useLegacySourcePoolDataFormat: false
     });
 
     s_usdcTokenPool.setDomains(domainUpdates);
