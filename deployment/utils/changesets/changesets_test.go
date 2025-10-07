@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -52,7 +51,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			addresses: []datastore.AddressRef{
 				{
 					ChainSelector: 4340886533089894000,
-					Address:       common.HexToAddress("0x01").String(),
+					Address:       "0x01",
 					Type:          datastore.ContractType("TestContract"),
 					Version:       semver.MustParse("1.0.0"),
 				},
@@ -62,8 +61,8 @@ func TestNewFromOnChainSequence(t *testing.T) {
 					ChainSelector: 4340886533089894000,
 					Transactions: []mcms_types.Transaction{
 						{
-							To:               common.HexToAddress("0x01").Hex(),
-							Data:             common.Hex2Bytes("0xdeadbeef"),
+							To:               "0x01",
+							Data:             []byte("0xdeadbeef"),
 							AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
 						},
 					},
@@ -109,14 +108,14 @@ func TestNewFromOnChainSequence(t *testing.T) {
 				ChainSelector: 4340886533089894000,
 				Type:          "Timelock",
 				Version:       semver.MustParse("1.0.0"),
-				Address:       common.HexToAddress("0x01").Hex(),
+				Address:       "0x01",
 			})
 			require.NoError(t, err)
 			err = ds.Addresses().Add(datastore.AddressRef{
 				ChainSelector: 4340886533089894000,
 				Type:          "MCM",
 				Version:       semver.MustParse("1.0.0"),
-				Address:       common.HexToAddress("0x02").Hex(),
+				Address:       "0x02",
 			})
 			require.NoError(t, err)
 			e := deployment.Environment{

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
@@ -23,7 +22,7 @@ func TestFindAndFormatRef(t *testing.T) {
 				ds := datastore.NewMemoryDataStore()
 				err := ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: 4340886533089894000,
-					Address:       common.HexToAddress("0x01").String(),
+					Address:       "0x01",
 					Type:          datastore.ContractType("TestContract"),
 					Version:       semver.MustParse("1.0.0"),
 					Qualifier:     "For testing",
@@ -33,7 +32,7 @@ func TestFindAndFormatRef(t *testing.T) {
 			},
 			ref: datastore.AddressRef{
 				ChainSelector: 4340886533089894000,
-				Address:       common.HexToAddress("0x01").String(),
+				Address:       "0x01",
 				Type:          datastore.ContractType("TestContract"),
 				Version:       semver.MustParse("1.0.0"),
 				Qualifier:     "For testing",
@@ -45,7 +44,7 @@ func TestFindAndFormatRef(t *testing.T) {
 				ds := datastore.NewMemoryDataStore()
 				err := ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: 4340886533089894000,
-					Address:       common.HexToAddress("0x01").String(),
+					Address:       "0x01",
 					Type:          datastore.ContractType("TestContract"),
 					Version:       semver.MustParse("1.0.0"),
 					Qualifier:     "For testing",
@@ -53,7 +52,7 @@ func TestFindAndFormatRef(t *testing.T) {
 				require.NoError(t, err)
 				err = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: 4340886533089894000,
-					Address:       common.HexToAddress("0x02").String(),
+					Address:       "0x02",
 					Type:          datastore.ContractType("TestContract"),
 					Version:       semver.MustParse("1.0.0"),
 					Qualifier:     "For production",
