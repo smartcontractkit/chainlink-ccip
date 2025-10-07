@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -40,14 +39,14 @@ func TestWithBatchOps(t *testing.T) {
 		ChainSelector: 5009297550715157269,
 		Type:          "Timelock",
 		Version:       semver.MustParse("1.0.0"),
-		Address:       common.HexToAddress("0x01").Hex(),
+		Address:       "0x01",
 	})
 	require.NoError(t, err)
 	err = ds.Addresses().Add(datastore.AddressRef{
 		ChainSelector: 5009297550715157269,
 		Type:          "MCM",
 		Version:       semver.MustParse("1.0.0"),
-		Address:       common.HexToAddress("0x02").Hex(),
+		Address:       "0x02",
 	})
 	require.NoError(t, err)
 
@@ -61,8 +60,8 @@ func TestWithBatchOps(t *testing.T) {
 			ChainSelector: 5009297550715157269,
 			Transactions: []mcms_types.Transaction{
 				{
-					To:               common.HexToAddress("0x01").Hex(),
-					Data:             common.Hex2Bytes("0xdeadbeef"),
+					To:               "0x01",
+					Data:             []byte("0xdeadbeef"),
 					AdditionalFields: json.RawMessage{},
 				},
 			},
