@@ -260,7 +260,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   // ================================================================
 
   /// @inheritdoc IPoolV2
-  /// @dev The _validateLockOrBurn check is an essential security check
+  /// @dev The _validateLockOrBurn check is an essential security check.
   /// @dev The _applyFee function deducts the fee from the amount and returns the amount after fee deduction.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
@@ -287,8 +287,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     );
   }
 
-  /// @notice Burn the token in the pool
-  /// @dev The _validateLockOrBurn check is an essential security check
+  /// @inheritdoc IPoolV1
+  /// @dev calls IPoolV2.lockOrBurn with finality 0 and empty tokenArgs.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
@@ -308,7 +308,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   // ================================================================
 
   /// @inheritdoc IPoolV2
-  /// @dev The _validateReleaseOrMint check is an essential security check
+  /// @dev The _validateReleaseOrMint check is an essential security check.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 finality
@@ -332,8 +332,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }
 
-  /// @notice Mint tokens from the pool to the recipient
-  /// @dev The _validateReleaseOrMint check is an essential security check
+  /// @inheritdoc IPoolV1
+  /// @dev calls IPoolV2.releaseOrMint with finality 0.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
