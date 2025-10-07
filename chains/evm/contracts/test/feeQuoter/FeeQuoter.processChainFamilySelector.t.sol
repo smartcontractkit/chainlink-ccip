@@ -119,7 +119,7 @@ contract FeeQuoter_processChainFamilySelector is FeeQuoterSetup {
     assertEq(resultBytes, encodedSuiArgs, "Should return the same Sui-encoded bytes");
     // The function always returns `true` for outOfOrder on Sui
     assertTrue(outOfOrder, "Out-of-order for Sui must be true");
-    assertEq(tokenReceiver, abi.encodePacked(suiArgs.tokenReceiver), "tokenReceiver mismatch");
+    assertEq(tokenReceiver, abi.encode(suiArgs.tokenReceiver), "tokenReceiver mismatch");
   }
 
   function test_processChainFamilySelector_Sui_NoTokenTransfer() public view {
