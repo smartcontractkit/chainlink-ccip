@@ -8,6 +8,8 @@ defaults:
   run:
     shell: bash
 
+permissions: {}
+
 jobs:
   changes:
     name: Detect changes
@@ -130,6 +132,8 @@ jobs:
     name: Publish Beta NPM
     environment: publish-contracts
     needs: [tag-check, changes, lint, native-compile]
+    permissions:
+      id-token: write  # Required for OIDC
     if: needs.tag-check.outputs.is-pre-release-ccip == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -181,10 +185,11 @@ jobs:
     name: Publish Prod NPM
     environment: publish-contracts
     needs: [tag-check, changes, lint, native-compile]
+    permissions:
+      id-token: write  # Required for OIDC
+      contents: write
     if: needs.tag-check.outputs.is-release-ccip == 'true'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
