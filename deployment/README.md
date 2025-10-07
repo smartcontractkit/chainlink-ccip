@@ -81,19 +81,27 @@ Within the `PipelinesRegistryProvider.Init()` function in `chainlink-deployments
 // NOTE: This is still example code - types are not guaranteed to exist as described here.
 // TODO: Update when types and names are solidified.
 
-mrr := changesets.NewMCMSReaderRegistry()
-tar := tokens.NewTokenAdapterRegistry()
+mcmsReg := changesets.NewMCMSReaderRegistry()
+mcmsReg.RegisterMCMSReader("evm", evm.MCMSReader{})
+mcmsReg.RegisterMCMSReader("solana", solana.MCMSReader{})
 
-mrr.RegisterMCMSReader("evm", evm.MCMSReader{})
-mrr.RegisterMCMSReader("solana", solana.MCMSReader{})
-// ... and so on
+tokenAdapterReg := tokens.NewTokenAdapterRegistry()
+tokenAdapterReg.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), evm1_7_0.TokenAdapter{})
+tokenAdapterReg.RegisterTokenAdapter("evm", semver.MustParse("1.5.1"), evm1_5_1.TokenAdapter{})
+tokenAdapterReg.RegisterTokenAdapter("solana", semver.MustParse("1.6.2"), solana1_6_2.TokenAdapter{})
 
-tar.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), evm1_7_0.TokensAdapter{})
-tar.RegisterTokenAdapter("solana", semver.MustParse("1.6.2"), solana1_6_2.TokensAdapter{})
-// ... and so on
+// We would have a separate chain adapter registry for v1_7_0.
+// We only have a single adapter registry for tokens because tokens must be backwards compatible.
+// You must be able to connect any token pool version to any other token pool version.
+chainAdapterReg1_6_0 := chains1_6_0.NewChainAdapterRegistry()
+chainAdapterReg1_6_0.RegisterChainAdapter("evm", evm1_6_0.ChainAdapter{})
+chainAdapterReg1_6_0.RegisterChainAdapter("solana", solana1_6_0.ChainAdapter{})
 
 registry.Add("configure-tokens-for-transfers",
-		changeset.Configure(tokens.ConfigureTokensForTransfers(mrr, tar)).WithEnvInput())
+		changeset.Configure(tokens.ConfigureTokensForTransfers(mcmsReg, tokenAdapterReg)).WithEnvInput())
+
+registry.Add("connect-chains-v1_6_0",
+		changeset.Configure(chains1_6_0.ConnectChains(mcmsReg, chainAdapterReg1_6_0)).WithEnvInput())
 ```
 
 ## New Chain Families
