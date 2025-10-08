@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
-import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
