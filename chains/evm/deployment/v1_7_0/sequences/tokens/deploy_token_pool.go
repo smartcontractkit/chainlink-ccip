@@ -42,23 +42,23 @@ func (c DeployTokenPoolInput) Validate(chain evm.Chain) error {
 	if c.ChainSel != chain.Selector {
 		return fmt.Errorf("chain selector %d does not match chain %s", c.ChainSel, chain)
 	}
-	if c.ConstructorArgs.Token == (common.Address{}) {
-		return errors.New("token address must be defined")
-	}
-	if c.ConstructorArgs.RMNProxy == (common.Address{}) {
-		return errors.New("RMN proxy address must be defined")
-	}
-	if c.ConstructorArgs.Router == (common.Address{}) {
-		return errors.New("router address must be defined")
-	}
 	if c.TokenSymbol == "" {
-		return errors.New("Token symbol must be defined")
+		return errors.New("token symbol must be defined")
 	}
 	if c.TokenPoolType == "" {
 		return errors.New("token pool type must be defined")
 	}
 	if c.TokenPoolVersion == nil {
 		return errors.New("token pool version must be defined")
+	}
+	if c.ConstructorArgs.Token == (common.Address{}) {
+		return errors.New("token address must be defined")
+	}
+	if c.ConstructorArgs.RMNProxy == (common.Address{}) {
+		return errors.New("rmn proxy address must be defined")
+	}
+	if c.ConstructorArgs.Router == (common.Address{}) {
+		return errors.New("router address must be defined")
 	}
 
 	return nil

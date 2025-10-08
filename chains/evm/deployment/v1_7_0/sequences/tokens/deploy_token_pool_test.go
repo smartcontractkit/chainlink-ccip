@@ -233,7 +233,7 @@ func TestDeployTokenPool(t *testing.T) {
 			// Check rmn proxy
 			getRmnProxyReport, err := operations.ExecuteOperation(
 				e.OperationsBundle,
-				token_pool.GetRmnProxy,
+				token_pool.GetRMNProxy,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
 					ChainSelector: chainSel,

@@ -244,6 +244,17 @@ var GetRouter = contract.NewRead(contract.ReadParams[any, common.Address, *token
 	},
 })
 
+var GetRMNProxy = contract.NewRead(contract.ReadParams[any, common.Address, *token_pool.TokenPool]{
+	Name:         "token-pool:get-rmn-proxy",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Gets the RMN proxy address on a TokenPool",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
+		return tokenPool.GetRmnProxy(opts)
+	},
+})
+
 var GetRateLimitAdmin = contract.NewRead(contract.ReadParams[any, common.Address, *token_pool.TokenPool]{
 	Name:         "token-pool:get-rate-limit-admin",
 	Version:      semver.MustParse("1.7.0"),
