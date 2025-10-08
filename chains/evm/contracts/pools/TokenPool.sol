@@ -17,6 +17,7 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
+import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 /// @notice Base abstract class with common functions for all token pools.
 /// A token pool serves as isolated place for holding tokens and token specific logic
 /// that may execute as tokens move across the bridge.
@@ -42,7 +43,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
   using SafeERC20 for IERC20;
 
-  error DuplicateCCV(address ccv);
   error InvalidDestBytesOverhead(uint32 destBytesOverhead);
   error InvalidFinality(uint16 requested, uint16 finalityThreshold);
   error AmountExceedsMaxPerRequest(uint256 requested, uint256 maximum);
@@ -920,10 +920,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       address[] calldata inboundCCVs = ccvConfigArgs[i].inboundCCVs;
 
       // check for duplicates in outbound CCVs.
-      _checkNoDuplicateAddresses(outboundCCVs);
+      CCVConfigValidation._assertNoDuplicates(outboundCCVs);
 
       // check for duplicates in inbound CCVs.
-      _checkNoDuplicateAddresses(inboundCCVs);
+      CCVConfigValidation._assertNoDuplicates(inboundCCVs);
 
       CCVConfig memory ccvConfig = CCVConfig({outboundCCVs: outboundCCVs, inboundCCVs: inboundCCVs});
       emit CCVConfigUpdated(remoteChainSelector, outboundCCVs, inboundCCVs);
@@ -959,20 +959,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     bytes calldata // tokenArgs
   ) external view virtual returns (address[] memory requiredCCVs) {
     return s_verifierConfig[destChainSelector].outboundCCVs;
-  }
-
-  /// @notice Checks a CCV address array for duplicate entries.
-  /// @param ccvs The array of CCV addresses to check for duplicates.
-  function _checkNoDuplicateAddresses(
-    address[] calldata ccvs
-  ) private pure {
-    for (uint256 i = 0; i < ccvs.length; ++i) {
-      for (uint256 j = i + 1; j < ccvs.length; ++j) {
-        if (ccvs[i] == ccvs[j]) {
-          revert DuplicateCCV(ccvs[i]);
-        }
-      }
-    }
   }
 
   // ================================================================
