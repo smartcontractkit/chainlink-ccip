@@ -8,6 +8,7 @@ contract TokenPoolV2_withdrawFees is TokenPoolV2Setup {
   function test_withdrawFees() public {
     uint256 feeAmount = 20e18;
     s_token.transfer(address(s_tokenPool), feeAmount);
+    assertEq(s_token.balanceOf(address(s_tokenPool)), s_tokenPool.getAccumulatedFees());
     s_tokenPool.withdrawFees(STRANGER);
     assertEq(s_token.balanceOf(STRANGER), feeAmount);
   }

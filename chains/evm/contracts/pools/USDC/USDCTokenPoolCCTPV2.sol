@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
-
+import {TokenPool} from "../TokenPool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
@@ -33,7 +33,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   uint256 public constant MIN_USDC_MESSAGE_LENGTH = 280;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "USDCTokenPoolCCTPV2 1.6.3-dev";
+    return "USDCTokenPoolCCTPV2 1.7.0-dev";
   }
 
   /// @dev This contract is only used for CCTP V2, which is why the supportedUSDCVersion field of the parent
@@ -55,7 +55,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
 
     Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
@@ -122,7 +122,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, TokenPool.WAIT_FOR_FINALITY);
 
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));

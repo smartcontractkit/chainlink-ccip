@@ -95,7 +95,7 @@ contract USDCSetup is BaseTest {
     // Mock the previous pool's releaseOrMint function to return the input amount
     vm.mockCall(
       s_previousPool,
-      abi.encodeWithSelector(TokenPool.releaseOrMint.selector),
+      abi.encodeWithSelector(IPoolV1.releaseOrMint.selector),
       abi.encode(Pool.ReleaseOrMintOutV1({destinationAmount: 1}))
     );
 

@@ -96,7 +96,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.mockCall(
       address(s_cctpV2Pool),
-      abi.encodeWithSelector(TokenPool.lockOrBurn.selector, lockOrBurnIn),
+      abi.encodeCall(IPoolV1.lockOrBurn, (lockOrBurnIn)),
       abi.encode(Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData}))
     );
 
@@ -104,7 +104,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     Pool.LockOrBurnOutV1 memory expectedOutput =
       Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData});
 
-    vm.expectCall(address(s_cctpV2Pool), abi.encodeWithSelector(TokenPool.lockOrBurn.selector, lockOrBurnIn));
+    vm.expectCall(address(s_cctpV2Pool), abi.encodeCall(IPoolV1.lockOrBurn, (lockOrBurnIn)));
 
     vm.expectCall(address(s_USDCToken), abi.encodeWithSelector(IERC20.transfer.selector, address(s_cctpV2Pool), amount));
 
