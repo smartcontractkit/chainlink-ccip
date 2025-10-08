@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
+import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
-contract TokenPoolV2_getRequiredInboundCCVs is TokenPoolSetup {
+contract TokenPoolV2_getRequiredInboundCCVs is TokenPoolV2Setup {
   function test_getRequiredInboundCCVs() public {
     address[] memory inboundCCVs = new address[](1);
     inboundCCVs[0] = makeAddr("inboundCCV1");

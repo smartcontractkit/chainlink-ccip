@@ -8,7 +8,7 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 /// @notice Helper contract for testing TokenPool V2 functionality.
-contract TokenPoolV2Helper is TokenPoolV2 {
+contract TokenPoolV2Helper is TokenPool {
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,

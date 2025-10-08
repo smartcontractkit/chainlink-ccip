@@ -33,10 +33,6 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip USDCTokenPoolProxy usdc_token_pool_proxy latest
 //go:generate go run generation/generate/wrap.go ccip BurnMintWithLockReleaseFlagTokenPool burn_mint_with_lock_release_flag_token_pool latest
 
-// V2 Pools
-//go:generate go run generation/generate/wrap.go ccip BurnMintTokenPoolV2 burn_mint_token_pool_v2 latest
-//go:generate go run generation/generate/wrap.go ccip TokenPoolV2 token_pool_v2 latest
-
 // Helpers
 //go:generate go run generation/generate/wrap.go ccip MaybeRevertMessageReceiver maybe_revert_message_receiver latest
 //go:generate go run generation/generate/wrap.go ccip LogMessageDataReceiver log_message_data_receiver latest

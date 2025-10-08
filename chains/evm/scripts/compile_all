@@ -99,10 +99,6 @@ compileContract pools/USDC/USDCTokenPoolCCTPV2
 compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
 
-# V2 Pools
-compileContract poolsV2/BurnMintTokenPoolV2
-compileContract poolsV2/TokenPoolV2
-
 # Test helpers
 compileContract test/helpers/USDCReaderTester
 compileContract test/helpers/receivers/MaybeRevertMessageReceiver
