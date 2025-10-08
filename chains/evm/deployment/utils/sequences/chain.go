@@ -1,4 +1,4 @@
-package changesets
+package sequences
 
 import (
 	"errors"

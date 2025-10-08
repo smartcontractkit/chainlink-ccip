@@ -96,6 +96,7 @@ compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/ERC20LockBox
 compileContract pools/USDC/SiloedUSDCTokenPool
 compileContract pools/USDC/USDCTokenPoolCCTPV2
+compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
 
 # Test helpers

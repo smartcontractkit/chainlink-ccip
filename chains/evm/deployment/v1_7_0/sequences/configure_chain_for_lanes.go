@@ -6,20 +6,21 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 type CommitteeVerifierDestChainConfig struct {
-	// Whether or not to allow traffic TO the remote chain
+	// Whether to allow traffic TO the remote chain
 	AllowlistEnabled bool
 	// Addresses that are allowed to send messages TO the remote chain
 	AddedAllowlistedSenders []common.Address
@@ -28,7 +29,7 @@ type CommitteeVerifierDestChainConfig struct {
 }
 
 type RemoteChainConfig struct {
-	// Whether or not to allow traffic FROM this remote chain
+	// Whether to allow traffic FROM this remote chain
 	AllowTrafficFrom bool
 	// The address on the remote chain from which the message is emitted
 	// For example, on EVM chains, this is the CCVProxy
@@ -218,8 +219,13 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 		writes = append(writes, routerReport.Output)
 
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+
 		return sequences.OnChainOutput{
-			Writes: writes,
+			BatchOps: []mcms_types.BatchOperation{batchOp},
 		}, nil
 	},
 )

@@ -60,10 +60,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "fee-quoter-v2:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys the FeeQuoter contract",
-	ContractType:     ContractType,
 	ContractMetadata: fee_quoter.FeeQuoterMetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(fee_quoter.FeeQuoterBin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(fee_quoter.FeeQuoterBin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
@@ -75,7 +76,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter.FeeQuoterABI,
 	NewContract:     fee_quoter.NewFeeQuoter,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter],
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(FeeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return FeeQuoter.ApplyAuthorizedCallerUpdates(opts, args)
@@ -89,7 +90,7 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter.FeeQuoterABI,
 	NewContract:     fee_quoter.NewFeeQuoter,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter],
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, []DestChainConfigArgs],
 	Validate:        func([]DestChainConfigArgs) error { return nil },
 	CallContract: func(FeeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return FeeQuoter.ApplyDestChainConfigUpdates(opts, transformDestChainConfigArgs(args))
@@ -103,7 +104,7 @@ var ApplyFeeTokensUpdates = contract.NewWrite(contract.WriteParams[ApplyFeeToken
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter.FeeQuoterABI,
 	NewContract:     fee_quoter.NewFeeQuoter,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter],
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, ApplyFeeTokensUpdatesArgs],
 	Validate:        func(ApplyFeeTokensUpdatesArgs) error { return nil },
 	CallContract: func(FeeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args ApplyFeeTokensUpdatesArgs) (*types.Transaction, error) {
 		return FeeQuoter.ApplyFeeTokensUpdates(opts, args.FeeTokensToRemove, args.FeeTokensToAdd)
@@ -117,7 +118,7 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter.FeeQuoterABI,
 	NewContract:     fee_quoter.NewFeeQuoter,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter],
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, ApplyTokenTransferFeeConfigUpdatesArgs],
 	Validate:        func(ApplyTokenTransferFeeConfigUpdatesArgs) error { return nil },
 	CallContract: func(FeeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesArgs) (*types.Transaction, error) {
 		return FeeQuoter.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
@@ -131,7 +132,7 @@ var UpdatePrices = contract.NewWrite(contract.WriteParams[PriceUpdates, *fee_quo
 	ContractType: ContractType,
 	ContractABI:  fee_quoter.FeeQuoterABI,
 	NewContract:  fee_quoter.NewFeeQuoter,
-	IsAllowedCaller: func(FeeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, caller common.Address) (bool, error) {
+	IsAllowedCaller: func(FeeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, caller common.Address, args PriceUpdates) (bool, error) {
 		priceUpdaters, err := FeeQuoter.GetAllAuthorizedCallers(opts)
 		if err != nil {
 			return false, fmt.Errorf("failed to get authorized callers from FeeQuoter (%s): %w", FeeQuoter.Address(), err)

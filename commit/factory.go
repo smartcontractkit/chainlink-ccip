@@ -65,54 +65,57 @@ const (
 )
 
 type PluginFactory struct {
-	baseLggr          logger.Logger
-	donID             plugintypes.DonID
-	ocrConfig         reader.OCR3ConfigWithMeta
-	commitCodec       cciptypes.CommitPluginCodec
-	msgHasher         cciptypes.MessageHasher
-	addrCodec         cciptypes.AddressCodec
-	homeChainReader   reader.HomeChain
-	homeChainSelector cciptypes.ChainSelector
-	chainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
-	extendedReaders   map[cciptypes.ChainSelector]contractreader.Extended
-	chainWriters      map[cciptypes.ChainSelector]types.ContractWriter
-	rmnPeerClient     rmn.PeerClient
-	rmnCrypto         cciptypes.RMNCrypto
+	baseLggr                   logger.Logger
+	donID                      plugintypes.DonID
+	ocrConfig                  reader.OCR3ConfigWithMeta
+	commitCodec                cciptypes.CommitPluginCodec
+	msgHasher                  cciptypes.MessageHasher
+	addrCodec                  cciptypes.AddressCodec
+	homeChainReader            reader.HomeChain
+	homeChainSelector          cciptypes.ChainSelector
+	looppCCIPProviderSupported map[string]bool // chainFamily -> supported
+	chainAccessors             map[cciptypes.ChainSelector]cciptypes.ChainAccessor
+	extendedReaders            map[cciptypes.ChainSelector]contractreader.Extended
+	chainWriters               map[cciptypes.ChainSelector]types.ContractWriter
+	rmnPeerClient              rmn.PeerClient
+	rmnCrypto                  cciptypes.RMNCrypto
 }
 
 type CommitPluginFactoryParams struct {
-	Lggr              logger.Logger
-	DonID             plugintypes.DonID
-	OcrConfig         reader.OCR3ConfigWithMeta
-	CommitCodec       cciptypes.CommitPluginCodec
-	MsgHasher         cciptypes.MessageHasher
-	AddrCodec         cciptypes.AddressCodec
-	HomeChainReader   reader.HomeChain
-	HomeChainSelector cciptypes.ChainSelector
-	ChainAccessors    map[cciptypes.ChainSelector]cciptypes.ChainAccessor
-	ExtendedReaders   map[cciptypes.ChainSelector]contractreader.Extended
-	ContractWriters   map[cciptypes.ChainSelector]types.ContractWriter
-	RmnPeerClient     rmn.PeerClient
-	RmnCrypto         cciptypes.RMNCrypto
+	Lggr                       logger.Logger
+	DonID                      plugintypes.DonID
+	OcrConfig                  reader.OCR3ConfigWithMeta
+	CommitCodec                cciptypes.CommitPluginCodec
+	MsgHasher                  cciptypes.MessageHasher
+	AddrCodec                  cciptypes.AddressCodec
+	HomeChainReader            reader.HomeChain
+	HomeChainSelector          cciptypes.ChainSelector
+	LOOPPCCIPProviderSupported map[string]bool // chainFamily -> supported
+	ChainAccessors             map[cciptypes.ChainSelector]cciptypes.ChainAccessor
+	ExtendedReaders            map[cciptypes.ChainSelector]contractreader.Extended
+	ContractWriters            map[cciptypes.ChainSelector]types.ContractWriter
+	RmnPeerClient              rmn.PeerClient
+	RmnCrypto                  cciptypes.RMNCrypto
 }
 
 // NewCommitPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by
 // the factory. It is safe to assume that a factory instance will create exactly one plugin instance.
 func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 	return &PluginFactory{
-		baseLggr:          params.Lggr,
-		donID:             params.DonID,
-		ocrConfig:         params.OcrConfig,
-		commitCodec:       params.CommitCodec,
-		msgHasher:         params.MsgHasher,
-		addrCodec:         params.AddrCodec,
-		homeChainReader:   params.HomeChainReader,
-		homeChainSelector: params.HomeChainSelector,
-		chainAccessors:    params.ChainAccessors,
-		extendedReaders:   params.ExtendedReaders,
-		chainWriters:      params.ContractWriters,
-		rmnPeerClient:     params.RmnPeerClient,
-		rmnCrypto:         params.RmnCrypto,
+		baseLggr:                   params.Lggr,
+		donID:                      params.DonID,
+		ocrConfig:                  params.OcrConfig,
+		commitCodec:                params.CommitCodec,
+		msgHasher:                  params.MsgHasher,
+		addrCodec:                  params.AddrCodec,
+		homeChainReader:            params.HomeChainReader,
+		homeChainSelector:          params.HomeChainSelector,
+		looppCCIPProviderSupported: params.LOOPPCCIPProviderSupported,
+		chainAccessors:             params.ChainAccessors,
+		extendedReaders:            params.ExtendedReaders,
+		chainWriters:               params.ContractWriters,
+		rmnPeerClient:              params.RmnPeerClient,
+		rmnCrypto:                  params.RmnCrypto,
 	}
 }
 
