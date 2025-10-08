@@ -80,7 +80,7 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, ApplyChainUpdatesArgs],
 	Validate:        func(ApplyChainUpdatesArgs) error { return nil },
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.TransactOpts, args ApplyChainUpdatesArgs) (*types.Transaction, error) {
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args ApplyChainUpdatesArgs) (*types.Transaction, error) {
 		chainsToAdd := make([]token_pool.TokenPoolChainUpdate, len(args.ChainsToAdd))
 		for i, chain := range args.ChainsToAdd {
 			chainsToAdd[i] = token_pool.TokenPoolChainUpdate{
@@ -91,7 +91,7 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 				InboundRateLimiterConfig:  token_pool.RateLimiterConfig(chain.InboundRateLimiterConfig),
 			}
 		}
-		return tokenPoolV2.ApplyChainUpdates(opts, args.RemoteChainSelectorsToRemove, chainsToAdd)
+		return tokenPool.ApplyChainUpdates(opts, args.RemoteChainSelectorsToRemove, chainsToAdd)
 	},
 })
 
@@ -104,8 +104,8 @@ var ApplyCCVConfigUpdates = contract.NewWrite(contract.WriteParams[[]CCVConfigAr
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, []CCVConfigArg],
 	Validate:        func([]CCVConfigArg) error { return nil },
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.TransactOpts, args []CCVConfigArg) (*types.Transaction, error) {
-		return tokenPoolV2.ApplyCCVConfigUpdates(opts, args)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args []CCVConfigArg) (*types.Transaction, error) {
+		return tokenPool.ApplyCCVConfigUpdates(opts, args)
 	},
 })
 
@@ -118,8 +118,8 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *toke
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, RemotePoolArgs],
 	Validate:        func(RemotePoolArgs) error { return nil },
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.TransactOpts, args RemotePoolArgs) (*types.Transaction, error) {
-		return tokenPoolV2.AddRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args RemotePoolArgs) (*types.Transaction, error) {
+		return tokenPool.AddRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
 	},
 })
 
@@ -132,8 +132,8 @@ var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *t
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, RemotePoolArgs],
 	Validate:        func(RemotePoolArgs) error { return nil },
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.TransactOpts, args RemotePoolArgs) (*types.Transaction, error) {
-		return tokenPoolV2.RemoveRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args RemotePoolArgs) (*types.Transaction, error) {
+		return tokenPool.RemoveRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
 	},
 })
 
@@ -146,8 +146,8 @@ var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[common.Address, *
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, common.Address],
 	Validate:        func(common.Address) error { return nil },
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
-		return tokenPoolV2.SetRateLimitAdmin(opts, args)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return tokenPool.SetRateLimitAdmin(opts, args)
 	},
 })
 
@@ -170,7 +170,7 @@ var SetChainRateLimiterConfigs = contract.NewWrite(contract.WriteParams[[]SetCha
 		return caller == owner || caller == rateLimitAdmin, nil
 	},
 	Validate: func([]SetChainRateLimiterConfigArg) error { return nil },
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.TransactOpts, args []SetChainRateLimiterConfigArg) (*types.Transaction, error) {
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args []SetChainRateLimiterConfigArg) (*types.Transaction, error) {
 		var remoteChainSelectors []uint64
 		var inboundConfigs []token_pool.RateLimiterConfig
 		var outboundConfigs []token_pool.RateLimiterConfig
@@ -179,7 +179,7 @@ var SetChainRateLimiterConfigs = contract.NewWrite(contract.WriteParams[[]SetCha
 			inboundConfigs = append(inboundConfigs, token_pool.RateLimiterConfig(arg.InboundRateLimiterConfig))
 			outboundConfigs = append(outboundConfigs, token_pool.RateLimiterConfig(arg.OutboundRateLimiterConfig))
 		}
-		return tokenPoolV2.SetChainRateLimiterConfigs(opts, remoteChainSelectors, inboundConfigs, outboundConfigs)
+		return tokenPool.SetChainRateLimiterConfigs(opts, remoteChainSelectors, inboundConfigs, outboundConfigs)
 	},
 })
 
@@ -192,8 +192,8 @@ var SetRouter = contract.NewWrite(contract.WriteParams[common.Address, *token_po
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, common.Address],
 	Validate:        func(common.Address) error { return nil },
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
-		return tokenPoolV2.SetRouter(opts, args)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return tokenPool.SetRouter(opts, args)
 	},
 })
 
@@ -206,8 +206,8 @@ var ApplyAllowListUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowLis
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, ApplyAllowListUpdatesArgs],
 	Validate:        func(ApplyAllowListUpdatesArgs) error { return nil },
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.TransactOpts, args ApplyAllowListUpdatesArgs) (*types.Transaction, error) {
-		return tokenPoolV2.ApplyAllowListUpdates(opts, args.Removes, args.Adds)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args ApplyAllowListUpdatesArgs) (*types.Transaction, error) {
+		return tokenPool.ApplyAllowListUpdates(opts, args.Removes, args.Adds)
 	},
 })
 
@@ -217,8 +217,8 @@ var GetAllowListEnabled = contract.NewRead(contract.ReadParams[any, bool, *token
 	Description:  "Gets whether the allowlist is enabled on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.CallOpts, args any) (bool, error) {
-		return tokenPoolV2.GetAllowListEnabled(opts)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (bool, error) {
+		return tokenPool.GetAllowListEnabled(opts)
 	},
 })
 
@@ -228,8 +228,8 @@ var GetAllowList = contract.NewRead(contract.ReadParams[any, []common.Address, *
 	Description:  "Gets the allowlist on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.CallOpts, args any) ([]common.Address, error) {
-		return tokenPoolV2.GetAllowList(opts)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) ([]common.Address, error) {
+		return tokenPool.GetAllowList(opts)
 	},
 })
 
@@ -239,8 +239,8 @@ var GetRouter = contract.NewRead(contract.ReadParams[any, common.Address, *token
 	Description:  "Gets the router address on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
-		return tokenPoolV2.GetRouter(opts)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
+		return tokenPool.GetRouter(opts)
 	},
 })
 
@@ -250,8 +250,8 @@ var GetRateLimitAdmin = contract.NewRead(contract.ReadParams[any, common.Address
 	Description:  "Gets the rate limit admin address on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
-		return tokenPoolV2.GetRateLimitAdmin(opts)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
+		return tokenPool.GetRateLimitAdmin(opts)
 	},
 })
 
@@ -261,8 +261,8 @@ var GetCurrentInboundRateLimiterState = contract.NewRead(contract.ReadParams[uin
 	Description:  "Gets the current inbound rate limiter state for a given remote chain selector on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterBucket, error) {
-		return tokenPoolV2.GetCurrentInboundRateLimiterState(opts, args)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterBucket, error) {
+		return tokenPool.GetCurrentInboundRateLimiterState(opts, args)
 	},
 })
 
@@ -272,8 +272,8 @@ var GetCurrentOutboundRateLimiterState = contract.NewRead(contract.ReadParams[ui
 	Description:  "Gets the current outbound rate limiter state for a given remote chain selector on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterBucket, error) {
-		return tokenPoolV2.GetCurrentOutboundRateLimiterState(opts, args)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterBucket, error) {
+		return tokenPool.GetCurrentOutboundRateLimiterState(opts, args)
 	},
 })
 
@@ -283,8 +283,8 @@ var GetSupportedChains = contract.NewRead(contract.ReadParams[any, []uint64, *to
 	Description:  "Gets the list of supported remote chain selectors on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.CallOpts, args any) ([]uint64, error) {
-		return tokenPoolV2.GetSupportedChains(opts)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) ([]uint64, error) {
+		return tokenPool.GetSupportedChains(opts)
 	},
 })
 
@@ -294,8 +294,8 @@ var GetRemotePools = contract.NewRead(contract.ReadParams[uint64, [][]byte, *tok
 	Description:  "Gets the remote pool addresses for a given remote chain selector on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.CallOpts, args uint64) ([][]byte, error) {
-		return tokenPoolV2.GetRemotePools(opts, args)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) ([][]byte, error) {
+		return tokenPool.GetRemotePools(opts, args)
 	},
 })
 
@@ -305,8 +305,8 @@ var GetRemoteToken = contract.NewRead(contract.ReadParams[uint64, []byte, *token
 	Description:  "Gets the remote pool address for a given remote chain selector on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.CallOpts, args uint64) ([]byte, error) {
-		return tokenPoolV2.GetRemoteToken(opts, args)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) ([]byte, error) {
+		return tokenPool.GetRemoteToken(opts, args)
 	},
 })
 
@@ -316,7 +316,7 @@ var GetToken = contract.NewRead(contract.ReadParams[any, common.Address, *token_
 	Description:  "Gets the local token address for a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPoolV2 *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
-		return tokenPoolV2.GetToken(opts)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
+		return tokenPool.GetToken(opts)
 	},
 })
