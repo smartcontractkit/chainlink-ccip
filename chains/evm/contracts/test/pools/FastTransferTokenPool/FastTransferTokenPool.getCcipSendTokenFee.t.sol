@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IFastTransferPool} from "../../../interfaces/IFastTransferPool.sol";
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
-
+import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
@@ -23,16 +23,6 @@ contract FastTransferTokenPool_getCcipSendTokenFee_Test is FastTransferTokenPool
   }
 
   function test_getCcipSendTokenFee_WithNativeFeeToken() public {
-    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-    chainUpdates[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: 9999,
-      remotePoolAddresses: new bytes[](0),
-      remoteTokenAddress: abi.encode(address(2)),
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
-    });
-    s_pool.applyChainUpdates(new uint64[](0), chainUpdates);
-
     uint256 fastFee = SOURCE_AMOUNT * FAST_FEE_FILLER_BPS / 10000;
     uint256 settlementQuote = 1 ether;
 

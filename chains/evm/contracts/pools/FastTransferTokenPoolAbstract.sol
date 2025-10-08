@@ -39,7 +39,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   error InsufficientPoolFees(uint256 requested, uint256 available);
   error QuoteFeeExceedsUserMaxLimit(uint256 quoteFee, uint256 maxFastTransferFee);
   error InvalidEncodedAddress(bytes encodedAddress);
-  error InvalidDestinationPool(uint64 destChainSelector, bytes destinationPool);
 
   event DestChainConfigUpdated(
     uint64 indexed destinationChainSelector,
@@ -264,11 +263,9 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       );
     }
 
-    // Only check for empty destination pool here, as proper validation is done during config update.
-    // An empty value means the config was never set.
-    if (destChainConfig.destinationPool.length == 0) {
-      revert InvalidDestinationPool(destinationChainSelector, destChainConfig.destinationPool);
-    }
+    // No need to check if destinationPool is empty here. If the config was never set, maxFillAmountPerRequest
+    // will be 0, causing the amount check above to revert with TransferAmountExceedsMaxFillAmount.
+    // The _validateBytesNotEmptyOrZero check in _updateDestChainConfig ensures destinationPool is always valid when set.
 
     message = Client.EVM2AnyMessage({
       receiver: destChainConfig.destinationPool,
