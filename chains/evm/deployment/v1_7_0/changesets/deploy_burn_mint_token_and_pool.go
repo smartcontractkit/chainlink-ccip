@@ -1,7 +1,7 @@
 package changesets
 
 import (
-	evm_changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
+	evm_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -17,5 +17,5 @@ var DeployBurnMintTokenAndPool = changesets.NewFromOnChainSequence(changesets.Ne
 	ResolveInput: func(e cldf_deployment.Environment, cfg tokens.DeployBurnMintTokenAndPoolInput) (tokens.DeployBurnMintTokenAndPoolInput, error) {
 		return cfg, nil
 	},
-	ResolveDep: evm_changesets.ResolveEVMChainDep[tokens.DeployBurnMintTokenAndPoolInput],
+	ResolveDep: evm_seq.ResolveEVMChainDep[tokens.DeployBurnMintTokenAndPoolInput],
 })

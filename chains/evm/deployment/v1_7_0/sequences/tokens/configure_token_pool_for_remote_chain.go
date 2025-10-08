@@ -7,14 +7,15 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -165,7 +166,12 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				}
 
 				// Return early as no further action is required
-				return sequences.OnChainOutput{Writes: writes}, nil
+				batchOp, err := contract.NewBatchOperationFromWrites(writes)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+				}
+
+				return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 			}
 		}
 
@@ -193,7 +199,12 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 		writes = append(writes, applyChainUpdatesReport.Output)
 
-		return sequences.OnChainOutput{Writes: writes}, nil
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+
+		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	},
 )
 

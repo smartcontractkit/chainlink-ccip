@@ -8,11 +8,11 @@ import (
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 var ConfigureTokenForTransfers = cldf_ops.NewSequence(
@@ -20,7 +20,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 	semver.MustParse("1.7.0"),
 	"Configures a token on an EVM chain for usage with CCIP",
 	func(b operations.Bundle, chains chain.BlockChains, input tokens.ConfigureTokenForTransfersInput) (output sequences.OnChainOutput, err error) {
-		writes := make([]contract.WriteOutput, 0)
+		ops := make([]mcms_types.BatchOperation, 0)
 		chain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
@@ -40,7 +40,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s for remote chain with selector %d: %w", input.TokenPoolAddress, chain, destChainSelector, err)
 			}
-			writes = append(writes, configureTokenPoolForRemoteChainReport.Output.Writes...)
+			ops = append(ops, configureTokenPoolForRemoteChainReport.Output.BatchOps...)
 		}
 
 		tokenAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[any]{
@@ -62,10 +62,10 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to register token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 		}
-		writes = append(writes, registerTokenReport.Output.Writes...)
+		ops = append(ops, registerTokenReport.Output.BatchOps...)
 
 		return sequences.OnChainOutput{
-			Writes: writes,
+			BatchOps: ops,
 		}, nil
 	},
 )

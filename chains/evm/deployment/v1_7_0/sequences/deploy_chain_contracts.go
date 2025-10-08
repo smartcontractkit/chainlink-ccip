@@ -141,7 +141,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Included in case the RMNRemote got deployed but the RMNProxy already existed.
 		// In this case, we would not have set the RMNRemote in the constructor.
 		// We would need to update the RMN on the existing RMNProxy.
-		setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, evm_contract.FunctionInput[rmn_proxy.SetRMNArgs]{
+		setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract.FunctionInput[rmn_proxy.SetRMNArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(rmnProxyRef.Address),
 			Args: rmn_proxy.SetRMNArgs{
@@ -292,7 +292,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, committeeVerifierRef)
 
 		// Set signature config on the CommitteeVerifier
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetSignatureConfigs, chain, evm_contract.FunctionInput[committee_verifier.SetSignatureConfigArgs]{
+		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetSignatureConfigs, chain, contract.FunctionInput[committee_verifier.SetSignatureConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(committeeVerifierRef.Address),
 			Args:          input.ContractParams.CommitteeVerifier.SignatureConfigArgs,

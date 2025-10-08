@@ -97,7 +97,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 
 		return sequences.OnChainOutput{
 			Addresses: []datastore.AddressRef{deployReport.Output},
-			Writes:    configureReport.Output.Writes,
+			BatchOps:  configureReport.Output.BatchOps,
 		}, nil
 	},
 )
