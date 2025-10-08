@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/contracts-ccip",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Chainlink smart contracts for CCIP",
   "author": "Chainlink devs",
   "repository": "github:smartcontractkit/chainlink-ccip",
@@ -28,7 +28,9 @@
     ".solhint.json",
     ".solhint-test.json",
     ".solhintignore",
-    ".solhintignore-test"
+    ".solhintignore-test",
+    "bytecode/*.md",
+    "bytecode/FeeQuoter.bin"
   ],
   "engines": {
     "node": ">=20",
