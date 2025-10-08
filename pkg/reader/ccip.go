@@ -455,6 +455,12 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
+	// GetOfframpSourceChainConfigs() will filter out the dest chain if it's included in selectors
+	sourceChainConfigs, err := r.configPoller.GetOfframpSourceChainConfigs(ctx, r.destChain, selectors)
+	if err != nil {
+		lggr.Errorw("failed to get offramp source chain configs from config poller", "err", err)
+	}
+
 	for _, chainSelector := range selectors {
 		// Capture loop variable
 		chain := chainSelector
@@ -466,6 +472,15 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
 				lggr.Errorw("chain accessor not found, chain native price skipped", "chain", chain, "err", err)
+				return
+			}
+
+			// Only fetch native token address if this is the destination chain OR if it is an enabled source chain
+			sourceChainConfig, ok := sourceChainConfigs[chain]
+			shouldFetchNativeTokenAddress := r.destChain == chain || (ok && sourceChainConfig.IsEnabled)
+			if !shouldFetchNativeTokenAddress {
+				lggr.Debugw("skipping native token price fetch for chain", "chain", chain,
+					"destChain", r.destChain, "isSourceChainEnabled", ok && sourceChainConfig.IsEnabled)
 				return
 			}
 
