@@ -27,7 +27,7 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     vm.expectEmit();
-    emit TokenPool.FastTransferInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
+    emit TokenPool.CustomFinalityTransferInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
     uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 2);
@@ -102,20 +102,22 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
     s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
   }
 
-  function _applyFastFinalityConfig(
+  function _applyCustomFinalityConfig(
     uint16 finalityThreshold,
-    uint16 fastTransferFeeBps,
+    uint16 customFinalityTransferFeeBps,
     uint256 maxAmountPerRequest
   ) internal {
-    TokenPool.FastFinalityRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.FastFinalityRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.FastFinalityRateLimitConfigArgs({
+    TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24})
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitArgs);
+    s_tokenPool.applyFinalityConfigUpdates(
+      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitArgs
+    );
   }
 
   function _buildReleaseOrMintIn(

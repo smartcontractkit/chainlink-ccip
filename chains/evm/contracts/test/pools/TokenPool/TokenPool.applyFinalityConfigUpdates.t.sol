@@ -9,25 +9,28 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
   function test_applyFinalityConfigUpdates() public {
     uint16 finalityThreshold = 100;
-    uint16 fastTransferFeeBps = 500; // 5%
+    uint16 customFinalityTransferFeeBps = 500; // 5%
     uint256 maxAmountPerRequest = 1000e18;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
-    TokenPool.FastFinalityRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.FastFinalityRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.FastFinalityRateLimitConfigArgs({
+    TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
 
     vm.expectEmit();
-    emit TokenPool.FinalityConfigUpdated(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest);
-    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitArgs);
+    emit TokenPool.FinalityConfigUpdated(finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest);
+    s_tokenPool.applyFinalityConfigUpdates(
+      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitArgs
+    );
 
-    (uint16 storedFinalityThreshold, uint16 storedFeeBps, uint256 storedMaxAmount) = s_tokenPool.getFastFinalityConfig();
+    (uint16 storedFinalityThreshold, uint16 storedFeeBps, uint256 storedMaxAmount) =
+      s_tokenPool.getCustomFinalityConfig();
     assertEq(storedFinalityThreshold, finalityThreshold);
-    assertEq(storedFeeBps, fastTransferFeeBps);
+    assertEq(storedFeeBps, customFinalityTransferFeeBps);
     assertEq(storedMaxAmount, maxAmountPerRequest);
 
     RateLimiter.TokenBucket memory outboundBucket = s_tokenPool.getFastOutboundBucket(DEST_CHAIN_SELECTOR);
@@ -51,27 +54,27 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
     vm.prank(STRANGER);
 
     uint16 finalityThreshold = 100;
-    uint16 fastTransferFeeBps = 500; // 5%
+    uint16 customFinalityTransferFeeBps = 500; // 5%
     uint256 maxAmountPerRequest = 1000e18;
-    TokenPool.FastFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
-      new TokenPool.FastFinalityRateLimitConfigArgs[](0);
+    TokenPool.CustomFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
+      new TokenPool.CustomFinalityRateLimitConfigArgs[](0);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
+      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
     );
   }
 
-  function test_applyFinalityConfigUpdates_RevertWhen_InvalidFastTransferFeeBps() public {
+  function test_applyFinalityConfigUpdates_RevertWhen_InvalidTransferFeeBps() public {
     uint16 finalityThreshold = 100;
-    uint16 fastTransferFeeBps = BPS_DIVIDER;
+    uint16 customFinalityTransferFeeBps = BPS_DIVIDER;
     uint256 maxAmountPerRequest = 1000e18;
-    TokenPool.FastFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
-      new TokenPool.FastFinalityRateLimitConfigArgs[](0);
+    TokenPool.CustomFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
+      new TokenPool.CustomFinalityRateLimitConfigArgs[](0);
 
-    vm.expectRevert(TokenPool.InvalidFastTransferFeeBps.selector);
+    vm.expectRevert(TokenPool.InvalidTransferFeeBps.selector);
     s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
+      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
     );
   }
 }

@@ -15,29 +15,33 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0);
-    (, uint16 bps,) = s_tokenPool.getFastFinalityConfig();
+    (, uint16 bps,) = s_tokenPool.getCustomFinalityConfig();
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
     uint16 finalityThreshold = 8;
-    uint16 fastTransferFeeBps = 500; // 5%
+    uint16 customFinalityTransferFeeBps = 500; // 5%
     uint256 maxAmountPerRequest = 1000e18;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
-    TokenPool.FastFinalityRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.FastFinalityRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.FastFinalityRateLimitConfigArgs({
+    TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitArgs);
+    s_tokenPool.applyFinalityConfigUpdates(
+      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitArgs
+    );
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
     vm.expectEmit();
-    emit TokenPool.FastTransferOutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
+    emit TokenPool.CustomFinalityTransferOutboundRateLimitConsumed(
+      DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount
+    );
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, finalityThreshold);
@@ -48,9 +52,9 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
 
   function test_validateLockOrBurn_RevertWhen_InvalidFinality() public {
     uint16 finalityThreshold = 5;
-    uint16 fastTransferFeeBps = 500;
+    uint16 customFinalityTransferFeeBps = 500;
     uint256 maxAmountPerRequest = 1000e18;
-    _applyFastFinalityConfig(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest);
+    _applyCustomFinalityConfig(finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
@@ -63,9 +67,9 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
 
   function test_validateLockOrBurn_RevertWhen_AmountExceedsMaxPerRequest() public {
     uint16 finalityThreshold = 8;
-    uint16 fastTransferFeeBps = 500;
+    uint16 customFinalityTransferFeeBps = 500;
     uint256 maxAmountPerRequest = 500e18;
-    _applyFastFinalityConfig(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest);
+    _applyCustomFinalityConfig(finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest);
 
     uint256 amount = maxAmountPerRequest + 1;
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(amount);
@@ -75,20 +79,22 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, finalityThreshold);
   }
 
-  function _applyFastFinalityConfig(
+  function _applyCustomFinalityConfig(
     uint16 finalityThreshold,
-    uint16 fastTransferFeeBps,
+    uint16 customFinalityTransferFeeBps,
     uint256 maxAmountPerRequest
   ) internal {
-    TokenPool.FastFinalityRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.FastFinalityRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.FastFinalityRateLimitConfigArgs({
+    TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24})
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitArgs);
+    s_tokenPool.applyFinalityConfigUpdates(
+      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitArgs
+    );
   }
 
   function _buildLockOrBurnIn(

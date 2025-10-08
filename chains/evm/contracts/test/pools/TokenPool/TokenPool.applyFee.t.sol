@@ -8,12 +8,15 @@ import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 contract TokenPoolV2_applyFee is TokenPoolV2Setup {
   function test_applyFee_FastFinality() public {
     uint16 finalityThreshold = 5;
-    uint16 fastTransferFeeBps = 500;
+    uint16 customFinalityTransferFeeBps = 500;
     uint256 maxAmountPerRequest = 1000e18;
     uint256 amount = 1000e18;
     vm.startPrank(OWNER);
     s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, new TokenPool.FastFinalityRateLimitConfigArgs[](0)
+      finalityThreshold,
+      customFinalityTransferFeeBps,
+      maxAmountPerRequest,
+      new TokenPool.CustomFinalityRateLimitConfigArgs[](0)
     );
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
@@ -25,7 +28,7 @@ contract TokenPoolV2_applyFee is TokenPoolV2Setup {
     });
 
     uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, finalityThreshold);
-    assertEq(amountAfterFee, amount - ((amount * fastTransferFeeBps) / BPS_DIVIDER));
+    assertEq(amountAfterFee, amount - ((amount * customFinalityTransferFeeBps) / BPS_DIVIDER));
   }
 
   function test_applyFee_NoFee() public {
