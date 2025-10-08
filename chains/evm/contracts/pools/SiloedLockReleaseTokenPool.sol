@@ -111,7 +111,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
       releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
     );
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
 
     // Save gas by using storage instead of memory as a value may need to be updated.
     SiloConfig storage remoteConfig = s_chainConfigs[releaseOrMintIn.remoteChainSelector];

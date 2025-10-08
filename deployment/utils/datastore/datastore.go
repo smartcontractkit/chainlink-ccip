@@ -9,7 +9,7 @@ import (
 // FormatFn is a function that formats a datastore.AddressRef into a specific type T.
 type FormatFn[T any] = func(ref datastore.AddressRef) (T, error)
 
-// FindRef queries the datastore for an AddressRef.
+// FindAndFormatRef queries the datastore for an AddressRef.
 // The inputted AddressRef may have only a subset of fields set (e.g. Type and Version).
 // This function enforces that exactly one match is found for the AddressRef.
 // It then formats the AddressRef into the desired type T using the provided FormatFn.

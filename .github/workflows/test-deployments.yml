@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'develop'
 
 jobs:
   detect_deployments_changes:

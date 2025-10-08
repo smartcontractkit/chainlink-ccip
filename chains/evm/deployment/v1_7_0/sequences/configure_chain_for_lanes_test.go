@@ -1,0 +1,228 @@
+package sequences_test
+
+import (
+	"testing"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
+	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/stretchr/testify/require"
+)
+
+func TestConfigureChainForLanes(t *testing.T) {
+	tests := []struct {
+		desc string
+	}{
+		{
+			desc: "valid input",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			chainSelector := uint64(5009297550715157269)
+
+			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
+				chainSelector: {NumAdditionalAccounts: 1},
+			})
+			require.NoError(t, err, "Failed to create environment")
+			evmChain := e.BlockChains.EVMChains()[chainSelector]
+
+			deploymentReport, err := operations.ExecuteSequence(
+				e.OperationsBundle,
+				sequences.DeployChainContracts,
+				evmChain,
+				sequences.DeployChainContractsInput{
+					ChainSelector:  chainSelector,
+					ContractParams: testsetup.CreateBasicContractParams(),
+				},
+			)
+			require.NoError(t, err, "ExecuteSequence should not error")
+
+			var r common.Address
+			var ccvProxy common.Address
+			var feeQuoter common.Address
+			var ccvAggregator common.Address
+			var committeeVerifier common.Address
+			var executorOnRamp common.Address
+			for _, addr := range deploymentReport.Output.Addresses {
+				switch addr.Type {
+				case datastore.ContractType(router.ContractType):
+					r = common.HexToAddress(addr.Address)
+				case datastore.ContractType(ccv_proxy.ContractType):
+					ccvProxy = common.HexToAddress(addr.Address)
+				case datastore.ContractType(fee_quoter.ContractType):
+					feeQuoter = common.HexToAddress(addr.Address)
+				case datastore.ContractType(ccv_aggregator.ContractType):
+					ccvAggregator = common.HexToAddress(addr.Address)
+				case datastore.ContractType(committee_verifier.ContractType):
+					committeeVerifier = common.HexToAddress(addr.Address)
+				case datastore.ContractType(executor_onramp.ContractType):
+					executorOnRamp = common.HexToAddress(addr.Address)
+				}
+			}
+			ccipMessageSource := common.HexToAddress("0x10").Bytes()
+			ccipMessageDest := common.HexToAddress("0x11").Bytes()
+			remoteChainSelector := uint64(4356164186791070119)
+
+			_, err = operations.ExecuteSequence(
+				e.OperationsBundle,
+				sequences.ConfigureChainForLanes,
+				evmChain,
+				sequences.ConfigureChainForLanesInput{
+					ChainSelector:     chainSelector,
+					Router:            r,
+					CCVProxy:          ccvProxy,
+					CommitteeVerifier: committeeVerifier,
+					FeeQuoter:         feeQuoter,
+					CCVAggregator:     ccvAggregator,
+					RemoteChains: map[uint64]sequences.RemoteChainConfig{
+						remoteChainSelector: {
+							AllowTrafficFrom:                 true,
+							CCIPMessageSource:                ccipMessageSource,
+							CCIPMessageDest:                  ccipMessageDest,
+							DefaultCCVOffRamps:               []common.Address{committeeVerifier},
+							DefaultCCVOnRamps:                []common.Address{committeeVerifier},
+							DefaultExecutor:                  executorOnRamp,
+							CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{},
+							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
+							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+						},
+					},
+				},
+			)
+			require.NoError(t, err, "ExecuteSequence should not error")
+
+			// Check onRamps on router
+			onRampOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+				ChainSelector: evmChain.Selector,
+				Address:       r,
+				Args:          remoteChainSelector,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Equal(t, ccvProxy.Hex(), onRampOnRouter.Output.Hex(), "OnRamp address on router should match CCVProxy address")
+
+			// Check offRamps on router
+			offRampsOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+				ChainSelector: evmChain.Selector,
+				Address:       r,
+				Args:          nil,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Len(t, offRampsOnRouter.Output, 1, "There should be one OffRamp on the router for the remote chain")
+			require.Equal(t, ccvAggregator.Hex(), offRampsOnRouter.Output[0].OffRamp.Hex(), "OffRamp address on router should match CCVAggregator address")
+
+			// Check sourceChainConfig on CCVAggregator
+			sourceChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, ccv_aggregator.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+				ChainSelector: evmChain.Selector,
+				Address:       ccvAggregator,
+				Args:          remoteChainSelector,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Equal(t, ccipMessageSource, sourceChainConfig.Output.OnRamp, "OnRamp in source chain config should match CCVProxy address")
+			require.Len(t, sourceChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in source chain config")
+			require.Equal(t, committeeVerifier.Hex(), sourceChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in source chain config should match CommitteeVerifier address")
+			require.True(t, sourceChainConfig.Output.IsEnabled, "IsEnabled in source chain config should be true")
+			require.Equal(t, r.Hex(), sourceChainConfig.Output.Router.Hex(), "Router in source chain config should match Router address")
+
+			// Check destChainConfig on CCVProxy
+			destChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, ccv_proxy.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+				ChainSelector: evmChain.Selector,
+				Address:       ccvProxy,
+				Args:          remoteChainSelector,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Equal(t, r.Hex(), destChainConfig.Output.Router.Hex(), "Router in dest chain config should match Router address")
+			require.Equal(t, ccipMessageDest, destChainConfig.Output.CcvAggregator, "CcvAggregator in dest chain config should match CCIPMessageDest")
+			require.Equal(t, executorOnRamp.Hex(), destChainConfig.Output.DefaultExecutor.Hex(), "DefaultExecutor in dest chain config should match configured DefaultExecutor")
+			require.Len(t, destChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in dest chain config")
+			require.Equal(t, committeeVerifier.Hex(), destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitteeVerifier address")
+
+			// Check destChainConfig on CommitteeVerifier
+			committeeVerifierDestChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+				ChainSelector: evmChain.Selector,
+				Address:       committeeVerifier,
+				Args:          remoteChainSelector,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Equal(t, r.Hex(), committeeVerifierDestChainConfig.Output.Router.Hex(), "Router in CommitteeVerifier dest chain config should match Router address")
+			require.False(t, committeeVerifierDestChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier dest chain config should be false")
+
+			// Check dest chains on ExecutorOnRamp
+			executorOnRampDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor_onramp.GetDestChains, evmChain, contract.FunctionInput[any]{
+				ChainSelector: evmChain.Selector,
+				Address:       executorOnRamp,
+				Args:          nil,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Len(t, executorOnRampDestChains.Output, 1, "There should be one dest chain on ExecutorOnRamp")
+			require.Equal(t, remoteChainSelector, executorOnRampDestChains.Output[0], "Dest chain selector on ExecutorOnRamp should match remote chain selector")
+
+			/////////////////////////////////////////
+			// Try sending CCIP message /////////////
+			/////////////////////////////////////////
+
+			_, tx, msgHasher, err := message_hasher.DeployMessageHasher(evmChain.DeployerKey, evmChain.Client)
+			require.NoError(t, err, "Failed to deploy MessageHasher")
+			_, err = evmChain.Confirm(tx)
+			require.NoError(t, err, "Failed to confirm MessageHasher deployment")
+
+			extraArgs, err := msgHasher.EncodeGenericExtraArgsV3(
+				&bind.CallOpts{Context: t.Context()},
+				message_hasher.ClientEVMExtraArgsV3{
+					RequiredCCV: []message_hasher.ClientCCV{
+						{
+							CcvAddress: committeeVerifier,
+							Args:       []byte{},
+						},
+					},
+					OptionalCCV:       []message_hasher.ClientCCV{},
+					OptionalThreshold: 0,
+					FinalityConfig:    0,
+					Executor:          executorOnRamp,
+					ExecutorArgs:      []byte{},
+					TokenArgs:         []byte{},
+				},
+			)
+			require.NoError(t, err, "EncodeGenericExtraArgsV3 should not error")
+
+			ccipSendArgs := router.CCIPSendArgs{
+				DestChainSelector: remoteChainSelector,
+				EVM2AnyMessage: router.EVM2AnyMessage{
+					Receiver:     common.LeftPadBytes(evmChain.DeployerKey.From.Bytes(), 32),
+					Data:         []byte{},
+					TokenAmounts: []router.EVMTokenAmount{},
+					ExtraArgs:    extraArgs,
+				},
+			}
+
+			fee, err := operations.ExecuteOperation(e.OperationsBundle, router.GetFee, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
+				ChainSelector: evmChain.Selector,
+				Address:       r,
+				Args:          ccipSendArgs,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+
+			// Send CCIP message with value
+			ccipSendArgs.Value = fee.Output
+			_, err = operations.ExecuteOperation(e.OperationsBundle, router.CCIPSend, evmChain, contract.FunctionInput[router.CCIPSendArgs]{
+				ChainSelector: evmChain.Selector,
+				Address:       r,
+				Args:          ccipSendArgs,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+		})
+	}
+}
