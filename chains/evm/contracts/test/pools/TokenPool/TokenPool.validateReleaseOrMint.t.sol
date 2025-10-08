@@ -104,7 +104,6 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
 
   function _applyCustomFinalityConfig(
     uint16 finalityThreshold,
-    uint16 customFinalityTransferFeeBps,
     uint256 maxAmountPerRequest
   ) internal {
     TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
@@ -116,7 +115,7 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
     });
     vm.startPrank(OWNER);
     s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitArgs
+      finalityThreshold, maxAmountPerRequest, rateLimitArgs
     );
   }
 

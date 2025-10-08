@@ -15,7 +15,6 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0);
-    (, uint16 bps,) = s_tokenPool.getCustomFinalityConfig();
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
@@ -33,7 +32,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     });
     vm.startPrank(OWNER);
     s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitArgs
+      finalityThreshold, maxAmountPerRequest, rateLimitArgs
     );
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
@@ -93,7 +92,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     });
     vm.startPrank(OWNER);
     s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitArgs
+      finalityThreshold, maxAmountPerRequest, rateLimitArgs
     );
   }
 

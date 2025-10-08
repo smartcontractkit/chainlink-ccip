@@ -92,7 +92,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event CCVConfigUpdated(uint64 indexed remoteChainSelector, address[] outboundCCVs, address[] inboundCCVs);
-  event FinalityConfigUpdated(uint16 finalityConfig, uint16 customFinalityTransferFeeBps, uint256 maxAmountPerRequest);
+  event FinalityConfigUpdated(uint16 finalityConfig, uint256 maxAmountPerRequest);
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
   event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector);
   /// @notice Emitted when pool fees are withdrawn.
@@ -120,9 +120,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   struct CustomFinalityConfig {
-    uint16 finalityThreshold; // ────────────╮ Minimum block depth on the source chain that token issuers consider sufficiently secure.
-    //                                       | 0 means the default finality.
-    uint16 customFinalityTransferFeeBps; // ─╯ Fee in basis points for custom finality transfers [0-10_000].
+    // 0 means the default finality.
+    uint16 finalityThreshold; // Minimum block depth on the source chain that token issuers consider sufficiently secure
     uint256 maxAmountPerRequest; // Maximum amount allowed per transfer request.
     // Separate buckets isolate custom-finality limits so these transfers cannot deplete the primary pool rate limits.
     mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) outboundRateLimiterConfig;
@@ -857,19 +856,14 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Updates the finality configuration for token transfers.
   function applyFinalityConfigUpdates(
     uint16 finalityThreshold,
-    uint16 customFinalityTransferFeeBps,
     uint256 maxAmountPerRequest,
     CustomFinalityRateLimitConfigArgs[] calldata rateLimitConfigArgs
   ) external virtual onlyOwner {
     CustomFinalityConfig storage finalityConfig = s_finalityConfig;
     finalityConfig.finalityThreshold = finalityThreshold;
-    if (customFinalityTransferFeeBps >= BPS_DIVIDER) {
-      revert InvalidTransferFeeBps();
-    }
-    finalityConfig.customFinalityTransferFeeBps = customFinalityTransferFeeBps;
     finalityConfig.maxAmountPerRequest = maxAmountPerRequest;
     _setCustomFinalityRateLimitConfig(rateLimitConfigArgs);
-    emit FinalityConfigUpdated(finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest);
+    emit FinalityConfigUpdated(finalityThreshold, maxAmountPerRequest);
   }
 
   /// @notice Sets the custom finality based rate limit configurations for specified remote chains.
@@ -1053,12 +1047,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 finality
   ) internal view virtual returns (uint256 destAmount) {
-    destAmount = lockOrBurnIn.amount;
-    if (finality != 0) {
-      // deduct custom finality transfer fee
-      destAmount -= (lockOrBurnIn.amount * s_finalityConfig.customFinalityTransferFeeBps) / BPS_DIVIDER;
-    }
-    // TODO : normal transfer fee
+    uint256 feeBps = finality != 0
+      ? s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector].customFinalityTransferFeeBps
+      : s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector].defaultFinalityTransferFeeBps;
+
+    destAmount = lockOrBurnIn.amount - (lockOrBurnIn.amount * feeBps) / BPS_DIVIDER;
     return destAmount;
   }
 }
