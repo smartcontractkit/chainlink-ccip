@@ -20,9 +20,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 )
@@ -57,16 +57,16 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			chainSelector := uint64(5009297550715157269)
-			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-				chainSelector: {NumAdditionalAccounts: 1},
-			})
-			require.NoError(t, err, "Failed to create test environment")
-			evmChain := e.BlockChains.EVMChains()[chainSelector]
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainSelector}),
+			)
+			require.NoError(t, err, "Failed to create environment")
+			require.NotNil(t, e, "Environment should be created")
 
 			report, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				sequences.DeployChainContracts,
-				evmChain,
+				e.BlockChains.EVMChains()[chainSelector],
 				sequences.DeployChainContractsInput{
 					ChainSelector:     chainSelector,
 					ExistingAddresses: test.existingAddresses,
@@ -116,12 +116,11 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 
 func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 	t.Run("sequential deployments", func(t *testing.T) {
-		e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-			5009297550715157269: {NumAdditionalAccounts: 1},
-			4949039107694359620: {NumAdditionalAccounts: 1},
-			6433500567565415381: {NumAdditionalAccounts: 1},
-		})
-		require.NoError(t, err, "Failed to create test environment")
+		e, err := environment.New(t.Context(),
+			environment.WithEVMSimulated(t, []uint64{5009297550715157269, 4949039107694359620, 6433500567565415381}),
+		)
+		require.NoError(t, err, "Failed to create environment")
+		require.NotNil(t, e, "Environment should be created")
 		evmChains := e.BlockChains.EVMChains()
 
 		// Deploy to each chain sequentially using the same bundle
@@ -149,12 +148,11 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 	})
 
 	t.Run("concurrent deployments", func(t *testing.T) {
-		e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-			5009297550715157269: {NumAdditionalAccounts: 1},
-			4949039107694359620: {NumAdditionalAccounts: 1},
-			6433500567565415381: {NumAdditionalAccounts: 1},
-		})
-		require.NoError(t, err, "Failed to create test environment")
+		e, err := environment.New(t.Context(),
+			environment.WithEVMSimulated(t, []uint64{5009297550715157269, 4949039107694359620, 6433500567565415381}),
+		)
+		require.NoError(t, err, "Failed to create environment")
+		require.NotNil(t, e, "Environment should be created")
 		evmChains := e.BlockChains.EVMChains()
 
 		// Deploy to all chains concurrently using the same bundle

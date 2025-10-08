@@ -13,8 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,19 +29,18 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-				5009297550715157269: {NumAdditionalAccounts: 1},
-				4356164186791070119: {NumAdditionalAccounts: 1},
-			})
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{5009297550715157269, 4356164186791070119}),
+			)
 			require.NoError(t, err, "Failed to create test environment")
-			evmChains := e.BlockChains.EVMChains()
+			require.NotNil(t, e, "Environment should be created")
 
 			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
 
 			// Deploy both chains
 			runningDataStore := datastore.NewMemoryDataStore()
-			for _, evmChain := range evmChains {
-				out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+			for _, evmChain := range e.BlockChains.EVMChains() {
+				out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 					MCMS: mcms.Input{},
 					Cfg: changesets.DeployChainContractsCfg{
 						ChainSel: evmChain.Selector,
@@ -54,7 +53,7 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 			}
 			e.DataStore = runningDataStore.Seal() // Override datastore in environment to include deployed contracts
 
-			_, err = changesets.ConfigureChainForLanes(mcmsRegistry).Apply(e, cs_core.WithMCMS[changesets.ConfigureChainForLanesCfg]{
+			_, err = changesets.ConfigureChainForLanes(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.ConfigureChainForLanesCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.ConfigureChainForLanesCfg{
 					ChainSel: 5009297550715157269,

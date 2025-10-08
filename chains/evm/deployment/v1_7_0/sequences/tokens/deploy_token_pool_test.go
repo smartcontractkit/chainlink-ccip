@@ -16,9 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 )
@@ -153,10 +153,11 @@ func TestDeployTokenPool(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			chainSel := uint64(5009297550715157269)
-			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-				chainSel: {NumAdditionalAccounts: 1},
-			})
-			require.NoError(t, err, "Failed to create test environment")
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainSel}),
+			)
+			require.NoError(t, err, "Failed to create environment")
+			require.NotNil(t, e, "Environment should be created")
 
 			// Deploy chain
 			chainReport, err := operations.ExecuteSequence(
@@ -206,7 +207,7 @@ func TestDeployTokenPool(t *testing.T) {
 
 			// Check token
 			getTokenReport, err := operations.ExecuteOperation(
-				e.OperationsBundle,
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				token_pool.GetToken,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
@@ -219,7 +220,7 @@ func TestDeployTokenPool(t *testing.T) {
 
 			// Check router
 			getRouterReport, err := operations.ExecuteOperation(
-				e.OperationsBundle,
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				token_pool.GetRouter,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
@@ -232,7 +233,7 @@ func TestDeployTokenPool(t *testing.T) {
 
 			// Check rmn proxy
 			getRmnProxyReport, err := operations.ExecuteOperation(
-				e.OperationsBundle,
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				token_pool.GetRmnProxy,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
@@ -245,7 +246,7 @@ func TestDeployTokenPool(t *testing.T) {
 
 			// Check allowlist
 			getAllowlistReport, err := operations.ExecuteOperation(
-				e.OperationsBundle,
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				token_pool.GetAllowList,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
@@ -257,9 +258,8 @@ func TestDeployTokenPool(t *testing.T) {
 			require.Equal(t, input.ConstructorArgs.Allowlist, getAllowlistReport.Output, "Expected allowlist address to be the same as the deployed allowlist")
 
 			// Check rate limit admin
-			/* TODO: This is broken, rateLimitAdmin is not getting set for some reason. Need to investigate.
 			getRateLimitAdminReport, err := operations.ExecuteOperation(
-				e.OperationsBundle,
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				token_pool.GetRateLimitAdmin,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
@@ -269,7 +269,6 @@ func TestDeployTokenPool(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.RateLimitAdmin, getRateLimitAdminReport.Output, "Expected rate limit admin address to be the same as the deployed rate limit admin")
-			*/
 		})
 	}
 }

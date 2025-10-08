@@ -115,7 +115,7 @@ var DeployBurnMintTokenAndPool = cldf_ops.NewSequence(
 		}
 
 		// Revoke mint role from the deployer key for safety.
-		revokeMintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc677.RevokeBurnRole, chain, evm_contract.FunctionInput[common.Address]{
+		revokeMintReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc677.RevokeMintRole, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.DeployTokenPoolInput.ChainSel,
 			Address:       common.HexToAddress(deployTokenReport.Output.Address),
 			Args:          chain.DeployerKey.From,

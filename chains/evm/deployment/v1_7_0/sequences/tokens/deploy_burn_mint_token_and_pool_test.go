@@ -15,8 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	token_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
 	"github.com/stretchr/testify/require"
@@ -76,10 +76,10 @@ func TestDeployBurnMintTokenAndPool(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			chainSel := uint64(5009297550715157269)
-			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-				chainSel: {NumAdditionalAccounts: 1},
-			})
-			require.NoError(t, err, "Failed to create test environment")
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainSel}),
+			)
+			require.NoError(t, err, "Failed to create environment")
 			require.NotNil(t, e, "Environment should be created")
 
 			// Deploy chain
@@ -130,12 +130,10 @@ func TestDeployBurnMintTokenAndPool(t *testing.T) {
 			require.NoError(t, err, "TotalSupply should not error")
 			require.Equal(t, input.TokenInfo.MaxSupply, totalSupply, "Expected token total supply to be the same as the deployed token")
 
-			/* TODO: This is broken, EOA is not getting removed as minter for some reason. Need to investigate.
 			// Check token minters
 			minters, err := token.GetMinters(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
 			require.NoError(t, err, "GetMinters should not error")
 			require.Equal(t, []common.Address{common.HexToAddress(poolAddress)}, minters, "Expected token pool to be the minter of the token")
-			*/
 
 			// Check token burners
 			burners, err := token.GetBurners(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
