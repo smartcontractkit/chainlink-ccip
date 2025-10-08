@@ -20,7 +20,6 @@
     "contracts/v1.5-CCIP-License-grants.md",
     "!contracts/test/**/*",
     "contracts/test/mocks/**/*",
-    "!contracts/test/mocks/test/*",
     "contracts/test/helpers/**/*",
     "scripts/compile_all",
     "abi/*.abi.json",
