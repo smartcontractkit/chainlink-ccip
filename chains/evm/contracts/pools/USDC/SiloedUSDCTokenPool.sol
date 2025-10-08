@@ -70,7 +70,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "SiloedUSDCTokenPool 1.6.4-dev";
+    return "SiloedUSDCTokenPool 1.6.x-dev";
   }
 
   /// @inheritdoc SiloedLockReleaseTokenPool

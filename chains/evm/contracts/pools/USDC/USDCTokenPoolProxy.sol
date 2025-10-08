@@ -70,7 +70,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
   /// @dev The legacy CCTP V1, CCTP V1, and CCTP V2 pools which interact with CCTP contracts.
   PoolAddresses internal s_pools;
 
-  string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.4-dev";
+  string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.x-dev";
 
   constructor(IERC20 token, PoolAddresses memory pools, address router) {
     // Note: It is not required that every pool address be set, as this proxy may be deployed on a chain which does not
