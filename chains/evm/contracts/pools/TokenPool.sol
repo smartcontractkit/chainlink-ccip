@@ -356,7 +356,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - RMN curse status
   /// - allowlist status
   /// - if the sender is a valid onRamp
-  /// - rate limiting for either default finality or custom-transfer lanes.
+  /// - rate limiting for either default or custom-finality transfer messages.
   /// @param lockOrBurnIn The input to validate.
   /// @param finality The finality depth requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
