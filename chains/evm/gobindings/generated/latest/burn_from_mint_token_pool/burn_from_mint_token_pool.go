@@ -104,7 +104,7 @@ type TokenPoolChainUpdate struct {
 	InboundRateLimiterConfig  RateLimiterConfig
 }
 
-type TokenPoolCustomFinalityRateLimitConfigArgs struct {
+type TokenPoolFastFinalityRateLimitConfigArgs struct {
 	RemoteChainSelector       uint64
 	OutboundRateLimiterConfig RateLimiterConfig
 	InboundRateLimiterConfig  RateLimiterConfig
@@ -800,16 +800,16 @@ func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactorSession) ApplyChain
 	return _BurnFromMintTokenPool.Contract.ApplyChainUpdates(&_BurnFromMintTokenPool.TransactOpts, remoteChainSelectorsToRemove, chainsToAdd)
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactor) ApplyFinalityConfigUpdates(opts *bind.TransactOpts, finalityThreshold uint16, customFinalityTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _BurnFromMintTokenPool.contract.Transact(opts, "applyFinalityConfigUpdates", finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactor) ApplyFinalityConfigUpdates(opts *bind.TransactOpts, finalityThreshold uint16, fastTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _BurnFromMintTokenPool.contract.Transact(opts, "applyFinalityConfigUpdates", finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolSession) ApplyFinalityConfigUpdates(finalityThreshold uint16, customFinalityTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _BurnFromMintTokenPool.Contract.ApplyFinalityConfigUpdates(&_BurnFromMintTokenPool.TransactOpts, finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolSession) ApplyFinalityConfigUpdates(finalityThreshold uint16, fastTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _BurnFromMintTokenPool.Contract.ApplyFinalityConfigUpdates(&_BurnFromMintTokenPool.TransactOpts, finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactorSession) ApplyFinalityConfigUpdates(finalityThreshold uint16, customFinalityTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _BurnFromMintTokenPool.Contract.ApplyFinalityConfigUpdates(&_BurnFromMintTokenPool.TransactOpts, finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactorSession) ApplyFinalityConfigUpdates(finalityThreshold uint16, fastTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _BurnFromMintTokenPool.Contract.ApplyFinalityConfigUpdates(&_BurnFromMintTokenPool.TransactOpts, finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
 }
 
 func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactor) ApplyTokenTransferFeeConfigUpdates(opts *bind.TransactOpts, tokenTransferFeeConfigArgs []TokenPoolTokenTransferFeeConfigArgs, destToUseDefaultFeeConfigs []uint64) (*types.Transaction, error) {
@@ -908,16 +908,16 @@ func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactorSession) SetChainRa
 	return _BurnFromMintTokenPool.Contract.SetChainRateLimiterConfigs(&_BurnFromMintTokenPool.TransactOpts, remoteChainSelectors, outboundConfigs, inboundConfigs)
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactor) SetCustomFinalityRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _BurnFromMintTokenPool.contract.Transact(opts, "setCustomFinalityRateLimitConfig", rateLimitConfigArgs)
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactor) SetFastFinalityRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _BurnFromMintTokenPool.contract.Transact(opts, "setFastFinalityRateLimitConfig", rateLimitConfigArgs)
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolSession) SetCustomFinalityRateLimitConfig(rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _BurnFromMintTokenPool.Contract.SetCustomFinalityRateLimitConfig(&_BurnFromMintTokenPool.TransactOpts, rateLimitConfigArgs)
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolSession) SetFastFinalityRateLimitConfig(rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _BurnFromMintTokenPool.Contract.SetFastFinalityRateLimitConfig(&_BurnFromMintTokenPool.TransactOpts, rateLimitConfigArgs)
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactorSession) SetCustomFinalityRateLimitConfig(rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _BurnFromMintTokenPool.Contract.SetCustomFinalityRateLimitConfig(&_BurnFromMintTokenPool.TransactOpts, rateLimitConfigArgs)
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactorSession) SetFastFinalityRateLimitConfig(rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _BurnFromMintTokenPool.Contract.SetFastFinalityRateLimitConfig(&_BurnFromMintTokenPool.TransactOpts, rateLimitConfigArgs)
 }
 
 func (_BurnFromMintTokenPool *BurnFromMintTokenPoolTransactor) SetRateLimitAdmin(opts *bind.TransactOpts, rateLimitAdmin common.Address) (*types.Transaction, error) {
@@ -1804,8 +1804,8 @@ func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) ParseConfigChanged(
 	return event, nil
 }
 
-type BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIterator struct {
-	Event *BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed
+type BurnFromMintTokenPoolFastTransferInboundRateLimitConsumedIterator struct {
+	Event *BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed
 
 	contract *bind.BoundContract
 	event    string
@@ -1816,7 +1816,7 @@ type BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIterator
 	fail error
 }
 
-func (it *BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIterator) Next() bool {
+func (it *BurnFromMintTokenPoolFastTransferInboundRateLimitConsumedIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -1825,7 +1825,7 @@ func (it *BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIte
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed)
+			it.Event = new(BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1840,7 +1840,7 @@ func (it *BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIte
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed)
+		it.Event = new(BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1855,44 +1855,44 @@ func (it *BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIte
 	}
 }
 
-func (it *BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIterator) Error() error {
+func (it *BurnFromMintTokenPoolFastTransferInboundRateLimitConsumedIterator) Error() error {
 	return it.fail
 }
 
-func (it *BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIterator) Close() error {
+func (it *BurnFromMintTokenPoolFastTransferInboundRateLimitConsumedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed struct {
+type BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed struct {
 	RemoteChainSelector uint64
 	Token               common.Address
 	Amount              *big.Int
 	Raw                 types.Log
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) FilterCustomFinalityTransferInboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIterator, error) {
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) FilterFastTransferInboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnFromMintTokenPoolFastTransferInboundRateLimitConsumedIterator, error) {
 
 	var remoteChainSelectorRule []interface{}
 	for _, remoteChainSelectorItem := range remoteChainSelector {
 		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
 	}
 
-	logs, sub, err := _BurnFromMintTokenPool.contract.FilterLogs(opts, "CustomFinalityTransferInboundRateLimitConsumed", remoteChainSelectorRule)
+	logs, sub, err := _BurnFromMintTokenPool.contract.FilterLogs(opts, "FastTransferInboundRateLimitConsumed", remoteChainSelectorRule)
 	if err != nil {
 		return nil, err
 	}
-	return &BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIterator{contract: _BurnFromMintTokenPool.contract, event: "CustomFinalityTransferInboundRateLimitConsumed", logs: logs, sub: sub}, nil
+	return &BurnFromMintTokenPoolFastTransferInboundRateLimitConsumedIterator{contract: _BurnFromMintTokenPool.contract, event: "FastTransferInboundRateLimitConsumed", logs: logs, sub: sub}, nil
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) WatchCustomFinalityTransferInboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error) {
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) WatchFastTransferInboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error) {
 
 	var remoteChainSelectorRule []interface{}
 	for _, remoteChainSelectorItem := range remoteChainSelector {
 		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
 	}
 
-	logs, sub, err := _BurnFromMintTokenPool.contract.WatchLogs(opts, "CustomFinalityTransferInboundRateLimitConsumed", remoteChainSelectorRule)
+	logs, sub, err := _BurnFromMintTokenPool.contract.WatchLogs(opts, "FastTransferInboundRateLimitConsumed", remoteChainSelectorRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1902,8 +1902,8 @@ func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) WatchCustomFinality
 			select {
 			case log := <-logs:
 
-				event := new(BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed)
-				if err := _BurnFromMintTokenPool.contract.UnpackLog(event, "CustomFinalityTransferInboundRateLimitConsumed", log); err != nil {
+				event := new(BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed)
+				if err := _BurnFromMintTokenPool.contract.UnpackLog(event, "FastTransferInboundRateLimitConsumed", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1924,17 +1924,17 @@ func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) WatchCustomFinality
 	}), nil
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) ParseCustomFinalityTransferInboundRateLimitConsumed(log types.Log) (*BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed, error) {
-	event := new(BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed)
-	if err := _BurnFromMintTokenPool.contract.UnpackLog(event, "CustomFinalityTransferInboundRateLimitConsumed", log); err != nil {
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) ParseFastTransferInboundRateLimitConsumed(log types.Log) (*BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed, error) {
+	event := new(BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed)
+	if err := _BurnFromMintTokenPool.contract.UnpackLog(event, "FastTransferInboundRateLimitConsumed", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-type BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIterator struct {
-	Event *BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed
+type BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumedIterator struct {
+	Event *BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed
 
 	contract *bind.BoundContract
 	event    string
@@ -1945,7 +1945,7 @@ type BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIterato
 	fail error
 }
 
-func (it *BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIterator) Next() bool {
+func (it *BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumedIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -1954,7 +1954,7 @@ func (it *BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIt
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed)
+			it.Event = new(BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1969,7 +1969,7 @@ func (it *BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIt
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed)
+		it.Event = new(BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1984,44 +1984,44 @@ func (it *BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIt
 	}
 }
 
-func (it *BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIterator) Error() error {
+func (it *BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumedIterator) Error() error {
 	return it.fail
 }
 
-func (it *BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIterator) Close() error {
+func (it *BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed struct {
+type BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed struct {
 	RemoteChainSelector uint64
 	Token               common.Address
 	Amount              *big.Int
 	Raw                 types.Log
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) FilterCustomFinalityTransferOutboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIterator, error) {
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) FilterFastTransferOutboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumedIterator, error) {
 
 	var remoteChainSelectorRule []interface{}
 	for _, remoteChainSelectorItem := range remoteChainSelector {
 		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
 	}
 
-	logs, sub, err := _BurnFromMintTokenPool.contract.FilterLogs(opts, "CustomFinalityTransferOutboundRateLimitConsumed", remoteChainSelectorRule)
+	logs, sub, err := _BurnFromMintTokenPool.contract.FilterLogs(opts, "FastTransferOutboundRateLimitConsumed", remoteChainSelectorRule)
 	if err != nil {
 		return nil, err
 	}
-	return &BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIterator{contract: _BurnFromMintTokenPool.contract, event: "CustomFinalityTransferOutboundRateLimitConsumed", logs: logs, sub: sub}, nil
+	return &BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumedIterator{contract: _BurnFromMintTokenPool.contract, event: "FastTransferOutboundRateLimitConsumed", logs: logs, sub: sub}, nil
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) WatchCustomFinalityTransferOutboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error) {
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) WatchFastTransferOutboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error) {
 
 	var remoteChainSelectorRule []interface{}
 	for _, remoteChainSelectorItem := range remoteChainSelector {
 		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
 	}
 
-	logs, sub, err := _BurnFromMintTokenPool.contract.WatchLogs(opts, "CustomFinalityTransferOutboundRateLimitConsumed", remoteChainSelectorRule)
+	logs, sub, err := _BurnFromMintTokenPool.contract.WatchLogs(opts, "FastTransferOutboundRateLimitConsumed", remoteChainSelectorRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2031,8 +2031,8 @@ func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) WatchCustomFinality
 			select {
 			case log := <-logs:
 
-				event := new(BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed)
-				if err := _BurnFromMintTokenPool.contract.UnpackLog(event, "CustomFinalityTransferOutboundRateLimitConsumed", log); err != nil {
+				event := new(BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed)
+				if err := _BurnFromMintTokenPool.contract.UnpackLog(event, "FastTransferOutboundRateLimitConsumed", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2053,9 +2053,9 @@ func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) WatchCustomFinality
 	}), nil
 }
 
-func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) ParseCustomFinalityTransferOutboundRateLimitConsumed(log types.Log) (*BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed, error) {
-	event := new(BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed)
-	if err := _BurnFromMintTokenPool.contract.UnpackLog(event, "CustomFinalityTransferOutboundRateLimitConsumed", log); err != nil {
+func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) ParseFastTransferOutboundRateLimitConsumed(log types.Log) (*BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed, error) {
+	event := new(BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed)
+	if err := _BurnFromMintTokenPool.contract.UnpackLog(event, "FastTransferOutboundRateLimitConsumed", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -2123,10 +2123,10 @@ func (it *BurnFromMintTokenPoolFinalityConfigUpdatedIterator) Close() error {
 }
 
 type BurnFromMintTokenPoolFinalityConfigUpdated struct {
-	FinalityConfig               uint16
-	CustomFinalityTransferFeeBps uint16
-	MaxAmountPerRequest          *big.Int
-	Raw                          types.Log
+	FinalityConfig      uint16
+	FastTransferFeeBps  uint16
+	MaxAmountPerRequest *big.Int
+	Raw                 types.Log
 }
 
 func (_BurnFromMintTokenPool *BurnFromMintTokenPoolFilterer) FilterFinalityConfigUpdated(opts *bind.FilterOpts) (*BurnFromMintTokenPoolFinalityConfigUpdatedIterator, error) {
@@ -3874,12 +3874,12 @@ func (BurnFromMintTokenPoolConfigChanged) Topic() common.Hash {
 	return common.HexToHash("0x9ea3374b67bf275e6bb9c8ae68f9cae023e1c528b4b27e092f0bb209d3531c19")
 }
 
-func (BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed) Topic() common.Hash {
-	return common.HexToHash("0x41a8aa8df7945f0fb8ac5f7d88279638d9dc2ef9a6bf4ec9a53b80681b34aff7")
+func (BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed) Topic() common.Hash {
+	return common.HexToHash("0xec8efbbe1188357e808975e80f998488a9c2747d618ffc39270836058a44428e")
 }
 
-func (BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed) Topic() common.Hash {
-	return common.HexToHash("0x343b97d8450aed1863423e09d2bb0dc2062ceb982a695c4c376c7ed1bb4a2bbb")
+func (BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed) Topic() common.Hash {
+	return common.HexToHash("0x251a578f8b9ffb7cb748680c76e7895fe65b3fcf44c2bd03e4f163dc38b2ed0b")
 }
 
 func (BurnFromMintTokenPoolFinalityConfigUpdated) Topic() common.Hash {
@@ -3997,7 +3997,7 @@ type BurnFromMintTokenPoolInterface interface {
 
 	ApplyChainUpdates(opts *bind.TransactOpts, remoteChainSelectorsToRemove []uint64, chainsToAdd []TokenPoolChainUpdate) (*types.Transaction, error)
 
-	ApplyFinalityConfigUpdates(opts *bind.TransactOpts, finalityThreshold uint16, customFinalityTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error)
+	ApplyFinalityConfigUpdates(opts *bind.TransactOpts, finalityThreshold uint16, fastTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error)
 
 	ApplyTokenTransferFeeConfigUpdates(opts *bind.TransactOpts, tokenTransferFeeConfigArgs []TokenPoolTokenTransferFeeConfigArgs, destToUseDefaultFeeConfigs []uint64) (*types.Transaction, error)
 
@@ -4015,7 +4015,7 @@ type BurnFromMintTokenPoolInterface interface {
 
 	SetChainRateLimiterConfigs(opts *bind.TransactOpts, remoteChainSelectors []uint64, outboundConfigs []RateLimiterConfig, inboundConfigs []RateLimiterConfig) (*types.Transaction, error)
 
-	SetCustomFinalityRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error)
+	SetFastFinalityRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error)
 
 	SetRateLimitAdmin(opts *bind.TransactOpts, rateLimitAdmin common.Address) (*types.Transaction, error)
 
@@ -4067,17 +4067,17 @@ type BurnFromMintTokenPoolInterface interface {
 
 	ParseConfigChanged(log types.Log) (*BurnFromMintTokenPoolConfigChanged, error)
 
-	FilterCustomFinalityTransferInboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumedIterator, error)
+	FilterFastTransferInboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnFromMintTokenPoolFastTransferInboundRateLimitConsumedIterator, error)
 
-	WatchCustomFinalityTransferInboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error)
+	WatchFastTransferInboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error)
 
-	ParseCustomFinalityTransferInboundRateLimitConsumed(log types.Log) (*BurnFromMintTokenPoolCustomFinalityTransferInboundRateLimitConsumed, error)
+	ParseFastTransferInboundRateLimitConsumed(log types.Log) (*BurnFromMintTokenPoolFastTransferInboundRateLimitConsumed, error)
 
-	FilterCustomFinalityTransferOutboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumedIterator, error)
+	FilterFastTransferOutboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumedIterator, error)
 
-	WatchCustomFinalityTransferOutboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error)
+	WatchFastTransferOutboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error)
 
-	ParseCustomFinalityTransferOutboundRateLimitConsumed(log types.Log) (*BurnFromMintTokenPoolCustomFinalityTransferOutboundRateLimitConsumed, error)
+	ParseFastTransferOutboundRateLimitConsumed(log types.Log) (*BurnFromMintTokenPoolFastTransferOutboundRateLimitConsumed, error)
 
 	FilterFinalityConfigUpdated(opts *bind.FilterOpts) (*BurnFromMintTokenPoolFinalityConfigUpdatedIterator, error)
 

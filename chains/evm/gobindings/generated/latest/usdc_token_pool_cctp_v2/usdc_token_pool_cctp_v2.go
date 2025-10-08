@@ -109,7 +109,7 @@ type TokenPoolChainUpdate struct {
 	InboundRateLimiterConfig  RateLimiterConfig
 }
 
-type TokenPoolCustomFinalityRateLimitConfigArgs struct {
+type TokenPoolFastFinalityRateLimitConfigArgs struct {
 	RemoteChainSelector       uint64
 	OutboundRateLimiterConfig RateLimiterConfig
 	InboundRateLimiterConfig  RateLimiterConfig
@@ -1008,16 +1008,16 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) ApplyChainUpda
 	return _USDCTokenPoolCCTPV2.Contract.ApplyChainUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, remoteChainSelectorsToRemove, chainsToAdd)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) ApplyFinalityConfigUpdates(opts *bind.TransactOpts, finalityThreshold uint16, customFinalityTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "applyFinalityConfigUpdates", finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) ApplyFinalityConfigUpdates(opts *bind.TransactOpts, finalityThreshold uint16, fastTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "applyFinalityConfigUpdates", finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) ApplyFinalityConfigUpdates(finalityThreshold uint16, customFinalityTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.ApplyFinalityConfigUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) ApplyFinalityConfigUpdates(finalityThreshold uint16, fastTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.Contract.ApplyFinalityConfigUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) ApplyFinalityConfigUpdates(finalityThreshold uint16, customFinalityTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.ApplyFinalityConfigUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) ApplyFinalityConfigUpdates(finalityThreshold uint16, fastTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.Contract.ApplyFinalityConfigUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, finalityThreshold, fastTransferFeeBps, maxAmountPerRequest, rateLimitConfigArgs)
 }
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) ApplyTokenTransferFeeConfigUpdates(opts *bind.TransactOpts, tokenTransferFeeConfigArgs []TokenPoolTokenTransferFeeConfigArgs, destToUseDefaultFeeConfigs []uint64) (*types.Transaction, error) {
@@ -1116,18 +1116,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetChainRateLi
 	return _USDCTokenPoolCCTPV2.Contract.SetChainRateLimiterConfigs(&_USDCTokenPoolCCTPV2.TransactOpts, remoteChainSelectors, outboundConfigs, inboundConfigs)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetCustomFinalityRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setCustomFinalityRateLimitConfig", rateLimitConfigArgs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) SetCustomFinalityRateLimitConfig(rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetCustomFinalityRateLimitConfig(&_USDCTokenPoolCCTPV2.TransactOpts, rateLimitConfigArgs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetCustomFinalityRateLimitConfig(rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetCustomFinalityRateLimitConfig(&_USDCTokenPoolCCTPV2.TransactOpts, rateLimitConfigArgs)
-}
-
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetDomains(opts *bind.TransactOpts, domains []USDCTokenPoolDomainUpdate) (*types.Transaction, error) {
 	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setDomains", domains)
 }
@@ -1138,6 +1126,18 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) SetDomains(domains []USD
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetDomains(domains []USDCTokenPoolDomainUpdate) (*types.Transaction, error) {
 	return _USDCTokenPoolCCTPV2.Contract.SetDomains(&_USDCTokenPoolCCTPV2.TransactOpts, domains)
+}
+
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetFastFinalityRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setFastFinalityRateLimitConfig", rateLimitConfigArgs)
+}
+
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) SetFastFinalityRateLimitConfig(rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.Contract.SetFastFinalityRateLimitConfig(&_USDCTokenPoolCCTPV2.TransactOpts, rateLimitConfigArgs)
+}
+
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetFastFinalityRateLimitConfig(rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.Contract.SetFastFinalityRateLimitConfig(&_USDCTokenPoolCCTPV2.TransactOpts, rateLimitConfigArgs)
 }
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetRateLimitAdmin(opts *bind.TransactOpts, rateLimitAdmin common.Address) (*types.Transaction, error) {
@@ -2375,264 +2375,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseConfigSet(log type
 	return event, nil
 }
 
-type USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumedIterator struct {
-	Event *USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumedIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumedIterator) Error() error {
-	return it.fail
-}
-
-func (it *USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed struct {
-	RemoteChainSelector uint64
-	Token               common.Address
-	Amount              *big.Int
-	Raw                 types.Log
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterCustomFinalityTransferInboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumedIterator, error) {
-
-	var remoteChainSelectorRule []interface{}
-	for _, remoteChainSelectorItem := range remoteChainSelector {
-		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
-	}
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "CustomFinalityTransferInboundRateLimitConsumed", remoteChainSelectorRule)
-	if err != nil {
-		return nil, err
-	}
-	return &USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumedIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "CustomFinalityTransferInboundRateLimitConsumed", logs: logs, sub: sub}, nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchCustomFinalityTransferInboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error) {
-
-	var remoteChainSelectorRule []interface{}
-	for _, remoteChainSelectorItem := range remoteChainSelector {
-		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
-	}
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "CustomFinalityTransferInboundRateLimitConsumed", remoteChainSelectorRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed)
-				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "CustomFinalityTransferInboundRateLimitConsumed", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseCustomFinalityTransferInboundRateLimitConsumed(log types.Log) (*USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed, error) {
-	event := new(USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed)
-	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "CustomFinalityTransferInboundRateLimitConsumed", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-type USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumedIterator struct {
-	Event *USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumedIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumedIterator) Error() error {
-	return it.fail
-}
-
-func (it *USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed struct {
-	RemoteChainSelector uint64
-	Token               common.Address
-	Amount              *big.Int
-	Raw                 types.Log
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterCustomFinalityTransferOutboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumedIterator, error) {
-
-	var remoteChainSelectorRule []interface{}
-	for _, remoteChainSelectorItem := range remoteChainSelector {
-		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
-	}
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "CustomFinalityTransferOutboundRateLimitConsumed", remoteChainSelectorRule)
-	if err != nil {
-		return nil, err
-	}
-	return &USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumedIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "CustomFinalityTransferOutboundRateLimitConsumed", logs: logs, sub: sub}, nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchCustomFinalityTransferOutboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error) {
-
-	var remoteChainSelectorRule []interface{}
-	for _, remoteChainSelectorItem := range remoteChainSelector {
-		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
-	}
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "CustomFinalityTransferOutboundRateLimitConsumed", remoteChainSelectorRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed)
-				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "CustomFinalityTransferOutboundRateLimitConsumed", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseCustomFinalityTransferOutboundRateLimitConsumed(log types.Log) (*USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed, error) {
-	event := new(USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed)
-	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "CustomFinalityTransferOutboundRateLimitConsumed", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
 type USDCTokenPoolCCTPV2DomainsSetIterator struct {
 	Event *USDCTokenPoolCCTPV2DomainsSet
 
@@ -2750,6 +2492,264 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseDomainsSet(log typ
 	return event, nil
 }
 
+type USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumedIterator struct {
+	Event *USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumedIterator) Error() error {
+	return it.fail
+}
+
+func (it *USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed struct {
+	RemoteChainSelector uint64
+	Token               common.Address
+	Amount              *big.Int
+	Raw                 types.Log
+}
+
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterFastTransferInboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumedIterator, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "FastTransferInboundRateLimitConsumed", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumedIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "FastTransferInboundRateLimitConsumed", logs: logs, sub: sub}, nil
+}
+
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchFastTransferInboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "FastTransferInboundRateLimitConsumed", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed)
+				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "FastTransferInboundRateLimitConsumed", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseFastTransferInboundRateLimitConsumed(log types.Log) (*USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed, error) {
+	event := new(USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed)
+	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "FastTransferInboundRateLimitConsumed", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumedIterator struct {
+	Event *USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumedIterator) Error() error {
+	return it.fail
+}
+
+func (it *USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed struct {
+	RemoteChainSelector uint64
+	Token               common.Address
+	Amount              *big.Int
+	Raw                 types.Log
+}
+
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterFastTransferOutboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumedIterator, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "FastTransferOutboundRateLimitConsumed", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumedIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "FastTransferOutboundRateLimitConsumed", logs: logs, sub: sub}, nil
+}
+
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchFastTransferOutboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "FastTransferOutboundRateLimitConsumed", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed)
+				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "FastTransferOutboundRateLimitConsumed", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseFastTransferOutboundRateLimitConsumed(log types.Log) (*USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed, error) {
+	event := new(USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed)
+	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "FastTransferOutboundRateLimitConsumed", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
 type USDCTokenPoolCCTPV2FinalityConfigUpdatedIterator struct {
 	Event *USDCTokenPoolCCTPV2FinalityConfigUpdated
 
@@ -2811,10 +2811,10 @@ func (it *USDCTokenPoolCCTPV2FinalityConfigUpdatedIterator) Close() error {
 }
 
 type USDCTokenPoolCCTPV2FinalityConfigUpdated struct {
-	FinalityConfig               uint16
-	CustomFinalityTransferFeeBps uint16
-	MaxAmountPerRequest          *big.Int
-	Raw                          types.Log
+	FinalityConfig      uint16
+	FastTransferFeeBps  uint16
+	MaxAmountPerRequest *big.Int
+	Raw                 types.Log
 }
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterFinalityConfigUpdated(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2FinalityConfigUpdatedIterator, error) {
@@ -4574,16 +4574,16 @@ func (USDCTokenPoolCCTPV2ConfigSet) Topic() common.Hash {
 	return common.HexToHash("0x2e902d38f15b233cbb63711add0fca4545334d3a169d60c0a616494d7eea9544")
 }
 
-func (USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed) Topic() common.Hash {
-	return common.HexToHash("0x41a8aa8df7945f0fb8ac5f7d88279638d9dc2ef9a6bf4ec9a53b80681b34aff7")
-}
-
-func (USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed) Topic() common.Hash {
-	return common.HexToHash("0x343b97d8450aed1863423e09d2bb0dc2062ceb982a695c4c376c7ed1bb4a2bbb")
-}
-
 func (USDCTokenPoolCCTPV2DomainsSet) Topic() common.Hash {
 	return common.HexToHash("0xe6d14ea297366c7bc1265d289d924bfd8b9afb148eb972b481f70da41c842cf5")
+}
+
+func (USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed) Topic() common.Hash {
+	return common.HexToHash("0xec8efbbe1188357e808975e80f998488a9c2747d618ffc39270836058a44428e")
+}
+
+func (USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed) Topic() common.Hash {
+	return common.HexToHash("0x251a578f8b9ffb7cb748680c76e7895fe65b3fcf44c2bd03e4f163dc38b2ed0b")
 }
 
 func (USDCTokenPoolCCTPV2FinalityConfigUpdated) Topic() common.Hash {
@@ -4719,7 +4719,7 @@ type USDCTokenPoolCCTPV2Interface interface {
 
 	ApplyChainUpdates(opts *bind.TransactOpts, remoteChainSelectorsToRemove []uint64, chainsToAdd []TokenPoolChainUpdate) (*types.Transaction, error)
 
-	ApplyFinalityConfigUpdates(opts *bind.TransactOpts, finalityThreshold uint16, customFinalityTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error)
+	ApplyFinalityConfigUpdates(opts *bind.TransactOpts, finalityThreshold uint16, fastTransferFeeBps uint16, maxAmountPerRequest *big.Int, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error)
 
 	ApplyTokenTransferFeeConfigUpdates(opts *bind.TransactOpts, tokenTransferFeeConfigArgs []TokenPoolTokenTransferFeeConfigArgs, destToUseDefaultFeeConfigs []uint64) (*types.Transaction, error)
 
@@ -4737,9 +4737,9 @@ type USDCTokenPoolCCTPV2Interface interface {
 
 	SetChainRateLimiterConfigs(opts *bind.TransactOpts, remoteChainSelectors []uint64, outboundConfigs []RateLimiterConfig, inboundConfigs []RateLimiterConfig) (*types.Transaction, error)
 
-	SetCustomFinalityRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolCustomFinalityRateLimitConfigArgs) (*types.Transaction, error)
-
 	SetDomains(opts *bind.TransactOpts, domains []USDCTokenPoolDomainUpdate) (*types.Transaction, error)
+
+	SetFastFinalityRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolFastFinalityRateLimitConfigArgs) (*types.Transaction, error)
 
 	SetRateLimitAdmin(opts *bind.TransactOpts, rateLimitAdmin common.Address) (*types.Transaction, error)
 
@@ -4809,23 +4809,23 @@ type USDCTokenPoolCCTPV2Interface interface {
 
 	ParseConfigSet(log types.Log) (*USDCTokenPoolCCTPV2ConfigSet, error)
 
-	FilterCustomFinalityTransferInboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumedIterator, error)
-
-	WatchCustomFinalityTransferInboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error)
-
-	ParseCustomFinalityTransferInboundRateLimitConsumed(log types.Log) (*USDCTokenPoolCCTPV2CustomFinalityTransferInboundRateLimitConsumed, error)
-
-	FilterCustomFinalityTransferOutboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumedIterator, error)
-
-	WatchCustomFinalityTransferOutboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error)
-
-	ParseCustomFinalityTransferOutboundRateLimitConsumed(log types.Log) (*USDCTokenPoolCCTPV2CustomFinalityTransferOutboundRateLimitConsumed, error)
-
 	FilterDomainsSet(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2DomainsSetIterator, error)
 
 	WatchDomainsSet(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2DomainsSet) (event.Subscription, error)
 
 	ParseDomainsSet(log types.Log) (*USDCTokenPoolCCTPV2DomainsSet, error)
+
+	FilterFastTransferInboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumedIterator, error)
+
+	WatchFastTransferInboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error)
+
+	ParseFastTransferInboundRateLimitConsumed(log types.Log) (*USDCTokenPoolCCTPV2FastTransferInboundRateLimitConsumed, error)
+
+	FilterFastTransferOutboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumedIterator, error)
+
+	WatchFastTransferOutboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error)
+
+	ParseFastTransferOutboundRateLimitConsumed(log types.Log) (*USDCTokenPoolCCTPV2FastTransferOutboundRateLimitConsumed, error)
 
 	FilterFinalityConfigUpdated(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2FinalityConfigUpdatedIterator, error)
 
