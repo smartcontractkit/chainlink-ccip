@@ -1,4 +1,16 @@
-[NOTES.md](../../../chainlink/contracts/release/ccip/NOTES.md)# @chainlink/contracts-ccip
+
+## 1.6.3
+
+CCIP 1.6.3 is a minor release that adds support for Sui to the FeeQuoter. No other contracts are in scope.
+
+
+### New features
+This release will start including compiled bytecode for the contracts that are in scope for this release. 
+It is always recommended to compile the contracts yourself to verify the bytecode matches your expectations.
+
+### Minor Changes
+
+- [#1217](https://github.com/smartcontractkit/chainlink-ccip/pull/1217) - Adds Sui support to the FeeQuoter contract.
 
 ## 1.6.3 
 
@@ -47,6 +59,10 @@ wrapper
 
 - [#1009](https://github.com/smartcontractkit/chainlink-ccip/pull/1009) [`d22a78e`](https://github.com/smartcontractkit/chainlink-ccip/pull/1009/commits/d22a78e6de780b6bb1f8259a6ea7753ed92892ce) - Adds support for USDC messages on Solana using a mint-recipient
 override field for CCTP messages.
+
+### Fixes
+
+- Fixed an issue that prevented ABIs from being included in the NPM package.
 
 ## 1.6.1
 
