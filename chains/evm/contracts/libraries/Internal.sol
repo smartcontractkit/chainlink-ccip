@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
-
 /// @notice Library for CCIP internal definitions common to multiple contracts.
 /// @dev The following is a non-exhaustive list of "known issues" for CCIP:
 /// - We could implement yield claiming for Blast. This is not worth the custom code path on non-blast chains.
@@ -16,8 +14,6 @@ library Internal {
   /// @dev We limit return data to a selector plus 4 words. This is to avoid malicious contracts from returning
   /// large amounts of data and causing repeated out-of-gas scenarios.
   uint16 internal constant MAX_RET_BYTES = 4 + 4 * 32;
-  /// @dev The expected number of bytes returned by the balanceOf function.
-  uint256 internal constant MAX_BALANCE_OF_RET_BYTES = 32;
 
   /// @dev The address used to send calls for gas estimation.
   /// You only need to use this address if the minimum gas limit specified by the user is not actually enough to execute the
@@ -70,39 +66,9 @@ library Internal {
     uint32 destGasAmount; // The amount of gas available for the releaseOrMint and balanceOf calls on the offRamp
   }
 
-  /// @notice Report that is submitted by the execution DON at the execution phase, including chain selector data.
-  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
-  struct ExecutionReport {
-    uint64 sourceChainSelector; // Source chain selector for which the report is submitted.
-    Any2EVMRampMessage[] messages;
-    // Contains a bytes array for each message, each inner bytes array contains bytes per transferred token.
-    bytes[][] offchainTokenData;
-    bytes32[] proofs;
-    uint256 proofFlagBits;
-  }
-
-  /// @dev Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays, sender, data and tokenAmounts.
-  /// Each variable array takes 1 more slot to store its length.
-  /// When abi encoded, excluding array contents, Any2EVMMessage takes up a fixed number of 13 slots, 32 bytes each.
-  /// Assume 1 slot for sender
-  /// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 14.
-  /// The fixed bytes does not cover struct data (this is represented by MESSAGE_FIXED_BYTES_PER_TOKEN)
-  uint256 public constant MESSAGE_FIXED_BYTES = 32 * 15;
-
-  /// @dev Any2EVMTokensTransfer struct bytes length
-  /// 0x20
-  /// sourcePoolAddress_offset
-  /// destTokenAddress
-  /// destGasAmount
-  /// extraData_offset
-  /// amount
-  /// sourcePoolAddress_length
-  /// sourcePoolAddress_content // assume 1 slot
-  /// extraData_length // contents billed separately
-  uint256 public constant MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * (4 + (3 + 2));
-
-  bytes32 internal constant ANY_2_EVM_MESSAGE_HASH = keccak256("Any2EVMMessageHashV1");
   bytes32 internal constant EVM_2_ANY_MESSAGE_HASH = keccak256("EVM2AnyMessageHashV1");
+
+  bytes32 internal constant LEAF_DOMAIN_SEPARATOR = 0x0000000000000000000000000000000000000000000000000000000000000000;
 
   /// @dev Used to hash messages for multi-lane family-agnostic OffRamps.
   /// OnRamp hash(EVM2AnyMessage) != Any2EVMRampMessage.messageId.
@@ -115,7 +81,7 @@ library Internal {
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
       abi.encode(
-        MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+        LEAF_DOMAIN_SEPARATOR,
         metadataHash,
         keccak256(
           abi.encode(
@@ -138,7 +104,7 @@ library Internal {
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
       abi.encode(
-        MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+        LEAF_DOMAIN_SEPARATOR,
         metadataHash,
         keccak256(
           abi.encode(
