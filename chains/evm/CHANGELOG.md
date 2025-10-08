@@ -5,8 +5,7 @@ CCIP 1.6.3 is a minor release that adds support for Sui to the FeeQuoter. No oth
 
 
 ### New features
-This release will start including compiled bytecode for the contracts that are in scope for this release. 
-It is always recommended to compile the contracts yourself to verify the bytecode matches your expectations.
+This release will start including compiled bytecode for the contracts that are in scope for each release. 
 
 ### Minor Changes
 
