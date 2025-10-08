@@ -22,10 +22,10 @@ compileContract() {
   contract=$(basename "$1")
   echo "Compiling" "$contract"
   dir=$CONTRACTS_DIR/solc/$PROJECT/$contract
-  
+
   local args # base args for forge
   args="build $CONTRACTS_DIR/contracts/"$1.sol" --root $CONTRACTS_DIR"
-  
+
   if [ "$ZKSYNC" = "true" ]; then
     $(dirname "$0")/forge_zksync $args --zksync
   else
