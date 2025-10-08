@@ -3,11 +3,10 @@ pragma solidity ^0.8.24;
 
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
-
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 
+import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
@@ -16,7 +15,9 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
+
 /// @notice Base abstract class with common functions for all token pools.
 /// A token pool serves as isolated place for holding tokens and token specific logic
 /// that may execute as tokens move across the bridge.
@@ -42,7 +43,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
   using SafeERC20 for IERC20;
 
-  error DuplicateCCV(address ccv);
   error InvalidDestBytesOverhead(uint32 destBytesOverhead);
   error InvalidFinality(uint16 requested, uint16 finalityThreshold);
   error AmountExceedsMaxPerRequest(uint256 requested, uint256 maximum);
@@ -154,6 +154,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @notice The division factor for basis points (BPS). This also represents the maximum BPS fee.
   uint256 internal constant BPS_DIVIDER = 10_000;
+  uint16 internal constant WAIT_FOR_FINALITY = 0;
   /// @dev The bridgeable token that is managed by this pool. Pools could support multiple tokens at the same time if
   /// required, but this implementation only supports one token.
   IERC20 internal immutable i_token;
@@ -296,7 +297,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
-    (lockOrBurnOutV1,) = lockOrBurn(lockOrBurnIn, uint16(0), "");
+    (lockOrBurnOutV1,) = lockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
     return lockOrBurnOutV1;
   }
 
@@ -341,7 +342,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    return releaseOrMint(releaseOrMintIn, 0);
+    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
   }
 
   /// @notice Contains the specific release or mint token logic for a pool.
@@ -353,11 +354,16 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   // │                         Validation                           │
   // ================================================================
 
-  /// @notice Validates the lock or burn request, and enforces rate limits.
-  /// @dev The validation covers token support, RMN curse status, allowlist membership, onRamp access, and
-  /// rate limiting for both standard and custom-finality lanes.
-  /// @param lockOrBurnIn The input to validate. Must reference a supported token, onRamp, and remote chain.
-  /// @param finality The finality depth requested by the message. A value of zero uses the standard lane.
+  /// @notice Validates the lock or burn input for correctness on
+  /// - token to be locked or burned
+  /// - RMN curse status
+  /// - allowlist status
+  /// - if the sender is a valid onRamp
+  /// - rate limiting for either normal or fast-transfer lanes.
+  /// @param lockOrBurnIn The input to validate.
+  /// @param finality The finality depth requested by the message. A value of zero is used for default finality.
+  /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
+  /// for various exploits.
   function _validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
@@ -366,7 +372,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
     CustomFinalityConfig storage finalityConfig = s_finalityConfig;
     uint256 amount = lockOrBurnIn.amount;
-    if (finality != 0 && finalityConfig.finalityThreshold != 0) {
+    if (finality != WAIT_FOR_FINALITY && finalityConfig.finalityThreshold != WAIT_FOR_FINALITY) {
       if (finality < finalityConfig.finalityThreshold) {
         revert InvalidFinality(finality, finalityConfig.finalityThreshold);
       }
@@ -385,12 +391,17 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     }
   }
 
-  /// @notice Validates a release or mint request and enforces the appropriate inbound rate limits.
-  /// @dev The validation checks token support, RMN curse status, offRamp access, remote pool configuration,
-  /// finality requirements, and consumes either the custom-finality transfer inbound bucket or the standard bucket.
-  /// @param releaseOrMintIn The input to validate. The remote chain, pool, and token must all be configured.
-  /// @param localAmount The amount to release or mint on the local chain after any decimal conversion.
-  /// @param finality The finality depth requested by the message. A value of zero uses the standard lane.
+  /// @notice Validates the release or mint input for correctness on
+  /// - token to be released or minted
+  /// - RMN curse status
+  /// - if the sender is a valid offRamp
+  /// - if the source pool is configured for the remote chain
+  /// - rate limiting for either normal or fast-transfer lanes.
+  /// @param releaseOrMintIn The input to validate.
+  /// @param localAmount The local amount to be released or minted.
+  /// @param finality The finality depth requested by the message. A value of zero is used for default finality.
+  /// @dev This function should always be called before executing a release or mint. Not doing so would allow
+  /// for various exploits.
   function _validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
@@ -405,7 +416,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
 
-    if (finality != 0) {
+    if (finality != WAIT_FOR_FINALITY) {
       s_finalityConfig.inboundRateLimiterConfig[releaseOrMintIn.remoteChainSelector]._consume(
         localAmount, releaseOrMintIn.localToken
       );
@@ -926,10 +937,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       address[] calldata inboundCCVs = ccvConfigArgs[i].inboundCCVs;
 
       // check for duplicates in outbound CCVs.
-      _checkNoDuplicateAddresses(outboundCCVs);
+      CCVConfigValidation._assertNoDuplicates(outboundCCVs);
 
       // check for duplicates in inbound CCVs.
-      _checkNoDuplicateAddresses(inboundCCVs);
+      CCVConfigValidation._assertNoDuplicates(inboundCCVs);
 
       CCVConfig memory ccvConfig = CCVConfig({outboundCCVs: outboundCCVs, inboundCCVs: inboundCCVs});
       emit CCVConfigUpdated(remoteChainSelector, outboundCCVs, inboundCCVs);
@@ -965,20 +976,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     bytes calldata // tokenArgs
   ) external view virtual returns (address[] memory requiredCCVs) {
     return s_verifierConfig[destChainSelector].outboundCCVs;
-  }
-
-  /// @notice Checks a CCV address array for duplicate entries.
-  /// @param ccvs The array of CCV addresses to check for duplicates.
-  function _checkNoDuplicateAddresses(
-    address[] calldata ccvs
-  ) private pure {
-    for (uint256 i = 0; i < ccvs.length; ++i) {
-      for (uint256 j = i + 1; j < ccvs.length; ++j) {
-        if (ccvs[i] == ccvs[j]) {
-          revert DuplicateCCV(ccvs[i]);
-        }
-      }
-    }
   }
 
   // ================================================================
@@ -1054,7 +1051,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     uint16 finality
   ) internal view virtual returns (uint256 destAmount) {
     destAmount = lockOrBurnIn.amount;
-    if (finality != 0) {
+    if (finality != WAIT_FOR_FINALITY) {
       // deduct custom finality transfer fee
       destAmount -= (lockOrBurnIn.amount * s_finalityConfig.customFinalityTransferFeeBps) / BPS_DIVIDER;
     }
