@@ -14,6 +14,8 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
       destGasOverhead: 50000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
       feeUSDCents: 100, // $1.00
+      customFinalityTransferFeeBps: 50, // 0.50%
+      defaultFinalityTransferFeeBps: 20, // 0.20%
       isEnabled: true
     });
 
@@ -34,6 +36,8 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
       destGasOverhead: 50000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
       feeUSDCents: 100,
+      customFinalityTransferFeeBps: 50,
+      defaultFinalityTransferFeeBps: 20,
       isEnabled: true
     });
 

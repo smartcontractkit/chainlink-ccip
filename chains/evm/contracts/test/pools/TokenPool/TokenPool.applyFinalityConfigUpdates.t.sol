@@ -22,15 +22,11 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
     });
 
     vm.expectEmit();
-    emit TokenPool.FinalityConfigUpdated(finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitArgs
-    );
+    emit TokenPool.FinalityConfigUpdated(finalityThreshold, maxAmountPerRequest);
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, maxAmountPerRequest, rateLimitArgs);
 
-    (uint16 storedFinalityThreshold, uint16 storedFeeBps, uint256 storedMaxAmount) =
-      s_tokenPool.getCustomFinalityConfig();
+    (uint16 storedFinalityThreshold, uint256 storedMaxAmount) = s_tokenPool.getCustomFinalityConfig();
     assertEq(storedFinalityThreshold, finalityThreshold);
-    assertEq(storedFeeBps, customFinalityTransferFeeBps);
     assertEq(storedMaxAmount, maxAmountPerRequest);
 
     RateLimiter.TokenBucket memory outboundBucket = s_tokenPool.getFastOutboundBucket(DEST_CHAIN_SELECTOR);
@@ -60,21 +56,6 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
       new TokenPool.CustomFinalityRateLimitConfigArgs[](0);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
-    );
-  }
-
-  function test_applyFinalityConfigUpdates_RevertWhen_InvalidTransferFeeBps() public {
-    uint16 finalityThreshold = 100;
-    uint16 customFinalityTransferFeeBps = BPS_DIVIDER;
-    uint256 maxAmountPerRequest = 1000e18;
-    TokenPool.CustomFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
-      new TokenPool.CustomFinalityRateLimitConfigArgs[](0);
-
-    vm.expectRevert(TokenPool.InvalidTransferFeeBps.selector);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
-    );
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, maxAmountPerRequest, emptyRateLimitArgs);
   }
 }

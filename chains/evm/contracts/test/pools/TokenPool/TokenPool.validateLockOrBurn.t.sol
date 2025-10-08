@@ -31,9 +31,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
       inboundRateLimiterConfig: inboundFastConfig
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, maxAmountPerRequest, rateLimitArgs
-    );
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, maxAmountPerRequest, rateLimitArgs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
@@ -91,9 +89,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24})
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, maxAmountPerRequest, rateLimitArgs
-    );
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, maxAmountPerRequest, rateLimitArgs);
   }
 
   function _buildLockOrBurnIn(
