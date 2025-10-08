@@ -11,7 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
@@ -35,10 +36,13 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 			require.NoError(t, err, "Failed to create test environment")
 			evmChains := e.BlockChains.EVMChains()
 
+			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+
 			// Deploy both chains
 			runningDataStore := datastore.NewMemoryDataStore()
 			for _, evmChain := range evmChains {
-				out, err := changesets.DeployChainContracts.Apply(e, changesets_utils.WithMCMS[changesets.DeployChainContractsCfg]{
+				out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+					MCMS: mcms.Input{},
 					Cfg: changesets.DeployChainContractsCfg{
 						ChainSel: evmChain.Selector,
 						Params:   testsetup.CreateBasicContractParams(),
@@ -50,18 +54,19 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 			}
 			e.DataStore = runningDataStore.Seal() // Override datastore in environment to include deployed contracts
 
-			_, err = changesets.ConfigureChainForLanes.Apply(e, changesets_utils.WithMCMS[changesets.ConfigureChainForLanesCfg]{
+			_, err = changesets.ConfigureChainForLanes(mcmsRegistry).Apply(e, cs_core.WithMCMS[changesets.ConfigureChainForLanesCfg]{
+				MCMS: mcms.Input{},
 				Cfg: changesets.ConfigureChainForLanesCfg{
 					ChainSel: 5009297550715157269,
 					RemoteChains: map[uint64]changesets.RemoteChainConfig{
 						4356164186791070119: {
 							AllowTrafficFrom: true,
-							CCIPMessageSource: datastore.AddressRef{
-								Type:    datastore.ContractType(ccv_proxy.ContractType),
-								Version: semver.MustParse("1.7.0"),
-							},
 							CCIPMessageDest: datastore.AddressRef{
 								Type:    datastore.ContractType(ccv_aggregator.ContractType),
+								Version: semver.MustParse("1.7.0"),
+							},
+							CCIPMessageSource: datastore.AddressRef{
+								Type:    datastore.ContractType(ccv_proxy.ContractType),
 								Version: semver.MustParse("1.7.0"),
 							},
 							DefaultCCVOffRamps: []datastore.AddressRef{

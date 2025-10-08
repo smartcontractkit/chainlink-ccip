@@ -25,7 +25,6 @@ contract FeeQuoter_processPoolReturnData is FeeQuoterFeeSetup {
     );
     expectedDestExecData[1] = abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD); //expected return data should be abi.encoded  default as isEnabled is false
 
-    // No revert - successful
     bytes[] memory destExecData =
       s_feeQuoter.processPoolReturnData(DEST_CHAIN_SELECTOR, tokenAmounts, sourceTokenAmounts);
 
@@ -61,9 +60,7 @@ contract FeeQuoter_processPoolReturnData is FeeQuoterFeeSetup {
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = sourceETH;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 0,
-      maxFeeUSDCents: 1,
-      deciBps: 0,
+      feeUSDCents: 0,
       destGasOverhead: 0,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
       isEnabled: true

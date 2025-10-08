@@ -15,11 +15,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
-	sequence_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -74,10 +74,8 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
-			for _, write := range report.Output.Writes {
-				// Contracts are deployed & still owned by deployer, so all writes should be executed
-				require.True(t, write.Executed(), "Expected all writes to be executed")
-			}
+			require.Len(t, report.Output.BatchOps, 1, "Expected 1 empty batch operation")
+			require.Len(t, report.Output.BatchOps[0].Transactions, 0, "Expected no transactions")
 
 			exists := map[deployment.ContractType]bool{
 				rmn_remote.ContractType:           false,
@@ -88,7 +86,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				committee_verifier.ContractType:   false,
 				ccv_proxy.ContractType:            false,
 				ccv_aggregator.ContractType:       false,
-				fee_quoter_v2.ContractType:        false,
+				fee_quoter.ContractType:           false,
 				committee_verifier.ProxyType:      false,
 				rmn_proxy.ContractType:            false,
 				token_admin_registry.ContractType: false,
@@ -127,7 +125,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		evmChains := e.BlockChains.EVMChains()
 
 		// Deploy to each chain sequentially using the same bundle
-		var allReports []operations.SequenceReport[sequences.DeployChainContractsInput, sequence_utils.OnChainOutput]
+		var allReports []operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]
 		for _, evmChain := range evmChains {
 			input := sequences.DeployChainContractsInput{
 				ChainSelector:     evmChain.Selector,
@@ -162,7 +160,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 		// Deploy to all chains concurrently using the same bundle
 		type deployResult struct {
 			chainSelector uint64
-			report        operations.SequenceReport[sequences.DeployChainContractsInput, sequence_utils.OnChainOutput]
+			report        operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]
 			err           error
 		}
 

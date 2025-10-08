@@ -4,21 +4,22 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	evm_changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	mcms "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 type RemoteChainConfig struct {
@@ -31,7 +32,7 @@ type RemoteChainConfig struct {
 	LaneMandatedCCVOnRamps           []datastore.AddressRef
 	DefaultExecutor                  datastore.AddressRef
 	CommitteeVerifierDestChainConfig sequences.CommitteeVerifierDestChainConfig
-	FeeQuoterDestChainConfig         fee_quoter_v2.DestChainConfig
+	FeeQuoterDestChainConfig         fee_quoter.DestChainConfig
 }
 
 type ConfigureChainForLanesCfg struct {
@@ -51,94 +52,104 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 ]{
 	Sequence: sequences.ConfigureChainForLanes,
 	ResolveInput: func(e cldf_deployment.Environment, cfg ConfigureChainForLanesCfg) (sequences.ConfigureChainForLanesInput, error) {
-		staticAddrs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{
-			{
-				ChainSelector: cfg.ChainSel,
-				Type:          datastore.ContractType(router.ContractType),
-				Version:       semver.MustParse("1.2.0"),
-			},
-			{
-				ChainSelector: cfg.ChainSel,
-				Type:          datastore.ContractType(ccv_proxy.ContractType),
-				Version:       semver.MustParse("1.7.0"),
-			},
-			{
-				ChainSelector: cfg.ChainSel,
-				Type:          datastore.ContractType(committee_verifier.ContractType),
-				Version:       semver.MustParse("1.7.0"),
-			},
-			{
-				ChainSelector: cfg.ChainSel,
-				Type:          datastore.ContractType(fee_quoter_v2.ContractType),
-				Version:       semver.MustParse("1.7.0"),
-			},
-			{
-				ChainSelector: cfg.ChainSel,
-				Type:          datastore.ContractType(ccv_aggregator.ContractType),
-				Version:       semver.MustParse("1.7.0"),
-			},
-		}, evm_datastore_utils.ToEVMAddress)
+		routerAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: cfg.ChainSel,
+			Type:          datastore.ContractType(router.ContractType),
+			Version:       semver.MustParse("1.2.0"),
+		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
-			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve contract refs: %w", err)
+			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve router ref: %w", err)
 		}
-		routerAddr := staticAddrs[0]
-		ccvProxyAddr := staticAddrs[1]
-		committeeVerifierAddr := staticAddrs[2]
-		feeQuoterAddr := staticAddrs[3]
-		ccvAggregatorAddr := staticAddrs[4]
+		ccvProxyAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: cfg.ChainSel,
+			Type:          datastore.ContractType(ccv_proxy.ContractType),
+			Version:       semver.MustParse("1.7.0"),
+		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve ccv proxy ref: %w", err)
+		}
+		committeeVerifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: cfg.ChainSel,
+			Type:          datastore.ContractType(committee_verifier.ContractType),
+			Version:       semver.MustParse("1.7.0"),
+		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+
+		feeQuoterAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: cfg.ChainSel,
+			Type:          datastore.ContractType(fee_quoter.ContractType),
+			Version:       semver.MustParse("1.7.0"),
+		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve fee quoter ref: %w", err)
+		}
+		ccvAggregatorAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			ChainSelector: cfg.ChainSel,
+			Type:          datastore.ContractType(ccv_aggregator.ContractType),
+			Version:       semver.MustParse("1.7.0"),
+		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve ccv aggregator ref: %w", err)
+		}
 
 		remoteChains := make(map[uint64]sequences.RemoteChainConfig, len(cfg.RemoteChains))
 		for remoteChainSel, remoteConfig := range cfg.RemoteChains {
-			refs := []datastore.AddressRef{remoteConfig.DefaultExecutor}
-			refs = append(refs, remoteConfig.DefaultCCVOffRamps...)
-			refs = append(refs, remoteConfig.LaneMandatedCCVOffRamps...)
-			refs = append(refs, remoteConfig.DefaultCCVOnRamps...)
-			refs = append(refs, remoteConfig.LaneMandatedCCVOnRamps...)
-
-			// Bookmarking for creating the final struct
-			defaultCCVOffRampsEnd := 1 + len(remoteConfig.DefaultCCVOffRamps)
-			laneMandatedCCVOffRampsEnd := defaultCCVOffRampsEnd + len(remoteConfig.LaneMandatedCCVOffRamps)
-			defaultCCVOnRampsEnd := laneMandatedCCVOffRampsEnd + len(remoteConfig.DefaultCCVOnRamps)
-			laneMandatedCCVOnRampsEnd := defaultCCVOnRampsEnd + len(remoteConfig.LaneMandatedCCVOnRamps)
-
-			// Set the chain selector of every ref stored thus far to the chain that we are configuring
-			for i := range refs {
-				refs[i].ChainSelector = cfg.ChainSel
+			executorOnRampAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteConfig.DefaultExecutor, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve executor on ramp ref: %w", err)
+			}
+			defaultCCVOnRamps := make([]common.Address, len(remoteConfig.DefaultCCVOnRamps))
+			for i, ref := range remoteConfig.DefaultCCVOnRamps {
+				addr, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+				if err != nil {
+					return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve ccv on ramp ref: %w", err)
+				}
+				defaultCCVOnRamps[i] = addr
+			}
+			defaultCCVOffRamps := make([]common.Address, len(remoteConfig.DefaultCCVOffRamps))
+			for i, ref := range remoteConfig.DefaultCCVOffRamps {
+				addr, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+				if err != nil {
+					return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve ccv off ramp ref: %w", err)
+				}
+				defaultCCVOffRamps[i] = addr
+			}
+			laneMandatedCCVOnRamps := make([]common.Address, len(remoteConfig.LaneMandatedCCVOnRamps))
+			for i, ref := range remoteConfig.LaneMandatedCCVOnRamps {
+				addr, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+				if err != nil {
+					return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve lane mandated ccv on ramp ref: %w", err)
+				}
+				laneMandatedCCVOnRamps[i] = addr
+			}
+			laneMandatedCCVOffRamps := make([]common.Address, len(remoteConfig.LaneMandatedCCVOffRamps))
+			for i, ref := range remoteConfig.LaneMandatedCCVOffRamps {
+				addr, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+				if err != nil {
+					return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve lane mandated ccv off ramp ref: %w", err)
+				}
+				laneMandatedCCVOffRamps[i] = addr
 			}
 
-			addrs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, refs, evm_datastore_utils.ToEVMAddress)
+			// TODO: CCIPMessageSource/Dest handling via ToPaddedEVMAddress is a hack, assumes the remote chain is also EVM.
+			// Usage of cross-family changesets will resolve this issue, and this changeset will eventually be deprecated.
+			ccipMessageSourceAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteConfig.CCIPMessageSource, remoteChainSel, evm_datastore_utils.ToPaddedEVMAddress)
 			if err != nil {
-				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve contract refs: %w", err)
+				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve CCIPMessageSource ref: %w", err)
 			}
-
-			// Resolve CCIPMessageSource separately since it is on the remote chain
-			// TODO: Current CCIPMessageSource handling (via ToPaddedEVMAddress) is a hack that we need to resolve ASAP.
-			// We need the cldf.BlockChain interface to support a method that converts an address from datastore to bytes
-			// e.g.
-			// for chainSel, chain := range e.BlockChains.All() {
-			//   fmt.Println(chain.AddressToBytes(addresses[chainSel]))
-			// }
-			// Right now, we just assume that the remote chain is EVM, which is not correct.
-			// Same goes for CCIPMessageDest.
-			remoteConfig.CCIPMessageSource.ChainSelector = remoteChainSel
-			remoteConfig.CCIPMessageDest.ChainSelector = remoteChainSel
-			remoteAddrs, err := datastore_utils.FindAndFormatEachRef(e.DataStore, []datastore.AddressRef{
-				remoteConfig.CCIPMessageSource,
-				remoteConfig.CCIPMessageDest,
-			}, evm_datastore_utils.ToPaddedEVMAddress)
+			ccipMessageDestAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteConfig.CCIPMessageDest, remoteChainSel, evm_datastore_utils.ToPaddedEVMAddress)
 			if err != nil {
-				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve CCIPMessageSource and CCIPMessageDest ref: %w", err)
+				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve CCIPMessageDest ref: %w", err)
 			}
 
 			remoteChains[remoteChainSel] = sequences.RemoteChainConfig{
 				AllowTrafficFrom:                 remoteConfig.AllowTrafficFrom,
-				DefaultExecutor:                  addrs[0],
-				DefaultCCVOffRamps:               addrs[1:defaultCCVOffRampsEnd],
-				LaneMandatedCCVOffRamps:          addrs[defaultCCVOffRampsEnd:laneMandatedCCVOffRampsEnd],
-				DefaultCCVOnRamps:                addrs[laneMandatedCCVOffRampsEnd:defaultCCVOnRampsEnd],
-				LaneMandatedCCVOnRamps:           addrs[defaultCCVOnRampsEnd:laneMandatedCCVOnRampsEnd],
-				CCIPMessageSource:                remoteAddrs[0],
-				CCIPMessageDest:                  remoteAddrs[1],
+				DefaultExecutor:                  executorOnRampAddr,
+				DefaultCCVOffRamps:               defaultCCVOffRamps,
+				LaneMandatedCCVOffRamps:          laneMandatedCCVOffRamps,
+				DefaultCCVOnRamps:                defaultCCVOnRamps,
+				LaneMandatedCCVOnRamps:           laneMandatedCCVOnRamps,
+				CCIPMessageSource:                ccipMessageSourceAddr,
+				CCIPMessageDest:                  ccipMessageDestAddr,
 				CommitteeVerifierDestChainConfig: remoteConfig.CommitteeVerifierDestChainConfig,
 				FeeQuoterDestChainConfig:         remoteConfig.FeeQuoterDestChainConfig,
 			}
@@ -154,5 +165,5 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			RemoteChains:      remoteChains,
 		}, nil
 	},
-	ResolveDep: evm_changesets.ResolveEVMChainDep[ConfigureChainForLanesCfg],
+	ResolveDep: evm_sequences.ResolveEVMChainDep[ConfigureChainForLanesCfg],
 })

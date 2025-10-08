@@ -3,6 +3,7 @@ package changesets
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -13,39 +14,61 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
 )
 
 // MCMSReader is an interface for reading MCMS state from a chain type.
 type MCMSReader interface {
-	OpCount(e deployment.Environment, chainSelector uint64, mcmAddress string) (uint64, error)
+	// GetChainMetadata returns the chain metadata for a given MCMS input.
+	// Each chain family defines its own implementation of this method.
+	GetChainMetadata(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (mcms_types.ChainMetadata, error)
 }
 
-var registeredMCMSReaders map[string]MCMSReader
+// MCMSReaderRegistry maintains a registry of MCMS readers.
+type MCMSReaderRegistry struct {
+	mu sync.Mutex
+	m  map[string]MCMSReader
+}
+
+func NewMCMSReaderRegistry() *MCMSReaderRegistry {
+	return &MCMSReaderRegistry{
+		m: make(map[string]MCMSReader),
+	}
+}
 
 // RegisterMCMSReader registers an MCMSReader for a specific chain family.
-func RegisterMCMSReader(chainFamily string, reader MCMSReader) {
-	if registeredMCMSReaders == nil {
-		registeredMCMSReaders = make(map[string]MCMSReader)
+func (r *MCMSReaderRegistry) RegisterMCMSReader(chainFamily string, reader MCMSReader) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.m == nil {
+		r.m = make(map[string]MCMSReader)
 	}
-	if _, exists := registeredMCMSReaders[chainFamily]; exists {
+	if _, exists := r.m[chainFamily]; exists {
 		panic(fmt.Sprintf("MCMS reader already registered for chain family: %s", chainFamily))
 	}
-	registeredMCMSReaders[chainFamily] = reader
+	r.m[chainFamily] = reader
 }
 
-// OutputBuilder helps construct a ChangesetOutput, including building an MCMS proposal if there are write operations.
-// Should be kept chain-family agnostic in case we want to move it out of evm-specific package later.
-// Even call.WriteOutput is not EVM-specific, could potentially extract as a standard.
+// GetMCMSReader retrieves an MCMSReader for a specific chain family.
+func (r *MCMSReaderRegistry) GetMCMSReader(chainFamily string) (MCMSReader, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	reader, ok := r.m[chainFamily]
+	return reader, ok
+}
+
+// OutputBuilder helps construct a ChangesetOutput, including building an MCMS proposal if there are batch operations.
 type OutputBuilder struct {
+	registry        *MCMSReaderRegistry
 	environment     deployment.Environment
-	writeOutputs    []contract.WriteOutput
+	batchOps        []mcms_types.BatchOperation
 	changesetOutput deployment.ChangesetOutput
 }
 
 // NewOutputBuilder creates a new OutputBuilder.
-func NewOutputBuilder(e deployment.Environment) *OutputBuilder {
+func NewOutputBuilder(e deployment.Environment, registry *MCMSReaderRegistry) *OutputBuilder {
 	return &OutputBuilder{
+		registry:        registry,
 		environment:     e,
 		changesetOutput: deployment.ChangesetOutput{},
 	}
@@ -63,25 +86,32 @@ func (b *OutputBuilder) WithDataStore(ds datastore.MutableDataStore) *OutputBuil
 	return b
 }
 
-// WithWriteOutputs sets the write outputs on the OutputBuilder.
-func (b *OutputBuilder) WithWriteOutputs(outs []contract.WriteOutput) *OutputBuilder {
-	b.writeOutputs = outs
+// WithBatchOps sets the batch operations on the OutputBuilder.
+func (b *OutputBuilder) WithBatchOps(ops []mcms_types.BatchOperation) *OutputBuilder {
+	// Filter out any batch operations that have no transactions.
+	filteredOps := make([]mcms_types.BatchOperation, 0, len(ops))
+	for _, op := range ops {
+		if len(op.Transactions) > 0 {
+			filteredOps = append(filteredOps, op)
+		}
+	}
+
+	b.batchOps = filteredOps
 	return b
 }
 
 // Build constructs the final ChangesetOutput, including building an MCMS proposal if there are write operations that have not been executed.
 func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutput, error) {
-	ops := b.convertWriteOutputsToBatchOperations()
-	if ops == nil || len(ops) == 0 {
+	if len(b.batchOps) == 0 {
 		// No write operations to include in MCMS proposal
 		return b.changesetOutput, nil
 	}
 
-	timelockAddresses, err := b.getTimelockAddresses(input.TimelockAddressRef, ops)
+	timelockAddresses, err := b.getTimelockAddresses(input.TimelockAddressRef, b.batchOps)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get timelock addresses: %w", err)
 	}
-	chainMetadata, err := b.getChainMetadata(input.MCMSAddressRef, ops)
+	chainMetadata, err := b.getChainMetadata(input, b.batchOps)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain metadata: %w", err)
 	}
@@ -93,7 +123,7 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 		SetValidUntil(input.ValidUntil).
 		SetDelay(input.TimelockDelay).
 		SetAction(input.TimelockAction).
-		SetOperations(ops).
+		SetOperations(b.batchOps).
 		SetTimelockAddresses(timelockAddresses).
 		SetChainMetadata(chainMetadata).
 		Build()
@@ -108,78 +138,54 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 	return b.changesetOutput, nil
 }
 
-// TODO: Incorporate batch size?
-func (b *OutputBuilder) convertWriteOutputsToBatchOperations() []mcms_types.BatchOperation {
-	batchOps := make(map[uint64]mcms_types.BatchOperation)
-	for _, outs := range b.writeOutputs {
-		if outs.Executed() {
-			continue // Skip executed transactions, should not be included in MCMS proposal
-		}
-		batchOp, exists := batchOps[outs.ChainSelector]
-		if !exists {
-			batchOps[outs.ChainSelector] = mcms_types.BatchOperation{
-				ChainSelector: mcms_types.ChainSelector(outs.ChainSelector),
-				Transactions:  []mcms_types.Transaction{outs.Tx},
-			}
-		} else {
-			batchOp.Transactions = append(batchOp.Transactions, outs.Tx)
-			batchOps[outs.ChainSelector] = batchOp
-		}
-	}
-	var batchOpsSlice []mcms_types.BatchOperation
-	for _, batchOps := range batchOps {
-		batchOpsSlice = append(batchOpsSlice, batchOps)
-	}
-	return batchOpsSlice
-}
-
+// getTimelockAddresses resolves the timelock contract addresses for each chain selector in the list of batch operations.
 func (b *OutputBuilder) getTimelockAddresses(
 	timelockRef datastore.AddressRef,
 	ops []mcms_types.BatchOperation,
 ) (map[mcms_types.ChainSelector]string, error) {
 	timelocks := make(map[mcms_types.ChainSelector]string)
 	for _, op := range ops {
-		timelockRef.ChainSelector = uint64(op.ChainSelector)
-		refs, err := datastore_utils.FindAndFormatEachRef(b.environment.DataStore, []datastore.AddressRef{timelockRef}, datastore_utils.FullRef)
+		if _, exists := timelocks[op.ChainSelector]; exists {
+			continue // Already resolved timelock for this chain selector
+		}
+		fullTimelockRef, err := datastore_utils.FindAndFormatRef(
+			b.environment.DataStore,
+			timelockRef,
+			uint64(op.ChainSelector),
+			datastore_utils.FullRef,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve timelock ref on chain with selector %d: %w", op.ChainSelector, err)
 		}
-		timelocks[op.ChainSelector] = refs[0].Address
+		timelocks[op.ChainSelector] = fullTimelockRef.Address
 	}
 
 	return timelocks, nil
 }
 
+// getChainMetadata fetches the current chain metadata (e.g. starting op count, mcm address) for each chain selector in the list of batch operations.
 func (b *OutputBuilder) getChainMetadata(
-	mcmRef datastore.AddressRef,
+	input mcms_utils.Input,
 	ops []mcms_types.BatchOperation,
 ) (map[mcms_types.ChainSelector]mcms_types.ChainMetadata, error) {
 	metadata := make(map[mcms_types.ChainSelector]mcms_types.ChainMetadata)
 	for _, op := range ops {
-		mcmRef.ChainSelector = uint64(op.ChainSelector)
-		refs, err := datastore_utils.FindAndFormatEachRef(b.environment.DataStore, []datastore.AddressRef{mcmRef}, datastore_utils.FullRef)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve mcm ref on chain with selector %d: %w", op.ChainSelector, err)
+		if _, ok := metadata[op.ChainSelector]; ok {
+			continue // Already fetched metadata for this chain selector
 		}
-		mcmAddress := refs[0].Address
-
 		family, err := chain_selectors.GetSelectorFamily(uint64(op.ChainSelector))
 		if err != nil {
 			return nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", op.ChainSelector, err)
 		}
-		reader, ok := registeredMCMSReaders[family]
+		reader, ok := b.registry.GetMCMSReader(family)
 		if !ok {
 			return nil, fmt.Errorf("no MCMS reader registered for chain family '%s'", family)
 		}
-
-		opCount, err := reader.OpCount(b.environment, uint64(op.ChainSelector), mcmAddress)
+		chainMetadata, err := reader.GetChainMetadata(b.environment, uint64(op.ChainSelector), input)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get current op count from MCMS at address %s on chain with selector %d: %w", mcmAddress, op.ChainSelector, err)
+			return nil, fmt.Errorf("failed to get MCMS chain metadata for chain with selector %d: %w", op.ChainSelector, err)
 		}
-		metadata[op.ChainSelector] = mcms_types.ChainMetadata{
-			MCMAddress:      mcmAddress,
-			StartingOpCount: opCount,
-		}
+		metadata[op.ChainSelector] = chainMetadata
 	}
 
 	return metadata, nil

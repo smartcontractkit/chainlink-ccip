@@ -114,4 +114,8 @@ interface IFeeQuoter {
   /// @notice Get the list of fee tokens.
   /// @return feeTokens The tokens set as fee tokens.
   function getFeeTokens() external view returns (address[] memory);
+
+  function resolveTokenReceiver(
+    bytes calldata extraArgs
+  ) external view returns (bytes memory tokenReceiver);
 }

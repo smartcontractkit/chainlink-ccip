@@ -5,22 +5,22 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter_v2"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 type CommitteeVerifierDestChainConfig struct {
-	// Whether or not to allow traffic TO the remote chain
+	// Whether to allow traffic TO the remote chain
 	AllowlistEnabled bool
 	// Addresses that are allowed to send messages TO the remote chain
 	AddedAllowlistedSenders []common.Address
@@ -29,7 +29,7 @@ type CommitteeVerifierDestChainConfig struct {
 }
 
 type RemoteChainConfig struct {
-	// Whether or not to allow traffic FROM this remote chain
+	// Whether to allow traffic FROM this remote chain
 	AllowTrafficFrom bool
 	// The address on the remote chain from which the message is emitted
 	// For example, on EVM chains, this is the CCVProxy
@@ -50,7 +50,7 @@ type RemoteChainConfig struct {
 	// CommitteeVerifierDestChainConfig configures the CommitteeVerifier for this remote chain
 	CommitteeVerifierDestChainConfig CommitteeVerifierDestChainConfig
 	// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
-	FeeQuoterDestChainConfig fee_quoter_v2.DestChainConfig
+	FeeQuoterDestChainConfig fee_quoter.DestChainConfig
 }
 
 type ConfigureChainForLanesInput struct {
@@ -84,7 +84,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		ccvProxyArgs := make([]ccv_proxy.DestChainConfigArgs, 0, len(input.RemoteChains))
 		committeeVerifierDestConfigArgs := make([]committee_verifier.DestChainConfigArgs, 0, len(input.RemoteChains))
 		committeeVerifierAllowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
-		feeQuoterArgs := make([]fee_quoter_v2.DestChainConfigArgs, 0, len(input.RemoteChains))
+		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
 		destChainSelectorsPerExecutor := make(map[common.Address][]uint64)
@@ -116,7 +116,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				RemovedAllowlistedSenders: remoteConfig.CommitteeVerifierDestChainConfig.RemovedAllowlistedSenders,
 				DestChainSelector:         remoteSelector,
 			})
-			feeQuoterArgs = append(feeQuoterArgs, fee_quoter_v2.DestChainConfigArgs{
+			feeQuoterArgs = append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
 				DestChainSelector: remoteSelector,
 				DestChainConfig:   remoteConfig.FeeQuoterDestChainConfig,
 			})
@@ -194,7 +194,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		writes = append(writes, committeeVerifierAllowlistReport.Output)
 
 		// ApplyDestChainConfigUpdates on FeeQuoter
-		feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter_v2.ApplyDestChainConfigUpdates, chain, evm_contract.FunctionInput[[]fee_quoter_v2.DestChainConfigArgs]{
+		feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.DestChainConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       input.FeeQuoter,
 			Args:          feeQuoterArgs,
@@ -219,8 +219,13 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 		writes = append(writes, routerReport.Output)
 
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+
 		return sequences.OnChainOutput{
-			Writes: writes,
+			BatchOps: []mcms_types.BatchOperation{batchOp},
 		}, nil
 	},
 )

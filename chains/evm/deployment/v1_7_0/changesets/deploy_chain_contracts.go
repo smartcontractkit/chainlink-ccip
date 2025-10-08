@@ -1,7 +1,7 @@
 package changesets
 
 import (
-	evm_changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/changesets"
+	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -32,5 +32,5 @@ var DeployChainContracts = changesets.NewFromOnChainSequence(changesets.NewFromO
 			ContractParams:    cfg.Params,
 		}, nil
 	},
-	ResolveDep: evm_changesets.ResolveEVMChainDep[DeployChainContractsCfg],
+	ResolveDep: evm_sequences.ResolveEVMChainDep[DeployChainContractsCfg],
 })

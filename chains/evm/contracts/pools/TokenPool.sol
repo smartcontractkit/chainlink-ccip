@@ -2,15 +2,19 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV1} from "../interfaces/IPool.sol";
+import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 
+import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
+import {Client} from "../libraries/Client.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
@@ -31,12 +35,20 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 /// 0.000567 tokens.
 /// In the case of a burnMint pool on chain A, these funds are burned in the pool on chain A.
 /// In the case of a lockRelease pool on chain A, these funds accumulate in the pool on chain A.
-abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
+
+abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.Bytes32Set;
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
   using RateLimiter for RateLimiter.TokenBucket;
+  using SafeERC20 for IERC20;
 
+  error InvalidDestBytesOverhead(uint32 destBytesOverhead);
+  error InvalidFinality(uint16 requested, uint16 finalityThreshold);
+  error AmountExceedsMaxPerRequest(uint256 requested, uint256 maximum);
+  error TokenTransferFeeConfigNotEnabled(uint64 destChainSelector);
+  error InvalidFastTransferFeeBps();
+  error InvalidFinalityConfig();
   error CallerIsNotARampOnRouter(address caller);
   error ZeroAddressInvalid();
   error SenderNotAllowed(address sender);
@@ -79,6 +91,14 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   event RateLimitAdminSet(address rateLimitAdmin);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
+  event CCVConfigUpdated(uint64 indexed remoteChainSelector, address[] outboundCCVs, address[] inboundCCVs);
+  event FinalityConfigUpdated(uint16 finalityConfig, uint16 fastTransferFeeBps, uint256 maxAmountPerRequest);
+  event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
+  event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector);
+  /// @notice Emitted when pool fees are withdrawn.
+  event PoolFeeWithdrawn(address indexed recipient, uint256 amount);
+  event FastTransferOutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
+  event FastTransferInboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector
@@ -95,6 +115,42 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     EnumerableSet.Bytes32Set remotePools; // Set of remote pool hashes, ABI encoded in the case of a remote EVM chain.
   }
 
+  struct FastFinalityConfig {
+    uint16 finalityThreshold; // ──╮ Minimum block depth on the source chain that token issuers consider sufficiently secure.
+    //                             | 0 means the default finality.
+    uint16 fastTransferFeeBps; // ─╯ Fee in basis points for fast transfers [0-10_000].
+    uint256 maxAmountPerRequest; // Maximum amount allowed per transfer request.
+    // Separate buckets isolate fast-finality limits so these transfers cannot deplete the primary pool rate limits.
+    mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) outboundRateLimiterConfig;
+    mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketInbound) inboundRateLimiterConfig;
+  }
+
+  struct FastFinalityRateLimitConfigArgs {
+    uint64 remoteChainSelector; // Remote chain selector.
+    RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limiter configuration.
+    RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limiter configuration.
+  }
+
+  struct CCVConfig {
+    address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
+    address[] inboundCCVs; // CCVs required for incoming messages from the remote chain.
+  }
+
+  struct CCVConfigArg {
+    uint64 remoteChainSelector;
+    address[] outboundCCVs;
+    address[] inboundCCVs;
+  }
+
+  /// @dev Struct with args for setting the token transfer fee configurations for a destination chain and a set of tokens.
+  struct TokenTransferFeeConfigArgs {
+    uint64 destChainSelector; // Destination chain selector.
+    TokenTransferFeeConfig tokenTransferFeeConfig; // Token transfer fee configuration.
+  }
+
+  /// @notice The division factor for basis points (BPS). This also represents the maximum BPS fee for fast transfer.
+  uint256 internal constant BPS_DIVIDER = 10_000;
+  uint16 internal constant WAIT_FOR_FINALITY = 0;
   /// @dev The bridgeable token that is managed by this pool. Pools could support multiple tokens at the same time if
   /// required, but this implementation only supports one token.
   IERC20 internal immutable i_token;
@@ -121,6 +177,12 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice The address of the rate limiter admin.
   /// @dev Can be address(0) if none is configured.
   address internal s_rateLimitAdmin;
+  // Tracks fast-finality parameters and per-lane rate limit buckets for fast transfers.
+  FastFinalityConfig internal s_finalityConfig;
+  // Stores verifier (CCV) requirements keyed by remote chain selector.
+  mapping(uint64 remoteChainSelector => CCVConfig ccvConfig) internal s_verifierConfig;
+  // Optional token-transfer fee overrides keyed by destination chain selector.
+  mapping(uint64 destChainSelector => TokenTransferFeeConfig tokenTransferFeeConfig) internal s_tokenTransferFeeConfig;
 
   constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
     if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) {
@@ -185,11 +247,12 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     emit RouterUpdated(oldRouter, newRouter);
   }
 
-  /// @notice Signals which version of the pool interface is supported
+  /// @notice Signals which version of the pool interface is supported.
   function supportsInterface(
     bytes4 interfaceId
   ) public pure virtual override returns (bool) {
-    return interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IPoolV1).interfaceId
+    return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == Pool.CCIP_POOL_V1
+      || interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IPoolV1).interfaceId
       || interfaceId == type(IERC165).interfaceId;
   }
 
@@ -197,26 +260,41 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   // │                        Lock or Burn                          │
   // ================================================================
 
-  /// @notice Burn the token in the pool
-  /// @dev The _validateLockOrBurn check is an essential security check
+  /// @inheritdoc IPoolV2
+  /// @dev The _validateLockOrBurn check is an essential security check.
+  /// @dev The _applyFee function deducts the fee from the amount and returns the amount after fee deduction.
   function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
-
-    _lockOrBurn(lockOrBurnIn.amount);
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 finality,
+    bytes memory // tokenArgs
+  ) public virtual returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
+    _validateLockOrBurn(lockOrBurnIn, finality);
+    destTokenAmount = _applyFee(lockOrBurnIn, finality);
+    _lockOrBurn(destTokenAmount);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
       token: address(i_token),
       sender: msg.sender,
-      amount: lockOrBurnIn.amount
+      amount: destTokenAmount
     });
 
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: _encodeLocalDecimals()
-    });
+    return (
+      Pool.LockOrBurnOutV1({
+        destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+        destPoolData: _encodeLocalDecimals()
+      }),
+      destTokenAmount
+    );
+  }
+
+  /// @inheritdoc IPoolV1
+  /// @dev calls IPoolV2.lockOrBurn with finality 0 and empty tokenArgs.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
+    (lockOrBurnOutV1,) = lockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
+    return lockOrBurnOutV1;
   }
 
   /// @notice Contains the specific lock or burn token logic for a pool.
@@ -230,19 +308,18 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   // │                      Release or Mint                         │
   // ================================================================
 
-  /// @notice Mint tokens from the pool to the recipient
-  /// @dev The _validateReleaseOrMint check is an essential security check
+  /// @inheritdoc IPoolV2
+  /// @dev The _validateReleaseOrMint check is an essential security check.
   function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    // Calculate the local amount
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 finality
+  ) public virtual override(IPoolV2) returns (Pool.ReleaseOrMintOutV1 memory) {
     uint256 localAmount = _calculateLocalAmount(
       releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
     );
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, finality);
 
-    // Mint to the receiver
     _releaseOrMint(releaseOrMintIn.receiver, localAmount);
 
     emit ReleasedOrMinted({
@@ -254,6 +331,14 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+  }
+
+  /// @inheritdoc IPoolV1
+  /// @dev calls IPoolV2.releaseOrMint with finality 0.
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
   }
 
   /// @notice Contains the specific release or mint token logic for a pool.
@@ -270,32 +355,52 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// - RMN curse status
   /// - allowlist status
   /// - if the sender is a valid onRamp
-  /// - rate limit status
+  /// - rate limiting for either normal or fast-transfer lanes.
   /// @param lockOrBurnIn The input to validate.
+  /// @param finality The finality depth requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
-  function _validateLockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) internal {
+  function _validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
     _checkAllowList(lockOrBurnIn.originalSender);
 
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
-    _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
+    FastFinalityConfig storage finalityConfig = s_finalityConfig;
+    uint256 amount = lockOrBurnIn.amount;
+    if (finality != WAIT_FOR_FINALITY && finalityConfig.finalityThreshold != WAIT_FOR_FINALITY) {
+      if (finality < finalityConfig.finalityThreshold) {
+        revert InvalidFinality(finality, finalityConfig.finalityThreshold);
+      }
+      if (amount > finalityConfig.maxAmountPerRequest) {
+        revert AmountExceedsMaxPerRequest(amount, finalityConfig.maxAmountPerRequest);
+      }
+
+      finalityConfig.outboundRateLimiterConfig[lockOrBurnIn.remoteChainSelector]._consume(
+        amount, lockOrBurnIn.localToken
+      );
+      emit FastTransferOutboundRateLimitConsumed(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.localToken, amount);
+    } else {
+      _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
+    }
   }
 
   /// @notice Validates the release or mint input for correctness on
   /// - token to be released or minted
   /// - RMN curse status
   /// - if the sender is a valid offRamp
-  /// - if the source pool is valid
-  /// - rate limit status
+  /// - if the source pool is configured for the remote chain
+  /// - rate limiting for either normal or fast-transfer lanes.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
+  /// @param finality The finality depth requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
-  function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn, uint256 localAmount) internal {
+  function _validateReleaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint256 localAmount,
+    uint16 finality
+  ) internal {
     if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
@@ -305,7 +410,16 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
 
-    _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
+    if (finality != WAIT_FOR_FINALITY) {
+      s_finalityConfig.inboundRateLimiterConfig[releaseOrMintIn.remoteChainSelector]._consume(
+        localAmount, releaseOrMintIn.localToken
+      );
+      emit FastTransferInboundRateLimitConsumed(
+        releaseOrMintIn.remoteChainSelector, releaseOrMintIn.localToken, localAmount
+      );
+    } else {
+      _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
+    }
   }
 
   // ================================================================
@@ -739,5 +853,203 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
         emit AllowListAdd(toAdd);
       }
     }
+  }
+
+  // ================================================================
+  // │                         Finality                             │
+  // ================================================================
+
+  /// @notice Updates the finality configuration for token transfers.
+  function applyFinalityConfigUpdates(
+    uint16 finalityThreshold,
+    uint16 fastTransferFeeBps,
+    uint256 maxAmountPerRequest,
+    FastFinalityRateLimitConfigArgs[] calldata rateLimitConfigArgs
+  ) external virtual onlyOwner {
+    FastFinalityConfig storage finalityConfig = s_finalityConfig;
+    finalityConfig.finalityThreshold = finalityThreshold;
+    if (fastTransferFeeBps >= BPS_DIVIDER) {
+      revert InvalidFastTransferFeeBps();
+    }
+    finalityConfig.fastTransferFeeBps = fastTransferFeeBps;
+    finalityConfig.maxAmountPerRequest = maxAmountPerRequest;
+    _setFastFinalityRateLimitConfig(rateLimitConfigArgs);
+    emit FinalityConfigUpdated(finalityThreshold, fastTransferFeeBps, maxAmountPerRequest);
+  }
+
+  /// @notice Sets the fast finality based rate limit configurations for specified remote chains.
+  /// @param rateLimitConfigArgs Array of structs containing remote chain selectors and their rate limiter configs.
+  function setFastFinalityRateLimitConfig(
+    FastFinalityRateLimitConfigArgs[] calldata rateLimitConfigArgs
+  ) external virtual onlyOwner {
+    _setFastFinalityRateLimitConfig(rateLimitConfigArgs);
+  }
+
+  function _setFastFinalityRateLimitConfig(
+    FastFinalityRateLimitConfigArgs[] calldata rateLimitConfigArgs
+  ) internal {
+    FastFinalityConfig storage finalityConfig = s_finalityConfig;
+    for (uint256 i = 0; i < rateLimitConfigArgs.length; ++i) {
+      FastFinalityRateLimitConfigArgs calldata configArgs = rateLimitConfigArgs[i];
+      uint64 remoteChainSelector = configArgs.remoteChainSelector;
+      if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+
+      RateLimiter._validateTokenBucketConfig(configArgs.outboundRateLimiterConfig);
+      RateLimiter.TokenBucket storage outboundBucket = finalityConfig.outboundRateLimiterConfig[remoteChainSelector];
+      bool outboundUninitialized = outboundBucket.lastUpdated == 0 && outboundBucket.capacity == 0
+        && outboundBucket.rate == 0 && outboundBucket.tokens == 0 && !outboundBucket.isEnabled;
+      if (outboundUninitialized && configArgs.outboundRateLimiterConfig.isEnabled) {
+        outboundBucket.tokens = configArgs.outboundRateLimiterConfig.capacity;
+        outboundBucket.lastUpdated = uint32(block.timestamp);
+      }
+      outboundBucket._setTokenBucketConfig(configArgs.outboundRateLimiterConfig);
+
+      RateLimiter._validateTokenBucketConfig(configArgs.inboundRateLimiterConfig);
+      RateLimiter.TokenBucket storage inboundBucket = finalityConfig.inboundRateLimiterConfig[remoteChainSelector];
+      bool inboundUninitialized = inboundBucket.lastUpdated == 0 && inboundBucket.capacity == 0
+        && inboundBucket.rate == 0 && inboundBucket.tokens == 0 && !inboundBucket.isEnabled;
+      if (inboundUninitialized && configArgs.inboundRateLimiterConfig.isEnabled) {
+        inboundBucket.tokens = configArgs.inboundRateLimiterConfig.capacity;
+        inboundBucket.lastUpdated = uint32(block.timestamp);
+      }
+      inboundBucket._setTokenBucketConfig(configArgs.inboundRateLimiterConfig);
+    }
+  }
+
+  // ================================================================
+  // │                          CCV                                 │
+  // ================================================================
+
+  /// @notice Updates the CCV configuration for specified remote chains.
+  /// If the array includes address(0), it indicates that the default CCV should be used alongside any other specified CCVs.
+  function applyCCVConfigUpdates(
+    CCVConfigArg[] calldata ccvConfigArgs
+  ) external virtual onlyOwner {
+    for (uint256 i = 0; i < ccvConfigArgs.length; ++i) {
+      uint64 remoteChainSelector = ccvConfigArgs[i].remoteChainSelector;
+      address[] calldata outboundCCVs = ccvConfigArgs[i].outboundCCVs;
+      address[] calldata inboundCCVs = ccvConfigArgs[i].inboundCCVs;
+
+      // check for duplicates in outbound CCVs.
+      CCVConfigValidation._assertNoDuplicates(outboundCCVs);
+
+      // check for duplicates in inbound CCVs.
+      CCVConfigValidation._assertNoDuplicates(inboundCCVs);
+
+      CCVConfig memory ccvConfig = CCVConfig({outboundCCVs: outboundCCVs, inboundCCVs: inboundCCVs});
+      emit CCVConfigUpdated(remoteChainSelector, outboundCCVs, inboundCCVs);
+      s_verifierConfig[remoteChainSelector] = ccvConfig;
+    }
+  }
+
+  /// @notice Returns the set of required CCVs for incoming messages from a source chain.
+  /// @param sourceChainSelector The source chain selector for incoming messages.
+  /// This implementation assumes the same set of CCVs are used for all transfers on a lane.
+  /// Implementers can override this function to define custom logic based on these params.
+  /// @return requiredCCVs Set of required CCV addresses.
+  function getRequiredInboundCCVs(
+    address, // localToken
+    uint64 sourceChainSelector,
+    uint256, // amount,
+    uint16, // finality
+    bytes calldata // sourcePoolData
+  ) external view virtual returns (address[] memory requiredCCVs) {
+    return s_verifierConfig[sourceChainSelector].inboundCCVs;
+  }
+
+  /// @notice Returns the set of required CCVs for outgoing messages to a destination chain.
+  /// @param destChainSelector The destination chain selector for outgoing messages.
+  /// This implementation assumes the same set of CCVs are used for all transfers on a lane.
+  /// Implementers can override this function to define custom logic based on these params.
+  /// @return requiredCCVs Set of required CCV addresses.
+  function getRequiredOutboundCCVs(
+    address, // localToken
+    uint64 destChainSelector,
+    uint256, // amount
+    uint16, // finality
+    bytes calldata // tokenArgs
+  ) external view virtual returns (address[] memory requiredCCVs) {
+    return s_verifierConfig[destChainSelector].outboundCCVs;
+  }
+
+  // ================================================================
+  // │                          Fee                                 │
+  // ================================================================
+
+  /// @notice Updates the token transfer fee configurations for specified destination chains.
+  /// @param tokenTransferFeeConfigArgs Array of structs containing destination chain selectors and their fee.
+  /// @param destToUseDefaultFeeConfigs Array of destination chain selectors to delete custom fee configs for.
+  function applyTokenTransferFeeConfigUpdates(
+    TokenTransferFeeConfigArgs[] calldata tokenTransferFeeConfigArgs,
+    uint64[] calldata destToUseDefaultFeeConfigs
+  ) external virtual onlyOwner {
+    for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
+      uint64 destChainSelector = tokenTransferFeeConfigArgs[i].destChainSelector;
+      TokenTransferFeeConfig calldata tokenTransferFeeConfig = tokenTransferFeeConfigArgs[i].tokenTransferFeeConfig;
+      s_tokenTransferFeeConfig[destChainSelector] = tokenTransferFeeConfig;
+      emit TokenTransferFeeConfigUpdated(destChainSelector, tokenTransferFeeConfig);
+    }
+
+    for (uint256 i = 0; i < destToUseDefaultFeeConfigs.length; ++i) {
+      uint64 destChainSelector = destToUseDefaultFeeConfigs[i];
+      delete s_tokenTransferFeeConfig[destChainSelector];
+      emit TokenTransferFeeConfigDeleted(destChainSelector);
+    }
+  }
+
+  /// @notice Returns the token transfer fee override for a destination chain.
+  /// @param destChainSelector The destination chain selector used for lookup.
+  /// @return feeConfig The enabled fee configuration for the lane.
+  function getTokenTransferFeeConfig(
+    address, // localToken
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata, // message
+    uint16, // finality
+    bytes calldata // tokenArgs
+  ) external view virtual returns (TokenTransferFeeConfig memory feeConfig) {
+    return s_tokenTransferFeeConfig[destChainSelector];
+  }
+
+  /// @notice Withdraws all accumulated pool fees to the specified recipient.
+  /// @dev For burn/mint pools, this transfers the entire token balance of the pool contract.
+  /// lock/release pools should override this function with their own accounting mechanism.
+  /// @param recipient The address to receive the withdrawn fees.
+  function withdrawFees(
+    address recipient
+  ) external virtual onlyOwner {
+    uint256 amount = getAccumulatedFees();
+    if (amount > 0) {
+      getToken().safeTransfer(recipient, amount);
+      emit PoolFeeWithdrawn(recipient, amount);
+    }
+  }
+
+  /// @notice Gets the accumulated pool fees that can be withdrawn.
+  /// @dev burn/mint pools should return the contract's token balance since pool fees
+  /// are minted directly to the pool contract (e.g., `return getToken().balanceOf(address(this))`).
+  /// lock/release pools should implement their own accounting mechanism for pool fees
+  /// by adding a storage variable (e.g., `s_accumulatedPoolFees`) since they cannot mint
+  /// additional tokens for pool fee rewards.
+  /// Note: Fee accounting can be obscured by sending tokens directly to the pool.
+  /// This does not introduce security issues but will need to be handled operationally.
+  /// @return The amount of accumulated pool fees available for withdrawal.
+  function getAccumulatedFees() public view virtual returns (uint256) {
+    return getToken().balanceOf(address(this));
+  }
+
+  // @notice Applies any applicable fees to the lock or burn amount.
+  /// @param lockOrBurnIn The original lock or burn request.
+  /// @param finality The finality depth requested by the message. A value of zero
+  function _applyFee(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 finality
+  ) internal view virtual returns (uint256 destAmount) {
+    destAmount = lockOrBurnIn.amount;
+    if (finality != WAIT_FOR_FINALITY) {
+      // deduct fast transfer fee
+      destAmount -= (lockOrBurnIn.amount * s_finalityConfig.fastTransferFeeBps) / BPS_DIVIDER;
+    }
+    // TODO : normal transfer fee
+    return destAmount;
   }
 }
