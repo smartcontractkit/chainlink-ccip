@@ -24,7 +24,7 @@ contract BurnMintTokenPoolSetup is BurnMintSetup {
 }
 
 contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
-  function test_PoolMint() public {
+  function test_releaseOrMint() public {
     uint256 amount = 1e19;
     address receiver = makeAddr("receiver_address");
 
@@ -44,6 +44,32 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
         sourcePoolData: "",
         offchainTokenData: ""
       })
+    );
+
+    assertEq(s_token.balanceOf(receiver), amount);
+  }
+
+  function test_releaseOrMint_WithFinalityParam() public {
+    uint256 amount = 1e19;
+    address receiver = makeAddr("receiver_address");
+
+    vm.startPrank(s_allowedOffRamp);
+
+    vm.expectEmit();
+    emit IERC20.Transfer(address(0), receiver, amount);
+
+    s_pool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: receiver,
+        sourceDenominatedAmount: amount,
+        localToken: address(s_token),
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        sourcePoolAddress: abi.encode(s_initialRemotePool),
+        sourcePoolData: "",
+        offchainTokenData: ""
+      }),
+      0
     );
 
     assertEq(s_token.balanceOf(receiver), amount);

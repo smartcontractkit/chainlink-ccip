@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {TokenPool} from "../../../poolsV2/TokenPool.sol";
+import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
@@ -68,7 +69,7 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
       inboundCCVs: validInbound
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.DuplicateCCV.selector, s_ccv1));
+    vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv1));
     s_tokenPool.applyCCVConfigUpdates(configArgs);
   }
 
@@ -88,7 +89,7 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
       inboundCCVs: duplicateInbound
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.DuplicateCCV.selector, s_ccv2));
+    vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv2));
     s_tokenPool.applyCCVConfigUpdates(configArgs);
   }
 }

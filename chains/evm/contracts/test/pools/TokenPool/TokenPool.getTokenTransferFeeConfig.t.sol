@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Client} from "../../../libraries/Client.sol";
-import {TokenPool} from "../../../poolsV2/TokenPool.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
 contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
