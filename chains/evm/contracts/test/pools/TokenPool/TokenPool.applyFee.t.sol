@@ -6,7 +6,7 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
 contract TokenPoolV2_applyFee is TokenPoolV2Setup {
-  function test_applyFee_FastFinality() public {
+  function test_applyFee_CustomFinality() public {
     uint16 finalityThreshold = 5;
     uint16 customFinalityTransferFeeBps = 500;
     uint256 maxAmountPerRequest = 1000e18;
