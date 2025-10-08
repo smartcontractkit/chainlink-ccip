@@ -6,7 +6,7 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract TokenPool_applyCCVConfigUpdates is TokenPoolV2Setup {
+contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
   // Test helper addresses.
   address internal s_ccv1 = makeAddr("ccv1");
   address internal s_ccv2 = makeAddr("ccv2");

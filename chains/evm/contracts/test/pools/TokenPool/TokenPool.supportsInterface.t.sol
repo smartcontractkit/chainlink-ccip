@@ -8,7 +8,7 @@ import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
-contract TokenPool_supportsInterface is TokenPoolV2Setup {
+contract TokenPoolV2_supportsInterface is TokenPoolV2Setup {
   function test_supportsInterface() public view {
     assertTrue(s_tokenPool.supportsInterface(type(IERC165).interfaceId));
     assertTrue(s_tokenPool.supportsInterface(Pool.CCIP_POOL_V2));

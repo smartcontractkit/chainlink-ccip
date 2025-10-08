@@ -61,6 +61,7 @@ func findRef(ds datastore.DataStore, ref datastore.AddressRef) (datastore.Addres
 	if len(refs) != 1 {
 		return datastore.AddressRef{}, fmt.Errorf("expected to find exactly 1 ref with criteria %s, found %d", SprintRef(ref), len(refs))
 	}
+
 	return refs[0], nil
 }
 

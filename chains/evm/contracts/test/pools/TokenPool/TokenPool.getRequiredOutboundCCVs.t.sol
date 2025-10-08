@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
-contract TokenPool_getRequiredOutboundCCVs is TokenPoolV2Setup {
+contract TokenPoolV2_getRequiredOutboundCCVs is TokenPoolV2Setup {
   function test_getRequiredInboundCCVs() public {
     address[] memory outboundCCVs = new address[](1);
     outboundCCVs[0] = makeAddr("outboundCCV1");
