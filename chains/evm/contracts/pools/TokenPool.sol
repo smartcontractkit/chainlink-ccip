@@ -359,7 +359,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - RMN curse status
   /// - allowlist status
   /// - if the sender is a valid onRamp
-  /// - rate limiting for either normal or fast-transfer lanes.
+  /// - rate limiting for either default finality or custom-transfer lanes.
   /// @param lockOrBurnIn The input to validate.
   /// @param finality The finality depth requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
@@ -396,7 +396,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - RMN curse status
   /// - if the sender is a valid offRamp
   /// - if the source pool is configured for the remote chain
-  /// - rate limiting for either normal or fast-transfer lanes.
+  /// - rate limiting for either normal or custom-finality transfer lanes.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
   /// @param finality The finality depth requested by the message. A value of zero is used for default finality.
@@ -1055,7 +1055,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       // deduct custom finality transfer fee
       destAmount -= (lockOrBurnIn.amount * s_finalityConfig.customFinalityTransferFeeBps) / BPS_DIVIDER;
     }
-    // TODO : normal transfer fee
+    // TODO : default finality transfer fee
     return destAmount;
   }
 }
