@@ -10,7 +10,6 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
   function test_applyFinalityConfigUpdates() public {
     uint16 finalityThreshold = 100;
     uint16 customFinalityTransferFeeBps = 500; // 5%
-    uint256 maxAmountPerRequest = 1000e18;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
@@ -22,16 +21,12 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
     });
 
     vm.expectEmit();
-    emit TokenPool.FinalityConfigUpdated(finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, rateLimitArgs
-    );
+    emit TokenPool.FinalityConfigUpdated(finalityThreshold, customFinalityTransferFeeBps);
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, customFinalityTransferFeeBps, rateLimitArgs);
 
-    (uint16 storedFinalityThreshold, uint16 storedFeeBps, uint256 storedMaxAmount) =
-      s_tokenPool.getCustomFinalityConfig();
+    (uint16 storedFinalityThreshold, uint16 storedFeeBps) = s_tokenPool.getCustomFinalityConfig();
     assertEq(storedFinalityThreshold, finalityThreshold);
     assertEq(storedFeeBps, customFinalityTransferFeeBps);
-    assertEq(storedMaxAmount, maxAmountPerRequest);
 
     RateLimiter.TokenBucket memory outboundBucket = s_tokenPool.getFastOutboundBucket(DEST_CHAIN_SELECTOR);
     assertTrue(outboundBucket.isEnabled);
@@ -55,26 +50,20 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
 
     uint16 finalityThreshold = 100;
     uint16 customFinalityTransferFeeBps = 500; // 5%
-    uint256 maxAmountPerRequest = 1000e18;
     TokenPool.CustomFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
       new TokenPool.CustomFinalityRateLimitConfigArgs[](0);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
-    );
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, customFinalityTransferFeeBps, emptyRateLimitArgs);
   }
 
   function test_applyFinalityConfigUpdates_RevertWhen_InvalidTransferFeeBps() public {
     uint16 finalityThreshold = 100;
     uint16 customFinalityTransferFeeBps = BPS_DIVIDER;
-    uint256 maxAmountPerRequest = 1000e18;
     TokenPool.CustomFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
       new TokenPool.CustomFinalityRateLimitConfigArgs[](0);
 
-    vm.expectRevert(TokenPool.InvalidTransferFeeBps.selector);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest, emptyRateLimitArgs
-    );
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidTransferFeeBps.selector, BPS_DIVIDER));
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, customFinalityTransferFeeBps, emptyRateLimitArgs);
   }
 }

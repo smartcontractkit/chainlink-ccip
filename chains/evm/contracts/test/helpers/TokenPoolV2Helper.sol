@@ -20,10 +20,10 @@ contract TokenPoolV2Helper is TokenPool {
   function getCustomFinalityConfig()
     external
     view
-    returns (uint16 finalityThreshold, uint16 customFinalityTransferFeeBps, uint256 maxAmountPerRequest)
+    returns (uint16 finalityThreshold, uint16 customFinalityTransferFeeBps)
   {
     CustomFinalityConfig storage config = s_finalityConfig;
-    return (config.finalityThreshold, config.customFinalityTransferFeeBps, config.maxAmountPerRequest);
+    return (config.finalityThreshold, config.customFinalityTransferFeeBps);
   }
 
   function getFastOutboundBucket(

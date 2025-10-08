@@ -45,9 +45,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   error InvalidDestBytesOverhead(uint32 destBytesOverhead);
   error InvalidFinality(uint16 requested, uint16 finalityThreshold);
-  error AmountExceedsMaxPerRequest(uint256 requested, uint256 maximum);
   error TokenTransferFeeConfigNotEnabled(uint64 destChainSelector);
-  error InvalidTransferFeeBps();
+  error InvalidTransferFeeBps(uint256 bps);
   error InvalidFinalityConfig();
   error CallerIsNotARampOnRouter(address caller);
   error ZeroAddressInvalid();
@@ -92,14 +91,12 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event CCVConfigUpdated(uint64 indexed remoteChainSelector, address[] outboundCCVs, address[] inboundCCVs);
-  event FinalityConfigUpdated(uint16 finalityConfig, uint16 customFinalityTransferFeeBps, uint256 maxAmountPerRequest);
+  event FinalityConfigUpdated(uint16 finalityConfig, uint16 customFinalityTransferFeeBps);
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
   event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector);
   /// @notice Emitted when pool fees are withdrawn.
   event PoolFeeWithdrawn(address indexed recipient, uint256 amount);
-  event CustomFinalityTransferOutboundRateLimitConsumed(
-    uint64 indexed remoteChainSelector, address token, uint256 amount
-  );
+  event CustomFinalityOutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event CustomFinalityTransferInboundRateLimitConsumed(
     uint64 indexed remoteChainSelector, address token, uint256 amount
   );
@@ -123,8 +120,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     uint16 finalityThreshold; // ────────────╮ Minimum block depth on the source chain that token issuers consider sufficiently secure.
     //                                       | 0 means the default finality.
     uint16 customFinalityTransferFeeBps; // ─╯ Fee in basis points for custom finality transfers [0-10_000].
-    uint256 maxAmountPerRequest; // Maximum amount allowed per transfer request.
-    // Separate buckets isolate custom-finality limits so these transfers cannot deplete the primary pool rate limits.
+    // Separate buckets provide isolated rate limits for custom-finality transfers, as their risk profiles differ from default transfers.
     mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) outboundRateLimiterConfig;
     mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketInbound) inboundRateLimiterConfig;
   }
@@ -152,8 +148,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     TokenTransferFeeConfig tokenTransferFeeConfig; // Token transfer fee configuration.
   }
 
-  /// @notice The division factor for basis points (BPS). This also represents the maximum BPS fee.
+  /// @notice The division factor for bps. This also represents the maximum bps fee.
   uint256 internal constant BPS_DIVIDER = 10_000;
+  /// @dev Constant representing the default finality.
   uint16 internal constant WAIT_FOR_FINALITY = 0;
   /// @dev The bridgeable token that is managed by this pool. Pools could support multiple tokens at the same time if
   /// required, but this implementation only supports one token.
@@ -376,16 +373,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       if (finality < finalityConfig.finalityThreshold) {
         revert InvalidFinality(finality, finalityConfig.finalityThreshold);
       }
-      if (amount > finalityConfig.maxAmountPerRequest) {
-        revert AmountExceedsMaxPerRequest(amount, finalityConfig.maxAmountPerRequest);
-      }
 
       finalityConfig.outboundRateLimiterConfig[lockOrBurnIn.remoteChainSelector]._consume(
         amount, lockOrBurnIn.localToken
       );
-      emit CustomFinalityTransferOutboundRateLimitConsumed(
-        lockOrBurnIn.remoteChainSelector, lockOrBurnIn.localToken, amount
-      );
+      emit CustomFinalityOutboundRateLimitConsumed(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.localToken, amount);
     } else {
       _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     }
@@ -396,7 +388,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - RMN curse status
   /// - if the sender is a valid offRamp
   /// - if the source pool is configured for the remote chain
-  /// - rate limiting for either normal or custom-finality transfer lanes.
+  /// - rate limiting for either default or custom-finality transfer messages.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
   /// @param finality The finality depth requested by the message. A value of zero is used for default finality.
@@ -869,18 +861,16 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function applyFinalityConfigUpdates(
     uint16 finalityThreshold,
     uint16 customFinalityTransferFeeBps,
-    uint256 maxAmountPerRequest,
     CustomFinalityRateLimitConfigArgs[] calldata rateLimitConfigArgs
   ) external virtual onlyOwner {
+    if (customFinalityTransferFeeBps >= BPS_DIVIDER) {
+      revert InvalidTransferFeeBps(customFinalityTransferFeeBps);
+    }
     CustomFinalityConfig storage finalityConfig = s_finalityConfig;
     finalityConfig.finalityThreshold = finalityThreshold;
-    if (customFinalityTransferFeeBps >= BPS_DIVIDER) {
-      revert InvalidTransferFeeBps();
-    }
     finalityConfig.customFinalityTransferFeeBps = customFinalityTransferFeeBps;
-    finalityConfig.maxAmountPerRequest = maxAmountPerRequest;
     _setCustomFinalityRateLimitConfig(rateLimitConfigArgs);
-    emit FinalityConfigUpdated(finalityThreshold, customFinalityTransferFeeBps, maxAmountPerRequest);
+    emit FinalityConfigUpdated(finalityThreshold, customFinalityTransferFeeBps);
   }
 
   /// @notice Sets the custom finality based rate limit configurations for specified remote chains.
