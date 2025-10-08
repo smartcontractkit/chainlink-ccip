@@ -58,3 +58,7 @@ abigen: ## Build & install abigen.
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
 	go install github.com/vektra/mockery/v2@v2.52.3
+
+.PHONY: extract-bytecode
+extract-bytecode: ## Extract bytecode from versioned gobindings to bytecode directory
+	cd gobindings && go run ./cmd/extract_bytecode/main.go

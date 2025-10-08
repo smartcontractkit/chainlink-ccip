@@ -9,7 +9,7 @@ report
 scripts/abigen
 scripts/forge_zksync
 abi
-bytecode/*.bin
+bytecode/**/*.bin
 solc
 zkout
 coverage

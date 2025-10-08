@@ -17,7 +17,6 @@ export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
 
 CONTRACTS_DIR="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; cd ../ && pwd -P )"
 ABI_DIR="$CONTRACTS_DIR"/abi/
-BYTECODE_DIR="$CONTRACTS_DIR"/bytecode/
 mkdir -p "$ABI_DIR"
 
 compileContract() {
@@ -47,7 +46,6 @@ compileContract() {
 
     # Copy the generated abi files to a single folder
     cp "$dir"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi.json
-    cp "$dir"/"$contract".sol/"$contract".bin "$BYTECODE_DIR""$contract".bin
   fi
 }
 
