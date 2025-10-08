@@ -4,7 +4,7 @@ use example_ccip_receiver::{
     Any2SVMMessage, BaseState, CcipReceiverError, ALLOWED_OFFRAMP, EXTERNAL_EXECUTION_CONFIG_SEED,
 };
 
-declare_id!("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui");
+declare_id!("7ZEJ659D7qZxivBaHizJDA3KEKJRdNSZoeei3fSCCiKY");
 
 /// This program an example of a CCIP Receiver Program.
 /// Used to test CCIP Router execute.
@@ -53,35 +53,13 @@ pub mod test_ccip_receiver {
             counter.value
         );
 
-        // additional accounts trigger additional CPI call
-        if !ctx.remaining_accounts.is_empty() {
-            let external_execution_config = &ctx.accounts.external_execution_config;
-            let (target_program, acc_infos) = ctx.remaining_accounts.split_at(1);
+        // Use first 8 bytes of message data as size of the large vector alloc below
+        let bytes_array: [u8; 8] = message.data[0..8].try_into().expect("Vec<u8> must be 8 bytes long");
+        let my_u32_be = usize::from_be_bytes(bytes_array);
+        msg!("Allocating vector of size: {}", my_u32_be);
 
-            let acc_metas: Vec<AccountMeta> = acc_infos
-                .to_vec()
-                .iter()
-                .flat_map(|acc_info| {
-                    // Check signer from PDA External Execution config
-                    let is_signer = acc_info.key() == external_execution_config.key();
-                    acc_info.to_account_metas(Some(is_signer))
-                })
-                .collect();
-
-            let instruction = Instruction {
-                program_id: target_program[0].key(),
-                accounts: acc_metas,
-                data: message.data,
-            };
-
-            let seeds = &[
-                EXTERNAL_EXECUTION_CONFIG_SEED,
-                &[ctx.bumps.external_execution_config],
-            ];
-            let signer = &[&seeds[..]];
-
-            invoke_signed(&instruction, acc_infos, signer)?;
-        };
+        // Allocate large vector to simulate receiver using heap
+       let mut _my_vec: Vec<u8> = Vec::with_capacity(my_u32_be);
 
         Ok(())
     }
