@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {TokenPool} from "../../../poolsV2/TokenPool.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
 contract TokenPoolV2_getRequiredOutboundCCVs is TokenPoolV2Setup {

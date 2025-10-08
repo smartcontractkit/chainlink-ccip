@@ -184,7 +184,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
 
     Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
@@ -270,7 +270,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, 0);
 
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));

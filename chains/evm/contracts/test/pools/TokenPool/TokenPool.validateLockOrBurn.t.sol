@@ -3,8 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
-import {TokenPool as TokenPoolV1} from "../../../pools/TokenPool.sol";
-import {TokenPool} from "../../../poolsV2/TokenPool.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
 contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
@@ -12,7 +11,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
     vm.expectEmit();
-    emit TokenPoolV1.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
+    emit TokenPool.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0);
