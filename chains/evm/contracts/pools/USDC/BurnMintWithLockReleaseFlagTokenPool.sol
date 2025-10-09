@@ -28,7 +28,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn, 0);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
 
     _lockOrBurn(lockOrBurnIn.amount);
 
@@ -55,7 +55,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     // which enables potentially local non-canonical USDC with different decimals to be minted.
     uint256 localAmount = _calculateLocalAmount(releaseOrMintIn.sourceDenominatedAmount, 6);
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, 0);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
 
     IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
 

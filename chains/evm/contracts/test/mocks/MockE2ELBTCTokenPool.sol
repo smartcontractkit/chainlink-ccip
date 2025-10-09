@@ -35,7 +35,7 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn, 0);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
 
     IBurnMintERC20(address(i_token)).burn(lockOrBurnIn.amount);
 

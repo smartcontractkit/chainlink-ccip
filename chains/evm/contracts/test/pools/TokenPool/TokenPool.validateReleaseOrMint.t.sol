@@ -102,7 +102,7 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
     s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
   }
 
-  function _applyCustomFinalityConfig(uint16 finalityThreshold, uint256 maxAmountPerRequest) internal {
+  function _applyCustomFinalityConfig(uint16 finalityThreshold) internal {
     TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
       new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
     rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
@@ -111,7 +111,7 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24})
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, maxAmountPerRequest, rateLimitArgs);
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, rateLimitArgs);
   }
 
   function _buildReleaseOrMintIn(

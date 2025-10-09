@@ -35,11 +35,10 @@ contract TokenPoolV2_applyFee is TokenPoolV2Setup {
   function test_applyFee_CustomFinality() public {
     uint16 finalityThreshold = 5;
     uint16 customFinalityTransferFeeBps = 500;
-    uint256 maxAmountPerRequest = 1000e18;
     uint256 amount = 1000e18;
     vm.startPrank(OWNER);
     s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, maxAmountPerRequest, new TokenPool.CustomFinalityRateLimitConfigArgs[](0)
+      finalityThreshold, new TokenPool.CustomFinalityRateLimitConfigArgs[](0)
     );
     // Set a fee config with custom finality fee
     _applyTokenTransferFeeConfigUpdates(customFinalityTransferFeeBps, 0);
@@ -56,7 +55,7 @@ contract TokenPoolV2_applyFee is TokenPoolV2Setup {
     assertEq(amountAfterFee, amount - ((amount * customFinalityTransferFeeBps) / BPS_DIVIDER));
   }
 
-  function test_applyFee_NoFee() public {
+  function test_applyFee_NoFee() public view {
     uint256 amount = 1000e18;
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       originalSender: s_sender,

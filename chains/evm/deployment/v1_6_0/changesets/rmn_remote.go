@@ -2,7 +2,7 @@ package changesets
 
 import (
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 // RMNCurseAction represent a curse action to be applied on a chain (ChainSelector) with a specific subject (SubjectToCurse)
@@ -17,7 +17,7 @@ type RMNCurseAction struct {
 type CurseAction func() ([]RMNCurseAction, error)
 
 type RMNCurseConfig struct {
-	MCMS         *common_utils.MCMSInput
+	MCMS         *mcms.Input
 	CurseActions []CurseAction
 	// Use this if you need to include lanes that are not in sourcechain in the offramp. i.e. not yet migrated lane from 1.5
 	IncludeNotConnectedLanes bool

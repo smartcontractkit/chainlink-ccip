@@ -19,7 +19,7 @@ var SetRamp = contract.NewWrite(contract.WriteParams[common.Address, *verifier_p
 	ContractType:    ContractType,
 	ContractABI:     verifier_proxy.VerifierProxyABI,
 	NewContract:     verifier_proxy.NewVerifierProxy,
-	IsAllowedCaller: contract.OnlyOwner[*verifier_proxy.VerifierProxy],
+	IsAllowedCaller: contract.OnlyOwner[*verifier_proxy.VerifierProxy, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(verifierProxy *verifier_proxy.VerifierProxy, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
 		return verifierProxy.SetVerifier(opts, args)

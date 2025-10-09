@@ -20,10 +20,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "mock-receiver-v2:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys the MockReceiverV2 contract",
-	ContractType:     ContractType,
 	ContractMetadata: mock_receiver_v2.MockReceiverV2MetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.7.0").String(): {EVM: common.FromHex(mock_receiver_v2.MockReceiverV2Bin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(mock_receiver_v2.MockReceiverV2Bin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
