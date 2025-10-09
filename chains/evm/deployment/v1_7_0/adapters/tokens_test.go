@@ -23,8 +23,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 )
@@ -32,11 +32,11 @@ import (
 func TestTokenAdapter(t *testing.T) {
 	chainA := uint64(5009297550715157269)
 	chainB := uint64(4949039107694359620)
-	e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-		chainA: {NumAdditionalAccounts: 1},
-		chainB: {NumAdditionalAccounts: 1},
-	})
-	require.NoError(t, err, "Failed to create test environment with 2 chains")
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainA, chainB}),
+	)
+	require.NoError(t, err, "Failed to create test environment")
+	require.NotNil(t, e, "Environment should be created")
 
 	mcmsRegistry := changesets.NewMCMSReaderRegistry()
 	tokenAdapterRegistry := tokens.NewTokenAdapterRegistry()
@@ -45,7 +45,7 @@ func TestTokenAdapter(t *testing.T) {
 	// On each chain, deploy chain contracts & a token + token pool
 	ds := datastore.NewMemoryDataStore()
 	for _, chainSel := range []uint64{chainA, chainB} {
-		deployChainOut, err := v1_7_0.DeployChainContracts(mcmsRegistry).Apply(e, changesets.WithMCMS[v1_7_0.DeployChainContractsCfg]{
+		deployChainOut, err := v1_7_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployChainContractsCfg]{
 			Cfg: v1_7_0.DeployChainContractsCfg{
 				ChainSel: chainSel,
 				Params:   testsetup.CreateBasicContractParams(),
@@ -66,7 +66,7 @@ func TestTokenAdapter(t *testing.T) {
 		}, chainSel, evm_datastore_utils.ToEVMAddress)
 		require.NoError(t, err, "Failed to find deployed rmn proxy ref in datastore after DeployChainContracts changeset")
 
-		deployTokenAndPoolOut, err := v1_7_0.DeployBurnMintTokenAndPool(mcmsRegistry).Apply(e, changesets.WithMCMS[evm_tokens.DeployBurnMintTokenAndPoolInput]{
+		deployTokenAndPoolOut, err := v1_7_0.DeployBurnMintTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[evm_tokens.DeployBurnMintTokenAndPoolInput]{
 			Cfg: evm_tokens.DeployBurnMintTokenAndPoolInput{
 				Accounts: map[common.Address]*big.Int{
 					e.BlockChains.EVMChains()[chainSel].DeployerKey.From: big.NewInt(1_000_000),
@@ -131,7 +131,7 @@ func TestTokenAdapter(t *testing.T) {
 		},
 	}
 
-	_, err = tokens.ConfigureTokensForTransfers(tokenAdapterRegistry, mcmsRegistry).Apply(e, tokens.ConfigureTokensForTransfersConfig{
+	_, err = tokens.ConfigureTokensForTransfers(tokenAdapterRegistry, mcmsRegistry).Apply(*e, tokens.ConfigureTokensForTransfersConfig{
 		Tokens: []tokens.TokenTransferConfig{
 			{
 				ChainSelector: chainA,
