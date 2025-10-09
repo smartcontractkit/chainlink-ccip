@@ -116,6 +116,31 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     assertEq(s_token.balanceOf(address(s_pool)), 0);
   }
 
+  function test_lockOrBurn_FeeNotApplied_LegacyLockOrBurn() public {
+    uint16 finalityThreshold = 5;
+    uint16 customFinalityTransferFeeBps = 500;
+    uint256 amount = 1000e18;
+
+    // Apply custom finality config with a fee
+    vm.startPrank(OWNER);
+    s_tokenPool.applyFinalityConfigUpdates(
+      finalityThreshold, customFinalityTransferFeeBps, new TokenPool.CustomFinalityRateLimitConfigArgs[](0)
+    );
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
+      originalSender: OWNER,
+      receiver: bytes(""),
+      amount: amount,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      localToken: address(s_token)
+    });
+
+    vm.startPrank(s_allowedOnRamp);
+    s_tokenPool.lockOrBurn(lockOrBurnIn);
+
+    assertEq(s_tokenPool.getAccumulatedFees(), 0); // No fees should be accumulated
+  }
+
   // Should not burn tokens if cursed.
   function test_lockOrBurn_RevertWhen_CursedByRMN() public {
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
