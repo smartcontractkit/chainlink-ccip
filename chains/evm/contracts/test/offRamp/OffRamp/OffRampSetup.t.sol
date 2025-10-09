@@ -5,12 +5,12 @@ import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageRece
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
-import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
-import {CCVAggregatorHelper} from "../../helpers/CCVAggregatorHelper.sol";
+import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 
-contract CCVAggregatorSetup is BaseTest {
-  CCVAggregatorHelper internal s_agg;
+contract OffRampSetup is BaseTest {
+  OffRampHelper internal s_agg;
   address internal s_defaultCCV;
   address internal s_tokenAdminRegistry;
 
@@ -20,8 +20,8 @@ contract CCVAggregatorSetup is BaseTest {
     s_defaultCCV = makeAddr("defaultCCV");
     s_tokenAdminRegistry = makeAddr("tokenAdminRegistry");
 
-    s_agg = new CCVAggregatorHelper(
-      CCVAggregator.StaticConfig({
+    s_agg = new OffRampHelper(
+      OffRamp.StaticConfig({
         localChainSelector: DEST_CHAIN_SELECTOR,
         gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
         rmnRemote: s_mockRMNRemote,
@@ -41,8 +41,8 @@ contract CCVAggregatorSetup is BaseTest {
     address[] memory defaultCCVs,
     address[] memory laneMandatedCCVs
   ) internal {
-    CCVAggregator.SourceChainConfigArgs[] memory updates = new CCVAggregator.SourceChainConfigArgs[](1);
-    updates[0] = CCVAggregator.SourceChainConfigArgs({
+    OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
+    updates[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: isEnabled,

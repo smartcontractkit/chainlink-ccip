@@ -6,19 +6,19 @@ import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.s
 import {Router} from "../../../Router.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
-import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {ReentrantCCV} from "../../helpers/ReentrantCCV.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
-import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
+import {OffRampSetup} from "./OffRampSetup.t.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
 contract GasBoundedExecuteCaller {
-  CCVAggregator internal immutable i_aggregator;
+  OffRamp internal immutable i_offRamp;
 
   constructor(
-    address aggregator
+    address offRamp
   ) {
-    i_aggregator = CCVAggregator(aggregator);
+    i_offRamp = OffRamp(offRamp);
   }
 
   function callExecute(
@@ -27,11 +27,11 @@ contract GasBoundedExecuteCaller {
     bytes[] calldata ccvData,
     uint256 gasForCall
   ) external {
-    address ccvAggregator = address(i_aggregator);
-    bytes memory payload = abi.encodeCall(i_aggregator.execute, (message, ccvs, ccvData));
+    address offRamp = address(i_offRamp);
+    bytes memory payload = abi.encodeCall(i_offRamp.execute, (message, ccvs, ccvData));
 
     assembly {
-      let success := call(gasForCall, ccvAggregator, 0, add(payload, 0x20), mload(payload), 0, 0)
+      let success := call(gasForCall, offRamp, 0, add(payload, 0x20), mload(payload), 0, 0)
       if iszero(success) {
         returndatacopy(0, 0, returndatasize())
         revert(0, returndatasize())
@@ -40,7 +40,7 @@ contract GasBoundedExecuteCaller {
   }
 }
 
-contract CCVAggregator_execute is CCVAggregatorSetup {
+contract OffRamp_execute is OffRampSetup {
   uint256 internal constant PLENTY_OF_GAS = 1_000_000;
 
   GasBoundedExecuteCaller internal s_gasBoundedExecuteCaller;
@@ -96,7 +96,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     // Expect execution state change event.
     vm.expectEmit();
-    emit CCVAggregator.ExecutionStateChanged(
+    emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
       message.sequenceNumber,
       keccak256(encodedMessage),
@@ -123,14 +123,14 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     message.receiver = abi.encodePacked(address(mock)); // Add receiver to message.
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
-    // Set CCVAggregator as a valid OffRamp on the Router.
+    // Set OffRamp as a valid OffRamp on the Router.
     Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
     newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_agg)});
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
 
     // Expect execution state change event.
     vm.expectEmit();
-    emit CCVAggregator.ExecutionStateChanged(
+    emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
       message.sequenceNumber,
       keccak256(encodedMessage),
@@ -157,7 +157,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     // Expect execution state change event.
     vm.expectEmit();
-    emit CCVAggregator.ExecutionStateChanged(
+    emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
       message.sequenceNumber,
       keccak256(encodedMessage),
@@ -194,12 +194,12 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     _setGetCCVsReturnData(address(bytes20(message.receiver)), message.sourceChainSelector, ccvs, new address[](0), 0);
 
     vm.expectEmit();
-    emit CCVAggregator.ExecutionStateChanged(
+    emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
       message.sequenceNumber,
       keccak256(encodedMessage),
       Internal.MessageExecutionState.FAILURE,
-      abi.encodeWithSelector(CCVAggregator.ReentrancyGuardReentrantCall.selector)
+      abi.encodeWithSelector(OffRamp.ReentrancyGuardReentrantCall.selector)
     );
 
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
@@ -213,7 +213,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
       abi.encode(true)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR));
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
@@ -227,7 +227,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     // Configure source chain as disabled.
     _applySourceConfig(abi.encode(makeAddr("onRamp")), false, defaultCCVs, new address[](0));
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.SourceChainNotEnabled.selector, SOURCE_CHAIN_SELECTOR));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.SourceChainNotEnabled.selector, SOURCE_CHAIN_SELECTOR));
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
@@ -242,9 +242,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
 
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(CCVAggregator.InvalidMessageDestChainSelector.selector, message.destChainSelector)
-    );
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidMessageDestChainSelector.selector, message.destChainSelector));
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
@@ -261,7 +259,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     // Keep ccvData the same, creating mismatch.
     bytes[] memory ccvData = originalCcvData;
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.InvalidCCVDataLength.selector, ccvs.length, ccvData.length));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidCCVDataLength.selector, ccvs.length, ccvData.length));
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
@@ -285,7 +283,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     // Try to execute the same message again - should revert.
     vm.expectRevert(
       abi.encodeWithSelector(
-        CCVAggregator.SkippedAlreadyExecutedMessage.selector,
+        OffRamp.SkippedAlreadyExecutedMessage.selector,
         keccak256(encodedMessage),
         SOURCE_CHAIN_SELECTOR,
         message.sequenceNumber
@@ -319,7 +317,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.etch(Internal.GAS_ESTIMATION_SENDER, address(s_gasBoundedExecuteCaller).code);
 
     vm.expectEmit();
-    emit CCVAggregator.ExecutionStateChanged(
+    emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
       message.sequenceNumber,
       keccak256(encodedMessage),
@@ -339,7 +337,7 @@ contract CCVAggregator_execute is CCVAggregatorSetup {
     vm.mockCallRevert(address(s_agg), abi.encodeWithSelector(s_agg.executeSingleMessage.selector), revertReason);
 
     vm.expectEmit();
-    emit CCVAggregator.ExecutionStateChanged(
+    emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
       message.sequenceNumber,
       keccak256(encodedMessage),

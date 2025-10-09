@@ -7,15 +7,15 @@ import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
 import {ERC165CheckerReverting} from "../../../libraries/ERC165CheckerReverting.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
-import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
-import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
+import {OffRampSetup} from "./OffRampSetup.t.sol";
 
 import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
 
 using ERC165CheckerReverting for address;
 
-contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
+contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
   address internal s_receiver;
   address internal s_requiredCCV;
   address internal s_optionalCCV1;
@@ -41,8 +41,8 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     s_destTokenPool = makeAddr("destTokenPool");
 
     // Configure source chain with lane mandated CCVs.
-    CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
-    configs[0] = CCVAggregator.SourceChainConfigArgs({
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
@@ -177,7 +177,7 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
       abi.encode(receiverRequired, new address[](0), uint8(0))
     );
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, s_requiredCCV));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, s_requiredCCV));
     s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
   }
 
@@ -211,7 +211,7 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
       abi.encode(receiverRequired, new address[](0), uint8(0))
     );
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, s_poolRequiredCCV));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, s_poolRequiredCCV));
     s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
   }
 
@@ -222,7 +222,7 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
     ccvs[2] = s_defaultCCV;
     MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](0);
 
-    vm.expectRevert(abi.encodeWithSelector(CCVAggregator.RequiredCCVMissing.selector, s_laneMandatedCCV));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, s_laneMandatedCCV));
     s_agg.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
   }
 
@@ -243,9 +243,7 @@ contract CCVAggregator_ensureCCVQuorumIsReached is CCVAggregatorSetup {
       abi.encode(new address[](0), receiverOptional, uint8(2))
     );
 
-    vm.expectRevert(
-      abi.encodeWithSelector(CCVAggregator.OptionalCCVQuorumNotReached.selector, receiverOptional.length, 1)
-    );
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.OptionalCCVQuorumNotReached.selector, receiverOptional.length, 1));
     s_agg.ensureCCVQuorumIsReached(
       SOURCE_CHAIN_SELECTOR, s_receiver, new MessageV1Codec.TokenTransferV1[](0), FINALITY, ccvs
     );

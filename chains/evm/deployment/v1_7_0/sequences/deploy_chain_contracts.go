@@ -13,12 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -33,7 +33,7 @@ type RMNRemoteParams struct {
 	LegacyRMN common.Address
 }
 
-type CCVAggregatorParams struct {
+type OffRampParams struct {
 	Version              *semver.Version
 	GasForCallExactCheck uint16
 }
@@ -67,7 +67,7 @@ type ExecutorOnRampParams struct {
 
 type ContractParams struct {
 	RMNRemote         RMNRemoteParams
-	CCVAggregator     CCVAggregatorParams
+	OffRamp           OffRampParams
 	CommitteeVerifier CommitteeVerifierParams
 	CCVProxy          CCVProxyParams
 	FeeQuoter         FeeQuoterParams
@@ -234,23 +234,23 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		writes = append(writes, updatePricesReport.Output)
 
-		// Deploy CCVAggregator
-		ccvAggregatorRef, err := maybeDeployContract(b, ccv_aggregator.Deploy, chain, contract.DeployInput[ccv_aggregator.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(ccv_aggregator.ContractType, *input.ContractParams.CCVAggregator.Version),
+		// Deploy OffRamp
+		offRampRef, err := maybeDeployContract(b, off_ramp.Deploy, chain, contract.DeployInput[off_ramp.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(off_ramp.ContractType, *input.ContractParams.OffRamp.Version),
 			ChainSelector:  chain.Selector,
-			Args: ccv_aggregator.ConstructorArgs{
-				StaticConfig: ccv_aggregator.StaticConfig{
+			Args: off_ramp.ConstructorArgs{
+				StaticConfig: off_ramp.StaticConfig{
 					LocalChainSelector:   chain.Selector,
 					RmnRemote:            common.HexToAddress(rmnProxyRef.Address),
-					GasForCallExactCheck: input.ContractParams.CCVAggregator.GasForCallExactCheck,
+					GasForCallExactCheck: input.ContractParams.OffRamp.GasForCallExactCheck,
 					TokenAdminRegistry:   common.HexToAddress(tokenAdminRegistryRef.Address),
 				},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCVAggregator: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OffRamp: %w", err)
 		}
-		addresses = append(addresses, ccvAggregatorRef)
+		addresses = append(addresses, offRampRef)
 
 		// Deploy CCVProxy
 		ccvProxyRef, err := maybeDeployContract(b, ccv_proxy.Deploy, chain, contract.DeployInput[ccv_proxy.ConstructorArgs]{

@@ -22,7 +22,7 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 import {IERC20} from "@openzeppelin/contracts@5.0.2/token/ERC20/IERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
-contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
+contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   using ERC165CheckerReverting for address;
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -92,7 +92,7 @@ contract CCVAggregator is ITypeAndVersion, Ownable2StepMsgSender {
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "CCVAggregator 1.7.0-dev";
+  string public constant override typeAndVersion = "OffRamp 1.7.0-dev";
   /// @dev Hash of encoded address(0) used for empty address checks.
   bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev ChainSelector of this chain.

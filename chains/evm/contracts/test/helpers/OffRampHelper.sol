@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 import {Client} from "../../libraries/Client.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
-import {CCVAggregator} from "../../offRamp/CCVAggregator.sol";
+import {OffRamp} from "../../offRamp/OffRamp.sol";
 
-contract CCVAggregatorHelper is CCVAggregator {
+contract OffRampHelper is OffRamp {
   constructor(
-    CCVAggregator.StaticConfig memory staticConfig
-  ) CCVAggregator(staticConfig) {}
+    OffRamp.StaticConfig memory staticConfig
+  ) OffRamp(staticConfig) {}
 
   function ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,

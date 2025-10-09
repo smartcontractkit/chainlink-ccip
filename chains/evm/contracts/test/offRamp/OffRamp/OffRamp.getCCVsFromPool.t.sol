@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
-import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
+import {OffRampSetup} from "./OffRampSetup.t.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
@@ -33,7 +33,7 @@ contract MockPoolV2 {
   }
 }
 
-contract CCVAggregator_getCCVsFromPool is CCVAggregatorSetup {
+contract OffRamp_getCCVsFromPool is OffRampSetup {
   address internal s_token;
 
   function setUp() public override {

@@ -43,16 +43,16 @@ Gethwrapper methods map 1:1 with operations. Operations yield reports that enabl
 
 ```golang
 var ApplySourceChainConfigUpdates = contract.NewWrite(
-	"ccv-aggregator:apply-source-chain-config-updates", // Operation name - contract:method
+	"off-ramp:apply-source-chain-config-updates", // Operation name - contract:method
 	semver.MustParse("1.7.0"), // The contract version
-	"Applies updates to source chain configurations on the CCVAggregator", // Operation description
-	ContractType, // The contract type ("CCVAggregator" in this case)
-	ccv_aggregator.CCVAggregatorABI, // Contract ABI - used to decode errors
-	ccv_aggregator.NewCCVAggregator, // Contract constructor from gethwrappers
+	"Applies updates to source chain configurations on the OffRamp", // Operation description
+	ContractType, // The contract type ("OffRamp" in this case)
+	off_ramp.OffRampABI, // Contract ABI - used to decode errors
+	off_ramp.NewOffRamp, // Contract constructor from gethwrappers
 	contract.OnlyOwner, // Allowed callers check - used to determine whether or not the deployer key can make the call
 	func([]SourceChainConfigArgs) error { return nil }, // Perform simple argument validations here (i.e. acceptable ranges)
-	func(ccvAggregator *ccv_aggregator.CCVAggregator, opts *bind.TransactOpts, args []SourceChainConfigArgs) (*types.Transaction, error) {
-		return ccvAggregator.ApplySourceChainConfigUpdates(opts, args)
+	func(offRamp *off_ramp.OffRamp, opts *bind.TransactOpts, args []SourceChainConfigArgs) (*types.Transaction, error) {
+		return offRamp.ApplySourceChainConfigUpdates(opts, args)
 	}, // Wrapper around gethwrappers call
 )
 ```
@@ -61,13 +61,13 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(
 
 ```golang
 var GetStaticConfig = contract.NewRead(
-	"ccv-aggregator:get-static-config", // Operation name - contract:method
+	"off-ramp:get-static-config", // Operation name - contract:method
 	semver.MustParse("1.7.0"), // The contract version
-	"Reads the static config of the CCVAggregator", // Operation description
-	ContractType, // The contract type ("CCVAggregator" in this case)
-	ccv_aggregator.NewCCVAggregator, // Contract constructor from gethwrappers
-	func(ccvAggregator *ccv_aggregator.CCVAggregator, opts *bind.CallOpts, args any) (StaticConfig, error) {
-		return ccvAggregator.GetStaticConfig(opts)
+	"Reads the static config of the OffRamp", // Operation description
+	ContractType, // The contract type ("OffRamp" in this case)
+	off_ramp.NewOffRamp, // Contract constructor from gethwrappers
+	func(offRamp *off_ramp.OffRamp, opts *bind.CallOpts, args any) (StaticConfig, error) {
+		return offRamp.GetStaticConfig(opts)
 	}, // Wrapper around gethwrappers call
 )
 ```
@@ -76,15 +76,15 @@ var GetStaticConfig = contract.NewRead(
 
 ```golang
 var Deploy = contract.NewDeploy(
-	"ccv-aggregator:deploy", // Operation name - contract:method
+	"off-ramp:deploy", // Operation name - contract:method
 	semver.MustParse("1.7.0"), // The contract version
-	"Deploys the CCVAggregator contract", // Operation description
-	ContractType, // The contract type ("CCVAggregator" in this case)
-	ccv_aggregator.CCVAggregatorABI, // Contract ABI - used to decode errors
+	"Deploys the OffRamp contract", // Operation description
+	ContractType, // The contract type ("OffRamp" in this case)
+	off_ramp.OffRampABI, // Contract ABI - used to decode errors
 	func(ConstructorArgs) error { return nil }, // Perform simple argument validations here (i.e. acceptable ranges)
 	contract.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := ccv_aggregator.DeployCCVAggregator(opts, backend, args)
+			address, tx, _, err := off_ramp.DeployOffRamp(opts, backend, args)
 			return address, tx, err
 		},
 		DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error) {...}
