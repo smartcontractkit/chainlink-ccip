@@ -140,8 +140,7 @@ func processGoFile(path, gobindingsDir, bytecodeDir, abiDir string) error {
 	// Extract metadata from the file
 	metadata, err := extractMetadata(path)
 	if err != nil {
-		fmt.Printf("  Warning: failed to extract metadata from %s: %v\n", path, err)
-		return nil // Continue processing other files
+		return err
 	}
 
 	if metadata.Bytecode == "" && metadata.ABI == "" {
@@ -152,7 +151,7 @@ func processGoFile(path, gobindingsDir, bytecodeDir, abiDir string) error {
 	// Determine the base output path - flatten to version/filename structure
 	relPath, err := filepath.Rel(gobindingsDir, path)
 	if err != nil {
-		return fmt.Errorf("failed to get relative path: %w", err)
+		return fmt.Errorf("failed to get relative path for %s: %w", path, err)
 	}
 
 	// Extract version (first directory) and base filename
