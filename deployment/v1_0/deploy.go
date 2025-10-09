@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -24,6 +26,13 @@ type MCMSDeploymentConfigPerChain struct {
 	TimelockMinDelay *big.Int         `json:"timelockMinDelay"`
 	Label            *string          `json:"label"`
 	Qualifier        *string          `json:"qualifier"`
+	TimelockAdmin    common.Address   `json:"timelockAdmin"`
+}
+
+type MCMSDeploymentConfigPerChainWithAddress struct {
+	MCMSDeploymentConfigPerChain
+	ChainSelector     uint64
+	ExistingAddresses []datastore.AddressRef
 }
 
 func DeployMCMS(deployerReg *DeployerRegistry) cldf.ChangeSetV2[MCMSDeploymentConfig] {
@@ -40,6 +49,7 @@ func deployMCMSVerify(_ *DeployerRegistry) func(cldf.Environment, MCMSDeployment
 func deployMCMSApply(d *DeployerRegistry) func(cldf.Environment, MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
+		ds := datastore.NewMemoryDataStore()
 		for selector, mcmsCfg := range cfg.Chains {
 			family, err := chain_selectors.GetSelectorFamily(selector)
 			if err != nil {
@@ -49,17 +59,30 @@ func deployMCMSApply(d *DeployerRegistry) func(cldf.Environment, MCMSDeploymentC
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, MCMSVersion.String())
 			}
+			// find existing addresses for this chain from the env
+			existingAddrs := d.ExistingAddressesForChain(e, selector)
+			// create the sequence input
+			seqCfg := MCMSDeploymentConfigPerChainWithAddress{
+				MCMSDeploymentConfigPerChain: mcmsCfg,
+				ExistingAddresses:            existingAddrs,
+				ChainSelector:                selector,
+			}
 			deployReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, deployer.DeployMCMS(), e.BlockChains,
-				mcmsCfg)
+				seqCfg)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy MCMS on chain with selector %d: %w", selector, err)
 			}
-
+			for _, r := range deployReport.Output.Addresses {
+				if err := ds.Addresses().Add(r); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
+				}
+			}
 			reports = append(reports, deployReport.ExecutionReports...)
 		}
 
 		return changesets.NewOutputBuilder(e, nil).
 			WithReports(reports).
+			WithDataStore(ds).
 			Build(mcms.Input{}) // for deployment, we don't need an MCMS proposal
 	}
 }
