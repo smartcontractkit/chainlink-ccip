@@ -20,7 +20,6 @@
     "contracts/v1.5-CCIP-License-grants.md",
     "!contracts/test/**/*",
     "contracts/test/mocks/**/*",
-    "!contracts/test/mocks/test/*",
     "contracts/test/helpers/**/*",
     "scripts/compile_all",
     "abi/*.abi.json",
@@ -38,8 +37,8 @@
     "@chainlink/contracts": "1.5.0",
     "@changesets/cli": "^2.29.7",
     "@changesets/get-github-info": "^0.6.0",
-    "@openzeppelin/contracts-4.8.3/": "npm:@openzeppelin/contracts@4.8.3",
-    "@openzeppelin/contracts-5.0.2/": "npm:@openzeppelin/contracts@5.0.2",
+    "@openzeppelin/contracts-4.8.3": "npm:@openzeppelin/contracts@4.8.3",
+    "@openzeppelin/contracts-5.0.2": "npm:@openzeppelin/contracts@5.0.2",
     "semver": "^7.7.2"
   },
   "devDependencies": {
