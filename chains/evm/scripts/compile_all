@@ -16,8 +16,6 @@ FOUNDRY_PROJECT_SUFFIX="-compile"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
 
 CONTRACTS_DIR="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; cd ../ && pwd -P )"
-ABI_DIR="$CONTRACTS_DIR"/abi/
-mkdir -p "$ABI_DIR"
 
 compileContract() {
   local contract
@@ -43,9 +41,6 @@ compileContract() {
 
     # Move the build info to an expected file name
     mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
-
-    # Copy the generated abi files to a single folder
-    cp "$dir"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi.json
   fi
 }
 

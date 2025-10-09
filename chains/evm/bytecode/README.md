@@ -12,6 +12,7 @@ The script:
 - Excludes the `latest/` directory (unaudited code)
 - Extracts the `Bin` field from each `*MetaData` variable in `.go` files
 - Writes the bytecode to corresponding `.bin` files in this directory
+- Also extracts ABIs (as JSON) to the `../abi` directory
 
 ## Usage
 
@@ -33,26 +34,27 @@ The script can be run in CI pipelines. It will:
 Example CI integration:
 
 ```yaml
-- name: Extract bytecode
+- name: Extract bytecode and ABIs
   run: |
     cd chains/evm
     make extract-bytecode
 ```
 
+Note: The extraction script extracts both bytecode and ABIs in a single pass.
+
 ## Directory Structure
 
-The bytecode maintains the same folder structure as the gobindings:
+The bytecode is organized by version with all binaries directly in the version directory:
 
 ```
 bytecode/
 ├── v1_0_0/
-│   ├── lock_release_token_pool/
-│   │   └── lock_release_token_pool.bin
-│   └── rmn_proxy_contract/
-│       └── rmn_proxy_contract.bin
+│   ├── lock_release_token_pool.bin
+│   ├── rmn_proxy_contract.bin
+│   └── ...
 ├── v1_2_0/
-│   ├── burn_mint_token_pool/
-│   │   └── burn_mint_token_pool.bin
+│   ├── burn_mint_token_pool.bin
+│   ├── commit_store.bin
 │   └── ...
 └── ...
 ```
