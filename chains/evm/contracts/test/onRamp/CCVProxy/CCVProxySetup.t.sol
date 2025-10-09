@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Client} from "../../../libraries/Client.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 
-import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
 
@@ -15,7 +15,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
 
   CCVProxy internal s_ccvProxy;
-  CCVAggregator internal s_ccvAggregatorRemote;
+  OffRamp internal s_offRampRemote;
 
   function setUp() public virtual override {
     super.setUp();
@@ -32,7 +32,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
-    s_ccvAggregatorRemote = CCVAggregator(makeAddr("CCVAggregatorRemote"));
+    s_offRampRemote = OffRamp(makeAddr("OffRampRemote"));
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = address(new MockVerifier(""));
     CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
@@ -42,7 +42,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
       defaultExecutor: address(new MockExecutor()),
-      ccvAggregator: abi.encodePacked(address(s_ccvAggregatorRemote))
+      offRamp: abi.encodePacked(address(s_offRampRemote))
     });
 
     s_ccvProxy.applyDestChainConfigUpdates(destChainConfigArgs);
@@ -72,7 +72,7 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       destChainSelector: destChainSelector,
       sequenceNumber: seqNum,
       onRampAddress: abi.encodePacked(address(s_ccvProxy)),
-      offRampAddress: abi.encodePacked(address(s_ccvAggregatorRemote)),
+      offRampAddress: abi.encodePacked(address(s_offRampRemote)),
       finality: 0,
       sender: abi.encodePacked(originalSender),
       receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
