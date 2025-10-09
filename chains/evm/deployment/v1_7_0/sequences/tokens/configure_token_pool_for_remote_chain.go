@@ -85,7 +85,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// 1. Check remote token, remove and re-add remote config if requested remote token is different
 		// 2. Check existing rate limiters and update if necessary
 		// 3. Check existing remote pools and add requested remote pool if it does not exist
-		removes := make([]uint64, 1) // Cap == 1 because we may need to remove the chain if the remote token is different
+		removes := make([]uint64, 0, 1) // Cap == 1 because we may need to remove the chain if the remote token is different
 		if slices.Contains(supportedChainsReport.Output, input.RemoteChainSelector) {
 			// Check existing remote token
 			getRemoteTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemoteToken, chain, evm_contract.FunctionInput[uint64]{
@@ -180,7 +180,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
 			Args: token_pool.ApplyChainUpdatesArgs{
-				RemoteChainSelectorsToRemove: []uint64{},
+				RemoteChainSelectorsToRemove: removes,
 				ChainsToAdd: []token_pool.ChainUpdate{
 					{
 						RemoteChainSelector: input.RemoteChainSelector,
@@ -188,8 +188,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 							input.RemoteChainConfig.RemotePool,
 						},
 						RemoteTokenAddress:        input.RemoteChainConfig.RemoteToken,
-						OutboundRateLimiterConfig: input.RemoteChainConfig.InboundRateLimiterConfig,
-						InboundRateLimiterConfig:  input.RemoteChainConfig.OutboundRateLimiterConfig,
+						OutboundRateLimiterConfig: input.RemoteChainConfig.OutboundRateLimiterConfig,
+						InboundRateLimiterConfig:  input.RemoteChainConfig.InboundRateLimiterConfig,
 					},
 				},
 			},

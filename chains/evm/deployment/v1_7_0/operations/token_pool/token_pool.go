@@ -179,7 +179,7 @@ var SetChainRateLimiterConfigs = contract.NewWrite(contract.WriteParams[[]SetCha
 			inboundConfigs = append(inboundConfigs, token_pool.RateLimiterConfig(arg.InboundRateLimiterConfig))
 			outboundConfigs = append(outboundConfigs, token_pool.RateLimiterConfig(arg.OutboundRateLimiterConfig))
 		}
-		return tokenPool.SetChainRateLimiterConfigs(opts, remoteChainSelectors, inboundConfigs, outboundConfigs)
+		return tokenPool.SetChainRateLimiterConfigs(opts, remoteChainSelectors, outboundConfigs, inboundConfigs)
 	},
 })
 

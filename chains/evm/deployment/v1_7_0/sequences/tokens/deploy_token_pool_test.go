@@ -255,7 +255,12 @@ func TestDeployTokenPool(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, input.ConstructorArgs.Allowlist, getAllowlistReport.Output, "Expected allowlist address to be the same as the deployed allowlist")
+			for _, addr := range input.ConstructorArgs.Allowlist {
+				require.Contains(t, getAllowlistReport.Output, addr, "Expected inputted allowlist address to be in the on-chain allowlist")
+			}
+			for _, addr := range getAllowlistReport.Output {
+				require.Contains(t, input.ConstructorArgs.Allowlist, addr, "Expected on-chain allowlist address to be in the inputted allowlist")
+			}
 
 			// Check rate limit admin
 			getRateLimitAdminReport, err := operations.ExecuteOperation(

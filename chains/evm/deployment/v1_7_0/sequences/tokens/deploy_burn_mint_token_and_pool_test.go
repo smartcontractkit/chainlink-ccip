@@ -139,6 +139,13 @@ func TestDeployBurnMintTokenAndPool(t *testing.T) {
 			burners, err := token.GetBurners(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
 			require.NoError(t, err, "GetBurners should not error")
 			require.Equal(t, []common.Address{common.HexToAddress(poolAddress)}, burners, "Expected token pool to be the burner of the token")
+
+			// Check balance of each account
+			for addr, amount := range input.Accounts {
+				balance, err := token.BalanceOf(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, addr)
+				require.NoError(t, err, "BalanceOf should not error")
+				require.Equal(t, amount, balance, "Expected balance of account %s to be the same as the deployed token", addr)
+			}
 		})
 	}
 }

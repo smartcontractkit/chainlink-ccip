@@ -29,7 +29,6 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		// Configure remote chains on the token pool as specified
 		// This means adding any remote chains not already added, removing any remote chains that are no longer desired,
 		// or modifying rate limiters on any existing remote chains.
-		// TODO: Change to ConfigureTokenPoolForRemoteChains (plural)?
 		for destChainSelector, remoteChainConfig := range input.RemoteChains {
 			configureTokenPoolForRemoteChainReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
 				ChainSelector:       input.ChainSelector,
