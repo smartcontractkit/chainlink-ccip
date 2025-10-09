@@ -157,6 +157,11 @@ jobs:
         working-directory: chains/evm
         run: make wrappers
 
+      - name: Extract bytecode and abi from gobindings
+        run: |
+          cd chains/evm
+          make extract-bytecode-abi
+
       - name: Version package.json
         working-directory: chains/evm
         shell: bash
@@ -210,6 +215,11 @@ jobs:
       - name: Run native compile and generate wrappers
         working-directory: chains/evm
         run: make wrappers
+      
+      - name: Extract bytecode and abi from gobindings
+        run: |
+          cd chains/evm
+          make extract-bytecode-abi
 
       - name: Validate version
         working-directory: chains/evm
