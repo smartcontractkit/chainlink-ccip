@@ -1047,7 +1047,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 finality
   ) internal view virtual returns (uint256 destAmount) {
-    uint256 feeBps = finality != 0
+    uint256 feeBps = finality != WAIT_FOR_FINALITY
       ? s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector].customFinalityTransferFeeBps
       : s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector].defaultFinalityTransferFeeBps;
 

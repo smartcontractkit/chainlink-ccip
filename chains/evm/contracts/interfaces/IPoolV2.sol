@@ -14,7 +14,7 @@ interface IPoolV2 is IPoolV1 {
     uint32 destBytesOverhead; //             │ Data availability bytes.
     uint32 feeUSDCents; //                   │ Fee to charge per token transfer, multiples of 0.01 USD.
     uint16 customFinalityTransferFeeBps; //  │ Fee in basis points for custom finality transfers [0-10_000].
-    uint16 defaultFinalityTransferFeeBps; // │ Fee in basis points for normal transfers [0-10_000].
+    uint16 defaultFinalityTransferFeeBps; // │ Fee in basis points for default finality transfers [0-10_000].
     bool isEnabled; // ──────────────────────╯ Whether this token has custom transfer fees.
   }
 

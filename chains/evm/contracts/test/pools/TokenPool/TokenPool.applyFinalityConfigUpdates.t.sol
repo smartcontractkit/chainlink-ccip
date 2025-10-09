@@ -9,7 +9,6 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
   function test_applyFinalityConfigUpdates() public {
     uint16 finalityThreshold = 100;
-    uint16 customFinalityTransferFeeBps = 500; // 5%
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
@@ -48,7 +47,6 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
     vm.prank(STRANGER);
 
     uint16 finalityThreshold = 100;
-    uint16 customFinalityTransferFeeBps = 500; // 5%
     TokenPool.CustomFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
       new TokenPool.CustomFinalityRateLimitConfigArgs[](0);
 

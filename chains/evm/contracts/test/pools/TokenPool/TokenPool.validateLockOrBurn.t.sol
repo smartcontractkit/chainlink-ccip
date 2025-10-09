@@ -19,7 +19,6 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
 
   function test_validateLockOrBurn_WithFastFinality() public {
     uint16 finalityThreshold = 8;
-    uint16 customFinalityTransferFeeBps = 500; // 5%
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
@@ -46,8 +45,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
 
   function test_validateLockOrBurn_RevertWhen_InvalidFinality() public {
     uint16 finalityThreshold = 5;
-    uint16 customFinalityTransferFeeBps = 500;
-    _applyCustomFinalityConfig(finalityThreshold, customFinalityTransferFeeBps);
+    _applyCustomFinalityConfig(finalityThreshold);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
@@ -58,7 +56,9 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, finalityThreshold - 1);
   }
 
-  function _applyCustomFinalityConfig(uint16 finalityThreshold, uint16 customFinalityTransferFeeBps) internal {
+  function _applyCustomFinalityConfig(
+    uint16 finalityThreshold
+  ) internal {
     TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
       new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
     rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({

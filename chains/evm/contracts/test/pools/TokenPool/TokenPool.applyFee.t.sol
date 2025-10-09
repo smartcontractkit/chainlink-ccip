@@ -11,7 +11,6 @@ contract TokenPoolV2_applyFee is TokenPoolV2Setup {
   function test_applyFee_DefaultFinality() public {
     uint16 finalityThreshold = 5;
     uint16 defaultFinalityTransferFeeBps = 200;
-    uint256 maxAmountPerRequest = 1000e18;
     uint256 amount = 1000e18;
     vm.startPrank(OWNER);
     s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, new TokenPool.CustomFinalityRateLimitConfigArgs[](0));

@@ -118,7 +118,6 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
 
   function test_lockOrBurn_FeeNotApplied_LegacyLockOrBurn() public {
     uint16 finalityThreshold = 5;
-    uint16 customFinalityTransferFeeBps = 500;
     uint256 amount = 1000e18;
 
     // Apply custom finality config with a fee
