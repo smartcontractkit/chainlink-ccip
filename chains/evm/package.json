@@ -23,14 +23,13 @@
     "!contracts/test/mocks/test/*",
     "contracts/test/helpers/**/*",
     "scripts/compile_all",
-    "abi/*.abi.json",
+    "abi",
+    "bytecode",
     "remappings.txt",
     ".solhint.json",
     ".solhint-test.json",
     ".solhintignore",
-    ".solhintignore-test",
-    "bytecode/*.md",
-    "bytecode/FeeQuoter.bin"
+    ".solhintignore-test"
   ],
   "engines": {
     "node": ">=20",
