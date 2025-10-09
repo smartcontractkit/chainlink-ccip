@@ -38,7 +38,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   error TransferAmountExceedsMaxFillAmount(uint64 remoteChainSelector, uint256 amount);
   error InsufficientPoolFees(uint256 requested, uint256 available);
   error QuoteFeeExceedsUserMaxLimit(uint256 quoteFee, uint256 maxFastTransferFee);
-  error InvalidReceiver(bytes receiver);
+  error InvalidEncodedAddress(bytes encodedAddress);
 
   event DestChainConfigUpdated(
     uint64 indexed destinationChainSelector,
@@ -263,6 +263,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       );
     }
 
+    // No need to check if destinationPool is empty here. If the config was never set, maxFillAmountPerRequest
+    // will be 0, causing the amount check above to revert with TransferAmountExceedsMaxFillAmount.
+    // The _validateBytesNotEmptyOrZero check in _updateDestChainConfig ensures destinationPool is always valid when set.
+
     message = Client.EVM2AnyMessage({
       receiver: destChainConfig.destinationPool,
       data: abi.encode(
@@ -392,32 +396,32 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param destinationChainSelector The destination chain selector.
   /// @dev Checks if the destination chain is allowed, if the sender is allowed, and if the RMN curse applies.
   function _validateSendRequest(uint64 destinationChainSelector, bytes calldata receiver) internal view virtual {
-    _validateReceiver(receiver);
+    _validateBytesNotEmptyOrZero(receiver);
 
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destinationChainSelector)))) revert CursedByRMN();
     _checkAllowList(msg.sender);
     if (!isSupportedChain(destinationChainSelector)) revert ChainNotAllowed(destinationChainSelector);
   }
 
-  /// @notice Validates receiver address parameters.
-  /// @dev Checks length bounds (0 < length ≤ 64) and ensures receiver is not all zeros.
-  /// @param receiver The receiver address to validate.
-  function _validateReceiver(
-    bytes calldata receiver
+  /// @notice Validates the encoded address parameters.
+  /// @dev Checks length bounds (0 < length ≤ 64) and ensures the encoded address is not all zeros.
+  /// @param encodedAddress The bytes address to validate.
+  function _validateBytesNotEmptyOrZero(
+    bytes calldata encodedAddress
   ) internal pure {
-    uint256 receiverLength = receiver.length;
-    if (receiverLength == 0 || receiverLength > 64) {
-      revert InvalidReceiver(receiver);
+    uint256 encodedAddressLength = encodedAddress.length;
+    if (encodedAddressLength == 0 || encodedAddressLength > 64) {
+      revert InvalidEncodedAddress(encodedAddress);
     }
 
     // Check if receiver is all zeros by scanning at most 2 32-byte words
     bool isNonZero = false;
     assembly {
-      let dataPtr := receiver.offset
+      let dataPtr := encodedAddress.offset
       // Load and check first 32 bytes
       if calldataload(dataPtr) { isNonZero := 1 }
 
-      if gt(receiverLength, 32) {
+      if gt(encodedAddressLength, 32) {
         // Load and check second 32 bytes only if receiver length > 32
         // Note: dataPtr + 32 may exceed the actual receiver data bounds (e.g., for 40-byte receiver,
         // this reads bytes [32, 64) where [40, 64) is out-of-bounds). However, this is safe because
@@ -427,7 +431,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     if (!isNonZero) {
-      revert InvalidReceiver(receiver);
+      revert InvalidEncodedAddress(encodedAddress);
     }
   }
 
@@ -578,7 +582,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destChainConfigArgs.remoteChainSelector];
+
+    _validateBytesNotEmptyOrZero(destChainConfigArgs.destinationPool);
     destChainConfig.destinationPool = destChainConfigArgs.destinationPool;
+
     destChainConfig.fastTransferFillerFeeBps = destChainConfigArgs.fastTransferFillerFeeBps;
     destChainConfig.fastTransferPoolFeeBps = destChainConfigArgs.fastTransferPoolFeeBps;
     destChainConfig.fillerAllowlistEnabled = destChainConfigArgs.fillerAllowlistEnabled;

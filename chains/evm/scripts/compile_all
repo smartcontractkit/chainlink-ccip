@@ -58,7 +58,7 @@ function getOptimizations() {
       "OffRamp" | "OffRampOverSuperchainInterop" | "OffRampWithMessageTransformer")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
-      "FeeQuoter" | "FeeQuoterV2")
+      "FeeQuoter")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
         ;;
       "BurnMintFastTransferTokenPool" | "HybridLockReleaseUSDCTokenPool")
@@ -69,18 +69,9 @@ function getOptimizations() {
     echo "$optimize_runs_override"
 }
 
-
-# Mod sec
-compileContract ccvs/VerifierProxy
-compileContract ccvs/CommitteeVerifier
-compileContract onRamp/CCVProxy
-compileContract onRamp/ExecutorOnRamp
-compileContract offRamp/CCVAggregator
-
 # 1.6
 compileContract offRamp/OffRamp
 compileContract FeeQuoter
-compileContract FeeQuoterV2
 compileContract onRamp/OnRamp
 compileContract applications/PingPongDemo
 compileContract applications/EtherSenderReceiver
@@ -111,6 +102,7 @@ compileContract pools/BurnMintFastTransferTokenPool
 compileContract pools/ERC20LockBox
 compileContract pools/USDC/SiloedUSDCTokenPool
 compileContract pools/USDC/USDCTokenPoolCCTPV2
+compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
 
 # Test helpers
@@ -123,7 +115,6 @@ compileContract test/helpers/MultiOCR3Helper
 compileContract test/mocks/MockE2EUSDCTokenMessenger
 compileContract test/mocks/MockE2EUSDCTransmitter
 compileContract test/mocks/MockE2ELBTCTokenPool
-compileContract test/mocks/MockReceiverV2
 compileContract test/helpers/CCIPReaderTester
 # Offchain test encoding utils
 compileContract test/helpers/EncodingUtils

@@ -82,12 +82,6 @@ contract MessageHasher {
     return Client._argsToBytes(extraArgs);
   }
 
-  function encodeGenericExtraArgsV3(
-    Client.EVMExtraArgsV3 memory extraArgs
-  ) public pure returns (bytes memory) {
-    return Client._argsToBytes(extraArgs);
-  }
-
   function decodeEVMExtraArgsV1(
     uint256 gasLimit
   ) public pure returns (Client.EVMExtraArgsV1 memory) {
