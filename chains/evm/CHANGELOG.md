@@ -1,5 +1,20 @@
 [NOTES.md](../../../chainlink/contracts/release/ccip/NOTES.md)# @chainlink/contracts-ccip
 
+## 1.6.3 
+
+CCIP 1.6.3 is a minor release that focuses on adding support for new chain families, SUI and TON, in the FeeQuoter and MessageHasher components.
+
+Key improvements include: 
+- **FeeQuoter Support for SUI and TON** - Added validation logic and address parsing for the new SUI and TON chain families, including precompile-space constants and address format checks to ensure compatibility with non-EVM chains. 
+
+- **MessageHasher Support for SUI and TON** – Extended message hashing logic to handle SUI custom extraArgs format.
+
+### Minor Changes
+
+- [#1153](https://github.com/smartcontractkit/chainlink-ccip/pull/1153) [`645285c`](https://github.com/smartcontractkit/chainlink-ccip/pull/1153/commits/645285c895f662d32b40cfefe4b6158329f93516) - Adds support for SUI based extraArgs and validation 
+
+- [#944](https://github.com/smartcontractkit/chainlink-ccip/pull/944) [`1f7f450`](https://github.com/smartcontractkit/chainlink-ccip/pull/944/commits/1f7f4504e10e772f79ff1a42b547276fcec3b34c) - Add TON chain family selector definition for EVM and Solana
+
 ## 1.6.2
 
 CCIP 1.6.2 is a minor release that focuses on adding support for new networks in miscellaneous token pools and deployable
