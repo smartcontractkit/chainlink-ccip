@@ -123,9 +123,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
 
     // Apply custom finality config with a fee
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, new TokenPool.CustomFinalityRateLimitConfigArgs[](0)
-    );
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, new TokenPool.CustomFinalityRateLimitConfigArgs[](0));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       originalSender: OWNER,

@@ -102,7 +102,9 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
     s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
   }
 
-  function _applyCustomFinalityConfig(uint16 finalityThreshold) internal {
+  function _applyCustomFinalityConfig(
+    uint16 finalityThreshold
+  ) internal {
     TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
       new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
     rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({

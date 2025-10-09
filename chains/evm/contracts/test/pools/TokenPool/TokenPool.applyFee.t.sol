@@ -14,9 +14,7 @@ contract TokenPoolV2_applyFee is TokenPoolV2Setup {
     uint256 maxAmountPerRequest = 1000e18;
     uint256 amount = 1000e18;
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, maxAmountPerRequest, new TokenPool.CustomFinalityRateLimitConfigArgs[](0)
-    );
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, new TokenPool.CustomFinalityRateLimitConfigArgs[](0));
     // Set a fee config with default finality fee
     _applyTokenTransferFeeConfigUpdates(0, defaultFinalityTransferFeeBps);
 
@@ -37,9 +35,7 @@ contract TokenPoolV2_applyFee is TokenPoolV2Setup {
     uint16 customFinalityTransferFeeBps = 500;
     uint256 amount = 1000e18;
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, new TokenPool.CustomFinalityRateLimitConfigArgs[](0)
-    );
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, new TokenPool.CustomFinalityRateLimitConfigArgs[](0));
     // Set a fee config with custom finality fee
     _applyTokenTransferFeeConfigUpdates(customFinalityTransferFeeBps, 0);
 

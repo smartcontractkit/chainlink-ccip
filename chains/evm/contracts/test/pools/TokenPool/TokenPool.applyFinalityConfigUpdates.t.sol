@@ -21,8 +21,8 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
     });
 
     vm.expectEmit();
-    emit TokenPool.FinalityConfigUpdated(finalityThreshold, customFinalityTransferFeeBps);
-    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, customFinalityTransferFeeBps, rateLimitArgs);
+    emit TokenPool.FinalityThresholdUpdated(finalityThreshold);
+    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, rateLimitArgs);
 
     uint16 storedFinalityThreshold = s_tokenPool.getCustomFinalityConfig();
     assertEq(storedFinalityThreshold, finalityThreshold);
@@ -53,16 +53,6 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
       new TokenPool.CustomFinalityRateLimitConfigArgs[](0);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, emptyRateLimitArgs);
-  }
-
-  function test_applyFinalityConfigUpdates_RevertWhen_InvalidTransferFeeBps() public {
-    uint16 finalityThreshold = 100;
-    uint16 customFinalityTransferFeeBps = BPS_DIVIDER;
-    TokenPool.CustomFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
-      new TokenPool.CustomFinalityRateLimitConfigArgs[](0);
-
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidTransferFeeBps.selector, BPS_DIVIDER));
     s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, emptyRateLimitArgs);
   }
 }

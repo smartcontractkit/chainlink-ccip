@@ -17,7 +17,7 @@ contract TokenPoolV2Helper is TokenPool {
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
-  function getCustomFinalityConfig() external view returns (uint16 finalityThreshold, uint256 maxAmountPerRequest) {
+  function getCustomFinalityConfig() external view returns (uint16 finalityThreshold) {
     return s_finalityConfig.finalityThreshold;
   }
 

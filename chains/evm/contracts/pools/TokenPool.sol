@@ -91,7 +91,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event CCVConfigUpdated(uint64 indexed remoteChainSelector, address[] outboundCCVs, address[] inboundCCVs);
-  event FinalityConfigUpdated(uint16 finalityConfig);
+  event FinalityThresholdUpdated(uint16 finalityConfig);
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
   event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector);
   /// @notice Emitted when pool fees are withdrawn.
@@ -877,7 +877,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     CustomFinalityConfig storage finalityConfig = s_finalityConfig;
     finalityConfig.finalityThreshold = finalityThreshold;
     _setCustomFinalityRateLimitConfig(rateLimitConfigArgs);
-    emit FinalityConfigUpdated(finalityThreshold);
+    emit FinalityThresholdUpdated(finalityThreshold);
   }
 
   /// @notice Sets the custom finality based rate limit configurations for specified remote chains.
