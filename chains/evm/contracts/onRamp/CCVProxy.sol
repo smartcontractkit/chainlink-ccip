@@ -49,7 +49,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     address[] defaultCCVs,
     address[] laneMandatedCCVs,
     address defaultExecutor,
-    bytes ccvAggregator
+    bytes offRamp
   );
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
@@ -89,7 +89,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     address defaultExecutor; // Default executor to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
-    bytes ccvAggregator; // Destination ccvAggregator address, NOT abi encoded but raw bytes.
+    bytes offRamp; // Destination OffRamp address, NOT abi encoded but raw bytes.
   }
 
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these can be passed in the
@@ -101,7 +101,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address defaultExecutor;
-    bytes ccvAggregator; // Destination ccvAggregator address, NOT abi encoded but raw bytes.
+    bytes offRamp; // Destination OffRamp address, NOT abi encoded but raw bytes.
   }
 
   /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
@@ -205,7 +205,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       destChainSelector: destChainSelector,
       sequenceNumber: ++destChainConfig.sequenceNumber,
       onRampAddress: abi.encodePacked(address(this)),
-      offRampAddress: destChainConfig.ccvAggregator,
+      offRampAddress: destChainConfig.offRamp,
       finality: resolvedExtraArgs.finalityConfig,
       sender: abi.encodePacked(originalSender),
       // The user encodes the receiver with abi.encode when creating EVM2AnyMessage
@@ -553,7 +553,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       // executor. A zero executor would break backward compatibility and cause otherwise-valid traffic to revert.
       if (destChainConfigArg.defaultExecutor == address(0)) revert InvalidConfig();
       destChainConfig.defaultExecutor = destChainConfigArg.defaultExecutor;
-      destChainConfig.ccvAggregator = destChainConfigArg.ccvAggregator;
+      destChainConfig.offRamp = destChainConfigArg.offRamp;
 
       emit DestChainConfigSet(
         destChainSelector,
@@ -562,7 +562,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
         destChainConfigArg.defaultCCVs,
         destChainConfigArg.laneMandatedCCVs,
         destChainConfigArg.defaultExecutor,
-        destChainConfigArg.ccvAggregator
+        destChainConfigArg.offRamp
       );
     }
   }

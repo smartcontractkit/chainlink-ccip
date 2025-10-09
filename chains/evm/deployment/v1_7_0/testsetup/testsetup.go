@@ -44,7 +44,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 		RMNRemote: sequences.RMNRemoteParams{
 			Version: semver.MustParse("1.6.0"),
 		},
-		CCVAggregator: sequences.CCVAggregatorParams{
+		OffRamp: sequences.OffRampParams{
 			Version: semver.MustParse("1.7.0"),
 		},
 		CommitteeVerifier: sequences.CommitteeVerifierParams{

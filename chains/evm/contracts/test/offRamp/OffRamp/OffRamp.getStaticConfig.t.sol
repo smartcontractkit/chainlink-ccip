@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
-import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
+import {OffRampSetup} from "./OffRampSetup.t.sol";
 
-contract CCVAggregator_getStaticConfig is CCVAggregatorSetup {
+contract OffRamp_getStaticConfig is OffRampSetup {
   function test_getStaticConfig_MatchesConstructorValues() public {
-    CCVAggregator.StaticConfig memory newConfig = CCVAggregator.StaticConfig({
+    OffRamp.StaticConfig memory newConfig = OffRamp.StaticConfig({
       localChainSelector: 999999,
       gasForCallExactCheck: 10000,
       rmnRemote: s_mockRMNRemote,
       tokenAdminRegistry: makeAddr("newRegistry")
     });
 
-    CCVAggregator newAgg = new CCVAggregator(newConfig);
-    CCVAggregator.StaticConfig memory returnedConfig = newAgg.getStaticConfig();
+    OffRamp newAgg = new OffRamp(newConfig);
+    OffRamp.StaticConfig memory returnedConfig = newAgg.getStaticConfig();
 
     assertEq(returnedConfig.localChainSelector, newConfig.localChainSelector);
     assertEq(returnedConfig.gasForCallExactCheck, newConfig.gasForCallExactCheck);
