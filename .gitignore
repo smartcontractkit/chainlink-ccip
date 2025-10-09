@@ -30,3 +30,34 @@ vendor/
 
 # Ignore personal settings
 **/.claude/settings.local.json
+
+# Tooling caches
+*.tsbuildinfo
+.eslintcache
+
+# Log files
+*.log
+
+# misc
+.DS_Store
+.envrc
+.env*
+.dbenv
+!.github/actions/setup-postgres/.env
+.direnv
+.idea
+.vscode/
+*.iml
+debug.env
+operator_ui/install
+.devenv
+
+# neovim
+.nvim.lua
+
+# codeship
+*.aes
+dockercfg
+env
+credentials.env
+gcr_creds.env
