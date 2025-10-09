@@ -17,6 +17,7 @@ var (
 	SolChainSelector = ccipocr3.ChainSelector(sel.SOLANA_DEVNET.Selector)
 	EvmChainSelector = ccipocr3.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 	AptChainSelector = ccipocr3.ChainSelector(sel.APTOS_TESTNET.Selector)
+	SuiChainSelector = ccipocr3.ChainSelector(sel.SUI_TESTNET.Selector)
 )
 
 func TestDeviates(t *testing.T) {
@@ -196,6 +197,27 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
 			chainSelector:  AptChainSelector,
 			exp:            big.NewInt(0 * 1 * 1e10), // gasprice * USD per APT * (USD / APT)
+		},
+		{
+			name:           "sui high fee case",
+			sourceGasPrice: big.NewInt(100000),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(4), new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1e18))), //  usdPerFeeCoin = $4 * 1e9 * 1e18 = 4e27
+			chainSelector:  SuiChainSelector,
+			exp:            big.NewInt(100000 * 4e9),
+		},
+		{
+			name:           "sui low fee case",
+			sourceGasPrice: big.NewInt(100),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(4), new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1e18))),
+			chainSelector:  SuiChainSelector,
+			exp:            big.NewInt(100 * 4e9),
+		},
+		{
+			name:           "sui 0 fee case",
+			sourceGasPrice: big.NewInt(0),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(4), new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1e18))),
+			chainSelector:  SuiChainSelector,
+			exp:            big.NewInt(0),
 		},
 	}
 
