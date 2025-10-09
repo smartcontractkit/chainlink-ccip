@@ -14,6 +14,8 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
       destGasOverhead: 50000,
       destBytesOverhead: 32,
       feeUSDCents: 100, // $1.00
+      customFinalityTransferFeeBps: 50, // 0.50%
+      defaultFinalityTransferFeeBps: 20, // 0.20%
       isEnabled: true
     });
 
@@ -32,6 +34,8 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     assertEq(returnedFeeConfig.destGasOverhead, feeConfig.destGasOverhead);
     assertEq(returnedFeeConfig.destBytesOverhead, feeConfig.destBytesOverhead);
     assertEq(returnedFeeConfig.feeUSDCents, feeConfig.feeUSDCents);
+    assertEq(returnedFeeConfig.customFinalityTransferFeeBps, feeConfig.customFinalityTransferFeeBps);
+    assertEq(returnedFeeConfig.defaultFinalityTransferFeeBps, feeConfig.defaultFinalityTransferFeeBps);
   }
 
   function test_getTokenTransferFeeConfig_DeleteConfig() public {

@@ -17,13 +17,8 @@ contract TokenPoolV2Helper is TokenPool {
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
-  function getCustomFinalityConfig()
-    external
-    view
-    returns (uint16 finalityThreshold, uint16 customFinalityTransferFeeBps)
-  {
-    CustomFinalityConfig storage config = s_finalityConfig;
-    return (config.finalityThreshold, config.customFinalityTransferFeeBps);
+  function getCustomFinalityConfig() external view returns (uint16 finalityThreshold) {
+    return s_finalityConfig.finalityThreshold;
   }
 
   function getFastOutboundBucket(
