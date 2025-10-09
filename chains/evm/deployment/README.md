@@ -43,7 +43,7 @@ Gethwrapper methods map 1:1 with operations. Operations yield reports that enabl
 
 ```golang
 var ApplySourceChainConfigUpdates = contract.NewWrite(
-	"ccv-aggregator:apply-source-chain-config-updates", // Operation name - contract:method
+	"off-ramp:apply-source-chain-config-updates", // Operation name - contract:method
 	semver.MustParse("1.7.0"), // The contract version
 	"Applies updates to source chain configurations on the OffRamp", // Operation description
 	ContractType, // The contract type ("OffRamp" in this case)
@@ -61,7 +61,7 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(
 
 ```golang
 var GetStaticConfig = contract.NewRead(
-	"ccv-aggregator:get-static-config", // Operation name - contract:method
+	"off-ramp:get-static-config", // Operation name - contract:method
 	semver.MustParse("1.7.0"), // The contract version
 	"Reads the static config of the OffRamp", // Operation description
 	ContractType, // The contract type ("OffRamp" in this case)
@@ -76,7 +76,7 @@ var GetStaticConfig = contract.NewRead(
 
 ```golang
 var Deploy = contract.NewDeploy(
-	"ccv-aggregator:deploy", // Operation name - contract:method
+	"off-ramp:deploy", // Operation name - contract:method
 	semver.MustParse("1.7.0"), // The contract version
 	"Deploys the OffRamp contract", // Operation description
 	ContractType, // The contract type ("OffRamp" in this case)
