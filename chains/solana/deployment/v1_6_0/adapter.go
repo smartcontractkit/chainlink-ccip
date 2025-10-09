@@ -8,7 +8,7 @@ import (
 
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
-	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_6"
+	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 )
 
 func init() {
@@ -16,7 +16,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	ccipapi.RegisterChainAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
+	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
 }
 
 type SolanaAdapter struct{}
