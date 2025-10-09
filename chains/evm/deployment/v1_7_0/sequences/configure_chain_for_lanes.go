@@ -7,11 +7,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_aggregator"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -66,8 +66,8 @@ type ConfigureChainForLanesInput struct {
 	CommitteeVerifier common.Address
 	// The FeeQuoter on the EVM chain being configured
 	FeeQuoter common.Address
-	// The CCVAggregator on the EVM chain being configured
-	CCVAggregator common.Address
+	// The OffRamp on the EVM chain being configured
+	OffRamp common.Address
 	// The configuration of each remote chain to configure
 	RemoteChains map[uint64]RemoteChainConfig
 }
@@ -80,7 +80,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		writes := make([]contract.WriteOutput, 0)
 
 		// Create inputs for each operation
-		ccvAggregatorArgs := make([]ccv_aggregator.SourceChainConfigArgs, 0, len(input.RemoteChains))
+		offRampArgs := make([]off_ramp.SourceChainConfigArgs, 0, len(input.RemoteChains))
 		ccvProxyArgs := make([]ccv_proxy.DestChainConfigArgs, 0, len(input.RemoteChains))
 		committeeVerifierDestConfigArgs := make([]committee_verifier.DestChainConfigArgs, 0, len(input.RemoteChains))
 		committeeVerifierAllowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
@@ -89,7 +89,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
 		destChainSelectorsPerExecutor := make(map[common.Address][]uint64)
 		for remoteSelector, remoteConfig := range input.RemoteChains {
-			ccvAggregatorArgs = append(ccvAggregatorArgs, ccv_aggregator.SourceChainConfigArgs{
+			offRampArgs = append(offRampArgs, off_ramp.SourceChainConfigArgs{
 				Router:              input.Router,
 				SourceChainSelector: remoteSelector,
 				IsEnabled:           remoteConfig.AllowTrafficFrom,
@@ -103,7 +103,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				DefaultCCVs:       remoteConfig.DefaultCCVOnRamps,
 				LaneMandatedCCVs:  remoteConfig.LaneMandatedCCVOnRamps,
 				DefaultExecutor:   remoteConfig.DefaultExecutor,
-				CcvAggregator:     remoteConfig.CCIPMessageDest,
+				OffRamp:           remoteConfig.CCIPMessageDest,
 			})
 			committeeVerifierDestConfigArgs = append(committeeVerifierDestConfigArgs, committee_verifier.DestChainConfigArgs{
 				Router:            input.Router,
@@ -126,7 +126,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			})
 			offRampAdds = append(offRampAdds, router.OffRamp{
 				SourceChainSelector: remoteSelector,
-				OffRamp:             input.CCVAggregator,
+				OffRamp:             input.OffRamp,
 			})
 			if destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] == nil {
 				destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] = []uint64{}
@@ -134,16 +134,16 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] = append(destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor], remoteSelector)
 		}
 
-		// ApplySourceChainConfigUpdates on CCVAggregator
-		ccvAggregatorReport, err := cldf_ops.ExecuteOperation(b, ccv_aggregator.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]ccv_aggregator.SourceChainConfigArgs]{
+		// ApplySourceChainConfigUpdates on OffRamp
+		offRampReport, err := cldf_ops.ExecuteOperation(b, off_ramp.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]off_ramp.SourceChainConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       input.CCVAggregator,
-			Args:          ccvAggregatorArgs,
+			Address:       input.OffRamp,
+			Args:          offRampArgs,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config updates to CCVAggregator(%s) on chain %s: %w", input.CCVAggregator, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config updates to OffRamp(%s) on chain %s: %w", input.OffRamp, chain, err)
 		}
-		writes = append(writes, ccvAggregatorReport.Output)
+		writes = append(writes, offRampReport.Output)
 
 		// ApplyDestChainConfigUpdates on CCVProxy
 		ccvProxyReport, err := cldf_ops.ExecuteOperation(b, ccv_proxy.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]ccv_proxy.DestChainConfigArgs]{

@@ -23,7 +23,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: laneMandated,
       defaultExecutor: defaultExecutor,
-      ccvAggregator: abi.encodePacked(address(s_ccvAggregatorRemote))
+      offRamp: abi.encodePacked(address(s_offRampRemote))
     });
 
     vm.expectEmit();
@@ -34,7 +34,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs,
       laneMandated,
       defaultExecutor,
-      abi.encodePacked(address(s_ccvAggregatorRemote))
+      abi.encodePacked(address(s_offRampRemote))
     );
     s_ccvProxy.applyDestChainConfigUpdates(args);
 
@@ -56,7 +56,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
       defaultExecutor: makeAddr("executor"),
-      ccvAggregator: abi.encodePacked(address(s_ccvAggregatorRemote))
+      offRamp: abi.encodePacked(address(s_offRampRemote))
     });
 
     // Should not revert, router can be zero.
@@ -75,7 +75,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
       defaultExecutor: makeAddr("executor"),
-      ccvAggregator: abi.encodePacked(address(s_ccvAggregatorRemote))
+      offRamp: abi.encodePacked(address(s_offRampRemote))
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVProxy.InvalidDestChainConfig.selector, uint64(0)));
@@ -92,7 +92,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
       defaultExecutor: address(0),
-      ccvAggregator: abi.encodePacked(address(s_ccvAggregatorRemote))
+      offRamp: abi.encodePacked(address(s_offRampRemote))
     });
 
     vm.expectRevert(CCVProxy.InvalidConfig.selector);
@@ -110,7 +110,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
       defaultExecutor: makeAddr("executor"),
-      ccvAggregator: abi.encodePacked(address(s_ccvAggregatorRemote))
+      offRamp: abi.encodePacked(address(s_offRampRemote))
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVProxy.InvalidDestChainConfig.selector, SOURCE_CHAIN_SELECTOR));

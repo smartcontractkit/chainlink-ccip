@@ -2,12 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {IRMNRemote} from "../../../interfaces/IRMNRemote.sol";
-import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
-contract CCVAggregator_constructor is BaseTest {
+contract OffRamp_constructor is BaseTest {
   function test_constructor() public {
-    CCVAggregator.StaticConfig memory config = CCVAggregator.StaticConfig({
+    OffRamp.StaticConfig memory config = OffRamp.StaticConfig({
       localChainSelector: DEST_CHAIN_SELECTOR,
       gasForCallExactCheck: 5000,
       rmnRemote: s_mockRMNRemote,
@@ -15,11 +15,11 @@ contract CCVAggregator_constructor is BaseTest {
     });
 
     vm.expectEmit();
-    emit CCVAggregator.StaticConfigSet(config);
+    emit OffRamp.StaticConfigSet(config);
 
-    CCVAggregator aggregator = new CCVAggregator(config);
+    OffRamp offRamp = new OffRamp(config);
 
-    CCVAggregator.StaticConfig memory returnedConfig = aggregator.getStaticConfig();
+    OffRamp.StaticConfig memory returnedConfig = offRamp.getStaticConfig();
     assertEq(returnedConfig.localChainSelector, config.localChainSelector);
     assertEq(returnedConfig.gasForCallExactCheck, config.gasForCallExactCheck);
     assertEq(address(returnedConfig.rmnRemote), address(config.rmnRemote));
@@ -27,38 +27,38 @@ contract CCVAggregator_constructor is BaseTest {
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_RMNRemote() public {
-    CCVAggregator.StaticConfig memory config = CCVAggregator.StaticConfig({
+    OffRamp.StaticConfig memory config = OffRamp.StaticConfig({
       localChainSelector: DEST_CHAIN_SELECTOR,
       gasForCallExactCheck: 5000,
       rmnRemote: IRMNRemote(address(0)),
       tokenAdminRegistry: address(0x123)
     });
 
-    vm.expectRevert(CCVAggregator.ZeroAddressNotAllowed.selector);
-    new CCVAggregator(config);
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
+    new OffRamp(config);
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_TokenAdminRegistry() public {
-    CCVAggregator.StaticConfig memory config = CCVAggregator.StaticConfig({
+    OffRamp.StaticConfig memory config = OffRamp.StaticConfig({
       localChainSelector: DEST_CHAIN_SELECTOR,
       gasForCallExactCheck: 5000,
       rmnRemote: s_mockRMNRemote,
       tokenAdminRegistry: address(0)
     });
 
-    vm.expectRevert(CCVAggregator.ZeroAddressNotAllowed.selector);
-    new CCVAggregator(config);
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
+    new OffRamp(config);
   }
 
   function test_constructor_RevertWhen_ZeroChainSelectorNotAllowed() public {
-    CCVAggregator.StaticConfig memory config = CCVAggregator.StaticConfig({
+    OffRamp.StaticConfig memory config = OffRamp.StaticConfig({
       localChainSelector: 0,
       gasForCallExactCheck: 5000,
       rmnRemote: s_mockRMNRemote,
       tokenAdminRegistry: address(0x123)
     });
 
-    vm.expectRevert(CCVAggregator.ZeroChainSelectorNotAllowed.selector);
-    new CCVAggregator(config);
+    vm.expectRevert(OffRamp.ZeroChainSelectorNotAllowed.selector);
+    new OffRamp(config);
   }
 }

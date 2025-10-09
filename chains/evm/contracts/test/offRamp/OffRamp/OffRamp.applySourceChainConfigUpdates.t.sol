@@ -2,17 +2,17 @@
 pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
-import {CCVAggregator} from "../../../offRamp/CCVAggregator.sol";
-import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
+import {OffRampSetup} from "./OffRampSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
+contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
   function test_applySourceChainConfigUpdates_multipleChains() public {
     uint64 chain1 = SOURCE_CHAIN_SELECTOR + 1;
     uint64 chain2 = SOURCE_CHAIN_SELECTOR + 2;
 
-    CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](2);
-    configs[0] = CCVAggregator.SourceChainConfigArgs({
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](2);
+    configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: chain1,
       isEnabled: true,
@@ -22,7 +22,7 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
     });
     configs[0].defaultCCV[0] = makeAddr("ccv1");
 
-    configs[1] = CCVAggregator.SourceChainConfigArgs({
+    configs[1] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: chain2,
       isEnabled: false,
@@ -35,9 +35,9 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
     configs[1].laneMandatedCCVs[1] = makeAddr("mandatedCCV2");
 
     vm.expectEmit();
-    emit CCVAggregator.SourceChainConfigSet(
+    emit OffRamp.SourceChainConfigSet(
       chain1,
-      CCVAggregator.SourceChainConfig({
+      OffRamp.SourceChainConfig({
         router: configs[0].router,
         isEnabled: configs[0].isEnabled,
         onRamp: configs[0].onRamp,
@@ -48,8 +48,8 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
 
     s_agg.applySourceChainConfigUpdates(configs);
 
-    CCVAggregator.SourceChainConfig memory config1 = s_agg.getSourceChainConfig(chain1);
-    CCVAggregator.SourceChainConfig memory config2 = s_agg.getSourceChainConfig(chain2);
+    OffRamp.SourceChainConfig memory config1 = s_agg.getSourceChainConfig(chain1);
+    OffRamp.SourceChainConfig memory config2 = s_agg.getSourceChainConfig(chain2);
 
     assertEq(address(config1.router), address(configs[0].router));
     assertEq(address(config2.router), address(configs[1].router));
@@ -72,8 +72,8 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
   }
 
   function test_applySourceChainConfigUpdates_updateExistingChain() public {
-    CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
-    configs[0] = CCVAggregator.SourceChainConfigArgs({
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: false,
@@ -87,15 +87,15 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
 
     s_agg.applySourceChainConfigUpdates(configs);
 
-    CCVAggregator.SourceChainConfig memory config = s_agg.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
+    OffRamp.SourceChainConfig memory config = s_agg.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
     assertEq(config.isEnabled, false);
     assertEq(config.defaultCCVs.length, 2);
     assertEq(config.laneMandatedCCVs.length, 1);
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroChainSelectorNotAllowed() public {
-    CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
-    configs[0] = CCVAggregator.SourceChainConfigArgs({
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: 0,
       isEnabled: true,
@@ -105,13 +105,13 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
     });
     configs[0].defaultCCV[0] = makeAddr("ccv");
 
-    vm.expectRevert(CCVAggregator.ZeroChainSelectorNotAllowed.selector);
+    vm.expectRevert(OffRamp.ZeroChainSelectorNotAllowed.selector);
     s_agg.applySourceChainConfigUpdates(configs);
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_Router() public {
-    CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
-    configs[0] = CCVAggregator.SourceChainConfigArgs({
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
       router: IRouter(address(0)),
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
@@ -121,13 +121,13 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
     });
     configs[0].defaultCCV[0] = makeAddr("ccv");
 
-    vm.expectRevert(CCVAggregator.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
     s_agg.applySourceChainConfigUpdates(configs);
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_DefaultCCV() public {
-    CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
-    configs[0] = CCVAggregator.SourceChainConfigArgs({
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
@@ -136,13 +136,13 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
       laneMandatedCCVs: new address[](0)
     });
 
-    vm.expectRevert(CCVAggregator.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
     s_agg.applySourceChainConfigUpdates(configs);
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_OnRamp() public {
-    CCVAggregator.SourceChainConfigArgs[] memory configs = new CCVAggregator.SourceChainConfigArgs[](1);
-    configs[0] = CCVAggregator.SourceChainConfigArgs({
+    OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
+    configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
@@ -152,7 +152,7 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
     });
     configs[0].defaultCCV[0] = makeAddr("ccv");
 
-    vm.expectRevert(CCVAggregator.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
     s_agg.applySourceChainConfigUpdates(configs);
   }
 
@@ -160,6 +160,6 @@ contract CCVAggregator_applySourceChainConfigUpdates is CCVAggregatorSetup {
     vm.stopPrank();
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
 
-    s_agg.applySourceChainConfigUpdates(new CCVAggregator.SourceChainConfigArgs[](0));
+    s_agg.applySourceChainConfigUpdates(new OffRamp.SourceChainConfigArgs[](0));
   }
 }

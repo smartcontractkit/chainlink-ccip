@@ -26,7 +26,7 @@
     "!contracts/ccvs/**/*",
     "!contracts/onRamp/CCVProxy.sol",
     "!contracts/onRamp/ExecutorOnRamp.sol",
-    "!contracts/offRamp/CCVAggregator.sol",
+    "!contracts/offRamp/OffRamp.sol",
     "!contracts/applications/CCIPClientExampleWithCCVs.sol",
     "!contracts/interfaces/IAny2EVMMessageReceiverV2.sol",
     "!contracts/interfaces/IPoolV2.sol",
