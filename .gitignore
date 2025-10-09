@@ -43,7 +43,6 @@ vendor/
 .envrc
 .env*
 .dbenv
-!.github/actions/setup-postgres/.env
 .direnv
 .idea
 .vscode/
