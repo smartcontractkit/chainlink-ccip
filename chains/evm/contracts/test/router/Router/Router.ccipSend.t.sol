@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IEVM2AnyOnRampClient} from "../../../interfaces/IEVM2AnyOnRampClient.sol";
+import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
+import {IWrappedNative} from "../../../interfaces/IWrappedNative.sol";
 
 import {FeeQuoter} from "../../../FeeQuoter.sol";
 import {Router} from "../../../Router.sol";
-import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
-import {IWrappedNative} from "../../../interfaces/IWrappedNative.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-
-import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
+
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract Router_ccipSend is OnRampSetup {
   function test_CCIPSendLinkFeeOneTokenSuccess_gas() public {
@@ -40,16 +40,15 @@ contract Router_ccipSend is OnRampSetup {
       amount: message.tokenAmounts[0].amount
     });
 
-    Internal.EVM2AnyRampMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
-
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent.header.sequenceNumber, msgEvent);
+    vm.expectCall(
+      address(s_onRamp),
+      abi.encodeCall(IEVM2AnyOnRampClient.forwardFromRouter, (DEST_CHAIN_SELECTOR, message, expectedFee, OWNER))
+    );
 
     vm.resumeGasMetering();
-    bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
-    assertEq(msgEvent.header.messageId, messageId);
     // Assert the user balance is lowered by the tokenAmounts sent and the fee amount
     uint256 expectedBalance = balanceBefore - (message.tokenAmounts[0].amount);
     assertEq(expectedBalance, sourceToken1.balanceOf(OWNER));
@@ -63,17 +62,12 @@ contract Router_ccipSend is OnRampSetup {
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
     assertGt(expectedFee, 0);
 
-    Internal.EVM2AnyRampMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
-
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent.header.sequenceNumber, msgEvent);
-
+    vm.expectCall(
+      address(s_onRamp),
+      abi.encodeCall(IEVM2AnyOnRampClient.forwardFromRouter, (DEST_CHAIN_SELECTOR, message, expectedFee, OWNER))
+    );
     vm.resumeGasMetering();
     bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
-    vm.pauseGasMetering();
-
-    assertEq(msgEvent.header.messageId, messageId);
-    vm.resumeGasMetering();
   }
 
   function test_ccipSend_nativeFeeOneTokenSuccess_gas() public {
@@ -94,8 +88,10 @@ contract Router_ccipSend is OnRampSetup {
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
     assertGt(expectedFee, 0);
 
-    Internal.EVM2AnyRampMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
-    msgEvent.feeValueJuels = expectedFee * s_sourceTokenPrices[1] / s_sourceTokenPrices[0];
+    vm.expectCall(
+      address(s_onRamp),
+      abi.encodeCall(IEVM2AnyOnRampClient.forwardFromRouter, (DEST_CHAIN_SELECTOR, message, expectedFee, OWNER))
+    );
 
     message.feeToken = address(0);
     // Assert that the tokens are burned
@@ -107,14 +103,10 @@ contract Router_ccipSend is OnRampSetup {
       amount: message.tokenAmounts[0].amount
     });
 
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent.header.sequenceNumber, msgEvent);
-
     vm.resumeGasMetering();
     bytes32 messageId = s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
-    assertEq(msgEvent.header.messageId, messageId);
     // Assert the user balance is lowered by the tokenAmounts sent and the fee amount
     uint256 expectedBalance = balanceBefore - (message.tokenAmounts[0].amount);
     assertEq(expectedBalance, sourceToken1.balanceOf(OWNER));
@@ -131,21 +123,16 @@ contract Router_ccipSend is OnRampSetup {
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
     assertGt(expectedFee, 0);
 
-    Internal.EVM2AnyRampMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
-    msgEvent.feeValueJuels = expectedFee * s_sourceTokenPrices[1] / s_sourceTokenPrices[0];
+    vm.expectCall(
+      address(s_onRamp),
+      abi.encodeCall(IEVM2AnyOnRampClient.forwardFromRouter, (DEST_CHAIN_SELECTOR, message, expectedFee, OWNER))
+    );
+
     // Set it to address(0) to indicate native
     message.feeToken = address(0);
 
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent.header.sequenceNumber, msgEvent);
-
     vm.resumeGasMetering();
     bytes32 messageId = s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
-    vm.pauseGasMetering();
-
-    assertEq(msgEvent.header.messageId, messageId);
-    // Assert the user balance is lowered by the tokenAmounts sent and the fee amount
-    vm.resumeGasMetering();
   }
 
   function test_NonLinkFeeToken() public {
@@ -248,5 +235,15 @@ contract Router_ccipSend is OnRampSetup {
     hoax(address(1), 1);
     vm.expectRevert(IRouterClient.InsufficientFeeTokenAmount.selector);
     s_sourceRouter.ccipSend{value: 1}(DEST_CHAIN_SELECTOR, message);
+  }
+
+  function _generateEmptyMessage() public view returns (Client.EVM2AnyMessage memory) {
+    return Client.EVM2AnyMessage({
+      receiver: abi.encode(OWNER),
+      data: "",
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
+    });
   }
 }

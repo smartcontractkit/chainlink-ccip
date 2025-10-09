@@ -23,7 +23,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: laneMandated,
       defaultExecutor: defaultExecutor,
-      offRamp: abi.encodePacked(address(s_offRampRemote))
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
     vm.expectEmit();
@@ -34,11 +34,11 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs,
       laneMandated,
       defaultExecutor,
-      abi.encodePacked(address(s_offRampRemote))
+      abi.encodePacked(address(s_offRampOnRemoteChain))
     );
-    s_ccvProxy.applyDestChainConfigUpdates(args);
+    s_onRamp.applyDestChainConfigUpdates(args);
 
-    CCVProxy.DestChainConfig memory cfg = s_ccvProxy.getDestChainConfig(NEW_DEST_SELECTOR);
+    CCVProxy.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR);
     assertEq(address(cfg.router), address(router));
     assertEq(cfg.defaultExecutor, defaultExecutor);
     assertEq(cfg.sequenceNumber, 0);
@@ -56,12 +56,12 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
       defaultExecutor: makeAddr("executor"),
-      offRamp: abi.encodePacked(address(s_offRampRemote))
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
     // Should not revert, router can be zero.
-    s_ccvProxy.applyDestChainConfigUpdates(args);
-    CCVProxy.DestChainConfig memory cfg = s_ccvProxy.getDestChainConfig(NEW_DEST_SELECTOR + 1);
+    s_onRamp.applyDestChainConfigUpdates(args);
+    CCVProxy.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR + 1);
     assertEq(address(cfg.router), address(0));
   }
 
@@ -75,11 +75,11 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
       defaultExecutor: makeAddr("executor"),
-      offRamp: abi.encodePacked(address(s_offRampRemote))
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVProxy.InvalidDestChainConfig.selector, uint64(0)));
-    s_ccvProxy.applyDestChainConfigUpdates(args);
+    s_onRamp.applyDestChainConfigUpdates(args);
   }
 
   function test_applyDestChainConfigUpdates_RevertWhen_DefaultExecutorZero() public {
@@ -92,11 +92,11 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
       defaultExecutor: address(0),
-      offRamp: abi.encodePacked(address(s_offRampRemote))
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
     vm.expectRevert(CCVProxy.InvalidConfig.selector);
-    s_ccvProxy.applyDestChainConfigUpdates(args);
+    s_onRamp.applyDestChainConfigUpdates(args);
   }
 
   function test_applyDestChainConfigUpdates_RevertWhen_DestIsLocalChain() public {
@@ -110,10 +110,10 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
       defaultExecutor: makeAddr("executor"),
-      offRamp: abi.encodePacked(address(s_offRampRemote))
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVProxy.InvalidDestChainConfig.selector, SOURCE_CHAIN_SELECTOR));
-    s_ccvProxy.applyDestChainConfigUpdates(args);
+    s_onRamp.applyDestChainConfigUpdates(args);
   }
 }

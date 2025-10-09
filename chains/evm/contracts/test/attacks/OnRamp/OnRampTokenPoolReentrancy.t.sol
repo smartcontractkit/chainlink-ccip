@@ -2,7 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
-import {OnRamp} from "../../../onRamp/OnRamp.sol";
+
+import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
 import {FacadeClient} from "./FacadeClient.sol";
@@ -10,8 +11,6 @@ import {ReentrantMaliciousTokenPool} from "./ReentrantMaliciousTokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-/// @title MultiOnRampTokenPoolReentrancy
-/// Attempts to perform a reentrancy exploit on Onramp with a malicious TokenPool
 contract OnRampTokenPoolReentrancy is OnRampSetup {
   FacadeClient internal s_facadeClient;
   ReentrantMaliciousTokenPool internal s_maliciousTokenPool;
@@ -77,7 +76,7 @@ contract OnRampTokenPoolReentrancy is OnRampSetup {
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message1);
     assertGt(expectedFee, 0);
 
-    vm.expectRevert(OnRamp.ReentrancyGuardReentrantCall.selector);
+    vm.expectRevert(CCVProxy.ReentrancyGuardReentrantCall.selector);
     // solhint-disable-next-line check-send-result
     s_facadeClient.send(amount);
   }
