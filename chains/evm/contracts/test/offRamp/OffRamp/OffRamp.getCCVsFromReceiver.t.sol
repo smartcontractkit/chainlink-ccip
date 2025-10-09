@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
-import {CCVAggregatorSetup} from "./CCVAggregatorSetup.t.sol";
+import {OffRampSetup} from "./OffRampSetup.t.sol";
 
-contract CCVAggregator_getCCVsFromReceiver is CCVAggregatorSetup {
+contract OffRamp_getCCVsFromReceiver is OffRampSetup {
   address internal s_userRequiredCCV;
   address internal s_optionalCcv1;
   address internal s_optionalCcv2;

@@ -5,15 +5,15 @@ import {ICrossChainVerifierV1} from "../../interfaces/ICrossChainVerifierV1.sol"
 
 import {Client} from "../../libraries/Client.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
-import {CCVAggregator} from "../../offRamp/CCVAggregator.sol";
+import {OffRamp} from "../../offRamp/OffRamp.sol";
 
 contract ReentrantCCV is ICrossChainVerifierV1 {
-  CCVAggregator internal immutable i_aggregator;
+  OffRamp internal immutable i_offRamp;
 
   constructor(
-    address aggregator
+    address offRamp
   ) {
-    i_aggregator = CCVAggregator(aggregator);
+    i_offRamp = OffRamp(offRamp);
   }
 
   function forwardToVerifier(
@@ -49,7 +49,7 @@ contract ReentrantCCV is ICrossChainVerifierV1 {
     ccvDataArray[0] = ccvData;
 
     // This should trigger the reentrancy guard.
-    i_aggregator.execute(MessageV1Codec._encodeMessageV1(message), ccvs, ccvDataArray);
+    i_offRamp.execute(MessageV1Codec._encodeMessageV1(message), ccvs, ccvDataArray);
   }
 
   function supportsInterface(
