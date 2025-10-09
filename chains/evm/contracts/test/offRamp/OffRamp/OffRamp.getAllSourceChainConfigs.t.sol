@@ -34,8 +34,7 @@ contract OffRamp_getAllSourceChainConfigs is OffRampSetup {
 
     s_agg.applySourceChainConfigUpdates(configs);
 
-    (uint64[] memory selectors, OffRamp.SourceChainConfig[] memory chainConfigs) =
-      s_agg.getAllSourceChainConfigs();
+    (uint64[] memory selectors, OffRamp.SourceChainConfig[] memory chainConfigs) = s_agg.getAllSourceChainConfigs();
 
     assertEq(selectors.length, 2);
     assertEq(chainConfigs.length, 2);

@@ -243,9 +243,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
       abi.encode(new address[](0), receiverOptional, uint8(2))
     );
 
-    vm.expectRevert(
-      abi.encodeWithSelector(OffRamp.OptionalCCVQuorumNotReached.selector, receiverOptional.length, 1)
-    );
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.OptionalCCVQuorumNotReached.selector, receiverOptional.length, 1));
     s_agg.ensureCCVQuorumIsReached(
       SOURCE_CHAIN_SELECTOR, s_receiver, new MessageV1Codec.TokenTransferV1[](0), FINALITY, ccvs
     );

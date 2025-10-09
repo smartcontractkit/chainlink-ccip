@@ -242,9 +242,7 @@ contract OffRamp_execute is OffRampSetup {
 
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(OffRamp.InvalidMessageDestChainSelector.selector, message.destChainSelector)
-    );
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidMessageDestChainSelector.selector, message.destChainSelector));
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
