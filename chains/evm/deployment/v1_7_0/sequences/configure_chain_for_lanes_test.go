@@ -15,8 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
-	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 )
@@ -33,11 +33,11 @@ func TestConfigureChainForLanes(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			chainSelector := uint64(5009297550715157269)
-
-			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-				chainSelector: {NumAdditionalAccounts: 1},
-			})
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainSelector}),
+			)
 			require.NoError(t, err, "Failed to create environment")
+			require.NotNil(t, e, "Environment should be created")
 			evmChain := e.BlockChains.EVMChains()[chainSelector]
 
 			deploymentReport, err := operations.ExecuteSequence(
