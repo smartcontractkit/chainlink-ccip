@@ -4,7 +4,7 @@ CCIP deployments often target multiple chain families (and product versions, in 
 
 ## Design
 
-This diagram provides an overview of all components and their locations. Connections are only made explicit made for the token path to avoid polluting the diagram.
+This diagram provides an overview of all components and their locations.
 
 ```mermaid
 flowchart LR
@@ -62,15 +62,21 @@ flowchart LR
     tar --> ta
     mrr --> mr
 
-    ta ----> artb
-    ta ----> dtfp
-    ta ----> ctft1_5
-    ta ----> ctft1_6
-    ta ----> ctft1_7
-    mr ----> cfmr
+    ta --> artb
+    ta --> dtfp
+    ta --> ctft1_5
+    ta --> ctft1_6
+    ta --> ctft1_7
+    mr ------> cfmr
 
-    dp --init--> registries
-    dp --run--> changesets
+    dp ---init---> registries
+    dp ---run---> changesets
+
+    cc1_6 --> mrr & car1_6
+    car1_6 --> ca1_6
+    ca1_6 ------> cllb1_6
+    ca1_6 ------> clls1_6
+    ca1_6 ------> clld1_6
 ```
 
 ## Usage
