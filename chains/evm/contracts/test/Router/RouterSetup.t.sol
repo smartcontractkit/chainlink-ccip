@@ -63,4 +63,3 @@ contract RouterSetup is FeeQuoterSetup {
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2 ** 128);
   }
 }
-
