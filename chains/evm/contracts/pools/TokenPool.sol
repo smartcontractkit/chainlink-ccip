@@ -90,7 +90,13 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event RateLimitAdminSet(address rateLimitAdmin);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
-  event CCVConfigUpdated(uint64 indexed remoteChainSelector, address[] outboundCCVs, address[] inboundCCVs);
+  event CCVConfigUpdated(
+    uint64 indexed remoteChainSelector,
+    address[] outboundCCVs,
+    address[] additionalOutboundCCVs,
+    address[] inboundCCVs,
+    address[] additionalInboundCCVs
+  );
   event FinalityConfigUpdated(uint16 finalityConfig, uint16 customFinalityTransferFeeBps);
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
   event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector);
@@ -100,6 +106,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event CustomFinalityTransferInboundRateLimitConsumed(
     uint64 indexed remoteChainSelector, address token, uint256 amount
   );
+  event ThresholdAmountForAdditionalCCVsSet(uint256 newAmount);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector
@@ -133,13 +140,17 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   struct CCVConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
+    address[] additionalOutboundCCVs; // Additional CCVs that are requited for outgoing messages above s_thresholdTransferAmount to the remote chain.
     address[] inboundCCVs; // CCVs required for incoming messages from the remote chain.
+    address[] additionalInboundCCVs; // Additional CCVs that are requited for incoming messages above s_thresholdTransferAmount from the remote chain.
   }
 
   struct CCVConfigArg {
     uint64 remoteChainSelector;
     address[] outboundCCVs;
+    address[] additionalOutboundCCVs;
     address[] inboundCCVs;
+    address[] additionalInboundCCVs;
   }
 
   /// @dev Struct with args for setting the token transfer fee configurations for a destination chain and a set of tokens.
@@ -161,6 +172,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   address internal immutable i_rmnProxy;
   /// @dev The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
+  /// @dev Threshold token transfer amount above which additional CCVs are required.
+  uint256 internal s_thresholdAmountForAdditionalCCVs;
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
   /// Only takes effect if i_allowlistEnabled is true.
   /// This can be used to ensure only token-issuer specified addresses can move tokens.
@@ -236,6 +249,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return address(s_router);
   }
 
+  /// @notice Gets the threshold amount for requiring additional CCVs.
+  function getThresholdAmountForAdditionalCCVs() public view returns (uint256 thresholdAmountForAdditionalCCVs) {
+    return s_thresholdAmountForAdditionalCCVs;
+  }
+
   /// @notice Sets the pool's Router
   /// @param newRouter The new Router
   function setRouter(
@@ -246,6 +264,15 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     s_router = IRouter(newRouter);
 
     emit RouterUpdated(oldRouter, newRouter);
+  }
+
+  /// @notice Sets the threshold amount for requiring additional CCVs.
+  /// @param thresholdAmountForAdditionalCCVs The new threshold amount.
+  function setThresholdAmountForAdditionalCCVs(
+    uint256 thresholdAmountForAdditionalCCVs
+  ) public onlyOwner {
+    s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;
+    emit ThresholdAmountForAdditionalCCVsSet(thresholdAmountForAdditionalCCVs);
   }
 
   /// @notice Signals which version of the pool interface is supported.
@@ -924,48 +951,100 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     for (uint256 i = 0; i < ccvConfigArgs.length; ++i) {
       uint64 remoteChainSelector = ccvConfigArgs[i].remoteChainSelector;
       address[] calldata outboundCCVs = ccvConfigArgs[i].outboundCCVs;
+      address[] calldata additionalOutboundCCVs = ccvConfigArgs[i].additionalOutboundCCVs;
       address[] calldata inboundCCVs = ccvConfigArgs[i].inboundCCVs;
+      address[] calldata additionalInboundCCVs = ccvConfigArgs[i].additionalInboundCCVs;
 
       // check for duplicates in outbound CCVs.
       CCVConfigValidation._assertNoDuplicates(outboundCCVs);
+      CCVConfigValidation._assertNoDuplicates(additionalOutboundCCVs);
 
       // check for duplicates in inbound CCVs.
       CCVConfigValidation._assertNoDuplicates(inboundCCVs);
+      CCVConfigValidation._assertNoDuplicates(additionalInboundCCVs);
 
-      CCVConfig memory ccvConfig = CCVConfig({outboundCCVs: outboundCCVs, inboundCCVs: inboundCCVs});
-      emit CCVConfigUpdated(remoteChainSelector, outboundCCVs, inboundCCVs);
-      s_verifierConfig[remoteChainSelector] = ccvConfig;
+      s_verifierConfig[remoteChainSelector] = CCVConfig({
+        outboundCCVs: outboundCCVs,
+        additionalOutboundCCVs: additionalOutboundCCVs,
+        inboundCCVs: inboundCCVs,
+        additionalInboundCCVs: additionalInboundCCVs
+      });
+      emit CCVConfigUpdated({
+        remoteChainSelector: remoteChainSelector,
+        outboundCCVs: outboundCCVs,
+        additionalOutboundCCVs: additionalOutboundCCVs,
+        inboundCCVs: inboundCCVs,
+        additionalInboundCCVs: additionalInboundCCVs
+      });
     }
   }
 
   /// @notice Returns the set of required CCVs for incoming messages from a source chain.
   /// @param sourceChainSelector The source chain selector for incoming messages.
-  /// This implementation assumes the same set of CCVs are used for all transfers on a lane.
+  /// @param amount The amount being transferred.
+  /// This implementation returns base CCVs for all transfers, and includes additional CCVs
+  /// when the transfer amount is above the configured threshold.
   /// Implementers can override this function to define custom logic based on these params.
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredInboundCCVs(
     address, // localToken
     uint64 sourceChainSelector,
-    uint256, // amount,
+    uint256 amount,
     uint16, // finality
     bytes calldata // sourcePoolData
   ) external view virtual returns (address[] memory requiredCCVs) {
-    return s_verifierConfig[sourceChainSelector].inboundCCVs;
+    CCVConfig storage config = s_verifierConfig[sourceChainSelector];
+    address[] memory baseCCVs = config.inboundCCVs;
+    address[] memory additionalCCVs = config.additionalInboundCCVs;
+    // If amount is above threshold, combine base and additional CCVs.
+    uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
+    if (thresholdAmount != 0 && amount >= thresholdAmount && additionalCCVs.length > 0) {
+      address[] memory requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
+      // Copy base CCVs.
+      for (uint256 i = 0; i < baseCCVs.length; ++i) {
+        requiredCCVs[i] = baseCCVs[i];
+      }
+      // Copy additional CCVs.
+      for (uint256 i = 0; i < additionalCCVs.length; ++i) {
+        requiredCCVs[baseCCVs.length + i] = additionalCCVs[i];
+      }
+      return requiredCCVs;
+    }
+    return baseCCVs;
   }
 
   /// @notice Returns the set of required CCVs for outgoing messages to a destination chain.
   /// @param destChainSelector The destination chain selector for outgoing messages.
-  /// This implementation assumes the same set of CCVs are used for all transfers on a lane.
+  /// @param amount The amount being transferred.
+  /// This implementation returns base CCVs for all transfers, and includes additional CCVs
+  /// when the transfer amount is above the configured threshold.
   /// Implementers can override this function to define custom logic based on these params.
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredOutboundCCVs(
     address, // localToken
     uint64 destChainSelector,
-    uint256, // amount
+    uint256 amount,
     uint16, // finality
     bytes calldata // tokenArgs
   ) external view virtual returns (address[] memory requiredCCVs) {
-    return s_verifierConfig[destChainSelector].outboundCCVs;
+    CCVConfig storage config = s_verifierConfig[destChainSelector];
+    address[] memory baseCCVs = config.outboundCCVs;
+    address[] memory additionalCCVs = config.additionalOutboundCCVs;
+    // If amount is above threshold, combine base and additional CCVs.
+    uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
+    if (thresholdAmount != 0 && amount >= thresholdAmount && additionalCCVs.length > 0) {
+      requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
+      // Copy base CCVs.
+      for (uint256 i = 0; i < baseCCVs.length; ++i) {
+        requiredCCVs[i] = baseCCVs[i];
+      }
+      // Copy additional CCVs.
+      for (uint256 i = 0; i < additionalCCVs.length; ++i) {
+        requiredCCVs[baseCCVs.length + i] = additionalCCVs[i];
+      }
+      return requiredCCVs;
+    }
+    return baseCCVs;
   }
 
   // ================================================================
