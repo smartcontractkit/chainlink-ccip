@@ -12,8 +12,6 @@ exclusion_list_ccip=(
 
   # Ignored for initial development of the skeleton
   "contracts/onRamp/CCVProxy.sol"
-  "contracts/onRamp/OnRamp.sol"
-  "contracts/NonceManager.sol"
   "contracts/ccvs/CommitteeVerifier.sol"
   "contracts/offRamp/OffRamp.sol"
 )

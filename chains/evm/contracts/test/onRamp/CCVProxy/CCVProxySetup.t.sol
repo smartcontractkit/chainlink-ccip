@@ -3,24 +3,22 @@ pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
-
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
-
 import {MockExecutor} from "../../mocks/MockExecutor.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
 contract CCVProxySetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
 
-  CCVProxy internal s_ccvProxy;
-  OffRamp internal s_offRampRemote;
+  CCVProxy internal s_onRamp;
+  OffRamp internal s_offRampOnRemoteChain = OffRamp(makeAddr("OffRampRemote"));
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_ccvProxy = new CCVProxy(
+    s_onRamp = new CCVProxy(
       CCVProxy.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
@@ -32,9 +30,10 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
-    s_offRampRemote = OffRamp(makeAddr("OffRampRemote"));
+
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = address(new MockVerifier(""));
+
     CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
     destChainConfigArgs[0] = CCVProxy.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -42,10 +41,10 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
       defaultExecutor: address(new MockExecutor()),
-      offRamp: abi.encodePacked(address(s_offRampRemote))
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
-    s_ccvProxy.applyDestChainConfigUpdates(destChainConfigArgs);
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
   // TODO make this work for other cases as well
@@ -66,13 +65,13 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     )
   {
     // TODO handle token transfers
-    CCVProxy.DestChainConfig memory destChainConfig = s_ccvProxy.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    CCVProxy.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     MessageV1Codec.MessageV1 memory messageV1 = MessageV1Codec.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: destChainSelector,
       sequenceNumber: seqNum,
-      onRampAddress: abi.encodePacked(address(s_ccvProxy)),
-      offRampAddress: abi.encodePacked(address(s_offRampRemote)),
+      onRampAddress: abi.encodePacked(address(s_onRamp)),
+      offRampAddress: abi.encodePacked(address(s_offRampOnRemoteChain)),
       finality: 0,
       sender: abi.encodePacked(originalSender),
       receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
