@@ -8,9 +8,9 @@ import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {ReentrantCCV} from "../../helpers/ReentrantCCV.sol";
-import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
+import {ExactGasReceiver} from "../../helpers/receivers/ExactGasReceiver.sol";
 
 contract GasBoundedExecuteCaller {
   OffRamp internal immutable i_offRamp;
@@ -93,40 +93,6 @@ contract OffRamp_execute is OffRampSetup {
   function test_execute() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-
-    // Expect execution state change event.
-    vm.expectEmit();
-    emit OffRamp.ExecutionStateChanged(
-      message.sourceChainSelector,
-      message.sequenceNumber,
-      keccak256(encodedMessage),
-      Internal.MessageExecutionState.SUCCESS,
-      ""
-    );
-
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
-
-    // Verify final state is SUCCESS.
-    assertEq(
-      uint256(Internal.MessageExecutionState.SUCCESS),
-      uint256(
-        s_agg.getExecutionState(
-          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
-        )
-      )
-    );
-  }
-
-  function test_execute_WithReceiver() public {
-    MessageV1Codec.MessageV1 memory message = _getMessage();
-    MockReceiverV2 mock = new MockReceiverV2(_arrayOf(s_defaultCCV), new address[](0), 0);
-    message.receiver = abi.encodePacked(address(mock)); // Add receiver to message.
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-
-    // Set OffRamp as a valid OffRamp on the Router.
-    Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
-    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_agg)});
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
 
     // Expect execution state change event.
     vm.expectEmit();
@@ -355,6 +321,54 @@ contract OffRamp_execute is OffRampSetup {
       uint256(
         s_agg.getExecutionState(
           SOURCE_CHAIN_SELECTOR, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
+        )
+      )
+    );
+  }
+
+  /// forge-config: default.fuzz.runs = 1000
+  function testFuzz_execute_WithReceiver(uint256 gasUsedByCCIPReceive, uint256 calldataLength) public {
+    vm.assume(gasUsedByCCIPReceive > 1_000);
+    vm.assume(gasUsedByCCIPReceive < PLENTY_OF_GAS);
+    vm.assume(calldataLength > 0);
+    vm.assume(calldataLength < 1000);
+    uint256 gasForExecute = gasUsedByCCIPReceive + 150_000 + 2 * (16 * calldataLength);
+    
+    // Create message with exact gas receiver.
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    message.data = vm.randomBytes(calldataLength);
+    message.receiver = abi.encodePacked(address(new ExactGasReceiver(gasUsedByCCIPReceive)));
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+
+    // Set OffRamp as a valid OffRamp on the Router.
+    Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
+    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_agg)});
+    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
+  
+    // Expect execution state change event.
+    vm.expectEmit();
+    emit OffRamp.ExecutionStateChanged(
+      message.sourceChainSelector,
+      message.sequenceNumber,
+      keccak256(encodedMessage),
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+    uint256 startGas = gasleft();
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, gasForExecute);
+    uint256 endGas = gasleft();
+
+    // Ensure that gasForExecute is spent consistently.
+    // Range sits between 50% and 97.5% spent.
+    assertGt(startGas - endGas, gasForExecute * 5 / 10);
+    assertLt(startGas - endGas, gasForExecute * 39 / 40);
+
+    // Verify final state is SUCCESS.
+    assertEq(
+      uint256(Internal.MessageExecutionState.SUCCESS),
+      uint256(
+        s_agg.getExecutionState(
+          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
     );
