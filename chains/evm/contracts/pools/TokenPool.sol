@@ -17,6 +17,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensio
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
+import {AccessControl} from "@openzeppelin/contracts@5.0.2/access/AccessControl.sol";
 
 /// @notice Base abstract class with common functions for all token pools.
 /// A token pool serves as isolated place for holding tokens and token specific logic
@@ -36,7 +37,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 /// In the case of a burnMint pool on chain A, these funds are burned in the pool on chain A.
 /// In the case of a lockRelease pool on chain A, these funds accumulate in the pool on chain A.
 
-abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
+abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
   using EnumerableSet for EnumerableSet.Bytes32Set;
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
@@ -87,7 +88,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
   event RouterUpdated(address oldRouter, address newRouter);
-  event RateLimitAdminSet(address rateLimitAdmin);
+  event RateLimitAdminRoleGranted(address account);
+  event RateLimitAdminRoleRevoked(address account);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event CCVConfigUpdated(uint64 indexed remoteChainSelector, address[] outboundCCVs, address[] inboundCCVs);
@@ -175,9 +177,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice A mapping of hashed pool addresses to their unhashed form. This is used to be able to find the actually
   /// configured pools and not just their hashed versions.
   mapping(bytes32 poolAddressHash => bytes poolAddress) internal s_remotePoolAddresses;
-  /// @notice The address of the rate limiter admin.
-  /// @dev Can be address(0) if none is configured.
-  address internal s_rateLimitAdmin;
+  /// @notice The role identifier for rate limiter admin.
+  bytes32 public constant RATE_LIMITER_ADMIN_ROLE = keccak256("RATE_LIMITER_ADMIN_ROLE");
   // Tracks custom-finality parameters and per-lane rate limit buckets.
   CustomFinalityConfig internal s_finalityConfig;
   // Stores verifier (CCV) requirements keyed by remote chain selector.
@@ -203,6 +204,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     i_tokenDecimals = localTokenDecimals;
 
     s_router = IRouter(router);
+
+    // Initialize AccessControl with the deployer as the default admin
+    _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
     // Pool can be set as permissioned or permissionless at deployment time only to save hot-path gas.
     i_allowlistEnabled = allowlist.length > 0;
@@ -678,19 +682,27 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// The exact additional capacity required depends on the refill rate and the size of the source chain epochs and the
   /// CCIP round time. For simplicity, a 5-10% buffer should be sufficient in most cases.
 
-  /// @notice Sets the rate limiter admin address.
+  /// @notice Grants the rate limiter admin role to an account.
   /// @dev Only callable by the owner.
-  /// @param rateLimitAdmin The new rate limiter admin address.
-  function setRateLimitAdmin(
-    address rateLimitAdmin
-  ) external onlyOwner {
-    s_rateLimitAdmin = rateLimitAdmin;
-    emit RateLimitAdminSet(rateLimitAdmin);
+  /// @param account The account to grant the role to.
+  function grantRateLimitAdminRole(address account) external onlyOwner {
+    _grantRole(RATE_LIMITER_ADMIN_ROLE, account);
+    emit RateLimitAdminRoleGranted(account);
   }
 
-  /// @notice Gets the rate limiter admin address.
-  function getRateLimitAdmin() external view returns (address) {
-    return s_rateLimitAdmin;
+  /// @notice Revokes the rate limiter admin role from an account.
+  /// @dev Only callable by the owner.
+  /// @param account The account to revoke the role from.
+  function revokeRateLimitAdminRole(address account) external onlyOwner {
+    _revokeRole(RATE_LIMITER_ADMIN_ROLE, account);
+    emit RateLimitAdminRoleRevoked(account);
+  }
+
+  /// @notice Checks if an account has the rate limiter admin role.
+  /// @param account The account to check.
+  /// @return true if the account has the role, false otherwise.
+  function hasRateLimitAdminRole(address account) external view returns (bool) {
+    return hasRole(RATE_LIMITER_ADMIN_ROLE, account);
   }
 
   /// @notice Consumes outbound rate limiting capacity in this pool
@@ -732,7 +744,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     RateLimiter.Config[] calldata outboundConfigs,
     RateLimiter.Config[] calldata inboundConfigs
   ) external {
-    if (msg.sender != s_rateLimitAdmin && msg.sender != owner()) revert Unauthorized(msg.sender);
+    if (!hasRole(RATE_LIMITER_ADMIN_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+      revert Unauthorized(msg.sender);
+    }
     if (remoteChainSelectors.length != outboundConfigs.length || remoteChainSelectors.length != inboundConfigs.length) {
       revert MismatchedArrayLengths();
     }
@@ -751,7 +765,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     RateLimiter.Config memory outboundConfig,
     RateLimiter.Config memory inboundConfig
   ) external {
-    if (msg.sender != s_rateLimitAdmin && msg.sender != owner()) revert Unauthorized(msg.sender);
+    if (!hasRole(RATE_LIMITER_ADMIN_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+      revert Unauthorized(msg.sender);
+    }
 
     _setRateLimitConfig(remoteChainSelector, outboundConfig, inboundConfig);
   }

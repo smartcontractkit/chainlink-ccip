@@ -77,6 +77,32 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     assertEq(bucket.lastUpdated, newTime);
   }
 
+  function test_SetChainRateLimiterConfigs_WithRateLimitAdminRole() public {
+    // Grant rate limit admin role to a user
+    address rateLimitAdmin = makeAddr("rateLimitAdmin");
+    s_tokenPool.grantRateLimitAdminRole(rateLimitAdmin);
+    
+    vm.startPrank(rateLimitAdmin);
+    
+    uint64[] memory chainSelectors = new uint64[](1);
+    chainSelectors[0] = DEST_CHAIN_SELECTOR;
+
+    RateLimiter.Config[] memory newOutboundConfigs = new RateLimiter.Config[](1);
+    newOutboundConfigs[0] = _getOutboundRateLimiterConfig();
+
+    RateLimiter.Config[] memory newInboundConfigs = new RateLimiter.Config[](1);
+    newInboundConfigs[0] = _getInboundRateLimiterConfig();
+
+    vm.expectEmit();
+    emit RateLimiter.ConfigChanged(newOutboundConfigs[0]);
+    vm.expectEmit();
+    emit RateLimiter.ConfigChanged(newInboundConfigs[0]);
+    vm.expectEmit();
+    emit TokenPool.ChainConfigured(DEST_CHAIN_SELECTOR, newOutboundConfigs[0], newInboundConfigs[0]);
+
+    s_tokenPool.setChainRateLimiterConfigs(chainSelectors, newOutboundConfigs, newInboundConfigs);
+  }
+
   // Reverts
 
   function test_RevertWhen_OnlyOwnerOrRateLimitAdmin() public {
