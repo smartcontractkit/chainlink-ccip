@@ -14,8 +14,8 @@ contract BaseVerifier_assertSenderIsAllowed is BaseVerifierSetup {
     // Should allow any sender when allowlist is disabled.
     address anySender = makeAddr("anySender");
 
-    vm.prank(s_ccvProxy);
-    s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, anySender, s_ccvProxy);
+    vm.prank(s_onRamp);
+    s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, anySender, s_onRamp);
   }
 
   function test_assertSenderIsAllowed_AllowlistEnabledWithAllowedSender() public {
@@ -36,8 +36,8 @@ contract BaseVerifier_assertSenderIsAllowed is BaseVerifierSetup {
     vm.prank(OWNER);
     s_baseVerifier.applyAllowlistUpdates(allowlistConfigs);
 
-    vm.prank(s_ccvProxy);
-    s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, allowedSender, s_ccvProxy);
+    vm.prank(s_onRamp);
+    s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, allowedSender, s_onRamp);
   }
 
   // Reverts
@@ -45,7 +45,7 @@ contract BaseVerifier_assertSenderIsAllowed is BaseVerifierSetup {
   function test_assertSenderIsAllowed_RevertWhen_CallerIsNotARampOnRouter() public {
     address sender = makeAddr("sender");
 
-    // Try calling from non-ccvProxy address
+    // Try calling from non-onRamp address
     vm.prank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CallerIsNotARampOnRouter.selector, STRANGER));
     s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, sender, STRANGER);
@@ -72,8 +72,8 @@ contract BaseVerifier_assertSenderIsAllowed is BaseVerifierSetup {
     s_baseVerifier.applyAllowlistUpdates(allowlistConfigs);
 
     // Should revert for non-allowed sender.
-    vm.prank(s_ccvProxy);
+    vm.prank(s_onRamp);
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.SenderNotAllowed.selector, notAllowedSender));
-    s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, notAllowedSender, s_ccvProxy);
+    s_baseVerifier.assertSenderIsAllowed(DEST_CHAIN_SELECTOR, notAllowedSender, s_onRamp);
   }
 }

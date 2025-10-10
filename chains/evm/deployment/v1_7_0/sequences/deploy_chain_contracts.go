@@ -20,12 +20,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -47,7 +47,7 @@ type CommitteeVerifierParams struct {
 	StorageLocation     string
 }
 
-type CCVProxyParams struct {
+type OnRampParams struct {
 	Version       *semver.Version
 	FeeAggregator common.Address
 }
@@ -70,7 +70,7 @@ type ContractParams struct {
 	RMNRemote         RMNRemoteParams
 	OffRamp           OffRampParams
 	CommitteeVerifier CommitteeVerifierParams
-	CCVProxy          CCVProxyParams
+	OnRamp            OnRampParams
 	FeeQuoter         FeeQuoterParams
 	ExecutorOnRamp    ExecutorOnRampParams
 }
@@ -253,26 +253,26 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, offRampRef)
 
-		// Deploy CCVProxy
-		ccvProxyRef, err := maybeDeployContract(b, ccv_proxy.Deploy, chain, contract.DeployInput[ccv_proxy.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(ccv_proxy.ContractType, *input.ContractParams.CCVProxy.Version),
+		// Deploy OnRamp
+		onRampRef, err := maybeDeployContract(b, on_ramp.Deploy, chain, contract.DeployInput[on_ramp.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(on_ramp.ContractType, *input.ContractParams.OnRamp.Version),
 			ChainSelector:  chain.Selector,
-			Args: ccv_proxy.ConstructorArgs{
-				StaticConfig: ccv_proxy.StaticConfig{
+			Args: on_ramp.ConstructorArgs{
+				StaticConfig: on_ramp.StaticConfig{
 					ChainSelector:      chain.Selector,
 					RmnRemote:          common.HexToAddress(rmnRemoteRef.Address),
 					TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
 				},
-				DynamicConfig: ccv_proxy.DynamicConfig{
+				DynamicConfig: on_ramp.DynamicConfig{
 					FeeQuoter:     common.HexToAddress(feeQuoterRef.Address),
-					FeeAggregator: input.ContractParams.CCVProxy.FeeAggregator,
+					FeeAggregator: input.ContractParams.OnRamp.FeeAggregator,
 				},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCVProxy: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OnRamp: %w", err)
 		}
-		addresses = append(addresses, ccvProxyRef)
+		addresses = append(addresses, onRampRef)
 
 		// Deploy CommitteeVerifier
 		committeeVerifierRef, err := maybeDeployContract(b, committee_verifier.Deploy, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{

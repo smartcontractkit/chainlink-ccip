@@ -2,14 +2,11 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
-import {CCVProxy} from "../../onRamp/CCVProxy.sol";
+import {OnRamp} from "../../onRamp/OnRamp.sol";
 
-/// @notice Test wrapper for CCVProxy to expose internal functions for testing.
-contract CCVProxyTestHelper is CCVProxy {
-  constructor(
-    StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig
-  ) CCVProxy(staticConfig, dynamicConfig) {}
+/// @notice Test wrapper for OnRamp to expose internal functions for testing.
+contract OnRampTestHelper is OnRamp {
+  constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) OnRamp(staticConfig, dynamicConfig) {}
 
   /// @notice Exposes the internal _parseExtraArgsWithDefaults function for testing.
   function parseExtraArgsWithDefaults(

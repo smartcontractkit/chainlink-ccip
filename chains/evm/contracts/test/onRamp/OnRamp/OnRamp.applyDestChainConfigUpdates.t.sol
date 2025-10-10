@@ -2,10 +2,10 @@
 pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
-import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
-import {CCVProxySetup} from "./CCVProxySetup.t.sol";
+import {OnRamp} from "../../../onRamp/OnRamp.sol";
+import {OnRampSetup} from "./OnRampSetup.t.sol";
 
-contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
+contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
   uint64 internal constant NEW_DEST_SELECTOR = uint64(uint256(keccak256("NEW_DEST_SELECTOR")));
 
   function test_applyDestChainConfigUpdates_SetsConfigAndEmitsEvent() public {
@@ -16,8 +16,8 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
     laneMandated[0] = makeAddr("laneCCV1");
     address defaultExecutor = makeAddr("defaultExecutor");
 
-    CCVProxy.DestChainConfigArgs[] memory args = new CCVProxy.DestChainConfigArgs[](1);
-    args[0] = CCVProxy.DestChainConfigArgs({
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
+    args[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: NEW_DEST_SELECTOR,
       router: router,
       defaultCCVs: defaultCCVs,
@@ -27,7 +27,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
     });
 
     vm.expectEmit();
-    emit CCVProxy.DestChainConfigSet(
+    emit OnRamp.DestChainConfigSet(
       NEW_DEST_SELECTOR,
       0,
       IRouter(router),
@@ -38,7 +38,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
     );
     s_onRamp.applyDestChainConfigUpdates(args);
 
-    CCVProxy.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR);
+    OnRamp.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR);
     assertEq(address(cfg.router), address(router));
     assertEq(cfg.defaultExecutor, defaultExecutor);
     assertEq(cfg.sequenceNumber, 0);
@@ -47,10 +47,10 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
   }
 
   function test_applyDestChainConfigUpdates_AllowsZeroRouterToPause() public {
-    CCVProxy.DestChainConfigArgs[] memory args = new CCVProxy.DestChainConfigArgs[](1);
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = makeAddr("defaultCCV");
-    args[0] = CCVProxy.DestChainConfigArgs({
+    args[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: NEW_DEST_SELECTOR + 1,
       router: IRouter(address(0)),
       defaultCCVs: defaultCCVs,
@@ -61,15 +61,15 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
 
     // Should not revert, router can be zero.
     s_onRamp.applyDestChainConfigUpdates(args);
-    CCVProxy.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR + 1);
+    OnRamp.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR + 1);
     assertEq(address(cfg.router), address(0));
   }
 
   function test_applyDestChainConfigUpdates_RevertWhen_InvalidDestChainConfig_ZeroSelector() public {
-    CCVProxy.DestChainConfigArgs[] memory args = new CCVProxy.DestChainConfigArgs[](1);
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = makeAddr("defaultCCV");
-    args[0] = CCVProxy.DestChainConfigArgs({
+    args[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: 0,
       router: s_sourceRouter,
       defaultCCVs: defaultCCVs,
@@ -78,15 +78,15 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCVProxy.InvalidDestChainConfig.selector, uint64(0)));
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainConfig.selector, uint64(0)));
     s_onRamp.applyDestChainConfigUpdates(args);
   }
 
   function test_applyDestChainConfigUpdates_RevertWhen_DefaultExecutorZero() public {
-    CCVProxy.DestChainConfigArgs[] memory args = new CCVProxy.DestChainConfigArgs[](1);
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = makeAddr("defaultCCV");
-    args[0] = CCVProxy.DestChainConfigArgs({
+    args[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: NEW_DEST_SELECTOR + 8,
       router: s_sourceRouter,
       defaultCCVs: defaultCCVs,
@@ -95,16 +95,16 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
-    vm.expectRevert(CCVProxy.InvalidConfig.selector);
+    vm.expectRevert(OnRamp.InvalidConfig.selector);
     s_onRamp.applyDestChainConfigUpdates(args);
   }
 
   function test_applyDestChainConfigUpdates_RevertWhen_DestIsLocalChain() public {
     // Using SOURCE_CHAIN_SELECTOR as local chain selector from setup.
-    CCVProxy.DestChainConfigArgs[] memory args = new CCVProxy.DestChainConfigArgs[](1);
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = makeAddr("defaultCCV");
-    args[0] = CCVProxy.DestChainConfigArgs({
+    args[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: SOURCE_CHAIN_SELECTOR,
       router: s_sourceRouter,
       defaultCCVs: defaultCCVs,
@@ -113,7 +113,7 @@ contract CCVProxy_applyDestChainConfigUpdates is CCVProxySetup {
       offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCVProxy.InvalidDestChainConfig.selector, SOURCE_CHAIN_SELECTOR));
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainConfig.selector, SOURCE_CHAIN_SELECTOR));
     s_onRamp.applyDestChainConfigUpdates(args);
   }
 }

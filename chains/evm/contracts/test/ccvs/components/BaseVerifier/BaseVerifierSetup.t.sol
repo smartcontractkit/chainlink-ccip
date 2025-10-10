@@ -15,7 +15,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
   BaseVerifierTestHelper internal s_baseVerifier;
 
   IRouter internal s_router;
-  address internal s_ccvProxy;
+  address internal s_onRamp;
   address internal s_offRampRemote;
 
   string internal constant STORAGE_LOCATION = "testStorageLocation";
@@ -24,9 +24,9 @@ contract BaseVerifierSetup is FeeQuoterSetup {
     super.setUp();
 
     s_router = IRouter(makeAddr("Router"));
-    s_ccvProxy = makeAddr("CCVProxy");
+    s_onRamp = makeAddr("OnRamp");
     vm.mockCall(
-      address(s_router), abi.encodeWithSelector(IRouter.getOnRamp.selector, DEST_CHAIN_SELECTOR), abi.encode(s_ccvProxy)
+      address(s_router), abi.encodeWithSelector(IRouter.getOnRamp.selector, DEST_CHAIN_SELECTOR), abi.encode(s_onRamp)
     );
     s_offRampRemote = makeAddr("OffRampRemote");
     s_sourceFeeToken = address(new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0));

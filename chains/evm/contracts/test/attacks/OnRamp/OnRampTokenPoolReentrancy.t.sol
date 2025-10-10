@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
-import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
+import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 import {FacadeClient} from "./FacadeClient.sol";
@@ -75,7 +75,7 @@ contract OnRampTokenPoolReentrancy is RouterSetup {
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message1);
     assertGt(expectedFee, 0);
 
-    vm.expectRevert(CCVProxy.ReentrancyGuardReentrantCall.selector);
+    vm.expectRevert(OnRamp.ReentrancyGuardReentrantCall.selector);
     // solhint-disable-next-line check-send-result
     s_facadeClient.send(amount);
   }

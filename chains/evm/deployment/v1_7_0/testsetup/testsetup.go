@@ -53,7 +53,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 			},
 			StorageLocation: "https://test.chain.link.fake",
 		},
-		CCVProxy: sequences.CCVProxyParams{
+		OnRamp: sequences.OnRampParams{
 			Version:       semver.MustParse("1.7.0"),
 			FeeAggregator: common.HexToAddress("0x01"),
 		},

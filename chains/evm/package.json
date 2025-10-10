@@ -24,7 +24,7 @@
     "contracts/test/helpers/**/*",
     "!contracts/poolsV2/**/*",
     "!contracts/ccvs/**/*",
-    "!contracts/onRamp/CCVProxy.sol",
+    "!contracts/onRamp/OnRamp.sol",
     "!contracts/onRamp/ExecutorOnRamp.sol",
     "!contracts/offRamp/OffRamp.sol",
     "!contracts/applications/CCIPClientExampleWithCCVs.sol",

@@ -5,10 +5,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -65,7 +65,7 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 								Version: semver.MustParse("1.7.0"),
 							},
 							CCIPMessageSource: datastore.AddressRef{
-								Type:    datastore.ContractType(ccv_proxy.ContractType),
+								Type:    datastore.ContractType(on_ramp.ContractType),
 								Version: semver.MustParse("1.7.0"),
 							},
 							DefaultCCVOffRamps: []datastore.AddressRef{
