@@ -20,7 +20,7 @@ contract TokenPoolV2_getRequiredInboundCCVs is TokenPoolV2Setup {
 
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
-    // Test with amount below threshold - should return only base CCVs.
+    // Test with amount below threshold, should return only base CCVs.
     address[] memory storedInbound =
       s_tokenPool.getRequiredInboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, 100, 0, "");
 
@@ -49,13 +49,13 @@ contract TokenPoolV2_getRequiredInboundCCVs is TokenPoolV2Setup {
     // Set threshold amount.
     s_tokenPool.setThresholdAmountForAdditionalCCVs(1000);
 
-    // Test with amount below threshold - should return only base CCVs.
+    // Test with amount below threshold, should return only base CCVs.
     address[] memory storedInboundBelow =
       s_tokenPool.getRequiredInboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, 500, 0, "");
     assertEq(storedInboundBelow.length, 1);
     assertEq(storedInboundBelow[0], inboundCCVs[0]);
 
-    // Test with amount above threshold - should return base + additional CCVs.
+    // Test with amount above threshold, should return base + additional CCVs.
     address[] memory storedInboundAbove =
       s_tokenPool.getRequiredInboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, 1500, 0, "");
     assertEq(storedInboundAbove.length, 2);
@@ -81,7 +81,7 @@ contract TokenPoolV2_getRequiredInboundCCVs is TokenPoolV2Setup {
     // Set threshold amount.
     s_tokenPool.setThresholdAmountForAdditionalCCVs(1000);
 
-    // Test with amount above threshold but no additional CCVs - should return only base CCVs.
+    // Test with amount above threshold but no additional CCVs, should return only base CCVs.
     address[] memory storedInbound =
       s_tokenPool.getRequiredInboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, 1500, 0, "");
     assertEq(storedInbound.length, 1);
