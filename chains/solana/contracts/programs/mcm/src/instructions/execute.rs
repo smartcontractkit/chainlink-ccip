@@ -93,6 +93,11 @@ pub fn execute<'info>(
 
     invoke_signed(&instruction, acc_infos, signer)?;
 
+    // if the CPI modified any typed accounts present in this outer context
+    // (e.g., calling `accept_ownership` which updates `multisig_config`),
+    // reload them to avoid Anchor writing back the stale outer copy on exit.
+    ctx.accounts.multisig_config.reload()?;
+
     emit!(OpExecuted {
         nonce,
         to: instruction.program_id,
