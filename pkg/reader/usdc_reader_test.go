@@ -3,11 +3,12 @@ package reader
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 
@@ -228,7 +229,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 			name:           "should return empty dataset when chain doesn't have events",
 			sourceSelector: emptyChain,
 			destSelector:   faultyChain,
-			expectedMsgIDs: []MessageTokenID{},
+			expectedMsgIDs: nil,
 		},
 		{
 			name:           "should return error when chain reader errors",
@@ -252,7 +253,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 			name:           "valid chain return events but nothing is matched",
 			sourceSelector: validChain,
 			destSelector:   emptyChain,
-			expectedMsgIDs: []MessageTokenID{},
+			expectedMsgIDs: nil,
 		},
 	}
 
@@ -271,7 +272,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, messages)
-				require.Equal(t, tc.expectedMsgIDs, maps.Keys(messages))
+				require.Equal(t, tc.expectedMsgIDs, slices.Collect(maps.Keys(messages)))
 			}
 		})
 	}

@@ -7,14 +7,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"slices"
-	"sort"
 	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -652,8 +651,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		}
 
 		// Iterate results in sourceChain selector order so that the router config is deterministic.
-		keys := maps.Keys(sourceConfigs)
-		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+		keys := slices.Sorted(maps.Keys(sourceConfigs))
 		for _, sourceChain := range keys {
 			cfg := sourceConfigs[sourceChain]
 			resp = resp.Append(consts.ContractNameOnRamp, sourceChain, cfg.OnRamp)

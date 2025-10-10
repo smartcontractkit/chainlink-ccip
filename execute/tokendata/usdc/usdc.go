@@ -3,9 +3,9 @@ package usdc
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -185,7 +185,7 @@ func (u *USDCTokenDataObserver) fetchUSDCEventMessages(
 				"Failed fetching USDC events from the source chain",
 				"sourceChainSelector", chainSelector,
 				"destChainSelector", u.destChainSelector,
-				"messageTokenIDs", maps.Keys(messages),
+				"messageTokenIDs", slices.Collect(maps.Keys(messages)),
 				"error", err,
 			)
 			return nil, err

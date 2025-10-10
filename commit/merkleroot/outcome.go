@@ -3,10 +3,10 @@ package merkleroot
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"time"
-
-	"golang.org/x/exp/maps"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -189,7 +189,7 @@ func buildMerkleRootsOutcome(
 	prevOutcome Outcome,
 	addressCodec cciptypes.AddressCodec,
 ) (Outcome, error) {
-	roots := maps.Values(consensusObservation.MerkleRoots)
+	roots := slices.Collect(maps.Values(consensusObservation.MerkleRoots))
 
 	outcomeType := ReportGenerated
 	if len(roots) == 0 {

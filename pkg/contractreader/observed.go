@@ -2,10 +2,10 @@ package contractreader
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"strings"
 	"time"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -147,7 +147,7 @@ func (o *Observed) BatchGetLatestValues(
 		"chainID", o.chainID,
 		"millis", duration.Milliseconds(),
 		"size", len(request),
-		"contracts", maps.Keys(request),
+		"contracts", slices.Collect(maps.Keys(request)),
 	)
 	return result, err
 }
