@@ -312,7 +312,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
-    uint256 g = gasleft();
     (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
       Client.Any2EVMMessage({
         messageId: messageId,
@@ -322,10 +321,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         destTokenAmounts: destTokenAmounts
       }),
       i_gasForCallExactCheck,
-      // We subtract the gas required to check whether or not gasLimit is within bound,
-      // the proportion of gas discluded by EIP-150 (2x because there are 2 calls: this-->router and router-->receiver),
-      // and an additional buffer for routeMessage logic prior to the receiver call.
-      g - 2 * (g / 64) - i_gasForCallExactCheck - 10000,
+      // Here, we designate the maximum gas possible for the receiver contract.
+      // Prior to accounting for EIP-150, we account for the worst-case calldata cost (16 gas per non-zero byte)
+      // and an additional buffer for opcodes surrounding / associated with the call. We use i_gasForCallExactCheck
+      // as the buffer value for configurability. We account for these variables twice because there are two external calls:
+      // offRamp-->router and router-->receiver. Likewise, we doubly account for EIP-150 in multiplying by 63/64 twice.
+      (gasleft() - 2 * i_gasForCallExactCheck - 2 * (16 * message.data.length)) * 3969 / 4096,
       receiver
     );
 
