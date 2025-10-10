@@ -22,7 +22,7 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
       laneMandatedCCVs: laneMandatedCCVs,
       defaultCCVs: defaultCCVs,
       defaultExecutor: makeAddr("defaultExecutor"),
-      offRamp: abi.encodePacked(address(s_offRampRemote))
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
     s_ccvProxyTestHelper.applyDestChainConfigUpdates(destChainConfigArgs);

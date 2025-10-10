@@ -2,9 +2,19 @@
 pragma solidity ^0.8.24;
 
 import {CCIPClientExampleWithCCVs} from "../../../applications/CCIPClientExampleWithCCVs.sol";
-import {CCIPClientExampleWithCCVsSetup} from "./CCIPClientExampleWithCCVsSetup.t.sol";
+import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 
-contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is CCIPClientExampleWithCCVsSetup {
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+
+contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
+  CCIPClientExampleWithCCVs internal s_client;
+
+  function setUp() public virtual override {
+    super.setUp();
+
+    s_client = new CCIPClientExampleWithCCVs(s_destRouter, IERC20(s_destFeeToken));
+  }
+
   function test_applyCCVConfigUpdates() public {
     address[] memory requiredCCVs = new address[](1);
     requiredCCVs[0] = address(0x1);

@@ -7,6 +7,21 @@ pragma solidity ^0.8.4;
 /// - uint32 is used for timestamps, which will overflow in 2106. This is not a concern for the current use case, as we
 /// expect to have migrated to a new version by then.
 library Internal {
+  // bytes4(keccak256("CCIP ChainFamilySelector EVM"));
+  bytes4 public constant CHAIN_FAMILY_SELECTOR_EVM = 0x2812d52c;
+
+  // bytes4(keccak256("CCIP ChainFamilySelector SVM"));
+  bytes4 public constant CHAIN_FAMILY_SELECTOR_SVM = 0x1e10bdc4;
+
+  // bytes4(keccak256("CCIP ChainFamilySelector APTOS"));
+  bytes4 public constant CHAIN_FAMILY_SELECTOR_APTOS = 0xac77ffec;
+
+  // bytes4(keccak256("CCIP ChainFamilySelector SUI"));
+  bytes4 public constant CHAIN_FAMILY_SELECTOR_SUI = 0xc4e05953;
+
+  // byte4(keccak256("CCIP ChainFamilySelector TVM"));
+  bytes4 public constant CHAIN_FAMILY_SELECTOR_TVM = 0x647e2ba9;
+
   error InvalidEVMAddress(bytes encodedAddress);
   error Invalid32ByteAddress(bytes encodedAddress);
   error InvalidTVMAddress(bytes encodedAddress);
@@ -64,63 +79,6 @@ library Internal {
     // has to be set for the specific token.
     bytes extraData;
     uint32 destGasAmount; // The amount of gas available for the releaseOrMint and balanceOf calls on the offRamp
-  }
-
-  bytes32 internal constant EVM_2_ANY_MESSAGE_HASH = keccak256("EVM2AnyMessageHashV1");
-
-  bytes32 internal constant LEAF_DOMAIN_SEPARATOR = 0x0000000000000000000000000000000000000000000000000000000000000000;
-
-  /// @dev Used to hash messages for multi-lane family-agnostic OffRamps.
-  /// OnRamp hash(EVM2AnyMessage) != Any2EVMRampMessage.messageId.
-  /// OnRamp hash(EVM2AnyMessage) != OffRamp hash(Any2EVMRampMessage).
-  /// @param original OffRamp message to hash.
-  /// @param metadataHash Hash preimage to ensure global uniqueness.
-  /// @return hashedMessage hashed message as a keccak256.
-  function _hash(Any2EVMRampMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
-    // Fixed-size message fields are included in nested hash to reduce stack pressure.
-    // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
-    return keccak256(
-      abi.encode(
-        LEAF_DOMAIN_SEPARATOR,
-        metadataHash,
-        keccak256(
-          abi.encode(
-            original.header.messageId,
-            original.receiver,
-            original.header.sequenceNumber,
-            original.gasLimit,
-            original.header.nonce
-          )
-        ),
-        keccak256(original.sender),
-        keccak256(original.data),
-        keccak256(abi.encode(original.tokenAmounts))
-      )
-    );
-  }
-
-  function _hash(EVM2AnyRampMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
-    // Fixed-size message fields are included in nested hash to reduce stack pressure.
-    // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
-    return keccak256(
-      abi.encode(
-        LEAF_DOMAIN_SEPARATOR,
-        metadataHash,
-        keccak256(
-          abi.encode(
-            original.sender,
-            original.header.sequenceNumber,
-            original.header.nonce,
-            original.feeToken,
-            original.feeTokenAmount
-          )
-        ),
-        keccak256(original.receiver),
-        keccak256(original.data),
-        keccak256(abi.encode(original.tokenAmounts)),
-        keccak256(original.extraArgs)
-      )
-    );
   }
 
   /// @dev We disallow the first 1024 addresses to avoid calling into a range known for hosting precompiles. Calling
@@ -190,22 +148,6 @@ library Internal {
     FAILURE
   }
 
-  /// @notice CCIP OCR plugin type, used to separate execution & commit transmissions and configs.
-  enum OCRPluginType {
-    Commit,
-    Execution
-  }
-
-  /// @notice Family-agnostic header for OnRamp & OffRamp messages.
-  /// The messageId is not expected to match hash(message), since it may originate from another ramp family.
-  struct RampMessageHeader {
-    bytes32 messageId; // Unique identifier for the message, generated with the source chain's encoding scheme (i.e. not necessarily abi.encoded).
-    uint64 sourceChainSelector; // ─╮ the chain selector of the source chain, note: not chainId.
-    uint64 destChainSelector; //    │ the chain selector of the destination chain, note: not chainId.
-    uint64 sequenceNumber; //       │ sequence number, not unique across lanes.
-    uint64 nonce; // ───────────────╯ nonce for this lane for this sender, not unique across senders/lanes.
-  }
-
   struct EVM2AnyTokenTransfer {
     // The source pool EVM address. This value is trusted as it was obtained through the onRamp. It can be relied
     // upon by the destination pool to validate the source pool.
@@ -222,61 +164,6 @@ library Internal {
     // consists of the amount of gas available for the releaseOrMint and transfer calls made by the offRamp.
     bytes destExecData;
   }
-
-  struct Any2EVMTokenTransfer {
-    // The source pool EVM address encoded to bytes. This value is trusted as it is obtained through the onRamp. It can
-    // be relied upon by the destination pool to validate the source pool.
-    bytes sourcePoolAddress;
-    address destTokenAddress; // ─╮ Address of destination token
-    uint32 destGasAmount; // ─────╯ The amount of gas available for the releaseOrMint and transfer calls on the offRamp.
-    // Optional pool data to be transferred to the destination chain. Be default this is capped at
-    // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
-    // has to be set for the specific token.
-    bytes extraData;
-    uint256 amount; // Amount of tokens.
-  }
-
-  /// @notice Family-agnostic message routed to an OffRamp.
-  /// Note: hash(Any2EVMRampMessage) != hash(EVM2AnyRampMessage), hash(Any2EVMRampMessage) != messageId due to encoding
-  /// and parameter differences.
-  struct Any2EVMRampMessage {
-    RampMessageHeader header; // Message header.
-    bytes sender; // sender address on the source chain.
-    bytes data; // arbitrary data payload supplied by the message sender.
-    address receiver; // receiver address on the destination chain.
-    uint256 gasLimit; // user supplied maximum gas amount available for dest chain execution.
-    Any2EVMTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
-  }
-
-  /// @notice Family-agnostic message emitted from the OnRamp.
-  /// Note: hash(Any2EVMRampMessage) != hash(EVM2AnyRampMessage) due to encoding & parameter differences.
-  /// messageId = hash(EVM2AnyRampMessage) using the source EVM chain's encoding format.
-  struct EVM2AnyRampMessage {
-    RampMessageHeader header; // Message header.
-    address sender; // sender address on the source chain.
-    bytes data; // arbitrary data payload supplied by the message sender.
-    bytes receiver; // receiver address on the destination chain.
-    bytes extraArgs; // destination-chain specific extra args, such as the gasLimit for EVM chains.
-    address feeToken; // fee token.
-    uint256 feeTokenAmount; // fee token amount.
-    uint256 feeValueJuels; // fee amount in Juels.
-    EVM2AnyTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer.
-  }
-
-  // bytes4(keccak256("CCIP ChainFamilySelector EVM"));
-  bytes4 public constant CHAIN_FAMILY_SELECTOR_EVM = 0x2812d52c;
-
-  // bytes4(keccak256("CCIP ChainFamilySelector SVM"));
-  bytes4 public constant CHAIN_FAMILY_SELECTOR_SVM = 0x1e10bdc4;
-
-  // bytes4(keccak256("CCIP ChainFamilySelector APTOS"));
-  bytes4 public constant CHAIN_FAMILY_SELECTOR_APTOS = 0xac77ffec;
-
-  // bytes4(keccak256("CCIP ChainFamilySelector SUI"));
-  bytes4 public constant CHAIN_FAMILY_SELECTOR_SUI = 0xc4e05953;
-
-  // byte4(keccak256("CCIP ChainFamilySelector TVM"));
-  bytes4 public constant CHAIN_FAMILY_SELECTOR_TVM = 0x647e2ba9;
 
   /// @dev Holds a merkle root and interval for a source chain so that an array of these can be passed in the CommitReport.
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.

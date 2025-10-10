@@ -1,6 +1,5 @@
 package ccip
 
-// Mod sec
 //go:generate go run generation/generate/wrap.go ccip VerifierProxy verifier_proxy latest
 //go:generate go run generation/generate/wrap.go ccip CommitteeVerifier committee_verifier latest
 //go:generate go run generation/generate/wrap.go ccip CCVProxy ccv_proxy latest
