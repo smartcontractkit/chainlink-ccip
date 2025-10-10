@@ -23,11 +23,19 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
-      inboundCCVs: inboundCCVs
+      additionalOutboundCCVs: new address[](0),
+      inboundCCVs: inboundCCVs,
+      additionalInboundCCVs: new address[](0)
     });
 
     vm.expectEmit();
-    emit TokenPool.CCVConfigUpdated(DEST_CHAIN_SELECTOR, outboundCCVs, inboundCCVs);
+    emit TokenPool.CCVConfigUpdated({
+      remoteChainSelector: configArgs[0].remoteChainSelector,
+      outboundCCVs: configArgs[0].outboundCCVs,
+      additionalOutboundCCVs: configArgs[0].additionalOutboundCCVs,
+      inboundCCVs: configArgs[0].inboundCCVs,
+      additionalInboundCCVs: configArgs[0].additionalInboundCCVs
+    });
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
     // Verify the configuration was stored correctly.
@@ -66,7 +74,9 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: duplicateOutbound,
-      inboundCCVs: validInbound
+      additionalOutboundCCVs: new address[](0),
+      inboundCCVs: validInbound,
+      additionalInboundCCVs: new address[](0)
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv1));
@@ -86,7 +96,9 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: validOutbound,
-      inboundCCVs: duplicateInbound
+      additionalOutboundCCVs: new address[](0),
+      inboundCCVs: duplicateInbound,
+      additionalInboundCCVs: new address[](0)
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv2));
