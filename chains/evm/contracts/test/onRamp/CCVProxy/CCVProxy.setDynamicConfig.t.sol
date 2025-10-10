@@ -14,11 +14,11 @@ contract CCVProxy_setDynamicConfig is CCVProxySetup {
       CCVProxy.DynamicConfig({feeQuoter: newFeeQuoter, reentrancyGuardEntered: false, feeAggregator: newFeeAggregator});
 
     vm.expectEmit();
-    emit CCVProxy.ConfigSet(s_ccvProxy.getStaticConfig(), newConfig);
+    emit CCVProxy.ConfigSet(s_onRamp.getStaticConfig(), newConfig);
 
-    s_ccvProxy.setDynamicConfig(newConfig);
+    s_onRamp.setDynamicConfig(newConfig);
 
-    CCVProxy.DynamicConfig memory retrievedConfig = s_ccvProxy.getDynamicConfig();
+    CCVProxy.DynamicConfig memory retrievedConfig = s_onRamp.getDynamicConfig();
     assertEq(retrievedConfig.feeQuoter, newFeeQuoter);
     assertEq(retrievedConfig.feeAggregator, newFeeAggregator);
     assertEq(retrievedConfig.reentrancyGuardEntered, false);
@@ -33,18 +33,18 @@ contract CCVProxy_setDynamicConfig is CCVProxySetup {
     CCVProxy.DynamicConfig memory config1 =
       CCVProxy.DynamicConfig({feeQuoter: feeQuoter1, reentrancyGuardEntered: false, feeAggregator: feeAggregator1});
 
-    s_ccvProxy.setDynamicConfig(config1);
+    s_onRamp.setDynamicConfig(config1);
 
-    CCVProxy.DynamicConfig memory retrievedConfig1 = s_ccvProxy.getDynamicConfig();
+    CCVProxy.DynamicConfig memory retrievedConfig1 = s_onRamp.getDynamicConfig();
     assertEq(retrievedConfig1.feeQuoter, feeQuoter1);
     assertEq(retrievedConfig1.feeAggregator, feeAggregator1);
 
     CCVProxy.DynamicConfig memory config2 =
       CCVProxy.DynamicConfig({feeQuoter: feeQuoter2, reentrancyGuardEntered: false, feeAggregator: feeAggregator2});
 
-    s_ccvProxy.setDynamicConfig(config2);
+    s_onRamp.setDynamicConfig(config2);
 
-    CCVProxy.DynamicConfig memory retrievedConfig2 = s_ccvProxy.getDynamicConfig();
+    CCVProxy.DynamicConfig memory retrievedConfig2 = s_onRamp.getDynamicConfig();
     assertEq(retrievedConfig2.feeQuoter, feeQuoter2);
     assertEq(retrievedConfig2.feeAggregator, feeAggregator2);
   }
@@ -60,7 +60,7 @@ contract CCVProxy_setDynamicConfig is CCVProxySetup {
 
     vm.startPrank(STRANGER);
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_ccvProxy.setDynamicConfig(newConfig);
+    s_onRamp.setDynamicConfig(newConfig);
   }
 
   function test_SetDynamicConfig_RevertWhen_InvalidConfig_ZeroFeeQuoter() public {
@@ -71,7 +71,7 @@ contract CCVProxy_setDynamicConfig is CCVProxySetup {
     });
 
     vm.expectRevert(CCVProxy.InvalidConfig.selector);
-    s_ccvProxy.setDynamicConfig(newConfig);
+    s_onRamp.setDynamicConfig(newConfig);
   }
 
   function test_SetDynamicConfig_RevertWhen_InvalidConfig_ZeroFeeAggregator() public {
@@ -82,7 +82,7 @@ contract CCVProxy_setDynamicConfig is CCVProxySetup {
     });
 
     vm.expectRevert(CCVProxy.InvalidConfig.selector);
-    s_ccvProxy.setDynamicConfig(newConfig);
+    s_onRamp.setDynamicConfig(newConfig);
   }
 
   function test_SetDynamicConfig_RevertWhen_InvalidConfig_ReentrancyGuardSet() public {
@@ -93,6 +93,6 @@ contract CCVProxy_setDynamicConfig is CCVProxySetup {
     });
 
     vm.expectRevert(CCVProxy.InvalidConfig.selector);
-    s_ccvProxy.setDynamicConfig(newConfig);
+    s_onRamp.setDynamicConfig(newConfig);
   }
 }
