@@ -3,11 +3,11 @@ pragma solidity ^0.8.0;
 
 import {DefensiveExample} from "../../../applications/DefensiveExample.sol";
 import {Client} from "../../../libraries/Client.sol";
-import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
+import {RouterSetup} from "../../onRamp/OnRamp/RouterSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-contract DefensiveExampleTest is OnRampSetup {
+contract DefensiveExampleTest is RouterSetup {
   event MessageFailed(bytes32 indexed messageId, bytes reason);
   event MessageSucceeded(bytes32 indexed messageId);
   event MessageRecovered(bytes32 indexed messageId);

@@ -3,9 +3,9 @@ pragma solidity ^0.8.24;
 
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 import {Client} from "../../../libraries/Client.sol";
-import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
+import {RouterSetup} from "../../onRamp/OnRamp/RouterSetup.t.sol";
 
-contract Router_getFee is OnRampSetup {
+contract Router_getFee is RouterSetup {
   function test_GetFeeSupportedChain() public view {
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),

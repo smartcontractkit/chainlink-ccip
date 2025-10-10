@@ -8,13 +8,12 @@ import {IWrappedNative} from "../../../interfaces/IWrappedNative.sol";
 import {FeeQuoter} from "../../../FeeQuoter.sol";
 import {Router} from "../../../Router.sol";
 import {Client} from "../../../libraries/Client.sol";
-import {Internal} from "../../../libraries/Internal.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
+import {RouterSetup} from "../../onRamp/OnRamp/RouterSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-contract Router_ccipSend is OnRampSetup {
+contract Router_ccipSend is RouterSetup {
   function test_CCIPSendLinkFeeOneTokenSuccess_gas() public {
     vm.pauseGasMetering();
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -67,7 +66,7 @@ contract Router_ccipSend is OnRampSetup {
       abi.encodeCall(IEVM2AnyOnRampClient.forwardFromRouter, (DEST_CHAIN_SELECTOR, message, expectedFee, OWNER))
     );
     vm.resumeGasMetering();
-    bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
   function test_ccipSend_nativeFeeOneTokenSuccess_gas() public {
@@ -104,7 +103,7 @@ contract Router_ccipSend is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    bytes32 messageId = s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
+    s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
     // Assert the user balance is lowered by the tokenAmounts sent and the fee amount
@@ -132,7 +131,7 @@ contract Router_ccipSend is OnRampSetup {
     message.feeToken = address(0);
 
     vm.resumeGasMetering();
-    bytes32 messageId = s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
+    s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
   }
 
   function test_NonLinkFeeToken() public {

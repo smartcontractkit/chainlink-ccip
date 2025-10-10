@@ -2,11 +2,11 @@
 pragma solidity ^0.8.24;
 
 import {PingPongDemo} from "../../../applications/PingPongDemo.sol";
-import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
+import {RouterSetup} from "../../onRamp/OnRamp/RouterSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-contract PingPongDappSetup is OnRampSetup {
+contract PingPongDappSetup is RouterSetup {
   PingPongDemo internal s_pingPong;
   IERC20 internal s_feeToken;
 

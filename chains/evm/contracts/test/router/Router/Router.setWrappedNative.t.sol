@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
+import {RouterSetup} from "../../onRamp/OnRamp/RouterSetup.t.sol";
 
-contract Router_setWrappedNative is OnRampSetup {
+contract Router_setWrappedNative is RouterSetup {
   function testFuzz_SetWrappedNative_Success(
     address wrappedNative
   ) public {
