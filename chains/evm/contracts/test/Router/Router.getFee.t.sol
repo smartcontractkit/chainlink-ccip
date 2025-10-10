@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
-import {Client} from "../../../libraries/Client.sol";
-import {RouterSetup} from "../../onRamp/OnRamp/RouterSetup.t.sol";
+import {IRouterClient} from "../../interfaces/IRouterClient.sol";
+import {Client} from "../../libraries/Client.sol";
+import {RouterSetup} from "./RouterSetup.t.sol";
 
 contract Router_getFee is RouterSetup {
   function test_GetFeeSupportedChain() public view {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {RouterSetup} from "../../onRamp/OnRamp/RouterSetup.t.sol";
+import {RouterSetup} from "./RouterSetup.t.sol";
 
 contract Router_constructor is RouterSetup {
   function test_Constructor() public view {

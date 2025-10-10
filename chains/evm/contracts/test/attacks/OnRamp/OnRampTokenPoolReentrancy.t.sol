@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Client} from "../../../libraries/Client.sol";
 import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {RouterSetup} from "../../onRamp/OnRamp/RouterSetup.t.sol";
+import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 import {FacadeClient} from "./FacadeClient.sol";
 import {ReentrantMaliciousTokenPool} from "./ReentrantMaliciousTokenPool.sol";
 

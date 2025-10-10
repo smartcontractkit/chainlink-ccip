@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IEVM2AnyOnRampClient} from "../../../interfaces/IEVM2AnyOnRampClient.sol";
+import {IEVM2AnyOnRampClient} from "../../interfaces/IEVM2AnyOnRampClient.sol";
 
-import {Router} from "../../../Router.sol";
-import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
-import {FeeQuoterSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
-import {MockExecutor} from "../../mocks/MockExecutor.sol";
-import {MockVerifier} from "../../mocks/MockVerifier.sol";
+import {Router} from "../../Router.sol";
+import {CCVProxy} from "../../onRamp/CCVProxy.sol";
+import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
+import {MockExecutor} from "../mocks/MockExecutor.sol";
+import {MockVerifier} from "../mocks/MockVerifier.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
@@ -63,3 +63,4 @@ contract RouterSetup is FeeQuoterSetup {
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2 ** 128);
   }
 }
+

@@ -3,10 +3,10 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-import {Router} from "../../../Router.sol";
+import {Router} from "../../Router.sol";
 
-import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
-import {RouterSetup} from "../../onRamp/OnRamp/RouterSetup.t.sol";
+import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
+import {RouterSetup} from "./RouterSetup.t.sol";
 
 contract Router_recoverTokens is RouterSetup {
   function test_RecoverTokens() public {
