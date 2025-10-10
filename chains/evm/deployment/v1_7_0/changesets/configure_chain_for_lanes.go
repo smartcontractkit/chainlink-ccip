@@ -12,10 +12,10 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -60,9 +60,9 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		if err != nil {
 			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve router ref: %w", err)
 		}
-		ccvProxyAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		onRampAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			ChainSelector: cfg.ChainSel,
-			Type:          datastore.ContractType(ccv_proxy.ContractType),
+			Type:          datastore.ContractType(on_ramp.ContractType),
 			Version:       semver.MustParse("1.7.0"),
 		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
@@ -158,7 +158,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		return sequences.ConfigureChainForLanesInput{
 			ChainSelector:     cfg.ChainSel,
 			Router:            routerAddr,
-			CCVProxy:          ccvProxyAddr,
+			OnRamp:            onRampAddr,
 			CommitteeVerifier: committeeVerifierAddr,
 			FeeQuoter:         feeQuoterAddr,
 			OffRamp:           offRampAddr,

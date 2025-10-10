@@ -7,11 +7,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -32,7 +32,7 @@ type RemoteChainConfig struct {
 	// Whether to allow traffic FROM this remote chain
 	AllowTrafficFrom bool
 	// The address on the remote chain from which the message is emitted
-	// For example, on EVM chains, this is the CCVProxy
+	// For example, on EVM chains, this is the OnRamp
 	CCIPMessageSource []byte
 	// The address on the remote chain against which the message gets executed
 	CCIPMessageDest []byte
@@ -59,9 +59,9 @@ type ConfigureChainForLanesInput struct {
 	// The router on the EVM chain being configured
 	// We assume that all connections will use the same router, either test or production
 	Router common.Address
-	// The CCVProxy on the EVM chain being configured
-	// Similarly, we assume that all connections will use the same CCVProxy
-	CCVProxy common.Address
+	// The OnRamp on the EVM chain being configured
+	// Similarly, we assume that all connections will use the same OnRamp
+	OnRamp common.Address
 	// The CommitteeVerifier on the EVM chain being configured
 	CommitteeVerifier common.Address
 	// The FeeQuoter on the EVM chain being configured
@@ -81,7 +81,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 
 		// Create inputs for each operation
 		offRampArgs := make([]off_ramp.SourceChainConfigArgs, 0, len(input.RemoteChains))
-		ccvProxyArgs := make([]ccv_proxy.DestChainConfigArgs, 0, len(input.RemoteChains))
+		onRampArgs := make([]on_ramp.DestChainConfigArgs, 0, len(input.RemoteChains))
 		committeeVerifierDestConfigArgs := make([]committee_verifier.DestChainConfigArgs, 0, len(input.RemoteChains))
 		committeeVerifierAllowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
 		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, len(input.RemoteChains))
@@ -97,7 +97,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				DefaultCCV:          remoteConfig.DefaultCCVOffRamps,
 				LaneMandatedCCVs:    remoteConfig.LaneMandatedCCVOffRamps,
 			})
-			ccvProxyArgs = append(ccvProxyArgs, ccv_proxy.DestChainConfigArgs{
+			onRampArgs = append(onRampArgs, on_ramp.DestChainConfigArgs{
 				Router:            input.Router,
 				DestChainSelector: remoteSelector,
 				DefaultCCVs:       remoteConfig.DefaultCCVOnRamps,
@@ -122,7 +122,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			})
 			onRampAdds = append(onRampAdds, router.OnRamp{
 				DestChainSelector: remoteSelector,
-				OnRamp:            input.CCVProxy,
+				OnRamp:            input.OnRamp,
 			})
 			offRampAdds = append(offRampAdds, router.OffRamp{
 				SourceChainSelector: remoteSelector,
@@ -145,16 +145,16 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 		writes = append(writes, offRampReport.Output)
 
-		// ApplyDestChainConfigUpdates on CCVProxy
-		ccvProxyReport, err := cldf_ops.ExecuteOperation(b, ccv_proxy.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]ccv_proxy.DestChainConfigArgs]{
+		// ApplyDestChainConfigUpdates on OnRamp
+		onRampReport, err := cldf_ops.ExecuteOperation(b, on_ramp.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]on_ramp.DestChainConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       input.CCVProxy,
-			Args:          ccvProxyArgs,
+			Address:       input.OnRamp,
+			Args:          onRampArgs,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CCVProxy(%s) on chain %s: %w", input.CCVProxy, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to OnRamp(%s) on chain %s: %w", input.OnRamp, chain, err)
 		}
-		writes = append(writes, ccvProxyReport.Output)
+		writes = append(writes, onRampReport.Output)
 
 		// ApplyDestChainConfigUpdates on CommitteeVerifier
 		committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.DestChainConfigArgs]{
