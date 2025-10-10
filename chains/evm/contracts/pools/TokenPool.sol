@@ -140,9 +140,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   struct CCVConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
-    address[] additionalOutboundCCVs; // Additional CCVs that are requited for outgoing messages above s_thresholdTransferAmount to the remote chain.
+    address[] additionalOutboundCCVs; // Additional CCVs that are required for outgoing messages above s_thresholdTransferAmount to the remote chain.
     address[] inboundCCVs; // CCVs required for incoming messages from the remote chain.
-    address[] additionalInboundCCVs; // Additional CCVs that are requited for incoming messages above s_thresholdTransferAmount from the remote chain.
+    address[] additionalInboundCCVs; // Additional CCVs that are required for incoming messages above s_thresholdTransferAmount from the remote chain.
   }
 
   struct CCVConfigArg {
@@ -173,6 +173,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @dev The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
   /// @dev Threshold token transfer amount above which additional CCVs are required.
+  /// Value of 0 means that there is no threshold and additional CCVs are not required for any transfer amount.
   uint256 internal s_thresholdAmountForAdditionalCCVs;
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
   /// Only takes effect if i_allowlistEnabled is true.
@@ -945,6 +946,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @notice Updates the CCV configuration for specified remote chains.
   /// If the array includes address(0), it indicates that the default CCV should be used alongside any other specified CCVs.
+  /// @dev Additional CCVs should only be configured for transfers above the threshold amount set in s_thresholdAmountForAdditionalCCVs and should not duplicate base CCVs.
+  /// Base CCVs are always required, while additional CCVs are only required when the transfer amount exceeds the threshold.
   function applyCCVConfigUpdates(
     CCVConfigArg[] calldata ccvConfigArgs
   ) external virtual onlyOwner {
