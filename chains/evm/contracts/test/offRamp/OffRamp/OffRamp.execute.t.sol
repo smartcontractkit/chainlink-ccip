@@ -8,9 +8,9 @@ import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {ReentrantCCV} from "../../helpers/ReentrantCCV.sol";
+import {ExactGasReceiver} from "../../helpers/receivers/ExactGasReceiver.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
-import {ExactGasReceiver} from "../../helpers/receivers/ExactGasReceiver.sol";
 
 contract GasBoundedExecuteCaller {
   OffRamp internal immutable i_offRamp;
@@ -326,25 +326,29 @@ contract OffRamp_execute is OffRampSetup {
     );
   }
 
-  /// forge-config: default.fuzz.runs = 1000
-  function testFuzz_execute_WithReceiver(uint256 gasUsedByCCIPReceive, uint256 calldataLength) public {
-    vm.assume(gasUsedByCCIPReceive > 1_000);
-    vm.assume(gasUsedByCCIPReceive < PLENTY_OF_GAS);
-    vm.assume(calldataLength > 0);
-    vm.assume(calldataLength < 1000);
-    uint256 gasForExecute = gasUsedByCCIPReceive + 150_000 + 2 * (16 * calldataLength);
-    
-    // Create message with exact gas receiver.
+  function testFuzz_execute_WithReceiver(uint32 _gasUsedByCCIPReceive, uint16 _calldataLength) public {
+    uint256 gasUsedByCCIPReceive = bound(_gasUsedByCCIPReceive, 1_000, PLENTY_OF_GAS);
+    uint256 calldataLength = bound(_calldataLength, 4, 1_000);
+    // gasForExecute reverses the gas computation peformed by the OffRamp when calling routeMessage.
+    // 110_000 accounts for logic preceeding and following the call to routeMessage.
+    uint256 gasForExecute =
+      110_000 + (gasUsedByCCIPReceive + 2 * GAS_FOR_CALL_EXACT_CHECK + 2 * (16 * calldataLength)) * 4096 / 3969;
+
+    // Create message with exact gas receiver and calldata.
     MessageV1Codec.MessageV1 memory message = _getMessage();
-    message.data = vm.randomBytes(calldataLength);
     message.receiver = abi.encodePacked(address(new ExactGasReceiver(gasUsedByCCIPReceive)));
+    message.data = new bytes(calldataLength);
+    // Fill with non-zero bytes to force worst-case calldata gas scenario for the given calldata size.
+    for (uint256 i = 0; i < calldataLength; i++) {
+      message.data[i] = 0x01;
+    }
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
     // Set OffRamp as a valid OffRamp on the Router.
     Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
     newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_agg)});
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
-  
+
     // Expect execution state change event.
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged(
@@ -354,14 +358,14 @@ contract OffRamp_execute is OffRampSetup {
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
+
+    // Call execute, tracking start and end gas.
     uint256 startGas = gasleft();
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, gasForExecute);
     uint256 endGas = gasleft();
 
-    // Ensure that gasForExecute is spent consistently.
-    // Range sits between 50% and 97.5% spent.
-    assertGt(startGas - endGas, gasForExecute * 5 / 10);
-    assertLt(startGas - endGas, gasForExecute * 39 / 40);
+    // Expect at least 70% gas utilization.
+    assertGt(startGas - endGas, gasForExecute * 7 / 10);
 
     // Verify final state is SUCCESS.
     assertEq(
