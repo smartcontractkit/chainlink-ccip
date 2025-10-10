@@ -109,16 +109,16 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event ThresholdAmountForAdditionalCCVsSet(uint256 newAmount);
 
   struct ChainUpdate {
-    uint64 remoteChainSelector; // Remote chain selector
+    uint64 remoteChainSelector; // Remote chain selector.
     bytes[] remotePoolAddresses; // Address of the remote pool, ABI encoded in the case of a remote EVM chain.
     bytes remoteTokenAddress; // Address of the remote token, ABI encoded in the case of a remote EVM chain.
-    RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
-    RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
+    RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain.
+    RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain.
   }
 
   struct RemoteChainConfig {
-    RateLimiter.TokenBucket outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
-    RateLimiter.TokenBucket inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
+    RateLimiter.TokenBucket outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain.
+    RateLimiter.TokenBucket inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain.
     bytes remoteTokenAddress; // Address of the remote token, ABI encoded in the case of a remote EVM chain.
     EnumerableSet.Bytes32Set remotePools; // Set of remote pool hashes, ABI encoded in the case of a remote EVM chain.
   }
@@ -192,11 +192,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice The address of the rate limiter admin.
   /// @dev Can be address(0) if none is configured.
   address internal s_rateLimitAdmin;
-  // Tracks custom-finality parameters and per-lane rate limit buckets.
+  /// @dev Tracks custom-finality parameters and per-lane rate limit buckets.
   CustomFinalityConfig internal s_finalityConfig;
-  // Stores verifier (CCV) requirements keyed by remote chain selector.
+  /// @dev Stores verifier (CCV) requirements keyed by remote chain selector.
   mapping(uint64 remoteChainSelector => CCVConfig ccvConfig) internal s_verifierConfig;
-  // Optional token-transfer fee overrides keyed by destination chain selector.
+  /// @dev Optional token-transfer fee overrides keyed by destination chain selector.
   mapping(uint64 destChainSelector => TokenTransferFeeConfig tokenTransferFeeConfig) internal s_tokenTransferFeeConfig;
 
   constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
