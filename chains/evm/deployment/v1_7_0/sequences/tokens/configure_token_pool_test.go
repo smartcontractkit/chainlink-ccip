@@ -111,8 +111,12 @@ func TestConfigurePool(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, input.AllowList, getAllowlistReport.Output, "Expected allowlist address to be the same as the deployed allowlist")
-
+			for _, addr := range input.AllowList {
+				require.Contains(t, getAllowlistReport.Output, addr, "Expected inputted allowlist address to be in the on-chain allowlist")
+			}
+			for _, addr := range getAllowlistReport.Output {
+				require.Contains(t, input.AllowList, addr, "Expected on-chain allowlist address to be in the inputted allowlist")
+			}
 			// Check rate limit admin
 			getRateLimitAdminReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
