@@ -115,11 +115,14 @@ func convertRemoteChainConfig(
 		InboundRateLimiterConfig:  inCfg.InboundRateLimiterConfig,
 		OutboundRateLimiterConfig: inCfg.OutboundRateLimiterConfig,
 	}
-	var err error
 	if inCfg.RemotePool != nil {
-		outCfg.RemotePool, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, adapter.AddressRefToBytes)
+		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
+		}
+		outCfg.RemotePool, err = adapter.AddressRefToBytes(fullRemotePoolRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to convert remote pool ref %s to bytes: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
 		}
 		// Can either provide the token reference directly or derive it from the pool reference.
 		if inCfg.RemoteToken != nil {
@@ -128,7 +131,7 @@ func convertRemoteChainConfig(
 				return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
 			}
 		} else {
-			outCfg.RemoteToken, err = adapter.DeriveTokenAddress(e, remoteChainSelector, *inCfg.RemotePool)
+			outCfg.RemoteToken, err = adapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
 			if err != nil {
 				return outCfg, fmt.Errorf("failed to get remote token address via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(*inCfg.RemotePool), remoteChainSelector, err)
 			}
