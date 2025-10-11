@@ -374,6 +374,7 @@ func (p *Plugin) getMessagesObservation(
 	totalMsgs := 0
 	encodedObsSize := 0
 	for _, report := range commitData {
+		lggr.Debugw("processing report", "report", report)
 		srcChain := report.SourceChain
 
 		if !supportedChains.Contains(srcChain) {
@@ -392,6 +393,38 @@ func (p *Plugin) getMessagesObservation(
 			)
 			continue
 		}
+
+		lggr.Debugw("read messages for report", "msgs", func(msgs []cciptypes.Message) []struct {
+			SourceChainSelector cciptypes.ChainSelector  `json:"sourceChainSelector"`
+			DestChainSelector   cciptypes.ChainSelector  `json:"destChainSelector"`
+			SequenceNumber      cciptypes.SeqNum         `json:"sequenceNumber"`
+			MessageID           cciptypes.Bytes32        `json:"messageID"`
+			OnRamp              cciptypes.UnknownAddress `json:"onRamp"`
+		} {
+			var loggedMsgs []struct {
+				SourceChainSelector cciptypes.ChainSelector  `json:"sourceChainSelector"`
+				DestChainSelector   cciptypes.ChainSelector  `json:"destChainSelector"`
+				SequenceNumber      cciptypes.SeqNum         `json:"sequenceNumber"`
+				MessageID           cciptypes.Bytes32        `json:"messageID"`
+				OnRamp              cciptypes.UnknownAddress `json:"onRamp"`
+			}
+			for _, msg := range msgs {
+				loggedMsgs = append(loggedMsgs, struct {
+					SourceChainSelector cciptypes.ChainSelector  `json:"sourceChainSelector"`
+					DestChainSelector   cciptypes.ChainSelector  `json:"destChainSelector"`
+					SequenceNumber      cciptypes.SeqNum         `json:"sequenceNumber"`
+					MessageID           cciptypes.Bytes32        `json:"messageID"`
+					OnRamp              cciptypes.UnknownAddress `json:"onRamp"`
+				}{
+					SourceChainSelector: msg.Header.SourceChainSelector,
+					DestChainSelector:   msg.Header.DestChainSelector,
+					SequenceNumber:      msg.Header.SequenceNumber,
+					MessageID:           msg.Header.MessageID,
+					OnRamp:              msg.Header.OnRamp,
+				})
+			}
+			return loggedMsgs
+		})
 
 		// Add the report to available reports
 		availableReports[srcChain] = append(availableReports[srcChain], report)
@@ -432,9 +465,15 @@ func (p *Plugin) getMessagesObservation(
 			// If a message is inflight or already executed, don't include it fully in the observation
 			// because its already been transmitted in a previous report or executed onchain.
 			if p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
+				lggr.Debugw("skipping inflight message",
+					"messageID", msg.Header.MessageID,
+				)
 				continue
 			}
 			if slices.Contains(report.ExecutedMessages, msg.Header.SequenceNumber) {
+				lggr.Debugw("skipping already executed message",
+					"messageID", msg.Header.MessageID,
+				)
 				continue
 			}
 
@@ -452,6 +491,9 @@ func (p *Plugin) getMessagesObservation(
 			encodedObsSize = len(encodedObs)
 			if totalMsgs > lenientMaxMsgsPerObs || encodedObsSize > lenientMaxObservationLength {
 				// remove the last message and token data
+				lggr.Debugw("converting last message to pseudo-deleted due to size limit",
+					"messageID", msg.Header.MessageID,
+				)
 				observation.Messages[srcChain][seqNum] = createEmptyMessageWithIDAndSeqNum(msg)
 				observation.TokenData[srcChain][seqNum] = exectypes.NewMessageTokenData()
 				stop = true
