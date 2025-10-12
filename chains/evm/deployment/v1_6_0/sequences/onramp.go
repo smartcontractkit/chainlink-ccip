@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -26,10 +26,10 @@ var (
 		"OnRampApplyDestChainConfigUpdatesSequence",
 		semver.MustParse("1.6.0"),
 		"Applies updates to destination chain configurations stored on OnRamp contracts on multiple EVM chains",
-		func(b operations.Bundle, chains map[uint64]cldf_evm.Chain, input OnRampApplyDestChainConfigUpdatesSequenceInput) (sequences.OnChainOutput, error) {
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input OnRampApplyDestChainConfigUpdatesSequenceInput) (sequences.OnChainOutput, error) {
 			writes := make([]contract.WriteOutput, 0)
 			for chainSel, update := range input.UpdatesByChain {
-				chain, ok := chains[chainSel]
+				chain, ok := chains.EVMChains()[chainSel]
 				if !ok {
 					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSel)
 				}

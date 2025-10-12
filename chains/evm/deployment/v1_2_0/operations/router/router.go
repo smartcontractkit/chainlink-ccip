@@ -13,6 +13,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "Router"
+var Version *semver.Version = semver.MustParse("1.2.0")
 
 type ConstructorArgs struct {
 	WrappedNative common.Address
@@ -41,11 +42,11 @@ type CCIPSendArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "router:deploy",
-	Version:          semver.MustParse("1.2.0"),
+	Version:          Version,
 	Description:      "Deploys the Router contract",
 	ContractMetadata: router.RouterMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.2.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(router.RouterBin),
 		},
 	},
@@ -54,7 +55,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var ApplyRampUpdates = contract.NewWrite(contract.WriteParams[ApplyRampsUpdatesArgs, *router.Router]{
 	Name:            "router:apply-ramp-updates",
-	Version:         semver.MustParse("1.2.0"),
+	Version:         Version,
 	Description:     "Applies ramp updates to the Router",
 	ContractType:    ContractType,
 	ContractABI:     router.RouterABI,
@@ -68,7 +69,7 @@ var ApplyRampUpdates = contract.NewWrite(contract.WriteParams[ApplyRampsUpdatesA
 
 var CCIPSend = contract.NewWrite(contract.WriteParams[CCIPSendArgs, *router.Router]{
 	Name:            "router:ccip-send",
-	Version:         semver.MustParse("1.2.0"),
+	Version:         Version,
 	Description:     "Sends a CCIP message via the Router",
 	ContractType:    ContractType,
 	ContractABI:     router.RouterABI,
@@ -84,7 +85,7 @@ var CCIPSend = contract.NewWrite(contract.WriteParams[CCIPSendArgs, *router.Rout
 
 var GetOffRamps = contract.NewRead(contract.ReadParams[any, []OffRamp, *router.Router]{
 	Name:         "router:get-off-ramps",
-	Version:      semver.MustParse("1.2.0"),
+	Version:      Version,
 	Description:  "Gets all off ramps on the router",
 	ContractType: ContractType,
 	NewContract:  router.NewRouter,
@@ -95,7 +96,7 @@ var GetOffRamps = contract.NewRead(contract.ReadParams[any, []OffRamp, *router.R
 
 var GetOnRamp = contract.NewRead(contract.ReadParams[uint64, common.Address, *router.Router]{
 	Name:         "router:get-on-ramp",
-	Version:      semver.MustParse("1.2.0"),
+	Version:      Version,
 	Description:  "Gets the on ramp for a given destination chain selector",
 	ContractType: ContractType,
 	NewContract:  router.NewRouter,
@@ -106,7 +107,7 @@ var GetOnRamp = contract.NewRead(contract.ReadParams[uint64, common.Address, *ro
 
 var GetFee = contract.NewRead(contract.ReadParams[CCIPSendArgs, *big.Int, *router.Router]{
 	Name:         "router:get-fee",
-	Version:      semver.MustParse("1.2.0"),
+	Version:      Version,
 	Description:  "Gets the fee for a message",
 	ContractType: ContractType,
 	NewContract:  router.NewRouter,

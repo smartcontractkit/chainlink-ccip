@@ -1,97 +1,97 @@
 package sequences
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-)
-
-type UpdateLanesSequenceInput struct {
-	FeeQuoterApplyDestChainConfigUpdatesSequenceInput FeeQuoterApplyDestChainConfigUpdatesSequenceInput
-	FeeQuoterUpdatePricesSequenceInput                FeeQuoterUpdatePricesSequenceInput
-	OffRampApplySourceChainConfigUpdatesSequenceInput OffRampApplySourceChainConfigUpdatesSequenceInput
-	OnRampApplyDestChainConfigUpdatesSequenceInput    OnRampApplyDestChainConfigUpdatesSequenceInput
-	RouterApplyRampUpdatesSequenceInput               RouterApplyRampUpdatesSequenceInput
-}
-
-var ConfigureLaneLegAsDest = operations.NewSequence(
-	"ConfigureLaneLegAsDest",
-	semver.MustParse("1.0.0"),
-	"Updates lanes on CCIP 1.6.0",
-	func(b operations.Bundle, chains map[uint64]cldf_evm.Chain, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
-		var result sequences.OnChainOutput
-
-		result, err := runAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, input.FeeQuoterApplyDestChainConfigUpdatesSequenceInput, result)
-		if err != nil {
-			return result, err
-		}
-		b.Logger.Info("Destination configs updated on FeeQuoters")
-
-		result, err = runAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, input.FeeQuoterUpdatePricesSequenceInput, result)
-		if err != nil {
-			return result, err
-		}
-		b.Logger.Info("Gas prices updated on FeeQuoters")
-
-		result, err = runAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, input.OffRampApplySourceChainConfigUpdatesSequenceInput, result)
-		if err != nil {
-			return result, err
-		}
-		b.Logger.Info("Destination configs updated on OnRamps")
-
-		result, err = runAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, input.OnRampApplyDestChainConfigUpdatesSequenceInput, result)
-		if err != nil {
-			return result, err
-		}
-		b.Logger.Info("Source configs updated on OffRamps")
-
-		result, err = runAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, input.RouterApplyRampUpdatesSequenceInput, result)
-		if err != nil {
-			return result, err
-		}
-		b.Logger.Info("Ramps updated on Routers")
-
-		return result, nil
-	},
 )
 
 var ConfigureLaneLegAsSource = operations.NewSequence(
 	"ConfigureLaneLegAsSource",
-	semver.MustParse("1.6.0"),
+	semver.MustParse("1.0.0"),
 	"Configures lane leg as source on CCIP 1.6.0",
-	func(b operations.Bundle, chains map[uint64]cldf_evm.Chain, input UpdateLanesSequenceInput) (sequences.OnChainOutput, error) {
+	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
 
-		result, err := runAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, input.FeeQuoterApplyDestChainConfigUpdatesSequenceInput, result)
+		result, err := runAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
+			Address: common.BytesToAddress(input.Source.FeeQuoter),
+			UpdatesByChain: map[uint64][]fee_quoter.FeeQuoterDestChainConfigArgs{
+				input.Source.Selector: {
+					{
+						DestChainSelector: input.Dest.Selector,
+						DestChainConfig:   TranslateFQ(input.Dest.FeeQuoterDestChainConfig),
+					},
+				},
+			},
+		}, result)
 		if err != nil {
 			return result, err
 		}
 		b.Logger.Info("Destination configs updated on FeeQuoters")
 
-		result, err = runAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, input.FeeQuoterUpdatePricesSequenceInput, result)
+		result, err = runAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
+			Address: common.BytesToAddress(input.Source.FeeQuoter),
+			UpdatesByChain: map[uint64]fee_quoter.InternalPriceUpdates{
+				input.Source.Selector: {
+					TokenPriceUpdates: TranslateTokenPrices(input.Source.TokenPrices),
+					GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
+						{
+							DestChainSelector: input.Dest.Selector,
+							UsdPerUnitGas:     input.Dest.GasPrice,
+						},
+					},
+				},
+			},
+		}, result)
 		if err != nil {
 			return result, err
 		}
 		b.Logger.Info("Gas prices updated on FeeQuoters")
 
-		result, err = runAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, input.OffRampApplySourceChainConfigUpdatesSequenceInput, result)
-		if err != nil {
-			return result, err
-		}
-		b.Logger.Info("Destination configs updated on OnRamps")
-
-		result, err = runAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, input.OnRampApplyDestChainConfigUpdatesSequenceInput, result)
+		result, err = runAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, OnRampApplyDestChainConfigUpdatesSequenceInput{
+			Address: common.BytesToAddress(input.Source.OnRamp),
+			UpdatesByChain: map[uint64][]onramp.OnRampDestChainConfigArgs{
+				input.Source.Selector: {
+					{
+						Router:            common.BytesToAddress(input.Source.Router),
+						DestChainSelector: input.Dest.Selector,
+						AllowlistEnabled:  input.Source.AllowListEnabled,
+					},
+				},
+			},
+		}, result)
 		if err != nil {
 			return result, err
 		}
 		b.Logger.Info("Source configs updated on OffRamps")
 
-		result, err = runAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, input.RouterApplyRampUpdatesSequenceInput, result)
+		onrampUpdate := router.OnRamp{
+			DestChainSelector: input.Dest.Selector,
+			OnRamp:            common.BytesToAddress(input.Source.OnRamp),
+		}
+		if input.IsDisabled {
+			onrampUpdate.OnRamp = common.Address{}
+		}
+		result, err = runAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
+			Address: common.BytesToAddress(input.Source.Router),
+			UpdatesByChain: map[uint64]router.ApplyRampsUpdatesArgs{
+				input.Source.Selector: {
+					OnRampUpdates: []router.OnRamp{onrampUpdate},
+				},
+			},
+		}, result)
 		if err != nil {
 			return result, err
 		}
@@ -101,10 +101,73 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 	},
 )
 
+var ConfigureLaneLegAsDest = operations.NewSequence(
+	"ConfigureLaneLegAsDest",
+	semver.MustParse("1.6.0"),
+	"Configures lane leg as destination on CCIP 1.6.0",
+	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
+		var result sequences.OnChainOutput
+
+		result, err := runAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
+			Address: common.BytesToAddress(input.Source.OffRamp),
+			UpdatesByChain: map[uint64][]offramp.OffRampSourceChainConfigArgs{
+				input.Source.Selector: {
+					{
+						Router:                    common.BytesToAddress(input.Source.Router),
+						SourceChainSelector:       input.Dest.Selector,
+						OnRamp:                    input.Dest.OnRamp,
+						IsEnabled:                 !input.IsDisabled,
+						IsRMNVerificationDisabled: !input.Dest.RMNVerificationEnabled,
+					},
+				},
+			},
+		}, result)
+		if err != nil {
+			return result, err
+		}
+		b.Logger.Info("Destination configs updated on OffRamps")
+
+		offrampUpdate := router.OffRamp{
+			SourceChainSelector: input.Dest.Selector,
+			OffRamp:             common.BytesToAddress(input.Dest.OffRamp),
+		}
+		var offRampAdds []router.OffRamp
+		var offRampRemoves []router.OffRamp
+		if input.IsDisabled {
+			offRampRemoves = []router.OffRamp{offrampUpdate}
+		} else {
+			offRampAdds = []router.OffRamp{offrampUpdate}
+		}
+		result, err = runAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
+			Address: common.BytesToAddress(input.Source.Router),
+			UpdatesByChain: map[uint64]router.ApplyRampsUpdatesArgs{
+				input.Source.Selector: {
+					OffRampAdds:    offRampAdds,
+					OffRampRemoves: offRampRemoves,
+				},
+			},
+		}, result)
+		if err != nil {
+			return result, err
+		}
+		b.Logger.Info("Ramps updated on Routers")
+
+		return result, nil
+	},
+)
+
+func (a *EVMAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return ConfigureLaneLegAsSource
+}
+
+func (a *EVMAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return ConfigureLaneLegAsDest
+}
+
 func runAndMergeSequence[IN any](
 	b operations.Bundle,
-	chains map[uint64]cldf_evm.Chain,
-	seq *operations.Sequence[IN, sequences.OnChainOutput, map[uint64]cldf_evm.Chain],
+	chains cldf_chain.BlockChains,
+	seq *operations.Sequence[IN, sequences.OnChainOutput, cldf_chain.BlockChains],
 	input IN,
 	agg sequences.OnChainOutput,
 ) (sequences.OnChainOutput, error) {
@@ -115,4 +178,39 @@ func runAndMergeSequence[IN any](
 	agg.BatchOps = append(agg.BatchOps, report.Output.BatchOps...)
 	agg.Addresses = append(agg.Addresses, report.Output.Addresses...)
 	return agg, nil
+}
+
+func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.FeeQuoterDestChainConfig {
+	return fee_quoter.FeeQuoterDestChainConfig{
+		IsEnabled:                         fqc.IsEnabled,
+		MaxNumberOfTokensPerMsg:           fqc.MaxNumberOfTokensPerMsg,
+		MaxDataBytes:                      fqc.MaxDataBytes,
+		MaxPerMsgGasLimit:                 fqc.MaxPerMsgGasLimit,
+		DestGasOverhead:                   fqc.DestGasOverhead,
+		DestGasPerPayloadByteBase:         fqc.DestGasPerPayloadByteBase,
+		DestGasPerPayloadByteHigh:         fqc.DestGasPerPayloadByteHigh,
+		DestGasPerPayloadByteThreshold:    fqc.DestGasPerPayloadByteThreshold,
+		DestDataAvailabilityOverheadGas:   fqc.DestDataAvailabilityOverheadGas,
+		DestGasPerDataAvailabilityByte:    fqc.DestGasPerDataAvailabilityByte,
+		DestDataAvailabilityMultiplierBps: fqc.DestDataAvailabilityMultiplierBps,
+		ChainFamilySelector:               [4]byte(binary.BigEndian.AppendUint32(nil, fqc.ChainFamilySelector)),
+		EnforceOutOfOrder:                 fqc.EnforceOutOfOrder,
+		DefaultTokenFeeUSDCents:           fqc.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead:       fqc.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:                 fqc.DefaultTxGasLimit,
+		GasMultiplierWeiPerEth:            fqc.GasMultiplierWeiPerEth,
+		GasPriceStalenessThreshold:        fqc.GasPriceStalenessThreshold,
+		NetworkFeeUSDCents:                fqc.NetworkFeeUSDCents,
+	}
+}
+
+func TranslateTokenPrices(prices map[string]*big.Int) []fee_quoter.InternalTokenPriceUpdate {
+	var result []fee_quoter.InternalTokenPriceUpdate
+	for k, v := range prices {
+		result = append(result, fee_quoter.InternalTokenPriceUpdate{
+			SourceToken: common.HexToAddress(k),
+			UsdPerToken: v,
+		})
+	}
+	return result
 }

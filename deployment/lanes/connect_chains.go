@@ -138,11 +138,14 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", destFamily)
 			}
-			srcOnRamp, err := srcAdapter.GetOnRampAddress(e, src.Selector)
+			err = populateAddresses(e, &src, srcAdapter)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching onramp address for src chain %d: %w", src.Selector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for src chain %d: %w", src.Selector, err)
 			}
-			src.OnRamp = srcOnRamp
+			err = populateAddresses(e, &dest, destAdapter)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", dest.Selector, err)
+			}
 			type lanePair struct {
 				chainA  ChainDefinition
 				chainB  ChainDefinition
@@ -185,4 +188,25 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
+}
+
+func populateAddresses(e cldf.Environment, chainDef *ChainDefinition, adapter LaneAdapter) error {
+	var err error
+	chainDef.OnRamp, err = adapter.GetOnRampAddress(e, chainDef.Selector)
+	if err != nil {
+		return fmt.Errorf("error fetching onramp address for chain %d: %w", chainDef.Selector, err)
+	}
+	chainDef.OffRamp, err = adapter.GetOffRampAddress(e, chainDef.Selector)
+	if err != nil {
+		return fmt.Errorf("error fetching offramp address for chain %d: %w", chainDef.Selector, err)
+	}
+	chainDef.FeeQuoter, err = adapter.GetFQAddress(e, chainDef.Selector)
+	if err != nil {
+		return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
+	}
+	chainDef.Router, err = adapter.GetRouterAddress(e, chainDef.Selector)
+	if err != nil {
+		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
+	}
+	return nil
 }

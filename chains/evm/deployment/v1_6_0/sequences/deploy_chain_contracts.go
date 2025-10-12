@@ -12,6 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/nonce_manager"
+	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -24,18 +27,13 @@ import (
 )
 
 type RMNRemoteParams struct {
-	Version   *semver.Version
 	LegacyRMN common.Address
-}
-
-type ExecutorOnRampParams struct {
-	Version       *semver.Version
-	MaxCCVsPerMsg uint8
 }
 
 type ContractParams struct {
 	RMNRemote RMNRemoteParams
 	FeeQuoter fqops.FeeQuoterParams
+	OffRamp   offrampops.OffRampParams
 }
 
 type DeployChainContractsInput struct {
@@ -76,7 +74,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy RMNRemote
 		rmnRemoteRef, err := maybeDeployContract(b, rmn_remote.Deploy, chain, contract.DeployInput[rmn_remote.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(rmn_remote.ContractType, *input.ContractParams.RMNRemote.Version),
+			TypeAndVersion: deployment.NewTypeAndVersion(rmn_remote.ContractType, *rmn_remote.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
@@ -119,7 +117,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy Router
 		routerRef, err := maybeDeployContract(b, router.Deploy, chain, contract.DeployInput[router.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *semver.MustParse("1.2.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
 			ChainSelector:  chain.Selector,
 			Args: router.ConstructorArgs{
 				WrappedNative: common.HexToAddress(wethRef.Address),
@@ -133,7 +131,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy TokenAdminRegistry
 		tokenAdminRegistryRef, err := maybeDeployContract(b, token_admin_registry.Deploy, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *semver.MustParse("1.5.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -141,9 +139,19 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, tokenAdminRegistryRef)
 
+		// Deploy NonceManager
+		nonceManagerRef, err := maybeDeployContract(b, nonce_manager.Deploy, chain, contract.DeployInput[nonce_manager.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(nonce_manager.ContractType, *nonce_manager.Version),
+			ChainSelector:  chain.Selector,
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		addresses = append(addresses, nonceManagerRef)
+
 		// Deploy FeeQuoter
 		feeQuoterRef, err := maybeDeployContract(b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(fqops.ContractType, *semver.MustParse("1.6.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(fqops.ContractType, *fqops.Version),
 			ChainSelector:  chain.Selector,
 			Args: fqops.ConstructorArgs{
 				StaticConfig: fee_quoter.FeeQuoterStaticConfig{
@@ -178,6 +186,52 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, feeQuoterRef)
+
+		// Deploy OffRamp
+		offRampRef, err := maybeDeployContract(b, offrampops.Deploy, chain, contract.DeployInput[offrampops.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(offrampops.ContractType, *offrampops.Version),
+			ChainSelector:  chain.Selector,
+			Args: offrampops.ConstructorArgs{
+				StaticConfig: offrampops.StaticConfig{
+					ChainSelector:        chain.Selector,
+					GasForCallExactCheck: input.ContractParams.OffRamp.GasForCallExactCheck,
+					RmnRemote:            common.HexToAddress(rmnProxyRef.Address),
+					NonceManager:         common.HexToAddress(nonceManagerRef.Address),
+					TokenAdminRegistry:   common.HexToAddress(tokenAdminRegistryRef.Address),
+				},
+				DynamicConfig: offrampops.DynamicConfig{
+					FeeQuoter:                               common.HexToAddress(feeQuoterRef.Address),
+					PermissionLessExecutionThresholdSeconds: input.ContractParams.OffRamp.PermissionLessExecutionThresholdSeconds,
+					MessageInterceptor:                      input.ContractParams.OffRamp.MessageInterceptor,
+				},
+			},
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OffRamp: %w", err)
+		}
+		addresses = append(addresses, offRampRef)
+
+		// Deploy OnRamp
+		onRampRef, err := maybeDeployContract(b, onrampops.Deploy, chain, contract.DeployInput[onrampops.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(onrampops.ContractType, *onrampops.Version),
+			ChainSelector:  chain.Selector,
+			Args: onrampops.ConstructorArgs{
+				StaticConfig: onrampops.StaticConfig{
+					ChainSelector:      chain.Selector,
+					RmnRemote:          common.HexToAddress(rmnProxyRef.Address),
+					TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
+					NonceManager:       common.HexToAddress(nonceManagerRef.Address),
+				},
+				DynamicConfig: onrampops.DynamicConfig{
+					FeeQuoter:     common.HexToAddress(feeQuoterRef.Address),
+					FeeAggregator: chain.DeployerKey.From,
+				},
+			},
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OnRamp: %w", err)
+		}
+		addresses = append(addresses, onRampRef)
 
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {

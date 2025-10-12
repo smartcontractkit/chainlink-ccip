@@ -16,6 +16,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "FeeQuoter"
+var Version *semver.Version = semver.MustParse("1.6.0")
 
 type ConstructorArgs struct {
 	StaticConfig                   fee_quoter.FeeQuoterStaticConfig
@@ -23,17 +24,17 @@ type ConstructorArgs struct {
 	FeeTokens                      []common.Address
 	TokenPriceFeedUpdates          []fee_quoter.FeeQuoterTokenPriceFeedUpdate
 	TokenTransferFeeConfigArgs     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
-	DestChainConfigArgs            []fee_quoter.FeeQuoterDestChainConfigArgs
 	MorePremiumMultiplierWeiPerEth []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs
+	DestChainConfigArgs            []fee_quoter.FeeQuoterDestChainConfigArgs
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "fee-quoter:deploy",
-	Version:          semver.MustParse("1.6.0"),
+	Version:          Version,
 	Description:      "Deploys the FeeQuoter contract",
 	ContractMetadata: fee_quoter.FeeQuoterMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.6.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(fee_quoter.FeeQuoterBin),
 		},
 	},
@@ -42,7 +43,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var FeeQuoterApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]fee_quoter.FeeQuoterDestChainConfigArgs, *fee_quoter.FeeQuoter]{
 	Name:            "fee-quoter:apply-dest-chain-config-updates",
-	Version:         semver.MustParse("1.6.0"),
+	Version:         Version,
 	Description:     "Applies updates to destination chain configs on the FeeQuoter 1.6.0 contract",
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter.FeeQuoterABI,
@@ -56,7 +57,7 @@ var FeeQuoterApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParam
 
 var FeeQuoterUpdatePrices = contract.NewWrite(contract.WriteParams[fee_quoter.InternalPriceUpdates, *fee_quoter.FeeQuoter]{
 	Name:            "fee-quoter:update-prices",
-	Version:         semver.MustParse("1.6.0"),
+	Version:         Version,
 	Description:     "Updates prices on the FeeQuoter 1.6.0 contract",
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter.FeeQuoterABI,

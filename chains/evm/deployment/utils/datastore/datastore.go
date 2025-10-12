@@ -8,6 +8,17 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
+// ToByteArray formats a datastore.AddressRef into a byte slice.
+func ToByteArray(ref datastore.AddressRef) (bytes []byte, err error) {
+	if ref.Address == "" {
+		return nil, fmt.Errorf("address is empty in ref: %s", datastore_utils.SprintRef(ref))
+	}
+	if !common.IsHexAddress(ref.Address) {
+		return nil, fmt.Errorf("address is not a valid hex address in ref: %s", datastore_utils.SprintRef(ref))
+	}
+	return common.Hex2Bytes(ref.Address), nil
+}
+
 // ToEVMAddress formats a datastore.AddressRef into an ethereum common.Address.
 func ToEVMAddress(ref datastore.AddressRef) (commonAddress common.Address, err error) {
 	if ref.Address == "" {
