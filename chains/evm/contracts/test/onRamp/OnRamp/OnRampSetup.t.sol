@@ -4,27 +4,27 @@ pragma solidity ^0.8.24;
 import {Client} from "../../../libraries/Client.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
-import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
+import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
 import {MockExecutor} from "../../mocks/MockExecutor.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
-contract CCVProxySetup is FeeQuoterFeeSetup {
+contract OnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
 
-  CCVProxy internal s_onRamp;
+  OnRamp internal s_onRamp;
   OffRamp internal s_offRampOnRemoteChain = OffRamp(makeAddr("OffRampRemote"));
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_onRamp = new CCVProxy(
-      CCVProxy.StaticConfig({
+    s_onRamp = new OnRamp(
+      OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      CCVProxy.DynamicConfig({
+      OnRamp.DynamicConfig({
         feeQuoter: address(s_feeQuoter),
         reentrancyGuardEntered: false,
         feeAggregator: FEE_AGGREGATOR
@@ -34,8 +34,8 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = address(new MockVerifier(""));
 
-    CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
-    destChainConfigArgs[0] = CCVProxy.DestChainConfigArgs({
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       laneMandatedCCVs: new address[](0),
@@ -59,13 +59,13 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
     returns (
       bytes32 messageId,
       bytes memory encodedMessage,
-      CCVProxy.Receipt[] memory verifierReceipts,
-      CCVProxy.Receipt memory executorReceipt,
+      OnRamp.Receipt[] memory verifierReceipts,
+      OnRamp.Receipt memory executorReceipt,
       bytes[] memory receiptBlobs
     )
   {
     // TODO handle token transfers
-    CCVProxy.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    OnRamp.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     MessageV1Codec.MessageV1 memory messageV1 = MessageV1Codec.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: destChainSelector,
@@ -80,9 +80,9 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
       data: message.data
     });
 
-    verifierReceipts = new CCVProxy.Receipt[](destChainConfig.defaultCCVs.length);
+    verifierReceipts = new OnRamp.Receipt[](destChainConfig.defaultCCVs.length);
     for (uint256 i = 0; i < verifierReceipts.length; ++i) {
-      verifierReceipts[i] = CCVProxy.Receipt({
+      verifierReceipts[i] = OnRamp.Receipt({
         issuer: destChainConfig.defaultCCVs[i],
         feeTokenAmount: 0,
         destGasLimit: 0,
@@ -91,9 +91,9 @@ contract CCVProxySetup is FeeQuoterFeeSetup {
         extraArgs: message.extraArgs
       });
     }
-    executorReceipt = CCVProxy.Receipt({
+    executorReceipt = OnRamp.Receipt({
       issuer: destChainConfig.defaultExecutor,
-      feeTokenAmount: 0, // Matches current CCVProxy event behavior
+      feeTokenAmount: 0, // Matches current OnRamp event behavior
       destGasLimit: 0,
       destBytesOverhead: 0,
       extraArgs: message.extraArgs

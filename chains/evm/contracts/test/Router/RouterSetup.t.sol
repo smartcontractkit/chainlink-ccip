@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IEVM2AnyOnRampClient} from "../../interfaces/IEVM2AnyOnRampClient.sol";
 
 import {Router} from "../../Router.sol";
-import {CCVProxy} from "../../onRamp/CCVProxy.sol";
+import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {MockExecutor} from "../mocks/MockExecutor.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
@@ -14,19 +14,19 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 contract RouterSetup is FeeQuoterSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
 
-  CCVProxy internal s_onRamp;
+  OnRamp internal s_onRamp;
   address internal s_offRamp;
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_onRamp = new CCVProxy(
-      CCVProxy.StaticConfig({
+    s_onRamp = new OnRamp(
+      OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      CCVProxy.DynamicConfig({
+      OnRamp.DynamicConfig({
         feeQuoter: address(s_feeQuoter),
         reentrancyGuardEntered: false,
         feeAggregator: FEE_AGGREGATOR
@@ -36,8 +36,8 @@ contract RouterSetup is FeeQuoterSetup {
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = address(new MockVerifier(""));
 
-    CCVProxy.DestChainConfigArgs[] memory destChainConfigs = new CCVProxy.DestChainConfigArgs[](1);
-    destChainConfigs[0] = CCVProxy.DestChainConfigArgs({
+    OnRamp.DestChainConfigArgs[] memory destChainConfigs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigs[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       laneMandatedCCVs: new address[](0),
