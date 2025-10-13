@@ -86,7 +86,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
-  event DynamicConfigSet(address newRouter, uint96 thresholdAmountForAdditionalCCVs);
+  event DynamicConfigSet(address router, uint96 thresholdAmountForAdditionalCCVs);
   event RateLimitAdminSet(address rateLimitAdmin);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
@@ -106,7 +106,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event CustomFinalityTransferInboundRateLimitConsumed(
     uint64 indexed remoteChainSelector, address token, uint256 amount
   );
-  event ThresholdAmountForAdditionalCCVsSet(uint256 newAmount);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector.
@@ -250,13 +249,14 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return (address(s_router), s_thresholdAmountForAdditionalCCVs);
   }
 
-  /// @notice Sets the pool's Router
-  /// @param newRouter The new Router
-  function setDynamicConfig(address newRouter, uint96 thresholdAmountForAdditionalCCVs) public onlyOwner {
-    if (newRouter == address(0)) revert ZeroAddressInvalid();
-    s_router = IRouter(newRouter);
+  /// @notice Sets the dynamic configuration for the pool.
+  /// @param router The address of the router contract.
+  /// @param thresholdAmountForAdditionalCCVs The threshold amount above which additional CCVs are required.
+  function setDynamicConfig(address router, uint96 thresholdAmountForAdditionalCCVs) public onlyOwner {
+    if (router == address(0)) revert ZeroAddressInvalid();
+    s_router = IRouter(router);
     s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;
-    emit DynamicConfigSet(newRouter, thresholdAmountForAdditionalCCVs);
+    emit DynamicConfigSet(router, thresholdAmountForAdditionalCCVs);
   }
 
   /// @notice Signals which version of the pool interface is supported.
