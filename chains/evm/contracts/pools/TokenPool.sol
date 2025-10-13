@@ -290,12 +290,25 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV1
-  /// @dev calls IPoolV2.lockOrBurn with finality 0 and empty tokenArgs.
+  /// @dev The _validateLockOrBurn check is an essential security check.
+  /// @dev _applyFee is not called in this legacy method, so the full amount is locked or burned.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
-    (lockOrBurnOutV1,) = lockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
-    return lockOrBurnOutV1;
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
+    _lockOrBurn(lockOrBurnIn.amount);
+
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: lockOrBurnIn.amount
+    });
+
+    return Pool.LockOrBurnOutV1({
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: _encodeLocalDecimals()
+    });
   }
 
   /// @notice Contains the specific lock or burn token logic for a pool.
