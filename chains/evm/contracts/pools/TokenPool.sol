@@ -984,17 +984,20 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     address[] memory additionalCCVs = config.additionalInboundCCVs;
     // If amount is above threshold, combine base and additional CCVs.
     uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
-    if (thresholdAmount != 0 && amount >= thresholdAmount && additionalCCVs.length > 0) {
-      requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
-      // Copy base CCVs.
-      for (uint256 i = 0; i < baseCCVs.length; ++i) {
-        requiredCCVs[i] = baseCCVs[i];
+    if (thresholdAmount != 0 && amount >= thresholdAmount) {
+      address[] memory additionalCCVs = config.additionalInboundCCVs;
+      if (additionalCCVs.length > 0) {
+        requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
+        // Copy base CCVs.
+        for (uint256 i = 0; i < baseCCVs.length; ++i) {
+          requiredCCVs[i] = baseCCVs[i];
+        }
+        // Copy additional CCVs.
+        for (uint256 i = 0; i < additionalCCVs.length; ++i) {
+          requiredCCVs[baseCCVs.length + i] = additionalCCVs[i];
+        }
+        return requiredCCVs;
       }
-      // Copy additional CCVs.
-      for (uint256 i = 0; i < additionalCCVs.length; ++i) {
-        requiredCCVs[baseCCVs.length + i] = additionalCCVs[i];
-      }
-      return requiredCCVs;
     }
     return baseCCVs;
   }
@@ -1015,20 +1018,22 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   ) external view virtual returns (address[] memory requiredCCVs) {
     CCVConfig storage config = s_verifierConfig[destChainSelector];
     address[] memory baseCCVs = config.outboundCCVs;
-    address[] memory additionalCCVs = config.additionalOutboundCCVs;
     // If amount is above threshold, combine base and additional CCVs.
     uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
-    if (thresholdAmount != 0 && amount >= thresholdAmount && additionalCCVs.length > 0) {
-      requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
-      // Copy base CCVs.
-      for (uint256 i = 0; i < baseCCVs.length; ++i) {
-        requiredCCVs[i] = baseCCVs[i];
+    if (thresholdAmount != 0 && amount >= thresholdAmount) {
+      address[] memory additionalCCVs = config.additionalOutboundCCVs;
+      if (additionalCCVs.length > 0) {
+        requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
+        // Copy base CCVs.
+        for (uint256 i = 0; i < baseCCVs.length; ++i) {
+          requiredCCVs[i] = baseCCVs[i];
+        }
+        // Copy additional CCVs.
+        for (uint256 i = 0; i < additionalCCVs.length; ++i) {
+          requiredCCVs[baseCCVs.length + i] = additionalCCVs[i];
+        }
+        return requiredCCVs;
       }
-      // Copy additional CCVs.
-      for (uint256 i = 0; i < additionalCCVs.length; ++i) {
-        requiredCCVs[baseCCVs.length + i] = additionalCCVs[i];
-      }
-      return requiredCCVs;
     }
     return baseCCVs;
   }
