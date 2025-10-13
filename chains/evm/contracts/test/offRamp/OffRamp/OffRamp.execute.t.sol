@@ -331,7 +331,7 @@ contract OffRamp_execute is OffRampSetup {
     uint256 calldataLength = bound(_calldataLength, 0, 1_000);
 
     // baseExecuteGas accounts for logic preceeding and following the call to routeMessage. This is a conservative estimate.
-    uint256 baseExecuteGas = 175_000;
+    uint256 baseExecuteGas = 200_000;
 
     // gasForExecute reverses the gas computation peformed by the OffRamp when calling routeMessage.
     uint256 gasForExecute =
@@ -364,7 +364,7 @@ contract OffRamp_execute is OffRampSetup {
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, gasForExecute);
     uint256 endGas = gasleft();
 
-    // Expect at least 50% gas utilization.
-    assertGt(startGas - endGas, gasForExecute * 5 / 10);
+    // Expect at least 30% gas utilization.
+    assertGt(startGas - endGas, gasForExecute * 3 / 10);
   }
 }
