@@ -1,6 +1,8 @@
 package token_pool
 
 import (
+	"math/big"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -27,6 +29,11 @@ type ConstructorArgs struct {
 type ApplyAllowListUpdatesArgs struct {
 	Adds    []common.Address
 	Removes []common.Address
+}
+
+type DynamicConfigArgs struct {
+	Router                           common.Address
+	ThresholdAmountForAdditionalCCVs *big.Int
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
@@ -56,17 +63,17 @@ var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[common.Address, *
 	},
 })
 
-var SetRouter = contract.NewWrite(contract.WriteParams[common.Address, *token_pool.TokenPool]{
-	Name:            "token-pool:set-router",
+var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfigArgs, *token_pool.TokenPool]{
+	Name:            "token-pool:set-dynamic-config",
 	Version:         semver.MustParse("1.7.0"),
-	Description:     "Sets the router address for a TokenPool",
+	Description:     "Sets the dynamic configuration (router, threshold) for a TokenPool",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
-	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, common.Address],
-	Validate:        func(common.Address) error { return nil },
-	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
-		return tokenPool.SetRouter(opts, args)
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, DynamicConfigArgs],
+	Validate:        func(DynamicConfigArgs) error { return nil },
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args DynamicConfigArgs) (*types.Transaction, error) {
+		return tokenPool.SetDynamicConfig(opts, args.Router, args.ThresholdAmountForAdditionalCCVs)
 	},
 })
 
@@ -106,14 +113,14 @@ var GetAllowList = contract.NewRead(contract.ReadParams[any, []common.Address, *
 	},
 })
 
-var GetRouter = contract.NewRead(contract.ReadParams[any, common.Address, *token_pool.TokenPool]{
-	Name:         "token-pool:get-router",
+var GetDynamicConfig = contract.NewRead(contract.ReadParams[any, token_pool.GetDynamicConfig, *token_pool.TokenPool]{
+	Name:         "token-pool:get-dynamic-config",
 	Version:      semver.MustParse("1.7.0"),
-	Description:  "Gets the router address on a TokenPool",
+	Description:  "Gets the router and threshold dynamic config on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
-		return tokenPool.GetRouter(opts)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (token_pool.GetDynamicConfig, error) {
+		return tokenPool.GetDynamicConfig(opts)
 	},
 })
 
