@@ -312,32 +312,32 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
+    bytes memory data = message.data;
     (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
       Client.Any2EVMMessage({
         messageId: messageId,
         sourceChainSelector: message.sourceChainSelector,
         sender: message.sender,
-        data: message.data,
+        data: data,
         destTokenAmounts: destTokenAmounts
       }),
       i_gasForCallExactCheck,
-      _gasLimitForReceiver(message.data.length),
+      // Here, we designate the maximum gas possible for the receiver contract.
+      // Doing so requires some estimation. We estimate gas spend in two phases: offRamp-->router and router-->receiver.
+      // For offRamp-->router, we subtract estimated calldata cost (16 gas per non-zero byte) and i_gasForCallExactCheck,
+      // which is a configurable way to account for static costs associated with the call. To account for EIP-150, we multiply
+      // the result by 63/64, which yields the estimated gas left at the start of routeMessage. Next, we subtract i_gasForCallExactCheck twice,
+      // once to account for routeMessage opcodes and once to account for static overhead associated with the router-->receiver call.
+      // Lastly, since we are making another call, we subtract the estimated calldata cost and multiply by 63/64 to account for EIP-150.
+      (
+        ((gasleft() - 16 * data.length - i_gasForCallExactCheck) * 63 / 64) - 2 * i_gasForCallExactCheck
+          - 16 * data.length
+      ) * 63 / 64,
       receiver
     );
 
     // If CCIP receiver execution is not successful, revert the call including token transfers.
     if (!success) revert ReceiverError(returnData);
-  }
-
-  function _gasLimitForReceiver(
-    uint256 calldataLength
-  ) internal view returns (uint256) {
-    // Here, we designate the maximum gas possible for the receiver contract.
-    // Prior to accounting for EIP-150, we account for the worst-case calldata cost (16 gas per non-zero byte)
-    // and an additional buffer for opcodes surrounding / associated with the call. We use i_gasForCallExactCheck
-    // as the buffer value for configurability. We account for these variables twice because there are two external calls:
-    // offRamp-->router and router-->receiver. Likewise, we doubly account for EIP-150 in multiplying by 63/64 twice.
-    return (gasleft() - 2 * i_gasForCallExactCheck - 2 * (16 * calldataLength)) * 3969 / 4096;
   }
 
   // ================================================================

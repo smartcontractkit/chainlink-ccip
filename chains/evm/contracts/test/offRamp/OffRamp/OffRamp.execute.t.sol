@@ -326,16 +326,20 @@ contract OffRamp_execute is OffRampSetup {
     );
   }
 
-  function testFuzz_execute_WithReceiver(uint32 _gasUsedByCCIPReceive, uint16 _calldataLength) public {
+  /// forge-config: default.fuzz.runs = 1000
+  function testFuzz_execute_WithReceiver(
+    uint32 _gasUsedByCCIPReceive,
+    uint32 _baseExecuteGas, // baseExecuteGas accounts for logic preceeding and following the call to routeMessage.
+    uint16 _calldataLength
+  ) public {
     uint256 gasUsedByCCIPReceive = bound(_gasUsedByCCIPReceive, 1_000, PLENTY_OF_GAS);
+    uint256 baseExecuteGas = bound(_baseExecuteGas, 130_000, PLENTY_OF_GAS);
     uint256 calldataLength = bound(_calldataLength, 0, 1_000);
 
-    // baseExecuteGas accounts for logic preceeding and following the call to routeMessage.
-    uint256 baseExecuteGas = 150_000;
-
     // gasForExecute reverses the gas computation peformed by the OffRamp when calling routeMessage.
-    uint256 gasForExecute =
-      baseExecuteGas + (gasUsedByCCIPReceive + 2 * GAS_FOR_CALL_EXACT_CHECK + 2 * (16 * calldataLength)) * 4096 / 3969;
+    uint256 gasForExecute = baseExecuteGas
+      + ((gasUsedByCCIPReceive * 64 / 63) + 16 * calldataLength + 2 * GAS_FOR_CALL_EXACT_CHECK) * 64 / 63
+      + GAS_FOR_CALL_EXACT_CHECK + 2 * (16 * calldataLength);
 
     // Create message with exact gas receiver and calldata.
     MessageV1Codec.MessageV1 memory message = _getMessage();
