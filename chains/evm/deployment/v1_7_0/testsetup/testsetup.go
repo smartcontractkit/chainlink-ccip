@@ -1,21 +1,13 @@
 package testsetup
 
 import (
-	"context"
-	"fmt"
 	"math/big"
-	"testing"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -80,33 +72,10 @@ func CreateBasicContractParams() sequences.ContractParams {
 	}
 }
 
-// CreateEnvironment creates a test deployment environment with the given EVM chains
-func CreateEnvironment(t *testing.T, evmChains map[uint64]provider.SimChainProviderConfig) (deployment.Environment, error) {
-	lggr, err := logger.New()
-	if err != nil {
-		return deployment.Environment{}, fmt.Errorf("failed to create logger: %w", err)
-	}
-
-	bundle := operations.NewBundle(
-		func() context.Context { return t.Context() },
-		lggr,
-		operations.NewMemoryReporter(),
-	)
-
-	blockChains := make([]chain.BlockChain, 0, len(evmChains))
-	for chainSel, cfg := range evmChains {
-		blockChain, err := provider.NewSimChainProvider(t, chainSel, cfg).Initialize(t.Context())
-		if err != nil {
-			return deployment.Environment{}, fmt.Errorf("failed to create chain provider: %w", err)
-		}
-		blockChains = append(blockChains, blockChain)
-	}
-
-	return deployment.Environment{
-		GetContext:       func() context.Context { return t.Context() },
-		Logger:           lggr,
-		OperationsBundle: bundle,
-		BlockChains:      chain.NewBlockChainsFromSlice(blockChains),
-		DataStore:        datastore.NewMemoryDataStore().Seal(),
-	}, nil
+// BundleWithFreshReporter returns a new bundle with a fresh reporter.
+// It takes the context function and logger from the inputted bundle.
+// You may want to use this if performing state checks using operations,
+// as you may inadvertently pull a report when you really want to re-check on-chain state.
+func BundleWithFreshReporter(bundle operations.Bundle) operations.Bundle {
+	return operations.NewBundle(bundle.GetContext, bundle.Logger, operations.NewMemoryReporter())
 }

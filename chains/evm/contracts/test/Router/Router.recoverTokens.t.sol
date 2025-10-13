@@ -3,12 +3,12 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-import {Router} from "../../../Router.sol";
+import {Router} from "../../Router.sol";
 
-import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
-import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
+import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
+import {RouterSetup} from "./RouterSetup.t.sol";
 
-contract Router_recoverTokens is OnRampSetup {
+contract Router_recoverTokens is RouterSetup {
   function test_RecoverTokens() public {
     // Assert we can recover sourceToken
     IERC20 token = IERC20(s_sourceTokens[0]);

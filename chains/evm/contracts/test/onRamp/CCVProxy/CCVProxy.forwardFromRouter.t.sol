@@ -39,14 +39,14 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
       receiptBlobs: receiptBlobs
     });
 
-    s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
   }
 
   function test_forwardFromRouter_SequenceNumberPersistsAndIncrements() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     // use the stored seq as a running expected value
-    CCVProxy.DestChainConfig memory destConfig = s_ccvProxy.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    CCVProxy.DestChainConfig memory destConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     destConfig.sequenceNumber++;
     // 1) Expect seq to increment for the first message.
     (
@@ -72,7 +72,7 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
       executorReceipt: executorReceipt,
       receiptBlobs: receiptBlobs
     });
-    bytes32 messageId1 = s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+    bytes32 messageId1 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
     // 2) Expect seq to increment again for the next message.
     destConfig.sequenceNumber++;
@@ -93,16 +93,16 @@ contract CCVProxy_forwardFromRouter is CCVProxySetup {
       executorReceipt: executorReceipt,
       receiptBlobs: receiptBlobs
     });
-    bytes32 messageId2 = s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+    bytes32 messageId2 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
     // Verify sequence numbers and message id are different
     assertTrue(messageId1 != messageId2);
-    CCVProxy.DestChainConfig memory finalConfig = s_ccvProxy.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    CCVProxy.DestChainConfig memory finalConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(finalConfig.sequenceNumber, destConfig.sequenceNumber);
   }
 
   function test_forwardFromRouter_RevertWhen_RouterMustSetOriginalSender() public {
     vm.expectRevert(CCVProxy.RouterMustSetOriginalSender.selector);
-    s_ccvProxy.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 1e17, address(0));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 1e17, address(0));
   }
 }
