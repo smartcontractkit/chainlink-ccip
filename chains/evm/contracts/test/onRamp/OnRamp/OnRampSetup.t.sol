@@ -80,6 +80,11 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       data: message.data
     });
 
+    // If legacy extraArgs are supplied, they are passed into the CCVs and Executor.
+    // If V3 extraArgs are supplied, the extraArgs as the user supplied them are used.
+    // TODO actually handle V3.
+    bool isLegacyExtraArgs = _isLegacyExtraArgs(message.extraArgs);
+
     verifierReceipts = new OnRamp.Receipt[](destChainConfig.defaultCCVs.length);
     for (uint256 i = 0; i < verifierReceipts.length; ++i) {
       verifierReceipts[i] = OnRamp.Receipt({
@@ -88,7 +93,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         destGasLimit: 0,
         destBytesOverhead: 0,
         // TODO when v3 extra args are passed in
-        extraArgs: message.extraArgs
+        extraArgs: isLegacyExtraArgs ? message.extraArgs : bytes("")
       });
     }
     executorReceipt = OnRamp.Receipt({
@@ -96,7 +101,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       feeTokenAmount: 0, // Matches current OnRamp event behavior
       destGasLimit: 0,
       destBytesOverhead: 0,
-      extraArgs: message.extraArgs
+      // TODO when v3 extra args are passed in
+      extraArgs: isLegacyExtraArgs ? message.extraArgs : bytes("")
     });
     receiptBlobs = new bytes[](1);
     receiptBlobs[0] = "";
@@ -124,6 +130,16 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       executorArgs: "",
       tokenArgs: ""
     });
+  }
+
+  function _isLegacyExtraArgs(
+    bytes memory extraArgs
+  ) internal pure returns (bool) {
+    bytes4 selector;
+    assembly {
+      selector := mload(add(extraArgs, 32))
+    }
+    return selector != Client.GENERIC_EXTRA_ARGS_V3_TAG;
   }
 
   // Helper function to assert that two CCV arrays are equal

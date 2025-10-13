@@ -46,6 +46,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
+  error InvalidOnRamp(bytes expected, bytes got);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -177,8 +178,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
     }
-    if (!s_sourceChainConfigs[message.sourceChainSelector].isEnabled) {
+    SourceChainConfig storage sourceConfig = s_sourceChainConfigs[message.sourceChainSelector];
+    if (!sourceConfig.isEnabled) {
       revert SourceChainNotEnabled(message.sourceChainSelector);
+    }
+    if (keccak256(message.onRampAddress) != keccak256(sourceConfig.onRamp)) {
+      revert InvalidOnRamp(sourceConfig.onRamp, message.onRampAddress);
     }
     if (message.destChainSelector != i_chainSelector) {
       revert InvalidMessageDestChainSelector(message.destChainSelector);
