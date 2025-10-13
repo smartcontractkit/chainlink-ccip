@@ -10,6 +10,8 @@ import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
 import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+
 contract e2e is OnRampSetup {
   OffRampHelper internal s_offRamp;
 
@@ -20,11 +22,7 @@ contract e2e is OnRampSetup {
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
-
-    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](2);
-    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: makeAddr("offRamp0")});
-    offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: makeAddr("offRamp1")});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     // OffRamp side
     s_offRamp = new OffRampHelper(
@@ -51,15 +49,21 @@ contract e2e is OnRampSetup {
       laneMandatedCCVs: new address[](0)
     });
     s_offRamp.applySourceChainConfigUpdates(updates);
+
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
+    s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
   }
 
   function test_e2e() public {
     uint64 expectedSeqNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber + 1;
 
+    IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
       data: "e2e test data",
-      tokenAmounts: new Client.EVMTokenAmount[](0),
+      tokenAmounts: new Client.EVMTokenAmount[](1),
       feeToken: s_sourceFeeToken,
       extraArgs: Client._argsToBytes(
         Client.EVMExtraArgsV3({
@@ -73,6 +77,7 @@ contract e2e is OnRampSetup {
         })
       )
     });
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 1e18});
 
     (
       bytes32 messageId,
