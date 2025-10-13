@@ -10,7 +10,7 @@ import {BaseTest} from "../../BaseTest.t.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 
 contract OffRampSetup is BaseTest {
-  OffRampHelper internal s_agg;
+  OffRampHelper internal s_offRamp;
   address internal s_defaultCCV;
   address internal s_tokenAdminRegistry;
 
@@ -20,7 +20,7 @@ contract OffRampSetup is BaseTest {
     s_defaultCCV = makeAddr("defaultCCV");
     s_tokenAdminRegistry = makeAddr("tokenAdminRegistry");
 
-    s_agg = new OffRampHelper(
+    s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         localChainSelector: DEST_CHAIN_SELECTOR,
         gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
@@ -50,7 +50,7 @@ contract OffRampSetup is BaseTest {
       defaultCCV: defaultCCVs,
       laneMandatedCCVs: laneMandatedCCVs
     });
-    s_agg.applySourceChainConfigUpdates(updates);
+    s_offRamp.applySourceChainConfigUpdates(updates);
   }
 
   /// @notice Sets up a receiver address to mock getCCVs responses and interface support.

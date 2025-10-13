@@ -26,11 +26,11 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     bytes memory defaultCcvData = abi.encode("mock ccv data");
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageHash, defaultCcvData)),
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_offRamp), message, messageHash, defaultCcvData)),
       abi.encode(true)
     );
 
-    vm.startPrank(address(s_agg));
+    vm.startPrank(address(s_offRamp));
   }
 
   function _getMessage() internal returns (MessageV1Codec.MessageV1 memory message) {
@@ -55,7 +55,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.MessageV1 memory message;
 
     vm.expectRevert(OffRamp.CanOnlySelfCall.selector);
-    s_agg.executeSingleMessage(message, bytes32(0), new address[](0), new bytes[](0));
+    s_offRamp.executeSingleMessage(message, bytes32(0), new address[](0), new bytes[](0));
   }
 
   function test_executeSingleMessage_RevertWhen_RequiredCCVMissing_ReceiverCCV() public {
@@ -75,7 +75,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, requiredCCV));
 
-    s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
 
   function test_executeSingleMessage_RevertWhen_RequiredCCVMissing_PoolCCV() public {
@@ -118,7 +118,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, poolRequiredCCV));
 
-    s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
 
   function test_executeSingleMessage_RevertWhen_RequiredCCVMissing_LaneMandatedCCV() public {
@@ -139,17 +139,17 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
 
     vm.stopPrank();
     vm.startPrank(OWNER);
-    s_agg.applySourceChainConfigUpdates(sourceChainConfigArgs);
+    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigArgs);
 
     bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
     address[] memory ccvs = _arrayOf(s_defaultCCV); // Report doesn't include the lane mandated CCV.
     bytes[] memory ccvData = new bytes[](1);
 
-    vm.startPrank(address(s_agg));
+    vm.startPrank(address(s_offRamp));
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, laneMandatedCCV));
 
-    s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
 
   function test_executeSingleMessage_RevertWhen_OptionalCCVQuorumNotReached() public {
@@ -174,7 +174,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       abi.encodeWithSelector(OffRamp.OptionalCCVQuorumNotReached.selector, optionalThreshold, ccvs.length)
     );
 
-    s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
 
   function test_executeSingleMessage_RevertWhen_CCVValidationFails() public {
@@ -187,13 +187,13 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     // Mock CCV validateReport to fail/revert.
     vm.mockCallRevert(
       s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_offRamp), message, messageId, ccvData[0])),
       revertReason
     );
 
     vm.expectRevert(revertReason);
 
-    s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
 
   function test_executeSingleMessage_RevertWhen_InvalidNumberOfTokens() public {
@@ -225,7 +225,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidNumberOfTokens.selector, invalidTokenAmounts.length));
 
-    s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
 
   function test_executeSingleMessage_RevertWhen_InvalidEVMAddress_TokenAddress() public {
@@ -248,6 +248,6 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, tokenAmounts[0].destTokenAddress));
 
-    s_agg.executeSingleMessage(message, messageId, ccvs, ccvData);
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, ccvData);
   }
 }

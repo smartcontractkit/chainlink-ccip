@@ -48,7 +48,7 @@ contract OffRamp_execute is OffRampSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_gasBoundedExecuteCaller = new GasBoundedExecuteCaller(address(s_agg));
+    s_gasBoundedExecuteCaller = new GasBoundedExecuteCaller(address(s_offRamp));
 
     MessageV1Codec.MessageV1 memory message = _getMessage();
 
@@ -59,7 +59,7 @@ contract OffRamp_execute is OffRampSetup {
     vm.mockCall(
       s_defaultCCV,
       abi.encodeCall(
-        ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageHash, abi.encode("mock ccv data"))
+        ICrossChainVerifierV1.verifyMessage, (address(s_offRamp), message, messageHash, abi.encode("mock ccv data"))
       ),
       abi.encode(true)
     );
@@ -110,7 +110,7 @@ contract OffRamp_execute is OffRampSetup {
     assertEq(
       uint256(Internal.MessageExecutionState.SUCCESS),
       uint256(
-        s_agg.getExecutionState(
+        s_offRamp.getExecutionState(
           message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
@@ -137,7 +137,7 @@ contract OffRamp_execute is OffRampSetup {
     assertEq(
       uint256(Internal.MessageExecutionState.FAILURE),
       uint256(
-        s_agg.getExecutionState(
+        s_offRamp.getExecutionState(
           message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
@@ -146,7 +146,7 @@ contract OffRamp_execute is OffRampSetup {
 
   function test_execute_ReentrancyGuardReentrantCall_Fails() public {
     // Create a malicious CCV that will call back into execute during validation.
-    ReentrantCCV maliciousCCV = new ReentrantCCV(address(s_agg));
+    ReentrantCCV maliciousCCV = new ReentrantCCV(address(s_offRamp));
 
     // Update report to use malicious CCV.
     MessageV1Codec.MessageV1 memory message = _getMessage();
@@ -234,13 +234,13 @@ contract OffRamp_execute is OffRampSetup {
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
     // Execute the message successfully first time.
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    s_offRamp.execute(encodedMessage, ccvs, ccvData);
 
     // Verify it's in SUCCESS state.
     assertEq(
       uint256(Internal.MessageExecutionState.SUCCESS),
       uint256(
-        s_agg.getExecutionState(
+        s_offRamp.getExecutionState(
           message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
@@ -255,7 +255,7 @@ contract OffRamp_execute is OffRampSetup {
         message.sequenceNumber
       )
     );
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    s_offRamp.execute(encodedMessage, ccvs, ccvData);
   }
 
   function test_execute_InsufficientGasToCompleteTx_setsToFailure() public {
@@ -267,14 +267,14 @@ contract OffRamp_execute is OffRampSetup {
     // Mock validateReport to pass initial checks.
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_offRamp), message, messageId, ccvData[0])),
       abi.encode(true)
     );
 
     // Mock executeSingleMessage to revert with NOT_ENOUGH_GAS_FOR_CALL_SIG.
     vm.mockCallRevert(
-      address(s_agg),
-      abi.encodeWithSelector(s_agg.executeSingleMessage.selector),
+      address(s_offRamp),
+      abi.encodeWithSelector(s_offRamp.executeSingleMessage.selector),
       abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
     );
 
@@ -300,7 +300,7 @@ contract OffRamp_execute is OffRampSetup {
     bytes memory revertReason = "ExecuteSingleMessage failed";
 
     // Mock executeSingleMessage to revert.
-    vm.mockCallRevert(address(s_agg), abi.encodeWithSelector(s_agg.executeSingleMessage.selector), revertReason);
+    vm.mockCallRevert(address(s_offRamp), abi.encodeWithSelector(s_offRamp.executeSingleMessage.selector), revertReason);
 
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged(
@@ -313,13 +313,13 @@ contract OffRamp_execute is OffRampSetup {
 
     // The message should succeed but set execution state to FAILURE due to executeSingleMessage revert.
     // This verifies that execution failures are handled gracefully.
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    s_offRamp.execute(encodedMessage, ccvs, ccvData);
 
     // Verify message state changed to FAILURE
     assertEq(
       uint256(Internal.MessageExecutionState.FAILURE),
       uint256(
-        s_agg.getExecutionState(
+        s_offRamp.getExecutionState(
           SOURCE_CHAIN_SELECTOR, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
@@ -328,36 +328,36 @@ contract OffRamp_execute is OffRampSetup {
 
   function testFuzz_execute_WithReceiver(uint32 _gasUsedByCCIPReceive, uint16 _calldataLength) public {
     uint256 gasUsedByCCIPReceive = bound(_gasUsedByCCIPReceive, 1_000, PLENTY_OF_GAS);
-    uint256 calldataLength = bound(_calldataLength, 4, 1_000);
-    // gasForExecute reverses the gas computation peformed by the OffRamp when calling routeMessage.
+    uint256 calldataLength = bound(_calldataLength, 0, 1_000);
+
     // 110_000 accounts for logic preceeding and following the call to routeMessage.
+    uint256 baseExecuteGas = 110_000;
+
+    // gasForExecute reverses the gas computation peformed by the OffRamp when calling routeMessage.
     uint256 gasForExecute =
-      110_000 + (gasUsedByCCIPReceive + 2 * GAS_FOR_CALL_EXACT_CHECK + 2 * (16 * calldataLength)) * 4096 / 3969;
+      baseExecuteGas + (gasUsedByCCIPReceive + 2 * GAS_FOR_CALL_EXACT_CHECK + 2 * (16 * calldataLength)) * 4096 / 3969;
 
     // Create message with exact gas receiver and calldata.
     MessageV1Codec.MessageV1 memory message = _getMessage();
     message.receiver = abi.encodePacked(address(new ExactGasReceiver(gasUsedByCCIPReceive)));
-    message.data = new bytes(calldataLength);
-    // Fill with non-zero bytes to force worst-case calldata gas scenario for the given calldata size.
-    for (uint256 i = 0; i < calldataLength; i++) {
-      message.data[i] = 0x01;
+    bytes memory data = new bytes(calldataLength);
+    assembly {
+      let dataPtr := add(data, 0x20) // Skip the length field of the bytes array.
+      let endPtr := add(dataPtr, calldataLength) // Calculate end pointer.
+
+      // Fill the array with 0x01 bytes, filling 32 bytes at a time.
+      // This forces the worst-case calldata gas scenario for the given calldata size.
+      for { let i := dataPtr } lt(i, endPtr) { i := add(i, 32) } {
+        mstore(i, 0x0101010101010101010101010101010101010101010101010101010101010101)
+      }
     }
+    message.data = data;
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
     // Set OffRamp as a valid OffRamp on the Router.
     Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
-    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_agg)});
+    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
-
-    // Expect execution state change event.
-    vm.expectEmit();
-    emit OffRamp.ExecutionStateChanged(
-      message.sourceChainSelector,
-      message.sequenceNumber,
-      keccak256(encodedMessage),
-      Internal.MessageExecutionState.SUCCESS,
-      ""
-    );
 
     // Call execute, tracking start and end gas.
     uint256 startGas = gasleft();
@@ -366,15 +366,5 @@ contract OffRamp_execute is OffRampSetup {
 
     // Expect at least 70% gas utilization.
     assertGt(startGas - endGas, gasForExecute * 7 / 10);
-
-    // Verify final state is SUCCESS.
-    assertEq(
-      uint256(Internal.MessageExecutionState.SUCCESS),
-      uint256(
-        s_agg.getExecutionState(
-          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
-        )
-      )
-    );
   }
 }

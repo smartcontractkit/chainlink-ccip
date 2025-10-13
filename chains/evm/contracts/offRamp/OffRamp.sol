@@ -321,17 +321,23 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         destTokenAmounts: destTokenAmounts
       }),
       i_gasForCallExactCheck,
-      // Here, we designate the maximum gas possible for the receiver contract.
-      // Prior to accounting for EIP-150, we account for the worst-case calldata cost (16 gas per non-zero byte)
-      // and an additional buffer for opcodes surrounding / associated with the call. We use i_gasForCallExactCheck
-      // as the buffer value for configurability. We account for these variables twice because there are two external calls:
-      // offRamp-->router and router-->receiver. Likewise, we doubly account for EIP-150 in multiplying by 63/64 twice.
-      (gasleft() - 2 * i_gasForCallExactCheck - 2 * (16 * message.data.length)) * 3969 / 4096,
+      _gasLimitForReceiver(message.data.length),
       receiver
     );
 
     // If CCIP receiver execution is not successful, revert the call including token transfers.
     if (!success) revert ReceiverError(returnData);
+  }
+
+  function _gasLimitForReceiver(
+    uint256 calldataLength
+  ) internal view returns (uint256) {
+    // Here, we designate the maximum gas possible for the receiver contract.
+    // Prior to accounting for EIP-150, we account for the worst-case calldata cost (16 gas per non-zero byte)
+    // and an additional buffer for opcodes surrounding / associated with the call. We use i_gasForCallExactCheck
+    // as the buffer value for configurability. We account for these variables twice because there are two external calls:
+    // offRamp-->router and router-->receiver. Likewise, we doubly account for EIP-150 in multiplying by 63/64 twice.
+    return (gasleft() - 2 * i_gasForCallExactCheck - 2 * (16 * calldataLength)) * 3969 / 4096;
   }
 
   // ================================================================
