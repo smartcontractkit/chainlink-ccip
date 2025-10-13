@@ -330,8 +330,8 @@ contract OffRamp_execute is OffRampSetup {
     uint256 gasUsedByCCIPReceive = bound(_gasUsedByCCIPReceive, 1_000, PLENTY_OF_GAS);
     uint256 calldataLength = bound(_calldataLength, 0, 1_000);
 
-    // baseExecuteGas accounts for logic preceeding and following the call to routeMessage. This is a conservative estimate.
-    uint256 baseExecuteGas = 200_000;
+    // baseExecuteGas accounts for logic preceeding and following the call to routeMessage.
+    uint256 baseExecuteGas = 150_000;
 
     // gasForExecute reverses the gas computation peformed by the OffRamp when calling routeMessage.
     uint256 gasForExecute =
@@ -359,12 +359,26 @@ contract OffRamp_execute is OffRampSetup {
     newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
 
-    // Call execute, tracking start and end gas.
-    uint256 startGas = gasleft();
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, gasForExecute);
-    uint256 endGas = gasleft();
+    // Expect execution state change event.
+    vm.expectEmit();
+    emit OffRamp.ExecutionStateChanged(
+      message.sourceChainSelector,
+      message.sequenceNumber,
+      keccak256(encodedMessage),
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
 
-    // Expect at least 30% gas utilization.
-    assertGt(startGas - endGas, gasForExecute * 3 / 10);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, gasForExecute);
+
+    // Verify final state is SUCCESS.
+    assertEq(
+      uint256(Internal.MessageExecutionState.SUCCESS),
+      uint256(
+        s_offRamp.getExecutionState(
+          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
+        )
+      )
+    );
   }
 }
