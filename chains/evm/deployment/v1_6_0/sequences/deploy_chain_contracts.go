@@ -129,6 +129,20 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, routerRef)
 
+		// Deploy Test Router
+		testRouterRef, err := maybeDeployContract(b, router.DeployTestRouter, chain, contract.DeployInput[router.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(router.TestRouterContractType, *router.Version),
+			ChainSelector:  chain.Selector,
+			Args: router.ConstructorArgs{
+				WrappedNative: common.HexToAddress(wethRef.Address),
+				RMNProxy:      common.HexToAddress(rmnProxyRef.Address),
+			},
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		addresses = append(addresses, testRouterRef)
+
 		// Deploy TokenAdminRegistry
 		tokenAdminRegistryRef, err := maybeDeployContract(b, token_admin_registry.Deploy, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),

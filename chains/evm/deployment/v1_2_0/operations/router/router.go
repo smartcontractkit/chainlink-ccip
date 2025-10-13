@@ -13,6 +13,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "Router"
+var TestRouterContractType cldf_deployment.ContractType = "TestRouter"
 var Version *semver.Version = semver.MustParse("1.2.0")
 
 type ConstructorArgs struct {
@@ -47,6 +48,19 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	ContractMetadata: router.RouterMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
+			EVM: common.FromHex(router.RouterBin),
+		},
+	},
+	Validate: func(ConstructorArgs) error { return nil },
+})
+
+var DeployTestRouter = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "test-router:deploy",
+	Version:          Version,
+	Description:      "Deploys the Test Router contract",
+	ContractMetadata: router.RouterMetaData,
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(TestRouterContractType, *Version).String(): {
 			EVM: common.FromHex(router.RouterBin),
 		},
 	},

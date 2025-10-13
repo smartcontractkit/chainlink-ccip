@@ -16,7 +16,11 @@ func ToByteArray(ref datastore.AddressRef) (bytes []byte, err error) {
 	if !common.IsHexAddress(ref.Address) {
 		return nil, fmt.Errorf("address is not a valid hex address in ref: %s", datastore_utils.SprintRef(ref))
 	}
-	return common.Hex2Bytes(ref.Address), nil
+	addr, err := ToEVMAddress(ref)
+	if err != nil {
+		return nil, err
+	}
+	return addr.Bytes(), nil
 }
 
 // ToEVMAddress formats a datastore.AddressRef into an ethereum common.Address.

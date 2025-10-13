@@ -26,19 +26,19 @@ func init() {
 
 type EVMAdapter struct{}
 
-func (a *EVMAdapter) GetOnRampAddress(e cldf.Environment, chainSelector uint64) ([]byte, error) {
+func (a *EVMAdapter) GetOnRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onramp.ContractType),
 		Version:       onramp.Version,
-	}, chainSelector, evm_datastore_utils.ToByteArray)
+	}, chainSelector, evm_datastore_utils.ToPaddedEVMAddress)
 	if err != nil {
 		return nil, err
 	}
 	return addr, nil
 }
 
-func (a *EVMAdapter) GetOffRampAddress(e cldf.Environment, chainSelector uint64) ([]byte, error) {
+func (a *EVMAdapter) GetOffRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(offramp.ContractType),
@@ -50,7 +50,7 @@ func (a *EVMAdapter) GetOffRampAddress(e cldf.Environment, chainSelector uint64)
 	return addr, nil
 }
 
-func (a *EVMAdapter) GetFQAddress(e cldf.Environment, chainSelector uint64) ([]byte, error) {
+func (a *EVMAdapter) GetFQAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(fee_quoter.ContractType),
@@ -62,7 +62,7 @@ func (a *EVMAdapter) GetFQAddress(e cldf.Environment, chainSelector uint64) ([]b
 	return addr, nil
 }
 
-func (a *EVMAdapter) GetRouterAddress(e cldf.Environment, chainSelector uint64) ([]byte, error) {
+func (a *EVMAdapter) GetRouterAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),

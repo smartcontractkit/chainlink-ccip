@@ -5,6 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/changesets"
@@ -20,7 +21,7 @@ import (
 
 func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, []uint64{5009297550715157269}),
+		environment.WithEVMSimulated(t, []uint64{chain_selectors.ETHEREUM_MAINNET.Selector}),
 	)
 	require.NoError(t, err, "Failed to create test environment")
 	require.NotNil(t, e, "Environment should be created")
@@ -35,7 +36,7 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 			input: cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: 5009297550715157269,
+					ChainSel: chain_selectors.ETHEREUM_MAINNET.Selector,
 					Params:   sequences.ContractParams{},
 				},
 			},
@@ -82,13 +83,13 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			makeDatastore: func() *datastore.MemoryDataStore {
 				ds := datastore.NewMemoryDataStore()
 				_ = ds.Addresses().Add(datastore.AddressRef{
-					ChainSelector: 5009297550715157269,
+					ChainSelector: chain_selectors.ETHEREUM_MAINNET.Selector,
 					Type:          datastore.ContractType(link.ContractType),
 					Version:       semver.MustParse("1.0.0"),
 					Address:       common.HexToAddress("0x01").Hex(),
 				})
 				_ = ds.Addresses().Add(datastore.AddressRef{
-					ChainSelector: 5009297550715157269,
+					ChainSelector: chain_selectors.ETHEREUM_MAINNET.Selector,
 					Type:          datastore.ContractType(weth.ContractType),
 					Version:       semver.MustParse("1.0.0"),
 					Address:       common.HexToAddress("0x02").Hex(),
@@ -101,7 +102,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			e, err := environment.New(t.Context(),
-				environment.WithEVMSimulated(t, []uint64{5009297550715157269}),
+				environment.WithEVMSimulated(t, []uint64{chain_selectors.ETHEREUM_MAINNET.Selector}),
 			)
 			require.NoError(t, err, "Failed to create test environment")
 			require.NotNil(t, e, "Environment should be created")
@@ -115,7 +116,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: 5009297550715157269,
+					ChainSel: chain_selectors.ETHEREUM_MAINNET.Selector,
 					Params: sequences.ContractParams{
 						FeeQuoter: fee_quoter.DefaultFeeQuoterParams(),
 						OffRamp:   offramp.DefaultOffRampParams(),

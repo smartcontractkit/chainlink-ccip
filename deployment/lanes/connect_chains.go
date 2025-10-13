@@ -2,17 +2,12 @@ package lanes
 
 import (
 	"fmt"
-	"time"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
-)
-
-const (
-	DefaultValidUntil = 72 * time.Hour
 )
 
 // ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
@@ -27,101 +22,13 @@ func makeVerify(_ *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(c
 	}
 }
 
-// type ConnectChainsBidirectional struct{}
-
-// func (cs ConnectChainsBidirectional) VerifyPreconditions(env cldf.Environment, cfg ConnectChainsConfig) error {
-// 	// TODO: implement this
-// 	return nil
-// }
-
-// func (cs ConnectChainsBidirectional) Apply(e cldf.Environment, cfg ConnectChainsConfig) (cldf.ChangesetOutput, error) {
-// 	finalOutput := cldf.ChangesetOutput{}
-// 	for i, lane := range cfg.Lanes {
-// 		src, dest := lane.Source, lane.Dest
-// 		srcFamily, err := chain_selectors.GetSelectorFamily(src.Selector)
-// 		if err != nil {
-// 			return cldf.ChangesetOutput{}, err
-// 		}
-// 		if _, exists := registeredChainAdapters[srcFamily]; !exists {
-// 			return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", srcFamily)
-// 		}
-// 		destFamily, err := chain_selectors.GetSelectorFamily(dest.Selector)
-// 		if err != nil {
-// 			return cldf.ChangesetOutput{}, err
-// 		}
-// 		if _, exists := registeredChainAdapters[destFamily]; !exists {
-// 			return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", destFamily)
-// 		}
-// 		srcOnRamp, err := registeredChainAdapters[srcFamily].GetOnRampAddress(e, src.Selector)
-// 		if err != nil {
-// 			return cldf.ChangesetOutput{}, fmt.Errorf("error fetching onramp address for src chain %d: %w", src.Selector, err)
-// 		}
-// 		src.OnRamp = srcOnRamp
-// 		// coalesce src -> dest
-// 		output, err := registeredChainAdapters[srcFamily].ConfigureLaneAsSourceAndDest(e, UpdateLanesInput{
-// 			Source:       src,
-// 			Dest:         dest,
-// 			IsDisabled:   lane.IsDisabled,
-// 			TestRouter:   lane.TestRouter,
-// 			ExtraConfigs: lane.ExtraConfigs,
-// 			MCMS:         cfg.MCMS,
-// 		})
-// 		if err != nil {
-// 			finalOutput.Reports = append(finalOutput.Reports, output.Reports...)
-// 			return cldf.ChangesetOutput{Reports: finalOutput.Reports}, fmt.Errorf("failed to apply changeset at index %d: %w", i, err)
-// 		}
-// 		err = MergeChangesetOutput(e, &finalOutput, output)
-// 		if err != nil {
-// 			finalOutput.Reports = append(finalOutput.Reports, output.Reports...)
-// 			return cldf.ChangesetOutput{Reports: finalOutput.Reports}, fmt.Errorf("failed to merge output of changeset at index %d: %w", i, err)
-// 		}
-// 		// coalesce dest -> src
-// 		output, err = registeredChainAdapters[destFamily].ConfigureLaneAsSourceAndDest(e, UpdateLanesInput{
-// 			Source:       dest,
-// 			Dest:         src,
-// 			IsDisabled:   lane.IsDisabled,
-// 			TestRouter:   lane.TestRouter,
-// 			ExtraConfigs: lane.ExtraConfigs,
-// 			MCMS:         cfg.MCMS,
-// 		})
-// 		if err != nil {
-// 			finalOutput.Reports = append(finalOutput.Reports, output.Reports...)
-// 			return cldf.ChangesetOutput{Reports: finalOutput.Reports}, fmt.Errorf("failed to apply changeset at index %d: %w", i, err)
-// 		}
-// 		err = MergeChangesetOutput(e, &finalOutput, output)
-// 		if err != nil {
-// 			finalOutput.Reports = append(finalOutput.Reports, output.Reports...)
-// 			return cldf.ChangesetOutput{Reports: finalOutput.Reports}, fmt.Errorf("failed to merge output of changeset at index %d: %w", i, err)
-// 		}
-// 	}
-// 	// Aggregate all Timelock proposals into 1 proposal
-// 	proposal, err := AggregateProposals(
-// 		e,
-// 		finalOutput.MCMSTimelockProposals,
-// 		"connect chains bidirectionally",
-// 		cfg.MCMS,
-// 	)
-// 	if err != nil {
-// 		return finalOutput, fmt.Errorf("failed to aggregate proposals: %w", err)
-// 	}
-
-// 	// If no proposal was created, we return the final output without a proposal
-// 	if proposal == nil {
-// 		return finalOutput, nil
-// 	}
-
-// 	// Reset proposals to only include the aggregated proposal
-// 	finalOutput.MCMSTimelockProposals = []mcmslib.TimelockProposal{*proposal}
-// 	return finalOutput, nil
-// }
-
 func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConnectChainsConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg ConnectChainsConfig) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
 		for _, lane := range cfg.Lanes {
-			src, dest := lane.Source, lane.Dest
+			src, dest := &lane.Source, &lane.Dest
 			srcFamily, err := chain_selectors.GetSelectorFamily(src.Selector)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
@@ -138,17 +45,17 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", destFamily)
 			}
-			err = populateAddresses(e, &src, srcAdapter)
+			err = populateAddresses(&e, src, srcAdapter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for src chain %d: %w", src.Selector, err)
 			}
-			err = populateAddresses(e, &dest, destAdapter)
+			err = populateAddresses(&e, dest, destAdapter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", dest.Selector, err)
 			}
 			type lanePair struct {
-				chainA  ChainDefinition
-				chainB  ChainDefinition
+				chainA  *ChainDefinition
+				chainB  *ChainDefinition
 				adapter LaneAdapter
 			}
 			for _, pair := range []lanePair{
@@ -190,7 +97,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	}
 }
 
-func populateAddresses(e cldf.Environment, chainDef *ChainDefinition, adapter LaneAdapter) error {
+func populateAddresses(e *cldf.Environment, chainDef *ChainDefinition, adapter LaneAdapter) error {
 	var err error
 	chainDef.OnRamp, err = adapter.GetOnRampAddress(e, chainDef.Selector)
 	if err != nil {

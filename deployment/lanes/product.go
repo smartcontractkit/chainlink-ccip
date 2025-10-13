@@ -18,10 +18,10 @@ type LaneAdapter interface {
 
 	// helpers to expose lower level functionality if needed
 	// needed for populating values in chain specific configs
-	GetOnRampAddress(e cldf.Environment, chainSelector uint64) ([]byte, error)
-	GetOffRampAddress(e cldf.Environment, chainSelector uint64) ([]byte, error)
-	GetRouterAddress(e cldf.Environment, chainSelector uint64) ([]byte, error)
-	GetFQAddress(e cldf.Environment, chainSelector uint64) ([]byte, error)
+	GetOnRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error)
+	GetOffRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error)
+	GetRouterAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error)
+	GetFQAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error)
 }
 
 type laneAdapterID string

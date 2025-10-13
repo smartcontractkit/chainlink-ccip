@@ -19,18 +19,18 @@ func init() {
 
 type SolanaAdapter struct{}
 
-func (a *SolanaAdapter) GetOnRampAddress(e cldf.Environment, chainSelector uint64) ([]byte, error) {
+func (a *SolanaAdapter) GetOnRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
 	return []byte{}, nil // Not implemented for Solana
 }
 
-func (a *SolanaAdapter) GetOffRampAddress(e cldf.Environment, chainSelector uint64) ([]byte, error) {
+func (a *SolanaAdapter) GetOffRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
 	return []byte{}, nil // Not implemented for Solana
 }
 
-func (a *SolanaAdapter) GetFQAddress(e cldf.Environment, chainSelector uint64) ([]byte, error) {
+func (a *SolanaAdapter) GetFQAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
 	return []byte{}, nil // Not implemented for Solana
 }
 
-func (a *SolanaAdapter) GetRouterAddress(e cldf.Environment, chainSelector uint64) ([]byte, error) {
+func (a *SolanaAdapter) GetRouterAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
 	return []byte{}, nil // Not implemented for Solana
 }
