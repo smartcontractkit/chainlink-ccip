@@ -66,7 +66,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			Version:       semver.MustParse("1.7.0"),
 		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
-			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve ccv proxy ref: %w", err)
+			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve onRamp ref: %w", err)
 		}
 		committeeVerifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			ChainSelector: cfg.ChainSel,
