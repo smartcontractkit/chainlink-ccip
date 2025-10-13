@@ -12,16 +12,17 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
-	e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-		5009297550715157269: {NumAdditionalAccounts: 1},
-	})
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{5009297550715157269}),
+	)
 	require.NoError(t, err, "Failed to create test environment")
+	require.NotNil(t, e, "Environment should be created")
 
 	tests := []struct {
 		desc        string
@@ -54,7 +55,7 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
-			err := changesets.DeployChainContracts(mcmsRegistry).VerifyPreconditions(e, test.input)
+			err := changesets.DeployChainContracts(mcmsRegistry).VerifyPreconditions(*e, test.input)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr, "Expected error containing %q but got none", test.expectedErr)
 			} else {
@@ -98,10 +99,11 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-				5009297550715157269: {NumAdditionalAccounts: 1},
-			})
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{5009297550715157269}),
+			)
 			require.NoError(t, err, "Failed to create test environment")
+			require.NotNil(t, e, "Environment should be created")
 
 			ds := test.makeDatastore()
 			existingAddrs, err := ds.Addresses().Fetch()
@@ -109,7 +111,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			e.DataStore = ds.Seal() // Override datastore in environment to include existing addresses
 
 			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
-			out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+			out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployChainContractsCfg{
 					ChainSel: 5009297550715157269,

@@ -2,17 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
-import {OnRamp} from "../../../onRamp/OnRamp.sol";
+import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {OnRampSetup} from "../../onRamp/OnRamp/OnRampSetup.t.sol";
+import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 import {FacadeClient} from "./FacadeClient.sol";
 import {ReentrantMaliciousTokenPool} from "./ReentrantMaliciousTokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-/// @title MultiOnRampTokenPoolReentrancy
-/// Attempts to perform a reentrancy exploit on Onramp with a malicious TokenPool
-contract OnRampTokenPoolReentrancy is OnRampSetup {
+contract OnRampTokenPoolReentrancy is RouterSetup {
   FacadeClient internal s_facadeClient;
   ReentrantMaliciousTokenPool internal s_maliciousTokenPool;
   IERC20 internal s_sourceToken;
@@ -20,7 +18,7 @@ contract OnRampTokenPoolReentrancy is OnRampSetup {
   address internal immutable i_receiver = makeAddr("receiver");
 
   function setUp() public virtual override {
-    OnRampSetup.setUp();
+    RouterSetup.setUp();
 
     s_sourceToken = IERC20(s_sourceTokens[0]);
     s_feeToken = IERC20(s_sourceTokens[0]);
@@ -77,7 +75,7 @@ contract OnRampTokenPoolReentrancy is OnRampSetup {
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message1);
     assertGt(expectedFee, 0);
 
-    vm.expectRevert(OnRamp.ReentrancyGuardReentrantCall.selector);
+    vm.expectRevert(CCVProxy.ReentrancyGuardReentrantCall.selector);
     // solhint-disable-next-line check-send-result
     s_facadeClient.send(amount);
   }
