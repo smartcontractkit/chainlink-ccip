@@ -47,17 +47,18 @@ contract TokenPoolV2_getRequiredOutboundCCVs is TokenPoolV2Setup {
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
     // Set threshold amount.
-    s_tokenPool.setThresholdAmountForAdditionalCCVs(1000);
+    uint96 thresholdAmount = 1000;
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), thresholdAmount);
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedOutboundBelow =
-      s_tokenPool.getRequiredOutboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, 500, 0, "");
+      s_tokenPool.getRequiredOutboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount - 500, 0, "");
     assertEq(storedOutboundBelow.length, 1);
     assertEq(storedOutboundBelow[0], outboundCCVs[0]);
 
     // Test with amount above threshold, should return base + additional CCVs.
     address[] memory storedOutboundAbove =
-      s_tokenPool.getRequiredOutboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, 1500, 0, "");
+      s_tokenPool.getRequiredOutboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "");
     assertEq(storedOutboundAbove.length, 2);
     assertEq(storedOutboundAbove[0], outboundCCVs[0]);
     assertEq(storedOutboundAbove[1], additionalOutboundCCVs[0]);
@@ -79,11 +80,12 @@ contract TokenPoolV2_getRequiredOutboundCCVs is TokenPoolV2Setup {
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
     // Set threshold amount.
-    s_tokenPool.setThresholdAmountForAdditionalCCVs(1000);
+    uint96 thresholdAmount = 1000;
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), thresholdAmount);
 
     // Test with amount above threshold but no additional CCVs, should return only base CCVs.
     address[] memory storedOutbound =
-      s_tokenPool.getRequiredOutboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, 1500, 0, "");
+      s_tokenPool.getRequiredOutboundCCVs(address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "");
     assertEq(storedOutbound.length, 1);
     assertEq(storedOutbound[0], outboundCCVs[0]);
   }

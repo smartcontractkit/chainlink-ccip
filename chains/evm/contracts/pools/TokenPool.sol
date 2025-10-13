@@ -86,7 +86,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
-  event RouterUpdated(address oldRouter, address newRouter);
+  event DynamicConfigSet(address newRouter, uint96 thresholdAmountForAdditionalCCVs);
   event RateLimitAdminSet(address rateLimitAdmin);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
@@ -172,15 +172,15 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   address internal immutable i_rmnProxy;
   /// @dev The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
-  /// @dev Threshold token transfer amount above which additional CCVs are required.
-  /// Value of 0 means that there is no threshold and additional CCVs are not required for any transfer amount.
-  uint256 internal s_thresholdAmountForAdditionalCCVs;
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
   /// Only takes effect if i_allowlistEnabled is true.
   /// This can be used to ensure only token-issuer specified addresses can move tokens.
   EnumerableSet.AddressSet internal s_allowlist;
   /// @dev The address of the router
   IRouter internal s_router;
+  /// @dev Threshold token transfer amount above which additional CCVs are required.
+  /// Value of 0 means that there is no threshold and additional CCVs are not required for any transfer amount.
+  uint96 internal s_thresholdAmountForAdditionalCCVs;
   /// @dev A set of allowed chain selectors. We want the allowlist to be enumerable to
   /// be able to quickly determine (without parsing logs) who can access the pool.
   /// @dev The chain selectors are in uint256 format because of the EnumerableSet implementation.
@@ -246,34 +246,17 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @notice Gets the pool's Router
   /// @return router The pool's Router
-  function getRouter() public view virtual returns (address router) {
-    return address(s_router);
-  }
-
-  /// @notice Gets the threshold amount for requiring additional CCVs.
-  function getThresholdAmountForAdditionalCCVs() public view returns (uint256 thresholdAmountForAdditionalCCVs) {
-    return s_thresholdAmountForAdditionalCCVs;
+  function getDynamicConfig() public view virtual returns (address router, uint96 thresholdAmountForAdditionalCCVs) {
+    return (address(s_router), s_thresholdAmountForAdditionalCCVs);
   }
 
   /// @notice Sets the pool's Router
   /// @param newRouter The new Router
-  function setRouter(
-    address newRouter
-  ) public onlyOwner {
+  function setDynamicConfig(address newRouter, uint96 thresholdAmountForAdditionalCCVs) public onlyOwner {
     if (newRouter == address(0)) revert ZeroAddressInvalid();
-    address oldRouter = address(s_router);
     s_router = IRouter(newRouter);
-
-    emit RouterUpdated(oldRouter, newRouter);
-  }
-
-  /// @notice Sets the threshold amount for requiring additional CCVs.
-  /// @param thresholdAmountForAdditionalCCVs The new threshold amount.
-  function setThresholdAmountForAdditionalCCVs(
-    uint256 thresholdAmountForAdditionalCCVs
-  ) public onlyOwner {
     s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;
-    emit ThresholdAmountForAdditionalCCVsSet(thresholdAmountForAdditionalCCVs);
+    emit DynamicConfigSet(newRouter, thresholdAmountForAdditionalCCVs);
   }
 
   /// @notice Signals which version of the pool interface is supported.
@@ -1002,7 +985,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     // If amount is above threshold, combine base and additional CCVs.
     uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
     if (thresholdAmount != 0 && amount >= thresholdAmount && additionalCCVs.length > 0) {
-      address[] memory requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
+      requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
       // Copy base CCVs.
       for (uint256 i = 0; i < baseCCVs.length; ++i) {
         requiredCCVs[i] = baseCCVs[i];
