@@ -112,7 +112,9 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     // Mock pool to require a specific CCV.
     vm.mockCall(
       pool,
-      abi.encodeCall(IPoolV2.getRequiredInboundCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, 0, "")),
+      abi.encodeCall(
+        IPoolV2.getRequiredCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, 0, "", IPoolV2.CCVDirection.Inbound)
+      ),
       abi.encode(_arrayOf(poolRequiredCCV))
     );
 

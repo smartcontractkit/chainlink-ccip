@@ -965,63 +965,38 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     }
   }
 
-  /// @notice Returns the set of required CCVs for incoming messages from a source chain.
-  /// @param sourceChainSelector The source chain selector for incoming messages.
+  /// @notice Returns the set of required CCVs for transfers in a specific direction.
+  /// @param remoteChainSelector The remote chain selector for this transfer.
   /// @param amount The amount being transferred.
-  /// This implementation returns base CCVs for all transfers, and includes additional CCVs
-  /// when the transfer amount is above the configured threshold.
-  /// Implementers can override this function to define custom logic based on these params.
+  /// This implementation returns base CCVs for all transfers, and includes additional CCVs when the transfer amount
+  /// is above the configured threshold. Implementers can override this function to define custom logic based on these
+  /// params.
   /// @return requiredCCVs Set of required CCV addresses.
-  function getRequiredInboundCCVs(
+  function getRequiredCCVs(
     address, // localToken
-    uint64 sourceChainSelector,
+    uint64 remoteChainSelector,
     uint256 amount,
     uint16, // finality
-    bytes calldata // sourcePoolData
+    bytes calldata, // extraData
+    IPoolV2.CCVDirection direction
   ) external view virtual returns (address[] memory requiredCCVs) {
-    CCVConfig storage config = s_verifierConfig[sourceChainSelector];
-    address[] memory baseCCVs = config.inboundCCVs;
-    address[] memory additionalCCVs = config.additionalInboundCCVs;
-    // If amount is above threshold, combine base and additional CCVs.
-    uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
-    if (thresholdAmount != 0 && amount >= thresholdAmount) {
-      address[] memory additionalCCVs = config.additionalInboundCCVs;
-      if (additionalCCVs.length > 0) {
-        requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
-        // Copy base CCVs.
-        for (uint256 i = 0; i < baseCCVs.length; ++i) {
-          requiredCCVs[i] = baseCCVs[i];
-        }
-        // Copy additional CCVs.
-        for (uint256 i = 0; i < additionalCCVs.length; ++i) {
-          requiredCCVs[baseCCVs.length + i] = additionalCCVs[i];
-        }
-        return requiredCCVs;
-      }
+    CCVConfig storage config = s_verifierConfig[remoteChainSelector];
+    if (direction == IPoolV2.CCVDirection.Inbound) {
+      return _resolveRequiredCCVs(config.inboundCCVs, config.additionalInboundCCVs, amount);
     }
-    return baseCCVs;
+    return _resolveRequiredCCVs(config.outboundCCVs, config.additionalOutboundCCVs, amount);
   }
 
-  /// @notice Returns the set of required CCVs for outgoing messages to a destination chain.
-  /// @param destChainSelector The destination chain selector for outgoing messages.
-  /// @param amount The amount being transferred.
-  /// This implementation returns base CCVs for all transfers, and includes additional CCVs
-  /// when the transfer amount is above the configured threshold.
-  /// Implementers can override this function to define custom logic based on these params.
-  /// @return requiredCCVs Set of required CCV addresses.
-  function getRequiredOutboundCCVs(
-    address, // localToken
-    uint64 destChainSelector,
-    uint256 amount,
-    uint16, // finality
-    bytes calldata // tokenArgs
-  ) external view virtual returns (address[] memory requiredCCVs) {
-    CCVConfig storage config = s_verifierConfig[destChainSelector];
-    address[] memory baseCCVs = config.outboundCCVs;
+  function _resolveRequiredCCVs(
+    address[] storage baseCCVsStorage,
+    address[] storage additionalCCVsStorage,
+    uint256 amount
+  ) internal view returns (address[] memory requiredCCVs) {
+    address[] memory baseCCVs = baseCCVsStorage;
     // If amount is above threshold, combine base and additional CCVs.
     uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
     if (thresholdAmount != 0 && amount >= thresholdAmount) {
-      address[] memory additionalCCVs = config.additionalOutboundCCVs;
+      address[] memory additionalCCVs = additionalCCVsStorage;
       if (additionalCCVs.length > 0) {
         requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
         // Copy base CCVs.

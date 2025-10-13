@@ -592,7 +592,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
 
     if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      requiredCCV = IPoolV2(pool).getRequiredInboundCCVs(localToken, sourceChainSelector, amount, finality, extraData);
+      requiredCCV = IPoolV2(pool).getRequiredCCVs(
+        localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.CCVDirection.Inbound
+      );
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
     }
 

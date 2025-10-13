@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
@@ -39,8 +40,10 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
     // Verify the configuration was stored correctly.
-    address[] memory storedOutbound = s_tokenPool.getRequiredOutboundCCVs(address(0), DEST_CHAIN_SELECTOR, 0, 0, "");
-    address[] memory storedInbound = s_tokenPool.getRequiredInboundCCVs(address(0), DEST_CHAIN_SELECTOR, 0, 0, "");
+    address[] memory storedOutbound =
+      s_tokenPool.getRequiredCCVs(address(0), DEST_CHAIN_SELECTOR, 0, 0, "", IPoolV2.CCVDirection.Outbound);
+    address[] memory storedInbound =
+      s_tokenPool.getRequiredCCVs(address(0), DEST_CHAIN_SELECTOR, 0, 0, "", IPoolV2.CCVDirection.Inbound);
 
     assertEq(storedOutbound.length, outboundCCVs.length);
     assertEq(storedOutbound[0], outboundCCVs[0]);
