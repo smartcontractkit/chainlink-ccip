@@ -47,7 +47,7 @@ contract TokenPoolV2_getRequiredInboundCCVs is TokenPoolV2Setup {
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
     // Set threshold amount.
-    uint96 thresholdAmount = 1000;
+    uint256 thresholdAmount = 1000;
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), thresholdAmount);
 
     // Test with amount below threshold, should return only base CCVs.
@@ -80,7 +80,7 @@ contract TokenPoolV2_getRequiredInboundCCVs is TokenPoolV2Setup {
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
     // Set threshold amount.
-    uint96 thresholdAmount = 1000;
+    uint256 thresholdAmount = 1000;
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), thresholdAmount);
 
     // Test with amount above threshold but no additional CCVs, should return only base CCVs.

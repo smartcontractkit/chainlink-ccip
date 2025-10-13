@@ -86,7 +86,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
-  event DynamicConfigSet(address router, uint96 thresholdAmountForAdditionalCCVs);
+  event DynamicConfigSet(address router, uint256 thresholdAmountForAdditionalCCVs);
   event RateLimitAdminSet(address rateLimitAdmin);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
@@ -179,7 +179,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   IRouter internal s_router;
   /// @dev Threshold token transfer amount above which additional CCVs are required.
   /// Value of 0 means that there is no threshold and additional CCVs are not required for any transfer amount.
-  uint96 internal s_thresholdAmountForAdditionalCCVs;
+  uint256 internal s_thresholdAmountForAdditionalCCVs;
   /// @dev A set of allowed chain selectors. We want the allowlist to be enumerable to
   /// be able to quickly determine (without parsing logs) who can access the pool.
   /// @dev The chain selectors are in uint256 format because of the EnumerableSet implementation.
@@ -245,14 +245,14 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @notice Gets the pool's Router
   /// @return router The pool's Router
-  function getDynamicConfig() public view virtual returns (address router, uint96 thresholdAmountForAdditionalCCVs) {
+  function getDynamicConfig() public view virtual returns (address router, uint256 thresholdAmountForAdditionalCCVs) {
     return (address(s_router), s_thresholdAmountForAdditionalCCVs);
   }
 
   /// @notice Sets the dynamic configuration for the pool.
   /// @param router The address of the router contract.
   /// @param thresholdAmountForAdditionalCCVs The threshold amount above which additional CCVs are required.
-  function setDynamicConfig(address router, uint96 thresholdAmountForAdditionalCCVs) public onlyOwner {
+  function setDynamicConfig(address router, uint256 thresholdAmountForAdditionalCCVs) public onlyOwner {
     if (router == address(0)) revert ZeroAddressInvalid();
     s_router = IRouter(router);
     s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;

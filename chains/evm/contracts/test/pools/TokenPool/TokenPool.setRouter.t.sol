@@ -7,14 +7,14 @@ import {TokenPoolWithAllowListSetup} from "./TokenPoolWithAllowListSetup.t.sol";
 contract TokenPoolWithAllowList_setDynamicConfig is TokenPoolWithAllowListSetup {
   function test_setDynamicConfig() public {
     address newRouter = makeAddr("newRouter");
-    uint96 newThresholdAmount = 1234;
+    uint256 newThresholdAmount = 1234;
 
     vm.expectEmit();
     emit TokenPool.DynamicConfigSet(newRouter, newThresholdAmount);
 
     s_tokenPool.setDynamicConfig(newRouter, newThresholdAmount);
 
-    (address router, uint96 thresholdAmount) = s_tokenPool.getDynamicConfig();
+    (address router, uint256 thresholdAmount) = s_tokenPool.getDynamicConfig();
     assertEq(newRouter, router);
     assertEq(newThresholdAmount, thresholdAmount);
   }
