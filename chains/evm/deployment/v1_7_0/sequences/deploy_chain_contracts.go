@@ -289,7 +289,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// TODO: validate prior to deploying that qualifiers are unique?
 		var committeeVerifierRefs []datastore.AddressRef
 		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifier {
-			addrs, writes, err := deployCommitteeVerifier(b, chain, DeployCommitteeVerifierInput{
+			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
 				ExistingAddresses: input.ExistingAddresses,
 				Params: DeployCommitteeVerifierParams{
@@ -310,13 +310,20 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
 			}
-			addresses = append(addresses, addrs...)
-			for _, addr := range addrs {
+			addresses = append(addresses, report.Output.Addresses...)
+			for _, addr := range report.Output.Addresses {
 				if addr.Type == datastore.ContractType(committee_verifier.ContractType) {
 					committeeVerifierRefs = append(committeeVerifierRefs, addr)
 				}
 			}
-			writes = append(writes, writes...)
+			// TODO: how to add writes from MCMS BatchOps?
+			// for _, op := range report.Output.BatchOps {
+			// 	writes = append(writes, contract.WriteOutput{
+			// 		ChainSelector: uint64(op.ChainSelector),
+			// 		Tx: op.Transactions[0],
+			// 		ExecInfo: op.Transactions[0].,
+			// 	})
+			// }
 		}
 
 		// Deploy ExecutorOnRamp

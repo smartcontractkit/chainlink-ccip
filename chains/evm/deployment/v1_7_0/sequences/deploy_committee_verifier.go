@@ -37,10 +37,49 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 	semver.MustParse("1.7.0"),
 	"Deploys the CommitteeVerifier contract",
 	func(b operations.Bundle, chain evm.Chain, input DeployCommitteeVerifierInput) (output sequences.OnChainOutput, err error) {
-		addresses, writes, err := deployCommitteeVerifier(b, chain, input)
+		addresses := make([]datastore.AddressRef, 0)
+		writes := make([]contract.WriteOutput, 0)
+
+		// Deploy CommitteeVerifier
+		var qualifierPtr *string
+		if input.Params.Qualifier != "" {
+			qualifierPtr = &input.Params.Qualifier
+		}
+		committeeVerifierRef, err := maybeDeployContract(b, committee_verifier.Deploy, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.Params.CommitteeVerifierVersion),
+			ChainSelector:  chain.Selector,
+			Args:           input.Params.Args,
+			Qualifier:      qualifierPtr,
+		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
 		}
+		addresses = append(addresses, committeeVerifierRef)
+
+		// Set signature config on the CommitteeVerifier
+		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetSignatureConfigs, chain, contract.FunctionInput[committee_verifier.SetSignatureConfigArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(committeeVerifierRef.Address),
+			Args:          input.Params.SignatureConfigArgs,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitteeVerifier: %w", err)
+		}
+		writes = append(writes, setSignatureConfigReport.Output)
+
+		// Deploy CommitteeVerifierProxy
+		committeeVerifierProxyRef, err := maybeDeployContract(b, committee_verifier.DeployProxy, chain, contract.DeployInput[committee_verifier.ProxyConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ProxyType, *input.Params.CommitteeVerifierProxyVersion),
+			ChainSelector:  chain.Selector,
+			Args: committee_verifier.ProxyConstructorArgs{
+				RampAddress: common.HexToAddress(committeeVerifierRef.Address),
+			},
+			Qualifier: qualifierPtr,
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierProxy: %w", err)
+		}
+		addresses = append(addresses, committeeVerifierProxyRef)
 
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
@@ -52,51 +91,3 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			BatchOps:  []mcms_types.BatchOperation{batchOp},
 		}, nil
 	})
-
-func deployCommitteeVerifier(b operations.Bundle, chain evm.Chain, input DeployCommitteeVerifierInput) ([]datastore.AddressRef, []contract.WriteOutput, error) {
-	addresses := make([]datastore.AddressRef, 0)
-	writes := make([]contract.WriteOutput, 0)
-
-	// Deploy CommitteeVerifier
-	var qualifierPtr *string
-	if input.Params.Qualifier != "" {
-		qualifierPtr = &input.Params.Qualifier
-	}
-	committeeVerifierRef, err := maybeDeployContract(b, committee_verifier.Deploy, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.Params.CommitteeVerifierVersion),
-		ChainSelector:  chain.Selector,
-		Args:           input.Params.Args,
-		Qualifier:      qualifierPtr,
-	}, input.ExistingAddresses)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
-	}
-	addresses = append(addresses, committeeVerifierRef)
-
-	// Set signature config on the CommitteeVerifier
-	setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetSignatureConfigs, chain, contract.FunctionInput[committee_verifier.SetSignatureConfigArgs]{
-		ChainSelector: chain.Selector,
-		Address:       common.HexToAddress(committeeVerifierRef.Address),
-		Args:          input.Params.SignatureConfigArgs,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to set signature config on CommitteeVerifier: %w", err)
-	}
-	writes = append(writes, setSignatureConfigReport.Output)
-
-	// Deploy CommitteeVerifierProxy
-	committeeVerifierProxyRef, err := maybeDeployContract(b, committee_verifier.DeployProxy, chain, contract.DeployInput[committee_verifier.ProxyConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ProxyType, *input.Params.CommitteeVerifierProxyVersion),
-		ChainSelector:  chain.Selector,
-		Args: committee_verifier.ProxyConstructorArgs{
-			RampAddress: common.HexToAddress(committeeVerifierRef.Address),
-		},
-		Qualifier: qualifierPtr,
-	}, input.ExistingAddresses)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to deploy CommitteeVerifierProxy: %w", err)
-	}
-	addresses = append(addresses, committeeVerifierProxyRef)
-
-	return addresses, writes, nil
-}
