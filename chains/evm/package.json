@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/contracts-ccip",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Chainlink smart contracts for CCIP",
   "author": "Chainlink devs",
   "repository": "github:smartcontractkit/chainlink-ccip",
@@ -22,7 +22,8 @@
     "contracts/test/mocks/**/*",
     "contracts/test/helpers/**/*",
     "scripts/compile_all",
-    "abi/*.abi.json",
+    "abi",
+    "bytecode",
     "remappings.txt",
     ".solhint.json",
     ".solhint-test.json",

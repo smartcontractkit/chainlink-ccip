@@ -12,7 +12,7 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
   using SafeERC20 for IERC20;
 
-  string public constant override typeAndVersion = "BurnMintFastTransferTokenPool 1.6.3-dev";
+  string public constant override typeAndVersion = "BurnMintFastTransferTokenPool 1.6.x-dev";
 
   constructor(
     IBurnMintERC20 token,

@@ -5,6 +5,7 @@ go 1.24.6
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/deckarep/golang-set/v2 v2.6.0
+	github.com/ethereum/go-ethereum v1.15.7
 	github.com/smartcontractkit/chain-selectors v1.0.71
 	github.com/smartcontractkit/chainlink-common v0.9.5-0.20250912150129-4e42c90b532e
 	github.com/smartcontractkit/chainlink-deployments-framework v0.44.0
@@ -49,7 +50,6 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/docker/docker v28.3.2+incompatible // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.3 // indirect
-	github.com/ethereum/go-ethereum v1.15.7 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect

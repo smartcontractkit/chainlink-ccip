@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -36,6 +37,10 @@ type DeployInput[ARGS any] struct {
 	// TypeAndVersion is the desired type and version of the contract to deploy.
 	// The deployment operation must define bytecode for this type and version.
 	TypeAndVersion deployment.TypeAndVersion `json:"typeAndVersion"`
+	// Qualifier is an optional string to differentiate between multiple deployments of
+	//	the same contract type and version on the same chain.
+	// if provided, it is stored in the AddressRef returned by the operation.
+	Qualifier *string `json:"qualifier,omitempty"`
 	// Args are the parameters passed to the contract constructor.
 	Args ARGS `json:"args"`
 }
@@ -149,12 +154,12 @@ func NewDeploy[ARGS any](params DeployParams[ARGS]) *operations.Operation[Deploy
 				return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s to %s with args %+v: %w", input.TypeAndVersion, chain, input.Args, deployErr)
 			}
 			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", input.TypeAndVersion, chain), "args", input.Args)
-
 			return datastore.AddressRef{
 				Address:       addr.Hex(),
 				ChainSelector: input.ChainSelector,
 				Type:          datastore.ContractType(input.TypeAndVersion.Type),
 				Version:       &input.TypeAndVersion.Version,
+				Qualifier:     ptr.ToString(input.Qualifier),
 			}, nil
 		},
 	)
@@ -219,4 +224,29 @@ func arrayify[ARGS any](args ARGS) ([]interface{}, error) {
 		result[i] = v.Field(i).Interface()
 	}
 	return result, nil
+}
+
+func MaybeDeployContract[ARGS any](
+	b operations.Bundle,
+	op *operations.Operation[DeployInput[ARGS], datastore.AddressRef, evm.Chain],
+	chain evm.Chain,
+	input DeployInput[ARGS],
+	existingAddresses []datastore.AddressRef) (datastore.AddressRef, error) {
+	for _, ref := range existingAddresses {
+		if ref.Type == datastore.ContractType(input.TypeAndVersion.Type) &&
+			ref.Version.String() == input.TypeAndVersion.Version.String() {
+			if input.Qualifier != nil {
+				if ref.Qualifier == *input.Qualifier {
+					return ref, nil
+				}
+			} else {
+				return ref, nil
+			}
+		}
+	}
+	report, err := operations.ExecuteOperation(b, op, chain, input)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s %s: %w", input.TypeAndVersion.Type, op.Def().Version, err)
+	}
+	return report.Output, nil
 }

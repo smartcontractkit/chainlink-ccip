@@ -67,7 +67,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "SiloedLockReleaseTokenPool 1.6.3-dev";
+    return "SiloedLockReleaseTokenPool 1.6.x-dev";
   }
 
   /// @notice Locks the token in the pool
