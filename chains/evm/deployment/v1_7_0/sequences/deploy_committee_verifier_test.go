@@ -16,18 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func basicParams() sequences.DeployCommitteeVerifierParams {
-	return sequences.DeployCommitteeVerifierParams{
-		CommitteeVerifierVersion:      semver.MustParse("1.7.0"),
-		CommitteeVerifierProxyVersion: semver.MustParse("1.7.0"),
-		Args: committee_verifier.ConstructorArgs{
-			DynamicConfig: committee_verifier.DynamicConfig{
-				FeeQuoter:      common.HexToAddress("0x01"),
-				FeeAggregator:  common.HexToAddress("0x02"),
-				AllowlistAdmin: common.HexToAddress("0x03"),
-			},
-			StorageLocation: "https://test.chain.link.fake",
-		},
+func basicParams() sequences.CommitteeVerifierParams {
+	return sequences.CommitteeVerifierParams{
+		Version:         semver.MustParse("1.7.0"),
+		FeeQuoter:       common.HexToAddress("0x01"),
+		FeeAggregator:   common.HexToAddress("0x02"),
+		AllowlistAdmin:  common.HexToAddress("0x03"),
+		StorageLocation: "https://test.chain.link.fake",
 		SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
 			Threshold: 1,
 			Signers: []common.Address{
@@ -123,9 +118,16 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 		e.BlockChains.EVMChains()[chainSelector],
 		evm_contract.DeployInput[committee_verifier.ConstructorArgs]{
 			ChainSelector:  chainSelector,
-			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *params.CommitteeVerifierVersion),
+			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *params.Version),
 			Qualifier:      &q,
-			Args:           params.Args,
+			Args: committee_verifier.ConstructorArgs{
+				DynamicConfig: committee_verifier.DynamicConfig{
+					FeeQuoter:      params.FeeQuoter,
+					FeeAggregator:  params.FeeAggregator,
+					AllowlistAdmin: params.AllowlistAdmin,
+				},
+				StorageLocation: params.StorageLocation,
+			},
 		},
 	)
 	require.NoError(t, err, "Failed to pre-deploy CommitteeVerifier")

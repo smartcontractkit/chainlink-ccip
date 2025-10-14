@@ -15,19 +15,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func basicDeployCommitteeVerifierParams() sequences.DeployCommitteeVerifierParams {
-	return sequences.DeployCommitteeVerifierParams{
-		CommitteeVerifierVersion:      semver.MustParse("1.7.0"),
-		CommitteeVerifierProxyVersion: semver.MustParse("1.7.0"),
-		Args: committee_verifier.ConstructorArgs{
-			// Use zero-value dynamic config and a dummy storage location for testing
-			DynamicConfig: committee_verifier.DynamicConfig{
-				FeeQuoter:      common.HexToAddress("0x01"),
-				FeeAggregator:  common.HexToAddress("0x02"),
-				AllowlistAdmin: common.HexToAddress("0x03"),
-			},
-			StorageLocation: "https://test.chain.link.fake",
-		},
+func basicDeployCommitteeVerifierParams() sequences.CommitteeVerifierParams {
+	return sequences.CommitteeVerifierParams{
+		Version:         semver.MustParse("1.7.0"),
+		FeeQuoter:       common.HexToAddress("0x01"),
+		FeeAggregator:   common.HexToAddress("0x02"),
+		AllowlistAdmin:  common.HexToAddress("0x03"),
+		StorageLocation: "https://test.chain.link.fake",
 		SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
 			Threshold: 1,
 			Signers: []common.Address{

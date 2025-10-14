@@ -47,17 +47,6 @@ type OffRampParams struct {
 	GasForCallExactCheck uint16
 }
 
-type CommitteeVerifierParams struct {
-	Version             *semver.Version
-	AllowlistAdmin      common.Address
-	FeeAggregator       common.Address
-	SignatureConfigArgs committee_verifier.SetSignatureConfigArgs
-	StorageLocation     string
-	// Qualifier distinguishes between multiple deployments of the committee verifier and proxy
-	// on the same chain.
-	Qualifier string
-}
-
 type OnRampParams struct {
 	Version       *semver.Version
 	FeeAggregator common.Address
@@ -292,17 +281,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
 				ExistingAddresses: input.ExistingAddresses,
-				Params: DeployCommitteeVerifierParams{
-					CommitteeVerifierVersion:      committeeVerifierParams.Version,
-					CommitteeVerifierProxyVersion: committeeVerifierParams.Version,
-					Args: committee_verifier.ConstructorArgs{
-						DynamicConfig: committee_verifier.DynamicConfig{
-							FeeQuoter:      common.HexToAddress(feeQuoterRef.Address),
-							FeeAggregator:  committeeVerifierParams.FeeAggregator,
-							AllowlistAdmin: committeeVerifierParams.AllowlistAdmin,
-						},
-						StorageLocation: committeeVerifierParams.StorageLocation,
-					},
+				Params: CommitteeVerifierParams{
+					Version:             committeeVerifierParams.Version,
+					FeeQuoter:           common.HexToAddress(feeQuoterRef.Address),
+					FeeAggregator:       committeeVerifierParams.FeeAggregator,
+					AllowlistAdmin:      committeeVerifierParams.AllowlistAdmin,
+					StorageLocation:     committeeVerifierParams.StorageLocation,
 					SignatureConfigArgs: committeeVerifierParams.SignatureConfigArgs,
 					Qualifier:           committeeVerifierParams.Qualifier,
 				},

@@ -11,7 +11,7 @@ import (
 
 type DeployCommitteeVerifierCfg struct {
 	ChainSel uint64
-	Params   sequences.DeployCommitteeVerifierParams
+	Params   sequences.CommitteeVerifierParams
 }
 
 func (c DeployCommitteeVerifierCfg) ChainSelector() uint64 {

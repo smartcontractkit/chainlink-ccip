@@ -16,11 +16,13 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-type DeployCommitteeVerifierParams struct {
-	CommitteeVerifierVersion      *semver.Version
-	CommitteeVerifierProxyVersion *semver.Version
-	Args                          committee_verifier.ConstructorArgs
-	SignatureConfigArgs           committee_verifier.SetSignatureConfigArgs
+type CommitteeVerifierParams struct {
+	Version             *semver.Version
+	FeeQuoter           common.Address
+	AllowlistAdmin      common.Address
+	FeeAggregator       common.Address
+	SignatureConfigArgs committee_verifier.SetSignatureConfigArgs
+	StorageLocation     string
 	// Qualifier distinguishes between multiple deployments of the committee verifier and proxy
 	// on the same chain.
 	Qualifier string
@@ -29,7 +31,7 @@ type DeployCommitteeVerifierParams struct {
 type DeployCommitteeVerifierInput struct {
 	ChainSelector     uint64
 	ExistingAddresses []datastore.AddressRef
-	Params            DeployCommitteeVerifierParams
+	Params            CommitteeVerifierParams
 }
 
 var DeployCommitteeVerifier = cldf_ops.NewSequence(
@@ -46,10 +48,17 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			qualifierPtr = &input.Params.Qualifier
 		}
 		committeeVerifierRef, err := maybeDeployContract(b, committee_verifier.Deploy, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.Params.CommitteeVerifierVersion),
+			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.Params.Version),
 			ChainSelector:  chain.Selector,
-			Args:           input.Params.Args,
-			Qualifier:      qualifierPtr,
+			Args: committee_verifier.ConstructorArgs{
+				DynamicConfig: committee_verifier.DynamicConfig{
+					FeeQuoter:      input.Params.FeeQuoter,
+					FeeAggregator:  input.Params.FeeAggregator,
+					AllowlistAdmin: input.Params.AllowlistAdmin,
+				},
+				StorageLocation: input.Params.StorageLocation,
+			},
+			Qualifier: qualifierPtr,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
@@ -69,7 +78,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 
 		// Deploy CommitteeVerifierProxy
 		committeeVerifierProxyRef, err := maybeDeployContract(b, committee_verifier.DeployProxy, chain, contract.DeployInput[committee_verifier.ProxyConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ProxyType, *input.Params.CommitteeVerifierProxyVersion),
+			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ProxyType, *semver.MustParse("1.7.0")),
 			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ProxyConstructorArgs{
 				RampAddress: common.HexToAddress(committeeVerifierRef.Address),
