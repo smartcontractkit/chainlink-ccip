@@ -82,7 +82,7 @@ contract OffRamp_execute is OffRampSetup, OffRamp {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: 1,
-      onRampAddress: abi.encodePacked(makeAddr("onRamp")),
+      onRampAddress: ON_RAMP,
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
       //
       finality: 0,
@@ -183,6 +183,42 @@ contract OffRamp_execute is OffRampSetup, OffRamp {
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
+  function test_execute_InsufficientGasToCompleteTx_setsToFailure() public {
+    uint256 gasForCall = 90_000;
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    bytes32 messageId = keccak256(encodedMessage);
+
+    // Mock validateReport to pass initial checks.
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_offRamp), message, messageId, ccvData[0])),
+      abi.encode(true)
+    );
+
+    // Mock executeSingleMessage to revert with NOT_ENOUGH_GAS_FOR_CALL_SIG.
+    vm.mockCallRevert(
+      address(s_offRamp),
+      abi.encodeWithSelector(s_offRamp.executeSingleMessage.selector),
+      abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
+    );
+
+    // Call from gas estimation sender to trigger the specific error handling. Since we use a contract
+    // to set a custom gas limit, we need to etch the code into that address.
+    vm.etch(Internal.GAS_ESTIMATION_SENDER, address(s_gasBoundedExecuteCaller).code);
+
+    vm.expectEmit();
+    emit OffRamp.ExecutionStateChanged(
+      message.sourceChainSelector,
+      message.sequenceNumber,
+      keccak256(encodedMessage),
+      Internal.MessageExecutionState.FAILURE,
+      abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
+    );
+
+    GasBoundedExecuteCaller(Internal.GAS_ESTIMATION_SENDER).callExecute(encodedMessage, ccvs, ccvData, gasForCall);
+  }
+
   function test_execute_RevertWhen_CursedByRMN() public {
     // Mock RMN to return cursed for source chain.
     vm.mockCall(
@@ -203,13 +239,25 @@ contract OffRamp_execute is OffRampSetup, OffRamp {
     defaultCCVs[0] = s_defaultCCV;
 
     // Configure source chain as disabled.
-    _applySourceConfig(abi.encode(makeAddr("onRamp")), false, defaultCCVs, new address[](0));
+    _applySourceConfig(ON_RAMP, false, defaultCCVs, new address[](0));
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.SourceChainNotEnabled.selector, SOURCE_CHAIN_SELECTOR));
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
     s_gasBoundedExecuteCaller.callExecute(encodedMsg, ccvs, ccvData, PLENTY_OF_GAS);
+  }
+
+  function test_execute_RevertWhen_InvalidOnRamp() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+
+    // Modify message with wrong onRamp address.
+    message.onRampAddress = abi.encodePacked(makeAddr("invalid onRamp"));
+
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRamp.selector, ON_RAMP, message.onRampAddress));
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
   }
 
   function test_execute_RevertWhen_InvalidMessageDestChainSelector() public {
@@ -268,42 +316,6 @@ contract OffRamp_execute is OffRampSetup, OffRamp {
       )
     );
     s_offRamp.execute(encodedMessage, ccvs, ccvData);
-  }
-
-  function test_execute_InsufficientGasToCompleteTx_setsToFailure() public {
-    uint256 gasForCall = 90_000;
-    MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
-    bytes32 messageId = keccak256(encodedMessage);
-
-    // Mock validateReport to pass initial checks.
-    vm.mockCall(
-      s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_offRamp), message, messageId, ccvData[0])),
-      abi.encode(true)
-    );
-
-    // Mock executeSingleMessage to revert with NOT_ENOUGH_GAS_FOR_CALL_SIG.
-    vm.mockCallRevert(
-      address(s_offRamp),
-      abi.encodeWithSelector(s_offRamp.executeSingleMessage.selector),
-      abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
-    );
-
-    // Call from gas estimation sender to trigger the specific error handling. Since we use a contract
-    // to set a custom gas limit, we need to etch the code into that address.
-    vm.etch(Internal.GAS_ESTIMATION_SENDER, address(s_gasBoundedExecuteCaller).code);
-
-    vm.expectEmit();
-    emit OffRamp.ExecutionStateChanged(
-      message.sourceChainSelector,
-      message.sequenceNumber,
-      keccak256(encodedMessage),
-      Internal.MessageExecutionState.FAILURE,
-      abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
-    );
-
-    GasBoundedExecuteCaller(Internal.GAS_ESTIMATION_SENDER).callExecute(encodedMessage, ccvs, ccvData, gasForCall);
   }
 
   function test_execute_RevertWhen_ExecuteSingleMessageFails() public {

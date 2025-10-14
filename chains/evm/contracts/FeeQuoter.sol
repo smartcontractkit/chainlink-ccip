@@ -851,6 +851,25 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     return abi.encode(abi.decode(extraArgs[4:], (Client.SVMExtraArgsV1)).tokenReceiver);
   }
 
+  function validateEncodedAddressAndEncodePacked(
+    uint64 destChainSelector,
+    bytes calldata addr
+  ) external view returns (bytes memory) {
+    bytes4 chainFamilySelector = s_destChainConfigs[destChainSelector].chainFamilySelector;
+    if (chainFamilySelector == 0) {
+      revert DestinationChainNotEnabled(destChainSelector);
+    }
+    _validateDestFamilyAddress(chainFamilySelector, addr, 0);
+
+    // We need to decode the ABI-encoded address into raw bytes. This is safe since we have validated the address
+    // format above.
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
+      return abi.encodePacked(abi.decode(addr, (address)));
+    }
+
+    return addr;
+  }
+
   // ================================================================
   // │                           Configs                            │
   // ================================================================

@@ -46,6 +46,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
+  error InvalidOnRamp(bytes expected, bytes got);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -177,8 +178,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
     }
-    if (!s_sourceChainConfigs[message.sourceChainSelector].isEnabled) {
+    SourceChainConfig storage sourceConfig = s_sourceChainConfigs[message.sourceChainSelector];
+    if (!sourceConfig.isEnabled) {
       revert SourceChainNotEnabled(message.sourceChainSelector);
+    }
+    if (keccak256(message.onRampAddress) != keccak256(sourceConfig.onRamp)) {
+      revert InvalidOnRamp(sourceConfig.onRamp, message.onRampAddress);
     }
     if (message.destChainSelector != i_chainSelector) {
       revert InvalidMessageDestChainSelector(message.destChainSelector);
@@ -652,9 +657,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address receiver,
     uint64 sourceChainSelector
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
-    Internal._validateEVMAddress(sourceTokenAmount.destTokenAddress);
-
-    address localToken = abi.decode(sourceTokenAmount.destTokenAddress, (address));
+    address localToken = address(bytes20(sourceTokenAmount.destTokenAddress));
     // We check with the token admin registry if the token has a pool on this chain.
     address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
     // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
@@ -667,9 +670,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     // Check V2 first, as it is the most recent version of the pool interface.
     if (localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V2)) {
-      // Revert for now
       // TODO write IPoolV2
-      revert NotACompatiblePool(localPoolAddress);
     }
 
     if (!localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V1)) {
@@ -687,7 +688,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         sourceDenominatedAmount: sourceTokenAmount.amount,
         localToken: localToken,
         remoteChainSelector: sourceChainSelector,
-        sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
+        // This re-encodes the address as bytes, but now with the zero prefix to make it 32 bytes long.
+        // We have to cast it to an address to ensure the bytes are padded on the left with zeros, bytes objects get
+        // padded on the right.
+        sourcePoolAddress: abi.encode(address(bytes20(sourceTokenAmount.sourcePoolAddress))),
         sourcePoolData: sourceTokenAmount.extraData,
         // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
         offchainTokenData: ""
