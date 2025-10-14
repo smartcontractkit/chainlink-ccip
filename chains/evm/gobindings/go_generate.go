@@ -1,10 +1,10 @@
 package ccip
 
+//go:generate go run generation/generate/wrap.go ccip OnRamp onramp latest
+//go:generate go run generation/generate/wrap.go ccip OffRamp offramp latest
 //go:generate go run generation/generate/wrap.go ccip VerifierProxy verifier_proxy latest
 //go:generate go run generation/generate/wrap.go ccip CommitteeVerifier committee_verifier latest
-//go:generate go run generation/generate/wrap.go ccip OnRamp on_ramp latest
-//go:generate go run generation/generate/wrap.go ccip ExecutorOnRamp executor_onramp latest
-//go:generate go run generation/generate/wrap.go ccip OffRamp off_ramp latest
+//go:generate go run generation/generate/wrap.go ccip Executor executor latest
 
 //go:generate go run generation/generate/wrap.go ccip Router router latest
 //go:generate go run generation/generate/wrap.go ccip FeeQuoter fee_quoter latest

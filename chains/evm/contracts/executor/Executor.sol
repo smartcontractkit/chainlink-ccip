@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IExecutorOnRamp} from "../interfaces/IExecutorOnRamp.sol";
+import {IExecutor} from "../interfaces/IExecutor.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
-/// @notice The ExecutorOnRamp configures the supported destination chains and CCV limits for an executor.
-contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
+/// @notice The Executor configures the supported destination chains and CCV limits for an executor.
+contract Executor is Ownable2StepMsgSender, IExecutor {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -36,7 +36,7 @@ contract ExecutorOnRamp is Ownable2StepMsgSender, IExecutorOnRamp {
   /// @notice The set of destination chains that the executor supports.
   EnumerableSet.UintSet private s_allowedDestChains;
 
-  string public constant typeAndVersion = "ExecutorOnRamp 1.7.0-dev";
+  string public constant typeAndVersion = "Executor 1.7.0-dev";
 
   constructor(
     uint8 maxCCVsPerMsg

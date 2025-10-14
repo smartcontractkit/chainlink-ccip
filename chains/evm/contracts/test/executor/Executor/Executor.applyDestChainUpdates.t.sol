@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ExecutorOnRamp} from "../../../onRamp/ExecutorOnRamp.sol";
-import {ExecutorOnRampSetup} from "./ExecutorOnRampSetup.t.sol";
+import {Executor} from "../../../executor/Executor.sol";
+import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract ExecutorOnRamp_applyDestChainUpdates is ExecutorOnRampSetup {
+contract Executor_applyDestChainUpdates is ExecutorSetup {
   function test_applyDestChainUpdates_AddNewChain() public {
     uint64[] memory newDests = new uint64[](1);
     newDests[0] = INITIAL_DEST + 1;
 
     vm.expectEmit();
-    emit ExecutorOnRamp.DestChainAdded(INITIAL_DEST + 1);
-    s_executorOnRamp.applyDestChainUpdates(new uint64[](0), newDests);
+    emit Executor.DestChainAdded(INITIAL_DEST + 1);
+    s_Executor.applyDestChainUpdates(new uint64[](0), newDests);
 
-    uint64[] memory currentDestChains = s_executorOnRamp.getDestChains();
+    uint64[] memory currentDestChains = s_Executor.getDestChains();
     assertEq(currentDestChains.length, 2);
     bool found = false;
     for (uint256 i = 0; i < currentDestChains.length; ++i) {
@@ -32,10 +32,10 @@ contract ExecutorOnRamp_applyDestChainUpdates is ExecutorOnRampSetup {
     newDests[0] = INITIAL_DEST;
 
     vm.recordLogs();
-    s_executorOnRamp.applyDestChainUpdates(new uint64[](0), newDests);
+    s_Executor.applyDestChainUpdates(new uint64[](0), newDests);
     vm.assertEq(vm.getRecordedLogs().length, 0);
 
-    uint64[] memory currentDestChains = s_executorOnRamp.getDestChains();
+    uint64[] memory currentDestChains = s_Executor.getDestChains();
     assertEq(currentDestChains.length, 1);
   }
 
@@ -44,10 +44,10 @@ contract ExecutorOnRamp_applyDestChainUpdates is ExecutorOnRampSetup {
     destsToRemove[0] = INITIAL_DEST;
 
     vm.expectEmit();
-    emit ExecutorOnRamp.DestChainRemoved(INITIAL_DEST);
-    s_executorOnRamp.applyDestChainUpdates(destsToRemove, new uint64[](0));
+    emit Executor.DestChainRemoved(INITIAL_DEST);
+    s_Executor.applyDestChainUpdates(destsToRemove, new uint64[](0));
 
-    uint64[] memory currentDestChains = s_executorOnRamp.getDestChains();
+    uint64[] memory currentDestChains = s_Executor.getDestChains();
     assertEq(currentDestChains.length, 0);
   }
 
@@ -56,10 +56,10 @@ contract ExecutorOnRamp_applyDestChainUpdates is ExecutorOnRampSetup {
     destsToRemove[0] = 999;
 
     vm.recordLogs();
-    s_executorOnRamp.applyDestChainUpdates(destsToRemove, new uint64[](0));
+    s_Executor.applyDestChainUpdates(destsToRemove, new uint64[](0));
     vm.assertEq(vm.getRecordedLogs().length, 0);
 
-    uint64[] memory currentDestChains = s_executorOnRamp.getDestChains();
+    uint64[] memory currentDestChains = s_Executor.getDestChains();
     assertEq(currentDestChains.length, 1);
   }
 
@@ -67,14 +67,14 @@ contract ExecutorOnRamp_applyDestChainUpdates is ExecutorOnRampSetup {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_executorOnRamp.applyDestChainUpdates(new uint64[](0), new uint64[](0));
+    s_Executor.applyDestChainUpdates(new uint64[](0), new uint64[](0));
   }
 
   function test_applyDestChainUpdates_RevertWhen_DestChainInvalid() public {
     uint64[] memory newDests = new uint64[](1);
     newDests[0] = 0;
 
-    vm.expectRevert(abi.encodeWithSelector(ExecutorOnRamp.InvalidDestChain.selector, 0));
-    s_executorOnRamp.applyDestChainUpdates(new uint64[](0), newDests);
+    vm.expectRevert(abi.encodeWithSelector(Executor.InvalidDestChain.selector, 0));
+    s_Executor.applyDestChainUpdates(new uint64[](0), newDests);
   }
 }
