@@ -3,6 +3,7 @@ package sequences
 import (
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -29,6 +30,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
+type MockReceiverParams struct {
+	Version *semver.Version
+	// CommitteeVerifierQualifiers are the qualifiers of the committee verifiers that are required by the mock receiver.
+	// If not provided, the first committee verifier with an empty qualifier will be used.
+	CommitteeVerifierQualifiers []string
+}
+
 type RMNRemoteParams struct {
 	Version   *semver.Version
 	LegacyRMN common.Address
@@ -45,6 +53,9 @@ type CommitteeVerifierParams struct {
 	FeeAggregator       common.Address
 	SignatureConfigArgs committee_verifier.SetSignatureConfigArgs
 	StorageLocation     string
+	// Qualifier distinguishes between multiple deployments of the committee verifier and proxy
+	// on the same chain.
+	Qualifier string
 }
 
 type OnRampParams struct {
@@ -69,10 +80,11 @@ type ExecutorOnRampParams struct {
 type ContractParams struct {
 	RMNRemote         RMNRemoteParams
 	OffRamp           OffRampParams
-	CommitteeVerifier CommitteeVerifierParams
+	CommitteeVerifier []CommitteeVerifierParams
 	OnRamp            OnRampParams
 	FeeQuoter         FeeQuoterParams
 	ExecutorOnRamp    ExecutorOnRampParams
+	MockReceiver      MockReceiverParams
 }
 
 type DeployChainContractsInput struct {
@@ -274,47 +286,38 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, onRampRef)
 
-		// Deploy CommitteeVerifier
-		committeeVerifierRef, err := maybeDeployContract(b, committee_verifier.Deploy, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.ContractParams.CommitteeVerifier.Version),
-			ChainSelector:  chain.Selector,
-			Args: committee_verifier.ConstructorArgs{
-				DynamicConfig: committee_verifier.DynamicConfig{
-					FeeQuoter:      common.HexToAddress(feeQuoterRef.Address),
-					FeeAggregator:  input.ContractParams.CommitteeVerifier.FeeAggregator,
-					AllowlistAdmin: input.ContractParams.CommitteeVerifier.AllowlistAdmin,
+		// TODO: validate prior to deploying that qualifiers are unique?
+		var committeeVerifierRefs []datastore.AddressRef
+		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifier {
+			addrs, writes, err := deployCommitteeVerifier(b, chain, DeployCommitteeVerifierInput{
+				ChainSelector:     chain.Selector,
+				ExistingAddresses: input.ExistingAddresses,
+				Params: DeployCommitteeVerifierParams{
+					CommitteeVerifierVersion:      committeeVerifierParams.Version,
+					CommitteeVerifierProxyVersion: committeeVerifierParams.Version,
+					Args: committee_verifier.ConstructorArgs{
+						DynamicConfig: committee_verifier.DynamicConfig{
+							FeeQuoter:      common.HexToAddress(feeQuoterRef.Address),
+							FeeAggregator:  committeeVerifierParams.FeeAggregator,
+							AllowlistAdmin: committeeVerifierParams.AllowlistAdmin,
+						},
+						StorageLocation: committeeVerifierParams.StorageLocation,
+					},
+					SignatureConfigArgs: committeeVerifierParams.SignatureConfigArgs,
+					Qualifier:           committeeVerifierParams.Qualifier,
 				},
-				StorageLocation: input.ContractParams.CommitteeVerifier.StorageLocation,
-			},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
+			}
+			addresses = append(addresses, addrs...)
+			for _, addr := range addrs {
+				if addr.Type == datastore.ContractType(committee_verifier.ContractType) {
+					committeeVerifierRefs = append(committeeVerifierRefs, addr)
+				}
+			}
+			writes = append(writes, writes...)
 		}
-		addresses = append(addresses, committeeVerifierRef)
-
-		// Set signature config on the CommitteeVerifier
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetSignatureConfigs, chain, contract.FunctionInput[committee_verifier.SetSignatureConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierRef.Address),
-			Args:          input.ContractParams.CommitteeVerifier.SignatureConfigArgs,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitteeVerifier: %w", err)
-		}
-		writes = append(writes, setSignatureConfigReport.Output)
-
-		// Deploy CommitteeVerifierProxy
-		committeeVerifierProxyRef, err := maybeDeployContract(b, committee_verifier.DeployProxy, chain, contract.DeployInput[committee_verifier.ProxyConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ProxyType, *semver.MustParse("1.7.0")),
-			ChainSelector:  chain.Selector,
-			Args: committee_verifier.ProxyConstructorArgs{
-				RampAddress: common.HexToAddress(committeeVerifierRef.Address),
-			},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierProxy: %w", err)
-		}
-		addresses = append(addresses, committeeVerifierProxyRef)
 
 		// Deploy ExecutorOnRamp
 		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, chain, contract.DeployInput[executor_onramp.ConstructorArgs]{
@@ -329,19 +332,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, executorOnRampRef)
 
-		// Deploy MockReceiver (defines committee verifier as required)
-		// TODO: Replace with a more configurable receiver contract.
-		mockReceiver, err := maybeDeployContract(b, mock_receiver.Deploy, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *semver.MustParse("1.7.0")),
-			ChainSelector:  chain.Selector,
-			Args: mock_receiver.ConstructorArgs{
-				RequiredVerifiers: []common.Address{common.HexToAddress(committeeVerifierRef.Address)},
-			},
-		}, input.ExistingAddresses)
+		mockReceiverRef, err := deployMockReceiver(b, chain, committeeVerifierRefs, input)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy MockReceiver: %w", err)
+			return sequences.OnChainOutput{}, err
 		}
-		addresses = append(addresses, mockReceiver)
+		addresses = append(addresses, mockReceiverRef)
 
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
@@ -354,6 +349,91 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+func getCommitteeVerifiers(committeeVerifierRefs []datastore.AddressRef, qualifiers []string) ([]datastore.AddressRef, error) {
+	if len(qualifiers) == 0 {
+		return committeeVerifierRefs, fmt.Errorf("no qualifiers provided")
+	}
+	var verifiers []datastore.AddressRef
+	for _, ref := range committeeVerifierRefs {
+		if slices.Contains(qualifiers, ref.Qualifier) {
+			verifiers = append(verifiers, ref)
+		}
+	}
+	if len(verifiers) == 0 {
+		return nil, fmt.Errorf("no committee verifiers found with qualifiers %v", qualifiers)
+	}
+	return verifiers, nil
+}
+
+// getDefaultCommitteeVerifier returns the committee verifier with an empty qualifier, since thats how we deploy
+// the canonical committee verifier now. If this isn't found it returns the first one.
+func getDefaultCommitteeVerifier(committeeVerifierRefs []datastore.AddressRef) (datastore.AddressRef, error) {
+	if len(committeeVerifierRefs) == 0 {
+		return datastore.AddressRef{}, fmt.Errorf("no committee verifiers found, need at least one")
+	}
+	for _, ref := range committeeVerifierRefs {
+		if ref.Qualifier == "" {
+			return ref, nil
+		}
+	}
+	return committeeVerifierRefs[0], nil
+}
+
+// deployMockReceiver computes required verifiers and deploys the MockReceiver contract.
+func deployMockReceiver(
+	b operations.Bundle,
+	chain evm.Chain,
+	committeeVerifierRefs []datastore.AddressRef,
+	input DeployChainContractsInput,
+) (datastore.AddressRef, error) {
+	// Determine version
+	var version *semver.Version
+	if input.ContractParams.MockReceiver.Version != nil {
+		version = input.ContractParams.MockReceiver.Version
+	} else {
+		version = semver.MustParse("1.7.0")
+	}
+
+	// Compute required verifiers
+	var requiredVerifiers []common.Address
+	if len(input.ContractParams.MockReceiver.CommitteeVerifierQualifiers) > 0 {
+		refs, err := getCommitteeVerifiers(committeeVerifierRefs, input.ContractParams.MockReceiver.CommitteeVerifierQualifiers)
+		if err != nil {
+			return datastore.AddressRef{}, fmt.Errorf("failed to get default committee verifier: %w", err)
+		}
+		for _, ref := range refs {
+			requiredVerifiers = append(requiredVerifiers, common.HexToAddress(ref.Address))
+		}
+	} else {
+		// backwards compatibilty: select the committee verifier with an empty qualifier, since thats how we deploy
+		// the canonical committee verifier now.
+		defRef, err := getDefaultCommitteeVerifier(committeeVerifierRefs)
+		if err != nil {
+			return datastore.AddressRef{}, fmt.Errorf("failed to get default committee verifier: %w", err)
+		}
+		requiredVerifiers = append(requiredVerifiers, common.HexToAddress(defRef.Address))
+		for _, ref := range committeeVerifierRefs {
+			if ref.Qualifier == "" {
+				requiredVerifiers = append(requiredVerifiers, common.HexToAddress(ref.Address))
+			}
+		}
+	}
+
+	// Deploy MockReceiver
+	mockReceiverRef, err := maybeDeployContract(b, mock_receiver.Deploy, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *version),
+		ChainSelector:  chain.Selector,
+		Args: mock_receiver.ConstructorArgs{
+			// TODO: this should be the proxy address, not the impl address.
+			RequiredVerifiers: requiredVerifiers,
+		},
+	}, input.ExistingAddresses)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to deploy MockReceiver: %w", err)
+	}
+	return mockReceiverRef, nil
+}
 
 func maybeDeployContract[ARGS any](
 	b cldf_ops.Bundle,

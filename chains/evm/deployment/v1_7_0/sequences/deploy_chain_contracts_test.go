@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
@@ -19,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
+	mock_recv_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_receiver_v2"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -195,4 +197,132 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 			require.NotEmpty(t, result.report.Output.Addresses, "Expected addresses for chain %d", result.chainSelector)
 		}
 	})
+}
+
+func TestDeployChainContracts_MultipleCommitteeVerifiersAndMockReceiverConfig(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	require.NotNil(t, e, "Environment should be created")
+
+	// Configure two committee verifiers with different qualifiers and request both for MockReceiver
+	params := testsetup.CreateBasicContractParams()
+	params.CommitteeVerifier = []sequences.CommitteeVerifierParams{
+		{
+			Version:       semver.MustParse("1.7.0"),
+			FeeAggregator: common.HexToAddress("0x01"),
+			SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
+				Threshold: 1,
+				Signers: []common.Address{
+					common.HexToAddress("0x02"),
+					common.HexToAddress("0x03"),
+				},
+			},
+			StorageLocation: "https://test.chain.link.fake",
+			Qualifier:       "alpha",
+		},
+		{
+			Version:       semver.MustParse("1.7.0"),
+			FeeAggregator: common.HexToAddress("0x01"),
+			SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
+				Threshold: 1,
+				Signers: []common.Address{
+					common.HexToAddress("0x02"),
+					common.HexToAddress("0x03"),
+				},
+			},
+			StorageLocation: "https://test.chain.link.fake",
+			Qualifier:       "beta",
+		},
+	}
+	params.MockReceiver = sequences.MockReceiverParams{
+		Version:                     semver.MustParse("1.7.0"),
+		CommitteeVerifierQualifiers: []string{"alpha", "beta"},
+	}
+
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		e.BlockChains.EVMChains()[chainSelector],
+		sequences.DeployChainContractsInput{
+			ChainSelector:     chainSelector,
+			ExistingAddresses: nil,
+			ContractParams:    params,
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	// Find MockReceiver address
+	var mockAddr common.Address
+	for _, addr := range report.Output.Addresses {
+		if deployment.ContractType(addr.Type) == mock_receiver.ContractType {
+			mockAddr = common.HexToAddress(addr.Address)
+			break
+		}
+	}
+	require.NotEqual(t, (common.Address{}), mockAddr, "MockReceiver address not found")
+
+	// Query MockReceiver for configured CCVs and validate that both alpha and beta were provided
+	mr, err := mock_recv_bindings.NewMockReceiverV2(mockAddr, e.BlockChains.EVMChains()[chainSelector].Client)
+	require.NoError(t, err)
+
+	required, optional, threshold, err := mr.GetCCVs(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(required), 2)
+	require.Equal(t, uint8(0), threshold) // default optional threshold
+	_ = optional                          // not asserted here
+}
+
+func TestDeployChainContracts_MockReceiver_DefaultQualifiersFallback(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	require.NotNil(t, e, "Environment should be created")
+
+	// Use default params with a single CommitteeVerifier (no qualifier specified)
+	params := testsetup.CreateBasicContractParams()
+	// Do not set MockReceiver.CommitteeVerifierQualifiers to exercise default behavior
+
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		e.BlockChains.EVMChains()[chainSelector],
+		sequences.DeployChainContractsInput{
+			ChainSelector:     chainSelector,
+			ExistingAddresses: nil,
+			ContractParams:    params,
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	// Collect canonical (empty qualifier) CommitteeVerifier addresses
+	canon := make(map[string]struct{})
+	var mockAddr common.Address
+	for _, addr := range report.Output.Addresses {
+		if deployment.ContractType(addr.Type) == committee_verifier.ContractType && addr.Qualifier == "" {
+			canon[common.HexToAddress(addr.Address).Hex()] = struct{}{}
+		}
+		if deployment.ContractType(addr.Type) == mock_receiver.ContractType {
+			mockAddr = common.HexToAddress(addr.Address)
+		}
+	}
+	require.NotEqual(t, (common.Address{}), mockAddr, "MockReceiver address not found")
+	require.NotEmpty(t, canon, "Expected at least one canonical CommitteeVerifier address")
+
+	// Verify MockReceiver required CCVs are the canonical CommitteeVerifier(s)
+	mr, err := mock_recv_bindings.NewMockReceiverV2(mockAddr, e.BlockChains.EVMChains()[chainSelector].Client)
+	require.NoError(t, err)
+	required, optional, threshold, err := mr.GetCCVs(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(required), 1)
+	require.Equal(t, uint8(0), threshold)
+	_ = optional // not asserted
+	for _, r := range required {
+		_, ok := canon[r.Hex()]
+		require.True(t, ok, "required CCV %s should be one of canonical CommitteeVerifiers", r.Hex())
+	}
 }
