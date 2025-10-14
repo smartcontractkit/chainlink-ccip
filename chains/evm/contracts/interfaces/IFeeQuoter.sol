@@ -118,4 +118,9 @@ interface IFeeQuoter {
   function resolveTokenReceiver(
     bytes calldata extraArgs
   ) external view returns (bytes memory tokenReceiver);
+
+  function validateEncodedAddressAndEncodePacked(
+    uint64 destChainSelector,
+    bytes calldata addr
+  ) external view returns (bytes memory);
 }

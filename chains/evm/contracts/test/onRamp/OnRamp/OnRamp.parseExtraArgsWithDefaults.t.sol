@@ -2,27 +2,27 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
-import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
-import {CCVProxyTestHelper} from "../../helpers/CCVProxyTestHelper.sol";
-import {CCVProxySetup} from "./CCVProxySetup.t.sol";
+import {OnRamp} from "../../../onRamp/OnRamp.sol";
+import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
+import {OnRampSetup} from "./OnRampSetup.t.sol";
 
-contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
-  CCVProxyTestHelper internal s_ccvProxyTestHelper;
+contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
+  OnRampTestHelper internal s_onRampTestHelper;
 
   address[] internal s_defaultCCVs;
   address[] internal s_laneMandatedCCVs;
   address internal s_defaultExecutor;
-  CCVProxy.DestChainConfig internal s_destChainConfig;
+  OnRamp.DestChainConfig internal s_destChainConfig;
 
   function setUp() public override {
     super.setUp();
-    s_ccvProxyTestHelper = new CCVProxyTestHelper(
-      CCVProxy.StaticConfig({
+    s_onRampTestHelper = new OnRampTestHelper(
+      OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      CCVProxy.DynamicConfig({
+      OnRamp.DynamicConfig({
         feeQuoter: address(s_feeQuoter),
         reentrancyGuardEntered: false,
         feeAggregator: FEE_AGGREGATOR
@@ -39,7 +39,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     s_defaultExecutor = makeAddr("defaultExecutor");
 
-    s_destChainConfig = CCVProxy.DestChainConfig({
+    s_destChainConfig = OnRamp.DestChainConfig({
       router: s_sourceRouter,
       sequenceNumber: 0,
       defaultExecutor: s_defaultExecutor,
@@ -65,7 +65,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    Client.EVMExtraArgsV3 memory result = s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
 
     // User-provided CCVs should be used (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(userRequiredCCVs.length, result.requiredCCV.length);
@@ -83,7 +83,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    Client.EVMExtraArgsV3 memory result = s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
 
     // Default CCVs should be applied (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(s_defaultCCVs.length, result.requiredCCV.length);
@@ -105,7 +105,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     bytes memory legacyExtraArgs = Client._argsToBytes(v2Args);
 
     Client.EVMExtraArgsV3 memory result =
-      s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, legacyExtraArgs);
+      s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, legacyExtraArgs);
 
     // Default CCVs should be used with V2 args passed to each CCV (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(s_defaultCCVs.length, result.requiredCCV.length);
@@ -131,8 +131,8 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
     // Should revert due to duplicate CCVs
-    vm.expectRevert(abi.encodeWithSelector(CCVProxy.DuplicateCCVInUserInput.selector, duplicateCCV));
-    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.DuplicateCCVInUserInput.selector, duplicateCCV));
+    s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
   }
 
   function test_parseExtraArgsWithDefaults_NoDuplicatesAllowed_WithinOptionalCCVs() public {
@@ -147,8 +147,8 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
     // Should revert due to duplicate CCVs
-    vm.expectRevert(abi.encodeWithSelector(CCVProxy.DuplicateCCVInUserInput.selector, duplicateCCV));
-    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.DuplicateCCVInUserInput.selector, duplicateCCV));
+    s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
   }
 
   function test_parseExtraArgsWithDefaults_NoDuplicatesAllowed_BetweenRequiredAndOptional() public {
@@ -166,8 +166,8 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
     // Should revert due to duplicate CCVs between required and optional
-    vm.expectRevert(abi.encodeWithSelector(CCVProxy.DuplicateCCVInUserInput.selector, duplicateCCV));
-    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.DuplicateCCVInUserInput.selector, duplicateCCV));
+    s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
   }
 
   function test_parseExtraArgsWithDefaults_WithOptionalCCVs() public {
@@ -192,7 +192,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    Client.EVMExtraArgsV3 memory result = s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
 
     // User provided required CCVs override defaults
     assertEq(requiredCCVs.length, result.requiredCCV.length);
@@ -216,7 +216,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    Client.EVMExtraArgsV3 memory result = s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
 
     // Required CCVs should remain empty (no defaults applied)
     assertEq(0, result.requiredCCV.length);
@@ -236,7 +236,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
     Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0), new Client.CCV[](0), 0);
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
-    Client.EVMExtraArgsV3 memory result = s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    Client.EVMExtraArgsV3 memory result = s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
 
     // Should have default CCVs
     assertEq(s_defaultCCVs.length, result.requiredCCV.length);
@@ -259,8 +259,8 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    vm.expectRevert(CCVProxy.InvalidOptionalCCVThreshold.selector);
-    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    vm.expectRevert(OnRamp.InvalidOptionalCCVThreshold.selector);
+    s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
   }
 
   function test_parseExtraArgsWithDefaults_RevertWhen_InvalidOptionalThreshold_Zero() public {
@@ -275,8 +275,8 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    vm.expectRevert(CCVProxy.InvalidOptionalCCVThreshold.selector);
-    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    vm.expectRevert(OnRamp.InvalidOptionalCCVThreshold.selector);
+    s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
   }
 
   function test_parseExtraArgsWithDefaults_RevertWhen_InvalidOptionalThreshold_EqualLength() public {
@@ -292,7 +292,7 @@ contract CCVProxy_parseExtraArgsWithDefaults is CCVProxySetup {
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    vm.expectRevert(CCVProxy.InvalidOptionalCCVThreshold.selector);
-    s_ccvProxyTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    vm.expectRevert(OnRamp.InvalidOptionalCCVThreshold.selector);
+    s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
   }
 }

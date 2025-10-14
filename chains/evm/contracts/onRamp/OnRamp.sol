@@ -23,7 +23,7 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 // TODO post process hooks?
-contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
+contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
@@ -114,7 +114,7 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "CCVProxy 1.7.0-dev";
+  string public constant override typeAndVersion = "OnRamp 1.7.0-dev";
   /// @dev The chain ID of the source chain that this contract is deployed to.
   uint64 private immutable i_localChainSelector;
   /// @dev The rmn contract.
@@ -267,8 +267,8 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
 
     // created fresh locals like near the callsite to fix stack too deep.
     address feeToken = message.feeToken;
-    uint256 feeTokenAmount = feeTokenAmount;
-    uint64 destChainSelector = destChainSelector;
+    uint256 feeTokenAmount2 = feeTokenAmount;
+    uint64 destChainSelector2 = destChainSelector;
 
     // 5. encode message and calculate messageId.
 
@@ -280,19 +280,19 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
     for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
       ccvBlobs[i] = ICrossChainVerifierV1(ccv.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, feeToken, feeTokenAmount, ccv.args
+        address(this), newMessage, messageId, feeToken, feeTokenAmount2, ccv.args
       );
     }
     for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
       Client.CCV memory ccvOpt = resolvedExtraArgs.optionalCCV[i];
       ccvBlobs[resolvedExtraArgs.requiredCCV.length + i] = ICrossChainVerifierV1(ccvOpt.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, feeToken, feeTokenAmount, ccvOpt.args
+        address(this), newMessage, messageId, feeToken, feeTokenAmount2, ccvOpt.args
       );
     }
 
     // 7. emit event
     emit CCIPMessageSent(
-      destChainSelector,
+      destChainSelector2,
       newMessage.sequenceNumber,
       messageId,
       encodedMessage,
@@ -632,8 +632,9 @@ contract CCVProxy is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSende
       amount: tokenAndAmount.amount,
       sourcePoolAddress: abi.encodePacked(address(sourcePool)),
       sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
-      // TODO handle bytes destTokenAddress for EVM since poolReturnData return abi.encoded for EVM
-      destTokenAddress: poolReturnData.destTokenAddress,
+      destTokenAddress: IFeeQuoter(s_dynamicConfig.feeQuoter).validateEncodedAddressAndEncodePacked(
+        destChainSelector, poolReturnData.destTokenAddress
+      ),
       extraData: poolReturnData.destPoolData
     });
   }

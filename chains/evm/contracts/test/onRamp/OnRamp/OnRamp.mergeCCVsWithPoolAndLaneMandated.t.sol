@@ -2,21 +2,21 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
-import {CCVProxy} from "../../../onRamp/CCVProxy.sol";
-import {CCVProxyTestHelper} from "../../helpers/CCVProxyTestHelper.sol";
-import {CCVProxySetup} from "./CCVProxySetup.t.sol";
+import {OnRamp} from "../../../onRamp/OnRamp.sol";
+import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
+import {OnRampSetup} from "./OnRampSetup.t.sol";
 
-contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
-  CCVProxyTestHelper internal s_ccvProxyTestHelper;
+contract OnRamp_mergeCCVsWithPoolAndLaneMandated is OnRampSetup {
+  OnRampTestHelper internal s_onRampTestHelper;
 
   function _setupTestDestChainConfig(
     address[] memory laneMandatedCCVs
   ) internal {
-    CCVProxy.DestChainConfigArgs[] memory destChainConfigArgs = new CCVProxy.DestChainConfigArgs[](1);
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = makeAddr("defaultCCV");
 
-    destChainConfigArgs[0] = CCVProxy.DestChainConfigArgs({
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       laneMandatedCCVs: laneMandatedCCVs,
@@ -25,18 +25,18 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
       offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
-    s_ccvProxyTestHelper.applyDestChainConfigUpdates(destChainConfigArgs);
+    s_onRampTestHelper.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
   function setUp() public override {
     super.setUp();
-    s_ccvProxyTestHelper = new CCVProxyTestHelper(
-      CCVProxy.StaticConfig({
+    s_onRampTestHelper = new OnRampTestHelper(
+      OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      CCVProxy.DynamicConfig({
+      OnRamp.DynamicConfig({
         feeQuoter: address(s_feeQuoter),
         reentrancyGuardEntered: false,
         feeAggregator: FEE_AGGREGATOR
@@ -65,7 +65,7 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     uint8 optionalThreshold = 2;
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+    s_onRampTestHelper.mergeCCVsWithPoolAndLaneMandated(
       DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
     );
 
@@ -99,7 +99,7 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     uint8 optionalThreshold = 0;
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+    s_onRampTestHelper.mergeCCVsWithPoolAndLaneMandated(
       DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
     );
 
@@ -129,7 +129,7 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     uint8 optionalThreshold = 2; // This will become 0 after moving both optionals to required.
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+    s_onRampTestHelper.mergeCCVsWithPoolAndLaneMandated(
       DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
     );
 
@@ -162,7 +162,7 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     uint8 optionalThreshold = 1;
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+    s_onRampTestHelper.mergeCCVsWithPoolAndLaneMandated(
       DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
     );
 
@@ -185,7 +185,7 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     uint8 optionalThreshold = 1;
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+    s_onRampTestHelper.mergeCCVsWithPoolAndLaneMandated(
       DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
     );
 
@@ -220,7 +220,7 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     uint8 optionalThreshold = 2;
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+    s_onRampTestHelper.mergeCCVsWithPoolAndLaneMandated(
       DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
     );
 
@@ -264,7 +264,7 @@ contract CCVProxy_mergeCCVsWithPoolAndLaneMandated is CCVProxySetup {
     uint8 optionalThreshold = 2;
 
     (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold) =
-    s_ccvProxyTestHelper.mergeCCVsWithPoolAndLaneMandated(
+    s_onRampTestHelper.mergeCCVsWithPoolAndLaneMandated(
       DEST_CHAIN_SELECTOR, poolRequiredCCV, requiredCCV, optionalCCV, optionalThreshold
     );
 
