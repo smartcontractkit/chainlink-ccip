@@ -201,9 +201,10 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 		{
 			name:           "sui high fee case",
 			sourceGasPrice: big.NewInt(100000),
-			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(4), new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1e18))), //  usdPerFeeCoin = $4 * 1e9 * 1e18 = 4e27
-			chainSelector:  SuiChainSelector,
-			exp:            big.NewInt(100000 * 4e9),
+			//  usdPerFeeCoin = $4 * 1e9 * 1e18 = 4e27
+			usdPerFeeCoin: new(big.Int).Mul(big.NewInt(4), new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1e18))),
+			chainSelector: SuiChainSelector,
+			exp:           big.NewInt(100000 * 4e9),
 		},
 		{
 			name:           "sui low fee case",
