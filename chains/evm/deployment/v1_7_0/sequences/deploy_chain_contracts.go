@@ -363,6 +363,15 @@ func maybeDeployContract[ARGS any](
 	existingAddresses []datastore.AddressRef) (datastore.AddressRef, error) {
 	for _, ref := range existingAddresses {
 		if ref.Type == datastore.ContractType(input.TypeAndVersion.Type) {
+			// Check matching qualifier if provided, since contracts like CommitteeVerifier may
+			// be deployed multiple times on the same chain.
+			if input.Qualifier != nil {
+				if ref.Qualifier == *input.Qualifier {
+					return ref, nil
+				} else {
+					continue
+				}
+			}
 			return ref, nil
 		}
 	}
