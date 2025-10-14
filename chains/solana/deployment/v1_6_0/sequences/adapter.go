@@ -1,4 +1,4 @@
-package v160
+package operations
 
 import (
 	"github.com/Masterminds/semver/v3"

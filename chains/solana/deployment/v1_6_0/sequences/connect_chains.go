@@ -1,4 +1,4 @@
-package v160
+package operations
 
 import (
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
