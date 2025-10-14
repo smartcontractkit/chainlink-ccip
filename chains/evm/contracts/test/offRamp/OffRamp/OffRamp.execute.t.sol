@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
+import {IRMNRemote} from "../../../interfaces/IRMNRemote.sol";
 
-import {Router} from "../../../Router.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
@@ -40,10 +40,22 @@ contract GasBoundedExecuteCaller {
   }
 }
 
-contract OffRamp_execute is OffRampSetup {
+contract OffRamp_execute is OffRampSetup, OffRamp {
   uint256 internal constant PLENTY_OF_GAS = 1_000_000;
 
   GasBoundedExecuteCaller internal s_gasBoundedExecuteCaller;
+
+  // We have the constructor here simply to access & test some internal functions.
+  constructor()
+    OffRamp(
+      OffRamp.StaticConfig({
+        localChainSelector: DEST_CHAIN_SELECTOR,
+        gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
+        rmnRemote: IRMNRemote(makeAddr("rmnRemote")),
+        tokenAdminRegistry: makeAddr("tokenAdminRegistry")
+      })
+    )
+  {}
 
   function setUp() public virtual override {
     super.setUp();
@@ -326,21 +338,31 @@ contract OffRamp_execute is OffRampSetup {
     );
   }
 
+  function test_padTo32() public pure {
+    assertEq(OffRamp._padTo32(0), 0);
+    assertEq(OffRamp._padTo32(1), 32);
+    assertEq(OffRamp._padTo32(31), 32);
+    assertEq(OffRamp._padTo32(32), 32);
+    assertEq(OffRamp._padTo32(33), 64);
+  }
+
+  function test_execute_WithReceiver_HighBaseExecuteGas() public {
+    callExecuteWithReceiver(50_000, 500, 20_000_000);
+  }
+
   /// forge-config: default.fuzz.runs = 1000
-  function testFuzz_execute_WithReceiver(
-    uint32 _gasUsedByCCIPReceive,
-    uint32 _baseExecuteGas, // baseExecuteGas accounts for logic preceeding and following the call to routeMessage.
-    uint16 _calldataLength
-  ) public {
+  function testFuzz_execute_WithReceiver(uint32 _gasUsedByCCIPReceive, uint16 _calldataLength) public {
     uint256 gasUsedByCCIPReceive = bound(_gasUsedByCCIPReceive, 1_000, PLENTY_OF_GAS);
-    uint256 baseExecuteGas = bound(_baseExecuteGas, 130_000, PLENTY_OF_GAS);
     uint256 calldataLength = bound(_calldataLength, 0, 1_000);
 
-    // gasForExecute reverses the gas computation peformed by the OffRamp when calling routeMessage.
-    uint256 gasForExecute = baseExecuteGas
-      + ((gasUsedByCCIPReceive * 64 / 63) + 16 * calldataLength + 2 * GAS_FOR_CALL_EXACT_CHECK) * 64 / 63
-      + GAS_FOR_CALL_EXACT_CHECK + 2 * (16 * calldataLength);
+    callExecuteWithReceiver(gasUsedByCCIPReceive, calldataLength, 120_000);
+  }
 
+  function callExecuteWithReceiver(
+    uint256 gasUsedByCCIPReceive, // The total gas that the receiver should consume during ccipReceive.
+    uint256 calldataLength, // The length of the calldata passed to ccipReceive.
+    uint256 baseExecuteGas // Accounts for logic preceeding and following the call to routeMessage.
+  ) public {
     // Create message with exact gas receiver and calldata.
     MessageV1Codec.MessageV1 memory message = _getMessage();
     message.receiver = abi.encodePacked(address(new ExactGasReceiver(gasUsedByCCIPReceive)));
@@ -355,34 +377,31 @@ contract OffRamp_execute is OffRampSetup {
         mstore(i, 0x0101010101010101010101010101010101010101010101010101010101010101)
       }
     }
-    message.data = data;
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
-    // Set OffRamp as a valid OffRamp on the Router.
-    Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
-    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
+    // Test with 0 and 1 token transfers.
+    for (uint256 tokenTransferLength = 0; tokenTransferLength < 2; ++tokenTransferLength) {
+      message.sequenceNumber++;
+      uint256 routeMessageCalldataLen =
+        388 + _padTo32(message.sender.length) + _padTo32(calldataLength) + tokenTransferLength * 64;
 
-    // Expect execution state change event.
-    vm.expectEmit();
-    emit OffRamp.ExecutionStateChanged(
-      message.sourceChainSelector,
-      message.sequenceNumber,
-      keccak256(encodedMessage),
-      Internal.MessageExecutionState.SUCCESS,
-      ""
-    );
+      // gasForExecute reverses the gas computation peformed by the OffRamp when calling routeMessage.
+      uint256 gasForExecute = baseExecuteGas
+        + ((gasUsedByCCIPReceive * 64 / 63) + 16 * calldataLength + GAS_FOR_CALL_EXACT_CHECK) * 64 / 63
+        + GAS_FOR_CALL_EXACT_CHECK + 2 * (16 * routeMessageCalldataLen);
 
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, gasForExecute);
+      message.data = data;
+      (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
-    // Verify final state is SUCCESS.
-    assertEq(
-      uint256(Internal.MessageExecutionState.SUCCESS),
-      uint256(
-        s_offRamp.getExecutionState(
-          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
+      // Execute and verify final state is SUCCESS.
+      s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, gasForExecute);
+      assertEq(
+        uint256(Internal.MessageExecutionState.SUCCESS),
+        uint256(
+          s_offRamp.getExecutionState(
+            message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
+          )
         )
-      )
-    );
+      );
+    }
   }
 }

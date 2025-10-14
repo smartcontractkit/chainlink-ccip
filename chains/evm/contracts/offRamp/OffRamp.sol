@@ -292,33 +292,46 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, receiver, message.sourceChainSelector);
     }
 
-    // TODO gaslimit
-    uint256 gasLimit = 200000;
+    {
+      // TODO gaslimit
+      uint256 gasLimit = 200000;
 
-    // There are three cases in which we skip calling the receiver:
-    // 1. If the message data is empty AND the gas limit is 0.
-    //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
-    //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
-    //          receiver without any gas, which would revert the transaction.
-    // 2. If the receiver is not a contract.
-    // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
-    //
-    // The ordering of these checks is important, as the first check is the cheapest to execute.
-    //
-    // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
-    // which checks for sufficient gas before making the external call.
-    if (
-      (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
-        || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
-    ) return;
+      // There are three cases in which we skip calling the receiver:
+      // 1. If the message data is empty AND the gas limit is 0.
+      //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
+      //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
+      //          receiver without any gas, which would revert the transaction.
+      // 2. If the receiver is not a contract.
+      // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
+      //
+      // The ordering of these checks is important, as the first check is the cheapest to execute.
+      //
+      // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
+      // which checks for sufficient gas before making the external call.
+      if (
+        (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
+          || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
+      ) return;
+    }
 
-    bytes memory data = message.data;
+    uint256 ccipReceiveCalldataLen = message.data.length;
+    // routeMessage calldata length calculation:
+    // 4 bytes for the function selector
+    // Top-level args: message (32 byte offset) + gasForCallExactCheck (32 bytes) + gasLimit (32 bytes) + receiver (32 bytes) = 32 * 4 = 128 bytes
+    // Message block: sender (offset) + data (offset) destTokenAmounts (offset) + messageID (32 bytes) + sourceChainSelector (32 bytes) = 32 * 5 = 160 bytes
+    // Sender block: 32 bytes (encoded length) + _padTo32(message.sender.length)
+    // Data block: 32 bytes (encoded length) + _padTo32(ccipReceiveCalldataLen)
+    // DestTokenAmounts block: 32 bytes (encoded length) + destTokenAmounts.length * (amount (32 bytes) + token (32 bytes))
+    // Simplified: 4 + 128 + 160 + 32 * 3 + _padTo32(message.sender.length) + _padTo32(ccipReceiveCalldataLen) + destTokenAmounts.length * 64
+    // = 388 + _padTo32(message.sender.length) + _padTo32(ccipReceiveCalldataLen) + destTokenAmounts.length * 64
+    uint256 routeMessageCalldataLen =
+      388 + _padTo32(message.sender.length) + _padTo32(ccipReceiveCalldataLen) + destTokenAmounts.length * 64;
     (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
       Client.Any2EVMMessage({
         messageId: messageId,
         sourceChainSelector: message.sourceChainSelector,
         sender: message.sender,
-        data: data,
+        data: message.data,
         destTokenAmounts: destTokenAmounts
       }),
       i_gasForCallExactCheck,
@@ -330,14 +343,21 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       // once to account for routeMessage opcodes and once to account for static overhead associated with the router-->receiver call.
       // Lastly, since we are making another call, we subtract the estimated calldata cost and multiply by 63/64 to account for EIP-150.
       (
-        ((gasleft() - 16 * data.length - i_gasForCallExactCheck) * 63 / 64) - 2 * i_gasForCallExactCheck
-          - 16 * data.length
+        ((gasleft() - 16 * routeMessageCalldataLen - i_gasForCallExactCheck) * 63 / 64) - 2 * i_gasForCallExactCheck
+          - 16 * ccipReceiveCalldataLen
       ) * 63 / 64,
       receiver
     );
 
     // If CCIP receiver execution is not successful, revert the call including token transfers.
     if (!success) revert ReceiverError(returnData);
+  }
+
+  /// @dev Pads a value to the nearest multiple of 32 (starting at 32).
+  function _padTo32(
+    uint256 n
+  ) internal pure returns (uint256) {
+    return ((n + 31) / 32) * 32;
   }
 
   // ================================================================

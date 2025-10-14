@@ -5,6 +5,7 @@ import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageRece
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
+import {Router} from "../../../Router.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
@@ -28,6 +29,11 @@ contract OffRampSetup is BaseTest {
         tokenAdminRegistry: s_tokenAdminRegistry
       })
     );
+
+    // Set OffRamp as a valid OffRamp on the Router.
+    Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
+    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
+    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
 
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = s_defaultCCV;
