@@ -13,6 +13,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "TokenAdminRegistry"
+var Version *semver.Version = semver.MustParse("1.5.0")
 
 type ConstructorArgs struct{}
 

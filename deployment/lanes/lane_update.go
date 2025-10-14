@@ -1,6 +1,12 @@
-package v1_6
+package lanes
 
-import "math/big"
+import (
+	"encoding/binary"
+	"math/big"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+)
 
 type ChainDefinition struct {
 	// Selector is the chain selector of this chain.
@@ -27,6 +33,12 @@ type ChainDefinition struct {
 	// OffRamp is the address of the OffRamp contract on this chain.
 	// This is populated programmatically
 	OffRamp []byte
+	// Router is the address of the Router contract on this chain.
+	// This is populated programmatically
+	Router []byte
+	// FeeQuoter is the address of the FeeQuoter contract on this chain.
+	// This is populated programmatically
+	FeeQuoter []byte
 }
 
 type FeeQuoterDestChainConfig struct {
@@ -49,4 +61,51 @@ type FeeQuoterDestChainConfig struct {
 	GasMultiplierWeiPerEth            uint64
 	GasPriceStalenessThreshold        uint32
 	NetworkFeeUSDCents                uint32
+}
+
+type ConnectChainsConfig struct {
+	Lanes []LaneConfig
+	MCMS  mcms.Input
+}
+type LaneConfig struct {
+	Source       ChainDefinition
+	Dest         ChainDefinition
+	Version      *semver.Version
+	IsDisabled   bool
+	TestRouter   bool
+	ExtraConfigs ExtraConfigs
+}
+
+type ExtraConfigs struct {
+	OnRampVersion []byte
+}
+
+type UpdateLanesInput struct {
+	Source       *ChainDefinition
+	Dest         *ChainDefinition
+	IsDisabled   bool
+	TestRouter   bool
+	ExtraConfigs ExtraConfigs
+}
+
+func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChain []byte) FeeQuoterDestChainConfig {
+	return FeeQuoterDestChainConfig{
+		IsEnabled:                         configEnabled,
+		MaxNumberOfTokensPerMsg:           10,
+		MaxDataBytes:                      30_000,
+		MaxPerMsgGasLimit:                 3_000_000,
+		DestGasOverhead:                   300_000,
+		DefaultTokenFeeUSDCents:           25,
+		DestGasPerPayloadByteBase:         16,
+		DestGasPerPayloadByteHigh:         40,
+		DestGasPerPayloadByteThreshold:    3000,
+		DestDataAvailabilityOverheadGas:   100,
+		DestGasPerDataAvailabilityByte:    16,
+		DestDataAvailabilityMultiplierBps: 1,
+		DefaultTokenDestGasOverhead:       90_000,
+		DefaultTxGasLimit:                 200_000,
+		GasMultiplierWeiPerEth:            11e17,
+		NetworkFeeUSDCents:                10,
+		ChainFamilySelector:               binary.BigEndian.Uint32(destChain[:]),
+	}
 }
