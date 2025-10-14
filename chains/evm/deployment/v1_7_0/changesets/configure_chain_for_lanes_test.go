@@ -6,9 +6,9 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -61,11 +61,11 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 						4356164186791070119: {
 							AllowTrafficFrom: true,
 							CCIPMessageDest: datastore.AddressRef{
-								Type:    datastore.ContractType(off_ramp.ContractType),
+								Type:    datastore.ContractType(offramp.ContractType),
 								Version: semver.MustParse("1.7.0"),
 							},
 							CCIPMessageSource: datastore.AddressRef{
-								Type:    datastore.ContractType(on_ramp.ContractType),
+								Type:    datastore.ContractType(onramp.ContractType),
 								Version: semver.MustParse("1.7.0"),
 							},
 							DefaultCCVOffRamps: []datastore.AddressRef{
@@ -75,7 +75,7 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 								{Type: datastore.ContractType(committee_verifier.ContractType), Version: semver.MustParse("1.7.0")},
 							},
 							DefaultExecutor: datastore.AddressRef{
-								Type:    datastore.ContractType(executor_onramp.ContractType),
+								Type:    datastore.ContractType(executor.ContractType),
 								Version: semver.MustParse("1.7.0"),
 							},
 							CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{

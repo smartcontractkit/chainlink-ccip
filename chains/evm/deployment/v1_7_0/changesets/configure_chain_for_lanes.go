@@ -5,21 +5,21 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-
+	
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 type RemoteChainConfig struct {
@@ -62,7 +62,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		}
 		onRampAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			ChainSelector: cfg.ChainSel,
-			Type:          datastore.ContractType(on_ramp.ContractType),
+			Type:          datastore.ContractType(onramp.ContractType),
 			Version:       semver.MustParse("1.7.0"),
 		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
@@ -84,7 +84,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		}
 		offRampAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			ChainSelector: cfg.ChainSel,
-			Type:          datastore.ContractType(off_ramp.ContractType),
+			Type:          datastore.ContractType(offramp.ContractType),
 			Version:       semver.MustParse("1.7.0"),
 		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
@@ -93,7 +93,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 
 		remoteChains := make(map[uint64]sequences.RemoteChainConfig, len(cfg.RemoteChains))
 		for remoteChainSel, remoteConfig := range cfg.RemoteChains {
-			executorOnRampAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteConfig.DefaultExecutor, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+			ExecutorAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteConfig.DefaultExecutor, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve executor on ramp ref: %w", err)
 			}
@@ -143,7 +143,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 
 			remoteChains[remoteChainSel] = sequences.RemoteChainConfig{
 				AllowTrafficFrom:                 remoteConfig.AllowTrafficFrom,
-				DefaultExecutor:                  executorOnRampAddr,
+				DefaultExecutor:                  ExecutorAddr,
 				DefaultCCVOffRamps:               defaultCCVOffRamps,
 				LaneMandatedCCVOffRamps:          laneMandatedCCVOffRamps,
 				DefaultCCVOnRamps:                defaultCCVOnRamps,

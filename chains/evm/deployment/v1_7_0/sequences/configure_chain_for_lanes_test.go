@@ -8,10 +8,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
@@ -56,21 +56,21 @@ func TestConfigureChainForLanes(t *testing.T) {
 			var feeQuoter common.Address
 			var offRamp common.Address
 			var committeeVerifier common.Address
-			var executorOnRamp common.Address
+			var Executor common.Address
 			for _, addr := range deploymentReport.Output.Addresses {
 				switch addr.Type {
 				case datastore.ContractType(router.ContractType):
 					r = common.HexToAddress(addr.Address)
-				case datastore.ContractType(on_ramp.ContractType):
+				case datastore.ContractType(onramp.ContractType):
 					onRamp = common.HexToAddress(addr.Address)
 				case datastore.ContractType(fee_quoter.ContractType):
 					feeQuoter = common.HexToAddress(addr.Address)
-				case datastore.ContractType(off_ramp.ContractType):
+				case datastore.ContractType(offramp.ContractType):
 					offRamp = common.HexToAddress(addr.Address)
 				case datastore.ContractType(committee_verifier.ContractType):
 					committeeVerifier = common.HexToAddress(addr.Address)
-				case datastore.ContractType(executor_onramp.ContractType):
-					executorOnRamp = common.HexToAddress(addr.Address)
+				case datastore.ContractType(executor.ContractType):
+					Executor = common.HexToAddress(addr.Address)
 				}
 			}
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
@@ -95,7 +95,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 							CCIPMessageDest:                  ccipMessageDest,
 							DefaultCCVOffRamps:               []common.Address{committeeVerifier},
 							DefaultCCVOnRamps:                []common.Address{committeeVerifier},
-							DefaultExecutor:                  executorOnRamp,
+							DefaultExecutor:                  Executor,
 							CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{},
 							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
 							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
@@ -125,7 +125,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, offRamp.Hex(), offRampsOnRouter.Output[0].OffRamp.Hex(), "OffRamp address on router should match OffRamp address")
 
 			// Check sourceChainConfig on OffRamp
-			sourceChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, off_ramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
+			sourceChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, offramp.GetSourceChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       offRamp,
 				Args:          remoteChainSelector,
@@ -138,7 +138,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, r.Hex(), sourceChainConfig.Output.Router.Hex(), "Router in source chain config should match Router address")
 
 			// Check destChainConfig on OnRamp
-			destChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, on_ramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+			destChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       onRamp,
 				Args:          remoteChainSelector,
@@ -146,7 +146,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, r.Hex(), destChainConfig.Output.Router.Hex(), "Router in dest chain config should match Router address")
 			require.Equal(t, ccipMessageDest, destChainConfig.Output.OffRamp, "OffRamp in dest chain config should match CCIPMessageDest")
-			require.Equal(t, executorOnRamp.Hex(), destChainConfig.Output.DefaultExecutor.Hex(), "DefaultExecutor in dest chain config should match configured DefaultExecutor")
+			require.Equal(t, Executor.Hex(), destChainConfig.Output.DefaultExecutor.Hex(), "DefaultExecutor in dest chain config should match configured DefaultExecutor")
 			require.Len(t, destChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in dest chain config")
 			require.Equal(t, committeeVerifier.Hex(), destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitteeVerifier address")
 
@@ -160,15 +160,15 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, r.Hex(), committeeVerifierDestChainConfig.Output.Router.Hex(), "Router in CommitteeVerifier dest chain config should match Router address")
 			require.False(t, committeeVerifierDestChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier dest chain config should be false")
 
-			// Check dest chains on ExecutorOnRamp
-			executorOnRampDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor_onramp.GetDestChains, evmChain, contract.FunctionInput[any]{
+			// Check dest chains on Executor
+			ExecutorDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor.GetDestChains, evmChain, contract.FunctionInput[any]{
 				ChainSelector: evmChain.Selector,
-				Address:       executorOnRamp,
+				Address:       Executor,
 				Args:          nil,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Len(t, executorOnRampDestChains.Output, 1, "There should be one dest chain on ExecutorOnRamp")
-			require.Equal(t, remoteChainSelector, executorOnRampDestChains.Output[0], "Dest chain selector on ExecutorOnRamp should match remote chain selector")
+			require.Len(t, ExecutorDestChains.Output, 1, "There should be one dest chain on Executor")
+			require.Equal(t, remoteChainSelector, ExecutorDestChains.Output[0], "Dest chain selector on Executor should match remote chain selector")
 
 			/////////////////////////////////////////
 			// Try sending CCIP message /////////////
@@ -191,7 +191,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 					OptionalCCV:       []message_hasher.ClientCCV{},
 					OptionalThreshold: 0,
 					FinalityConfig:    0,
-					Executor:          executorOnRamp,
+					Executor:          Executor,
 					ExecutorArgs:      []byte{},
 					TokenArgs:         []byte{},
 				},
