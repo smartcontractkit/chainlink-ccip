@@ -282,15 +282,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
 				ExistingAddresses: input.ExistingAddresses,
-				Params: CommitteeVerifierParams{
-					Version:             committeeVerifierParams.Version,
-					FeeQuoter:           common.HexToAddress(feeQuoterRef.Address),
-					FeeAggregator:       committeeVerifierParams.FeeAggregator,
-					AllowlistAdmin:      committeeVerifierParams.AllowlistAdmin,
-					StorageLocation:     committeeVerifierParams.StorageLocation,
-					SignatureConfigArgs: committeeVerifierParams.SignatureConfigArgs,
-					Qualifier:           committeeVerifierParams.Qualifier,
-				},
+				Params:            committeeVerifierParams,
+				FeeQuoter:         common.HexToAddress(feeQuoterRef.Address),
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)

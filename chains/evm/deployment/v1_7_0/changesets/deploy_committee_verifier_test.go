@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -18,7 +19,6 @@ import (
 func basicDeployCommitteeVerifierParams() sequences.CommitteeVerifierParams {
 	return sequences.CommitteeVerifierParams{
 		Version:         semver.MustParse("1.7.0"),
-		FeeQuoter:       common.HexToAddress("0x01"),
 		FeeAggregator:   common.HexToAddress("0x02"),
 		AllowlistAdmin:  common.HexToAddress("0x03"),
 		StorageLocation: "https://test.chain.link.fake",
@@ -40,6 +40,15 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 	)
 	require.NoError(t, err, "Failed to create test environment")
 	require.NotNil(t, e, "Environment should be created")
+	ds := datastore.NewMemoryDataStore()
+	fqAddressRef := datastore.AddressRef{
+		ChainSelector: 5009297550715157269,
+		Type:          datastore.ContractType(fee_quoter.ContractType),
+		Version:       semver.MustParse("1.7.0"),
+		Address:       common.HexToAddress("0x01").Hex(),
+	}
+	require.NoError(t, ds.Addresses().Add(fqAddressRef))
+	e.DataStore = ds.Seal()
 
 	tests := []struct {
 		desc        string
@@ -51,8 +60,9 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 			input: cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployCommitteeVerifierCfg{
-					ChainSel: 5009297550715157269,
-					Params:   basicDeployCommitteeVerifierParams(),
+					ChainSel:  5009297550715157269,
+					Params:    basicDeployCommitteeVerifierParams(),
+					FeeQuoter: fqAddressRef,
 				},
 			},
 		},
@@ -61,11 +71,13 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 			input: cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployCommitteeVerifierCfg{
-					ChainSel: 12345,
-					Params:   basicDeployCommitteeVerifierParams(),
+					ChainSel:  12345,
+					Params:    basicDeployCommitteeVerifierParams(),
+					FeeQuoter: fqAddressRef,
 				},
 			},
-			expectedErr: "no EVM chain with selector 12345 found in environment",
+			// fee quoter ref only valid for chain selector 5009297550715157269.
+			expectedErr: "failed to resolve fee quoter ref",
 		},
 	}
 
@@ -83,6 +95,13 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 }
 
 func TestDeployCommitteeVerifier_Apply(t *testing.T) {
+	fqAddressRef := datastore.AddressRef{
+		ChainSelector: 5009297550715157269,
+		Type:          datastore.ContractType(fee_quoter.ContractType),
+		Version:       semver.MustParse("1.7.0"),
+		Address:       common.HexToAddress("0x01").Hex(),
+	}
+
 	tests := []struct {
 		desc          string
 		makeDatastore func() *datastore.MemoryDataStore
@@ -90,19 +109,22 @@ func TestDeployCommitteeVerifier_Apply(t *testing.T) {
 		{
 			desc: "empty datastore",
 			makeDatastore: func() *datastore.MemoryDataStore {
-				return datastore.NewMemoryDataStore()
+				ds := datastore.NewMemoryDataStore()
+				require.NoError(t, ds.Addresses().Add(fqAddressRef))
+				return ds
 			},
 		},
 		{
 			desc: "non-empty datastore",
 			makeDatastore: func() *datastore.MemoryDataStore {
 				ds := datastore.NewMemoryDataStore()
-				_ = ds.Addresses().Add(datastore.AddressRef{
+				require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: 5009297550715157269,
 					Type:          datastore.ContractType(committee_verifier.ProxyType),
 					Version:       semver.MustParse("1.7.0"),
 					Address:       common.HexToAddress("0x02").Hex(),
-				})
+				}))
+				require.NoError(t, ds.Addresses().Add(fqAddressRef))
 				return ds
 			},
 		},
@@ -125,8 +147,9 @@ func TestDeployCommitteeVerifier_Apply(t *testing.T) {
 			out, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployCommitteeVerifierCfg{
-					ChainSel: 5009297550715157269,
-					Params:   basicDeployCommitteeVerifierParams(),
+					ChainSel:  5009297550715157269,
+					Params:    basicDeployCommitteeVerifierParams(),
+					FeeQuoter: fqAddressRef,
 				},
 			})
 			require.NoError(t, err, "Failed to apply DeployCommitteeVerifier changeset")
@@ -151,9 +174,18 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	)
 	require.NoError(t, err, "Failed to create test environment")
 	require.NotNil(t, e, "Environment should be created")
+	fqAddressRef := datastore.AddressRef{
+		ChainSelector: 5009297550715157269,
+		Type:          datastore.ContractType(fee_quoter.ContractType),
+		Version:       semver.MustParse("1.7.0"),
+		Address:       common.HexToAddress("0x01").Hex(),
+	}
 
 	// Ensure environment has an initial (empty) datastore
-	e.DataStore = datastore.NewMemoryDataStore().Seal()
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(fqAddressRef))
+
+	e.DataStore = ds.Seal()
 
 	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
 
@@ -163,8 +195,9 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	out1, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
-			ChainSel: 5009297550715157269,
-			Params:   paramsAlpha,
+			ChainSel:  5009297550715157269,
+			Params:    paramsAlpha,
+			FeeQuoter: fqAddressRef,
 		},
 	})
 	require.NoError(t, err, "First apply failed")
@@ -189,8 +222,9 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	// 2) Second run with qualifier "beta"; seed env with first run addresses so they are considered existing
 	dsSeed := datastore.NewMemoryDataStore()
 	for _, r := range addrs1 {
-		_ = dsSeed.Addresses().Add(r)
+		require.NoError(t, dsSeed.Addresses().Add(r))
 	}
+	require.NoError(t, dsSeed.Addresses().Add(fqAddressRef))
 	e.DataStore = dsSeed.Seal()
 
 	paramsBeta := basicDeployCommitteeVerifierParams()
@@ -198,8 +232,9 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	out2, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
-			ChainSel: 5009297550715157269,
-			Params:   paramsBeta,
+			ChainSel:  5009297550715157269,
+			Params:    paramsBeta,
+			FeeQuoter: fqAddressRef,
 		},
 	})
 	require.NoError(t, err, "Second apply failed")
@@ -218,18 +253,20 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	// 3) Third run re-using qualifier "alpha" should be idempotent (returns existing alpha addresses)
 	dsUnion := datastore.NewMemoryDataStore()
 	for _, r := range addrs1 {
-		_ = dsUnion.Addresses().Add(r)
+		require.NoError(t, dsUnion.Addresses().Add(r))
 	}
 	for _, r := range addrs2 {
-		_ = dsUnion.Addresses().Add(r)
+		require.NoError(t, dsUnion.Addresses().Add(r))
 	}
+	require.NoError(t, dsUnion.Addresses().Add(fqAddressRef))
 	e.DataStore = dsUnion.Seal()
 
 	out3, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
-			ChainSel: 5009297550715157269,
-			Params:   paramsAlpha, // same qualifier as first run
+			ChainSel:  5009297550715157269,
+			Params:    paramsAlpha, // same qualifier as first run
+			FeeQuoter: fqAddressRef,
 		},
 	})
 	require.NoError(t, err, "Third apply (repeat qualifier) failed")

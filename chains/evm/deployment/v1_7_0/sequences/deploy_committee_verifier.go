@@ -19,7 +19,6 @@ import (
 
 type CommitteeVerifierParams struct {
 	Version             *semver.Version
-	FeeQuoter           common.Address
 	AllowlistAdmin      common.Address
 	FeeAggregator       common.Address
 	SignatureConfigArgs committee_verifier.SetSignatureConfigArgs
@@ -33,6 +32,7 @@ type DeployCommitteeVerifierInput struct {
 	ChainSelector     uint64
 	ExistingAddresses []datastore.AddressRef
 	Params            CommitteeVerifierParams
+	FeeQuoter         common.Address
 }
 
 var DeployCommitteeVerifier = cldf_ops.NewSequence(
@@ -53,7 +53,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ConstructorArgs{
 				DynamicConfig: committee_verifier.DynamicConfig{
-					FeeQuoter:      input.Params.FeeQuoter,
+					FeeQuoter:      input.FeeQuoter,
 					FeeAggregator:  input.Params.FeeAggregator,
 					AllowlistAdmin: input.Params.AllowlistAdmin,
 				},

@@ -19,7 +19,6 @@ import (
 func basicParams() sequences.CommitteeVerifierParams {
 	return sequences.CommitteeVerifierParams{
 		Version:         semver.MustParse("1.7.0"),
-		FeeQuoter:       common.HexToAddress("0x01"),
 		FeeAggregator:   common.HexToAddress("0x02"),
 		AllowlistAdmin:  common.HexToAddress("0x03"),
 		StorageLocation: "https://test.chain.link.fake",
@@ -53,6 +52,7 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 			)
 			require.NoError(t, err, "Failed to create environment")
 			require.NotNil(t, e, "Environment should be created")
+			e.DataStore = datastore.NewMemoryDataStore().Seal()
 
 			params := basicParams()
 			params.Qualifier = "alpha"
@@ -65,6 +65,7 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 					ChainSelector:     chainSelector,
 					ExistingAddresses: test.existingAddresses,
 					Params:            params,
+					FeeQuoter:         common.HexToAddress("0x01"),
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -122,7 +123,7 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 			Qualifier:      &q,
 			Args: committee_verifier.ConstructorArgs{
 				DynamicConfig: committee_verifier.DynamicConfig{
-					FeeQuoter:      params.FeeQuoter,
+					FeeQuoter:      common.HexToAddress("0x01"),
 					FeeAggregator:  params.FeeAggregator,
 					AllowlistAdmin: params.AllowlistAdmin,
 				},
@@ -141,6 +142,7 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 			ChainSelector:     chainSelector,
 			ExistingAddresses: []datastore.AddressRef{deployReport.Output},
 			Params:            params,
+			FeeQuoter:         common.HexToAddress("0x01"),
 		},
 	)
 	require.NoError(t, err, "ExecuteSequence should not error with pre-deployed address")
@@ -190,6 +192,7 @@ func TestDeployCommitteeVerifier_MultipleDeployments(t *testing.T) {
 				ChainSelector:     evmChain.Selector,
 				ExistingAddresses: nil,
 				Params:            params,
+				FeeQuoter:         common.HexToAddress("0x01"),
 			}
 
 			report, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployCommitteeVerifier, evmChain, input)
@@ -233,6 +236,7 @@ func TestDeployCommitteeVerifier_MultipleDeployments(t *testing.T) {
 					ChainSelector:     chainSel,
 					ExistingAddresses: nil,
 					Params:            params,
+					FeeQuoter:         common.HexToAddress("0x01"),
 				}
 
 				report, execErr := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployCommitteeVerifier, evmChain, input)
@@ -275,6 +279,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 			ChainSelector:     chainSel,
 			ExistingAddresses: nil,
 			Params:            paramsAlpha,
+			FeeQuoter:         common.HexToAddress("0x01"),
 		},
 	)
 	require.NoError(t, err)
@@ -305,6 +310,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 			ChainSelector:     chainSel,
 			ExistingAddresses: addrs1,
 			Params:            paramsBeta,
+			FeeQuoter:         common.HexToAddress("0x01"),
 		},
 	)
 	require.NoError(t, err)
@@ -327,6 +333,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 			ChainSelector:     chainSel,
 			ExistingAddresses: append(addrs1, addrs2...),
 			Params:            paramsAlpha,
+			FeeQuoter:         common.HexToAddress("0x01"),
 		},
 	)
 	require.NoError(t, err)
