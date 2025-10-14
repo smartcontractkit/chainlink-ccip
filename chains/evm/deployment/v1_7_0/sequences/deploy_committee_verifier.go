@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -47,7 +48,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		if input.Params.Qualifier != "" {
 			qualifierPtr = &input.Params.Qualifier
 		}
-		committeeVerifierRef, err := maybeDeployContract(b, committee_verifier.Deploy, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
+		committeeVerifierRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.Deploy, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.Params.Version),
 			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ConstructorArgs{
@@ -77,7 +78,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		writes = append(writes, setSignatureConfigReport.Output)
 
 		// Deploy CommitteeVerifierProxy
-		committeeVerifierProxyRef, err := maybeDeployContract(b, committee_verifier.DeployProxy, chain, contract.DeployInput[committee_verifier.ProxyConstructorArgs]{
+		committeeVerifierProxyRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.DeployProxy, chain, contract.DeployInput[committee_verifier.ProxyConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ProxyType, *semver.MustParse("1.7.0")),
 			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ProxyConstructorArgs{
