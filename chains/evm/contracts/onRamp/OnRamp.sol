@@ -267,8 +267,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // created fresh locals like near the callsite to fix stack too deep.
     address feeToken = message.feeToken;
-    uint256 feeTokenAmount = feeTokenAmount;
-    uint64 destChainSelector = destChainSelector;
+    uint256 feeTokenAmount2 = feeTokenAmount;
+    uint64 destChainSelector2 = destChainSelector;
 
     // 5. encode message and calculate messageId.
 
@@ -280,19 +280,19 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
       ccvBlobs[i] = ICrossChainVerifierV1(ccv.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, feeToken, feeTokenAmount, ccv.args
+        address(this), newMessage, messageId, feeToken, feeTokenAmount2, ccv.args
       );
     }
     for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
       Client.CCV memory ccvOpt = resolvedExtraArgs.optionalCCV[i];
       ccvBlobs[resolvedExtraArgs.requiredCCV.length + i] = ICrossChainVerifierV1(ccvOpt.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, feeToken, feeTokenAmount, ccvOpt.args
+        address(this), newMessage, messageId, feeToken, feeTokenAmount2, ccvOpt.args
       );
     }
 
     // 7. emit event
     emit CCIPMessageSent(
-      destChainSelector,
+      destChainSelector2,
       newMessage.sequenceNumber,
       messageId,
       encodedMessage,
@@ -632,8 +632,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       amount: tokenAndAmount.amount,
       sourcePoolAddress: abi.encodePacked(address(sourcePool)),
       sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
-      // TODO handle bytes destTokenAddress for EVM since poolReturnData return abi.encoded for EVM
-      destTokenAddress: poolReturnData.destTokenAddress,
+      destTokenAddress: IFeeQuoter(s_dynamicConfig.feeQuoter).validateEncodedAddressAndEncodePacked(
+        destChainSelector, poolReturnData.destTokenAddress
+      ),
       extraData: poolReturnData.destPoolData
     });
   }

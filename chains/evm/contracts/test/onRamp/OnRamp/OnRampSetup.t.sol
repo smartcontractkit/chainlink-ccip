@@ -9,6 +9,8 @@ import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
 import {MockExecutor} from "../../mocks/MockExecutor.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
+import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+
 contract OnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
 
@@ -64,7 +66,6 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       bytes[] memory receiptBlobs
     )
   {
-    // TODO handle token transfers
     OnRamp.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     MessageV1Codec.MessageV1 memory messageV1 = MessageV1Codec.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
@@ -80,6 +81,22 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       data: message.data
     });
 
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      address token = message.tokenAmounts[i].token;
+      messageV1.tokenTransfer[i] = MessageV1Codec.TokenTransferV1({
+        amount: message.tokenAmounts[i].amount,
+        sourcePoolAddress: abi.encodePacked(s_sourcePoolByToken[token]),
+        sourceTokenAddress: abi.encodePacked(token),
+        destTokenAddress: abi.encodePacked(s_destTokenBySourceToken[token]),
+        extraData: abi.encode(IERC20Metadata(token).decimals())
+      });
+    }
+
+    // If legacy extraArgs are supplied, they are passed into the CCVs and Executor.
+    // If V3 extraArgs are supplied, the extraArgs as the user supplied them are used.
+    // TODO actually handle V3.
+    bool isLegacyExtraArgs = _isLegacyExtraArgs(message.extraArgs);
+
     verifierReceipts = new OnRamp.Receipt[](destChainConfig.defaultCCVs.length);
     for (uint256 i = 0; i < verifierReceipts.length; ++i) {
       verifierReceipts[i] = OnRamp.Receipt({
@@ -88,7 +105,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         destGasLimit: 0,
         destBytesOverhead: 0,
         // TODO when v3 extra args are passed in
-        extraArgs: message.extraArgs
+        extraArgs: isLegacyExtraArgs ? message.extraArgs : bytes("")
       });
     }
     executorReceipt = OnRamp.Receipt({
@@ -96,7 +113,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       feeTokenAmount: 0, // Matches current OnRamp event behavior
       destGasLimit: 0,
       destBytesOverhead: 0,
-      extraArgs: message.extraArgs
+      // TODO when v3 extra args are passed in
+      extraArgs: isLegacyExtraArgs ? message.extraArgs : bytes("")
     });
     receiptBlobs = new bytes[](1);
     receiptBlobs[0] = "";
@@ -124,6 +142,16 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       executorArgs: "",
       tokenArgs: ""
     });
+  }
+
+  function _isLegacyExtraArgs(
+    bytes memory extraArgs
+  ) internal pure returns (bool) {
+    bytes4 selector;
+    assembly {
+      selector := mload(add(extraArgs, 32))
+    }
+    return selector != Client.GENERIC_EXTRA_ARGS_V3_TAG;
   }
 
   // Helper function to assert that two CCV arrays are equal
