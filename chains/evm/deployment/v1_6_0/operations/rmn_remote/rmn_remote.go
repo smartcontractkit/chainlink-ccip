@@ -14,6 +14,7 @@ import (
 type Subject = [16]byte
 
 var ContractType cldf_deployment.ContractType = "RMNRemote"
+var Version *semver.Version = semver.MustParse("1.6.0")
 
 type ConstructorArgs struct {
 	LocalChainSelector uint64
