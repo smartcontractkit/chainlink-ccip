@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -153,12 +154,12 @@ func NewDeploy[ARGS any](params DeployParams[ARGS]) *operations.Operation[Deploy
 				return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s to %s with args %+v: %w", input.TypeAndVersion, chain, input.Args, deployErr)
 			}
 			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", input.TypeAndVersion, chain), "args", input.Args)
-
 			return datastore.AddressRef{
 				Address:       addr.Hex(),
 				ChainSelector: input.ChainSelector,
 				Type:          datastore.ContractType(input.TypeAndVersion.Type),
 				Version:       &input.TypeAndVersion.Version,
+				Qualifier:     ptr.ToString(input.Qualifier),
 			}, nil
 		},
 	)
