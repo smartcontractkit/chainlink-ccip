@@ -26,7 +26,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		var result sequences.OnChainOutput
 		fmt.Println("Configuring lane leg as source:", input)
 
-		result, err := runAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
+		result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.FeeQuoter),
 			UpdatesByChain: map[uint64][]fee_quoter.FeeQuoterDestChainConfigArgs{
 				input.Source.Selector: {
@@ -42,7 +42,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		}
 		b.Logger.Info("Destination configs updated on FeeQuoters")
 
-		result, err = runAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
+		result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
 			Address: common.BytesToAddress(input.Source.FeeQuoter),
 			UpdatesByChain: map[uint64]fee_quoter.InternalPriceUpdates{
 				input.Source.Selector: {
@@ -61,7 +61,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		}
 		b.Logger.Info("Gas prices updated on FeeQuoters")
 
-		result, err = runAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, OnRampApplyDestChainConfigUpdatesSequenceInput{
+		result, err = sequences.RunAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, OnRampApplyDestChainConfigUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.OnRamp),
 			UpdatesByChain: map[uint64][]onramp.OnRampDestChainConfigArgs{
 				input.Source.Selector: {
@@ -85,7 +85,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		if input.IsDisabled {
 			onrampUpdate.OnRamp = common.Address{}
 		}
-		result, err = runAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
+		result, err = sequences.RunAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.Router),
 			UpdatesByChain: map[uint64]router.ApplyRampsUpdatesArgs{
 				input.Source.Selector: {
@@ -110,7 +110,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		var result sequences.OnChainOutput
 		fmt.Println("Configuring lane leg as destination:", input)
 
-		result, err := runAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
+		result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.OffRamp),
 			UpdatesByChain: map[uint64][]offramp.OffRampSourceChainConfigArgs{
 				input.Source.Selector: {
@@ -140,7 +140,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		} else {
 			offRampAdds = []router.OffRamp{offrampUpdate}
 		}
-		result, err = runAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
+		result, err = sequences.RunAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.Router),
 			UpdatesByChain: map[uint64]router.ApplyRampsUpdatesArgs{
 				input.Source.Selector: {
@@ -164,22 +164,6 @@ func (a *EVMAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.Updat
 
 func (a *EVMAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return ConfigureLaneLegAsDest
-}
-
-func runAndMergeSequence[IN any](
-	b operations.Bundle,
-	chains cldf_chain.BlockChains,
-	seq *operations.Sequence[IN, sequences.OnChainOutput, cldf_chain.BlockChains],
-	input IN,
-	agg sequences.OnChainOutput,
-) (sequences.OnChainOutput, error) {
-	report, err := operations.ExecuteSequence(b, seq, chains, input)
-	if err != nil {
-		return agg, fmt.Errorf("failed to execute %s: %w", seq.ID(), err)
-	}
-	agg.BatchOps = append(agg.BatchOps, report.Output.BatchOps...)
-	agg.Addresses = append(agg.Addresses, report.Output.Addresses...)
-	return agg, nil
 }
 
 func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.FeeQuoterDestChainConfig {
