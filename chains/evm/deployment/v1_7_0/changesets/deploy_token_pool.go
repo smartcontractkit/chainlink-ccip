@@ -39,8 +39,6 @@ type DeployTokenPoolCfg struct {
 	Router datastore.AddressRef
 	// Allowlist is the list of addresses allowed to transfer the token.
 	Allowlist []common.Address
-	// ConstructorArgs are the constructor arguments for the token pool.
-	ConstructorArgs token_pool.ConstructorArgs
 }
 
 func (c DeployTokenPoolCfg) ChainSelector() uint64 {
