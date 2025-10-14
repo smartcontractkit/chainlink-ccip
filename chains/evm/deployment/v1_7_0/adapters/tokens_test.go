@@ -9,7 +9,6 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/adapters"
@@ -70,19 +69,9 @@ func TestTokenAdapter(t *testing.T) {
 				err = ds.Merge(deployChainOut.DataStore.Seal())
 				require.NoError(t, err, "Failed to merge datastore from DeployChainContracts changeset")
 
-				router, err := datastore_utils.FindAndFormatRef(deployChainOut.DataStore.Seal(), datastore.AddressRef{
-					ChainSelector: chainSel,
-					Type:          datastore.ContractType(router.ContractType),
-				}, chainSel, evm_datastore_utils.ToEVMAddress)
-				require.NoError(t, err, "Failed to find deployed router ref in datastore after DeployChainContracts changeset")
-				rmnProxy, err := datastore_utils.FindAndFormatRef(deployChainOut.DataStore.Seal(), datastore.AddressRef{
-					ChainSelector: chainSel,
-					Type:          datastore.ContractType(rmn_proxy.ContractType),
-				}, chainSel, evm_datastore_utils.ToEVMAddress)
-				require.NoError(t, err, "Failed to find deployed rmn proxy ref in datastore after DeployChainContracts changeset")
-
-				deployTokenAndPoolOut, err := v1_7_0.DeployBurnMintTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[evm_tokens.DeployBurnMintTokenAndPoolInput]{
-					Cfg: evm_tokens.DeployBurnMintTokenAndPoolInput{
+				e.DataStore = ds.Seal()
+				deployTokenAndPoolOut, err := v1_7_0.DeployBurnMintTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployBurnMintTokenAndPoolCfg]{
+					Cfg: v1_7_0.DeployBurnMintTokenAndPoolCfg{
 						Accounts: map[common.Address]*big.Int{
 							e.BlockChains.EVMChains()[chainSel].DeployerKey.From: big.NewInt(1_000_000),
 						},
@@ -91,15 +80,16 @@ func TestTokenAdapter(t *testing.T) {
 							MaxSupply: big.NewInt(10_000_000),
 							Name:      "TEST",
 						},
-						DeployTokenPoolInput: evm_tokens.DeployTokenPoolInput{
-							ChainSel:         chainSel,
-							TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
-							TokenPoolVersion: semver.MustParse("1.7.0"),
-							TokenSymbol:      "TEST",
-							ConstructorArgs: token_pool.ConstructorArgs{
-								LocalTokenDecimals: 18,
-								Router:             router,
-								RMNProxy:           rmnProxy,
+						DeployTokenPoolCfg: v1_7_0.DeployTokenPoolCfg{
+							ChainSel:           chainSel,
+							TokenPoolType:      datastore.ContractType(burn_mint_token_pool.ContractType),
+							TokenPoolVersion:   semver.MustParse("1.7.0"),
+							TokenSymbol:        "TEST",
+							LocalTokenDecimals: 18,
+							Router: datastore.AddressRef{
+								ChainSelector: chainSel,
+								Type:          datastore.ContractType(router.ContractType),
+								Version:       semver.MustParse("1.2.0"),
 							},
 						},
 					},
