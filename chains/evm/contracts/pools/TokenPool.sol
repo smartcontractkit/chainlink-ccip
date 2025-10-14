@@ -93,9 +93,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event CCVConfigUpdated(
     uint64 indexed remoteChainSelector,
     address[] outboundCCVs,
-    address[] additionalOutboundCCVs,
+    address[] outboundCCVsToAddAboveThreshold,
     address[] inboundCCVs,
-    address[] additionalInboundCCVs
+    address[] inboundCCVsToAddAboveThreshold
   );
   event FinalityConfigUpdated(uint16 finalityConfig, uint16 customFinalityTransferFeeBps);
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
@@ -139,17 +139,17 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   struct CCVConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
-    address[] additionalOutboundCCVs; // Additional CCVs that are required for outgoing messages above s_thresholdTransferAmount to the remote chain.
+    address[] outboundCCVsToAddAboveThreshold; // Additional CCVs that are required for outgoing messages above s_thresholdTransferAmount to the remote chain.
     address[] inboundCCVs; // CCVs required for incoming messages from the remote chain.
-    address[] additionalInboundCCVs; // Additional CCVs that are required for incoming messages above s_thresholdTransferAmount from the remote chain.
+    address[] inboundCCVsToAddAboveThreshold; // Additional CCVs that are required for incoming messages above s_thresholdTransferAmount from the remote chain.
   }
 
   struct CCVConfigArg {
     uint64 remoteChainSelector;
     address[] outboundCCVs;
-    address[] additionalOutboundCCVs;
+    address[] outboundCCVsToAddAboveThreshold;
     address[] inboundCCVs;
-    address[] additionalInboundCCVs;
+    address[] inboundCCVsToAddAboveThreshold;
   }
 
   /// @dev Struct with args for setting the token transfer fee configurations for a destination chain and a set of tokens.
@@ -943,37 +943,37 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Updates the CCV configuration for specified remote chains.
   /// If the array includes address(0), it indicates that the default CCV should be used alongside any other specified CCVs.
   /// @dev Additional CCVs should only be configured for transfers above the threshold amount set in s_thresholdAmountForAdditionalCCVs and should not duplicate base CCVs.
-  /// Base CCVs are always required, while additional CCVs are only required when the transfer amount exceeds the threshold.
+  /// Base CCVs are always required, while add-above-threshold CCVs are only required when the transfer amount exceeds the threshold.
   function applyCCVConfigUpdates(
     CCVConfigArg[] calldata ccvConfigArgs
   ) external virtual onlyOwner {
     for (uint256 i = 0; i < ccvConfigArgs.length; ++i) {
       uint64 remoteChainSelector = ccvConfigArgs[i].remoteChainSelector;
       address[] calldata outboundCCVs = ccvConfigArgs[i].outboundCCVs;
-      address[] calldata additionalOutboundCCVs = ccvConfigArgs[i].additionalOutboundCCVs;
+      address[] calldata outboundCCVsToAddAboveThreshold = ccvConfigArgs[i].outboundCCVsToAddAboveThreshold;
       address[] calldata inboundCCVs = ccvConfigArgs[i].inboundCCVs;
-      address[] calldata additionalInboundCCVs = ccvConfigArgs[i].additionalInboundCCVs;
+      address[] calldata inboundCCVsToAddAboveThreshold = ccvConfigArgs[i].inboundCCVsToAddAboveThreshold;
 
       // check for duplicates in outbound CCVs.
       CCVConfigValidation._assertNoDuplicates(outboundCCVs);
-      CCVConfigValidation._assertNoDuplicates(additionalOutboundCCVs);
+      CCVConfigValidation._assertNoDuplicates(outboundCCVsToAddAboveThreshold);
 
       // check for duplicates in inbound CCVs.
       CCVConfigValidation._assertNoDuplicates(inboundCCVs);
-      CCVConfigValidation._assertNoDuplicates(additionalInboundCCVs);
+      CCVConfigValidation._assertNoDuplicates(inboundCCVsToAddAboveThreshold);
 
       s_verifierConfig[remoteChainSelector] = CCVConfig({
         outboundCCVs: outboundCCVs,
-        additionalOutboundCCVs: additionalOutboundCCVs,
+        outboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
         inboundCCVs: inboundCCVs,
-        additionalInboundCCVs: additionalInboundCCVs
+        inboundCCVsToAddAboveThreshold: inboundCCVsToAddAboveThreshold
       });
       emit CCVConfigUpdated({
         remoteChainSelector: remoteChainSelector,
         outboundCCVs: outboundCCVs,
-        additionalOutboundCCVs: additionalOutboundCCVs,
+        outboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
         inboundCCVs: inboundCCVs,
-        additionalInboundCCVs: additionalInboundCCVs
+        inboundCCVsToAddAboveThreshold: inboundCCVsToAddAboveThreshold
       });
     }
   }
@@ -995,30 +995,30 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   ) external view virtual returns (address[] memory requiredCCVs) {
     CCVConfig storage config = s_verifierConfig[remoteChainSelector];
     if (direction == IPoolV2.CCVDirection.Inbound) {
-      return _resolveRequiredCCVs(config.inboundCCVs, config.additionalInboundCCVs, amount);
+      return _resolveRequiredCCVs(config.inboundCCVs, config.inboundCCVsToAddAboveThreshold, amount);
     }
-    return _resolveRequiredCCVs(config.outboundCCVs, config.additionalOutboundCCVs, amount);
+    return _resolveRequiredCCVs(config.outboundCCVs, config.outboundCCVsToAddAboveThreshold, amount);
   }
 
   function _resolveRequiredCCVs(
     address[] storage baseCCVsStorage,
-    address[] storage additionalCCVsStorage,
+    address[] storage requiredCCVsAboveThresholdStorage,
     uint256 amount
   ) internal view returns (address[] memory requiredCCVs) {
     address[] memory baseCCVs = baseCCVsStorage;
     // If amount is above threshold, combine base and additional CCVs.
     uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
     if (thresholdAmount != 0 && amount >= thresholdAmount) {
-      address[] memory additionalCCVs = additionalCCVsStorage;
-      if (additionalCCVs.length > 0) {
-        requiredCCVs = new address[](baseCCVs.length + additionalCCVs.length);
+      address[] memory thresholdCCVs = requiredCCVsAboveThresholdStorage;
+      if (thresholdCCVs.length > 0) {
+        requiredCCVs = new address[](baseCCVs.length + thresholdCCVs.length);
         // Copy base CCVs.
         for (uint256 i = 0; i < baseCCVs.length; ++i) {
           requiredCCVs[i] = baseCCVs[i];
         }
         // Copy additional CCVs.
-        for (uint256 i = 0; i < additionalCCVs.length; ++i) {
-          requiredCCVs[baseCCVs.length + i] = additionalCCVs[i];
+        for (uint256 i = 0; i < thresholdCCVs.length; ++i) {
+          requiredCCVs[baseCCVs.length + i] = thresholdCCVs[i];
         }
         return requiredCCVs;
       }

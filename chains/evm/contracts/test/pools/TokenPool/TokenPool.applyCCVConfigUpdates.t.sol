@@ -24,18 +24,18 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
-      additionalOutboundCCVs: new address[](0),
+      outboundCCVsToAddAboveThreshold: new address[](0),
       inboundCCVs: inboundCCVs,
-      additionalInboundCCVs: new address[](0)
+      inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
     vm.expectEmit();
     emit TokenPool.CCVConfigUpdated({
       remoteChainSelector: configArgs[0].remoteChainSelector,
       outboundCCVs: configArgs[0].outboundCCVs,
-      additionalOutboundCCVs: configArgs[0].additionalOutboundCCVs,
+      outboundCCVsToAddAboveThreshold: configArgs[0].outboundCCVsToAddAboveThreshold,
       inboundCCVs: configArgs[0].inboundCCVs,
-      additionalInboundCCVs: configArgs[0].additionalInboundCCVs
+      inboundCCVsToAddAboveThreshold: configArgs[0].inboundCCVsToAddAboveThreshold
     });
     s_tokenPool.applyCCVConfigUpdates(configArgs);
 
@@ -77,9 +77,9 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: duplicateOutbound,
-      additionalOutboundCCVs: new address[](0),
+      outboundCCVsToAddAboveThreshold: new address[](0),
       inboundCCVs: validInbound,
-      additionalInboundCCVs: new address[](0)
+      inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv1));
@@ -99,9 +99,9 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: validOutbound,
-      additionalOutboundCCVs: new address[](0),
+      outboundCCVsToAddAboveThreshold: new address[](0),
       inboundCCVs: duplicateInbound,
-      additionalInboundCCVs: new address[](0)
+      inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv2));

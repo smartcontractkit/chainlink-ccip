@@ -14,9 +14,9 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
-      additionalOutboundCCVs: new address[](0),
+      outboundCCVsToAddAboveThreshold: new address[](0),
       inboundCCVs: new address[](0),
-      additionalInboundCCVs: new address[](0)
+      inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
     s_tokenPool.applyCCVConfigUpdates(configArgs);
@@ -29,20 +29,20 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     assertEq(storedOutbound[0], outboundCCVs[0]);
   }
 
-  function test_getRequiredCCVs_Outbound_WithAdditionalCCVs() public {
+  function test_getRequiredCCVs_Outbound_WithCCVsToAddAboveThreshold() public {
     address[] memory outboundCCVs = new address[](1);
     outboundCCVs[0] = makeAddr("outboundCCV1");
 
-    address[] memory additionalOutboundCCVs = new address[](1);
-    additionalOutboundCCVs[0] = makeAddr("additionalOutboundCCV1");
+    address[] memory outboundCCVsToAddAboveThreshold = new address[](1);
+    outboundCCVsToAddAboveThreshold[0] = makeAddr("additionalOutboundCCV1");
 
     TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
-      additionalOutboundCCVs: additionalOutboundCCVs,
+      outboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
       inboundCCVs: new address[](0),
-      additionalInboundCCVs: new address[](0)
+      inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
     s_tokenPool.applyCCVConfigUpdates(configArgs);
@@ -64,7 +64,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     );
     assertEq(storedOutboundAbove.length, 2);
     assertEq(storedOutboundAbove[0], outboundCCVs[0]);
-    assertEq(storedOutboundAbove[1], additionalOutboundCCVs[0]);
+    assertEq(storedOutboundAbove[1], outboundCCVsToAddAboveThreshold[0]);
   }
 
   function test_getRequiredCCVs_Outbound_NoAdditionalCCVs() public {
@@ -75,9 +75,9 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
-      additionalOutboundCCVs: new address[](0),
+      outboundCCVsToAddAboveThreshold: new address[](0),
       inboundCCVs: new address[](0),
-      additionalInboundCCVs: new address[](0)
+      inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
     s_tokenPool.applyCCVConfigUpdates(configArgs);
@@ -102,9 +102,9 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      additionalOutboundCCVs: new address[](0),
+      outboundCCVsToAddAboveThreshold: new address[](0),
       inboundCCVs: inboundCCVs,
-      additionalInboundCCVs: new address[](0)
+      inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
     s_tokenPool.applyCCVConfigUpdates(configArgs);
@@ -117,20 +117,20 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     assertEq(storedInbound[0], inboundCCVs[0]);
   }
 
-  function test_getRequiredCCVs_Inbound_WithAdditionalCCVs() public {
+  function test_getRequiredCCVs_Inbound_WithCCVsToAddAboveThreshold() public {
     address[] memory inboundCCVs = new address[](1);
     inboundCCVs[0] = makeAddr("inboundCCV1");
 
-    address[] memory additionalInboundCCVs = new address[](1);
-    additionalInboundCCVs[0] = makeAddr("additionalInboundCCV1");
+    address[] memory inboundCCVsToAddAboveThreshold = new address[](1);
+    inboundCCVsToAddAboveThreshold[0] = makeAddr("additionalInboundCCV1");
 
     TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      additionalOutboundCCVs: new address[](0),
+      outboundCCVsToAddAboveThreshold: new address[](0),
       inboundCCVs: inboundCCVs,
-      additionalInboundCCVs: additionalInboundCCVs
+      inboundCCVsToAddAboveThreshold: inboundCCVsToAddAboveThreshold
     });
 
     s_tokenPool.applyCCVConfigUpdates(configArgs);
@@ -152,7 +152,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     );
     assertEq(storedInboundAbove.length, 2);
     assertEq(storedInboundAbove[0], inboundCCVs[0]);
-    assertEq(storedInboundAbove[1], additionalInboundCCVs[0]);
+    assertEq(storedInboundAbove[1], inboundCCVsToAddAboveThreshold[0]);
   }
 
   function test_getRequiredCCVs_Inbound_NoAdditionalCCVs() public {
@@ -163,9 +163,9 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     configArgs[0] = TokenPool.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      additionalOutboundCCVs: new address[](0),
+      outboundCCVsToAddAboveThreshold: new address[](0),
       inboundCCVs: inboundCCVs,
-      additionalInboundCCVs: new address[](0)
+      inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
     s_tokenPool.applyCCVConfigUpdates(configArgs);
