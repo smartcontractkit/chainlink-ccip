@@ -21,11 +21,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -61,7 +61,7 @@ type FeeQuoterParams struct {
 	USDPerWETH                     *big.Int
 }
 
-type ExecutorOnRampParams struct {
+type ExecutorParams struct {
 	Version       *semver.Version
 	MaxCCVsPerMsg uint8
 }
@@ -72,7 +72,7 @@ type ContractParams struct {
 	CommitteeVerifier CommitteeVerifierParams
 	OnRamp            OnRampParams
 	FeeQuoter         FeeQuoterParams
-	ExecutorOnRamp    ExecutorOnRampParams
+	Executor          ExecutorParams
 }
 
 type DeployChainContractsInput struct {
@@ -236,11 +236,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, updatePricesReport.Output)
 
 		// Deploy OffRamp
-		offRampRef, err := maybeDeployContract(b, off_ramp.Deploy, chain, contract.DeployInput[off_ramp.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(off_ramp.ContractType, *input.ContractParams.OffRamp.Version),
+		offRampRef, err := maybeDeployContract(b, offramp.Deploy, chain, contract.DeployInput[offramp.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(offramp.ContractType, *input.ContractParams.OffRamp.Version),
 			ChainSelector:  chain.Selector,
-			Args: off_ramp.ConstructorArgs{
-				StaticConfig: off_ramp.StaticConfig{
+			Args: offramp.ConstructorArgs{
+				StaticConfig: offramp.StaticConfig{
 					LocalChainSelector:   chain.Selector,
 					RmnRemote:            common.HexToAddress(rmnProxyRef.Address),
 					GasForCallExactCheck: input.ContractParams.OffRamp.GasForCallExactCheck,
@@ -254,16 +254,16 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, offRampRef)
 
 		// Deploy OnRamp
-		onRampRef, err := maybeDeployContract(b, on_ramp.Deploy, chain, contract.DeployInput[on_ramp.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(on_ramp.ContractType, *input.ContractParams.OnRamp.Version),
+		onRampRef, err := maybeDeployContract(b, onramp.Deploy, chain, contract.DeployInput[onramp.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(onramp.ContractType, *input.ContractParams.OnRamp.Version),
 			ChainSelector:  chain.Selector,
-			Args: on_ramp.ConstructorArgs{
-				StaticConfig: on_ramp.StaticConfig{
+			Args: onramp.ConstructorArgs{
+				StaticConfig: onramp.StaticConfig{
 					ChainSelector:      chain.Selector,
 					RmnRemote:          common.HexToAddress(rmnRemoteRef.Address),
 					TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
 				},
-				DynamicConfig: on_ramp.DynamicConfig{
+				DynamicConfig: onramp.DynamicConfig{
 					FeeQuoter:     common.HexToAddress(feeQuoterRef.Address),
 					FeeAggregator: input.ContractParams.OnRamp.FeeAggregator,
 				},
@@ -316,18 +316,18 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, committeeVerifierProxyRef)
 
-		// Deploy ExecutorOnRamp
-		executorOnRampRef, err := maybeDeployContract(b, executor_onramp.Deploy, chain, contract.DeployInput[executor_onramp.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(executor_onramp.ContractType, *input.ContractParams.ExecutorOnRamp.Version),
+		// Deploy Executor
+		ExecutorRef, err := maybeDeployContract(b, executor.Deploy, chain, contract.DeployInput[executor.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(executor.ContractType, *input.ContractParams.Executor.Version),
 			ChainSelector:  chain.Selector,
-			Args: executor_onramp.ConstructorArgs{
-				MaxCCVsPerMsg: input.ContractParams.ExecutorOnRamp.MaxCCVsPerMsg,
+			Args: executor.ConstructorArgs{
+				MaxCCVsPerMsg: input.ContractParams.Executor.MaxCCVsPerMsg,
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ExecutorOnRamp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Executor: %w", err)
 		}
-		addresses = append(addresses, executorOnRampRef)
+		addresses = append(addresses, ExecutorRef)
 
 		// Deploy MockReceiver (defines committee verifier as required)
 		// TODO: Replace with a more configurable receiver contract.
