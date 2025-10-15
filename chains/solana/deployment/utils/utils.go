@@ -1,17 +1,17 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 
 	solbinary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-func GetSolProgramSize(e *cldf.Environment, chain cldf_solana.Chain, programID solana.PublicKey) (int, error) {
-	accountInfo, err := chain.Client.GetAccountInfoWithOpts(e.GetContext(), programID, &solrpc.GetAccountInfoOpts{
+func GetSolProgramSize(chain cldf_solana.Chain, programID solana.PublicKey) (int, error) {
+	accountInfo, err := chain.Client.GetAccountInfoWithOpts(context.Background(), programID, &solrpc.GetAccountInfoOpts{
 		Commitment: cldf_solana.SolDefaultCommitment,
 	})
 	if err != nil {
@@ -24,7 +24,7 @@ func GetSolProgramSize(e *cldf.Environment, chain cldf_solana.Chain, programID s
 	return programBytes, nil
 }
 
-func GetSolProgramData(e cldf.Environment, chain cldf_solana.Chain, programID solana.PublicKey) (struct {
+func GetSolProgramData(chain cldf_solana.Chain, programID solana.PublicKey) (struct {
 	DataType uint32
 	Address  solana.PublicKey
 }, error) {
@@ -32,7 +32,7 @@ func GetSolProgramData(e cldf.Environment, chain cldf_solana.Chain, programID so
 		DataType uint32
 		Address  solana.PublicKey
 	}
-	data, err := chain.Client.GetAccountInfoWithOpts(e.GetContext(), programID, &solrpc.GetAccountInfoOpts{
+	data, err := chain.Client.GetAccountInfoWithOpts(context.Background(), programID, &solrpc.GetAccountInfoOpts{
 		Commitment: solrpc.CommitmentConfirmed,
 	})
 	if err != nil {

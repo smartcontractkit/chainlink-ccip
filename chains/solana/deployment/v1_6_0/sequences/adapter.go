@@ -1,4 +1,4 @@
-package operations
+package sequences
 
 import (
 	"github.com/Masterminds/semver/v3"

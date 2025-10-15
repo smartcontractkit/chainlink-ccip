@@ -1,4 +1,4 @@
-package router
+package rmn_remote
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -14,15 +14,15 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var ContractType cldf_deployment.ContractType = "Router"
-var ProgramName = "ccip_router"
-var ProgramSize = 5 * 1024 * 1024
+var ContractType cldf_deployment.ContractType = "RMNRemote"
+var ProgramName = "rmn_remote"
+var ProgramSize = 3 * 1024 * 1024
 var Version *semver.Version = semver.MustParse("1.6.0")
 
 var Deploy = operations.NewOperation(
-	"router:deploy",
+	"rmn-remote:deploy",
 	Version,
-	"Deploys the Router program",
+	"Deploys the RMNRemote program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input []datastore.AddressRef) (datastore.AddressRef, error) {
 		return utils.MaybeDeployContract(
 			b,
@@ -37,25 +37,22 @@ var Deploy = operations.NewOperation(
 )
 
 var Initialize = operations.NewOperation(
-	"off-ramp:initialize",
+	"rmn-remote:initialize",
 	Version,
-	"Initializes the OffRamp 1.6.0 contract",
+	"Initializes the RMNRemote 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) ([]solana.Instruction, error) {
-		programData, err := utils.GetSolProgramData(chain, input.Router)
+		programData, err := utils.GetSolProgramData(chain, input.RMNRemote)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get program data: %w", err)
 		}
-		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
-		instruction, err := ccip_router.NewInitializeInstruction(
-			chain.Selector,
-			solana.PublicKey{},
-			input.FeeQuoter,
-			input.LinkToken,
-			input.RMNRemote,
-			routerConfigPDA,
+		rmnRemoteConfigPDA, _, _ := state.FindRMNRemoteConfigPDA(input.RMNRemote)
+		rmnRemoteCursesPDA, _, _ := state.FindRMNRemoteCursesPDA(input.RMNRemote)
+		instruction, err := rmn_remote.NewInitializeInstruction(
+			rmnRemoteConfigPDA,
+			rmnRemoteCursesPDA,
 			chain.DeployerKey.PublicKey(),
 			solana.SystemProgramID,
-			input.Router,
+			input.RMNRemote,
 			programData.Address,
 		).ValidateAndBuild()
 		if err != nil {
@@ -63,15 +60,12 @@ var Initialize = operations.NewOperation(
 		}
 		err = chain.Confirm([]solana.Instruction{instruction})
 		if err != nil {
-			return nil, fmt.Errorf("failed to confirm router initialization: %w", err)
+			return nil, fmt.Errorf("failed to confirm initialization: %w", err)
 		}
 		return []solana.Instruction{instruction}, nil
 	},
 )
 
 type Params struct {
-	FeeQuoter solana.PublicKey
-	Router    solana.PublicKey
-	LinkToken solana.PublicKey
 	RMNRemote solana.PublicKey
 }

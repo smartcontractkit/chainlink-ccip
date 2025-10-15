@@ -1,4 +1,4 @@
-package operations
+package sequences
 
 import (
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"

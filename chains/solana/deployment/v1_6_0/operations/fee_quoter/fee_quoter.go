@@ -1,19 +1,17 @@
 package fee_quoter
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	bin "github.com/gagliardetto/binary"
+	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -23,135 +21,104 @@ var ProgramName = "fee_quoter"
 var ProgramSize = 5 * 1024 * 1024
 var Version *semver.Version = semver.MustParse("1.6.0")
 
-type ConstructorArgs struct {
-	StaticConfig                   fee_quoter.FeeQuoterStaticConfig
-	PriceUpdaters                  []common.Address
-	FeeTokens                      []common.Address
-	TokenPriceFeedUpdates          []fee_quoter.FeeQuoterTokenPriceFeedUpdate
-	TokenTransferFeeConfigArgs     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
-	MorePremiumMultiplierWeiPerEth []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs
-	DestChainConfigArgs            []fee_quoter.FeeQuoterDestChainConfigArgs
-}
-
 var Deploy = operations.NewOperation(
 	"fee-quoter:deploy",
 	Version,
 	"Deploys the FeeQuoter program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input []datastore.AddressRef) (datastore.AddressRef, error) {
-		// BEGIN Validation
-		for _, ref := range input {
-		if ref.Type == datastore.ContractType(input.TypeAndVersion.Type) {
-			return ref, nil
-		}
-	}
-
-		var (
-			addr      common.Address
-			tx        *types.Transaction
-			deployErr error
-		)
-		if chain.IsZkSyncVM {
-			addr, deployErr = deployZkContract(
-				nil,
-				bytecode.ZkSyncVM,
-				chain.ClientZkSyncVM,
-				chain.DeployerKeyZkSyncVM,
-				parsedABI,
-				args...,
-			)
-		} else {
-			addr, tx, _, deployErr = deployEVMContract(
-				chain.DeployerKey,
-				*parsedABI,
-				bytecode.EVM,
-				chain.Client,
-				args...,
-			)
-		}
-		if !chain.IsZkSyncVM {
-			// Non-ZkSyncVM chains require manual confirmation of the deployment transaction.
-			// We attempt to decode any errors with the provided ABI.
-			_, confirmErr := deployment.ConfirmIfNoErrorWithABI(chain, tx, params.ContractMetadata.ABI, deployErr)
-			if confirmErr != nil {
-				return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s to %s with args %+v: %w", input.TypeAndVersion, chain, input.Args, confirmErr)
-			}
-			b.Logger.Debugw(fmt.Sprintf("Confirmed %s tx on %s", params.Name, chain), "hash", tx.Hash().Hex())
-		} else if deployErr != nil {
-			// For ZkSyncVM chains, if an error is returned from initial deployment, we return it here.
-			return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s to %s with args %+v: %w", input.TypeAndVersion, chain, input.Args, deployErr)
-		}
-		b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", input.TypeAndVersion, chain), "args", input.Args)
-
-		return datastore.AddressRef{
-			Address:       addr.Hex(),
-			ChainSelector: input.ChainSelector,
-			Type:          datastore.ContractType(input.TypeAndVersion.Type),
-			Version:       &input.TypeAndVersion.Version,
-		}, nil
+		return utils.MaybeDeployContract(
+			b,
+			chain,
+			input,
+			ContractType,
+			Version,
+			"",
+			ProgramName,
+			ProgramSize)
 	},
 )
 
-var FeeQuoterApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]fee_quoter.FeeQuoterDestChainConfigArgs, *fee_quoter.FeeQuoter]{
-	Name:            "fee-quoter:apply-dest-chain-config-updates",
-	Version:         Version,
-	Description:     "Applies updates to destination chain configs on the FeeQuoter 1.6.0 contract",
-	ContractType:    ContractType,
-	ContractABI:     fee_quoter.FeeQuoterABI,
-	NewContract:     fee_quoter.NewFeeQuoter,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, []fee_quoter.FeeQuoterDestChainConfigArgs],
-	Validate:        func([]fee_quoter.FeeQuoterDestChainConfigArgs) error { return nil },
-	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args []fee_quoter.FeeQuoterDestChainConfigArgs) (*types.Transaction, error) {
-		return feeQuoter.ApplyDestChainConfigUpdates(opts, args)
+var Initialize = operations.NewOperation(
+	"fee-quoter:initialize",
+	Version,
+	"Initializes the FeeQuoter 1.6.0 contract",
+	func(b operations.Bundle, chain cldf_solana.Chain, input Params) ([]solana.Instruction, error) {
+		programData, err := utils.GetSolProgramData(chain, input.FeeQuoter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get program data: %w", err)
+		}
+		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
+		instruction, err := fee_quoter.NewInitializeInstruction(
+			input.MaxFeeJuelsPerMsg,
+			input.Router,
+			feeQuoterConfigPDA,
+			input.LinkToken,
+			chain.DeployerKey.PublicKey(),
+			solana.SystemProgramID,
+			input.FeeQuoter,
+			programData.Address,
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, fmt.Errorf("failed to build initialize instruction: %w", err)
+		}
+		err = chain.Confirm([]solana.Instruction{instruction})
+		if err != nil {
+			return nil, fmt.Errorf("failed to confirm initialization: %w", err)
+		}
+		return []solana.Instruction{instruction}, nil
 	},
-})
+)
 
-var FeeQuoterUpdatePrices = contract.NewWrite(contract.WriteParams[fee_quoter.InternalPriceUpdates, *fee_quoter.FeeQuoter]{
-	Name:            "fee-quoter:update-prices",
-	Version:         Version,
-	Description:     "Updates prices on the FeeQuoter 1.6.0 contract",
-	ContractType:    ContractType,
-	ContractABI:     fee_quoter.FeeQuoterABI,
-	NewContract:     fee_quoter.NewFeeQuoter,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, fee_quoter.InternalPriceUpdates],
-	Validate:        func(fee_quoter.InternalPriceUpdates) error { return nil },
-	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args fee_quoter.InternalPriceUpdates) (*types.Transaction, error) {
-		return feeQuoter.UpdatePrices(opts, args)
+var AddPriceUpdater = operations.NewOperation(
+	"fee-quoter:add-price-updater",
+	Version,
+	"Adds a price updater to the FeeQuoter 1.6.0 contract",
+	func(b operations.Bundle, chain cldf_solana.Chain, input Params) ([]solana.Instruction, error) {
+		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
+		offRampBillingSignerPDA, _, _ := state.FindOfframpBillingSignerPDA(input.OffRamp)
+		fqAllowedPriceUpdaterOfframpPDA, _, _ := state.FindFqAllowedPriceUpdaterPDA(offRampBillingSignerPDA, input.FeeQuoter)
+		instruction, err := fee_quoter.NewAddPriceUpdaterInstruction(
+			offRampBillingSignerPDA,
+			fqAllowedPriceUpdaterOfframpPDA,
+			feeQuoterConfigPDA,
+			chain.DeployerKey.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, fmt.Errorf("failed to build add price updater instruction: %w", err)
+		}
+		return []solana.Instruction{instruction}, nil
 	},
-})
+)
 
-type FeeQuoterParams struct {
-	MaxFeeJuelsPerMsg              *big.Int
-	TokenPriceStalenessThreshold   uint32
-	LinkPremiumMultiplierWeiPerEth uint64
-	WethPremiumMultiplierWeiPerEth uint64
-	MorePremiumMultiplierWeiPerEth []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs
-	TokenPriceFeedUpdates          []fee_quoter.FeeQuoterTokenPriceFeedUpdate
-	TokenTransferFeeConfigArgs     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
-	DestChainConfigArgs            []fee_quoter.FeeQuoterDestChainConfigArgs
+type Params struct {
+	MaxFeeJuelsPerMsg bin.Uint128
+	FeeQuoter         solana.PublicKey
+	Router            solana.PublicKey
+	OffRamp           solana.PublicKey
+	LinkToken         solana.PublicKey
+	Authority         solana.PublicKey
 }
 
-func (c FeeQuoterParams) Validate() error {
-	if c.MaxFeeJuelsPerMsg == nil {
-		return errors.New("MaxFeeJuelsPerMsg is nil")
+func DefaultParams() Params {
+	defaultLow, defaultHigh := GetHighLowBits(big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)))
+	return Params{
+		MaxFeeJuelsPerMsg: bin.Uint128{
+			Lo:         defaultLow,
+			Hi:         defaultHigh,
+			Endianness: nil,
+		},
 	}
-	if c.MaxFeeJuelsPerMsg.Cmp(big.NewInt(0)) <= 0 {
-		return errors.New("MaxFeeJuelsPerMsg must be positive")
-	}
-	if c.TokenPriceStalenessThreshold == 0 {
-		return errors.New("TokenPriceStalenessThreshold can't be 0")
-	}
-	return nil
 }
 
-func DefaultFeeQuoterParams() FeeQuoterParams {
-	return FeeQuoterParams{
-		MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-		TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
-		LinkPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
-		WethPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
-		TokenPriceFeedUpdates:          []fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
-		TokenTransferFeeConfigArgs:     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
-		MorePremiumMultiplierWeiPerEth: []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{},
-		DestChainConfigArgs:            []fee_quoter.FeeQuoterDestChainConfigArgs{},
-	}
+func GetHighLowBits(n *big.Int) (low, high uint64) {
+	mask := big.NewInt(0).SetUint64(0xFFFFFFFFFFFFFFFF) // 64-bit mask
+
+	lowBig := big.NewInt(0).And(n, mask)
+	low = lowBig.Uint64()
+
+	highBig := big.NewInt(0).Rsh(n, 64) // Shift right by 64 bits
+	high = highBig.Uint64()
+
+	return low, high
 }
