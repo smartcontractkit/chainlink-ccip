@@ -138,7 +138,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Initialize RMN Remote
-		_, err = operations.ExecuteOperation(b, rmn_remote.Initialize, chain, rmn_remote.Params{
+		_, err = operations.ExecuteOperation(b, rmnremoteops.Initialize, chain, rmnremoteops.Params{
 			RMNRemote: solana.MustPublicKeyFromBase58(rmnRemoteRef.Output.Address),
 		})
 		if err != nil {

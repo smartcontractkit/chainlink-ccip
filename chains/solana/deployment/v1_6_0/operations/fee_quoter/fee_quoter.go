@@ -87,6 +87,10 @@ var AddPriceUpdater = operations.NewOperation(
 		if err != nil {
 			return nil, fmt.Errorf("failed to build add price updater instruction: %w", err)
 		}
+		err = chain.Confirm([]solana.Instruction{instruction})
+		if err != nil {
+			return nil, fmt.Errorf("failed to confirm add price updater: %w", err)
+		}
 		return []solana.Instruction{instruction}, nil
 	},
 )

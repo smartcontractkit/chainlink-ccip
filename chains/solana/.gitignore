@@ -31,3 +31,6 @@ override*.toml
 # go work files
 go.work*
 devnet.config.yaml
+
+# deployment
+deployment/**/*.json
