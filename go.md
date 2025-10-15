@@ -82,6 +82,9 @@ flowchart LR
 	click chainlink-ccip/cmd/carpenter href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/deployment --> chainlink-deployments-framework
 	click chainlink-ccip/deployment href "https://github.com/smartcontractkit/chainlink-ccip"
+	chainlink-ccip/integration-tests --> chainlink-ccip/chains/evm/deployment
+	chainlink-ccip/integration-tests --> chainlink-ccip/chains/solana/deployment
+	click chainlink-ccip/integration-tests href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-common --> chain-selectors
 	chainlink-common --> chainlink-common/pkg/chipingress
 	chainlink-common --> chainlink-protos/billing/go
@@ -167,6 +170,7 @@ flowchart LR
 		 chainlink-ccip/chains/solana/gobindings
 		 chainlink-ccip/cmd/carpenter
 		 chainlink-ccip/deployment
+		 chainlink-ccip/integration-tests
 	end
 	click chainlink-ccip-repo href "https://github.com/smartcontractkit/chainlink-ccip"
 
