@@ -1,6 +1,7 @@
 package fee_quoter
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -20,6 +22,13 @@ var ContractType cldf_deployment.ContractType = "FeeQuoter"
 var ProgramName = "fee_quoter"
 var ProgramSize = 5 * 1024 * 1024
 var Version *semver.Version = semver.MustParse("1.6.0")
+
+type ConnectChainsParams struct {
+	FeeQuoter           solana.PublicKey
+	OffRamp             solana.PublicKey
+	RemoteChainSelector uint64
+	DestChainConfig     fee_quoter.DestChainConfig
+}
 
 var Deploy = operations.NewOperation(
 	"fee-quoter:deploy",
@@ -42,10 +51,10 @@ var Initialize = operations.NewOperation(
 	"fee-quoter:initialize",
 	Version,
 	"Initializes the FeeQuoter 1.6.0 contract",
-	func(b operations.Bundle, chain cldf_solana.Chain, input Params) ([]solana.Instruction, error) {
+	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		programData, err := utils.GetSolProgramData(chain, input.FeeQuoter)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get program data: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
 		instruction, err := fee_quoter.NewInitializeInstruction(
@@ -59,13 +68,13 @@ var Initialize = operations.NewOperation(
 			programData.Address,
 		).ValidateAndBuild()
 		if err != nil {
-			return nil, fmt.Errorf("failed to build initialize instruction: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build initialize instruction: %w", err)
 		}
 		err = chain.Confirm([]solana.Instruction{instruction})
 		if err != nil {
-			return nil, fmt.Errorf("failed to confirm initialization: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm initialization: %w", err)
 		}
-		return []solana.Instruction{instruction}, nil
+		return sequences.OnChainOutput{}, nil
 	},
 )
 
@@ -73,7 +82,8 @@ var AddPriceUpdater = operations.NewOperation(
 	"fee-quoter:add-price-updater",
 	Version,
 	"Adds a price updater to the FeeQuoter 1.6.0 contract",
-	func(b operations.Bundle, chain cldf_solana.Chain, input Params) ([]solana.Instruction, error) {
+	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
+		authority := GetAuthority(chain, input.FeeQuoter)
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
 		offRampBillingSignerPDA, _, _ := state.FindOfframpBillingSignerPDA(input.OffRamp)
 		fqAllowedPriceUpdaterOfframpPDA, _, _ := state.FindFqAllowedPriceUpdaterPDA(offRampBillingSignerPDA, input.FeeQuoter)
@@ -81,19 +91,75 @@ var AddPriceUpdater = operations.NewOperation(
 			offRampBillingSignerPDA,
 			fqAllowedPriceUpdaterOfframpPDA,
 			feeQuoterConfigPDA,
-			chain.DeployerKey.PublicKey(),
+			authority,
 			solana.SystemProgramID,
 		).ValidateAndBuild()
 		if err != nil {
-			return nil, fmt.Errorf("failed to build add price updater instruction: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add price updater instruction: %w", err)
 		}
 		err = chain.Confirm([]solana.Instruction{instruction})
 		if err != nil {
-			return nil, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
 		}
-		return []solana.Instruction{instruction}, nil
+		return sequences.OnChainOutput{}, nil
 	},
 )
+
+var ConnectChains = operations.NewOperation(
+	"fee-quoter:connect-chains",
+	Version,
+	"Connects the FeeQuoter 1.6.0 contract to other chains",
+	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
+		isUpdate := false
+		authority := GetAuthority(chain, input.FeeQuoter)
+		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
+		fqRemoteChainPDA, _, _ := state.FindFqDestChainPDA(input.RemoteChainSelector, input.FeeQuoter)
+		var destChainStateAccount fee_quoter.DestChain
+		err := chain.GetAccountDataBorshInto(context.Background(), fqRemoteChainPDA, &destChainStateAccount)
+		if err == nil {
+			fmt.Println("Remote chain state account found:", destChainStateAccount)
+			isUpdate = true
+		}
+		var ixn solana.Instruction
+		if isUpdate {
+			ixn, err = fee_quoter.NewUpdateDestChainConfigInstruction(
+				input.RemoteChainSelector,
+				input.DestChainConfig,
+				feeQuoterConfigPDA,
+				fqRemoteChainPDA,
+				chain.DeployerKey.PublicKey(),
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build update dest chain instruction: %w", err)
+			}
+		} else {
+			ixn, err = fee_quoter.NewAddDestChainInstruction(
+				input.RemoteChainSelector,
+				input.DestChainConfig,
+				feeQuoterConfigPDA,
+				fqRemoteChainPDA,
+				authority,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
+			}
+			err = utils.ExtendLookupTable(chain, input.OffRamp, []solana.PublicKey{fqRemoteChainPDA})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
+			}
+		}
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
+func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
+	return chain.DeployerKey.PublicKey()
+}
 
 type Params struct {
 	MaxFeeJuelsPerMsg bin.Uint128
@@ -101,7 +167,6 @@ type Params struct {
 	Router            solana.PublicKey
 	OffRamp           solana.PublicKey
 	LinkToken         solana.PublicKey
-	Authority         solana.PublicKey
 }
 
 func DefaultParams() Params {

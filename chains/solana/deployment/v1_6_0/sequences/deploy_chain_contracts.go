@@ -5,6 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
@@ -182,7 +183,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			rmnRemoteCursePDA,
 		}
 
-		err = offrampops.ExtendLookupTable(chain, offRampAddress, lookupTableKeys)
+		err = utils.ExtendLookupTable(chain, offRampAddress, lookupTableKeys)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
 		}

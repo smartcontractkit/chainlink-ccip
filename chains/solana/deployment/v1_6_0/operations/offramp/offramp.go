@@ -3,6 +3,7 @@ package offramp
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -12,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -19,6 +21,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "OffRamp"
+var SourceChainType cldf_deployment.ContractType = "SourceChain"
 var ProgramName = "off_ramp"
 var ProgramSize = int(1.5 * 1024 * 1024)
 var Version *semver.Version = semver.MustParse("1.6.0")
@@ -29,6 +32,13 @@ type Params struct {
 	Router               solana.PublicKey
 	OffRamp              solana.PublicKey
 	RMNRemote            solana.PublicKey
+}
+
+type ConnectChainsParams struct {
+	OffRamp             solana.PublicKey
+	RemoteChainSelector uint64
+	SourceOnRamp        []byte
+	EnabledAsSource     bool
 }
 
 var Deploy = operations.NewOperation(
@@ -52,10 +62,10 @@ var Initialize = operations.NewOperation(
 	"off-ramp:initialize",
 	Version,
 	"Initializes the OffRamp 1.6.0 contract",
-	func(b operations.Bundle, chain cldf_solana.Chain, input Params) ([]solana.Instruction, error) {
+	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		programData, err := utils.GetSolProgramData(chain, input.OffRamp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get program data: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
 		table, err := common.SetupLookupTable(
 			context.Background(),
@@ -72,7 +82,7 @@ var Initialize = operations.NewOperation(
 				solana.SPLAssociatedTokenAccountProgramID,
 			})
 		if err != nil {
-			return nil, fmt.Errorf("failed to setup lookup table: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to setup lookup table: %w", err)
 		}
 		offRampReferenceAddressesPDA, _, _ := state.FindOfframpReferenceAddressesPDA(input.OffRamp)
 		offRampStatePDA, _, _ := state.FindOfframpStatePDA(input.OffRamp)
@@ -89,13 +99,13 @@ var Initialize = operations.NewOperation(
 			programData.Address,
 		).ValidateAndBuild()
 		if err != nil {
-			return nil, fmt.Errorf("failed to build initialize instruction: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build initialize instruction: %w", err)
 		}
 		err = chain.Confirm([]solana.Instruction{instruction})
 		if err != nil {
-			return nil, fmt.Errorf("failed to confirm offramp initialization: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm offramp initialization: %w", err)
 		}
-		return []solana.Instruction{instruction}, nil
+		return sequences.OnChainOutput{}, nil
 	},
 )
 
@@ -103,10 +113,10 @@ var InitializeConfig = operations.NewOperation(
 	"off-ramp:initialize-config",
 	Version,
 	"Initializes the config of the OffRamp 1.6.0 contract",
-	func(b operations.Bundle, chain cldf_solana.Chain, input Params) ([]solana.Instruction, error) {
+	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		programData, err := utils.GetSolProgramData(chain, input.OffRamp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get program data: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
 		offRampConfigPDA, _, _ := state.FindOfframpConfigPDA(input.OffRamp)
 		instruction, err := ccip_offramp.NewInitializeConfigInstruction(
@@ -119,58 +129,89 @@ var InitializeConfig = operations.NewOperation(
 			programData.Address,
 		).ValidateAndBuild()
 		if err != nil {
-			return nil, fmt.Errorf("failed to build initialize instruction: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build initialize instruction: %w", err)
 		}
 		err = chain.Confirm([]solana.Instruction{instruction})
 		if err != nil {
-			return nil, fmt.Errorf("failed to confirm initialization: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm initialization: %w", err)
 		}
-		return []solana.Instruction{instruction}, nil
+		return sequences.OnChainOutput{}, nil
 	},
 )
 
-func ExtendLookupTable(chain cldf_solana.Chain, offRampID solana.PublicKey, lookUpTableEntries []solana.PublicKey) error {
-	var referenceAddressesAccount ccip_offramp.ReferenceAddresses
-	offRampReferenceAddressesPDA, _, _ := state.FindOfframpReferenceAddressesPDA(offRampID)
-	err := chain.GetAccountDataBorshInto(context.Background(), offRampReferenceAddressesPDA, &referenceAddressesAccount)
-	if err != nil {
-		return fmt.Errorf("failed to get offramp reference addresses: %w", err)
-	}
-	addressLookupTable := referenceAddressesAccount.OfframpLookupTable
-
-	addresses, err := common.GetAddressLookupTable(
-		context.Background(),
-		chain.Client,
-		addressLookupTable)
-	if err != nil {
-		return fmt.Errorf("failed to get address lookup table: %w", err)
-	}
-
-	// calculate diff and add new entries
-	seen := make(map[solana.PublicKey]bool)
-	toAdd := make([]solana.PublicKey, 0)
-	for _, entry := range addresses {
-		seen[entry] = true
-	}
-	for _, entry := range lookUpTableEntries {
-		if _, ok := seen[entry]; !ok {
-			toAdd = append(toAdd, entry)
+var ConnectChains = operations.NewOperation(
+	"off-ramp:connect-chains",
+	Version,
+	"Connects the OffRamp 1.6.0 contract to other chains",
+	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
+		isUpdate := false
+		authority := GetAuthority(chain, input.OffRamp)
+		offRampConfigPDA, _, _ := state.FindOfframpConfigPDA(input.OffRamp)
+		offRampSourceChainPDA, _, _ := state.FindOfframpSourceChainPDA(input.RemoteChainSelector, input.OffRamp)
+		var sourceChainAccount ccip_offramp.SourceChain
+		err := chain.GetAccountDataBorshInto(context.Background(), offRampSourceChainPDA, &sourceChainAccount)
+		if err == nil {
+			fmt.Println("Remote chain state account found:", sourceChainAccount)
+			isUpdate = true
 		}
-	}
-	if len(toAdd) == 0 {
-		return nil
-	}
+		var onRampAddress ccip_offramp.OnRampAddress
+		copy(onRampAddress.Bytes[:], input.SourceOnRamp)
+		addressBytesLen := len(onRampAddress.Bytes)
+		if addressBytesLen < 0 || addressBytesLen > math.MaxUint32 {
+			return sequences.OnChainOutput{}, fmt.Errorf("invalid on ramp address length: %d", addressBytesLen)
+		}
+		onRampAddress.Len = uint32(addressBytesLen)
+		validSourceChainConfig := ccip_offramp.SourceChainConfig{
+			OnRamp:    onRampAddress,
+			IsEnabled: input.EnabledAsSource,
+		}
+		var ixn solana.Instruction
+		if isUpdate {
+			ixn, err = ccip_offramp.NewUpdateSourceChainConfigInstruction(
+				input.RemoteChainSelector,
+				validSourceChainConfig,
+				offRampSourceChainPDA,
+				offRampConfigPDA,
+				authority,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build update dest chain instruction: %w", err)
+			}
+		} else {
+			ixn, err = ccip_offramp.NewAddSourceChainInstruction(
+				input.RemoteChainSelector,
+				validSourceChainConfig,
+				offRampSourceChainPDA,
+				offRampConfigPDA,
+				authority,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build add source chain instruction: %w", err)
+			}
+			err = utils.ExtendLookupTable(chain, input.OffRamp, []solana.PublicKey{offRampSourceChainPDA})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
+			}
+		}
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+		}
+		sourceRef := datastore.AddressRef{
+			Address:       offRampSourceChainPDA.String(),
+			ChainSelector: chain.Selector,
+			Type:          datastore.ContractType(SourceChainType),
+			Version:       Version,
+		}
+		return sequences.OnChainOutput{
+			Addresses: []datastore.AddressRef{sourceRef},
+		}, nil
+	},
+)
 
-	if err := common.ExtendLookupTable(
-		context.Background(),
-		chain.Client,
-		addressLookupTable,
-		*chain.DeployerKey,
-		toAdd,
-	); err != nil {
-		return fmt.Errorf("failed to extend lookup table: %w", err)
-	}
-	return nil
+func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
+	return chain.DeployerKey.PublicKey()
 }
 
 func DefaultParams() Params {

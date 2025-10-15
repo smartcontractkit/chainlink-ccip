@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -40,10 +41,10 @@ var Initialize = operations.NewOperation(
 	"rmn-remote:initialize",
 	Version,
 	"Initializes the RMNRemote 1.6.0 contract",
-	func(b operations.Bundle, chain cldf_solana.Chain, input Params) ([]solana.Instruction, error) {
+	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		programData, err := utils.GetSolProgramData(chain, input.RMNRemote)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get program data: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
 		rmnRemoteConfigPDA, _, _ := state.FindRMNRemoteConfigPDA(input.RMNRemote)
 		rmnRemoteCursesPDA, _, _ := state.FindRMNRemoteCursesPDA(input.RMNRemote)
@@ -56,13 +57,13 @@ var Initialize = operations.NewOperation(
 			programData.Address,
 		).ValidateAndBuild()
 		if err != nil {
-			return nil, fmt.Errorf("failed to build initialize instruction: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build initialize instruction: %w", err)
 		}
 		err = chain.Confirm([]solana.Instruction{instruction})
 		if err != nil {
-			return nil, fmt.Errorf("failed to confirm initialization: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm initialization: %w", err)
 		}
-		return []solana.Instruction{instruction}, nil
+		return sequences.OnChainOutput{}, nil
 	},
 )
 

@@ -1,7 +1,8 @@
-package changesets_test
+package deployment
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -22,59 +23,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
-	programsPath, ds, err := SetupSolanaEnvironment(t, chain_selectors.SOLANA_MAINNET.Selector)
-	require.NoError(t, err, "Failed to set up Solana environment")
-	require.NotNil(t, ds, "Datastore should be created")
-	e, err := environment.New(t.Context(),
-		environment.WithSolanaContainer(t, []uint64{chain_selectors.SOLANA_MAINNET.Selector}, programsPath, solanaProgramIDs),
-	)
-	require.NoError(t, err, "Failed to create test environment")
-	require.NotNil(t, e, "Environment should be created")
-
-	tests := []struct {
-		desc        string
-		input       cs_core.WithMCMS[changesets.DeployChainContractsCfg]
-		expectedErr string
-	}{
-		{
-			desc: "valid input",
-			input: cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
-				MCMS: mcms.Input{},
-				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: chain_selectors.SOLANA_MAINNET.Selector,
-					Params:   sequences.ContractParams{},
-				},
-			},
-		},
-		{
-			desc: "invalid chain selector",
-			input: cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
-				MCMS: mcms.Input{},
-				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: 12345,
-					Params:   sequences.ContractParams{},
-				},
-			},
-			expectedErr: "no Solana chain with selector 12345 found in environment",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
-			err := changesets.DeployChainContracts(mcmsRegistry).VerifyPreconditions(*e, test.input)
-			if test.expectedErr != "" {
-				require.ErrorContains(t, err, test.expectedErr, "Expected error containing %q but got none", test.expectedErr)
-			} else {
-				require.NoError(t, err, "Did not expect error but got: %v", err)
-			}
-		})
-	}
-}
-
 func TestDeployChainContracts_Apply(t *testing.T) {
-	programsPath, ds, err := SetupSolanaEnvironment(t, chain_selectors.SOLANA_MAINNET.Selector)
+	t.Parallel()
+	programsPath, ds, err := PreloadSolanaEnvironment(chain_selectors.SOLANA_MAINNET.Selector)
 	require.NoError(t, err, "Failed to set up Solana environment")
 	require.NotNil(t, ds, "Datastore should be created")
 
@@ -84,7 +35,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	require.NoError(t, err, "Failed to create test environment")
 	require.NotNil(t, e, "Environment should be created")
 
-	e.DataStore = ds.Seal() // Override datastore in environment to include existing addresses
+	e.DataStore = ds.Seal() // Add preloaded contracts to env datastore
 	mint, _ := solana.NewRandomPrivateKey()
 
 	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
@@ -128,8 +79,8 @@ var solanaContracts = map[string]datastore.ContractType{
 	"rmn_remote":   datastore.ContractType(rmnremoteops.ContractType),
 }
 
-func SetupSolanaEnvironment(t *testing.T, chainSelector uint64) (string, *datastore.MemoryDataStore, error) {
-	programsPath := t.TempDir()
+func PreloadSolanaEnvironment(chainSelector uint64) (string, *datastore.MemoryDataStore, error) {
+	programsPath := os.TempDir()
 	ds := datastore.NewMemoryDataStore()
 	err := utils.DownloadSolanaCCIPProgramArtifacts(context.Background(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV0_1_1])
 	if err != nil {

@@ -24,7 +24,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 	"Configures lane leg as source on CCIP 1.6.0",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
-		fmt.Println("Configuring lane leg as source:", input)
+		fmt.Println("EVM Configuring lane leg as source:", input)
 
 		result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.FeeQuoter),
@@ -108,7 +108,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 	"Configures lane leg as destination on CCIP 1.6.0",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
-		fmt.Println("Configuring lane leg as destination:", input)
+		fmt.Println("EVM Configuring lane leg as destination:", input)
 
 		result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.OffRamp),
