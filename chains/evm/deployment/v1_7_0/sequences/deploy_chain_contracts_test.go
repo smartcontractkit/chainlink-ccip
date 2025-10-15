@@ -12,11 +12,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -80,12 +80,12 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			exists := map[deployment.ContractType]bool{
 				rmn_remote.ContractType:           false,
 				router.ContractType:               false,
-				executor_onramp.ContractType:      false,
+				executor.ContractType:             false,
 				link.ContractType:                 false,
 				weth.ContractType:                 false,
 				committee_verifier.ContractType:   false,
-				on_ramp.ContractType:              false,
-				off_ramp.ContractType:             false,
+				onramp.ContractType:               false,
+				offramp.ContractType:              false,
 				fee_quoter.ContractType:           false,
 				committee_verifier.ProxyType:      false,
 				rmn_proxy.ContractType:            false,

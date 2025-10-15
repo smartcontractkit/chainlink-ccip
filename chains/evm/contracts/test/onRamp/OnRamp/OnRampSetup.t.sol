@@ -49,7 +49,6 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
-  // TODO make this work for other cases as well
   function _evmMessageToEvent(
     Client.EVM2AnyMessage memory message,
     uint64 destChainSelector,

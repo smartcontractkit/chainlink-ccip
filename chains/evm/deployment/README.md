@@ -47,11 +47,11 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(
 	semver.MustParse("1.7.0"), // The contract version
 	"Applies updates to source chain configurations on the OffRamp", // Operation description
 	ContractType, // The contract type ("OffRamp" in this case)
-	off_ramp.OffRampABI, // Contract ABI - used to decode errors
-	off_ramp.NewOffRamp, // Contract constructor from gethwrappers
+	offramp.OffRampABI, // Contract ABI - used to decode errors
+	offramp.NewOffRamp, // Contract constructor from gethwrappers
 	contract.OnlyOwner, // Allowed callers check - used to determine whether or not the deployer key can make the call
 	func([]SourceChainConfigArgs) error { return nil }, // Perform simple argument validations here (i.e. acceptable ranges)
-	func(offRamp *off_ramp.OffRamp, opts *bind.TransactOpts, args []SourceChainConfigArgs) (*types.Transaction, error) {
+	func(offRamp *offramp.OffRamp, opts *bind.TransactOpts, args []SourceChainConfigArgs) (*types.Transaction, error) {
 		return offRamp.ApplySourceChainConfigUpdates(opts, args)
 	}, // Wrapper around gethwrappers call
 )
@@ -65,8 +65,8 @@ var GetStaticConfig = contract.NewRead(
 	semver.MustParse("1.7.0"), // The contract version
 	"Reads the static config of the OffRamp", // Operation description
 	ContractType, // The contract type ("OffRamp" in this case)
-	off_ramp.NewOffRamp, // Contract constructor from gethwrappers
-	func(offRamp *off_ramp.OffRamp, opts *bind.CallOpts, args any) (StaticConfig, error) {
+	offramp.NewOffRamp, // Contract constructor from gethwrappers
+	func(offRamp *offramp.OffRamp, opts *bind.CallOpts, args any) (StaticConfig, error) {
 		return offRamp.GetStaticConfig(opts)
 	}, // Wrapper around gethwrappers call
 )
@@ -80,11 +80,11 @@ var Deploy = contract.NewDeploy(
 	semver.MustParse("1.7.0"), // The contract version
 	"Deploys the OffRamp contract", // Operation description
 	ContractType, // The contract type ("OffRamp" in this case)
-	off_ramp.OffRampABI, // Contract ABI - used to decode errors
+	offramp.OffRampABI, // Contract ABI - used to decode errors
 	func(ConstructorArgs) error { return nil }, // Perform simple argument validations here (i.e. acceptable ranges)
 	contract.VMDeployers[ConstructorArgs]{
 		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := off_ramp.DeployOffRamp(opts, backend, args)
+			address, tx, _, err := offramp.DeployOffRamp(opts, backend, args)
 			return address, tx, err
 		},
 		DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error) {...}

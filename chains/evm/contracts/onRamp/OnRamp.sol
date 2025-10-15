@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
-import {IExecutorOnRamp} from "../interfaces/IExecutorOnRamp.sol";
+import {IExecutor} from "../interfaces/IExecutor.sol";
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
@@ -474,7 +474,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     Client.EVM2AnyMessage memory message,
     uint64 destChainSelector
   ) internal view returns (uint256) {
-    return IExecutorOnRamp(resolvedExtraArgs.executor).getFee(
+    return IExecutor(resolvedExtraArgs.executor).getFee(
       destChainSelector,
       message,
       resolvedExtraArgs.requiredCCV,
