@@ -1,9 +1,9 @@
 package sequences
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
-	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -14,6 +14,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
@@ -28,14 +29,24 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type MockReceiverParams struct {
 	Version *semver.Version
-	// CommitteeVerifierQualifiers are the qualifiers of the committee verifiers that are required by the mock receiver.
-	// If not provided, the first committee verifier with an empty qualifier will be used.
-	CommitteeVerifierQualifiers []string
+	// RequiredVerifiers are references to verifier contracts that are required.
+	// Note that these could be references to contracts that are either already deployed
+	// or will be deployed by the DeployChainContracts sequence.
+	RequiredVerifiers []datastore.AddressRef
+	// OptionalVerifiers are references to verifier contracts that are optional.
+	// Note that these could be references to contracts that are either already deployed
+	// or will be deployed by the DeployChainContracts sequence.
+	OptionalVerifiers []datastore.AddressRef
+	OptionalThreshold uint8
+	// Qualifier distinguishes between multiple deployments of the mock receiver on the same chain.
+	// If only one mock receiver is deployed this can be left blank.
+	Qualifier string
 }
 
 type RMNRemoteParams struct {
@@ -74,7 +85,7 @@ type ContractParams struct {
 	OnRamp            OnRampParams
 	FeeQuoter         FeeQuoterParams
 	ExecutorOnRamp    ExecutorOnRampParams
-	MockReceiver      MockReceiverParams
+	MockReceivers     []MockReceiverParams
 }
 
 type DeployChainContractsInput struct {
@@ -317,11 +328,30 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, executorOnRampRef)
 
-		mockReceiverRef, err := deployMockReceiver(b, chain, committeeVerifierRefs, input)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
+		for _, mockReceiverParams := range input.ContractParams.MockReceivers {
+			requiredVerifiers, optionalVerifiers, err := GetMockReceiverVerifiers(mockReceiverParams, addresses, input.ExistingAddresses)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get mock receiver verifiers: %w", err)
+			}
+			var qualifierPtr *string
+			if mockReceiverParams.Qualifier != "" {
+				qualifierPtr = &mockReceiverParams.Qualifier
+			}
+			deployReceiverReport, err := operations.ExecuteOperation(b, mock_receiver.Deploy, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
+				ChainSelector:  chain.Selector,
+				Args: mock_receiver.ConstructorArgs{
+					RequiredVerifiers: requiredVerifiers,
+					OptionalVerifiers: optionalVerifiers,
+					OptionalThreshold: mockReceiverParams.OptionalThreshold,
+				},
+				Qualifier: qualifierPtr,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy MockReceiver: %w", err)
+			}
+			addresses = append(addresses, deployReceiverReport.Output)
 		}
-		addresses = append(addresses, mockReceiverRef)
 
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
@@ -335,87 +365,56 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	},
 )
 
-func getCommitteeVerifiers(committeeVerifierRefs []datastore.AddressRef, qualifiers []string) ([]datastore.AddressRef, error) {
-	if len(qualifiers) == 0 {
-		return committeeVerifierRefs, fmt.Errorf("no qualifiers provided")
-	}
-	var verifiers []datastore.AddressRef
-	for _, ref := range committeeVerifierRefs {
-		if slices.Contains(qualifiers, ref.Qualifier) {
-			verifiers = append(verifiers, ref)
+// getMockReceiverVerifiers finds the required and optional verifier addresses given the mock receiver
+// params, the addresses of the newly deployed contracts, and the addresses of the existing contracts.
+func GetMockReceiverVerifiers(
+	mockReceiverParams MockReceiverParams,
+	addresses []datastore.AddressRef,
+	existingAddresses []datastore.AddressRef,
+) (requiredVerifiers []common.Address, optionalVerifiers []common.Address, err error) {
+	// create a datastore in order to use the API.
+	ds := datastore.NewMemoryDataStore()
+	for _, ref := range append(addresses, existingAddresses...) {
+		// We ignore ErrAddressRefExists since a partial deployment could result in an address being in both
+		// addresses and existingAddresses due to the idempotent nature of the sequence.
+		if err := ds.Addresses().Add(ref); err != nil && !errors.Is(err, datastore.ErrAddressRefExists) {
+			return nil, nil, fmt.Errorf("failed to add address to datastore (%+v): %w", ref, err)
 		}
 	}
-	if len(verifiers) == 0 {
-		return nil, fmt.Errorf("no committee verifiers found with qualifiers %v", qualifiers)
-	}
-	return verifiers, nil
-}
-
-// getDefaultCommitteeVerifier returns the committee verifier with an empty qualifier, since thats how we deploy
-// the canonical committee verifier now. If this isn't found it returns the first one.
-func getDefaultCommitteeVerifier(committeeVerifierRefs []datastore.AddressRef) (datastore.AddressRef, error) {
-	if len(committeeVerifierRefs) == 0 {
-		return datastore.AddressRef{}, fmt.Errorf("no committee verifiers found, need at least one")
-	}
-	for _, ref := range committeeVerifierRefs {
-		if ref.Qualifier == "" {
-			return ref, nil
-		}
-	}
-	return committeeVerifierRefs[0], nil
-}
-
-// deployMockReceiver computes required verifiers and deploys the MockReceiver contract.
-func deployMockReceiver(
-	b operations.Bundle,
-	chain evm.Chain,
-	committeeVerifierRefs []datastore.AddressRef,
-	input DeployChainContractsInput,
-) (datastore.AddressRef, error) {
-	// Determine version
-	var version *semver.Version
-	if input.ContractParams.MockReceiver.Version != nil {
-		version = input.ContractParams.MockReceiver.Version
-	} else {
-		version = semver.MustParse("1.7.0")
-	}
-
-	// Compute required verifiers
-	var requiredVerifiers []common.Address
-	if len(input.ContractParams.MockReceiver.CommitteeVerifierQualifiers) > 0 {
-		refs, err := getCommitteeVerifiers(committeeVerifierRefs, input.ContractParams.MockReceiver.CommitteeVerifierQualifiers)
+	sealed := ds.Seal()
+	for _, ref := range mockReceiverParams.RequiredVerifiers {
+		address, err := datastore_utils.FindAndFormatRef(sealed, ref, ref.ChainSelector, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
-			return datastore.AddressRef{}, fmt.Errorf("failed to get default committee verifier: %w", err)
+			return nil, nil, fmt.Errorf(
+				"failed to find required verifier (%+v) in datastore containing existing and newly deployed addresses: %w",
+				ref,
+				err)
 		}
-		for _, ref := range refs {
-			requiredVerifiers = append(requiredVerifiers, common.HexToAddress(ref.Address))
-		}
-	} else {
-		// backwards compatibilty: select the committee verifier with an empty qualifier, since thats how we deploy
-		// the canonical committee verifier now.
-		defRef, err := getDefaultCommitteeVerifier(committeeVerifierRefs)
+		requiredVerifiers = append(requiredVerifiers, address)
+	}
+	for _, ref := range mockReceiverParams.OptionalVerifiers {
+		address, err := datastore_utils.FindAndFormatRef(sealed, ref, ref.ChainSelector, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
-			return datastore.AddressRef{}, fmt.Errorf("failed to get default committee verifier: %w", err)
+			return nil, nil, fmt.Errorf(
+				"failed to find optional verifier (%+v) in datastore containing existing and newly deployed addresses: %w",
+				ref,
+				err)
 		}
-		requiredVerifiers = append(requiredVerifiers, common.HexToAddress(defRef.Address))
-		for _, ref := range committeeVerifierRefs {
-			if ref.Qualifier == "" {
-				requiredVerifiers = append(requiredVerifiers, common.HexToAddress(ref.Address))
-			}
-		}
+		optionalVerifiers = append(optionalVerifiers, address)
 	}
-
-	// Deploy MockReceiver
-	mockReceiverRef, err := contract_utils.MaybeDeployContract(b, mock_receiver.Deploy, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *version),
-		ChainSelector:  chain.Selector,
-		Args: mock_receiver.ConstructorArgs{
-			// TODO: this should be the proxy address, not the impl address.
-			RequiredVerifiers: requiredVerifiers,
-		},
-	}, input.ExistingAddresses)
-	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to deploy MockReceiver: %w", err)
+	if len(requiredVerifiers) != len(mockReceiverParams.RequiredVerifiers) {
+		return nil, nil, fmt.Errorf("not all required verifiers found, got %d (%+v), expected %d (%+v)",
+			len(requiredVerifiers),
+			requiredVerifiers,
+			len(mockReceiverParams.RequiredVerifiers),
+			mockReceiverParams.RequiredVerifiers)
 	}
-	return mockReceiverRef, nil
+	if len(optionalVerifiers) != len(mockReceiverParams.OptionalVerifiers) {
+		return nil, nil, fmt.Errorf("not all optional verifiers found, got %d (%+v), expected %d (%+v)",
+			len(optionalVerifiers),
+			optionalVerifiers,
+			len(mockReceiverParams.OptionalVerifiers),
+			mockReceiverParams.OptionalVerifiers)
+	}
+	return requiredVerifiers, optionalVerifiers, nil
 }

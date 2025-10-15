@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -53,6 +54,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 					},
 				},
 				StorageLocation: "https://test.chain.link.fake",
+				Qualifier:       "alpha",
 			},
 		},
 		OnRamp: sequences.OnRampParams{
@@ -70,6 +72,19 @@ func CreateBasicContractParams() sequences.ContractParams {
 			WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
 			USDPerLINK:                     usdPerLink,
 			USDPerWETH:                     usdPerWeth,
+		},
+		MockReceivers: []sequences.MockReceiverParams{
+			{
+				Version: semver.MustParse("1.7.0"),
+				RequiredVerifiers: []datastore.AddressRef{
+					{
+						// ChainSelector we don't know here but should still work.
+						Type:      datastore.ContractType(committee_verifier.ContractType),
+						Version:   semver.MustParse("1.7.0"),
+						Qualifier: "alpha",
+					},
+				},
+			},
 		},
 	}
 }

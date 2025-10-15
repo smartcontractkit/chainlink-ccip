@@ -4,8 +4,9 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	mock_recv_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_receiver_v2"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -199,7 +201,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 	})
 }
 
-func TestDeployChainContracts_MultipleCommitteeVerifiersAndMockReceiverConfig(t *testing.T) {
+func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverConfigs(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -237,9 +239,44 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMockReceiverConfig(t 
 			Qualifier:       "beta",
 		},
 	}
-	params.MockReceiver = sequences.MockReceiverParams{
-		Version:                     semver.MustParse("1.7.0"),
-		CommitteeVerifierQualifiers: []string{"alpha", "beta"},
+	params.MockReceivers = []sequences.MockReceiverParams{
+		{
+			Version: semver.MustParse("1.7.0"),
+			RequiredVerifiers: []datastore.AddressRef{
+				{
+					ChainSelector: chainSelector,
+					Type:          datastore.ContractType(committee_verifier.ContractType),
+					Version:       semver.MustParse("1.7.0"),
+					Qualifier:     "alpha",
+				},
+				{
+					ChainSelector: chainSelector,
+					Type:          datastore.ContractType(committee_verifier.ContractType),
+					Version:       semver.MustParse("1.7.0"),
+					Qualifier:     "beta",
+				},
+			},
+			Qualifier: "q1",
+		},
+		{
+			Version: semver.MustParse("1.7.0"),
+			RequiredVerifiers: []datastore.AddressRef{
+				{
+					Type:      datastore.ContractType(committee_verifier.ContractType),
+					Version:   semver.MustParse("1.7.0"),
+					Qualifier: "alpha",
+				},
+			},
+			OptionalVerifiers: []datastore.AddressRef{
+				{
+					Type:      datastore.ContractType(committee_verifier.ContractType),
+					Version:   semver.MustParse("1.7.0"),
+					Qualifier: "beta",
+				},
+			},
+			OptionalThreshold: 1,
+			Qualifier:         "q2",
+		},
 	}
 
 	report, err := operations.ExecuteSequence(
@@ -254,75 +291,185 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMockReceiverConfig(t 
 	)
 	require.NoError(t, err, "ExecuteSequence should not error")
 
-	// Find MockReceiver address
-	var mockAddr common.Address
+	// Assert mock receiver properties
+	ds := datastore.NewMemoryDataStore()
 	for _, addr := range report.Output.Addresses {
-		if deployment.ContractType(addr.Type) == mock_receiver.ContractType {
-			mockAddr = common.HexToAddress(addr.Address)
-			break
-		}
+		require.NoError(t, ds.Addresses().Add(addr))
 	}
-	require.NotEqual(t, (common.Address{}), mockAddr, "MockReceiver address not found")
+	sealed := ds.Seal()
 
-	// Query MockReceiver for configured CCVs and validate that both alpha and beta were provided
-	mr, err := mock_recv_bindings.NewMockReceiverV2(mockAddr, e.BlockChains.EVMChains()[chainSelector].Client)
+	q1ReceiverRef, err := datastore_utils.FindAndFormatRef(sealed, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(mock_receiver.ContractType),
+		Version:       semver.MustParse("1.7.0"),
+		Qualifier:     "q1",
+	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 
-	required, optional, threshold, err := mr.GetCCVs(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector)
+	q2ReceiverRef, err := datastore_utils.FindAndFormatRef(sealed, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(mock_receiver.ContractType),
+		Version:       semver.MustParse("1.7.0"),
+		Qualifier:     "q2",
+	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, len(required), 2)
-	require.Equal(t, uint8(0), threshold) // default optional threshold
-	_ = optional                          // not asserted here
+
+	q1Receiver, err := mock_recv_bindings.NewMockReceiverV2(q1ReceiverRef, e.BlockChains.EVMChains()[chainSelector].Client)
+	require.NoError(t, err)
+
+	required, optional, threshold, err := q1Receiver.GetCCVs(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector)
+	require.NoError(t, err)
+	require.Len(t, required, 2)
+	require.Len(t, optional, 0)
+	require.Equal(t, uint8(0), threshold)
+
+	q2Receiver, err := mock_recv_bindings.NewMockReceiverV2(q2ReceiverRef, e.BlockChains.EVMChains()[chainSelector].Client)
+	require.NoError(t, err)
+
+	required, optional, threshold, err = q2Receiver.GetCCVs(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector)
+	require.NoError(t, err)
+	require.Len(t, required, 1)
+	require.Len(t, optional, 1)
+	require.Equal(t, uint8(1), threshold)
 }
 
-func TestDeployChainContracts_MockReceiver_DefaultQualifiersFallback(t *testing.T) {
-	chainSelector := uint64(5009297550715157269)
-	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, []uint64{chainSelector}),
-	)
-	require.NoError(t, err, "Failed to create environment")
-	require.NotNil(t, e, "Environment should be created")
+func TestGetMockReceiverVerifiers(t *testing.T) {
+	chainSelector := uint64(12345)
+	v1_7_0 := semver.MustParse("1.7.0")
 
-	// Use default params with a single CommitteeVerifier (no qualifier specified)
-	params := testsetup.CreateBasicContractParams()
-	// Do not set MockReceiver.CommitteeVerifierQualifiers to exercise default behavior
-
-	report, err := operations.ExecuteSequence(
-		e.OperationsBundle,
-		sequences.DeployChainContracts,
-		e.BlockChains.EVMChains()[chainSelector],
-		sequences.DeployChainContractsInput{
-			ChainSelector:     chainSelector,
-			ExistingAddresses: nil,
-			ContractParams:    params,
-		},
-	)
-	require.NoError(t, err, "ExecuteSequence should not error")
-
-	// Collect canonical (empty qualifier) CommitteeVerifier addresses
-	canon := make(map[string]struct{})
-	var mockAddr common.Address
-	for _, addr := range report.Output.Addresses {
-		if deployment.ContractType(addr.Type) == committee_verifier.ContractType && addr.Qualifier == "" {
-			canon[common.HexToAddress(addr.Address).Hex()] = struct{}{}
-		}
-		if deployment.ContractType(addr.Type) == mock_receiver.ContractType {
-			mockAddr = common.HexToAddress(addr.Address)
-		}
+	// Note that address is not specified in the refs below - this is intentional.
+	requiredVerifierRef := datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(committee_verifier.ContractType),
+		Version:       v1_7_0,
+		Qualifier:     "alpha",
 	}
-	require.NotEqual(t, (common.Address{}), mockAddr, "MockReceiver address not found")
-	require.NotEmpty(t, canon, "Expected at least one canonical CommitteeVerifier address")
+	optionalVerifierRef := datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(committee_verifier.ContractType),
+		Version:       v1_7_0,
+		Qualifier:     "beta",
+	}
 
-	// Verify MockReceiver required CCVs are the canonical CommitteeVerifier(s)
-	mr, err := mock_recv_bindings.NewMockReceiverV2(mockAddr, e.BlockChains.EVMChains()[chainSelector].Client)
-	require.NoError(t, err)
-	required, optional, threshold, err := mr.GetCCVs(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector)
-	require.NoError(t, err)
-	require.GreaterOrEqual(t, len(required), 1)
-	require.Equal(t, uint8(0), threshold)
-	_ = optional // not asserted
-	for _, r := range required {
-		_, ok := canon[r.Hex()]
-		require.True(t, ok, "required CCV %s should be one of canonical CommitteeVerifiers", r.Hex())
+	requiredAddr := common.HexToAddress("0x01")
+	optionalAddr := common.HexToAddress("0x02")
+
+	// Create address refs with addresses for the datastore
+	addresses := []datastore.AddressRef{
+		{
+			ChainSelector: chainSelector,
+			Type:          datastore.ContractType(committee_verifier.ContractType),
+			Version:       v1_7_0,
+			Qualifier:     "alpha",
+			Address:       requiredAddr.Hex(),
+		},
+		{
+			ChainSelector: chainSelector,
+			Type:          datastore.ContractType(router.ContractType),
+			Version:       semver.MustParse("1.2.0"),
+			Address:       common.HexToAddress("0xAA").Hex(),
+		},
+		{
+			ChainSelector: chainSelector,
+			Type:          datastore.ContractType(committee_verifier.ContractType),
+			Version:       v1_7_0,
+			Qualifier:     "gamma",
+			Address:       common.HexToAddress("0xCC").Hex(),
+		},
+	}
+	existingAddresses := []datastore.AddressRef{
+		{
+			ChainSelector: chainSelector,
+			Type:          datastore.ContractType(committee_verifier.ContractType),
+			Version:       v1_7_0,
+			Qualifier:     "beta",
+			Address:       optionalAddr.Hex(),
+		},
+		{
+			ChainSelector: chainSelector,
+			Type:          datastore.ContractType(link.ContractType),
+			Version:       semver.MustParse("1.0.0"),
+			Address:       common.HexToAddress("0xBB").Hex(),
+		},
+		{
+			ChainSelector: chainSelector,
+			Type:          datastore.ContractType(committee_verifier.ContractType),
+			Version:       v1_7_0,
+			Qualifier:     "delta",
+			Address:       common.HexToAddress("0xDD").Hex(),
+		},
+	}
+
+	tests := []struct {
+		name               string
+		mockReceiverParams sequences.MockReceiverParams
+		addresses          []datastore.AddressRef
+		existingAddresses  []datastore.AddressRef
+		expectedRequired   []common.Address
+		expectedOptional   []common.Address
+		expectErr          bool
+		errContains        string
+	}{
+		{
+			name: "happy path - all verifiers found",
+			mockReceiverParams: sequences.MockReceiverParams{
+				RequiredVerifiers: []datastore.AddressRef{requiredVerifierRef},
+				OptionalVerifiers: []datastore.AddressRef{optionalVerifierRef},
+			},
+			addresses:         addresses,
+			existingAddresses: existingAddresses,
+			expectedRequired:  []common.Address{requiredAddr},
+			expectedOptional:  []common.Address{optionalAddr},
+			expectErr:         false,
+		},
+		{
+			name: "error - required verifier not found",
+			mockReceiverParams: sequences.MockReceiverParams{
+				RequiredVerifiers: []datastore.AddressRef{requiredVerifierRef},
+			},
+			addresses:         []datastore.AddressRef{},
+			existingAddresses: []datastore.AddressRef{},
+			expectErr:         true,
+			errContains:       "failed to find required verifier",
+		},
+		{
+			name: "error - optional verifier not found",
+			mockReceiverParams: sequences.MockReceiverParams{
+				OptionalVerifiers: []datastore.AddressRef{optionalVerifierRef},
+			},
+			addresses:         []datastore.AddressRef{},
+			existingAddresses: []datastore.AddressRef{},
+			expectErr:         true,
+			errContains:       "failed to find optional verifier",
+		},
+		{
+			name: "no verifiers requested",
+			mockReceiverParams: sequences.MockReceiverParams{
+				RequiredVerifiers: []datastore.AddressRef{},
+				OptionalVerifiers: []datastore.AddressRef{},
+			},
+			addresses:         addresses,
+			existingAddresses: existingAddresses,
+			expectedRequired:  nil,
+			expectedOptional:  nil,
+			expectErr:         false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			required, optional, err := sequences.GetMockReceiverVerifiers(tc.mockReceiverParams, tc.addresses, tc.existingAddresses)
+
+			if tc.expectErr {
+				require.Error(t, err)
+				if tc.errContains != "" {
+					require.Contains(t, err.Error(), tc.errContains)
+				}
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expectedRequired, required)
+				require.Equal(t, tc.expectedOptional, optional)
+			}
+		})
 	}
 }
