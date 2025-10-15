@@ -47,7 +47,7 @@ func TestToEVMAddress(t *testing.T) {
 	}
 }
 
-func TestToPaddedEVMAddress(t *testing.T) {
+func TestToEVMAddressBytes(t *testing.T) {
 	tests := []struct {
 		desc        string
 		ref         datastore.AddressRef
@@ -75,12 +75,12 @@ func TestToPaddedEVMAddress(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			addr, err := datastore_utils.ToPaddedEVMAddress(test.ref)
+			addr, err := datastore_utils.ToEVMAddressBytes(test.ref)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr)
 				return
 			}
-			require.Equal(t, common.LeftPadBytes(common.HexToAddress(test.ref.Address).Bytes(), 32), addr)
+			require.Equal(t, common.HexToAddress(test.ref.Address).Bytes(), addr)
 		})
 	}
 }

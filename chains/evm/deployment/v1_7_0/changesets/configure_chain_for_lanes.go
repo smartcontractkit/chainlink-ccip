@@ -130,13 +130,13 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 				laneMandatedInboundCCVs[i] = addr
 			}
 
-			// TODO: CCIPMessageSource/Dest handling via ToPaddedEVMAddress is a hack, assumes the remote chain is also EVM.
+			// TODO: CCIPMessageSource/Dest handling via ToEVMAddressBytes is a hack, assumes the remote chain is also EVM.
 			// Usage of cross-family changesets will resolve this issue, and this changeset will eventually be deprecated.
-			ccipMessageSourceAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteConfig.CCIPMessageSource, remoteChainSel, evm_datastore_utils.ToPaddedEVMAddress)
+			ccipMessageSourceAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteConfig.CCIPMessageSource, remoteChainSel, evm_datastore_utils.ToEVMAddressBytes)
 			if err != nil {
 				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve CCIPMessageSource ref: %w", err)
 			}
-			ccipMessageDestAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteConfig.CCIPMessageDest, remoteChainSel, evm_datastore_utils.ToPaddedEVMAddress)
+			ccipMessageDestAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteConfig.CCIPMessageDest, remoteChainSel, evm_datastore_utils.ToEVMAddressBytes)
 			if err != nil {
 				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve CCIPMessageDest ref: %w", err)
 			}
