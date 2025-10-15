@@ -115,8 +115,8 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   function _assertSenderIsAllowed(uint64 destChainSelector, address sender, address verifierCaller) internal view {
     DestChainConfig storage destChainConfig = _getDestChainConfig(destChainSelector);
-    // CCVs should query the CCVProxy address from the router, this allows for CCVProxy updates without touching CCVs
-    // CCVProxy address may be zero intentionally to pause, which should stop all messages.
+    // CCVs should query the OnRamp address from the router, this allows for OnRamp updates without touching CCVs
+    // OnRamp address may be zero intentionally to pause, which should stop all messages.
     if (verifierCaller != destChainConfig.router.getOnRamp(destChainSelector)) {
       revert CallerIsNotARampOnRouter(verifierCaller);
     }

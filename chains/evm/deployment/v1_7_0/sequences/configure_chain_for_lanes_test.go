@@ -7,16 +7,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/ccv_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/off_ramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/on_ramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
-	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 )
@@ -33,11 +33,11 @@ func TestConfigureChainForLanes(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			chainSelector := uint64(5009297550715157269)
-
-			e, err := testsetup.CreateEnvironment(t, map[uint64]cldf_evm_provider.SimChainProviderConfig{
-				chainSelector: {NumAdditionalAccounts: 1},
-			})
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainSelector}),
+			)
 			require.NoError(t, err, "Failed to create environment")
+			require.NotNil(t, e, "Environment should be created")
 			evmChain := e.BlockChains.EVMChains()[chainSelector]
 
 			deploymentReport, err := operations.ExecuteSequence(
@@ -52,7 +52,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 
 			var r common.Address
-			var ccvProxy common.Address
+			var onRamp common.Address
 			var feeQuoter common.Address
 			var offRamp common.Address
 			var committeeVerifier common.Address
@@ -61,8 +61,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 				switch addr.Type {
 				case datastore.ContractType(router.ContractType):
 					r = common.HexToAddress(addr.Address)
-				case datastore.ContractType(ccv_proxy.ContractType):
-					ccvProxy = common.HexToAddress(addr.Address)
+				case datastore.ContractType(on_ramp.ContractType):
+					onRamp = common.HexToAddress(addr.Address)
 				case datastore.ContractType(fee_quoter.ContractType):
 					feeQuoter = common.HexToAddress(addr.Address)
 				case datastore.ContractType(off_ramp.ContractType):
@@ -84,7 +84,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				sequences.ConfigureChainForLanesInput{
 					ChainSelector:     chainSelector,
 					Router:            r,
-					CCVProxy:          ccvProxy,
+					OnRamp:            onRamp,
 					CommitteeVerifier: committeeVerifier,
 					FeeQuoter:         feeQuoter,
 					OffRamp:           offRamp,
@@ -112,7 +112,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, ccvProxy.Hex(), onRampOnRouter.Output.Hex(), "OnRamp address on router should match CCVProxy address")
+			require.Equal(t, onRamp.Hex(), onRampOnRouter.Output.Hex(), "OnRamp address on router should match OnRamp address")
 
 			// Check offRamps on router
 			offRampsOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
@@ -131,16 +131,16 @@ func TestConfigureChainForLanes(t *testing.T) {
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, ccipMessageSource, sourceChainConfig.Output.OnRamp, "OnRamp in source chain config should match CCVProxy address")
+			require.Equal(t, ccipMessageSource, sourceChainConfig.Output.OnRamp, "OnRamp in source chain config should match OnRamp address")
 			require.Len(t, sourceChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in source chain config")
 			require.Equal(t, committeeVerifier.Hex(), sourceChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in source chain config should match CommitteeVerifier address")
 			require.True(t, sourceChainConfig.Output.IsEnabled, "IsEnabled in source chain config should be true")
 			require.Equal(t, r.Hex(), sourceChainConfig.Output.Router.Hex(), "Router in source chain config should match Router address")
 
-			// Check destChainConfig on CCVProxy
-			destChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, ccv_proxy.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+			// Check destChainConfig on OnRamp
+			destChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, on_ramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
-				Address:       ccvProxy,
+				Address:       onRamp,
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")

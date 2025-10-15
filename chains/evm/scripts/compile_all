@@ -62,16 +62,12 @@ function getOptimizations() {
 }
 
 
-# 1.7
 compileContract ccvs/VerifierProxy
 compileContract ccvs/CommitteeVerifier
-compileContract onRamp/CCVProxy
+compileContract onRamp/OnRamp
 compileContract onRamp/ExecutorOnRamp
 compileContract offRamp/OffRamp
-
-# 1.6
 compileContract FeeQuoter
-compileContract onRamp/OnRamp
 compileContract applications/PingPongDemo
 compileContract applications/EtherSenderReceiver
 compileContract Router

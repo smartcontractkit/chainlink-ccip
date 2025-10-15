@@ -17,8 +17,8 @@ contract CommitteeVerifier_forwardToVerifier is CommitteeVerifierSetup {
   function test_forwardToVerifier() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _generateBasicMessageV1();
 
-    vm.prank(s_ccvProxy);
-    s_committeeVerifier.forwardToVerifier(s_ccvProxy, message, messageId, s_sourceFeeTokens[0], 1000, "");
+    vm.prank(s_onRamp);
+    s_committeeVerifier.forwardToVerifier(s_onRamp, message, messageId, s_sourceFeeTokens[0], 1000, "");
   }
 
   function test_forwardToVerifier_ViaVerifierProxy() public {
@@ -26,9 +26,9 @@ contract CommitteeVerifier_forwardToVerifier is CommitteeVerifierSetup {
 
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _generateBasicMessageV1();
 
-    vm.prank(s_ccvProxy);
+    vm.prank(s_onRamp);
     ICrossChainVerifierV1(address(verifierProxy)).forwardToVerifier(
-      s_ccvProxy, message, messageId, s_sourceFeeTokens[0], 1000, ""
+      s_onRamp, message, messageId, s_sourceFeeTokens[0], 1000, ""
     );
   }
 
