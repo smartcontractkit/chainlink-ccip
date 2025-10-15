@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IExecutorOnRamp} from "../../interfaces/IExecutorOnRamp.sol";
+import {IExecutor} from "../../interfaces/IExecutor.sol";
 
 import {Client} from "../../libraries/Client.sol";
 
-contract MockExecutor is IExecutorOnRamp {
+contract MockExecutor is IExecutor {
   function getFee(
     uint64, // destChainSelector,
     Client.EVM2AnyMessage memory, // message,
