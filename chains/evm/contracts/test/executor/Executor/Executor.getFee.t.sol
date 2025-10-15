@@ -12,7 +12,7 @@ contract Executor_getFee is ExecutorSetup {
     requiredCCVs[0] = Client.CCV({ccvAddress: INITIAL_CCV, args: ""});
     Client.CCV[] memory optionalCCVs = new Client.CCV[](0);
 
-    uint256 fee = s_Executor.getFee(INITIAL_DEST, message, requiredCCVs, optionalCCVs, "");
+    uint256 fee = s_executor.getFee(INITIAL_DEST, message, requiredCCVs, optionalCCVs, "");
     assertEq(fee, 0);
   }
 
@@ -23,7 +23,7 @@ contract Executor_getFee is ExecutorSetup {
     Client.CCV[] memory optionalCCVs = new Client.CCV[](0);
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidDestChain.selector, 999));
-    s_Executor.getFee(999, message, requiredCCVs, optionalCCVs, "");
+    s_executor.getFee(999, message, requiredCCVs, optionalCCVs, "");
   }
 
   function test_getFee_RevertWhen_UnsupportedRequiredCCV() public {
@@ -34,7 +34,7 @@ contract Executor_getFee is ExecutorSetup {
     Client.CCV[] memory optionalCCVs = new Client.CCV[](0);
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidCCV.selector, unsupportedCCV));
-    s_Executor.getFee(INITIAL_DEST, message, requiredCCVs, optionalCCVs, "");
+    s_executor.getFee(INITIAL_DEST, message, requiredCCVs, optionalCCVs, "");
   }
 
   function test_getFee_RevertWhen_UnsupportedOptionalCCV() public {
@@ -46,7 +46,7 @@ contract Executor_getFee is ExecutorSetup {
     optionalCCVs[0] = Client.CCV({ccvAddress: unsupportedCCV, args: ""});
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidCCV.selector, unsupportedCCV));
-    s_Executor.getFee(INITIAL_DEST, message, requiredCCVs, optionalCCVs, "");
+    s_executor.getFee(INITIAL_DEST, message, requiredCCVs, optionalCCVs, "");
   }
 
   function test_getFee_RevertWhen_ExceedsMaxCCVs() public {
@@ -61,6 +61,6 @@ contract Executor_getFee is ExecutorSetup {
         Executor.ExceedsMaxCCVs.selector, requiredCCVs.length + optionalCCVs.length, INITIAL_MAX_CCVS
       )
     );
-    s_Executor.getFee(INITIAL_DEST, message, requiredCCVs, optionalCCVs, "");
+    s_executor.getFee(INITIAL_DEST, message, requiredCCVs, optionalCCVs, "");
   }
 }

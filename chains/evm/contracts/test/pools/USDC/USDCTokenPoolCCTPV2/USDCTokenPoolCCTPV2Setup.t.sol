@@ -23,7 +23,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       address(s_router)
     );
 
-    // Set the on and off ramps as authorized callers for the pool.
+    // Set the on and offramps as authorized callers for the pool.
     address[] memory allowedCallers = new address[](3);
     allowedCallers[0] = OWNER;
     allowedCallers[1] = address(s_routerAllowedOnRamp);

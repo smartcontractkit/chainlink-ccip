@@ -12,20 +12,20 @@ contract Executor_setMaxCCVsPerMsg is ExecutorSetup {
 
     vm.expectEmit();
     emit Executor.MaxCCVsPerMsgSet(maxCCVsPerMsg);
-    s_Executor.setMaxCCVsPerMsg(maxCCVsPerMsg);
+    s_executor.setMaxCCVsPerMsg(maxCCVsPerMsg);
 
-    assertEq(maxCCVsPerMsg, s_Executor.getMaxCCVsPerMsg());
+    assertEq(maxCCVsPerMsg, s_executor.getMaxCCVsPerMsg());
   }
 
   function test_setMaxCCVsPerMsg_RevertWhen_NotOwner() public {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_Executor.setMaxCCVsPerMsg(1);
+    s_executor.setMaxCCVsPerMsg(1);
   }
 
   function test_setMaxCCVsPerMsg_RevertWhen_InvalidMaxCCVsPerMsg() public {
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidMaxPossibleCCVsPerMsg.selector, 0));
-    s_Executor.setMaxCCVsPerMsg(0);
+    s_executor.setMaxCCVsPerMsg(0);
   }
 }

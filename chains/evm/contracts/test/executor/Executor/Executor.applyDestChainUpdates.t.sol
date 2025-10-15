@@ -13,9 +13,9 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
 
     vm.expectEmit();
     emit Executor.DestChainAdded(INITIAL_DEST + 1);
-    s_Executor.applyDestChainUpdates(new uint64[](0), newDests);
+    s_executor.applyDestChainUpdates(new uint64[](0), newDests);
 
-    uint64[] memory currentDestChains = s_Executor.getDestChains();
+    uint64[] memory currentDestChains = s_executor.getDestChains();
     assertEq(currentDestChains.length, 2);
     bool found = false;
     for (uint256 i = 0; i < currentDestChains.length; ++i) {
@@ -32,10 +32,10 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
     newDests[0] = INITIAL_DEST;
 
     vm.recordLogs();
-    s_Executor.applyDestChainUpdates(new uint64[](0), newDests);
+    s_executor.applyDestChainUpdates(new uint64[](0), newDests);
     vm.assertEq(vm.getRecordedLogs().length, 0);
 
-    uint64[] memory currentDestChains = s_Executor.getDestChains();
+    uint64[] memory currentDestChains = s_executor.getDestChains();
     assertEq(currentDestChains.length, 1);
   }
 
@@ -45,9 +45,9 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
 
     vm.expectEmit();
     emit Executor.DestChainRemoved(INITIAL_DEST);
-    s_Executor.applyDestChainUpdates(destsToRemove, new uint64[](0));
+    s_executor.applyDestChainUpdates(destsToRemove, new uint64[](0));
 
-    uint64[] memory currentDestChains = s_Executor.getDestChains();
+    uint64[] memory currentDestChains = s_executor.getDestChains();
     assertEq(currentDestChains.length, 0);
   }
 
@@ -56,10 +56,10 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
     destsToRemove[0] = 999;
 
     vm.recordLogs();
-    s_Executor.applyDestChainUpdates(destsToRemove, new uint64[](0));
+    s_executor.applyDestChainUpdates(destsToRemove, new uint64[](0));
     vm.assertEq(vm.getRecordedLogs().length, 0);
 
-    uint64[] memory currentDestChains = s_Executor.getDestChains();
+    uint64[] memory currentDestChains = s_executor.getDestChains();
     assertEq(currentDestChains.length, 1);
   }
 
@@ -67,7 +67,7 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_Executor.applyDestChainUpdates(new uint64[](0), new uint64[](0));
+    s_executor.applyDestChainUpdates(new uint64[](0), new uint64[](0));
   }
 
   function test_applyDestChainUpdates_RevertWhen_DestChainInvalid() public {
@@ -75,6 +75,6 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
     newDests[0] = 0;
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidDestChain.selector, 0));
-    s_Executor.applyDestChainUpdates(new uint64[](0), newDests);
+    s_executor.applyDestChainUpdates(new uint64[](0), newDests);
   }
 }

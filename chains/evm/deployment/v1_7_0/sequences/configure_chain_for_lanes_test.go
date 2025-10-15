@@ -93,8 +93,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 							AllowTrafficFrom:                 true,
 							CCIPMessageSource:                ccipMessageSource,
 							CCIPMessageDest:                  ccipMessageDest,
-							DefaultCCVOffRamps:               []common.Address{committeeVerifier},
-							DefaultCCVOnRamps:                []common.Address{committeeVerifier},
+							DefaultInboundCCVs:               []common.Address{committeeVerifier},
+							DefaultOutboundCCVs:              []common.Address{committeeVerifier},
 							DefaultExecutor:                  Executor,
 							CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{},
 							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain

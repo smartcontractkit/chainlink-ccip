@@ -5,7 +5,7 @@ import {Executor} from "../../../executor/Executor.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
 contract ExecutorSetup is BaseTest {
-  Executor internal s_Executor;
+  Executor internal s_executor;
   address internal constant INITIAL_CCV = address(121212);
   uint64 internal constant INITIAL_DEST = 1;
   uint8 internal constant INITIAL_MAX_CCVS = 1;
@@ -13,14 +13,14 @@ contract ExecutorSetup is BaseTest {
   function setUp() public override {
     super.setUp();
 
-    s_Executor = new Executor(INITIAL_MAX_CCVS);
+    s_executor = new Executor(INITIAL_MAX_CCVS);
 
     address[] memory ccvs = new address[](1);
     ccvs[0] = INITIAL_CCV;
-    s_Executor.applyAllowedCCVUpdates(new address[](0), ccvs, true);
+    s_executor.applyAllowedCCVUpdates(new address[](0), ccvs, true);
 
     uint64[] memory dests = new uint64[](1);
     dests[0] = INITIAL_DEST;
-    s_Executor.applyDestChainUpdates(new uint64[](0), dests);
+    s_executor.applyDestChainUpdates(new uint64[](0), dests);
   }
 }

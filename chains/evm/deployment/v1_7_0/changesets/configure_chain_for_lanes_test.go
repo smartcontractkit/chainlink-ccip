@@ -68,10 +68,10 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 								Type:    datastore.ContractType(onramp.ContractType),
 								Version: semver.MustParse("1.7.0"),
 							},
-							DefaultCCVOffRamps: []datastore.AddressRef{
+							DefaultInboundCCVs: []datastore.AddressRef{
 								{Type: datastore.ContractType(committee_verifier.ContractType), Version: semver.MustParse("1.7.0")},
 							},
-							DefaultCCVOnRamps: []datastore.AddressRef{
+							DefaultOutboundCCVs: []datastore.AddressRef{
 								{Type: datastore.ContractType(committee_verifier.ContractType), Version: semver.MustParse("1.7.0")},
 							},
 							DefaultExecutor: datastore.AddressRef{

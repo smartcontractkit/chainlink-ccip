@@ -31,7 +31,6 @@ contract Executor is Ownable2StepMsgSender, IExecutor {
   /// @notice Whether or not the CCV allowlist is enabled.
   bool private s_ccvAllowlistEnabled;
   /// @notice The set of CCVs that the executor supports.
-  /// @dev Addresses correspond to the CCVOnRamp for each CCV.
   EnumerableSet.AddressSet private s_allowedCCVs;
   /// @notice The set of destination chains that the executor supports.
   EnumerableSet.UintSet private s_allowedDestChains;

@@ -37,13 +37,13 @@ type RemoteChainConfig struct {
 	// The address on the remote chain against which the message gets executed
 	CCIPMessageDest []byte
 	// The default CCVs that will be applied to messages FROM this remote chain if no receiver is specified
-	DefaultCCVOffRamps []common.Address
+	DefaultInboundCCVs []common.Address
 	// Any CCVs that must always be used for messages FROM this remote chain
-	LaneMandatedCCVOffRamps []common.Address
+	LaneMandatedInboundCCVs []common.Address
 	// The CCVs that will be used for messages TO this remote chain if none are specified
-	DefaultCCVOnRamps []common.Address
+	DefaultOutboundCCVs []common.Address
 	// The CCVs that will always be applied to messages TO this remote chain
-	LaneMandatedCCVOnRamps []common.Address
+	LaneMandatedOutboundCCVs []common.Address
 	// The executor that will be used for messages TO this remote chain if none is specified
 	// The address corresponds to the Executor contract
 	DefaultExecutor common.Address
@@ -94,14 +94,14 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				SourceChainSelector: remoteSelector,
 				IsEnabled:           remoteConfig.AllowTrafficFrom,
 				OnRamp:              remoteConfig.CCIPMessageSource,
-				DefaultCCV:          remoteConfig.DefaultCCVOffRamps,
-				LaneMandatedCCVs:    remoteConfig.LaneMandatedCCVOffRamps,
+				DefaultCCV:          remoteConfig.DefaultInboundCCVs,
+				LaneMandatedCCVs:    remoteConfig.LaneMandatedInboundCCVs,
 			})
 			onRampArgs = append(onRampArgs, onramp.DestChainConfigArgs{
 				Router:            input.Router,
 				DestChainSelector: remoteSelector,
-				DefaultCCVs:       remoteConfig.DefaultCCVOnRamps,
-				LaneMandatedCCVs:  remoteConfig.LaneMandatedCCVOnRamps,
+				DefaultCCVs:       remoteConfig.DefaultOutboundCCVs,
+				LaneMandatedCCVs:  remoteConfig.LaneMandatedOutboundCCVs,
 				DefaultExecutor:   remoteConfig.DefaultExecutor,
 				OffRamp:           remoteConfig.CCIPMessageDest,
 			})
