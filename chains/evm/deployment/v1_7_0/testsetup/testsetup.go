@@ -61,7 +61,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 			Version:       semver.MustParse("1.7.0"),
 			FeeAggregator: common.HexToAddress("0x01"),
 		},
-		ExecutorOnRamp: sequences.ExecutorOnRampParams{
+		Executor: sequences.ExecutorParams{
 			Version:       semver.MustParse("1.7.0"),
 			MaxCCVsPerMsg: 10,
 		},

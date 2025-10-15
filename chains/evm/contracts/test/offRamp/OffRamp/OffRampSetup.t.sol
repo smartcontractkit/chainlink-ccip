@@ -14,6 +14,8 @@ contract OffRampSetup is BaseTest {
   address internal s_defaultCCV;
   address internal s_tokenAdminRegistry;
 
+  bytes internal constant ON_RAMP = abi.encodePacked("onRamp");
+
   function setUp() public virtual override {
     BaseTest.setUp();
 
@@ -32,7 +34,7 @@ contract OffRampSetup is BaseTest {
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = s_defaultCCV;
 
-    _applySourceConfig(abi.encode(makeAddr("onRamp")), true, defaultCCVs, new address[](0));
+    _applySourceConfig(ON_RAMP, true, defaultCCVs, new address[](0));
   }
 
   function _applySourceConfig(

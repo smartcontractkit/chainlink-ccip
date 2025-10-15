@@ -85,7 +85,7 @@ var CCIPSend = contract.NewWrite(contract.WriteParams[CCIPSendArgs, *router.Rout
 var GetOffRamps = contract.NewRead(contract.ReadParams[any, []OffRamp, *router.Router]{
 	Name:         "router:get-off-ramps",
 	Version:      semver.MustParse("1.2.0"),
-	Description:  "Gets all off ramps on the router",
+	Description:  "Gets all offramps on the router",
 	ContractType: ContractType,
 	NewContract:  router.NewRouter,
 	CallContract: func(router *router.Router, opts *bind.CallOpts, args any) ([]OffRamp, error) {
@@ -96,7 +96,7 @@ var GetOffRamps = contract.NewRead(contract.ReadParams[any, []OffRamp, *router.R
 var GetOnRamp = contract.NewRead(contract.ReadParams[uint64, common.Address, *router.Router]{
 	Name:         "router:get-on-ramp",
 	Version:      semver.MustParse("1.2.0"),
-	Description:  "Gets the on ramp for a given destination chain selector",
+	Description:  "Gets the onramp for a given destination chain selector",
 	ContractType: ContractType,
 	NewContract:  router.NewRouter,
 	CallContract: func(router *router.Router, opts *bind.CallOpts, destChainSelector uint64) (common.Address, error) {
