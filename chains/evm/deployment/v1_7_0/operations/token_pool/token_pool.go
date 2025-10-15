@@ -147,7 +147,7 @@ var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[common.Address, *
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
-		return tokenPool.SetRateLimitAdmin(opts, args)
+		return tokenPool.GrantRateLimitAdminRole(opts, args)
 	},
 })
 
@@ -163,11 +163,14 @@ var SetChainRateLimiterConfigs = contract.NewWrite(contract.WriteParams[[]SetCha
 		if err != nil {
 			return false, err
 		}
-		rateLimitAdmin, err := contract.GetRateLimitAdmin(opts)
+		if caller == owner {
+			return true, nil
+		}
+		hasRateLimitAdminRole, err := contract.HasRateLimitAdminRole(opts, caller)
 		if err != nil {
 			return false, err
 		}
-		return caller == owner || caller == rateLimitAdmin, nil
+		return hasRateLimitAdminRole, nil
 	},
 	Validate: func([]SetChainRateLimiterConfigArg) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args []SetChainRateLimiterConfigArg) (*types.Transaction, error) {
@@ -255,14 +258,14 @@ var GetRMNProxy = contract.NewRead(contract.ReadParams[any, common.Address, *tok
 	},
 })
 
-var GetRateLimitAdmin = contract.NewRead(contract.ReadParams[any, common.Address, *token_pool.TokenPool]{
-	Name:         "token-pool:get-rate-limit-admin",
+var HasRateLimitAdminRole = contract.NewRead(contract.ReadParams[common.Address, bool, *token_pool.TokenPool]{
+	Name:         "token-pool:has-rate-limit-admin-role",
 	Version:      semver.MustParse("1.7.0"),
-	Description:  "Gets the rate limit admin address on a TokenPool",
+	Description:  "Checks if the provided address has the rate limiter admin role on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
-		return tokenPool.GetRateLimitAdmin(opts)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, account common.Address) (bool, error) {
+		return tokenPool.HasRateLimitAdminRole(opts, account)
 	},
 })
 

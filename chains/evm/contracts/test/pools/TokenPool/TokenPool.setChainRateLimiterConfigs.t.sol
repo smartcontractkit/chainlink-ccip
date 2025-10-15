@@ -81,9 +81,9 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     // Grant rate limit admin role to a user
     address rateLimitAdmin = makeAddr("rateLimitAdmin");
     s_tokenPool.grantRateLimitAdminRole(rateLimitAdmin);
-    
+
     vm.startPrank(rateLimitAdmin);
-    
+
     uint64[] memory chainSelectors = new uint64[](1);
     chainSelectors[0] = DEST_CHAIN_SELECTOR;
 

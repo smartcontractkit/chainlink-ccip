@@ -117,18 +117,19 @@ func TestConfigurePool(t *testing.T) {
 			for _, addr := range getAllowlistReport.Output {
 				require.Contains(t, input.AllowList, addr, "Expected on-chain allowlist address to be in the inputted allowlist")
 			}
-			// Check rate limit admin
-			getRateLimitAdminReport, err := operations.ExecuteOperation(
+			// Check rate limit admin role assignment
+			hasRateLimitAdminRoleReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetRateLimitAdmin,
+				token_pool.HasRateLimitAdminRole,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
+				contract.FunctionInput[common.Address]{
 					ChainSelector: chainSel,
 					Address:       input.TokenPoolAddress,
+					Args:          input.RateLimitAdmin,
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, input.RateLimitAdmin, getRateLimitAdminReport.Output, "Expected rate limit admin address to be the same as the deployed rate limit admin")
+			require.True(t, hasRateLimitAdminRoleReport.Output, "Expected rate limit admin role to be granted to the configured address")
 		})
 	}
 }

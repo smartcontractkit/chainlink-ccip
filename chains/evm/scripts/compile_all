@@ -9,6 +9,7 @@ echo " └───────────────────────�
 # The offRamp uses a specific lower optimization runs value. All other contracts use the default value
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_LARGE_TOKEN_POOL=5000
+OPTIMIZE_RUNS_TOKEN_POOL=15000
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
@@ -31,7 +32,7 @@ compileContract() {
   else
     local command
     command="forge $args \
-    $(getOptimizations "$contract") \
+    $(getOptimizations "$1" "$contract") \
     --extra-output-files bin abi metadata \
     --build-info \
     --build-info-path $dir/build \
@@ -50,9 +51,15 @@ compileContract() {
 # Define optimization overrides in this function. Anything that is not an override will use the default value
 # as specified in the foundry.toml.
 function getOptimizations() {
+    local contract_path=$1
+    local contract_name=$2
     local optimize_runs_override=""
 
-    case $1 in
+    if [[ $contract_path == pools/* ]]; then
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_TOKEN_POOL"
+    fi
+
+    case $contract_name in
       "HybridLockReleaseUSDCTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
         ;;
@@ -105,5 +112,4 @@ compileContract test/mocks/MockE2EUSDCTokenMessenger
 compileContract test/mocks/MockE2EUSDCTransmitter
 compileContract test/mocks/MockE2ELBTCTokenPool
 compileContract test/mocks/MockReceiverV2
-
 

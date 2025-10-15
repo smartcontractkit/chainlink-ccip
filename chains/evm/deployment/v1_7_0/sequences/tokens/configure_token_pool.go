@@ -105,22 +105,23 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		// Set rate limit admin (if necessary)
 		// Check the rate limit admin currently set on the token pool
 		if input.RateLimitAdmin != (common.Address{}) {
-			currentRateLimitAdminReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRateLimitAdmin, chain, evm_contract.FunctionInput[any]{
+			hasRateLimitAdminRoleReport, err := cldf_ops.ExecuteOperation(b, token_pool.HasRateLimitAdminRole, chain, evm_contract.FunctionInput[common.Address]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
+				Args:          input.RateLimitAdmin,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current rate limit admin from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to check rate limit admin role on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
-			if currentRateLimitAdminReport.Output != input.RateLimitAdmin {
-				// Rate limit admin is not set to desired, so update it
+			if !hasRateLimitAdminRoleReport.Output {
+				// Rate limit admin is not yet granted, so grant it
 				setRateLimitAdminReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitAdmin, chain, evm_contract.FunctionInput[common.Address]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
 					Args:          input.RateLimitAdmin,
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to grant rate limit admin role on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 				}
 				writes = append(writes, setRateLimitAdminReport.Output)
 			}

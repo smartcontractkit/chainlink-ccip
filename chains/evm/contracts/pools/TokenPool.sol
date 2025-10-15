@@ -15,9 +15,10 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+
+import {AccessControl} from "@openzeppelin/contracts@5.0.2/access/AccessControl.sol";
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
-import {AccessControl} from "@openzeppelin/contracts@5.0.2/access/AccessControl.sol";
 
 /// @notice Base abstract class with common functions for all token pools.
 /// A token pool serves as isolated place for holding tokens and token specific logic
@@ -154,6 +155,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
   uint256 internal constant BPS_DIVIDER = 10_000;
   /// @dev Constant representing the default finality.
   uint16 internal constant WAIT_FOR_FINALITY = 0;
+  /// @notice The role identifier for rate limiter admin keccak256("RATE_LIMITER_ADMIN_ROLE").
+  bytes32 public constant RATE_LIMITER_ADMIN_ROLE = 0x1e2af826b947397cb8f2b6a77511b5c805f9cbc82085d4c1f3e92bd927e9c5af;
   /// @dev The bridgeable token that is managed by this pool. Pools could support multiple tokens at the same time if
   /// required, but this implementation only supports one token.
   IERC20 internal immutable i_token;
@@ -177,8 +180,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
   /// @notice A mapping of hashed pool addresses to their unhashed form. This is used to be able to find the actually
   /// configured pools and not just their hashed versions.
   mapping(bytes32 poolAddressHash => bytes poolAddress) internal s_remotePoolAddresses;
-  /// @notice The role identifier for rate limiter admin.
-  bytes32 public constant RATE_LIMITER_ADMIN_ROLE = keccak256("RATE_LIMITER_ADMIN_ROLE");
   // Tracks custom-finality parameters and per-lane rate limit buckets.
   CustomFinalityConfig internal s_finalityConfig;
   // Stores verifier (CCV) requirements keyed by remote chain selector.
@@ -205,7 +206,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
 
     s_router = IRouter(router);
 
-    // Initialize AccessControl with the deployer as the default admin
+    // Initialize AccessControl with the deployer as the default admin.
     _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
     // Pool can be set as permissioned or permissionless at deployment time only to save hot-path gas.
@@ -255,10 +256,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
   /// @notice Signals which version of the pool interface is supported.
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override returns (bool) {
+  ) public view virtual override(AccessControl, IERC165) returns (bool) {
     return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == Pool.CCIP_POOL_V1
       || interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IPoolV1).interfaceId
-      || interfaceId == type(IERC165).interfaceId;
+      || interfaceId == type(IERC165).interfaceId || AccessControl.supportsInterface(interfaceId);
   }
 
   // ================================================================
@@ -698,7 +699,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
   /// @notice Grants the rate limiter admin role to an account.
   /// @dev Only callable by the owner.
   /// @param account The account to grant the role to.
-  function grantRateLimitAdminRole(address account) external onlyOwner {
+  function grantRateLimitAdminRole(
+    address account
+  ) external onlyOwner {
     _grantRole(RATE_LIMITER_ADMIN_ROLE, account);
     emit RateLimitAdminRoleGranted(account);
   }
@@ -706,7 +709,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
   /// @notice Revokes the rate limiter admin role from an account.
   /// @dev Only callable by the owner.
   /// @param account The account to revoke the role from.
-  function revokeRateLimitAdminRole(address account) external onlyOwner {
+  function revokeRateLimitAdminRole(
+    address account
+  ) external onlyOwner {
     _revokeRole(RATE_LIMITER_ADMIN_ROLE, account);
     emit RateLimitAdminRoleRevoked(account);
   }
@@ -714,7 +719,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
   /// @notice Checks if an account has the rate limiter admin role.
   /// @param account The account to check.
   /// @return true if the account has the role, false otherwise.
-  function hasRateLimitAdminRole(address account) external view returns (bool) {
+  function hasRateLimitAdminRole(
+    address account
+  ) external view returns (bool) {
     return hasRole(RATE_LIMITER_ADMIN_ROLE, account);
   }
 
