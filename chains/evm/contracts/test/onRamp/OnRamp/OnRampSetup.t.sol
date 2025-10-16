@@ -93,19 +93,12 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
     // If legacy extraArgs are supplied, they are passed into the CCVs and Executor.
     // If V3 extraArgs are supplied, the extraArgs as the user supplied them are used.
-    // TODO actually handle V3.
     bool isLegacyExtraArgs = _isLegacyExtraArgs(message.extraArgs);
 
-    verifierReceipts = new OnRamp.Receipt[](destChainConfig.defaultCCVs.length);
-    for (uint256 i = 0; i < verifierReceipts.length; ++i) {
-      verifierReceipts[i] = OnRamp.Receipt({
-        issuer: destChainConfig.defaultCCVs[i],
-        feeTokenAmount: 0,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        // TODO when v3 extra args are passed in
-        extraArgs: isLegacyExtraArgs ? message.extraArgs : bytes("")
-      });
+    if (isLegacyExtraArgs) {
+      verifierReceipts = _computeVerifierReceiptsLegacyArgs(message.extraArgs, destChainConfig.defaultCCVs);
+    } else {
+      verifierReceipts = this.computeVerifierReceiptsArgsV3(message.extraArgs, destChainConfig.defaultCCVs);
     }
     executorReceipt = OnRamp.Receipt({
       issuer: destChainConfig.defaultExecutor,
@@ -115,15 +108,75 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       // TODO when v3 extra args are passed in
       extraArgs: isLegacyExtraArgs ? message.extraArgs : bytes("")
     });
-    receiptBlobs = new bytes[](1);
-    receiptBlobs[0] = "";
+
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
       MessageV1Codec._encodeMessageV1(messageV1),
       verifierReceipts,
       executorReceipt,
-      receiptBlobs
+      new bytes[](verifierReceipts.length)
     );
+  }
+
+  // This function is external so we can make the extraArgs calldata to allow for indexing.
+  function computeVerifierReceiptsArgsV3(
+    bytes calldata extraArgs,
+    address[] calldata defaultCCVs
+  ) external pure returns (OnRamp.Receipt[] memory verifierReceipts) {
+    Client.EVMExtraArgsV3 memory extraArgsV3 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV3));
+    uint256 userDefinedCCVCount = extraArgsV3.ccvs.length;
+    verifierReceipts = new OnRamp.Receipt[](userDefinedCCVCount + defaultCCVs.length);
+
+    uint256 currentVerifierIndex = 0;
+    for (uint256 i = 0; i < userDefinedCCVCount; ++i) {
+      verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
+        issuer: extraArgsV3.ccvs[i].ccvAddress,
+        feeTokenAmount: 0,
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        extraArgs: extraArgsV3.ccvs[i].args
+      });
+    }
+
+    for (uint256 i = 0; i < defaultCCVs.length; ++i) {
+      bool found = false;
+      for (uint256 j = 0; j < userDefinedCCVCount; ++j) {
+        // Skip if the default CCV is already included in the user-defined CCVs.
+        if (defaultCCVs[i] == extraArgsV3.ccvs[j].ccvAddress) {
+          found = true;
+          break;
+        }
+      }
+
+      if (found) {
+        continue;
+      }
+      verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
+        issuer: defaultCCVs[i],
+        feeTokenAmount: 0,
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        extraArgs: ""
+      });
+    }
+    return verifierReceipts;
+  }
+
+  function _computeVerifierReceiptsLegacyArgs(
+    bytes memory extraArgs,
+    address[] memory defaultCCVs
+  ) internal pure returns (OnRamp.Receipt[] memory verifierReceipts) {
+    verifierReceipts = new OnRamp.Receipt[](defaultCCVs.length);
+    for (uint256 i = 0; i < verifierReceipts.length; ++i) {
+      verifierReceipts[i] = OnRamp.Receipt({
+        issuer: defaultCCVs[i],
+        feeTokenAmount: 0,
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        extraArgs: extraArgs
+      });
+    }
+    return verifierReceipts;
   }
 
   // Helper function to create EVMExtraArgsV3 struct

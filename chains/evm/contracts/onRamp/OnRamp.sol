@@ -188,8 +188,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 2. get pool params, this potentially mutates CCV list.
 
-    // TODO pool call to get CCVs from IPoolV2 getRequiredCCVs
-
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
@@ -207,11 +205,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       data: message.data
     });
 
-    resolvedExtraArgs.ccvs = _mergeCCVLists(
-      resolvedExtraArgs.ccvs,
-      destChainConfig.laneMandatedCCVs,
-      new address[](0) // TODO pass in pool required CCVs
-    );
+    resolvedExtraArgs.ccvs =
+      _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector));
 
     // 3. getFee on all verifiers & executor.
 
@@ -556,6 +551,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       ),
       extraData: poolReturnData.destPoolData
     });
+  }
+
+  // TODO this function currently returns the default CCVs.
+  function _getCCVsForPool(
+    uint64 destChainSelector
+  ) internal view returns (address[] memory) {
+    // TODO pool call to get CCVs from IPoolV2 getRequiredCCVs
+    return s_destChainConfigs[destChainSelector].defaultCCVs;
   }
 
   // ================================================================
