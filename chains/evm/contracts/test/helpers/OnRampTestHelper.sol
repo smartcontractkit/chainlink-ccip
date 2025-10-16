@@ -16,21 +16,12 @@ contract OnRampTestHelper is OnRamp {
     return _parseExtraArgsWithDefaults(destChainConfig, extraArgs);
   }
 
-  /// @notice Exposes the internal _mergeCCVsWithPoolAndLaneMandated function for testing.
-  /// Note: This assumes the test has already set up the DestChainConfig via applyDestChainConfigUpdates
-  function mergeCCVsWithPoolAndLaneMandated(
-    uint64 destChainSelector,
-    address[] memory poolRequiredCCVs,
-    Client.CCV[] memory requiredCCV,
-    Client.CCV[] memory optionalCCV,
-    uint8 optionalThreshold
-  )
-    external
-    view
-    returns (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold)
-  {
-    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
-    return
-      _mergeCCVsWithPoolAndLaneMandated(destChainConfig, poolRequiredCCVs, requiredCCV, optionalCCV, optionalThreshold);
+  /// @notice Exposes the internal _mergeCCVLists function for testing.
+  function mergeCCVLists(
+    Client.CCV[] memory userRequestedOrDefaultCCVs,
+    address[] memory laneMandatedCCVs,
+    address[] memory poolRequiredCCVs
+  ) external pure returns (Client.CCV[] memory ccvs) {
+    return _mergeCCVLists(userRequestedOrDefaultCCVs, laneMandatedCCVs, poolRequiredCCVs);
   }
 }

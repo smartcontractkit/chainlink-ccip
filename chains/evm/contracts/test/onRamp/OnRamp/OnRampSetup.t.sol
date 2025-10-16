@@ -128,14 +128,10 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
   // Helper function to create EVMExtraArgsV3 struct
   function _createV3ExtraArgs(
-    Client.CCV[] memory requiredCCVs,
-    Client.CCV[] memory optionalCCVs,
-    uint8 optionalThreshold
+    Client.CCV[] memory ccvs
   ) internal pure returns (Client.EVMExtraArgsV3 memory) {
     return Client.EVMExtraArgsV3({
-      requiredCCV: requiredCCVs,
-      optionalCCV: optionalCCVs,
-      optionalThreshold: optionalThreshold,
+      ccvs: ccvs,
       finalityConfig: 12,
       executor: address(0), // No executor specified.
       executorArgs: "",
