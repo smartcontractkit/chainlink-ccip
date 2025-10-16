@@ -289,6 +289,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// TODO: validate prior to deploying that qualifiers are unique?
 		var committeeVerifierRefs []datastore.AddressRef
+		var committeeVerifierBatchOps []mcms_types.BatchOperation
 		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifier {
 			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
@@ -305,14 +306,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					committeeVerifierRefs = append(committeeVerifierRefs, addr)
 				}
 			}
-			// TODO: how to add writes from MCMS BatchOps?
-			// for _, op := range report.Output.BatchOps {
-			// 	writes = append(writes, contract.WriteOutput{
-			// 		ChainSelector: uint64(op.ChainSelector),
-			// 		Tx: op.Transactions[0],
-			// 		ExecInfo: op.Transactions[0].,
-			// 	})
-			// }
+			committeeVerifierBatchOps = append(committeeVerifierBatchOps, report.Output.BatchOps...)
 		}
 
 		// Deploy Executor
@@ -329,7 +323,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, ExecutorRef)
 
 		for _, mockReceiverParams := range input.ContractParams.MockReceivers {
-			requiredVerifiers, optionalVerifiers, err := GetMockReceiverVerifiers(mockReceiverParams, addresses, input.ExistingAddresses)
+			requiredVerifiers, optionalVerifiers, err := getMockReceiverVerifiers(mockReceiverParams, addresses, input.ExistingAddresses)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get mock receiver verifiers: %w", err)
 			}
@@ -353,21 +347,24 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			addresses = append(addresses, deployReceiverReport.Output)
 		}
 
+		var batchOps []mcms_types.BatchOperation
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}
+		batchOps = append(batchOps, batchOp)
+		batchOps = append(batchOps, committeeVerifierBatchOps...)
 
 		return sequences.OnChainOutput{
 			Addresses: addresses,
-			BatchOps:  []mcms_types.BatchOperation{batchOp},
+			BatchOps:  batchOps,
 		}, nil
 	},
 )
 
 // getMockReceiverVerifiers finds the required and optional verifier addresses given the mock receiver
 // params, the addresses of the newly deployed contracts, and the addresses of the existing contracts.
-func GetMockReceiverVerifiers(
+func getMockReceiverVerifiers(
 	mockReceiverParams MockReceiverParams,
 	addresses []datastore.AddressRef,
 	existingAddresses []datastore.AddressRef,
