@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/token_pool"
@@ -16,7 +18,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
+)
+
+const (
+	outbound uint8 = 0
+	inbound  uint8 = 1
 )
 
 func TestConfigureTokenForTransfers(t *testing.T) {
@@ -195,14 +201,14 @@ func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remo
 	require.Contains(t, remotePools, config.RemotePool, "Remote pool should be in the list of remote pools")
 
 	// Check inbound CCVs
-	inboundCCVs, err := tp.GetRequiredInboundCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{})
+	inboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
 	require.NoError(t, err, "Failed to get inbound CCVs")
 	for _, ccv := range config.InboundCCVs {
 		require.Contains(t, inboundCCVs, common.HexToAddress(ccv), "Inbound CCV should be in the list of required inbound CCVs")
 	}
 
 	// Check outbound CCVs
-	outboundCCVs, err := tp.GetRequiredOutboundCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{})
+	outboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, outbound)
 	require.NoError(t, err, "Failed to get outbound CCVs")
 	for _, ccv := range config.OutboundCCVs {
 		require.Contains(t, outboundCCVs, common.HexToAddress(ccv), "Outbound CCV should be in the list of required outbound CCVs")
