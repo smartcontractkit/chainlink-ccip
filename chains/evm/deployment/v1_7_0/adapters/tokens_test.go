@@ -6,6 +6,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
@@ -25,7 +27,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
+)
+
+const (
+	outbound = 0
+	inbound  = 1
 )
 
 func TestTokenAdapter(t *testing.T) {
@@ -258,12 +264,12 @@ func TestTokenAdapter(t *testing.T) {
 
 				boundTokenPool, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
 				require.NoError(t, err, "Failed to instantiate token pool contract")
-				inboundCCVs, err := boundTokenPool.GetRequiredInboundCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{})
+				inboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
 				require.NoError(t, err, "Failed to get inbound CCVs from token pool")
 				require.Len(t, inboundCCVs, 1, "Number of inbound CCVs should match")
 				require.Equal(t, verifierAddr, inboundCCVs[0], "Inbound CCV address should match")
 
-				outboundCCVs, err := boundTokenPool.GetRequiredOutboundCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{})
+				outboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, outbound)
 				require.NoError(t, err, "Failed to get outbound CCVs from token pool")
 				require.Len(t, outboundCCVs, 1, "Number of outbound CCVs should match")
 				require.Equal(t, verifierAddr, outboundCCVs[0], "Outbound CCV address should match")

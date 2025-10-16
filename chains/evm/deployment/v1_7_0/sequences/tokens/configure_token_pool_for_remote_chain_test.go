@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
@@ -13,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
 )
 
 func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
@@ -60,13 +61,13 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 	require.Equal(t, input.RemoteChainConfig.OutboundRateLimiterConfig.Rate, outboundRateLimiterReport.Rate, "Outbound rate limiter rate should match")
 	require.Equal(t, input.RemoteChainConfig.OutboundRateLimiterConfig.Capacity, outboundRateLimiterReport.Capacity, "Outbound rate limiter capacity should match")
 
-	inboundCCVs, err := tp.GetRequiredInboundCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{})
+	inboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
 	require.NoError(t, err, "Failed to get inbound CCVs from token pool")
 	for _, ccv := range input.RemoteChainConfig.InboundCCVs {
 		require.Contains(t, inboundCCVs, common.HexToAddress(ccv), "Inbound CCV should be in the list of required inbound CCVs")
 	}
 
-	outboundCCVs, err := tp.GetRequiredOutboundCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{})
+	outboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, outbound)
 	require.NoError(t, err, "Failed to get outbound CCVs from token pool")
 	for _, ccv := range input.RemoteChainConfig.OutboundCCVs {
 		require.Contains(t, outboundCCVs, common.HexToAddress(ccv), "Outbound CCV should be in the list of required outbound CCVs")

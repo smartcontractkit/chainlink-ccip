@@ -16,13 +16,15 @@ contract MockPoolV2 {
     s_requiredCCVs = requiredCCVs;
   }
 
-  function getRequiredInboundCCVs(
+  function getRequiredCCVs(
     address,
     uint64,
     uint256,
     uint16,
-    bytes memory
+    bytes memory,
+    IPoolV2.CCVDirection direction
   ) external view returns (address[] memory) {
+    if (direction != IPoolV2.CCVDirection.Inbound) revert("direction");
     return s_requiredCCVs;
   }
 
