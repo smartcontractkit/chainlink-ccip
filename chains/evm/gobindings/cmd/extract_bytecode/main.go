@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -196,7 +197,24 @@ func writeBytecode(bytecodeDir, version, baseFilename, bytecode string) error {
 	return nil
 }
 
+// fixABIInternalTypes fixes malformed internalType fields in ABI JSON strings.
+// The Go binding generator sometimes omits spaces after type keywords like "contract", "struct", and "enum".
+// For example: "contractIERC20" should be "contract IERC20"
+func fixABIInternalTypes(abi string) string {
+	// Pattern matches: internalType":"<keyword><CapitalLetter>
+	// where keyword is "contract", "struct", or "enum"
+	// This regex finds cases where there's no space between the keyword and the type name
+	pattern := regexp.MustCompile(`("internalType":")(contract|struct|enum)([A-Z])`)
+
+	// Replace with a space between the keyword and the type name
+	// $1 = '"internalType":"', $2 = keyword (contract/struct/enum), $3 = capital letter
+	return pattern.ReplaceAllString(abi, `${1}${2} ${3}`)
+}
+
 func writeABI(abiDir, version, baseFilename, abi string) error {
+	// Fix malformed internalType fields before writing
+	abi = fixABIInternalTypes(abi)
+
 	filename := baseFilename + ".json"
 	filePath := filepath.Join(abiDir, version, filename)
 	relPath := filepath.Join(version, filename)

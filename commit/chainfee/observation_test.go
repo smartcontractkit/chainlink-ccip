@@ -1,14 +1,15 @@
 package chainfee
 
 import (
+	"maps"
 	"math/big"
 	"math/rand"
+	"slices"
 	"sort"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
-	"golang.org/x/exp/maps"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/require"
@@ -187,11 +188,11 @@ func Test_processor_Observation(t *testing.T) {
 			require.GreaterOrEqual(t, obs.TimestampNow.UnixNano(), tStart.UnixNano())
 			require.LessOrEqual(t, obs.TimestampNow.UnixNano(), tEnd.UnixNano())
 			require.Equal(t, tc.chainFeeComponents, obs.FeeComponents)
-			require.ElementsMatch(t, slicesWithoutDst, maps.Keys(obs.FeeComponents))
+			require.ElementsMatch(t, slicesWithoutDst, slices.Collect(maps.Keys(obs.FeeComponents)))
 			require.Equal(t, tc.nativeTokenPrices, obs.NativeTokenPrices)
-			require.ElementsMatch(t, slicesWithoutDst, maps.Keys(obs.NativeTokenPrices))
+			require.ElementsMatch(t, slicesWithoutDst, slices.Collect(maps.Keys(obs.NativeTokenPrices)))
 			require.Equal(t, tc.expectedChainFeePriceUpdates, obs.ChainFeeUpdates)
-			require.ElementsMatch(t, slicesWithoutDst, maps.Keys(obs.ChainFeeUpdates))
+			require.ElementsMatch(t, slicesWithoutDst, slices.Collect(maps.Keys(obs.ChainFeeUpdates)))
 			require.Equal(t, tc.fChain, obs.FChain)
 		})
 	}
@@ -385,9 +386,12 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 				return
 			}
 
-			require.True(t, tc.expUniqueChains == len(maps.Keys(obs.FeeComponents)))
-			require.True(t, tc.expUniqueChains == len(maps.Keys(obs.NativeTokenPrices)))
-			require.ElementsMatch(t, maps.Keys(obs.FeeComponents), maps.Keys(obs.NativeTokenPrices))
+			require.True(t, tc.expUniqueChains == len(obs.FeeComponents))
+			require.True(t, tc.expUniqueChains == len(obs.NativeTokenPrices))
+			require.ElementsMatch(t,
+				slices.Collect(maps.Keys(obs.FeeComponents)),
+				slices.Collect(maps.Keys(obs.NativeTokenPrices)),
+			)
 		})
 	}
 }

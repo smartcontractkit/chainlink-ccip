@@ -6,12 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -608,7 +608,7 @@ func (p *Plugin) Reports(
 
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
 		p.chainSupport,
-		maps.Keys(p.oracleIDToP2pID),
+		slices.Collect(maps.Keys(p.oracleIDToP2pID)),
 		p.offchainCfg.TransmissionDelayMultiplier,
 	)
 	if err != nil {
