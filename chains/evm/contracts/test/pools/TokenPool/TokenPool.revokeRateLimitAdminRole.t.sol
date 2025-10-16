@@ -10,13 +10,13 @@ contract TokenPool_revokeRateLimitAdminRole is TokenPoolSetup {
   function test_revokeRateLimitAdminRole() public {
     // First grant the role.
     s_tokenPool.grantRateLimitAdminRole(OWNER);
-    assertTrue(s_tokenPool.hasRateLimitAdminRole(OWNER));
+    assertTrue(s_tokenPool.hasRole(s_tokenPool.RATE_LIMITER_ADMIN_ROLE(),OWNER));
 
     // Then revoke it.
     vm.expectEmit();
     emit TokenPool.RateLimitAdminRoleRevoked(OWNER);
     s_tokenPool.revokeRateLimitAdminRole(OWNER);
-    assertFalse(s_tokenPool.hasRateLimitAdminRole(OWNER));
+    assertFalse(s_tokenPool.hasRole(s_tokenPool.RATE_LIMITER_ADMIN_ROLE(), OWNER));
   }
 
   // Reverts

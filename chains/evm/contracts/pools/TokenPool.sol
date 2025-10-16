@@ -10,13 +10,11 @@ import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
-import {AccessControl} from "@openzeppelin/contracts@5.0.2/access/AccessControl.sol";
+import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts@5.0.2/access/extensions/AccessControlDefaultAdminRules.sol";
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
@@ -38,7 +36,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 /// In the case of a burnMint pool on chain A, these funds are burned in the pool on chain A.
 /// In the case of a lockRelease pool on chain A, these funds accumulate in the pool on chain A.
 
-abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
+abstract contract TokenPool is IPoolV2, AccessControlDefaultAdminRules {
   using EnumerableSet for EnumerableSet.Bytes32Set;
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
@@ -187,7 +185,16 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
   // Optional token-transfer fee overrides keyed by destination chain selector.
   mapping(uint64 destChainSelector => TokenTransferFeeConfig tokenTransferFeeConfig) internal s_tokenTransferFeeConfig;
 
-  constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
+  modifier onlyOwner() {
+    if (!hasRole(DEFAULT_ADMIN_ROLE, _msgSender())) {
+      revert OnlyCallableByOwner();
+    }
+    _;
+  }
+
+  constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router)
+    AccessControlDefaultAdminRules(0, msg.sender)
+  {
     if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) {
       revert ZeroAddressInvalid();
     }
@@ -205,9 +212,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
     i_tokenDecimals = localTokenDecimals;
 
     s_router = IRouter(router);
-
-    // Initialize AccessControl with the deployer as the default admin.
-    _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
     // Pool can be set as permissioned or permissionless at deployment time only to save hot-path gas.
     i_allowlistEnabled = allowlist.length > 0;
@@ -256,10 +260,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
   /// @notice Signals which version of the pool interface is supported.
   function supportsInterface(
     bytes4 interfaceId
-  ) public view virtual override(AccessControl, IERC165) returns (bool) {
+  ) public view virtual override(AccessControlDefaultAdminRules, IERC165) returns (bool) {
     return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == Pool.CCIP_POOL_V1
       || interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IPoolV1).interfaceId
-      || interfaceId == type(IERC165).interfaceId || AccessControl.supportsInterface(interfaceId);
+      || interfaceId == type(IERC165).interfaceId || AccessControlDefaultAdminRules.supportsInterface(interfaceId);
   }
 
   // ================================================================
@@ -718,7 +722,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender, AccessControl {
 
   /// @notice Checks if an account has the rate limiter admin role.
   /// @param account The account to check.
-  /// @return true if the account has the role, false otherwise.
+  /// @return True if the account has the role, false otherwise.
   function hasRateLimitAdminRole(
     address account
   ) external view returns (bool) {
