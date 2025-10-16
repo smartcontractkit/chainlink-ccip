@@ -10,7 +10,7 @@ This document describes the changes introduced in the different versions of the 
 
 ### Changed
 
-- Allow setting rate limit with rate and capacity set to 0 [#1290](https://github.com/smartcontractkit/chainlink-ccip/pull/1290)
+- [Token Pools] Allow setting rate limit with rate and capacity set to 0 [#1290](https://github.com/smartcontractkit/chainlink-ccip/pull/1290)
 
 <!-- ### Fixed
 - (Placeholder for bug fixes) -->
@@ -24,7 +24,7 @@ This document describes the changes introduced in the different versions of the 
 
 ### Added
 
-- Modify Rate Limit Admin by the owner of the State PDA of the Token Pool.
+- [Token Pools] Modify Rate Limit Admin by the owner of the State PDA of the Token Pool.
 
 ---
 
