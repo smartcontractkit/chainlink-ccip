@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -22,12 +21,6 @@ import (
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-)
-
-var (
-	// based on RMN contract code
-	// The curse vote address used in an OwnerUnvoteToCurseRequest to lift a curse
-	Lift_Curse_Vote_Addr = utils.ZeroAddress
 )
 
 type CurseAdapter struct {
