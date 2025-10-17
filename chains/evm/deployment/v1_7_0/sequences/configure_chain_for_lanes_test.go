@@ -182,18 +182,16 @@ func TestConfigureChainForLanes(t *testing.T) {
 			extraArgs, err := msgHasher.EncodeGenericExtraArgsV3(
 				&bind.CallOpts{Context: t.Context()},
 				message_hasher.ClientEVMExtraArgsV3{
-					RequiredCCV: []message_hasher.ClientCCV{
+					Ccvs: []message_hasher.ClientCCV{
 						{
 							CcvAddress: committeeVerifier,
 							Args:       []byte{},
 						},
 					},
-					OptionalCCV:       []message_hasher.ClientCCV{},
-					OptionalThreshold: 0,
-					FinalityConfig:    0,
-					Executor:          Executor,
-					ExecutorArgs:      []byte{},
-					TokenArgs:         []byte{},
+					FinalityConfig: 0,
+					Executor:       Executor,
+					ExecutorArgs:   []byte{},
+					TokenArgs:      []byte{},
 				},
 			)
 			require.NoError(t, err, "EncodeGenericExtraArgsV3 should not error")

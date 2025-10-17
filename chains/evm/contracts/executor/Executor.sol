@@ -161,14 +161,12 @@ contract Executor is Ownable2StepMsgSender, IExecutor {
 
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   /// @param destChainSelector The destination chain selector.
-  /// @param requiredCCVs The CCVs that are required to execute the message.
-  /// @param optionalCCVs The CCVs that can optionally be used to execute the message
+  /// @param ccvs The CCVs that are requested on source.
   /// @return fee The fee required to execute the message.
   function getFee(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata, // message
-    Client.CCV[] calldata requiredCCVs,
-    Client.CCV[] calldata optionalCCVs,
+    Client.CCV[] calldata ccvs,
     bytes calldata // extraArgs
   ) external view returns (uint256) {
     if (!s_allowedDestChains.contains(destChainSelector)) {
@@ -176,24 +174,16 @@ contract Executor is Ownable2StepMsgSender, IExecutor {
     }
 
     if (s_ccvAllowlistEnabled) {
-      for (uint256 i = 0; i < requiredCCVs.length; ++i) {
-        address ccvAddress = requiredCCVs[i].ccvAddress;
-        if (!s_allowedCCVs.contains(ccvAddress)) {
-          revert InvalidCCV(ccvAddress);
-        }
-      }
-
-      for (uint256 i = 0; i < optionalCCVs.length; ++i) {
-        address ccvAddress = optionalCCVs[i].ccvAddress;
+      for (uint256 i = 0; i < ccvs.length; ++i) {
+        address ccvAddress = ccvs[i].ccvAddress;
         if (!s_allowedCCVs.contains(ccvAddress)) {
           revert InvalidCCV(ccvAddress);
         }
       }
     }
 
-    uint256 possibleCCVs = requiredCCVs.length + optionalCCVs.length;
-    if (possibleCCVs > s_maxCCVsPerMsg) {
-      revert ExceedsMaxCCVs(possibleCCVs, s_maxCCVsPerMsg);
+    if (ccvs.length > s_maxCCVsPerMsg) {
+      revert ExceedsMaxCCVs(ccvs.length, s_maxCCVsPerMsg);
     }
 
     // TODO: get execution fee, for now we just return 0

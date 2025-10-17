@@ -39,7 +39,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InvalidDestChainConfig(uint64 destChainSelector);
   error ReentrancyGuardReentrantCall();
   error InvalidOptionalCCVThreshold();
-  error DuplicateCCVInUserInput(address ccvAddress);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -189,17 +188,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 2. get pool params, this potentially mutates CCV list.
 
-    // TODO pool call to get CCVs from IPoolV2 getRequiredCCVs
-
-    (resolvedExtraArgs.requiredCCV, resolvedExtraArgs.optionalCCV, resolvedExtraArgs.optionalThreshold) =
-    _mergeCCVsWithPoolAndLaneMandated(
-      destChainConfig,
-      new address[](0), // TODO pass in pool required CCVs
-      resolvedExtraArgs.requiredCCV,
-      resolvedExtraArgs.optionalCCV,
-      resolvedExtraArgs.optionalThreshold
-    );
-
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
@@ -217,25 +205,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       data: message.data
     });
 
+    resolvedExtraArgs.ccvs =
+      _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector));
+
     // 3. getFee on all verifiers & executor.
 
-    Receipt[] memory verifierReceipts =
-      new Receipt[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
+    Receipt[] memory verifierReceipts = new Receipt[](resolvedExtraArgs.ccvs.length);
 
-    for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
-      Client.CCV memory verifier = resolvedExtraArgs.requiredCCV[i];
+    for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
+      Client.CCV memory verifier = resolvedExtraArgs.ccvs[i];
       verifierReceipts[i] = Receipt({
-        issuer: verifier.ccvAddress,
-        destGasLimit: 0, // TODO
-        destBytesOverhead: 0, // TODO
-        feeTokenAmount: 0, // TODO
-        extraArgs: verifier.args
-      });
-    }
-
-    for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
-      Client.CCV memory verifier = resolvedExtraArgs.optionalCCV[i];
-      verifierReceipts[resolvedExtraArgs.requiredCCV.length + i] = Receipt({
         issuer: verifier.ccvAddress,
         destGasLimit: 0, // TODO
         destBytesOverhead: 0, // TODO
@@ -274,19 +253,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
     bytes32 messageId = keccak256(encodedMessage);
-    bytes[] memory ccvBlobs = new bytes[](resolvedExtraArgs.requiredCCV.length + resolvedExtraArgs.optionalCCV.length);
+    bytes[] memory ccvBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
-    for (uint256 i = 0; i < resolvedExtraArgs.requiredCCV.length; ++i) {
-      Client.CCV memory ccv = resolvedExtraArgs.requiredCCV[i];
+    for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
+      Client.CCV memory ccv = resolvedExtraArgs.ccvs[i];
       ccvBlobs[i] = ICrossChainVerifierV1(ccv.ccvAddress).forwardToVerifier(
         address(this), newMessage, messageId, feeToken, feeTokenAmount2, ccv.args
-      );
-    }
-    for (uint256 i = 0; i < resolvedExtraArgs.optionalCCV.length; ++i) {
-      Client.CCV memory ccvOpt = resolvedExtraArgs.optionalCCV[i];
-      ccvBlobs[resolvedExtraArgs.requiredCCV.length + i] = ICrossChainVerifierV1(ccvOpt.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, feeToken, feeTokenAmount2, ccvOpt.args
       );
     }
 
@@ -307,100 +280,63 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   }
 
   /// @notice Merges lane mandated and pool required CCVs with user-provided CCVs.
-  /// This function ensures no duplicates are added and handles moving CCVs from optional to required.
-  /// @param destChainConfig Destination chain configuration containing lane mandated CCVs.
-  /// @param poolRequiredCCVs Pool-specific required CCVs.
-  /// @param requiredCCV User-provided required CCVs.
-  /// @param optionalCCV User-provided optional CCVs.
-  /// @param optionalThreshold Threshold for optional CCVs.
-  /// @return newRequiredCCVs Updated required CCVs list.
-  /// @return newOptionalCCVs Updated optional CCVs list.
-  /// @return newOptionalThreshold Updated optional threshold.
-  function _mergeCCVsWithPoolAndLaneMandated(
-    DestChainConfig storage destChainConfig,
-    address[] memory poolRequiredCCVs,
-    Client.CCV[] memory requiredCCV,
-    Client.CCV[] memory optionalCCV,
-    uint8 optionalThreshold
-  )
-    internal
-    view
-    returns (Client.CCV[] memory newRequiredCCVs, Client.CCV[] memory newOptionalCCVs, uint8 newOptionalThreshold)
-  {
+  /// @dev This function assumes there are no duplicates in the userRequestedOrDefaultCCVs list.
+  /// @dev There is no protocol-level requirement on the ordering of CCVs in the final list, but for determinism we
+  /// process user requested first, then lane-mandated second, pool-required.
+  /// @param userRequestedOrDefaultCCVs User-provided required CCVs. Can not be empty, as defaults are applied earlier
+  /// if needed. This list does not only contain addresses, but also arguments
+  /// @param laneMandatedCCVs Lane mandated CCVs are always added, regardless of what a user/pool chooses. Can be empty.
+  /// @param poolRequiredCCVs Pool-specific required CCVs. Can be empty.
+  /// @return ccvs Updated list of CCVs.
+  function _mergeCCVLists(
+    Client.CCV[] memory userRequestedOrDefaultCCVs,
+    address[] memory laneMandatedCCVs,
+    address[] memory poolRequiredCCVs
+  ) internal pure returns (Client.CCV[] memory ccvs) {
     // Maximum possible CCVs to add
-    uint256 totalMandatory = destChainConfig.laneMandatedCCVs.length + poolRequiredCCVs.length;
-    Client.CCV[] memory toBeAdded = new Client.CCV[](totalMandatory);
+    uint256 totalCCVs = userRequestedOrDefaultCCVs.length + laneMandatedCCVs.length + poolRequiredCCVs.length;
+    ccvs = new Client.CCV[](totalCCVs);
     uint256 toBeAddedIndex = 0;
 
-    // Process all mandatory CCVs in a single pass.
-    // We iterate lane-mandated first, then pool-required for determinism only; there is no protocol-level
-    // requirement on relative ordering. Duplicates across the two sources are removed below.
-    for (uint256 i = 0; i < totalMandatory; ++i) {
-      address mandatoryCCV = i < destChainConfig.laneMandatedCCVs.length
-        ? destChainConfig.laneMandatedCCVs[i]
-        : poolRequiredCCVs[i - destChainConfig.laneMandatedCCVs.length];
-
-      // Skip CCVs we've already collected from a lane-mandated or pool-required
-      // to avoid adding duplicates to requiredCCV.
-      bool isDuplicateInToBeAdded = false;
+    // First add all user requested CCVs.
+    for (uint256 i = 0; i < userRequestedOrDefaultCCVs.length; ++i) {
+      ccvs[toBeAddedIndex++] = userRequestedOrDefaultCCVs[i];
+    }
+    // Add lane mandated CCVs, skipping duplicates.
+    for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
+      address laneMandatedCCV = laneMandatedCCVs[i];
+      bool found = false;
       for (uint256 j = 0; j < toBeAddedIndex; ++j) {
-        if (toBeAdded[j].ccvAddress == mandatoryCCV) {
-          isDuplicateInToBeAdded = true;
+        if (ccvs[j].ccvAddress == laneMandatedCCV) {
+          found = true;
           break;
         }
       }
-      if (isDuplicateInToBeAdded) continue;
-
-      // Check if already exists in user's required CCVs
-      bool existsInUserRequired = false;
-      for (uint256 reqCCVIndex = 0; reqCCVIndex < requiredCCV.length; ++reqCCVIndex) {
-        if (mandatoryCCV == requiredCCV[reqCCVIndex].ccvAddress) {
-          existsInUserRequired = true;
+      if (!found) {
+        ccvs[toBeAddedIndex++] = Client.CCV({ccvAddress: laneMandatedCCV, args: ""});
+      }
+    }
+    // Add pool required CCVs, skipping duplicates.
+    for (uint256 i = 0; i < poolRequiredCCVs.length; ++i) {
+      address poolRequiredCCV = poolRequiredCCVs[i];
+      bool found = false;
+      for (uint256 j = 0; j < toBeAddedIndex; ++j) {
+        if (ccvs[j].ccvAddress == poolRequiredCCV) {
+          found = true;
           break;
         }
       }
-
-      // If not in user's required list, add it
-      if (!existsInUserRequired) {
-        toBeAdded[toBeAddedIndex++].ccvAddress = mandatoryCCV;
-
-        // If the mandatory CCV is in the optional CCVs, remove it and adjust threshold
-        for (uint256 optCCVIndex = 0; optCCVIndex < optionalCCV.length; ++optCCVIndex) {
-          if (mandatoryCCV == optionalCCV[optCCVIndex].ccvAddress) {
-            // Copy the args from optional CCV
-            toBeAdded[toBeAddedIndex - 1].args = optionalCCV[optCCVIndex].args;
-
-            // Remove from optional CCVs by swapping with last element
-            optionalCCV[optCCVIndex] = optionalCCV[optionalCCV.length - 1];
-            // Reduce array length
-            assembly {
-              mstore(optionalCCV, sub(mload(optionalCCV), 1))
-            }
-
-            // Decrement threshold to maintain security guarantee
-            if (optionalThreshold > 0) {
-              optionalThreshold--;
-            }
-            // Since each CCV address should be unique, we can break after finding the first match
-            break;
-          }
-        }
+      if (!found) {
+        ccvs[toBeAddedIndex++] = Client.CCV({ccvAddress: poolRequiredCCV, args: ""});
       }
     }
 
-    if (toBeAddedIndex > 0) {
-      newRequiredCCVs = new Client.CCV[](requiredCCV.length + toBeAddedIndex);
-      for (uint256 i = 0; i < toBeAddedIndex; ++i) {
-        newRequiredCCVs[i] = toBeAdded[i];
-      }
-      for (uint256 i = 0; i < requiredCCV.length; ++i) {
-        newRequiredCCVs[toBeAddedIndex + i] = requiredCCV[i];
-      }
-
-      return (newRequiredCCVs, optionalCCV, optionalThreshold);
+    // Resize the array to the actual number of CCVs added.
+    assembly {
+      mstore(ccvs, toBeAddedIndex)
     }
 
-    return (requiredCCV, optionalCCV, optionalThreshold);
+    return ccvs;
   }
 
   /// @notice Parses and validates extra arguments, applying defaults from destination chain configuration.
@@ -416,48 +352,30 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     if (extraArgs.length >= 4 && bytes4(extraArgs[0:4]) == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV3));
 
-      if (resolvedArgs.optionalCCV.length != 0) {
-        // Prevent impossible execution scenarios: if threshold >= array length, no combination of optional CCVs
-        // could ever satisfy the requirement. Zero threshold defeats the purpose of having optional CCVs.
-        if (resolvedArgs.optionalCCV.length <= resolvedArgs.optionalThreshold || resolvedArgs.optionalThreshold == 0) {
-          revert InvalidOptionalCCVThreshold();
-        }
-      }
-
-      // We need to ensure no duplicate CCVs are present across required and optional lists.
-      uint256 requiredCCVLength = resolvedArgs.requiredCCV.length;
-      uint256 optionalCCVLength = resolvedArgs.optionalCCV.length;
-      uint256 totalInputCCV = requiredCCVLength + optionalCCVLength;
-      for (uint256 i = 0; i < totalInputCCV; ++i) {
-        address ccvAddressI = i < requiredCCVLength
-          ? resolvedArgs.requiredCCV[i].ccvAddress
-          : resolvedArgs.optionalCCV[i - requiredCCVLength].ccvAddress;
-
-        for (uint256 j = i + 1; j < totalInputCCV; ++j) {
-          address ccvAddressJ = j < requiredCCVLength
-            ? resolvedArgs.requiredCCV[j].ccvAddress
-            : resolvedArgs.optionalCCV[j - requiredCCVLength].ccvAddress;
-
-          if (ccvAddressI == ccvAddressJ) {
-            revert DuplicateCCVInUserInput(ccvAddressI);
+      // We need to ensure no duplicate CCVs are present in the ccv list.
+      uint256 length = resolvedArgs.ccvs.length;
+      for (uint256 i = 0; i < length; ++i) {
+        for (uint256 j = i + 1; j < length; ++j) {
+          if (resolvedArgs.ccvs[i].ccvAddress == resolvedArgs.ccvs[j].ccvAddress) {
+            revert CCVConfigValidation.DuplicateCCVNotAllowed(resolvedArgs.ccvs[i].ccvAddress);
           }
         }
       }
 
       // When users don't specify any CCVs, default CCVs are chosen.
-      if (resolvedArgs.requiredCCV.length + resolvedArgs.optionalCCV.length == 0) {
-        resolvedArgs.requiredCCV = new Client.CCV[](destChainConfig.defaultCCVs.length);
+      if (resolvedArgs.ccvs.length == 0) {
+        resolvedArgs.ccvs = new Client.CCV[](destChainConfig.defaultCCVs.length);
         for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-          resolvedArgs.requiredCCV[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
+          resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
         }
       }
     } else {
       // If old extraArgs are supplied, they are assumed to be for the default CCV and the default executor.
       // This means any default CCV/executor has to be able to process all prior extraArgs.
       resolvedArgs.executorArgs = extraArgs;
-      resolvedArgs.requiredCCV = new Client.CCV[](destChainConfig.defaultCCVs.length);
+      resolvedArgs.ccvs = new Client.CCV[](destChainConfig.defaultCCVs.length);
       for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-        resolvedArgs.requiredCCV[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: extraArgs});
+        resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: extraArgs});
       }
     }
 
@@ -475,11 +393,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector
   ) internal view returns (uint256) {
     return IExecutor(resolvedExtraArgs.executor).getFee(
-      destChainSelector,
-      message,
-      resolvedExtraArgs.requiredCCV,
-      resolvedExtraArgs.optionalCCV,
-      resolvedExtraArgs.executorArgs
+      destChainSelector, message, resolvedExtraArgs.ccvs, resolvedExtraArgs.executorArgs
     );
   }
 
@@ -637,6 +551,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       ),
       extraData: poolReturnData.destPoolData
     });
+  }
+
+  // TODO this function currently returns the default CCVs.
+  function _getCCVsForPool(
+    uint64 destChainSelector
+  ) internal view returns (address[] memory) {
+    // TODO pool call to get CCVs from IPoolV2 getRequiredCCVs
+    return s_destChainConfigs[destChainSelector].defaultCCVs;
   }
 
   // ================================================================

@@ -8,8 +8,7 @@ interface IExecutor {
   function getFee(
     uint64 destChainSelector,
     Client.EVM2AnyMessage memory message,
-    Client.CCV[] memory requiredCCVs,
-    Client.CCV[] memory optionalCCVs,
+    Client.CCV[] memory ccvs,
     bytes memory extraArgs
   ) external view returns (uint256);
 }
