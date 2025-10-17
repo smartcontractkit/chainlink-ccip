@@ -56,15 +56,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
     bytes encodedMessage,
-    Receipt[] verifierReceipts,
-    Receipt executorReceipt,
+    Receipt[] receipts,
     bytes[] verifierBlobs
   );
 
   struct CCIPMessageSentEventData {
     bytes encodedMessage;
-    Receipt[] verifierReceipts;
-    Receipt executorReceipt;
+    Receipt[] receipts;
     bytes[] verifierBlobs;
   }
 
@@ -191,11 +189,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       tokenReceiver = abi.encode(message.receiver);
     }
 
-    // 2. get pool params, this potentially mutates the CCV list.
-
-    resolvedExtraArgs.ccvs =
-      _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector));
-
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
@@ -213,19 +206,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       data: message.data
     });
 
-    // 3. getFee on all verifiers & executor.
+    // 2. get pool params, this potentially mutates the CCV list.
+
+    resolvedExtraArgs.ccvs =
+      _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector));
+
+    // 3. getFee on all verifiers, pool and executor.
 
     CCIPMessageSentEventData memory eventData;
-    eventData.verifierReceipts =
-      _getVerifierReceipts(destChainSelector, message, resolvedExtraArgs.ccvs, resolvedExtraArgs.finalityConfig);
-
-    eventData.executorReceipt = Receipt({
-      issuer: resolvedExtraArgs.executor,
-      destGasLimit: 0, // TODO
-      destBytesOverhead: 0, // TODO
-      feeTokenAmount: _getExecutorFee(resolvedExtraArgs, message, destChainSelector),
-      extraArgs: resolvedExtraArgs.executorArgs
-    });
+    // Populate receipts for verifiers, pool and executor in that order.
+    eventData.receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
     // 4. lockOrBurn
 
@@ -239,9 +229,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 5. encode message and calculate messageId.
 
     eventData.encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
-    eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
-
     messageId = keccak256(eventData.encodedMessage);
+
+    eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
     for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
@@ -257,8 +247,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       newMessage.sequenceNumber,
       messageId,
       eventData.encodedMessage,
-      eventData.verifierReceipts,
-      eventData.executorReceipt,
+      eventData.receipts,
       eventData.verifierBlobs
     );
 
@@ -556,32 +545,17 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
 
     // We sum the fees for the verifier, executor and the pool (if any).
-    Receipt[] memory verifierReceipts =
-      _getVerifierReceipts(destChainSelector, message, resolvedExtraArgs.ccvs, resolvedExtraArgs.finalityConfig);
-
-    Receipt memory executorReceipt = Receipt({
-      issuer: resolvedExtraArgs.executor,
-      destGasLimit: 0, // TODO
-      destBytesOverhead: 0, // TODO
-      feeTokenAmount: _getExecutorFee(resolvedExtraArgs, message, destChainSelector),
-      extraArgs: resolvedExtraArgs.executorArgs
-    });
+    Receipt[] memory receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
     uint256 destGasLimit = 0;
     uint256 destBytesOverhead = 0;
 
-    // Sum verifier fees
-    for (uint256 i = 0; i < verifierReceipts.length; ++i) {
-      feeTokenAmount += verifierReceipts[i].feeTokenAmount;
-      destGasLimit += verifierReceipts[i].destGasLimit;
-      destBytesOverhead += verifierReceipts[i].destBytesOverhead;
+    // Sum all receipts.
+    for (uint256 i = 0; i < receipts.length; ++i) {
+      feeTokenAmount += receipts[i].feeTokenAmount;
+      destGasLimit += receipts[i].destGasLimit;
+      destBytesOverhead += receipts[i].destBytesOverhead;
     }
-    // Add executor fee
-    feeTokenAmount += executorReceipt.feeTokenAmount;
-    destGasLimit += executorReceipt.destGasLimit;
-    destBytesOverhead += executorReceipt.destBytesOverhead;
-
-    // TODO: pool fees
 
     // TODO: handle destBytes & gas
 
@@ -589,20 +563,20 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     return feeTokenAmount;
   }
 
-  function _getVerifierReceipts(
+  function _getReceipts(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
-    Client.CCV[] memory ccvs,
-    uint16 finalityConfig
+    Client.EVMExtraArgsV3 memory extraArgs
   ) internal view returns (Receipt[] memory verifierReceipts) {
-    verifierReceipts = new Receipt[](ccvs.length);
+    // Already ensure there's room for the token transfer and executor receipts.
+    verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
 
-    for (uint256 i = 0; i < ccvs.length; ++i) {
-      Client.CCV memory verifier = ccvs[i];
+    for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
+      Client.CCV memory verifier = extraArgs.ccvs[i];
 
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
         verifier.ccvAddress
-      ).getFee(address(this), destChainSelector, message, verifier.args, finalityConfig);
+      ).getFee(address(this), destChainSelector, message, verifier.args, extraArgs.finalityConfig);
 
       verifierReceipts[i] = Receipt({
         issuer: verifier.ccvAddress,
@@ -613,17 +587,35 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       });
     }
 
+    // TODO gas & bytes for exec.
+    verifierReceipts[verifierReceipts.length - 1] = Receipt({
+      issuer: extraArgs.executor,
+      destGasLimit: 0,
+      destBytesOverhead: 0,
+      feeTokenAmount: _getExecutorFee(extraArgs, message, destChainSelector),
+      extraArgs: extraArgs.executorArgs
+    });
+
+    if (message.tokenAmounts.length > 0) {
+      // TODO pool fees
+      verifierReceipts[verifierReceipts.length - 2] = Receipt({
+        issuer: message.tokenAmounts[0].token,
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        feeTokenAmount: 0,
+        extraArgs: extraArgs.tokenArgs
+      });
+    }
+
     return verifierReceipts;
   }
 
   function _getExecutorFee(
-    Client.EVMExtraArgsV3 memory resolvedExtraArgs,
+    Client.EVMExtraArgsV3 memory extraArgs,
     Client.EVM2AnyMessage memory message,
     uint64 destChainSelector
   ) internal view returns (uint256) {
-    return IExecutor(resolvedExtraArgs.executor).getFee(
-      destChainSelector, message, resolvedExtraArgs.ccvs, resolvedExtraArgs.executorArgs
-    );
+    return IExecutor(extraArgs.executor).getFee(destChainSelector, message, extraArgs.ccvs, extraArgs.executorArgs);
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.

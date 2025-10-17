@@ -29,7 +29,7 @@ contract FeeQuoterSetup is TokenSetup {
   // CommitteeVerifier
   uint16 internal constant DEFAULT_CCV_FEE_USD_CENTS = 45;
   uint32 internal constant DEFAULT_CCV_GAS_LIMIT = 7_500 * 6 + 5_000; // 6 sigs + buffer
-  uint32 internal constant DEFAULT_CCV_PAYLOAD_SIZE = 6 * 64 + 32; // 6 sigs + one slot for length
+  uint32 internal constant DEFAULT_CCV_PAYLOAD_SIZE = 6 * 64 + 2 * 32; // 6 sigs + two slots for length
 
   // Use 16 gas per data availability byte in our tests.
   // This is an overestimation in OP stack, it ignores 4 gas per 0 byte rule.

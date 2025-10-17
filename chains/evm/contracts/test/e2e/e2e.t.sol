@@ -100,13 +100,8 @@ contract e2e is OnRampSetup {
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 1e18});
 
-    (
-      bytes32 messageId,
-      bytes memory encodedMessage,
-      OnRamp.Receipt[] memory verifierReceipts,
-      OnRamp.Receipt memory executorReceipt,
-      bytes[] memory verifierBlobs
-    ) = _evmMessageToEvent({
+    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
+    _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
       seqNum: expectedSeqNum,
@@ -119,8 +114,7 @@ contract e2e is OnRampSetup {
       sequenceNumber: expectedSeqNum,
       messageId: messageId,
       encodedMessage: encodedMessage,
-      verifierReceipts: verifierReceipts,
-      executorReceipt: executorReceipt,
+      receipts: receipts,
       verifierBlobs: verifierBlobs
     });
 

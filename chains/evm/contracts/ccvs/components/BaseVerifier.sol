@@ -33,7 +33,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   struct DestChainConfig {
     IRouter router; // ──────────╮ Local router to use for messages going to this dest chain.
-    uint16 feeUSDCents; //       │ The fee in US dollar cents for messages to this dest chain.
+    uint16 feeUSDCents; //       │ The fee in US dollar cents for messages to this dest chain. [0, $655.35]
     uint32 gasForVerification; //│ The gas to reserve for verification of messages on the dest chain.
     uint32 payloadSizeBytes; //  │ The size of the verification payload on the dest chain.
     bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
@@ -119,10 +119,12 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       destChainConfig.router = destChainConfigArg.router;
       destChainConfig.allowlistEnabled = destChainConfigArg.allowlistEnabled;
       destChainConfig.feeUSDCents = destChainConfigArg.feeUSDCents;
+      // The call can never cost 0 gas.
       if (destChainConfigArg.gasForVerification == 0) {
         revert DestGasCannotBeZero(destChainSelector);
       }
       destChainConfig.gasForVerification = destChainConfigArg.gasForVerification;
+      // The payload could be zero bytes if no offchain data is required.
       destChainConfig.payloadSizeBytes = destChainConfigArg.payloadSizeBytes;
 
       emit DestChainConfigSet(destChainSelector, address(destChainConfigArg.router), destChainConfig.allowlistEnabled);
