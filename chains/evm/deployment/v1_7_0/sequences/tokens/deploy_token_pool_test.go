@@ -218,10 +218,10 @@ func TestDeployTokenPool(t *testing.T) {
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ConstructorArgs.Token, getTokenReport.Output, "Expected token address to be the same as the deployed token")
 
-			// Check router
-			getRouterReport, err := operations.ExecuteOperation(
+			// Check dynamic config
+			getDynamicConfigReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetRouter,
+				token_pool.GetDynamicConfig,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
 					ChainSelector: chainSel,
@@ -229,7 +229,8 @@ func TestDeployTokenPool(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, input.ConstructorArgs.Router, getRouterReport.Output, "Expected router address to be the same as the deployed router")
+			require.Equal(t, input.ConstructorArgs.Router, getDynamicConfigReport.Output.Router, "Expected router address to be the same as the deployed router")
+			require.Zero(t, getDynamicConfigReport.Output.ThresholdAmountForAdditionalCCVs.Sign(), "Expected default threshold to be zero")
 
 			// Check rmn proxy
 			getRmnProxyReport, err := operations.ExecuteOperation(

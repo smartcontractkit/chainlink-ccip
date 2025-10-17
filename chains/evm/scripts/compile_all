@@ -72,7 +72,7 @@ function getOptimizations() {
 compileContract ccvs/VerifierProxy
 compileContract ccvs/CommitteeVerifier
 compileContract onRamp/OnRamp
-compileContract onRamp/ExecutorOnRamp
+compileContract executor/Executor
 compileContract offRamp/OffRamp
 compileContract FeeQuoter
 compileContract applications/PingPongDemo

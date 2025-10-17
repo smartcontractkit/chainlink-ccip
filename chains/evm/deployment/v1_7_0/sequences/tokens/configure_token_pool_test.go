@@ -1,6 +1,7 @@
 package tokens_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -24,6 +25,7 @@ func TestConfigurePool(t *testing.T) {
 		{
 			desc: "happy path",
 			makeInput: func(tokenAndPoolReport operations.SequenceReport[tokens.DeployBurnMintTokenAndPoolInput, seq_core.OnChainOutput]) tokens.ConfigureTokenPoolInput {
+				threshold := big.NewInt(123)
 				return tokens.ConfigureTokenPoolInput{
 					ChainSelector:    tokenAndPoolReport.Input.DeployTokenPoolInput.ChainSel,
 					TokenPoolAddress: common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address),
@@ -31,8 +33,9 @@ func TestConfigurePool(t *testing.T) {
 						common.HexToAddress("0x07"),
 						common.HexToAddress("0x08"),
 					},
-					RouterAddress:  common.HexToAddress("0x09"),
-					RateLimitAdmin: common.HexToAddress("0x10"),
+					RouterAddress:                    common.HexToAddress("0x09"),
+					ThresholdAmountForAdditionalCCVs: threshold,
+					RateLimitAdmin:                   common.HexToAddress("0x10"),
 				}
 			},
 			expectedErr: "",
@@ -87,10 +90,10 @@ func TestConfigurePool(t *testing.T) {
 			require.Len(t, configureReport.Output.BatchOps[0].Transactions, 0, "Expected 0 transactions in batch operation")
 			require.Len(t, configureReport.Output.Addresses, 0, "Expected 0 addresses in output")
 
-			// Check router
-			getRouterReport, err := operations.ExecuteOperation(
+			// Check dynamic config
+			getDynamicConfigReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetRouter,
+				token_pool.GetDynamicConfig,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
 					ChainSelector: chainSel,
@@ -98,7 +101,8 @@ func TestConfigurePool(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, input.RouterAddress, getRouterReport.Output, "Expected router address to be the same as the deployed router")
+			require.Equal(t, input.RouterAddress, getDynamicConfigReport.Output.Router, "Expected router address to be the same as the deployed router")
+			require.Zero(t, getDynamicConfigReport.Output.ThresholdAmountForAdditionalCCVs.Cmp(input.ThresholdAmountForAdditionalCCVs))
 
 			// Check allowlist
 			getAllowlistReport, err := operations.ExecuteOperation(

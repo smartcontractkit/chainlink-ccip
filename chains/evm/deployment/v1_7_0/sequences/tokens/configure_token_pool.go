@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -28,6 +29,9 @@ type ConfigureTokenPoolInput struct {
 	// RouterAddress is the address of the Router contract on this chain.
 	// If left empty, setRouter will not be attempted.
 	RouterAddress common.Address
+	// ThresholdAmountForAdditionalCCVs is the transfer threshold where additional CCVs are required.
+	// If nil, the existing threshold will be retained.
+	ThresholdAmountForAdditionalCCVs *big.Int
 	// RateLimitAdmin is an additional address allowed to set rate limiters.
 	// If left empty, setRateLimitAdmin will not be attempted.
 	RateLimitAdmin common.Address
@@ -78,27 +82,47 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			}
 		}
 
-		// Set router (if necessary)
-		// Check the router currently set on the token pool
-		if input.RouterAddress != (common.Address{}) {
-			currentRouterReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRouter, chain, evm_contract.FunctionInput[any]{
+		// Set dynamic config (if necessary)
+		if input.RouterAddress != (common.Address{}) || input.ThresholdAmountForAdditionalCCVs != nil {
+			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[any]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current router from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current dynamic config from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
-			if currentRouterReport.Output != input.RouterAddress {
-				// Router is not set to desired, so update it
-				setRouterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRouter, chain, evm_contract.FunctionInput[common.Address]{
+
+			currentDynamicConfig := currentDynamicConfigReport.Output
+			desiredRouter := currentDynamicConfig.Router
+			if input.RouterAddress != (common.Address{}) {
+				desiredRouter = input.RouterAddress
+			}
+
+			currentThreshold := big.NewInt(0)
+			if currentDynamicConfig.ThresholdAmountForAdditionalCCVs != nil {
+				currentThreshold = new(big.Int).Set(currentDynamicConfig.ThresholdAmountForAdditionalCCVs)
+			}
+			desiredThreshold := new(big.Int).Set(currentThreshold)
+			if input.ThresholdAmountForAdditionalCCVs != nil {
+				desiredThreshold = new(big.Int).Set(input.ThresholdAmountForAdditionalCCVs)
+			}
+
+			routerChanged := desiredRouter != currentDynamicConfig.Router
+			thresholdChanged := desiredThreshold.Cmp(currentThreshold) != 0
+
+			if routerChanged || thresholdChanged {
+				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.DynamicConfigArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
-					Args:          input.RouterAddress,
+					Args: token_pool.DynamicConfigArgs{
+						Router:                           desiredRouter,
+						ThresholdAmountForAdditionalCCVs: desiredThreshold,
+					},
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set router on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 				}
-				writes = append(writes, setRouterReport.Output)
+				writes = append(writes, setDynamicConfigReport.Output)
 			}
 		}
 

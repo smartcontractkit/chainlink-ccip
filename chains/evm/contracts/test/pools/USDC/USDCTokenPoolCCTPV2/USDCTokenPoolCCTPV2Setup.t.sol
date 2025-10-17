@@ -21,7 +21,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       address(s_router)
     );
 
-    // Set the on and off ramps as authorized callers for the pool.
+    // Set the on and offramps as authorized callers for the pool.
     s_usdcTokenPool.grantRole(s_usdcTokenPool.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOnRamp));
     s_usdcTokenPool.grantRole(s_usdcTokenPool.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOffRamp));
 

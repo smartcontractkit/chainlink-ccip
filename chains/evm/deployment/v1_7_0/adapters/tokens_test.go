@@ -6,10 +6,11 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/adapters"
@@ -26,7 +27,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
+)
+
+const (
+	outbound = 0
+	inbound  = 1
 )
 
 func TestTokenAdapter(t *testing.T) {
@@ -70,19 +75,9 @@ func TestTokenAdapter(t *testing.T) {
 				err = ds.Merge(deployChainOut.DataStore.Seal())
 				require.NoError(t, err, "Failed to merge datastore from DeployChainContracts changeset")
 
-				router, err := datastore_utils.FindAndFormatRef(deployChainOut.DataStore.Seal(), datastore.AddressRef{
-					ChainSelector: chainSel,
-					Type:          datastore.ContractType(router.ContractType),
-				}, chainSel, evm_datastore_utils.ToEVMAddress)
-				require.NoError(t, err, "Failed to find deployed router ref in datastore after DeployChainContracts changeset")
-				rmnProxy, err := datastore_utils.FindAndFormatRef(deployChainOut.DataStore.Seal(), datastore.AddressRef{
-					ChainSelector: chainSel,
-					Type:          datastore.ContractType(rmn_proxy.ContractType),
-				}, chainSel, evm_datastore_utils.ToEVMAddress)
-				require.NoError(t, err, "Failed to find deployed rmn proxy ref in datastore after DeployChainContracts changeset")
-
-				deployTokenAndPoolOut, err := v1_7_0.DeployBurnMintTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[evm_tokens.DeployBurnMintTokenAndPoolInput]{
-					Cfg: evm_tokens.DeployBurnMintTokenAndPoolInput{
+				e.DataStore = ds.Seal()
+				deployTokenAndPoolOut, err := v1_7_0.DeployBurnMintTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployBurnMintTokenAndPoolCfg]{
+					Cfg: v1_7_0.DeployBurnMintTokenAndPoolCfg{
 						Accounts: map[common.Address]*big.Int{
 							e.BlockChains.EVMChains()[chainSel].DeployerKey.From: big.NewInt(1_000_000),
 						},
@@ -91,15 +86,16 @@ func TestTokenAdapter(t *testing.T) {
 							MaxSupply: big.NewInt(10_000_000),
 							Name:      "TEST",
 						},
-						DeployTokenPoolInput: evm_tokens.DeployTokenPoolInput{
-							ChainSel:         chainSel,
-							TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
-							TokenPoolVersion: semver.MustParse("1.7.0"),
-							TokenSymbol:      "TEST",
-							ConstructorArgs: token_pool.ConstructorArgs{
-								LocalTokenDecimals: 18,
-								Router:             router,
-								RMNProxy:           rmnProxy,
+						DeployTokenPoolCfg: v1_7_0.DeployTokenPoolCfg{
+							ChainSel:           chainSel,
+							TokenPoolType:      datastore.ContractType(burn_mint_token_pool.ContractType),
+							TokenPoolVersion:   semver.MustParse("1.7.0"),
+							TokenSymbol:        "TEST",
+							LocalTokenDecimals: 18,
+							Router: datastore.AddressRef{
+								ChainSelector: chainSel,
+								Type:          datastore.ContractType(router.ContractType),
+								Version:       semver.MustParse("1.2.0"),
 							},
 						},
 					},
@@ -268,12 +264,12 @@ func TestTokenAdapter(t *testing.T) {
 
 				boundTokenPool, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
 				require.NoError(t, err, "Failed to instantiate token pool contract")
-				inboundCCVs, err := boundTokenPool.GetRequiredInboundCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{})
+				inboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
 				require.NoError(t, err, "Failed to get inbound CCVs from token pool")
 				require.Len(t, inboundCCVs, 1, "Number of inbound CCVs should match")
 				require.Equal(t, verifierAddr, inboundCCVs[0], "Inbound CCV address should match")
 
-				outboundCCVs, err := boundTokenPool.GetRequiredOutboundCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{})
+				outboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, outbound)
 				require.NoError(t, err, "Failed to get outbound CCVs from token pool")
 				require.Len(t, outboundCCVs, 1, "Number of outbound CCVs should match")
 				require.Equal(t, verifierAddr, outboundCCVs[0], "Outbound CCV address should match")
