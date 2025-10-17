@@ -48,9 +48,9 @@ var Deploy = operations.NewOperation(
 )
 
 var Initialize = operations.NewOperation(
-	"off-ramp:initialize",
+	"router:initialize",
 	Version,
-	"Initializes the OffRamp 1.6.0 contract",
+	"Initializes the Router 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		programData, err := utils.GetSolProgramData(chain, input.Router)
 		if err != nil {
