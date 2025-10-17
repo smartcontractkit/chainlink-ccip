@@ -14,7 +14,8 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
-import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts@5.0.2/access/extensions/AccessControlDefaultAdminRules.sol";
+import {AccessControlDefaultAdminRules} from
+  "@openzeppelin/contracts@5.0.2/access/extensions/AccessControlDefaultAdminRules.sol";
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
@@ -65,6 +66,7 @@ abstract contract TokenPool is IPoolV2, AccessControlDefaultAdminRules {
   error MismatchedArrayLengths();
   error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
   error InvalidDecimalArgs(uint8 expected, uint8 actual);
+  error OnlyCallableByOwner();
 
   event LockedOrBurned(uint64 indexed remoteChainSelector, address token, address sender, uint256 amount);
   event ReleasedOrMinted(
@@ -192,9 +194,13 @@ abstract contract TokenPool is IPoolV2, AccessControlDefaultAdminRules {
     _;
   }
 
-  constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router)
-    AccessControlDefaultAdminRules(0, msg.sender)
-  {
+  constructor(
+    IERC20 token,
+    uint8 localTokenDecimals,
+    address[] memory allowlist,
+    address rmnProxy,
+    address router
+  ) AccessControlDefaultAdminRules(0, msg.sender) {
     if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) {
       revert ZeroAddressInvalid();
     }

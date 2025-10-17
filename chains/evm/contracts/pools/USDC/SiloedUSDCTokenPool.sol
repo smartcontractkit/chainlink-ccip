@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 
-import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
@@ -27,7 +26,7 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 /// able to migrate to CCTP in the future, due to the inability to manage the token
 /// balances under CCTP accounting rules defined at:
 /// https://github.com/circlefin/stablecoin-evm/blob/master/doc/bridged_USDC_standard.md
-contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
+contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool {
   using EnumerableSet for EnumerableSet.UintSet;
 
   event CCTPMigrationProposed(uint64 remoteChainSelector);
@@ -43,7 +42,9 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   error NoMigrationProposalPending();
   error ChainAlreadyMigrated(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
+  error UnauthorizedCaller(address caller);
 
+  bytes32 public constant AUTHORIZED_CALLER_ROLE = keccak256("AUTHORIZED_CALLER_ROLE");
   /// @notice The address of the circle-controlled wallet which will execute a CCTP lane migration
   address internal s_circleUSDCMigrator;
   uint64 internal s_proposedUSDCMigrationChain;
@@ -63,10 +64,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     address rmnProxy,
     address router,
     address lockBox
-  )
-    SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox)
-    AuthorizedCallers(new address[](0))
-  {}
+  ) SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox) {}
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
@@ -136,7 +134,9 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
 
     // Validate logic is inherited from AuthorizedCallers, and is used to validate that the caller is the authorized USDC proxy contract rather than the ramp.
-    _validateCaller();
+    if (!hasRole(AUTHORIZED_CALLER_ROLE, msg.sender)) {
+      revert UnauthorizedCaller(msg.sender);
+    }
   }
 
   /// @dev This function is overridden to remove the Off-Ramp check, as this pool does not receive calls
@@ -147,7 +147,9 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
 
     // Validate logic is inherited from AuthorizedCallers, and is used to validate that the caller is the authorized USDC proxy contract rather than the ramp.
-    _validateCaller();
+    if (!hasRole(AUTHORIZED_CALLER_ROLE, msg.sender)) {
+      revert UnauthorizedCaller(msg.sender);
+    }
   }
 
   // ================================================================

@@ -3,10 +3,9 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "../../../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
+import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
-
-import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
   address public s_sender = makeAddr("sender");
@@ -145,7 +144,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
       localToken: address(s_USDCToken)
     });
 
-    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, unauthorizedCaller));
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.UnauthorizedCaller.selector, unauthorizedCaller));
     s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
 
     vm.stopPrank();
@@ -183,7 +182,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
       localToken: address(s_USDCToken)
     });
 
-    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, unauthorizedProxy));
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.UnauthorizedCaller.selector, unauthorizedProxy));
     s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
   }
 }

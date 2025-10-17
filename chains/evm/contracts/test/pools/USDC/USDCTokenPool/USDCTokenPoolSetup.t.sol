@@ -8,8 +8,6 @@ import {USDCTokenPoolHelper} from "../../../helpers/USDCTokenPoolHelper.sol";
 import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol";
 import {MockUSDCTokenMessenger} from "../../../mocks/MockUSDCTokenMessenger.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
-
-import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract USDCTokenPoolSetup is USDCSetup {
@@ -53,16 +51,10 @@ contract USDCTokenPoolSetup is USDCSetup {
     );
 
     // Set the owner as an authorized caller for the pools
-    address[] memory authorizedCallers = new address[](3);
-    authorizedCallers[0] = OWNER;
-    authorizedCallers[1] = address(s_routerAllowedOnRamp);
-    authorizedCallers[2] = address(s_routerAllowedOffRamp);
-    s_usdcTokenPool.applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
-    );
-    s_usdcTokenPoolWithAllowList.applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
-    );
+    s_usdcTokenPool.grantRole(s_usdcTokenPool.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOnRamp));
+    s_usdcTokenPool.grantRole(s_usdcTokenPool.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOffRamp));
+    s_usdcTokenPoolWithAllowList.grantRole(s_usdcTokenPool.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOnRamp));
+    s_usdcTokenPoolWithAllowList.grantRole(s_usdcTokenPool.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOffRamp));
 
     _poolApplyChainUpdates(address(s_usdcTokenPool));
     _poolApplyChainUpdates(address(s_usdcTokenPoolWithAllowList));

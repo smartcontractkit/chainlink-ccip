@@ -6,8 +6,6 @@ import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2Helper} from "../../../helpers/USDCTokenPoolCCTPV2Helper.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
-import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-
 contract USDCTokenPoolCCTPV2Setup is USDCSetup {
   USDCTokenPoolCCTPV2Helper internal s_usdcTokenPool;
 
@@ -24,13 +22,8 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
     );
 
     // Set the on and off ramps as authorized callers for the pool.
-    address[] memory allowedCallers = new address[](3);
-    allowedCallers[0] = OWNER;
-    allowedCallers[1] = address(s_routerAllowedOnRamp);
-    allowedCallers[2] = address(s_routerAllowedOffRamp);
-    s_usdcTokenPool.applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
-    );
+    s_usdcTokenPool.grantRole(s_usdcTokenPool.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOnRamp));
+    s_usdcTokenPool.grantRole(s_usdcTokenPool.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOffRamp));
 
     // Set the pool as an authorized caller for the message transmitter proxy.
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =

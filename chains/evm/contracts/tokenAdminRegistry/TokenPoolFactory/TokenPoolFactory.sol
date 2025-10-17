@@ -229,8 +229,8 @@ contract TokenPoolFactory is ITypeAndVersion {
     // Apply the chain updates to the token pool
     TokenPool(poolAddress).applyChainUpdates(new uint64[](0), chainUpdates);
 
-    // Begin the 2 step ownership transfer of the token pool to the msg.sender.
-    IOwnable(poolAddress).transferOwnership(address(msg.sender)); // 2 step ownership transfer
+    // Begin the 2 step DEFAULT_ADMINT role transfer of the token pool to the msg.sender.
+    TokenPool(poolAddress).beginDefaultAdminTransfer((address(msg.sender))); // 2 step ownership transfer
 
     return poolAddress;
   }

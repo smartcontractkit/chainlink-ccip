@@ -10,7 +10,6 @@ import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.s
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
-import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
@@ -40,7 +39,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@4.8.3/utils/structs/Enumera
 */
 /// @dev This specific pool is used for CCTP V1. The CCTP V2 pool is a separate contract, which inherits many of the
 /// state management from this contract, only overriding the functions absolutely necessary for supporting CCTP V2.
-contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
+contract USDCTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -60,9 +59,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   error InvalidTransmitterInProxy();
   error InvalidPreviousPool();
   error InvalidMessageLength(uint256 length);
-
+  error UnauthorizedCaller(address caller);
   // This data is supplied from offchain and contains everything needed to mint the USDC tokens on the destination chain
   // through CCTP.
+
   struct MessageAndAttestation {
     bytes message;
     bytes attestation;
@@ -78,6 +78,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     bool useLegacySourcePoolDataFormat; // Whether to use the legacy source pool data format
   }
 
+  /// @notice The role authorized to call functions that should only be callable by the USDCTokenPoolProxy.
+  bytes32 public constant AUTHORIZED_CALLER_ROLE = keccak256("AUTHORIZED_CALLER_ROLE");
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
   uint32 public immutable i_supportedUSDCVersion;
 
@@ -105,8 +107,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   // A mapping of CCIP chain identifiers to destination domains
   mapping(uint64 chainSelector => Domain CCTPDomain) internal s_chainToDomain;
 
-  /// @dev The authorized callers are set as empty since the USDCTokenPoolProxy is the only authorized caller,
-  /// but cannot be deployed until after this contract is deployed. The allowed callers are set after deployment.
+  /// @dev The AUTHORIZED_CALLER_ROLE is not granted to any address at deployment, since the USDCTokenPoolProxy is the only authorized caller,
+  // but cannot be deployed until after this contract is deployed. The role is granted to allowed callers after deployment.
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
@@ -115,7 +117,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     address rmnProxy,
     address router,
     uint32 supportedUSDCVersion
-  ) TokenPool(token, 6, allowlist, rmnProxy, router) AuthorizedCallers(new address[](0)) {
+  ) TokenPool(token, 6, allowlist, rmnProxy, router) {
     // The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
     i_supportedUSDCVersion = supportedUSDCVersion;
 
@@ -229,7 +231,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     uint64 remoteChainSelector
   ) internal view virtual override {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-    _validateCaller();
+    if (!hasRole(AUTHORIZED_CALLER_ROLE, msg.sender)) {
+      revert UnauthorizedCaller(msg.sender);
+    }
   }
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
@@ -238,7 +242,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     uint64 remoteChainSelector
   ) internal view virtual override {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-    _validateCaller();
+    if (!hasRole(AUTHORIZED_CALLER_ROLE, msg.sender)) {
+      revert UnauthorizedCaller(msg.sender);
+    }
   }
 
   /// @inheritdoc TokenPool

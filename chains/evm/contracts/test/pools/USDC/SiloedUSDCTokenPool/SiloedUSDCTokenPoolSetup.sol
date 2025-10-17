@@ -4,8 +4,6 @@ pragma solidity ^0.8.24;
 import {ERC20LockBox} from "../../../../pools/ERC20LockBox.sol";
 import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
-
-import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract SiloedUSDCTokenPoolSetup is USDCSetup {
@@ -35,13 +33,8 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       address(s_lockBox) // lockBox
     );
 
-    address[] memory authorizedCallers = new address[](3);
-    authorizedCallers[0] = OWNER;
-    authorizedCallers[1] = address(s_routerAllowedOnRamp);
-    authorizedCallers[2] = address(s_routerAllowedOffRamp);
-    s_usdcTokenPool.applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
-    );
+    s_usdcTokenPool.grantRole(s_usdcTokenPool.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOnRamp));
+    s_usdcTokenPool.grantRole(s_usdcTokenPool.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOffRamp));
 
     BurnMintERC20(address(s_USDCToken)).grantMintAndBurnRoles(address(s_usdcTokenPool));
 
@@ -82,8 +75,11 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       address(s_lockBox) // lockBox
     );
 
-    s_usdcTokenPoolTransferLiquidity.applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+    s_usdcTokenPoolTransferLiquidity.grantRole(
+      s_usdcTokenPoolTransferLiquidity.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOnRamp)
+    );
+    s_usdcTokenPoolTransferLiquidity.grantRole(
+      s_usdcTokenPoolTransferLiquidity.AUTHORIZED_CALLER_ROLE(), address(s_routerAllowedOffRamp)
     );
 
     _poolApplyChainUpdates(address(s_usdcTokenPoolTransferLiquidity));

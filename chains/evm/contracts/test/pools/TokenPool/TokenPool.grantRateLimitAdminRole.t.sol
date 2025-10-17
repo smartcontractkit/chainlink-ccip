@@ -8,7 +8,7 @@ import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
 
 contract TokenPool_grantRateLimitAdminRole is TokenPoolSetup {
   function test_grantRateLimitAdminRole() public {
-    assertFalse(s_tokenPool.hasRole(s_tokenPool.RATE_LIMITER_ADMIN_ROLE(),OWNER));
+    assertFalse(s_tokenPool.hasRole(s_tokenPool.RATE_LIMITER_ADMIN_ROLE(), OWNER));
     vm.expectEmit();
     emit TokenPool.RateLimitAdminRoleGranted(OWNER);
     s_tokenPool.grantRateLimitAdminRole(OWNER);

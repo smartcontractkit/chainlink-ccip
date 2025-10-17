@@ -4,8 +4,6 @@ pragma solidity ^0.8.24;
 import {IOwner} from "../../../interfaces/IOwner.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
-
 import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {BurnFromMintTokenPool} from "../../../pools/BurnFromMintTokenPool.sol";
@@ -66,8 +64,9 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     assertEq(predictedPoolAddress, poolAddress, "Pool Address should have been predicted");
 
     s_tokenAdminRegistry.acceptAdminRole(tokenAddress);
-    Ownable2Step(tokenAddress).acceptOwnership();
-    Ownable2Step(poolAddress).acceptOwnership();
+    vm.warp(block.timestamp + 1);
+    FactoryBurnMintERC20(tokenAddress).acceptOwnership();
+    TokenPool(poolAddress).acceptDefaultAdminTransfer();
 
     assertEq(poolAddress, s_tokenAdminRegistry.getPool(tokenAddress), "Token Pool should be set");
     assertEq(IOwner(tokenAddress).owner(), OWNER, "Token should be owned by the owner");
@@ -196,8 +195,9 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       s_tokenAdminRegistry.getTokenConfig(tokenAddress).pendingAdministrator, address(0), "Administrator should be set"
     );
 
-    Ownable2Step(tokenAddress).acceptOwnership();
-    Ownable2Step(poolAddress).acceptOwnership();
+    vm.warp(block.timestamp + 1);
+    FactoryBurnMintERC20(tokenAddress).acceptOwnership();
+    TokenPool(poolAddress).acceptDefaultAdminTransfer();
 
     assertEq(IOwner(tokenAddress).owner(), OWNER, "Token should be controlled by the OWNER");
     assertEq(IOwner(poolAddress).owner(), OWNER, "Pool should be controlled by the OWNER");
@@ -327,8 +327,9 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     assertNotEq(address(0), poolAddress, "Pool Address should not be 0");
 
     s_tokenAdminRegistry.acceptAdminRole(tokenAddress);
-    Ownable2Step(tokenAddress).acceptOwnership();
-    Ownable2Step(poolAddress).acceptOwnership();
+    vm.warp(block.timestamp + 1);
+    FactoryBurnMintERC20(tokenAddress).acceptOwnership();
+    TokenPool(poolAddress).acceptDefaultAdminTransfer();
 
     assertEq(
       TokenPool(poolAddress).getRemoteToken(DEST_CHAIN_SELECTOR),
@@ -398,7 +399,8 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // Check that the pool was correctly deployed on the local chain first
 
     // Accept the ownership which was transferred
-    Ownable2Step(poolAddress).acceptOwnership();
+    vm.warp(block.timestamp + 1);
+    TokenPool(poolAddress).acceptDefaultAdminTransfer();
 
     // Ensure that the remote Token was set to the one we predicted
     assertEq(
@@ -466,8 +468,9 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     assertNotEq(address(0), poolAddress, "Pool Address should not be 0");
 
     s_tokenAdminRegistry.acceptAdminRole(tokenAddress);
-    Ownable2Step(tokenAddress).acceptOwnership();
-    Ownable2Step(poolAddress).acceptOwnership();
+    vm.warp(block.timestamp + 1);
+    FactoryBurnMintERC20(tokenAddress).acceptOwnership();
+    TokenPool(poolAddress).acceptDefaultAdminTransfer();
 
     assertEq(
       TokenPool(poolAddress).getRemoteToken(DEST_CHAIN_SELECTOR),
