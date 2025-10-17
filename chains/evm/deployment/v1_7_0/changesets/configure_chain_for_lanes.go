@@ -9,7 +9,6 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/onramp"
@@ -38,7 +37,9 @@ type RemoteChainConfig struct {
 type ConfigureChainForLanesCfg struct {
 	ChainSel     uint64
 	RemoteChains map[uint64]RemoteChainConfig
-	MCMSArgs     *mcms.Input
+	// CommitteeVerifiers are the committee verifiers that will be configured by the CS.
+	CommitteeVerifiers []datastore.AddressRef
+	MCMSArgs           *mcms.Input
 }
 
 func (c ConfigureChainForLanesCfg) ChainSelector() uint64 {
@@ -68,11 +69,15 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		if err != nil {
 			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve onRamp ref: %w", err)
 		}
-		committeeVerifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-			ChainSelector: cfg.ChainSel,
-			Type:          datastore.ContractType(committee_verifier.ContractType),
-			Version:       semver.MustParse("1.7.0"),
-		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+
+		var committeeVerifiers []common.Address
+		for _, cvRef := range cfg.CommitteeVerifiers {
+			committeeVerifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, cvRef, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve committee verifier ref: %w", err)
+			}
+			committeeVerifiers = append(committeeVerifiers, committeeVerifierAddr)
+		}
 
 		feeQuoterAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			ChainSelector: cfg.ChainSel,
@@ -156,13 +161,13 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 		}
 
 		return sequences.ConfigureChainForLanesInput{
-			ChainSelector:     cfg.ChainSel,
-			Router:            routerAddr,
-			OnRamp:            onRampAddr,
-			CommitteeVerifier: committeeVerifierAddr,
-			FeeQuoter:         feeQuoterAddr,
-			OffRamp:           offRampAddr,
-			RemoteChains:      remoteChains,
+			ChainSelector:      cfg.ChainSel,
+			Router:             routerAddr,
+			OnRamp:             onRampAddr,
+			CommitteeVerifiers: committeeVerifiers,
+			FeeQuoter:          feeQuoterAddr,
+			OffRamp:            offRampAddr,
+			RemoteChains:       remoteChains,
 		}, nil
 	},
 	ResolveDep: evm_sequences.ResolveEVMChainDep[ConfigureChainForLanesCfg],
