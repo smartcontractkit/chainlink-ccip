@@ -63,7 +63,11 @@ func (a *EVMAdapter) GetFQAddress(e *cldf.Environment, chainSelector uint64) ([]
 }
 
 func (a *EVMAdapter) GetRouterAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(router.ContractType),
 		Version:       router.Version,
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
 		return nil, err
 	}
