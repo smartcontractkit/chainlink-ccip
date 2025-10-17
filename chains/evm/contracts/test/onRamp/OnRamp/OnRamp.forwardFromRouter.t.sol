@@ -20,7 +20,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       bytes memory encodedMessage,
       OnRamp.Receipt[] memory verifierReceipts,
       OnRamp.Receipt memory executorReceipt,
-      bytes[] memory receiptBlobs
+      bytes[] memory verifierBlobs
     ) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -36,7 +36,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       encodedMessage: encodedMessage,
       verifierReceipts: verifierReceipts,
       executorReceipt: executorReceipt,
-      receiptBlobs: receiptBlobs
+      verifierBlobs: verifierBlobs
     });
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
@@ -54,7 +54,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       bytes memory encodedMessage,
       OnRamp.Receipt[] memory verifierReceipts,
       OnRamp.Receipt memory executorReceipt,
-      bytes[] memory receiptBlobs
+      bytes[] memory verifierBlobs
     ) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -70,13 +70,13 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       encodedMessage: encodedMessage,
       verifierReceipts: verifierReceipts,
       executorReceipt: executorReceipt,
-      receiptBlobs: receiptBlobs
+      verifierBlobs: verifierBlobs
     });
     bytes32 messageId1 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
     // 2) Expect seq to increment again for the next message.
     destConfig.sequenceNumber++;
-    (messageIdExpected, encodedMessage, verifierReceipts, executorReceipt, receiptBlobs) = _evmMessageToEvent({
+    (messageIdExpected, encodedMessage, verifierReceipts, executorReceipt, verifierBlobs) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
       seqNum: destConfig.sequenceNumber,
@@ -91,7 +91,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       encodedMessage: encodedMessage,
       verifierReceipts: verifierReceipts,
       executorReceipt: executorReceipt,
-      receiptBlobs: receiptBlobs
+      verifierBlobs: verifierBlobs
     });
     bytes32 messageId2 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 

@@ -42,10 +42,6 @@ contract BaseVerifierTestHelper is BaseVerifier {
     return "";
   }
 
-  function getFee(address, uint64, Client.EVM2AnyMessage memory, bytes memory) external pure returns (uint256) {
-    return 0;
-  }
-
   function verifyMessage(
     address originalCaller,
     MessageV1Codec.MessageV1 memory message,

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
+
 import {Client} from "../../../libraries/Client.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
@@ -62,7 +64,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       bytes memory encodedMessage,
       OnRamp.Receipt[] memory verifierReceipts,
       OnRamp.Receipt memory executorReceipt,
-      bytes[] memory receiptBlobs
+      bytes[] memory verifierBlobs
     )
   {
     OnRamp.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
@@ -96,9 +98,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     bool isLegacyExtraArgs = _isLegacyExtraArgs(message.extraArgs);
 
     if (isLegacyExtraArgs) {
-      verifierReceipts = _computeVerifierReceiptsLegacyArgs(message.extraArgs, destChainConfig.defaultCCVs);
+      verifierReceipts = _computeVerifierReceiptsLegacyArgs(message, destChainConfig.defaultCCVs);
     } else {
-      verifierReceipts = this.computeVerifierReceiptsArgsV3(message.extraArgs, destChainConfig.defaultCCVs);
+      verifierReceipts = this.computeVerifierReceiptsArgsV3(message, destChainConfig.defaultCCVs);
     }
     executorReceipt = OnRamp.Receipt({
       issuer: destChainConfig.defaultExecutor,
@@ -120,20 +122,24 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
   // This function is external so we can make the extraArgs calldata to allow for indexing.
   function computeVerifierReceiptsArgsV3(
-    bytes calldata extraArgs,
+    Client.EVM2AnyMessage calldata message,
     address[] calldata defaultCCVs
-  ) external pure returns (OnRamp.Receipt[] memory verifierReceipts) {
-    Client.EVMExtraArgsV3 memory extraArgsV3 = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV3));
+  ) external view returns (OnRamp.Receipt[] memory verifierReceipts) {
+    Client.EVMExtraArgsV3 memory extraArgsV3 = abi.decode(message.extraArgs[4:], (Client.EVMExtraArgsV3));
     uint256 userDefinedCCVCount = extraArgsV3.ccvs.length;
     verifierReceipts = new OnRamp.Receipt[](userDefinedCCVCount + defaultCCVs.length);
 
     uint256 currentVerifierIndex = 0;
     for (uint256 i = 0; i < userDefinedCCVCount; ++i) {
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
+        extraArgsV3.ccvs[i].ccvAddress
+      ).getFee(address(this), DEST_CHAIN_SELECTOR, message, extraArgsV3.ccvs[i].args, extraArgsV3.finalityConfig);
+
       verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
         issuer: extraArgsV3.ccvs[i].ccvAddress,
-        feeTokenAmount: 0,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
+        feeTokenAmount: feeUSDCents,
+        destGasLimit: gasForVerification,
+        destBytesOverhead: payloadSizeBytes,
         extraArgs: extraArgsV3.ccvs[i].args
       });
     }
@@ -151,11 +157,15 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       if (found) {
         continue;
       }
+
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(defaultCCVs[i])
+        .getFee(address(this), DEST_CHAIN_SELECTOR, message, "", extraArgsV3.finalityConfig);
+
       verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
         issuer: defaultCCVs[i],
-        feeTokenAmount: 0,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
+        feeTokenAmount: feeUSDCents,
+        destGasLimit: gasForVerification,
+        destBytesOverhead: payloadSizeBytes,
         extraArgs: ""
       });
     }
@@ -163,17 +173,20 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   }
 
   function _computeVerifierReceiptsLegacyArgs(
-    bytes memory extraArgs,
+    Client.EVM2AnyMessage memory message,
     address[] memory defaultCCVs
-  ) internal pure returns (OnRamp.Receipt[] memory verifierReceipts) {
+  ) internal view returns (OnRamp.Receipt[] memory verifierReceipts) {
     verifierReceipts = new OnRamp.Receipt[](defaultCCVs.length);
     for (uint256 i = 0; i < verifierReceipts.length; ++i) {
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
+        ICrossChainVerifierV1(defaultCCVs[i]).getFee(address(this), DEST_CHAIN_SELECTOR, message, "", 0);
+
       verifierReceipts[i] = OnRamp.Receipt({
         issuer: defaultCCVs[i],
-        feeTokenAmount: 0,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        extraArgs: extraArgs
+        feeTokenAmount: feeUSDCents,
+        destGasLimit: gasForVerification,
+        destBytesOverhead: payloadSizeBytes,
+        extraArgs: message.extraArgs
       });
     }
     return verifierReceipts;

@@ -6,6 +6,8 @@ import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {Client} from "../../libraries/Client.sol";
+
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
@@ -17,9 +19,11 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   error CursedByRMN(uint64 destChainSelector);
   error InvalidDestChainConfig(uint64 destChainSelector);
+  error DestGasCannotBeZero(uint64 destChainSelector);
   error InvalidAllowListRequest(uint64 destChainSelector);
   error SenderNotAllowed(address sender);
   error CallerIsNotARampOnRouter(address caller);
+  error InvalidDestination(uint64 destChainSelector);
 
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
   event DestChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
@@ -28,15 +32,21 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   event StorageLocationUpdated(string oldLocation, string newLocation);
 
   struct DestChainConfig {
-    bool allowlistEnabled; // ─╮ True if the allowlist is enabled.
-    IRouter router; // ────────╯ Local router to use for messages going to this dest chain.
+    IRouter router; // ──────────╮ Local router to use for messages going to this dest chain.
+    uint16 feeUSDCents; //       │ The fee in US dollar cents for messages to this dest chain.
+    uint32 gasForVerification; //│ The gas to reserve for verification of messages on the dest chain.
+    uint32 payloadSizeBytes; //  │ The size of the verification payload on the dest chain.
+    bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
 
   struct DestChainConfigArgs {
     IRouter router; // ──────────╮ Local router to use for messages going to this dest chain.
     uint64 destChainSelector; // │ Destination chain selector.
-    bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
+    bool allowlistEnabled; //    │ True if the allowlist is enabled.
+    uint16 feeUSDCents; // ──────╯ The fee in US dollar cents for messages to this dest chain.
+    uint32 gasForVerification; // ─╮ The gas to reserve for verification of messages on the dest chain.
+    uint32 payloadSizeBytes; // ───╯ The size of the verification payload on the dest chain.
   }
 
   /// @dev Struct to hold the allowlist configuration args per dest chain.
@@ -66,7 +76,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   }
 
   /// @inheritdoc ICrossChainVerifierV1
-  function getStorageLocation() external view override returns (string memory) {
+  function getStorageLocation() external view virtual override returns (string memory) {
     return s_storageLocation;
   }
 
@@ -77,7 +87,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   /// @return allowedSendersList list of addresses that are allowed to send messages to the destination chain.
   function getDestChainConfig(
     uint64 destChainSelector
-  ) external view returns (bool allowlistEnabled, address router, address[] memory allowedSendersList) {
+  ) external view virtual returns (bool allowlistEnabled, address router, address[] memory allowedSendersList) {
     DestChainConfig storage config = _getDestChainConfig(destChainSelector);
     allowlistEnabled = config.allowlistEnabled;
     router = address(config.router);
@@ -87,7 +97,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   function _getDestChainConfig(
     uint64 destChainSelector
-  ) internal view returns (DestChainConfig storage) {
+  ) internal view virtual returns (DestChainConfig storage) {
     return s_destChainConfigs[destChainSelector];
   }
 
@@ -95,7 +105,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   /// @dev the function that calls this has to ensure proper access control is in place.
   function _applyDestChainConfigUpdates(
     DestChainConfigArgs[] memory destChainConfigArgs
-  ) internal {
+  ) internal virtual {
     for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
       DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
@@ -108,12 +118,22 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       // The router can be zero to pause the destination chain
       destChainConfig.router = destChainConfigArg.router;
       destChainConfig.allowlistEnabled = destChainConfigArg.allowlistEnabled;
+      destChainConfig.feeUSDCents = destChainConfigArg.feeUSDCents;
+      if (destChainConfigArg.gasForVerification == 0) {
+        revert DestGasCannotBeZero(destChainSelector);
+      }
+      destChainConfig.gasForVerification = destChainConfigArg.gasForVerification;
+      destChainConfig.payloadSizeBytes = destChainConfigArg.payloadSizeBytes;
 
       emit DestChainConfigSet(destChainSelector, address(destChainConfigArg.router), destChainConfig.allowlistEnabled);
     }
   }
 
-  function _assertSenderIsAllowed(uint64 destChainSelector, address sender, address verifierCaller) internal view {
+  function _assertSenderIsAllowed(
+    uint64 destChainSelector,
+    address sender,
+    address verifierCaller
+  ) internal view virtual {
     DestChainConfig storage destChainConfig = _getDestChainConfig(destChainSelector);
     // CCVs should query the OnRamp address from the router, this allows for OnRamp updates without touching CCVs
     // OnRamp address may be zero intentionally to pause, which should stop all messages.
@@ -132,7 +152,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   /// @param allowlistConfigArgsItems Array of AllowlistConfigArguments where each item is for a destChainSelector.
   function _applyAllowlistUpdates(
     AllowlistConfigArgs[] calldata allowlistConfigArgsItems
-  ) internal {
+  ) internal virtual {
     for (uint256 i = 0; i < allowlistConfigArgsItems.length; ++i) {
       AllowlistConfigArgs memory allowlistConfigArgs = allowlistConfigArgsItems[i];
 
@@ -167,10 +187,28 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     }
   }
 
+  /// @inheritdoc ICrossChainVerifierV1
+  function getFee(
+    address, // originalCaller
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage memory, // message
+    bytes memory, // extraArgs
+    uint16 // finalityConfig
+  ) external view virtual returns (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) {
+    if (s_destChainConfigs[destChainSelector].router == IRouter(address(0))) {
+      revert InvalidDestination(destChainSelector);
+    }
+    return (
+      s_destChainConfigs[destChainSelector].feeUSDCents,
+      s_destChainConfigs[destChainSelector].gasForVerification,
+      s_destChainConfigs[destChainSelector].payloadSizeBytes
+    );
+  }
+
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
   /// @param feeTokens The fee tokens to withdraw.
   /// @param feeAggregator The address to withdraw the fee tokens to.
-  function _withdrawFeeTokens(address[] calldata feeTokens, address feeAggregator) internal {
+  function _withdrawFeeTokens(address[] calldata feeTokens, address feeAggregator) internal virtual {
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       IERC20 feeToken = IERC20(feeTokens[i]);
       uint256 feeTokenBalance = feeToken.balanceOf(address(this));

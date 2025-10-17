@@ -143,17 +143,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   // │                             Fees                             │
   // ================================================================
 
-  /// @inheritdoc ICrossChainVerifierV1
-  function getFee(
-    address, // originalCaller
-    uint64, // destChainSelector
-    Client.EVM2AnyMessage memory, // message
-    bytes memory // extraArgs
-  ) external pure returns (uint256) {
-    // TODO: Process msg & return fee
-    return 0;
-  }
-
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
   /// @param feeTokens The fee tokens to withdraw.
   /// @dev This function can be permissionless as it only transfers tokens to the fee aggregator which is a trusted address.

@@ -41,7 +41,10 @@ contract e2e is OnRampSetup {
     destChainConfigs[0] = BaseVerifier.DestChainConfigArgs({
       router: s_sourceRouter,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      allowlistEnabled: false
+      allowlistEnabled: false,
+      feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
+      gasForVerification: DEFAULT_CCV_GAS_LIMIT,
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
     committeeVerifier.applyDestChainConfigUpdates(destChainConfigs);
 
@@ -102,7 +105,7 @@ contract e2e is OnRampSetup {
       bytes memory encodedMessage,
       OnRamp.Receipt[] memory verifierReceipts,
       OnRamp.Receipt memory executorReceipt,
-      bytes[] memory receiptBlobs
+      bytes[] memory verifierBlobs
     ) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -118,7 +121,7 @@ contract e2e is OnRampSetup {
       encodedMessage: encodedMessage,
       verifierReceipts: verifierReceipts,
       executorReceipt: executorReceipt,
-      receiptBlobs: receiptBlobs
+      verifierBlobs: verifierBlobs
     });
 
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
