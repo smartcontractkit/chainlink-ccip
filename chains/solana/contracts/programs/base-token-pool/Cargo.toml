@@ -1,6 +1,6 @@
 [package]
 name = "base-token-pool"
-version = "0.1.1"
+version = "1.6.0-candidate"
 description = "Created with Anchor"
 edition = "2021"
 
