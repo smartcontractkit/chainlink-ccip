@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -13,7 +14,9 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
@@ -26,8 +29,25 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/onramp"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
+
+type MockReceiverParams struct {
+	Version *semver.Version
+	// RequiredVerifiers are references to verifier contracts that are required.
+	// Note that these could be references to contracts that are either already deployed
+	// or will be deployed by the DeployChainContracts sequence.
+	RequiredVerifiers []datastore.AddressRef
+	// OptionalVerifiers are references to verifier contracts that are optional.
+	// Note that these could be references to contracts that are either already deployed
+	// or will be deployed by the DeployChainContracts sequence.
+	OptionalVerifiers []datastore.AddressRef
+	OptionalThreshold uint8
+	// Qualifier distinguishes between multiple deployments of the mock receiver on the same chain.
+	// If only one mock receiver is deployed this can be left blank.
+	Qualifier string
+}
 
 type RMNRemoteParams struct {
 	Version   *semver.Version
@@ -37,14 +57,6 @@ type RMNRemoteParams struct {
 type OffRampParams struct {
 	Version              *semver.Version
 	GasForCallExactCheck uint16
-}
-
-type CommitteeVerifierParams struct {
-	Version             *semver.Version
-	AllowlistAdmin      common.Address
-	FeeAggregator       common.Address
-	SignatureConfigArgs committee_verifier.SetSignatureConfigArgs
-	StorageLocation     string
 }
 
 type OnRampParams struct {
@@ -69,10 +81,11 @@ type ExecutorParams struct {
 type ContractParams struct {
 	RMNRemote         RMNRemoteParams
 	OffRamp           OffRampParams
-	CommitteeVerifier CommitteeVerifierParams
+	CommitteeVerifier []CommitteeVerifierParams
 	OnRamp            OnRampParams
 	FeeQuoter         FeeQuoterParams
 	Executor          ExecutorParams
+	MockReceivers     []MockReceiverParams
 }
 
 type DeployChainContractsInput struct {
@@ -92,7 +105,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
 
 		// Deploy WETH
-		wethRef, err := maybeDeployContract(b, weth.Deploy, chain, contract.DeployInput[weth.ConstructorArgs]{
+		wethRef, err := contract_utils.MaybeDeployContract(b, weth.Deploy, chain, contract.DeployInput[weth.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *semver.MustParse("1.0.0")),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
@@ -102,7 +115,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, wethRef)
 
 		// Deploy LINK
-		linkRef, err := maybeDeployContract(b, link.Deploy, chain, contract.DeployInput[link.ConstructorArgs]{
+		linkRef, err := contract_utils.MaybeDeployContract(b, link.Deploy, chain, contract.DeployInput[link.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(link.ContractType, *semver.MustParse("1.0.0")),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
@@ -112,7 +125,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, linkRef)
 
 		// Deploy RMNRemote
-		rmnRemoteRef, err := maybeDeployContract(b, rmn_remote.Deploy, chain, contract.DeployInput[rmn_remote.ConstructorArgs]{
+		rmnRemoteRef, err := contract_utils.MaybeDeployContract(b, rmn_remote.Deploy, chain, contract.DeployInput[rmn_remote.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_remote.ContractType, *input.ContractParams.RMNRemote.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
@@ -126,7 +139,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, rmnRemoteRef)
 
 		// Deploy RMNProxy
-		rmnProxyRef, err := maybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+		rmnProxyRef, err := contract_utils.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *semver.MustParse("1.0.0")),
 			ChainSelector:  chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
@@ -155,7 +168,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, setRMNReport.Output)
 
 		// Deploy Router
-		routerRef, err := maybeDeployContract(b, router.Deploy, chain, contract.DeployInput[router.ConstructorArgs]{
+		routerRef, err := contract_utils.MaybeDeployContract(b, router.Deploy, chain, contract.DeployInput[router.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *semver.MustParse("1.2.0")),
 			ChainSelector:  chain.Selector,
 			Args: router.ConstructorArgs{
@@ -169,7 +182,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, routerRef)
 
 		// Deploy TokenAdminRegistry
-		tokenAdminRegistryRef, err := maybeDeployContract(b, token_admin_registry.Deploy, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{
+		tokenAdminRegistryRef, err := contract_utils.MaybeDeployContract(b, token_admin_registry.Deploy, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *semver.MustParse("1.5.0")),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
@@ -179,7 +192,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, tokenAdminRegistryRef)
 
 		// Deploy FeeQuoter
-		feeQuoterRef, err := maybeDeployContract(b, fee_quoter.Deploy, chain, contract.DeployInput[fee_quoter.ConstructorArgs]{
+		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract.DeployInput[fee_quoter.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(fee_quoter.ContractType, *input.ContractParams.FeeQuoter.Version),
 			ChainSelector:  chain.Selector,
 			Args: fee_quoter.ConstructorArgs{
@@ -236,7 +249,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, updatePricesReport.Output)
 
 		// Deploy OffRamp
-		offRampRef, err := maybeDeployContract(b, offramp.Deploy, chain, contract.DeployInput[offramp.ConstructorArgs]{
+		offRampRef, err := contract_utils.MaybeDeployContract(b, offramp.Deploy, chain, contract.DeployInput[offramp.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(offramp.ContractType, *input.ContractParams.OffRamp.Version),
 			ChainSelector:  chain.Selector,
 			Args: offramp.ConstructorArgs{
@@ -254,7 +267,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, offRampRef)
 
 		// Deploy OnRamp
-		onRampRef, err := maybeDeployContract(b, onramp.Deploy, chain, contract.DeployInput[onramp.ConstructorArgs]{
+		onRampRef, err := contract_utils.MaybeDeployContract(b, onramp.Deploy, chain, contract.DeployInput[onramp.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(onramp.ContractType, *input.ContractParams.OnRamp.Version),
 			ChainSelector:  chain.Selector,
 			Args: onramp.ConstructorArgs{
@@ -274,50 +287,30 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, onRampRef)
 
-		// Deploy CommitteeVerifier
-		committeeVerifierRef, err := maybeDeployContract(b, committee_verifier.Deploy, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.ContractParams.CommitteeVerifier.Version),
-			ChainSelector:  chain.Selector,
-			Args: committee_verifier.ConstructorArgs{
-				DynamicConfig: committee_verifier.DynamicConfig{
-					FeeQuoter:      common.HexToAddress(feeQuoterRef.Address),
-					FeeAggregator:  input.ContractParams.CommitteeVerifier.FeeAggregator,
-					AllowlistAdmin: input.ContractParams.CommitteeVerifier.AllowlistAdmin,
-				},
-				StorageLocation: input.ContractParams.CommitteeVerifier.StorageLocation,
-			},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
+		// TODO: validate prior to deploying that qualifiers are unique?
+		var committeeVerifierRefs []datastore.AddressRef
+		var committeeVerifierBatchOps []mcms_types.BatchOperation
+		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifier {
+			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
+				ChainSelector:     chain.Selector,
+				ExistingAddresses: input.ExistingAddresses,
+				Params:            committeeVerifierParams,
+				FeeQuoter:         common.HexToAddress(feeQuoterRef.Address),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
+			}
+			addresses = append(addresses, report.Output.Addresses...)
+			for _, addr := range report.Output.Addresses {
+				if addr.Type == datastore.ContractType(committee_verifier.ContractType) {
+					committeeVerifierRefs = append(committeeVerifierRefs, addr)
+				}
+			}
+			committeeVerifierBatchOps = append(committeeVerifierBatchOps, report.Output.BatchOps...)
 		}
-		addresses = append(addresses, committeeVerifierRef)
-
-		// Set signature config on the CommitteeVerifier
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetSignatureConfigs, chain, contract.FunctionInput[committee_verifier.SetSignatureConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierRef.Address),
-			Args:          input.ContractParams.CommitteeVerifier.SignatureConfigArgs,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitteeVerifier: %w", err)
-		}
-		writes = append(writes, setSignatureConfigReport.Output)
-
-		// Deploy CommitteeVerifierProxy
-		committeeVerifierProxyRef, err := maybeDeployContract(b, committee_verifier.DeployProxy, chain, contract.DeployInput[committee_verifier.ProxyConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ProxyType, *semver.MustParse("1.7.0")),
-			ChainSelector:  chain.Selector,
-			Args: committee_verifier.ProxyConstructorArgs{
-				RampAddress: common.HexToAddress(committeeVerifierRef.Address),
-			},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierProxy: %w", err)
-		}
-		addresses = append(addresses, committeeVerifierProxyRef)
 
 		// Deploy Executor
-		ExecutorRef, err := maybeDeployContract(b, executor.Deploy, chain, contract.DeployInput[executor.ConstructorArgs]{
+		ExecutorRef, err := contract_utils.MaybeDeployContract(b, executor.Deploy, chain, contract.DeployInput[executor.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(executor.ContractType, *input.ContractParams.Executor.Version),
 			ChainSelector:  chain.Selector,
 			Args: executor.ConstructorArgs{
@@ -329,46 +322,96 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, ExecutorRef)
 
-		// Deploy MockReceiver (defines committee verifier as required)
-		// TODO: Replace with a more configurable receiver contract.
-		mockReceiver, err := maybeDeployContract(b, mock_receiver.Deploy, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *semver.MustParse("1.7.0")),
-			ChainSelector:  chain.Selector,
-			Args: mock_receiver.ConstructorArgs{
-				RequiredVerifiers: []common.Address{common.HexToAddress(committeeVerifierRef.Address)},
-			},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy MockReceiver: %w", err)
+		for _, mockReceiverParams := range input.ContractParams.MockReceivers {
+			requiredVerifiers, optionalVerifiers, err := getMockReceiverVerifiers(mockReceiverParams, addresses, input.ExistingAddresses)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get mock receiver verifiers: %w", err)
+			}
+			var qualifierPtr *string
+			if mockReceiverParams.Qualifier != "" {
+				qualifierPtr = &mockReceiverParams.Qualifier
+			}
+			deployReceiverReport, err := operations.ExecuteOperation(b, mock_receiver.Deploy, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
+				ChainSelector:  chain.Selector,
+				Args: mock_receiver.ConstructorArgs{
+					RequiredVerifiers: requiredVerifiers,
+					OptionalVerifiers: optionalVerifiers,
+					OptionalThreshold: mockReceiverParams.OptionalThreshold,
+				},
+				Qualifier: qualifierPtr,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy MockReceiver: %w", err)
+			}
+			addresses = append(addresses, deployReceiverReport.Output)
 		}
-		addresses = append(addresses, mockReceiver)
 
+		var batchOps []mcms_types.BatchOperation
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}
+		batchOps = append(batchOps, batchOp)
+		batchOps = append(batchOps, committeeVerifierBatchOps...)
 
 		return sequences.OnChainOutput{
 			Addresses: addresses,
-			BatchOps:  []mcms_types.BatchOperation{batchOp},
+			BatchOps:  batchOps,
 		}, nil
 	},
 )
 
-func maybeDeployContract[ARGS any](
-	b cldf_ops.Bundle,
-	op *cldf_ops.Operation[contract.DeployInput[ARGS], datastore.AddressRef, evm.Chain],
-	chain evm.Chain,
-	input contract.DeployInput[ARGS],
-	existingAddresses []datastore.AddressRef) (datastore.AddressRef, error) {
-	for _, ref := range existingAddresses {
-		if ref.Type == datastore.ContractType(input.TypeAndVersion.Type) {
-			return ref, nil
+// getMockReceiverVerifiers finds the required and optional verifier addresses given the mock receiver
+// params, the addresses of the newly deployed contracts, and the addresses of the existing contracts.
+func getMockReceiverVerifiers(
+	mockReceiverParams MockReceiverParams,
+	addresses []datastore.AddressRef,
+	existingAddresses []datastore.AddressRef,
+) (requiredVerifiers []common.Address, optionalVerifiers []common.Address, err error) {
+	// create a datastore in order to use the API.
+	ds := datastore.NewMemoryDataStore()
+	for _, ref := range append(addresses, existingAddresses...) {
+		// We ignore ErrAddressRefExists since a partial deployment could result in an address being in both
+		// addresses and existingAddresses due to the idempotent nature of the sequence.
+		if err := ds.Addresses().Add(ref); err != nil && !errors.Is(err, datastore.ErrAddressRefExists) {
+			return nil, nil, fmt.Errorf("failed to add address to datastore (%+v): %w", ref, err)
 		}
 	}
-	report, err := cldf_ops.ExecuteOperation(b, op, chain, input)
-	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s %s: %w", input.TypeAndVersion.Type, op.Def().Version, err)
+	sealed := ds.Seal()
+	for _, ref := range mockReceiverParams.RequiredVerifiers {
+		address, err := datastore_utils.FindAndFormatRef(sealed, ref, ref.ChainSelector, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return nil, nil, fmt.Errorf(
+				"failed to find required verifier (%+v) in datastore containing existing and newly deployed addresses: %w",
+				ref,
+				err)
+		}
+		requiredVerifiers = append(requiredVerifiers, address)
 	}
-	return report.Output, nil
+	for _, ref := range mockReceiverParams.OptionalVerifiers {
+		address, err := datastore_utils.FindAndFormatRef(sealed, ref, ref.ChainSelector, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return nil, nil, fmt.Errorf(
+				"failed to find optional verifier (%+v) in datastore containing existing and newly deployed addresses: %w",
+				ref,
+				err)
+		}
+		optionalVerifiers = append(optionalVerifiers, address)
+	}
+	if len(requiredVerifiers) != len(mockReceiverParams.RequiredVerifiers) {
+		return nil, nil, fmt.Errorf("not all required verifiers found, got %d (%+v), expected %d (%+v)",
+			len(requiredVerifiers),
+			requiredVerifiers,
+			len(mockReceiverParams.RequiredVerifiers),
+			mockReceiverParams.RequiredVerifiers)
+	}
+	if len(optionalVerifiers) != len(mockReceiverParams.OptionalVerifiers) {
+		return nil, nil, fmt.Errorf("not all optional verifiers found, got %d (%+v), expected %d (%+v)",
+			len(optionalVerifiers),
+			optionalVerifiers,
+			len(mockReceiverParams.OptionalVerifiers),
+			mockReceiverParams.OptionalVerifiers)
+	}
+	return requiredVerifiers, optionalVerifiers, nil
 }
