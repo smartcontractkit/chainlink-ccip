@@ -26,6 +26,12 @@ type CommitteeVerifierDestChainConfig struct {
 	AddedAllowlistedSenders []common.Address
 	// Addresses that are no longer allowed to send messages TO the remote chain
 	RemovedAllowlistedSenders []common.Address
+	// The fee in USD cents charged for verification on the remote chain
+	FeeUSDCents uint16
+	// The gas required to execute the verification call on the destination chain. Used in billing.
+	GasForVerification uint32
+	// The size of the CCV specific payload in bytes. Used in billing.
+	PayloadSizeBytes uint32
 }
 
 type RemoteChainConfig struct {
@@ -106,9 +112,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				OffRamp:           remoteConfig.CCIPMessageDest,
 			})
 			committeeVerifierDestConfigArgs = append(committeeVerifierDestConfigArgs, committee_verifier.DestChainConfigArgs{
-				Router:            input.Router,
-				DestChainSelector: remoteSelector,
-				AllowlistEnabled:  remoteConfig.CommitteeVerifierDestChainConfig.AllowlistEnabled,
+				Router:             input.Router,
+				DestChainSelector:  remoteSelector,
+				AllowlistEnabled:   remoteConfig.CommitteeVerifierDestChainConfig.AllowlistEnabled,
+				FeeUSDCents:        remoteConfig.CommitteeVerifierDestChainConfig.FeeUSDCents,
+				GasForVerification: remoteConfig.CommitteeVerifierDestChainConfig.GasForVerification,
+				PayloadSizeBytes:   remoteConfig.CommitteeVerifierDestChainConfig.PayloadSizeBytes,
 			})
 			committeeVerifierAllowlistArgs = append(committeeVerifierAllowlistArgs, committee_verifier.AllowlistConfigArgs{
 				AllowlistEnabled:          remoteConfig.CommitteeVerifierDestChainConfig.AllowlistEnabled,

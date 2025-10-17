@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
-import {Client} from "../../libraries/Client.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
 /// @notice Test helper contract to expose BaseVerifier's internal functions for testing

@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 
-import {Client} from "../libraries/Client.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {SignatureQuorumValidator} from "./components/SignatureQuorumValidator.sol";
