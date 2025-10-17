@@ -102,18 +102,13 @@ library Client {
     bytes32[] receiverObjectIds;
   }
 
-  /// @dev The expected static payload size of a token transfer when Borsh encoded and submitted to SUI.
+  /// @dev The expected static payload size of a token transfer when BCS encoded and submitted to SUI.
   /// TokenPool extra data and offchain data sizes are dynamic, and should be accounted for separately.
-  uint256 public constant SUI_TOKEN_TRANSFER_DATA_OVERHEAD = (4 + 32) // source_pool
-    + 32 // token_address
-    + 4 // gas_amount
-    + 4 // extra_data overhead
-    + 32 // amount
-    + 32 // size of the token lookup table account
-    + 32 // token-related accounts in the lookup table, over-estimated to 32, typically between 11 - 13
-    + 32 // token account belonging to the token receiver, e.g ATA, not included in the token lookup table
-    + 32 // per-chain token pool config, not included in the token lookup table
-    + 32; // per-chain token billing config, not always included in the token lookup table
+  uint256 public constant SUI_TOKEN_TRANSFER_DATA_OVERHEAD = (4 + 32) // source_pool, 4 bytes for length, 32 bytes for address
+    + 32 // dest_token_address
+    + 4 // dest_gas_amount
+    + 4 // extra_data length, the contents are calculated separately
+    + 32; // amount
 
   /// @dev Number of overhead accounts needed for message execution on SUI.
   /// @dev This is the message.receiver.

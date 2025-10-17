@@ -3,13 +3,14 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"sync/atomic"
 	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -102,7 +103,7 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 	}
 
 	cdp.lggr.Debugw("about to discover contracts", "supportedChains", supportedChains)
-	contracts, err := (*cdp.reader).DiscoverContracts(ctx, supportedChains, maps.Keys(chainConfigs))
+	contracts, err := (*cdp.reader).DiscoverContracts(ctx, supportedChains, slices.Collect(maps.Keys(chainConfigs)))
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w, seqNr: %d", err, seqNr)
 	}

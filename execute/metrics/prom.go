@@ -3,13 +3,14 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -187,7 +188,7 @@ func (p *PromReporter) TrackObservation(obs exectypes.Observation, state exectyp
 	p.trackOutputStats(obs, state, plugincommon.ObservationMethod)
 
 	for sourceChainSelector, cr := range obs.Messages {
-		maxSeqNr := pickHighestSeqNr(maps.Keys(cr))
+		maxSeqNr := pickHighestSeqNr(slices.Collect(maps.Keys(cr)))
 		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.ObservationMethod)
 		p.trackLatestRoundID(round, sourceChainSelector, plugincommon.OutcomeMethod)
 	}
