@@ -23,7 +23,7 @@ build: ensure_go_version
 
 # If you have a different version of protoc installed, you can use the following command to generate the protobuf files
 # make generate PROTOC_BIN=/path/to/protoc
-generate: ensure_go_version clean-generate proto-generate generate-mocks
+generate: ensure_go_version clean-generate proto-generate generate-mocks modgraph
 
 generate-mocks: ensure_go_version
 	go install github.com/vektra/mockery/v2@v2.52.3
@@ -104,3 +104,13 @@ install_buf:
 
 ensure_buf_version:
 	@$(BUF_BIN) --version | grep -q '1.50.0' || (echo "Please use buf 1.50.0" && exit 1)
+
+gomods: ## Install gomods
+	go install github.com/jmank88/gomods@v0.1.7
+
+gomodtidy: gomods
+	gomods tidy
+
+modgraph: gomods
+	go install github.com/jmank88/modgraph@v0.1.1
+	./modgraph > go.md

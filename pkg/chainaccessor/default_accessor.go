@@ -3,11 +3,10 @@ package chainaccessor
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"time"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -625,8 +624,7 @@ func createExecutedMessagesKeyFilter(
 	var countSqNrs uint64
 	// final query should look like
 	// (chainA && (sqRange1 || sqRange2 || ...)) || (chainB && (sqRange1 || sqRange2 || ...))
-	sortedChains := maps.Keys(rangesPerChain)
-	slices.Sort(sortedChains)
+	sortedChains := slices.Sorted(maps.Keys(rangesPerChain))
 	for _, srcChain := range sortedChains {
 		seqNumRanges := rangesPerChain[srcChain]
 		var seqRangeExpressions []query.Expression
@@ -686,8 +684,7 @@ func (l *DefaultAccessor) Nonces(
 	lggr := logutil.WithContextValues(ctx, l.lggr)
 
 	// sort the input to ensure deterministic results
-	sortedChains := maps.Keys(addressesByChain)
-	slices.Sort(sortedChains)
+	sortedChains := slices.Sorted(maps.Keys(addressesByChain))
 
 	// create the structure that will contain our result
 	res := make(map[cciptypes.ChainSelector]map[string]uint64)

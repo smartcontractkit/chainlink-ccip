@@ -11,6 +11,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "NonceManager"
+var Version *semver.Version = semver.MustParse("1.6.0")
 
 type ConstructorArgs struct {
 	AuthorizedCallers []common.Address

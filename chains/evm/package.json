@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/contracts-ccip",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Chainlink smart contracts for CCIP",
   "author": "Chainlink devs",
   "repository": "github:smartcontractkit/chainlink-ccip",
@@ -20,7 +20,6 @@
     "contracts/v1.5-CCIP-License-grants.md",
     "!contracts/test/**/*",
     "contracts/test/mocks/**/*",
-    "!contracts/test/mocks/test/*",
     "contracts/test/helpers/**/*",
     "!contracts/poolsV2/**/*",
     "!contracts/ccvs/**/*",
@@ -35,7 +34,8 @@
     "!contracts/libraries/MessageV1Codec.sol",
     "!contracts/libraries/CCVConfigValidation.sol",
     "scripts/compile_all",
-    "abi/*.abi.json",
+    "abi",
+    "bytecode",
     "remappings.txt",
     ".solhint.json",
     ".solhint-test.json",
@@ -50,8 +50,8 @@
     "@chainlink/contracts": "1.5.0",
     "@changesets/cli": "^2.29.7",
     "@changesets/get-github-info": "^0.6.0",
-    "@openzeppelin/contracts-4.8.3/": "npm:@openzeppelin/contracts@4.8.3",
-    "@openzeppelin/contracts-5.0.2/": "npm:@openzeppelin/contracts@5.0.2",
+    "@openzeppelin/contracts-4.8.3": "npm:@openzeppelin/contracts@4.8.3",
+    "@openzeppelin/contracts-5.0.2": "npm:@openzeppelin/contracts@5.0.2",
     "semver": "^7.7.2"
   },
   "devDependencies": {
