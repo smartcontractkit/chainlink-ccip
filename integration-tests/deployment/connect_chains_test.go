@@ -1,0 +1,228 @@
+package deployment
+
+import (
+	"encoding/hex"
+	"math/big"
+	"testing"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/gagliardetto/solana-go"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	evm_changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/changesets"
+	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	evmofframpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/changesets"
+	solana_changesets "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/changesets"
+	solanafqqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
+	solanaofframpops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
+	tokenops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
+	solanasequences "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/stretchr/testify/require"
+
+	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment"
+	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+)
+
+func checkBidirectionalLaneConnectivity(
+	t *testing.T,
+	e *fdeployment.Environment,
+	solanaChain lanesapi.ChainDefinition,
+	evmChain lanesapi.ChainDefinition,
+	solanaAdapter lanesapi.LaneAdapter,
+	evmAdapter lanesapi.LaneAdapter,
+	testRouter bool,
+	disable bool,
+) {
+	// Solana Validation
+	var offRampSourceChain ccip_offramp.SourceChain
+	var destChainStateAccount ccip_router.DestChain
+	var destChainFqAccount fee_quoter.DestChain
+	var offRampEvmSourceChainPDA solana.PublicKey
+	var evmDestChainStatePDA solana.PublicKey
+	var fqEvmDestChainPDA solana.PublicKey
+	feeQuoterOnSrcAddr, err := solanaAdapter.GetFQAddress(e, solanaChain.Selector)
+	require.NoError(t, err, "must get feeQuoter from srcAdapter")
+	routerOnSrcAddr, err := solanaAdapter.GetRouterAddress(e, solanaChain.Selector)
+	require.NoError(t, err, "must get router from srcAdapter")
+	offRampOnSrcAddr, err := solanaAdapter.GetOffRampAddress(e, solanaChain.Selector)
+	require.NoError(t, err, "must get offRamp from srcAdapter")
+
+	offRampEvmSourceChainPDA, _, _ = state.FindOfframpSourceChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(offRampOnSrcAddr))
+	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
+	require.NoError(t, err)
+	require.Equal(t, !disable, offRampSourceChain.Config.IsEnabled)
+
+	evmDestChainStatePDA, _ = state.FindDestChainStatePDA(evmChain.Selector, solana.PublicKeyFromBytes(routerOnSrcAddr))
+	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), evmDestChainStatePDA, &destChainStateAccount)
+	require.NoError(t, err)
+	require.Equal(t, solanaChain.AllowListEnabled, destChainStateAccount.Config.AllowListEnabled)
+
+	fqEvmDestChainPDA, _, _ = state.FindFqDestChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(feeQuoterOnSrcAddr))
+	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
+	require.NoError(t, err, "failed to get account info")
+	require.Equal(t, !disable, destChainFqAccount.Config.IsEnabled)
+
+	// EVM Validation
+	feeQuoterOnDestAddr, err := evmAdapter.GetFQAddress(e, evmChain.Selector)
+	require.NoError(t, err, "must get feeQuoter from srcAdapter")
+	feeQuoterOnDest, err := evmfq.NewFeeQuoter(common.BytesToAddress(feeQuoterOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
+	require.NoError(t, err, "must instantiate feeQuoter")
+
+	onRampDestAddr, err := evmAdapter.GetOnRampAddress(e, evmChain.Selector)
+	require.NoError(t, err, "must get onRamp from destAdapter")
+	onRampDest, err := onramp.NewOnRamp(common.BytesToAddress(onRampDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
+	require.NoError(t, err, "must instantiate onRamp")
+
+	offRampDestAddr, err := evmAdapter.GetOffRampAddress(e, evmChain.Selector)
+	require.NoError(t, err, "must get offRamp from destAdapter")
+	offRampDest, err := offramp.NewOffRamp(common.BytesToAddress(offRampDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
+	require.NoError(t, err, "must instantiate offRamp")
+
+	routerOnDestAddr, err := evmAdapter.GetRouterAddress(e, evmChain.Selector)
+	require.NoError(t, err, "must get router from destAdapter")
+	// routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
+	// require.NoError(t, err, "must instantiate router")
+
+	destChainConfig, err := onRampDest.GetDestChainConfig(nil, solanaChain.Selector)
+	require.NoError(t, err, "must get dest chain config from onRamp")
+	routerAddr := routerOnDestAddr
+	if disable {
+		routerAddr = common.HexToAddress("0x0").Bytes()
+	}
+	require.Equal(t, routerAddr, destChainConfig.Router.Bytes(), "router must equal expected")
+	require.Equal(t, evmChain.AllowListEnabled, destChainConfig.AllowlistEnabled, "allowListEnabled must equal expected")
+
+	srcChainConfig, err := offRampDest.GetSourceChainConfig(nil, solanaChain.Selector)
+	require.NoError(t, err, "must get src chain config from offRamp")
+	require.Equal(t, !disable, srcChainConfig.IsEnabled, "isEnabled must be expected")
+	require.Equal(t, !solanaChain.RMNVerificationEnabled, srcChainConfig.IsRMNVerificationDisabled, "rmnVerificationDisabled must equal expected")
+	require.Equal(t, routerOnSrcAddr, srcChainConfig.OnRamp, "remote onRamp must be set on offRamp")
+	// require.Equal(t, routerOnSrcAddr, srcChainConfig.Router.Bytes(), "router must equal expected")
+
+	// isOffRamp, err := routerOnDest.IsOffRamp(nil, solanaChain.Selector, common.Address(offRampOnSrcAddr))
+	// require.NoError(t, err, "must check if router has offRamp")
+	// require.Equal(t, !disable, isOffRamp, "isOffRamp result must equal expected")
+	// onRampOnRouter, err := routerOnDest.GetOnRamp(nil, solanaChain.Selector)
+	// require.NoError(t, err, "must get onRamp from router")
+	// onRampAddr := routerOnSrcAddr
+	// if disable {
+	// 	onRampAddr = common.HexToAddress("0x0").Bytes()
+	// }
+	// require.Equal(t, onRampAddr, onRampOnRouter.Bytes(), "onRamp must equal expected")
+
+	feeQuoterDestConfig, err := feeQuoterOnDest.GetDestChainConfig(nil, solanaChain.Selector)
+	require.NoError(t, err, "must get dest chain config from feeQuoter")
+	require.Equal(t, sequences.TranslateFQ(solanaChain.FeeQuoterDestChainConfig), feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
+
+	price, err := feeQuoterOnDest.GetDestinationChainGasPrice(nil, solanaChain.Selector)
+	require.NoError(t, err, "must get price from feeQuoter")
+	require.Equal(t, solanaChain.GasPrice, price.Value, "price must equal expected")
+}
+
+func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
+	t.Parallel()
+	programsPath, ds, err := PreloadSolanaEnvironment(chain_selectors.SOLANA_MAINNET.Selector)
+	require.NoError(t, err, "Failed to set up Solana environment")
+	require.NotNil(t, ds, "Datastore should be created")
+
+	evmChains := []uint64{
+		chain_selectors.ETHEREUM_MAINNET.Selector,
+	}
+	solanaChains := []uint64{
+		chain_selectors.SOLANA_MAINNET.Selector,
+	}
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, evmChains),
+		environment.WithSolanaContainer(t, solanaChains, programsPath, solanaProgramIDs),
+	)
+	require.NoError(t, err, "Failed to create test environment")
+	require.NotNil(t, e, "Environment should be created")
+	e.DataStore = ds.Seal() // Add preloaded contracts to env datastore
+
+	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+	for _, chainSel := range evmChains {
+		out, err := evm_changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[evm_changesets.DeployChainContractsCfg]{
+			MCMS: mcms.Input{},
+			Cfg: evm_changesets.DeployChainContractsCfg{
+				ChainSel: chainSel,
+				Params: evmsequences.ContractParams{
+					FeeQuoter: evmfqops.DefaultFeeQuoterParams(),
+					OffRamp:   evmofframpops.DefaultOffRampParams(),
+				},
+			},
+		})
+		require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+		out.DataStore.Merge(e.DataStore)
+		e.DataStore = out.DataStore.Seal()
+	}
+	for _, chainSel := range solanaChains {
+		mint, _ := solana.NewRandomPrivateKey()
+		out, err := solana_changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+			MCMS: mcms.Input{},
+			Cfg: solana_changesets.DeployChainContractsCfg{
+				ChainSel: chainSel,
+				Params: solanasequences.ContractParams{
+					FeeQuoter: solanafqqops.DefaultParams(),
+					OffRamp:   solanaofframpops.DefaultParams(),
+					LinkToken: tokenops.Params{
+						TokenPrivKey:  mint,
+						TokenDecimals: 9,
+					},
+				},
+			},
+		})
+		require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+		out.DataStore.Merge(e.DataStore)
+		e.DataStore = out.DataStore.Seal()
+	}
+	evmEncoded, err := hex.DecodeString(ccipapi.EVMFamilySelector)
+	require.NoError(t, err, "Failed to decode EVM family selector")
+	svmEncoded, err := hex.DecodeString(ccipapi.SVMFamilySelector)
+	require.NoError(t, err, "Failed to decode SVM family selector")
+	laneVersion := semver.MustParse("1.6.0")
+	chain1 := lanesapi.ChainDefinition{
+		Selector:                 chain_selectors.SOLANA_MAINNET.Selector,
+		GasPrice:                 big.NewInt(1e17),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, svmEncoded),
+	}
+	chain2 := lanesapi.ChainDefinition{
+		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
+		GasPrice:                 big.NewInt(1e9),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
+	}
+
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+		Lanes: []lanesapi.LaneConfig{
+			{
+				Version: laneVersion,
+				Source:  chain1,
+				Dest:    chain2,
+			},
+		},
+	})
+	require.NoError(t, err, "Failed to apply ConnectChains changeset")
+	laneRegistry := lanesapi.GetLaneAdapterRegistry()
+	srcFamily, err := chain_selectors.GetSelectorFamily(chain1.Selector)
+	require.NoError(t, err, "must get selector family for src")
+	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, laneVersion)
+	require.True(t, exists, "must have ChainAdapter registered for src chain family")
+	destFamily, err := chain_selectors.GetSelectorFamily(chain2.Selector)
+	require.NoError(t, err, "must get selector family for dest")
+	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, laneVersion)
+	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
+	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
+}
