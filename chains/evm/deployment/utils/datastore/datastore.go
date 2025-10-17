@@ -4,8 +4,10 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 // ToEVMAddress formats a datastore.AddressRef into an ethereum common.Address.
@@ -26,4 +28,15 @@ func ToPaddedEVMAddress(ref datastore.AddressRef) (paddedAddress []byte, err err
 		return nil, err
 	}
 	return common.LeftPadBytes(addr.Bytes(), 32), nil
+}
+
+func AddressRefOnChain(e cldf.Environment, selector uint64, ref datastore.AddressRef) (common.Address, error) {
+	addressRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, selector, datastore_utils.FullRef)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to resolve address ref on chain with selector %d: %w", selector, err)
+	}
+	if addressRef.Address == "" {
+		return common.Address{}, fmt.Errorf("address ref resolved to empty address on chain %d for ref %v", selector, addressRef)
+	}
+	return common.HexToAddress(addressRef.Address), nil
 }
