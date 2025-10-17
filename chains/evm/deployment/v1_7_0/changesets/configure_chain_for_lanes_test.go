@@ -79,7 +79,12 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 								Version: semver.MustParse("1.7.0"),
 							},
 							CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{
-								AllowlistEnabled: false,
+								AllowlistEnabled:          false,
+								AddedAllowlistedSenders:   nil,
+								RemovedAllowlistedSenders: nil,
+								FeeUSDCents:               50,
+								GasForVerification:        50_000,
+								PayloadSizeBytes:          6*64 + 2*32,
 							},
 							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
 						},

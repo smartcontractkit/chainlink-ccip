@@ -65,7 +65,7 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
     bytes memory signatures = _createSignatures(signerKeys, TEST_HASH);
 
     // Change chain ID to simulate fork.
-    uint256 originalChainId = block.chainid;
+    uint256 originalChainId = uint128(block.chainid);
     uint256 newChainId = originalChainId + 100000;
     vm.chainId(newChainId);
 

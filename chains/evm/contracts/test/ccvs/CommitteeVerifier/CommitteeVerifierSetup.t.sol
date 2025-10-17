@@ -28,7 +28,10 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
     destChainConfigs[0] = BaseVerifier.DestChainConfigArgs({
       router: s_router,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      allowlistEnabled: false
+      allowlistEnabled: false,
+      feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
+      gasForVerification: DEFAULT_CCV_GAS_LIMIT,
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
 
     s_committeeVerifier.applyDestChainConfigUpdates(destChainConfigs);

@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 
-import {Client} from "../libraries/Client.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {SignatureQuorumValidator} from "./components/SignatureQuorumValidator.sol";
@@ -142,17 +141,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   // ================================================================
   // │                             Fees                             │
   // ================================================================
-
-  /// @inheritdoc ICrossChainVerifierV1
-  function getFee(
-    address, // originalCaller
-    uint64, // destChainSelector
-    Client.EVM2AnyMessage memory, // message
-    bytes memory // extraArgs
-  ) external pure returns (uint256) {
-    // TODO: Process msg & return fee
-    return 0;
-  }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
   /// @param feeTokens The fee tokens to withdraw.
