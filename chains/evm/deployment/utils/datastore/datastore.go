@@ -19,6 +19,15 @@ func ToEVMAddress(ref datastore.AddressRef) (commonAddress common.Address, err e
 	return common.HexToAddress(ref.Address), nil
 }
 
+// ToPaddedEVMAddressBytes formats a datastore.AddressRef into a 20-byte ethereum address, padded to 32 bytes.
+func ToPaddedEVMAddressBytes(ref datastore.AddressRef) (paddedAddress []byte, err error) {
+	addr, err := ToEVMAddress(ref)
+	if err != nil {
+		return nil, err
+	}
+	return common.LeftPadBytes(addr.Bytes(), 32), nil
+}
+
 // ToEVMAddressBytes formats a datastore.AddressRef into a 20-byte ethereum address.
 func ToEVMAddressBytes(ref datastore.AddressRef) (paddedAddress []byte, err error) {
 	addr, err := ToEVMAddress(ref)

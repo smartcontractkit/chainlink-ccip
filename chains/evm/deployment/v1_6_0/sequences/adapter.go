@@ -31,7 +31,7 @@ func (a *EVMAdapter) GetOnRampAddress(e *cldf.Environment, chainSelector uint64)
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onramp.ContractType),
 		Version:       onramp.Version,
-	}, chainSelector, evm_datastore_utils.ToPaddedEVMAddress)
+	}, chainSelector, evm_datastore_utils.ToPaddedEVMAddressBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (a *EVMAdapter) GetOffRampAddress(e *cldf.Environment, chainSelector uint64
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(offramp.ContractType),
 		Version:       offramp.Version,
-	}, chainSelector, evm_datastore_utils.ToByteArray)
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (a *EVMAdapter) GetFQAddress(e *cldf.Environment, chainSelector uint64) ([]
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(fee_quoter.ContractType),
 		Version:       fee_quoter.Version,
-	}, chainSelector, evm_datastore_utils.ToByteArray)
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (a *EVMAdapter) GetRouterAddress(e *cldf.Environment, chainSelector uint64)
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),
 		Version:       router.Version,
-	}, chainSelector, evm_datastore_utils.ToByteArray)
+	}, chainSelector, evm_datastore_utils.ToPaddedEVMAddressBytes)
 	if err != nil {
 		return nil, err
 	}
