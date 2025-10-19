@@ -14,6 +14,8 @@ const (
 	ProposerManyChainMultisig  cldf.ContractType = "ProposerManyChainMultiSig"
 	RBACTimelock               cldf.ContractType = "RBACTimelock"
 	CallProxy                  cldf.ContractType = "CallProxy"
+	// CLL Identifiers
+	CLLQualifier = "CLL"
 )
 
 var (

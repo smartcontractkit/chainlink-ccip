@@ -6,11 +6,14 @@ replace (
 	// Make sure we're working with the latest chainlink-ccip
 	github.com/smartcontractkit/chainlink-ccip => ..
 
-	// Make sure we're working with the latest chainlink-ccip/deployment
+	// Make sure we're working with the latest chainlink-ccip/chains/evm/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => ../chains/evm/deployment
 
-	// Make sure we're working with the latest chainlink-ccip/deployment
+	// Make sure we're working with the latest chainlink-ccip/chains/solana/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
+
+	// Make sure we're working with the latest chainlink-ccip/chains/solana
+	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
 
 	// Make sure we're working with the latest chainlink-ccip/deployment
 	github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment
