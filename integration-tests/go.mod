@@ -9,11 +9,11 @@ replace (
 	// Make sure we're working with the latest chainlink-ccip/chains/evm/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => ../chains/evm/deployment
 
-	// Make sure we're working with the latest chainlink-ccip/chains/solana/deployment
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
-
 	// Make sure we're working with the latest chainlink-ccip/chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
+
+	// Make sure we're working with the latest chainlink-ccip/chains/solana/deployment
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
 
 	// Make sure we're working with the latest chainlink-ccip/deployment
 	github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment
@@ -21,6 +21,7 @@ replace (
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
+	github.com/aws/smithy-go v1.22.5
 	github.com/ethereum/go-ethereum v1.16.2
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/smartcontractkit/chain-selectors v1.0.72
@@ -53,7 +54,6 @@ require (
 	github.com/avast/retry-go/v4 v4.6.1 // indirect
 	github.com/awalterschulze/gographviz v2.0.3+incompatible // indirect
 	github.com/aws/aws-sdk-go v1.55.7 // indirect
-	github.com/aws/smithy-go v1.22.5 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
