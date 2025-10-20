@@ -98,10 +98,10 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
 
     address[] memory result = s_onRampTestHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
 
-    assertEq(result.length, poolCCVs.length, "Should preserve address(0) sentinel for merge step");
-    assertEq(result[0], poolCCVs[0], "First CCV should match");
-    assertEq(result[1], address(0), "Sentinel should be present");
-    assertEq(result[2], poolCCVs[2], "Third CCV should match");
+    assertEq(result.length, poolCCVs.length, "Should substitute defaults for sentinel while preserving other CCVs");
+    assertEq(result[0], poolCCVs[0], "First CCV should remain the pool requirement");
+    assertEq(result[1], poolCCVs[2], "Second CCV should be the remaining pool requirement");
+    assertEq(result[2], s_helperDefaultCCV, "Defaults should be appended once per sentinel");
   }
 
   function _deployPoolV2(

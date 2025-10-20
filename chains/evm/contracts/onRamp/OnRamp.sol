@@ -14,7 +14,6 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
-import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
@@ -22,13 +21,13 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 // TODO post process hooks?
 contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
-  using ERC165CheckerReverting for address;
   using USDPriceWith18Decimals for uint224;
 
   error CannotSendZeroTokens();
@@ -219,9 +218,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       );
     }
 
-    resolvedExtraArgs.ccvs = _mergeCCVLists(
-      resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs, destChainConfig.defaultCCVs
-    );
+    resolvedExtraArgs.ccvs = _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
 
     // 3. getFee on all verifiers & executor.
 
@@ -301,18 +298,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param userRequestedOrDefaultCCVs User-provided required CCVs. Can not be empty, as defaults are applied earlier
   /// if needed. This list does not only contain addresses, but also arguments
   /// @param laneMandatedCCVs Lane mandated CCVs are always added, regardless of what a user/pool chooses. Can be empty.
-  /// @param poolRequiredCCVs Pool-specific required CCVs. Can be empty or contain address(0).
-  /// @param defaultCCVs Default CCVs to configured for the destination chain.
+  /// @param poolRequiredCCVs Pool-specific required CCVs. Can be empty. Any address(0) sentinels should already have
+  /// been resolved to the concrete default list by `_getCCVsForPool`.
   /// @return ccvs Updated list of CCVs.
   function _mergeCCVLists(
     Client.CCV[] memory userRequestedOrDefaultCCVs,
     address[] memory laneMandatedCCVs,
-    address[] memory poolRequiredCCVs,
-    address[] memory defaultCCVs
+    address[] memory poolRequiredCCVs
   ) internal pure returns (Client.CCV[] memory ccvs) {
-    // Maximum possible CCVs: user + lane + pool + defaults (in case pool signals with address(0)).
-    uint256 totalCCVs =
-      userRequestedOrDefaultCCVs.length + laneMandatedCCVs.length + poolRequiredCCVs.length + defaultCCVs.length;
+    // Maximum possible CCVs: user + lane + pool.
+    uint256 totalCCVs = userRequestedOrDefaultCCVs.length + laneMandatedCCVs.length + poolRequiredCCVs.length;
     ccvs = new Client.CCV[](totalCCVs);
     uint256 toBeAddedIndex = 0;
 
@@ -335,33 +330,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
     }
 
-    // Pool requirements may include address(0) to request defaults alongside custom verifiers. Track whether we have
-    // already materialised the defaults so repeated sentinels are ignored and ordering stays deterministic.
-    bool defaultsAdded = false;
-    // Merge pool-provided CCVs last so user-specified args are preserved. Defaults are only appended when the pool
-    // explicitly asks for them via address(0) or when `_getCCVsForPool` already substituted the default list.
     for (uint256 i = 0; i < poolRequiredCCVs.length; ++i) {
       address poolRequiredCCV = poolRequiredCCVs[i];
-
-      // Pool uses address(0) to include defaults alongside the custom requirements.
-      if (poolRequiredCCV == address(0)) {
-        if (!defaultsAdded) {
-          for (uint256 defaultCCVIndex = 0; defaultCCVIndex < defaultCCVs.length; ++defaultCCVIndex) {
-            bool defaultFound = false;
-            for (uint256 j = 0; j < toBeAddedIndex; ++j) {
-              if (ccvs[j].ccvAddress == defaultCCVs[defaultCCVIndex]) {
-                defaultFound = true;
-                break;
-              }
-            }
-            if (!defaultFound) {
-              ccvs[toBeAddedIndex++] = Client.CCV({ccvAddress: defaultCCVs[defaultCCVIndex], args: ""});
-            }
-          }
-          defaultsAdded = true;
-        }
-        continue;
-      }
 
       bool found = false;
       for (uint256 j = 0; j < toBeAddedIndex; ++j) {
@@ -598,15 +568,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   }
 
   /// @notice Gets the required CCVs from the pool for token transfers.
-  /// @dev Returns exactly what the pool specifies, including address(0) if present.
-  /// The caller (_mergeCCVLists) is responsible for interpreting address(0) as a signal to use defaults.
+  /// @dev Resolves address(0) returned by the pool into the destination defaults.
   /// If the pool does not specify any CCVs, we fall back to the default CCVs.
   /// @param destChainSelector The destination chain selector.
   /// @param token The token address being transferred.
   /// @param amount The amount of tokens being transferred.
   /// @param finality The finality configuration from the message.
   /// @param tokenArgs Additional token arguments from the message.
-  /// @return requiredCCVs The list of CCV addresses the pool requires (may include address(0)).
+  /// @return requiredCCVs The list of CCV addresses the pool requires with defaults expanded if requested.
   function _getCCVsForPool(
     uint64 destChainSelector,
     address token,
@@ -614,22 +583,48 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint16 finality,
     bytes memory tokenArgs
   ) internal view returns (address[] memory requiredCCVs) {
+    address[] memory defaultCCVs = s_destChainConfigs[destChainSelector].defaultCCVs;
     IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(token));
 
-    if (address(pool)._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
+    if (IERC165(pool).supportsInterface(type(IPoolV2).interfaceId)) {
       requiredCCVs = IPoolV2(address(pool)).getRequiredCCVs(
         token, destChainSelector, amount, finality, tokenArgs, IPoolV2.CCVDirection.Outbound
       );
 
       if (requiredCCVs.length != 0) {
-        return requiredCCVs;
+        bool includeDefaults = false;
+        uint256 nonZeroCount = 0;
+        for (uint256 i = 0; i < requiredCCVs.length; ++i) {
+          if (requiredCCVs[i] == address(0)) {
+            includeDefaults = true;
+          } else {
+            ++nonZeroCount;
+          }
+        }
+
+        if (!includeDefaults) {
+          return requiredCCVs;
+        }
+
+        address[] memory resolvedCCVs = new address[](nonZeroCount + defaultCCVs.length);
+        uint256 writeIndex = 0;
+        for (uint256 i = 0; i < requiredCCVs.length; ++i) {
+          address poolCCV = requiredCCVs[i];
+          if (poolCCV != address(0)) {
+            resolvedCCVs[writeIndex++] = poolCCV;
+          }
+        }
+        for (uint256 i = 0; i < defaultCCVs.length; ++i) {
+          resolvedCCVs[writeIndex++] = defaultCCVs[i];
+        }
+
+        return resolvedCCVs;
       }
     }
 
-    // If the pool does not specify any CCVs, or the pool does not support the V2 interface, we fall back to the
-    // default CCVs. If this wasn't done, any pool not specifying CCVs would allow any arbitrary CCV to mint infinite
-    // tokens by fabricating messages. Since CCVs are permissionless, this would mean anyone would be able to mint.
-    return s_destChainConfigs[destChainSelector].defaultCCVs;
+    // Pool not specifying CCVs or lacking V2 support falls back to destination defaults so the lane still enforces a
+    // minimum verifier set.
+    return defaultCCVs;
   }
 
   // ================================================================
