@@ -166,9 +166,9 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
 
     address[] memory poolRequiredCCV = new address[](4);
     poolRequiredCCV[0] = makeAddr("poolCCV1");
-    poolRequiredCCV[1] = defaultCCVs[0];
-    poolRequiredCCV[2] = defaultCCVs[1];
-    poolRequiredCCV[3] = makeAddr("poolCCV2");
+    poolRequiredCCV[1] = makeAddr("poolCCV2");
+    poolRequiredCCV[2] = defaultCCVs[0];
+    poolRequiredCCV[3] = defaultCCVs[1];
 
     Client.CCV[] memory userSpecifiedCCVs = new Client.CCV[](1);
     userSpecifiedCCVs[0] = Client.CCV({ccvAddress: defaultCCVs[0], args: "userArgs"});
@@ -179,8 +179,8 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     Client.CCV[] memory expectedRequired = new Client.CCV[](4);
     expectedRequired[0] = Client.CCV({ccvAddress: defaultCCVs[0], args: "userArgs"});
     expectedRequired[1] = Client.CCV({ccvAddress: poolRequiredCCV[0], args: ""});
-    expectedRequired[2] = Client.CCV({ccvAddress: defaultCCVs[1], args: ""});
-    expectedRequired[3] = Client.CCV({ccvAddress: poolRequiredCCV[3], args: ""});
+    expectedRequired[2] = Client.CCV({ccvAddress: poolRequiredCCV[1], args: ""});
+    expectedRequired[3] = Client.CCV({ccvAddress: defaultCCVs[1], args: ""});
     _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
   }
 }

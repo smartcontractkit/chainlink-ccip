@@ -586,45 +586,49 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     address[] memory defaultCCVs = s_destChainConfigs[destChainSelector].defaultCCVs;
     IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(token));
 
-    if (IERC165(pool).supportsInterface(type(IPoolV2).interfaceId)) {
-      requiredCCVs = IPoolV2(address(pool)).getRequiredCCVs(
-        token, destChainSelector, amount, finality, tokenArgs, IPoolV2.CCVDirection.Outbound
-      );
-
-      if (requiredCCVs.length != 0) {
-        bool includeDefaults = false;
-        uint256 nonZeroCount = 0;
-        for (uint256 i = 0; i < requiredCCVs.length; ++i) {
-          if (requiredCCVs[i] == address(0)) {
-            includeDefaults = true;
-          } else {
-            ++nonZeroCount;
-          }
-        }
-
-        if (!includeDefaults) {
-          return requiredCCVs;
-        }
-
-        address[] memory resolvedCCVs = new address[](nonZeroCount + defaultCCVs.length);
-        uint256 writeIndex = 0;
-        for (uint256 i = 0; i < requiredCCVs.length; ++i) {
-          address poolCCV = requiredCCVs[i];
-          if (poolCCV != address(0)) {
-            resolvedCCVs[writeIndex++] = poolCCV;
-          }
-        }
-        for (uint256 i = 0; i < defaultCCVs.length; ++i) {
-          resolvedCCVs[writeIndex++] = defaultCCVs[i];
-        }
-
-        return resolvedCCVs;
-      }
-    }
-
     // Pool not specifying CCVs or lacking V2 support falls back to destination defaults so the lane still enforces a
     // minimum verifier set.
-    return defaultCCVs;
+    if (!IERC165(pool).supportsInterface(type(IPoolV2).interfaceId)) {
+      return defaultCCVs;
+    }
+
+    requiredCCVs = IPoolV2(address(pool)).getRequiredCCVs(
+      token, destChainSelector, amount, finality, tokenArgs, IPoolV2.CCVDirection.Outbound
+    );
+
+    if (requiredCCVs.length == 0) {
+      return defaultCCVs;
+    }
+
+    address[] memory resolvedCCVs = new address[](requiredCCVs.length + defaultCCVs.length);
+    uint256 writeIndex = 0;
+    bool includeDefaults = false;
+
+    for (uint256 i = 0; i < requiredCCVs.length; ++i) {
+      address poolCCV = requiredCCVs[i];
+      if (poolCCV == address(0)) {
+        includeDefaults = true;
+        continue;
+      }
+      resolvedCCVs[writeIndex++] = poolCCV;
+    }
+
+    if (!includeDefaults) {
+      assembly {
+        mstore(resolvedCCVs, writeIndex)
+      }
+      return resolvedCCVs;
+    }
+
+    for (uint256 i = 0; i < defaultCCVs.length; ++i) {
+      resolvedCCVs[writeIndex++] = defaultCCVs[i];
+    }
+
+    assembly {
+      mstore(resolvedCCVs, writeIndex)
+    }
+
+    return resolvedCCVs;
   }
 
   // ================================================================
