@@ -2,6 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {Router} from "../../Router.sol";
+import {CommitteeVerifier} from "../../ccvs/CommitteeVerifier.sol";
+import {VerifierProxy} from "../../ccvs/VerifierProxy.sol";
+import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
@@ -16,6 +19,7 @@ contract e2e is OnRampSetup {
   OffRampHelper internal s_offRamp;
 
   address internal s_destVerifier;
+  address internal s_userSpecifiedCCV;
 
   function setUp() public virtual override {
     super.setUp();
@@ -23,6 +27,25 @@ contract e2e is OnRampSetup {
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+
+    CommitteeVerifier committeeVerifier = new CommitteeVerifier(
+      CommitteeVerifier.DynamicConfig({
+        feeQuoter: address(s_feeQuoter),
+        feeAggregator: address(1),
+        allowlistAdmin: address(0)
+      }),
+      ""
+    );
+
+    BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
+    destChainConfigs[0] = BaseVerifier.DestChainConfigArgs({
+      router: s_sourceRouter,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      allowlistEnabled: false
+    });
+    committeeVerifier.applyDestChainConfigUpdates(destChainConfigs);
+
+    s_userSpecifiedCCV = address(new VerifierProxy(address(committeeVerifier)));
 
     // OffRamp side
     s_offRamp = new OffRampHelper(
@@ -60,21 +83,16 @@ contract e2e is OnRampSetup {
 
     IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
 
+    Client.CCV[] memory userCCVs = new Client.CCV[](1);
+    userCCVs[0] = Client.CCV({ccvAddress: s_userSpecifiedCCV, args: "1"});
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
       data: "e2e test data",
       tokenAmounts: new Client.EVMTokenAmount[](1),
       feeToken: s_sourceFeeToken,
       extraArgs: Client._argsToBytes(
-        Client.EVMExtraArgsV3({
-          requiredCCV: new Client.CCV[](0),
-          optionalCCV: new Client.CCV[](0),
-          optionalThreshold: 0,
-          finalityConfig: 0,
-          executor: address(0),
-          executorArgs: "",
-          tokenArgs: ""
-        })
+        Client.EVMExtraArgsV3({ccvs: userCCVs, finalityConfig: 0, executor: address(0), executorArgs: "", tokenArgs: ""})
       )
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 1e18});

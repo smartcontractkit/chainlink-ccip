@@ -187,8 +187,15 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
     vm.mockCall(
       pool,
       abi.encodeCall(
-        IPoolV2.getRequiredInboundCCVs,
-        (token, SOURCE_CHAIN_SELECTOR, tokenAmounts[0].amount, 0, tokenAmounts[0].extraData)
+        IPoolV2.getRequiredCCVs,
+        (
+          token,
+          SOURCE_CHAIN_SELECTOR,
+          tokenAmounts[0].amount,
+          0,
+          tokenAmounts[0].extraData,
+          IPoolV2.CCVDirection.Inbound
+        )
       ),
       abi.encode(ccvs)
     );

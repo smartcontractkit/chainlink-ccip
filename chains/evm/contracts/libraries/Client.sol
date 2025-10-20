@@ -155,9 +155,7 @@ library Client {
   bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
 
   struct EVMExtraArgsV3 {
-    CCV[] requiredCCV;
-    CCV[] optionalCCV;
-    uint8 optionalThreshold;
+    CCV[] ccvs;
     /// @notice The finality config, 0 means the default finality that the CCV considers final. Any non-zero value means
     /// a block depth.
     uint16 finalityConfig;

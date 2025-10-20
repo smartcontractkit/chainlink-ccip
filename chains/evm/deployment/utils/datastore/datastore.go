@@ -4,8 +4,9 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 // ToEVMAddress formats a datastore.AddressRef into an ethereum common.Address.
@@ -19,11 +20,11 @@ func ToEVMAddress(ref datastore.AddressRef) (commonAddress common.Address, err e
 	return common.HexToAddress(ref.Address), nil
 }
 
-// ToPaddedEVMAddress formats a datastore.AddressRef into a 32-byte padded ethereum address.
-func ToPaddedEVMAddress(ref datastore.AddressRef) (paddedAddress []byte, err error) {
+// ToEVMAddressBytes formats a datastore.AddressRef into a 20-byte ethereum address.
+func ToEVMAddressBytes(ref datastore.AddressRef) (paddedAddress []byte, err error) {
 	addr, err := ToEVMAddress(ref)
 	if err != nil {
 		return nil, err
 	}
-	return common.LeftPadBytes(addr.Bytes(), 32), nil
+	return addr.Bytes(), nil
 }

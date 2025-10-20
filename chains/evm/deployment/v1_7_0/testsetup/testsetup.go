@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -39,25 +40,28 @@ func CreateBasicContractParams() sequences.ContractParams {
 		OffRamp: sequences.OffRampParams{
 			Version: semver.MustParse("1.7.0"),
 		},
-		CommitteeVerifier: sequences.CommitteeVerifierParams{
-			Version:       semver.MustParse("1.7.0"),
-			FeeAggregator: common.HexToAddress("0x01"),
-			SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
-				Threshold: 1,
-				Signers: []common.Address{
-					common.HexToAddress("0x02"),
-					common.HexToAddress("0x03"),
-					common.HexToAddress("0x04"),
-					common.HexToAddress("0x05"),
+		CommitteeVerifier: []sequences.CommitteeVerifierParams{
+			{
+				Version:       semver.MustParse("1.7.0"),
+				FeeAggregator: common.HexToAddress("0x01"),
+				SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
+					Threshold: 1,
+					Signers: []common.Address{
+						common.HexToAddress("0x02"),
+						common.HexToAddress("0x03"),
+						common.HexToAddress("0x04"),
+						common.HexToAddress("0x05"),
+					},
 				},
+				StorageLocation: "https://test.chain.link.fake",
+				Qualifier:       "alpha",
 			},
-			StorageLocation: "https://test.chain.link.fake",
 		},
 		OnRamp: sequences.OnRampParams{
 			Version:       semver.MustParse("1.7.0"),
 			FeeAggregator: common.HexToAddress("0x01"),
 		},
-		ExecutorOnRamp: sequences.ExecutorOnRampParams{
+		Executor: sequences.ExecutorParams{
 			Version:       semver.MustParse("1.7.0"),
 			MaxCCVsPerMsg: 10,
 		},
@@ -68,6 +72,19 @@ func CreateBasicContractParams() sequences.ContractParams {
 			WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
 			USDPerLINK:                     usdPerLink,
 			USDPerWETH:                     usdPerWeth,
+		},
+		MockReceivers: []sequences.MockReceiverParams{
+			{
+				Version: semver.MustParse("1.7.0"),
+				RequiredVerifiers: []datastore.AddressRef{
+					{
+						// ChainSelector we don't know here but should still work.
+						Type:      datastore.ContractType(committee_verifier.ContractType),
+						Version:   semver.MustParse("1.7.0"),
+						Qualifier: "alpha",
+					},
+				},
+			},
 		},
 	}
 }

@@ -2,24 +2,16 @@ module github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment
 
 go 1.24.6
 
-replace (
-	// Taken from CLDF go.mod: https://github.com/smartcontractkit/chainlink-deployments-framework/blob/main/go.mod
-	github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.4
-
-	// Make sure we're working with the latest chainlink-ccip
-	github.com/smartcontractkit/chainlink-ccip => ../../../
-
-	// Make sure we're working with the latest chainlink-ccip/deployment
-	github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment
-)
+// Taken from CLDF go.mod: https://github.com/smartcontractkit/chainlink-deployments-framework/blob/main/go.mod
+replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.4
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/aws/smithy-go v1.22.5
 	github.com/ethereum/go-ethereum v1.16.2
 	github.com/smartcontractkit/chain-selectors v1.0.72
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250911201806-8ab81b52ffaa
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.1.1-solana.0.20250911201806-8ab81b52ffaa
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251020065051-c0de184e9cce
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20251020065051-c0de184e9cce
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250929154511-1f5fbda7ae76
 	github.com/smartcontractkit/chainlink-deployments-framework v0.55.1
 	github.com/smartcontractkit/chainlink-evm v0.3.3
