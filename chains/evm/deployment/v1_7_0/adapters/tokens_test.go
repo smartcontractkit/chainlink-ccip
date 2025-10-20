@@ -145,6 +145,18 @@ func TestTokenAdapter(t *testing.T) {
 						Version: semver.MustParse("1.7.0"),
 					},
 				},
+				CustomFinalityConfig: &tokens.CustomFinalityRateLimiterConfig{
+					Inbound: tokens.RateLimiterConfig{
+						IsEnabled: true,
+						Rate:      big.NewInt(5),
+						Capacity:  big.NewInt(50),
+					},
+					Outbound: tokens.RateLimiterConfig{
+						IsEnabled: true,
+						Rate:      big.NewInt(6),
+						Capacity:  big.NewInt(60),
+					},
+				},
 			}
 
 			_, err = tokens.ConfigureTokensForTransfers(tokenAdapterRegistry, mcmsRegistry).Apply(*e, tokens.ConfigureTokensForTransfersConfig{
@@ -163,6 +175,10 @@ func TestTokenAdapter(t *testing.T) {
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							chainB: remoteChainConfig,
 						},
+						FinalityConfig: &tokens.FinalityConfig{
+							FinalityThreshold:            21,
+							CustomFinalityTransferFeeBps: 432,
+						},
 					},
 					{
 						ChainSelector: chainB,
@@ -177,6 +193,10 @@ func TestTokenAdapter(t *testing.T) {
 						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							chainA: remoteChainConfig,
+						},
+						FinalityConfig: &tokens.FinalityConfig{
+							FinalityThreshold:            21,
+							CustomFinalityTransferFeeBps: 432,
 						},
 					},
 				},
@@ -273,6 +293,17 @@ func TestTokenAdapter(t *testing.T) {
 				require.NoError(t, err, "Failed to get outbound CCVs from token pool")
 				require.Len(t, outboundCCVs, 1, "Number of outbound CCVs should match")
 				require.Equal(t, verifierAddr, outboundCCVs[0], "Outbound CCV address should match")
+
+				finalityIter, err := boundTokenPool.FilterFinalityConfigUpdated(nil)
+				require.NoError(t, err, "Failed to filter finality config events")
+				var finalityEventFound bool
+				for finalityIter.Next() {
+					finalityEventFound = true
+					require.Equal(t, uint16(21), finalityIter.Event.FinalityConfig, "Finality threshold should match configured value")
+					require.Equal(t, uint16(432), finalityIter.Event.CustomFinalityTransferFeeBps, "Custom finality fee should match configured value")
+				}
+				require.NoError(t, finalityIter.Error())
+				require.True(t, finalityEventFound, "Finality config update event should be emitted")
 			}
 		})
 	}

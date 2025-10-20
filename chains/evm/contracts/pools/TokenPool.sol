@@ -747,6 +747,31 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._currentTokenBucketState();
   }
 
+  /// @notice Returns the finality threshold and custom-finality fee configured for custom-finality transfers.
+  function getCustomFinalityConfig()
+    external
+    view
+    returns (uint16 finalityThreshold, uint16 customFinalityTransferFeeBps)
+  {
+    return (s_finalityConfig.finalityThreshold, s_finalityConfig.customFinalityTransferFeeBps);
+  }
+
+  /// @notice Gets the current outbound custom-finality rate limiter state for a given remote chain.
+  /// @return The token bucket reflecting the state at the time of the call.
+  function getCurrentOutboundCustomFinalityRateLimiterState(
+    uint64 remoteChainSelector
+  ) external view returns (RateLimiter.TokenBucket memory) {
+    return s_finalityConfig.outboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState();
+  }
+
+  /// @notice Gets the current inbound custom-finality rate limiter state for a given remote chain.
+  /// @return The token bucket reflecting the state at the time of the call.
+  function getCurrentInboundCustomFinalityRateLimiterState(
+    uint64 remoteChainSelector
+  ) external view returns (RateLimiter.TokenBucket memory) {
+    return s_finalityConfig.inboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState();
+  }
+
   /// @notice Sets multiple chain rate limiter configs.
   /// @param remoteChainSelectors The remote chain selector for which the rate limits apply.
   /// @param outboundConfigs The new outbound rate limiter config, meaning the onRamp rate limits for the given chain.

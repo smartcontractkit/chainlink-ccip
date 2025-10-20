@@ -38,6 +38,18 @@ type RateLimiterConfig struct {
 	Rate *big.Int
 }
 
+// CustomFinalityRateLimiterConfig encapsulates rate limiter settings applied to custom-finality transfers.
+type CustomFinalityRateLimiterConfig struct {
+	Inbound  RateLimiterConfig
+	Outbound RateLimiterConfig
+}
+
+// FinalityConfig captures global custom-finality parameters for a token pool.
+type FinalityConfig struct {
+	FinalityThreshold            uint16
+	CustomFinalityTransferFeeBps uint16
+}
+
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
 type RemoteChainConfig[R any, CCV any] struct {
 	// The token on the remote chain.
@@ -53,6 +65,8 @@ type RemoteChainConfig[R any, CCV any] struct {
 	OutboundCCVs []CCV
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.
 	InboundCCVs []CCV
+	// CustomFinalityConfig optionally overrides the rate limiter behaviour for custom-finality transfers.
+	CustomFinalityConfig *CustomFinalityRateLimiterConfig
 }
 
 // ConfigureTokenForTransfersInput is the input for the ConfigureTokenForTransfers sequence.
@@ -67,6 +81,8 @@ type ConfigureTokenForTransfersInput struct {
 	ExternalAdmin string
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
 	RegistryAddress string
+	// FinalityConfig optionally overrides global custom-finality parameters on the pool.
+	FinalityConfig *FinalityConfig
 }
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
