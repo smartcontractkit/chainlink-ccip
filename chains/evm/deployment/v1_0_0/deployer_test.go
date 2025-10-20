@@ -1,56 +1,21 @@
 package v1_0_0
 
 import (
-	"crypto/ecdsa"
 	"math/big"
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
-	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 )
-
-var (
-	// TestXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
-	// in tests.
-	TestXXXMCMSSigner *ecdsa.PrivateKey
-)
-
-func init() {
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		panic(err)
-	}
-	TestXXXMCMSSigner = key
-}
-
-func SingleGroupTimelockConfigV2(t *testing.T) v1_0.MCMSDeploymentConfigPerChain {
-	return v1_0.MCMSDeploymentConfigPerChain{
-		Canceller:        SingleGroupMCMSV2(t),
-		Bypasser:         SingleGroupMCMSV2(t),
-		Proposer:         SingleGroupMCMSV2(t),
-		TimelockMinDelay: big.NewInt(0),
-	}
-}
-
-func SingleGroupMCMSV2(t *testing.T) mcmstypes.Config {
-	publicKey := TestXXXMCMSSigner.Public().(*ecdsa.PublicKey)
-	// Convert the public key to an Ethereum address
-	address := crypto.PubkeyToAddress(*publicKey)
-	c, err := mcmstypes.NewConfig(1, []common.Address{address}, []mcmstypes.Config{})
-	require.NoError(t, err)
-	return c
-}
 
 func TestDeployMCMS(t *testing.T) {
 	t.Parallel()
@@ -62,15 +27,15 @@ func TestDeployMCMS(t *testing.T) {
 	evmChain := env.BlockChains.EVMChains()[selector]
 
 	evmDeployer := &EVMDeployer{}
-	dReg := v1_0.NewDeployerRegistry()
+	dReg := v1_0.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, v1_0.MCMSVersion, evmDeployer)
 	cs := v1_0.DeployMCMS(dReg)
 	output, err := cs.Apply(*env, v1_0.MCMSDeploymentConfig{
 		Chains: map[uint64]v1_0.MCMSDeploymentConfigPerChain{
 			selector: {
-				Canceller:        SingleGroupMCMSV2(t),
-				Bypasser:         SingleGroupMCMSV2(t),
-				Proposer:         SingleGroupMCMSV2(t),
+				Canceller:        v1_0.SingleGroupMCMSV2(),
+				Bypasser:         v1_0.SingleGroupMCMSV2(),
+				Proposer:         v1_0.SingleGroupMCMSV2(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
 				TimelockAdmin:    evmChain.DeployerKey.From,
