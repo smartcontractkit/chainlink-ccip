@@ -60,41 +60,44 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 
 			deps := mcmsops.Deps{
 				Chain:             chain,
-				ExistingAddresses: in.ExistingAddresses,
+				ExistingAddresses: append(in.ExistingAddresses, output.Addresses...),
+				Qualifier:         *in.Qualifier,
 			}
 
 			// Initialize Access Controller
-			initAccessRef, err := initAccessController(b, deps)
+			initAccessRef, err := initAccessController(b, deps, accessControllerAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize Access Controller: %w", err)
 			}
 			output.Addresses = append(output.Addresses, initAccessRef...)
+			deps.ExistingAddresses = append(deps.ExistingAddresses, initAccessRef...)
 
-			initMcmRef, err := initMCM(b, deps, in.MCMSDeploymentConfigPerChain)
+			initMcmRef, err := initMCM(b, deps, in.MCMSDeploymentConfigPerChain, mcmAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize MCMs: %w", err)
 			}
 			output.Addresses = append(output.Addresses, initMcmRef...)
+			deps.ExistingAddresses = append(deps.ExistingAddresses, initMcmRef...)
 
-			initTimelockRef, err := initTimelock(b, deps, in.TimelockMinDelay)
+			initTimelockRef, err := initTimelock(b, deps, in.TimelockMinDelay, timelockAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize Timelock: %w", err)
 			}
 			output.Addresses = append(output.Addresses, initTimelockRef...)
+			deps.ExistingAddresses = append(deps.ExistingAddresses, initTimelockRef...)
 
 			// roles
-			setupRolesRef, err := setupRoles(b, deps, mcmAddress)
+			err = setupRoles(b, deps, mcmAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to setup roles in Timelock: %w", err)
 			}
-			output.Addresses = append(output.Addresses, setupRolesRef...)
 
 			return output, err
 		},
 	)
 }
 
-func initAccessController(b operations.Bundle, deps mcmsops.Deps) ([]cldf_datastore.AddressRef, error) {
+func initAccessController(b operations.Bundle, deps mcmsops.Deps, accessController solana.PublicKey) ([]cldf_datastore.AddressRef, error) {
 	roles := []cldf_deployment.ContractType{
 		mcmsops.ProposerAccessControllerAccount,
 		mcmsops.ExecutorAccessControllerAccount,
@@ -105,8 +108,9 @@ func initAccessController(b operations.Bundle, deps mcmsops.Deps) ([]cldf_datast
 	for _, role := range roles {
 		ref, err := operations.ExecuteOperation(b, mcmsops.InitAccessControllerOp, deps,
 			mcmsops.InitAccessControllerInput{
-				ContractType: role,
-				ChainSel:     deps.Chain.ChainSelector(),
+				ContractType:     role,
+				ChainSel:         deps.Chain.ChainSelector(),
+				AccessController: accessController,
 			})
 		if err != nil {
 			return nil, fmt.Errorf("failed to init access controller for role %s: %w", role, err)
@@ -117,7 +121,7 @@ func initAccessController(b operations.Bundle, deps mcmsops.Deps) ([]cldf_datast
 	return refs, nil
 }
 
-func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentConfigPerChain) ([]cldf_datastore.AddressRef, error) {
+func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentConfigPerChain, mcmAddress solana.PublicKey) ([]cldf_datastore.AddressRef, error) {
 	var refs []cldf_datastore.AddressRef
 	configs := []struct {
 		ctype cldf_deployment.ContractType
@@ -139,7 +143,12 @@ func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentC
 
 	for _, cfg := range configs {
 		ref, err := operations.ExecuteOperation(b, mcmsops.InitMCMOp, deps,
-			mcmsops.InitMCMInput{ContractType: cfg.ctype, MCMConfig: cfg.cfg, ChainSel: deps.Chain.ChainSelector()})
+			mcmsops.InitMCMInput{
+				ContractType: cfg.ctype,
+				MCMConfig:    cfg.cfg,
+				ChainSel:     deps.Chain.ChainSelector(),
+				MCM:          mcmAddress,
+			})
 		if err != nil {
 			return nil, fmt.Errorf("failed to init config type:%q, err:%w", cfg.ctype, err)
 		}
@@ -148,11 +157,12 @@ func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentC
 	return refs, nil
 }
 
-func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int) ([]cldf_datastore.AddressRef, error) {
+func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int, timelockAddress solana.PublicKey) ([]cldf_datastore.AddressRef, error) {
 	ref, err := operations.ExecuteOperation(b, mcmsops.InitTimelockOp, deps, mcmsops.InitTimelockInput{
 		ContractType: utils.RBACTimelock,
 		ChainSel:     deps.Chain.ChainSelector(),
 		MinDelay:     minDelay,
+		Timelock:     timelockAddress,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to init timelock: %w", err)
@@ -160,7 +170,7 @@ func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int) ([]
 	return []cldf_datastore.AddressRef{ref.Output}, nil
 }
 
-func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.PublicKey) ([]cldf_datastore.AddressRef, error) {
+func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.PublicKey) error {
 	proposerRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		utils.ProposerManyChainMultisig,
@@ -179,7 +189,6 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 		mcmsops.Version,
 		deps.Qualifier,
 	)
-	var refs []cldf_datastore.AddressRef
 	proposerPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(proposerRef.Address)))
 	cancellerPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(cancellerRef.Address)))
 	bypasserPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(bypasserRef.Address)))
@@ -205,14 +214,13 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 		},
 	}
 	for _, role := range roles {
-		ref, err := operations.ExecuteOperation(b, mcmsops.AddAccessOp, deps, mcmsops.AddAccessInput{
+		_, err := operations.ExecuteOperation(b, mcmsops.AddAccessOp, deps, mcmsops.AddAccessInput{
 			Role:     role.role,
 			Accounts: role.pdas,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to add access for role %d: %w", role.role, err)
+			return fmt.Errorf("failed to add access for role %d: %w", role.role, err)
 		}
-		refs = append(refs, ref.Output)
 	}
-	return refs, nil
+	return nil
 }

@@ -15,7 +15,7 @@ const (
 	RBACTimelock               cldf.ContractType = "RBACTimelock"
 	CallProxy                  cldf.ContractType = "CallProxy"
 	// CLL Identifiers
-	CLLQualifier = "CLL"
+	CLLQualifier = "CLLCCIP"
 )
 
 var (

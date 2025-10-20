@@ -171,8 +171,9 @@ func initAccessController(b operations.Bundle, deps Deps, in InitAccessControlle
 		deps.Qualifier,
 	)
 
-	accessControllerAccount := solana.PublicKeyFromBytes([]byte(ref.Address))
-	if !accessControllerAccount.IsZero() {
+	var accessControllerAccount solana.PublicKey
+	if ref.Address != "" {
+		accessControllerAccount = solana.PublicKeyFromBytes([]byte(ref.Address))
 		var data access_controller.AccessController
 		err := common.GetAccountDataBorshInto(b.GetContext(), deps.Chain.Client, accessControllerAccount, rpc.CommitmentConfirmed, &data)
 		if err == nil {
@@ -202,6 +203,7 @@ func initAccessController(b operations.Bundle, deps Deps, in InitAccessControlle
 		ChainSelector: deps.Chain.Selector,
 		Type:          cldf_datastore.ContractType(in.ContractType),
 		Qualifier:     deps.Qualifier,
+		Version:       Version,
 	}, nil
 }
 
@@ -258,9 +260,9 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.Ad
 		deps.Qualifier,
 	)
 
-	mcmSeed := state.PDASeed([]byte(ref.Address))
-
-	if mcmSeed != (state.PDASeed{}) {
+	var mcmSeed state.PDASeed
+	if ref.Address != "" {
+		mcmSeed = state.PDASeed([]byte(ref.Address))
 		mcmConfigPDA := state.GetMCMConfigPDA(in.MCM, mcmSeed)
 		var data mcm.MultisigConfig
 		err := common.GetAccountDataBorshInto(b.GetContext(), deps.Chain.Client, mcmConfigPDA, rpc.CommitmentConfirmed, &data)
@@ -294,6 +296,7 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.Ad
 		ChainSelector: deps.Chain.Selector,
 		Type:          cldf_datastore.ContractType(in.ContractType),
 		Qualifier:     deps.Qualifier,
+		Version:       Version,
 	}, nil
 }
 
@@ -352,9 +355,10 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (cldf_da
 		Version,
 		deps.Qualifier,
 	)
-	timelockSeed := state.PDASeed([]byte(ref.Address))
 
-	if (timelockSeed != state.PDASeed{}) {
+	var timelockSeed state.PDASeed
+	if ref.Address != "" {
+		timelockSeed = state.PDASeed([]byte(ref.Address))
 		timelockConfigPDA := state.GetTimelockConfigPDA(in.Timelock, timelockSeed)
 		var timelockConfig timelock.Config
 		err := deps.Chain.GetAccountDataBorshInto(b.GetContext(), timelockConfigPDA, &timelockConfig)
@@ -380,6 +384,7 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (cldf_da
 		ChainSelector: deps.Chain.Selector,
 		Type:          cldf_datastore.ContractType(in.ContractType),
 		Qualifier:     deps.Qualifier,
+		Version:       Version,
 	}, nil
 }
 
@@ -416,7 +421,7 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 		deps.ExistingAddresses,
 		AccessControllerProgramType,
 		Version,
-		deps.Qualifier,
+		"",
 	)
 	proposerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
