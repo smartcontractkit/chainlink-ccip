@@ -82,12 +82,12 @@ func TestConfigureChainForLanes(t *testing.T) {
 				sequences.ConfigureChainForLanes,
 				evmChain,
 				sequences.ConfigureChainForLanesInput{
-					ChainSelector:     chainSelector,
-					Router:            r,
-					OnRamp:            onRamp,
-					CommitteeVerifier: committeeVerifier,
-					FeeQuoter:         feeQuoter,
-					OffRamp:           offRamp,
+					ChainSelector:      chainSelector,
+					Router:             r,
+					OnRamp:             onRamp,
+					CommitteeVerifiers: []common.Address{committeeVerifier},
+					FeeQuoter:          feeQuoter,
+					OffRamp:            offRamp,
 					RemoteChains: map[uint64]sequences.RemoteChainConfig{
 						remoteChainSelector: {
 							AllowTrafficFrom:    true,

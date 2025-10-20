@@ -56,4 +56,10 @@ contract TokenPoolV2_setCustomFinalityRateLimitConfig is TokenPoolV2Setup {
     );
     s_tokenPool.setCustomFinalityRateLimitConfig(args);
   }
+
+  function test_setCustomFinalityRateLimitConfig_RevertWhen_Unauthorized() public {
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.Unauthorized.selector, STRANGER));
+    vm.startPrank(STRANGER);
+    s_tokenPool.setCustomFinalityRateLimitConfig(new TokenPool.CustomFinalityRateLimitConfigArgs[](0));
+  }
 }

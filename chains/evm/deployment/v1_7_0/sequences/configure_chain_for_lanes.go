@@ -68,8 +68,8 @@ type ConfigureChainForLanesInput struct {
 	// The OnRamp on the EVM chain being configured
 	// Similarly, we assume that all connections will use the same OnRamp
 	OnRamp common.Address
-	// The CommitteeVerifier on the EVM chain being configured
-	CommitteeVerifier common.Address
+	// The CommitteeVerifiers on the EVM chain being configured
+	CommitteeVerifiers []common.Address
 	// The FeeQuoter on the EVM chain being configured
 	FeeQuoter common.Address
 	// The OffRamp on the EVM chain being configured
@@ -166,15 +166,17 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		writes = append(writes, onRampReport.Output)
 
 		// ApplyDestChainConfigUpdates on CommitteeVerifier
-		committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.DestChainConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       input.CommitteeVerifier,
-			Args:          committeeVerifierDestConfigArgs,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CommitteeVerifier(%s) on chain %s: %w", input.CommitteeVerifier, chain, err)
+		for _, committeeVerifier := range input.CommitteeVerifiers {
+			committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.DestChainConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       committeeVerifier,
+				Args:          committeeVerifierDestConfigArgs,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
+			}
+			writes = append(writes, committeeVerifierReport.Output)
 		}
-		writes = append(writes, committeeVerifierReport.Output)
 
 		// ApplyDestChainUpdates on each Executor
 		for ExecutorAddr, destChainSelectorsToAdd := range destChainSelectorsPerExecutor {
@@ -192,15 +194,17 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 
 		// ApplyAllowlistUpdates on CommitteeVerifier
-		committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       input.CommitteeVerifier,
-			Args:          committeeVerifierAllowlistArgs,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allowlist updates to CommitteeVerifier(%s) on chain %s: %w", input.CommitteeVerifier, chain, err)
+		for _, committeeVerifier := range input.CommitteeVerifiers {
+			committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       committeeVerifier,
+				Args:          committeeVerifierAllowlistArgs,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allowlist updates to CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
+			}
+			writes = append(writes, committeeVerifierAllowlistReport.Output)
 		}
-		writes = append(writes, committeeVerifierAllowlistReport.Output)
 
 		// ApplyDestChainConfigUpdates on FeeQuoter
 		feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.DestChainConfigArgs]{
