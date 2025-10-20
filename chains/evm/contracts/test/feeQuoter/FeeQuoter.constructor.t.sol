@@ -28,6 +28,14 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
 
     assertEq(priceUpdaters, s_feeQuoter.getAllAuthorizedCallers());
 
+    _assertTokenPriceFeedConfigEquality(
+      tokenPriceFeedUpdates[0].feedConfig, s_feeQuoter.getTokenPriceFeedConfig(s_sourceTokens[0])
+    );
+
+    _assertTokenPriceFeedConfigEquality(
+      tokenPriceFeedUpdates[1].feedConfig, s_feeQuoter.getTokenPriceFeedConfig(s_sourceTokens[1])
+    );
+
     assertEq(
       s_feeQuoterPremiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth,
       s_feeQuoter.getPremiumMultiplierWeiPerEth(s_feeQuoterPremiumMultiplierWeiPerEthArgs[0].token)
