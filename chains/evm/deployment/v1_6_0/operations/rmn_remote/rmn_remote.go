@@ -9,9 +9,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 )
-
-type Subject = [16]byte
 
 var ContractType cldf_deployment.ContractType = "RMNRemote"
 var Version *semver.Version = semver.MustParse("1.6.0")
@@ -22,7 +21,7 @@ type ConstructorArgs struct {
 }
 
 type CurseArgs struct {
-	Subject Subject
+	Subject []fastcurse.Subject
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
@@ -48,7 +47,7 @@ var Curse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_remote.RMNRem
 	IsAllowedCaller: contract.OnlyOwner[*rmn_remote.RMNRemote, CurseArgs],
 	Validate:        func(CurseArgs) error { return nil },
 	CallContract: func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
-		return rmnRemote.Curse(opts, args.Subject)
+		return rmnRemote.Curse0(opts, args.Subject)
 	},
 })
 
@@ -62,6 +61,17 @@ var Uncurse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_remote.RMNR
 	IsAllowedCaller: contract.OnlyOwner[*rmn_remote.RMNRemote, CurseArgs],
 	Validate:        func(CurseArgs) error { return nil },
 	CallContract: func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
-		return rmnRemote.Uncurse(opts, args.Subject)
+		return rmnRemote.Uncurse0(opts, args.Subject)
+	},
+})
+
+var IsCursed = contract.NewRead(contract.ReadParams[fastcurse.Subject, bool, *rmn_remote.RMNRemote]{
+	Name:         "rmn-remote:is-cursed",
+	Version:      semver.MustParse("1.6.0"),
+	Description:  "Checks if a subject is cursed on an RMNRemote contract",
+	ContractType: ContractType,
+	NewContract:  rmn_remote.NewRMNRemote,
+	CallContract: func(rmn *rmn_remote.RMNRemote, opts *bind.CallOpts, args fastcurse.Subject) (bool, error) {
+		return rmn.IsCursed(opts, args)
 	},
 })

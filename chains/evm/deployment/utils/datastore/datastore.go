@@ -4,8 +4,9 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 // ToByteArray formats a datastore.AddressRef into a byte slice.
