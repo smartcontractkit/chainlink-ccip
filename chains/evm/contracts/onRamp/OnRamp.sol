@@ -298,8 +298,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param userRequestedOrDefaultCCVs User-provided required CCVs. Can not be empty, as defaults are applied earlier
   /// if needed. This list does not only contain addresses, but also arguments
   /// @param laneMandatedCCVs Lane mandated CCVs are always added, regardless of what a user/pool chooses. Can be empty.
-  /// @param poolRequiredCCVs Pool-specific required CCVs. Can be empty. Any address(0) sentinels should already have
-  /// been resolved to the concrete default list by `_getCCVsForPool`.
+  /// @param poolRequiredCCVs Pool-specific required CCVs.
   /// @return ccvs Updated list of CCVs.
   function _mergeCCVLists(
     Client.CCV[] memory userRequestedOrDefaultCCVs,
@@ -329,10 +328,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         ccvs[toBeAddedIndex++] = Client.CCV({ccvAddress: laneMandatedCCV, args: ""});
       }
     }
-
+    // Add pool required CCVs, skipping duplicates.
     for (uint256 i = 0; i < poolRequiredCCVs.length; ++i) {
       address poolRequiredCCV = poolRequiredCCVs[i];
-
       bool found = false;
       for (uint256 j = 0; j < toBeAddedIndex; ++j) {
         if (ccvs[j].ccvAddress == poolRequiredCCV) {
