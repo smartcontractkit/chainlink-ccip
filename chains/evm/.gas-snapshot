@@ -5,6 +5,7 @@ BaseVerifier_applyDestChainConfigUpdates:test_applyDestChainConfigUpdates() (gas
 BaseVerifier_assertSenderIsAllowed:test_assertSenderIsAllowed() (gas: 18277)
 BaseVerifier_assertSenderIsAllowed:test_assertSenderIsAllowed_AllowlistEnabledWithAllowedSender() (gas: 104873)
 BaseVerifier_getDestChainConfig:test_getDestChainConfig() (gas: 17289)
+BaseVerifier_getFee:test_getFee() (gas: 16227)
 BaseVerifier_getStorageLocation:test_getStorageLocation() (gas: 12722)
 BaseVerifier_getStorageLocation:test_supportsInterface() (gas: 9968)
 BaseVerifier_withdrawFeeTokens:test_withdrawFeeTokens() (gas: 214656)

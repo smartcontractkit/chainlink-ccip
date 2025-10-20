@@ -23,7 +23,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error InvalidAllowListRequest(uint64 destChainSelector);
   error SenderNotAllowed(address sender);
   error CallerIsNotARampOnRouter(address caller);
-  error InvalidDestination(uint64 destChainSelector);
+  error DestinationNotSupported(uint64 destChainSelector);
 
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
   event DestChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
@@ -198,7 +198,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint16 // finalityConfig
   ) external view virtual returns (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) {
     if (s_destChainConfigs[destChainSelector].router == IRouter(address(0))) {
-      revert InvalidDestination(destChainSelector);
+      revert DestinationNotSupported(destChainSelector);
     }
     return (
       s_destChainConfigs[destChainSelector].feeUSDCents,
