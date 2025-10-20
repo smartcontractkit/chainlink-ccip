@@ -298,13 +298,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev This function assumes there are no duplicates in the userRequestedOrDefaultCCVs list.
   /// @dev There is no protocol-level requirement on the ordering of CCVs in the final list, but for determinism we
   /// process user requested first, then lane-mandated second, pool-required last.
-  /// @dev Pool can signal to use defaults by returning empty array or including address(0) in their list, mirroring the
-  /// `_getCCVsForMessage` flow on the OffRamp so both sides interpret CCV requirements consistently.
   /// @param userRequestedOrDefaultCCVs User-provided required CCVs. Can not be empty, as defaults are applied earlier
   /// if needed. This list does not only contain addresses, but also arguments
   /// @param laneMandatedCCVs Lane mandated CCVs are always added, regardless of what a user/pool chooses. Can be empty.
   /// @param poolRequiredCCVs Pool-specific required CCVs. Can be empty or contain address(0).
-  /// @param defaultCCVs Default CCVs to use when pool returns empty or signals with address(0).
+  /// @param defaultCCVs Default CCVs to configured for the destination chain.
   /// @return ccvs Updated list of CCVs.
   function _mergeCCVLists(
     Client.CCV[] memory userRequestedOrDefaultCCVs,

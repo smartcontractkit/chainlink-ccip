@@ -13,7 +13,9 @@ import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165
 contract MockPoolV2 {
   address[] internal s_requiredCCVs;
 
-  constructor(address[] memory requiredCCVs) {
+  constructor(
+    address[] memory requiredCCVs
+  ) {
     s_requiredCCVs = requiredCCVs;
   }
 
@@ -29,7 +31,9 @@ contract MockPoolV2 {
     return s_requiredCCVs;
   }
 
-  function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+  function supportsInterface(
+    bytes4 interfaceId
+  ) external pure returns (bool) {
     return interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 }
@@ -66,9 +70,7 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
 
     _deployPoolV2(expectedCCVs);
 
-    address[] memory result = s_onRampTestHelper.getCCVsForPool(
-      DEST_CHAIN_SELECTOR, s_token, 100, 0, ""
-    );
+    address[] memory result = s_onRampTestHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
 
     assertEq(result.length, expectedCCVs.length, "Should surface pool-provided CCVs");
     assertEq(result[0], expectedCCVs[0], "First CCV should match");
@@ -85,9 +87,7 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
       pool, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId), abi.encode(false)
     );
 
-    address[] memory result = s_onRampTestHelper.getCCVsForPool(
-      DEST_CHAIN_SELECTOR, s_token, 100, 0, ""
-    );
+    address[] memory result = s_onRampTestHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
 
     assertEq(result.length, 1, "Should fall back to default CCV when pool is V1");
     assertEq(result[0], s_helperDefaultCCV, "Returned CCV should be the helper default");
@@ -96,9 +96,7 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
   function test_getCCVsForPool_ReturnsDefaultCCVs_WhenPoolReturnsEmptyArray() public {
     _deployPoolV2(new address[](0));
 
-    address[] memory result = s_onRampTestHelper.getCCVsForPool(
-      DEST_CHAIN_SELECTOR, s_token, 100, 0, ""
-    );
+    address[] memory result = s_onRampTestHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
 
     assertEq(result.length, 1, "Should fall back to default CCV when pool is silent");
     assertEq(result[0], s_helperDefaultCCV, "Returned CCV should be the helper default");
@@ -112,9 +110,7 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
 
     _deployPoolV2(poolCCVs);
 
-    address[] memory result = s_onRampTestHelper.getCCVsForPool(
-      DEST_CHAIN_SELECTOR, s_token, 100, 0, ""
-    );
+    address[] memory result = s_onRampTestHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
 
     assertEq(result.length, poolCCVs.length, "Should preserve address(0) sentinel for merge step");
     assertEq(result[0], poolCCVs[0], "First CCV should match");
@@ -140,7 +136,9 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
     s_onRampTestHelper.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
-  function _deployPoolV2(address[] memory requiredCCVs) internal returns (address pool) {
+  function _deployPoolV2(
+    address[] memory requiredCCVs
+  ) internal returns (address pool) {
     pool = address(new MockPoolV2(requiredCCVs));
 
     vm.mockCall(
@@ -151,9 +149,13 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
     );
 
     _mockRegistryPool(pool);
+
+    return pool;
   }
 
-  function _mockRegistryPool(address pool) internal {
+  function _mockRegistryPool(
+    address pool
+  ) internal {
     vm.mockCall(
       address(s_tokenAdminRegistry),
       abi.encodeWithSelector(ITokenAdminRegistry.getPool.selector, s_token),
