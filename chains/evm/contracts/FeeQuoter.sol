@@ -791,10 +791,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
       return (
         extraArgs,
         true,
-        abi.encode(
-          _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder)
-            .tokenReceiver
-        )
+        abi.encode(_parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit).tokenReceiver)
       );
     }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {

@@ -143,28 +143,6 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     }
   }
 
-  function testFuzz_getValidatedFee_EnforceOutOfOrder(bool enforce, bool allowOutOfOrderExecution) public {
-    // Update config to enforce allowOutOfOrderExecution = defaultVal.
-    vm.stopPrank();
-    vm.startPrank(OWNER);
-
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
-    destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = enforce;
-    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
-
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodeWithSelector(
-      Client.GENERIC_EXTRA_ARGS_V2_TAG,
-      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: allowOutOfOrderExecution})
-    );
-
-    // If enforcement is on, only true should be allowed.
-    if (enforce && !allowOutOfOrderExecution) {
-      vm.expectRevert(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
-    }
-    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
-  }
-
   function test_getValidatedFee_SVM() public {
     // Update config to add a Solana chain.
     vm.stopPrank();
@@ -217,8 +195,9 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
   // sending a token + message to reciever
   function test_tokenTransferAndMsgReciever_Sui() public {
-    address[] memory feeTokens = new address[](1);
-    feeTokens[0] = s_sourceTokens[1];
+    FeeQuoter.FeeTokenArgs[] memory feeTokens = new FeeQuoter.FeeTokenArgs[](1);
+    feeTokens[0].token = s_sourceTokens[1];
+    feeTokens[0].premiumMultiplierWeiPerEth = 1e18;
 
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
 
@@ -247,8 +226,9 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
   // sending a token
   function test_tokenTransferValidatedFee_Sui() public {
-    address[] memory feeTokens = new address[](1);
-    feeTokens[0] = s_sourceTokens[1];
+    FeeQuoter.FeeTokenArgs[] memory feeTokens = new FeeQuoter.FeeTokenArgs[](1);
+    feeTokens[0].token = s_sourceTokens[1];
+    feeTokens[0].premiumMultiplierWeiPerEth = 1e18;
 
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
 
@@ -276,8 +256,9 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
   // sending message to reciever only
   function test_MsgRecieverValidatedFee_Sui() public {
-    address[] memory feeTokens = new address[](1);
-    feeTokens[0] = s_sourceTokens[1];
+    FeeQuoter.FeeTokenArgs[] memory feeTokens = new FeeQuoter.FeeTokenArgs[](1);
+    feeTokens[0].token = s_sourceTokens[1];
+    feeTokens[0].premiumMultiplierWeiPerEth = 1e18;
 
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
 
@@ -396,10 +377,6 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
-  // ================================================================
-  // │                           SVM                                │
-  // ================================================================
-
   // Used to generate a message with a specific extraArgs tag for SVM
   function _generateEmptyMessage2SVM() public view returns (Client.EVM2AnyMessage memory) {
     return Client.EVM2AnyMessage({
@@ -417,12 +394,6 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
         })
       )
     });
-  }
-
-  function test_getValidatedFee_SVM() public {
-    _setDestChainConfig(Internal.CHAIN_FAMILY_SELECTOR_SVM);
-
-    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, _generateEmptyMessage2SVM());
   }
 
   // Reverts
@@ -620,10 +591,6 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
-  // ================================================================
-  // │                           SUI                                │
-  // ================================================================
-
   // Used to generate a message with a specific extraArgs tag for Sui
   function _generateEmptyMessage2Sui() public view returns (Client.EVM2AnyMessage memory) {
     return Client.EVM2AnyMessage({
@@ -806,27 +773,6 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
   }
 
-  function test_getValidatedFee_Sui_RevertWhen_Invalid32ByteAddress_ReceiverInPrecompileSpace() public {
-    _setDestChainConfig(Internal.CHAIN_FAMILY_SELECTOR_SUI);
-
-    uint256 precompileMinusOne = Internal.APTOS_PRECOMPILE_SPACE - 1;
-
-    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
-
-    msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
-    msg_.receiver = abi.encode(0xdeadbeef); // zero reciever
-    msg_.extraArgs = Client._suiArgsToBytes(
-      Client.SuiExtraArgsV1({
-        gasLimit: 100000,
-        allowOutOfOrderExecution: false,
-        tokenReceiver: bytes32(uint256(0xdeadbeef)), // receiver is also token recipient
-        receiverObjectIds: new bytes32[](2)
-      })
-    );
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector));
-    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
-  }
-
   function test_getValidatedFee_RevertWhen_MsgRecieverIsEmptyForMsgSendSui() public {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
@@ -874,20 +820,6 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
       )
     );
 
-    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
-  }
-
-  // ================================================================
-  // │                          Aptos                               │
-  // ================================================================
-
-  function test_getValidatedFee_Aptos() public {
-    _setDestChainConfig(Internal.CHAIN_FAMILY_SELECTOR_APTOS);
-
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs =
-      Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: true}));
-
-    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, m);
   }
 }
