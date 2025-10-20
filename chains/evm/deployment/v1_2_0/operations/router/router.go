@@ -7,9 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 var ContractType cldf_deployment.ContractType = "Router"
@@ -112,5 +113,16 @@ var GetFee = contract.NewRead(contract.ReadParams[CCIPSendArgs, *big.Int, *route
 	NewContract:  router.NewRouter,
 	CallContract: func(router *router.Router, opts *bind.CallOpts, args CCIPSendArgs) (*big.Int, error) {
 		return router.GetFee(opts, args.DestChainSelector, args.EVM2AnyMessage)
+	},
+})
+
+var IsChainSupported = contract.NewRead(contract.ReadParams[uint64, bool, *router.Router]{
+	Name:         "router:isChainSupported",
+	Version:      semver.MustParse("1.2.0"),
+	Description:  "If the router supports a given destination chain selector",
+	ContractType: ContractType,
+	NewContract:  router.NewRouter,
+	CallContract: func(router *router.Router, opts *bind.CallOpts, args uint64) (bool, error) {
+		return router.IsChainSupported(opts, args)
 	},
 })
