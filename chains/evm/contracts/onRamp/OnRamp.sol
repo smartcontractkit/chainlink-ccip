@@ -611,15 +611,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       resolvedCCVs[writeIndex++] = poolCCV;
     }
 
-    if (!includeDefaults) {
-      assembly {
-        mstore(resolvedCCVs, writeIndex)
+    if (includeDefaults) {
+      for (uint256 i = 0; i < defaultCCVs.length; ++i) {
+        resolvedCCVs[writeIndex++] = defaultCCVs[i];
       }
-      return resolvedCCVs;
-    }
-
-    for (uint256 i = 0; i < defaultCCVs.length; ++i) {
-      resolvedCCVs[writeIndex++] = defaultCCVs[i];
     }
 
     assembly {
