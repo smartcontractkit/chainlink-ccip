@@ -28,14 +28,16 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
     assertEq(storedFinalityThreshold, finalityThreshold);
     assertEq(storedFeeBps, customFinalityTransferFeeBps);
 
-    RateLimiter.TokenBucket memory outboundBucket = s_tokenPool.getCurrentOutboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
+    RateLimiter.TokenBucket memory outboundBucket =
+      s_tokenPool.getCurrentOutboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
     assertTrue(outboundBucket.isEnabled);
     assertEq(outboundBucket.capacity, outboundFastConfig.capacity);
     assertEq(outboundBucket.rate, outboundFastConfig.rate);
     assertEq(outboundBucket.tokens, outboundFastConfig.capacity);
     assertEq(outboundBucket.lastUpdated, uint32(block.timestamp));
 
-    RateLimiter.TokenBucket memory inboundBucket = s_tokenPool.getCurrentInboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
+    RateLimiter.TokenBucket memory inboundBucket =
+      s_tokenPool.getCurrentInboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
     assertTrue(inboundBucket.isEnabled);
     assertEq(inboundBucket.capacity, inboundFastConfig.capacity);
     assertEq(inboundBucket.rate, inboundFastConfig.rate);

@@ -18,15 +18,15 @@ contract TokenPoolV2_setCustomFinalityRateLimitConfig is TokenPoolV2Setup {
 
     s_tokenPool.setCustomFinalityRateLimitConfig(args);
 
-    RateLimiter.TokenBucket memory outboundBucket = s_tokenPool.getCurrentOutboundCustomFinalityRateLimiterState(
-      DEST_CHAIN_SELECTOR
-    );
+    RateLimiter.TokenBucket memory outboundBucket =
+      s_tokenPool.getCurrentOutboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
     assertTrue(outboundBucket.isEnabled);
     assertEq(outboundBucket.capacity, outboundConfig.capacity);
     assertEq(outboundBucket.rate, outboundConfig.rate);
     assertEq(outboundBucket.tokens, outboundConfig.capacity);
 
-    RateLimiter.TokenBucket memory inboundBucket = s_tokenPool.getCurrentInboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
+    RateLimiter.TokenBucket memory inboundBucket =
+      s_tokenPool.getCurrentInboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
     assertTrue(inboundBucket.isEnabled);
     assertEq(inboundBucket.capacity, inboundConfig.capacity);
     assertEq(inboundBucket.rate, inboundConfig.rate);

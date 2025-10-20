@@ -41,7 +41,8 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, finalityThreshold);
 
-    RateLimiter.TokenBucket memory bucket = s_tokenPool.getCurrentOutboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
+    RateLimiter.TokenBucket memory bucket =
+      s_tokenPool.getCurrentOutboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
     assertEq(bucket.tokens, outboundFastConfig.capacity - lockOrBurnIn.amount);
   }
 
