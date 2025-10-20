@@ -3,44 +3,17 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
-import {OnRamp} from "../../../onRamp/OnRamp.sol";
 
+import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
+import {MockPoolV2} from "../../mocks/MockPoolV2.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
-contract MockPoolV2 {
-  address[] internal s_requiredCCVs;
-
-  constructor(
-    address[] memory requiredCCVs
-  ) {
-    s_requiredCCVs = requiredCCVs;
-  }
-
-  function getRequiredCCVs(
-    address,
-    uint64,
-    uint256,
-    uint16,
-    bytes memory,
-    IPoolV2.CCVDirection direction
-  ) external view returns (address[] memory) {
-    if (direction != IPoolV2.CCVDirection.Outbound) revert("direction");
-    return s_requiredCCVs;
-  }
-
-  function supportsInterface(
-    bytes4 interfaceId
-  ) external pure returns (bool) {
-    return interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IERC165).interfaceId;
-  }
-}
-
 contract OnRamp_getCCVsForPool is OnRampSetup {
   OnRampTestHelper internal s_onRampTestHelper;
-  address internal s_token;
+  address internal s_token = makeAddr("token");
   address internal s_helperDefaultCCV;
 
   function setUp() public override {
@@ -59,8 +32,21 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
       })
     );
 
-    s_token = makeAddr("token");
-    _configureHelperDestChain();
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = makeAddr("helperDefaultCCV");
+    s_helperDefaultCCV = defaultCCVs[0];
+
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      laneMandatedCCVs: new address[](0),
+      defaultCCVs: defaultCCVs,
+      defaultExecutor: makeAddr("helperExecutor"),
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+
+    s_onRampTestHelper.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
   function test_getCCVsForPool_ReturnsPoolCCVs_WhenPoolSupportsV2() public {
@@ -118,48 +104,15 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
     assertEq(result[2], poolCCVs[2], "Third CCV should match");
   }
 
-  function _configureHelperDestChain() internal {
-    address[] memory defaultCCVs = new address[](1);
-    defaultCCVs[0] = makeAddr("helperDefaultCCV");
-    s_helperDefaultCCV = defaultCCVs[0];
-
-    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
-    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      router: s_sourceRouter,
-      laneMandatedCCVs: new address[](0),
-      defaultCCVs: defaultCCVs,
-      defaultExecutor: makeAddr("helperExecutor"),
-      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
-    });
-
-    s_onRampTestHelper.applyDestChainConfigUpdates(destChainConfigArgs);
-  }
-
   function _deployPoolV2(
     address[] memory requiredCCVs
   ) internal returns (address pool) {
     pool = address(new MockPoolV2(requiredCCVs));
-
-    vm.mockCall(
-      pool, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId), abi.encode(true)
-    );
-    vm.mockCall(
-      pool, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId), abi.encode(true)
-    );
-
-    _mockRegistryPool(pool);
-
-    return pool;
-  }
-
-  function _mockRegistryPool(
-    address pool
-  ) internal {
     vm.mockCall(
       address(s_tokenAdminRegistry),
       abi.encodeWithSelector(ITokenAdminRegistry.getPool.selector, s_token),
       abi.encode(pool)
     );
+    return pool;
   }
 }

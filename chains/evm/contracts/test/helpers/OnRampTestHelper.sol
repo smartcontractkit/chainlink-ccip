@@ -26,7 +26,6 @@ contract OnRampTestHelper is OnRamp {
     return _mergeCCVLists(userRequestedOrDefaultCCVs, laneMandatedCCVs, poolRequiredCCVs, defaultCCVs);
   }
 
-  /// @notice Exposes the internal _getCCVsForPool function for testing.
   function getCCVsForPool(
     uint64 destChainSelector,
     address token,
