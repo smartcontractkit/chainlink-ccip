@@ -82,11 +82,9 @@ func GetAddressRef(
 			ref.Version.Equal(contractVersion) {
 			if contractQualifier != "" {
 				if ref.Qualifier == contractQualifier {
-					fmt.Println("Found existing", contractType, "at", ref.Address)
 					return ref
 				}
 			} else {
-				fmt.Println("Found existing", contractType, "at", ref.Address)
 				return ref
 			}
 		}
