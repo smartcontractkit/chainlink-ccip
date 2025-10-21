@@ -543,6 +543,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
 
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
+    // Update the CCVs list to include lane mandated and pool required CCVs.
+    resolvedExtraArgs.ccvs =
+      _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector));
 
     // We sum the fees for the verifier, executor and the pool (if any).
     Receipt[] memory receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);

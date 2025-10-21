@@ -82,6 +82,7 @@ contract e2e is OnRampSetup {
   }
 
   function test_e2e() public {
+    vm.pauseGasMetering();
     uint64 expectedSeqNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber + 1;
 
     IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
@@ -118,7 +119,9 @@ contract e2e is OnRampSetup {
       verifierBlobs: verifierBlobs
     });
 
+    vm.resumeGasMetering();
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    vm.pauseGasMetering();
 
     assertEq(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber, expectedSeqNum);
 
@@ -134,6 +137,7 @@ contract e2e is OnRampSetup {
       returnData: ""
     });
 
+    vm.resumeGasMetering();
     s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1));
   }
 }
