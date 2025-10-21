@@ -901,7 +901,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @param rateLimitConfigArgs Array of structs containing remote chain selectors and their rate limiter configs.
   function setCustomFinalityRateLimitConfig(
     CustomFinalityRateLimitConfigArgs[] calldata rateLimitConfigArgs
-  ) external virtual onlyOwner {
+  ) external virtual {
+    if (msg.sender != s_rateLimitAdmin && msg.sender != owner()) revert Unauthorized(msg.sender);
     _setCustomFinalityRateLimitConfig(rateLimitConfigArgs);
   }
 
