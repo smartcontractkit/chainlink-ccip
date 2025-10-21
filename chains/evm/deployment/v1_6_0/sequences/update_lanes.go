@@ -1,6 +1,5 @@
 package sequences
 
-/* TODO: Fix imports
 import (
 	"encoding/binary"
 	"math/big"
@@ -200,4 +199,3 @@ func TranslateTokenPrices(prices map[string]*big.Int) []fee_quoter.InternalToken
 	}
 	return result
 }
-*/
