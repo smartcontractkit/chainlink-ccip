@@ -26,13 +26,12 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
       - name: Display Go version
         run: go version
+      - name: Tidy
+        run: make gomodtidy
       - name: Install protoc
         run: make install-protoc
       - name: Re-Generate files
-        run: |
-          make generate
-      - name: Tidy
-        run: go mod tidy
+        run: make generate
       - name: ensure no changes
         run: |
           set -e
@@ -40,6 +39,6 @@ jobs:
           if [ ! -z "$git_status" ]; then
             git status
             git diff
-            echo "Error: modified files detected, run 'make generate' / 'go mod tidy'."
+            echo "Error: modified files detected, run 'make gomodtidy' / 'make generate' / ."
             exit 1
           fi

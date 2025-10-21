@@ -17,6 +17,7 @@ contract FeeQuoterSetup is TokenSetup {
   address internal constant CUSTOM_TOKEN_2 = address(bytes20(keccak256("CUSTOM_TOKEN_2")));
 
   uint32 internal constant MAX_DATA_SIZE = 30_000;
+  uint16 internal constant MAX_TOKENS_LENGTH = 1;
   uint32 internal constant MAX_GAS_LIMIT = 4_000_000;
 
   // OnRamp
