@@ -1,6 +1,5 @@
 package changesets_test
 
-/* TODO: Fix imports
 import (
 	"encoding/hex"
 	"math/big"
@@ -193,4 +192,3 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
 	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
 }
-*/
