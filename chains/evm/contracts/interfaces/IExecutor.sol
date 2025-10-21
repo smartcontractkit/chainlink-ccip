@@ -7,8 +7,10 @@ interface IExecutor {
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   function getFee(
     uint64 destChainSelector,
-    Client.EVM2AnyMessage memory message,
+    uint16 requestedBlockDepth,
+    uint32 dataLength,
+    uint8 numberOfTokens,
     Client.CCV[] memory ccvs,
     bytes memory extraArgs
-  ) external view returns (uint256);
+  ) external view returns (uint16 usdCents, uint32 gasLimit, uint32 destBytesOverhead);
 }
