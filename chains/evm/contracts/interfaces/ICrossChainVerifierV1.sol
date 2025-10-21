@@ -32,22 +32,23 @@ interface ICrossChainVerifierV1 is IERC165 {
     bytes memory ccvData
   ) external;
 
-  /// @notice Quotes the fee for a CCIP message to a destination chain.
-  /// @dev This takes EVM2AnyMessage (instead of MessageV1) because
-  /// the router client API that user contracts interact with (IRouterClient.getFee)
-  /// exposes EVM2AnyMessage. The on-ramp can translate to MessageV1 internally
-  /// where required (e.g., verifier hooks), but using EVM2AnyMessage here keeps the
-  /// interface aligned with what clients construct and pass to the router.
-  /// @param originalCaller The original caller of getFee.
+  /// @notice Quotes the fee, including gas and calldata bytes, for a CCIP message to a destination chain.
+  /// @dev This takes EVM2AnyMessage (instead of MessageV1) because the router client API that user contracts interact
+  /// with exposes EVM2AnyMessage. The onRamp can translate to MessageV1 internally where required (e.g., verifier or
+  /// executor hooks), but using EVM2AnyMessage here keeps the interface aligned with what clients construct and pass to
+  /// the router.
+  /// @param originalCaller The original caller of getFee, this is required to support proxy patterns.
   /// @param destChainSelector The destination chain selector of the message.
   /// @param message The message to be sent.
-  /// @param extraArgs Opaque extra args that can be used by the fee quoter
+  /// @param extraArgs Opaque extra args that can be used by the fee quoter,
+  /// @param finalityConfig Finality configuration.
   function getFee(
     address originalCaller,
     uint64 destChainSelector,
     Client.EVM2AnyMessage memory message,
-    bytes memory extraArgs
-  ) external view returns (uint256);
+    bytes memory extraArgs,
+    uint16 finalityConfig
+  ) external view returns (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes);
 
   /// @notice Message sending, verifier hook.
   /// @param originalCaller The original caller of forwardToVerifier.
