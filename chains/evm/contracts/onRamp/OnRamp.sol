@@ -211,7 +211,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 2. get pool params, this potentially mutates the CCV list.
 
-  address[] memory poolRequiredCCVs = new address[](0);
+    address[] memory poolRequiredCCVs = new address[](0);
     if (message.tokenAmounts.length != 0) {
       poolRequiredCCVs = _getCCVsForPool(
         destChainSelector,
@@ -246,10 +246,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
+    address feeToken = message.feeToken;
+    uint256 feeTokenAmount = feeTokenAmount;
     for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.ccvs[i];
       eventData.verifierBlobs[i] = ICrossChainVerifierV1(ccv.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, message.feeToken, feeTokenAmount, ccv.args
+        address(this), newMessage, messageId, feeToken, feeTokenAmount, ccv.args
       );
     }
 
@@ -610,9 +612,17 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
     // Update the CCVs list to include lane mandated and pool required CCVs.
-    resolvedExtraArgs.ccvs = _mergeCCVLists(
-      resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector, message)
-    );
+    address[] memory poolRequiredCCVs = new address[](0);
+    if (message.tokenAmounts.length != 0) {
+      poolRequiredCCVs = _getCCVsForPool(
+        destChainSelector,
+        message.tokenAmounts[0].token,
+        message.tokenAmounts[0].amount,
+        resolvedExtraArgs.finalityConfig,
+        resolvedExtraArgs.tokenArgs
+      );
+    }
+    resolvedExtraArgs.ccvs = _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
 
     // We sum the fees for the verifier, executor and the pool (if any).
     Receipt[] memory receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
