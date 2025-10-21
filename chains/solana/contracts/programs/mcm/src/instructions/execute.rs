@@ -93,6 +93,12 @@ pub fn execute<'info>(
 
     invoke_signed(&instruction, acc_infos, signer)?;
 
+    // Reload the accounts to avoid Anchor writing back the stale outer copy on exit
+    // (in case the CPI modified any accounts present in this outer context)
+    ctx.accounts.multisig_config.reload()?;
+    ctx.accounts.root_metadata.reload()?;
+    ctx.accounts.expiring_root_and_op_count.reload()?;
+
     emit!(OpExecuted {
         nonce,
         to: instruction.program_id,
