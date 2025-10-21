@@ -695,7 +695,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     Client.EVM2AnyMessage memory message,
     uint64 destChainSelector
   ) internal view returns (uint256) {
-    return IExecutor(extraArgs.executor).getFee(destChainSelector, message, extraArgs.ccvs, extraArgs.executorArgs);
+    return IExecutor(extraArgs.executor).getFee(
+      address(this), destChainSelector, message, extraArgs.ccvs, extraArgs.executorArgs
+    );
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.

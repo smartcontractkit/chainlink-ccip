@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Proxy} from "../../Proxy.sol";
 import {Router} from "../../Router.sol";
 import {CommitteeVerifier} from "../../ccvs/CommitteeVerifier.sol";
-import {VerifierProxy} from "../../ccvs/VerifierProxy.sol";
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -48,7 +48,7 @@ contract e2e is OnRampSetup {
     });
     committeeVerifier.applyDestChainConfigUpdates(destChainConfigs);
 
-    s_userSpecifiedCCV = address(new VerifierProxy(address(committeeVerifier)));
+    s_userSpecifiedCCV = address(new Proxy(address(committeeVerifier)));
 
     // OffRamp side
     s_offRamp = new OffRampHelper(
