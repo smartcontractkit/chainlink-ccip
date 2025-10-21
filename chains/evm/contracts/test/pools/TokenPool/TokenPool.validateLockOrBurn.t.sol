@@ -17,7 +17,6 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0);
-    (, uint16 bps) = s_tokenPool.getCustomFinalityConfig();
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {

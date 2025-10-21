@@ -13,7 +13,7 @@ contract SignatureQuorumValidator_constructor is SignatureValidatorSetup {
     testSigners[0] = vm.addr(PRIVATE_KEY_0);
     verifier.setSignatureConfig(testSigners, 1);
 
-    uint256 expectedChainId = block.chainid;
+    uint256 expectedChainId = uint128(block.chainid);
     uint256 newChainId = expectedChainId + 100000;
 
     // Simulate chain fork by changing chain ID.

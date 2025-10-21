@@ -90,13 +90,20 @@ func TestConfigureChainForLanes(t *testing.T) {
 					OffRamp:            offRamp,
 					RemoteChains: map[uint64]sequences.RemoteChainConfig{
 						remoteChainSelector: {
-							AllowTrafficFrom:                 true,
-							CCIPMessageSource:                ccipMessageSource,
-							CCIPMessageDest:                  ccipMessageDest,
-							DefaultInboundCCVs:               []common.Address{committeeVerifier},
-							DefaultOutboundCCVs:              []common.Address{committeeVerifier},
-							DefaultExecutor:                  Executor,
-							CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{},
+							AllowTrafficFrom:    true,
+							CCIPMessageSource:   ccipMessageSource,
+							CCIPMessageDest:     ccipMessageDest,
+							DefaultInboundCCVs:  []common.Address{committeeVerifier},
+							DefaultOutboundCCVs: []common.Address{committeeVerifier},
+							DefaultExecutor:     Executor,
+							CommitteeVerifierDestChainConfig: sequences.CommitteeVerifierDestChainConfig{
+								AllowlistEnabled:          false,
+								AddedAllowlistedSenders:   nil,
+								RemovedAllowlistedSenders: nil,
+								FeeUSDCents:               50,
+								GasForVerification:        50_000,
+								PayloadSizeBytes:          6*64 + 2*32,
+							},
 							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
 							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
 						},
