@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "chains/solana/contracts/target/idl/base_token_pool.json"
+      - "chains/solana/contracts/target/idl/burnmint_token_pool.json"
+      - "chains/solana/contracts/target/idl/lockrelease_token_pool.json"
       - "chains/solana/contracts/target/idl/ccip_common.json"
       - "chains/solana/contracts/target/idl/ccip_offramp.json"
       - "chains/solana/contracts/target/idl/ccip_router.json"
