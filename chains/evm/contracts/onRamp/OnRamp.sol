@@ -39,6 +39,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InvalidDestChainConfig(uint64 destChainSelector);
   error ReentrancyGuardReentrantCall();
   error InvalidOptionalCCVThreshold();
+  error DestinationChainNotSupported(uint64 destChainSelector);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -208,8 +209,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 2. get pool params, this potentially mutates the CCV list.
 
-    resolvedExtraArgs.ccvs =
-      _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector));
+    resolvedExtraArgs.ccvs = _mergeCCVLists(
+      resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector, message)
+    );
 
     // 3. getFee on all verifiers, pool and executor.
 
@@ -522,8 +524,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   // TODO this function currently returns the default CCVs.
   function _getCCVsForPool(
-    uint64 destChainSelector
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message
   ) internal view returns (address[] memory) {
+    if (message.tokenAmounts.length == 0) {
+      return new address[](0);
+    }
+
     // TODO pool call to get CCVs from IPoolV2 getRequiredCCVs
     return s_destChainConfigs[destChainSelector].defaultCCVs;
   }
@@ -541,11 +548,15 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount) {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    if (address(destChainConfig.router) == address(0)) {
+      revert DestinationChainNotSupported(destChainSelector);
+    }
 
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
     // Update the CCVs list to include lane mandated and pool required CCVs.
-    resolvedExtraArgs.ccvs =
-      _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector));
+    resolvedExtraArgs.ccvs = _mergeCCVLists(
+      resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector, message)
+    );
 
     // We sum the fees for the verifier, executor and the pool (if any).
     Receipt[] memory receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);

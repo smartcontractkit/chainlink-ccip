@@ -19,6 +19,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   OnRamp internal s_onRamp;
   OffRamp internal s_offRampOnRemoteChain = OffRamp(makeAddr("OffRampRemote"));
 
+  address internal s_defaultCCV;
+  address internal s_defaultExecutor;
+
   function setUp() public virtual override {
     super.setUp();
 
@@ -34,9 +37,11 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
+    s_defaultCCV = address(new MockVerifier(""));
+    s_defaultExecutor = address(new MockExecutor());
 
     address[] memory defaultCCVs = new address[](1);
-    defaultCCVs[0] = address(new MockVerifier(""));
+    defaultCCVs[0] = s_defaultCCV;
 
     OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
     destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
@@ -44,7 +49,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       router: s_sourceRouter,
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
-      defaultExecutor: address(new MockExecutor()),
+      defaultExecutor: s_defaultExecutor,
       offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
