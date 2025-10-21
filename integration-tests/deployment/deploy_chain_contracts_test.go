@@ -2,22 +2,27 @@ package deployment
 
 import (
 	"context"
+	"math/big"
 	"os"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/changesets"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
+	mcmsops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/mcms"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokenops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
@@ -54,6 +59,22 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+	dReg := mcmsapi.GetRegistry()
+	cs := mcmsapi.DeployMCMS(dReg)
+	output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
+		Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
+			chain_selectors.SOLANA_MAINNET.Selector: {
+				Canceller:        mcmsapi.SingleGroupMCMSV2(),
+				Bypasser:         mcmsapi.SingleGroupMCMSV2(),
+				Proposer:         mcmsapi.SingleGroupMCMSV2(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String(common_utils.CLLQualifier),
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	e.DataStore = output.DataStore.Seal()
 }
 
 var solanaProgramIDs = map[string]string{
@@ -63,20 +84,23 @@ var solanaProgramIDs = map[string]string{
 	// "lockrelease_token_pool":    "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
 	"fee_quoter": "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
 	// "test_ccip_receiver":        "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
-	"ccip_offramp": "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
-	// "mcm":                       "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
-	// "timelock":                  "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
-	// "access_controller":         "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
+	"ccip_offramp":      "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
+	"mcm":               "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
+	"timelock":          "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
+	"access_controller": "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
 	// "external_program_cpi_stub": "2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm",
 	"rmn_remote": "RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7",
 	// "cctp_token_pool":           "CCiTPESGEevd7TBU8EGBKrcxuRq7jx3YtW6tPidnscaZ",
 }
 
 var solanaContracts = map[string]datastore.ContractType{
-	"ccip_router":  datastore.ContractType(routerops.ContractType),
-	"fee_quoter":   datastore.ContractType(fqops.ContractType),
-	"ccip_offramp": datastore.ContractType(offrampops.ContractType),
-	"rmn_remote":   datastore.ContractType(rmnremoteops.ContractType),
+	"ccip_router":       datastore.ContractType(routerops.ContractType),
+	"fee_quoter":        datastore.ContractType(fqops.ContractType),
+	"ccip_offramp":      datastore.ContractType(offrampops.ContractType),
+	"rmn_remote":        datastore.ContractType(rmnremoteops.ContractType),
+	"mcm":               datastore.ContractType(mcmsops.McmProgramType),
+	"timelock":          datastore.ContractType(mcmsops.TimelockProgramType),
+	"access_controller": datastore.ContractType(mcmsops.AccessControllerProgramType),
 }
 
 func PreloadSolanaEnvironment(chainSelector uint64) (string, *datastore.MemoryDataStore, error) {

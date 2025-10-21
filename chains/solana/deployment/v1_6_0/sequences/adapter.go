@@ -11,7 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
-	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	laneapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
@@ -20,7 +21,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
+	laneapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
+	mcmsapi.GetRegistry().RegisterDeployer(chain_selectors.FamilySolana, mcmsapi.MCMSVersion, &SolanaAdapter{})
 }
 
 type SolanaAdapter struct{}

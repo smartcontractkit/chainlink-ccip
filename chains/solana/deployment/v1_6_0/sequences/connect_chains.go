@@ -26,7 +26,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 	"Configures lane leg as source on CCIP 1.6.0",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
-		fmt.Println("SVM Configuring lane leg as source:", input)
+		b.Logger.Info("SVM Configuring lane leg as source:", input)
 		feeQuoterAddress := solana.PublicKeyFromBytes(input.Source.FeeQuoter)
 		offRampAddress := solana.PublicKeyFromBytes(input.Source.OffRamp)
 		ccipRouterProgram := solana.PublicKeyFromBytes(input.Source.Router)
@@ -71,7 +71,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 	"Configures lane leg as destination on CCIP 1.6.0",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
-		fmt.Println("SVM Configuring lane leg as destination:", input)
+		b.Logger.Info("SVM Configuring lane leg as destination:", input)
 		feeQuoterAddress := solana.PublicKeyFromBytes(input.Source.FeeQuoter)
 		offRampAddress := solana.PublicKeyFromBytes(input.Source.OffRamp)
 		ccipRouterProgram := solana.PublicKeyFromBytes(input.Source.Router)
