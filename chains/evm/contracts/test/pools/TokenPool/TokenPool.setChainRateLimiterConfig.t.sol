@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
+
+import {IMessageTransmitter} from "../../../pools/USDC/interfaces/IMessageTransmitter.sol";
 import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
 
 contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
@@ -15,8 +19,10 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
     newTime = uint32(bound(newTime, block.timestamp + 1, type(uint32).max));
     vm.warp(newTime);
 
-    uint256 oldOutboundTokens = s_tokenPool.getCurrentOutboundRateLimiterState(DEST_CHAIN_SELECTOR).tokens;
-    uint256 oldInboundTokens = s_tokenPool.getCurrentInboundRateLimiterState(DEST_CHAIN_SELECTOR).tokens;
+    uint256 oldOutboundTokens =
+      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, IPoolV2.MessageDirection.Outbound).tokens;
+    uint256 oldInboundTokens =
+      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, IPoolV2.MessageDirection.Inbound).tokens;
 
     RateLimiter.Config memory newOutboundConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
     RateLimiter.Config memory newInboundConfig =
@@ -33,7 +39,8 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
 
     uint256 expectedTokens = RateLimiter._min(newOutboundConfig.capacity, oldOutboundTokens);
 
-    RateLimiter.TokenBucket memory bucket = s_tokenPool.getCurrentOutboundRateLimiterState(DEST_CHAIN_SELECTOR);
+    RateLimiter.TokenBucket memory bucket =
+      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, IPoolV2.MessageDirection.Outbound);
     assertEq(bucket.capacity, newOutboundConfig.capacity);
     assertEq(bucket.rate, newOutboundConfig.rate);
     assertEq(bucket.tokens, expectedTokens);
@@ -41,7 +48,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
 
     expectedTokens = RateLimiter._min(newInboundConfig.capacity, oldInboundTokens);
 
-    bucket = s_tokenPool.getCurrentInboundRateLimiterState(DEST_CHAIN_SELECTOR);
+    bucket = s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, IPoolV2.MessageDirection.Inbound);
     assertEq(bucket.capacity, newInboundConfig.capacity);
     assertEq(bucket.rate, newInboundConfig.rate);
     assertEq(bucket.tokens, expectedTokens);

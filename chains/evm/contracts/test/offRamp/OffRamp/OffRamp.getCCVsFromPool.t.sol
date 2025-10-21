@@ -22,9 +22,9 @@ contract MockPoolV2 {
     uint256,
     uint16,
     bytes memory,
-    IPoolV2.CCVDirection direction
+    IPoolV2.MessageDirection direction
   ) external view returns (address[] memory) {
-    if (direction != IPoolV2.CCVDirection.Inbound) revert("direction");
+    if (direction != IPoolV2.MessageDirection.Inbound) revert("direction");
     return s_requiredCCVs;
   }
 

@@ -16,7 +16,7 @@ interface IPoolV2 is IPoolV1 {
     bool isEnabled; // ──────────╯ Whether this token has custom transfer fees.
   }
 
-  enum CCVDirection {
+  enum MessageDirection {
     Outbound,
     Inbound
   }
@@ -56,7 +56,7 @@ interface IPoolV2 is IPoolV1 {
     uint256 amount,
     uint16 finality,
     bytes calldata extraData,
-    CCVDirection direction
+    MessageDirection direction
   ) external view returns (address[] memory requiredCCVs);
 
   /// @notice Returns the fee overrides for transferring the pool's token to a destination chain.

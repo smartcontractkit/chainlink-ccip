@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
@@ -19,14 +21,14 @@ contract TokenPoolV2_setCustomFinalityRateLimitConfig is TokenPoolV2Setup {
     s_tokenPool.setCustomFinalityRateLimitConfig(args);
 
     RateLimiter.TokenBucket memory outboundBucket =
-      s_tokenPool.getCurrentOutboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
+      s_tokenPool.getCurrentCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR, IPoolV2.MessageDirection.Outbound);
     assertTrue(outboundBucket.isEnabled);
     assertEq(outboundBucket.capacity, outboundConfig.capacity);
     assertEq(outboundBucket.rate, outboundConfig.rate);
     assertEq(outboundBucket.tokens, outboundConfig.capacity);
 
     RateLimiter.TokenBucket memory inboundBucket =
-      s_tokenPool.getCurrentInboundCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR);
+      s_tokenPool.getCurrentCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR, IPoolV2.MessageDirection.Inbound);
     assertTrue(inboundBucket.isEnabled);
     assertEq(inboundBucket.capacity, inboundConfig.capacity);
     assertEq(inboundBucket.rate, inboundConfig.rate);

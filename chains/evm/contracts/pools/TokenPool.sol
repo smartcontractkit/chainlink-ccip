@@ -65,6 +65,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   error MismatchedArrayLengths();
   error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
   error InvalidDecimalArgs(uint8 expected, uint8 actual);
+  error InvalidMessageDirection(IPoolV2.MessageDirection direction);
 
   event LockedOrBurned(uint64 indexed remoteChainSelector, address token, address sender, uint256 amount);
   event ReleasedOrMinted(
@@ -732,22 +733,22 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param direction The message direction, either outbound or inbound.
   /// @return The token bucket.
-  function getCurrentOutboundRateLimiterState(
-    uint64 remoteChainSelector
+  function getCurrentRateLimiterState(
+    uint64 remoteChainSelector,
+    IPoolV2.MessageDirection direction
   ) external view returns (RateLimiter.TokenBucket memory) {
-    return s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._currentTokenBucketState();
+    if (direction == IPoolV2.MessageDirection.Outbound) {
+      return s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._currentTokenBucketState();
+    } else if (direction == IPoolV2.MessageDirection.Inbound) {
+      return s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._currentTokenBucketState();
+    }
+    revert InvalidMessageDirection(direction);
   }
 
-  /// @notice Gets the token bucket with its values for the block it was requested at.
-  /// @return The token bucket.
-  function getCurrentInboundRateLimiterState(
-    uint64 remoteChainSelector
-  ) external view returns (RateLimiter.TokenBucket memory) {
-    return s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._currentTokenBucketState();
-  }
-
-  /// @notice Returns the finality threshold and custom-finality fee configured for custom-finality transfers.
+  /// @notice Returns the finality threshold and transfer fee configured for custom-finality transfers.
   function getCustomFinalityConfig()
     external
     view
@@ -757,19 +758,19 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @notice Gets the current outbound custom-finality rate limiter state for a given remote chain.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param direction The message direction, either outbound or inbound.
   /// @return The token bucket reflecting the state at the time of the call.
-  function getCurrentOutboundCustomFinalityRateLimiterState(
-    uint64 remoteChainSelector
+  function getCurrentCustomFinalityRateLimiterState(
+    uint64 remoteChainSelector,
+    IPoolV2.MessageDirection direction
   ) external view returns (RateLimiter.TokenBucket memory) {
-    return s_finalityConfig.outboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState();
-  }
-
-  /// @notice Gets the current inbound custom-finality rate limiter state for a given remote chain.
-  /// @return The token bucket reflecting the state at the time of the call.
-  function getCurrentInboundCustomFinalityRateLimiterState(
-    uint64 remoteChainSelector
-  ) external view returns (RateLimiter.TokenBucket memory) {
-    return s_finalityConfig.inboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState();
+    if (direction == IPoolV2.MessageDirection.Outbound) {
+      return s_finalityConfig.outboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState();
+    } else if (direction == IPoolV2.MessageDirection.Inbound) {
+      return s_finalityConfig.inboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState();
+    }
+    revert InvalidMessageDirection(direction);
   }
 
   /// @notice Sets multiple chain rate limiter configs.
@@ -1017,10 +1018,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     uint256 amount,
     uint16, // finality
     bytes calldata, // extraData
-    IPoolV2.CCVDirection direction
+    IPoolV2.MessageDirection direction
   ) external view virtual returns (address[] memory requiredCCVs) {
     CCVConfig storage config = s_verifierConfig[remoteChainSelector];
-    if (direction == IPoolV2.CCVDirection.Inbound) {
+    if (direction == IPoolV2.MessageDirection.Inbound) {
       return _resolveRequiredCCVs(config.inboundCCVs, config.inboundCCVsToAddAboveThreshold, amount);
     }
     return _resolveRequiredCCVs(config.outboundCCVs, config.outboundCCVsToAddAboveThreshold, amount);

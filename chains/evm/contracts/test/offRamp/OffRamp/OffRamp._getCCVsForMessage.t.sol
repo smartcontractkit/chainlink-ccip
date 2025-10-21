@@ -194,7 +194,7 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
           tokenAmounts[0].amount,
           0,
           tokenAmounts[0].extraData,
-          IPoolV2.CCVDirection.Inbound
+          IPoolV2.MessageDirection.Inbound
         )
       ),
       abi.encode(ccvs)
