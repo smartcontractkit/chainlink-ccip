@@ -47,10 +47,10 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
   }
 
   function test_mergeCCVLists_SkipsDuplicatesInPoolRequiredCCV() public {
-    // Setup pool CCVs with duplicates.
     address poolCCV1 = makeAddr("poolCCV1");
     address poolCCV2 = makeAddr("poolCCV2");
 
+    // Setup pool CCVs with duplicates.
     address[] memory poolRequiredCCV = new address[](3);
     poolRequiredCCV[0] = poolCCV1;
     poolRequiredCCV[1] = poolCCV1; // Duplicate
@@ -84,17 +84,44 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     _assertCCVArraysEqual(newRequiredCCVs, userSpecifiedCCVs);
   }
 
-  function test_mergeCCVLists_EmptyPoolRequiredCCV() public {
-    address[] memory poolRequiredCCV = new address[](0);
+  function test_mergeCCVLists_PoolFallbackDefaults_UsesDefaults() public {
+    address[] memory defaultCCVs = new address[](2);
+    defaultCCVs[0] = makeAddr("defaultCCV1");
+    defaultCCVs[1] = makeAddr("defaultCCV2");
 
     Client.CCV[] memory userSpecifiedCCVs = new Client.CCV[](1);
     userSpecifiedCCVs[0] = Client.CCV({ccvAddress: makeAddr("requiredCCV1"), args: "required1"});
 
+    address[] memory poolRequiredCCV = new address[](defaultCCVs.length);
+    poolRequiredCCV[0] = defaultCCVs[0];
+    poolRequiredCCV[1] = defaultCCVs[1];
+
     Client.CCV[] memory newRequiredCCVs =
       s_onRampTestHelper.mergeCCVLists(userSpecifiedCCVs, new address[](0), poolRequiredCCV);
 
+    Client.CCV[] memory expectedRequired = new Client.CCV[](3);
+    expectedRequired[0] = userSpecifiedCCVs[0];
+    expectedRequired[1] = Client.CCV({ccvAddress: defaultCCVs[0], args: ""});
+    expectedRequired[2] = Client.CCV({ccvAddress: defaultCCVs[1], args: ""});
+
     // Should return original arrays unchanged.
-    _assertCCVArraysEqual(newRequiredCCVs, userSpecifiedCCVs);
+    _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
+  }
+
+  function test_mergeCCVLists_NoPoolProcessing_KeepsUserAndLaneOnly() public {
+    Client.CCV[] memory userSpecifiedCCVs = new Client.CCV[](1);
+    userSpecifiedCCVs[0] = Client.CCV({ccvAddress: makeAddr("userCCV"), args: "userArgs"});
+
+    address[] memory laneMandatedCCVs = new address[](1);
+    laneMandatedCCVs[0] = makeAddr("laneCCV");
+
+    Client.CCV[] memory newRequiredCCVs =
+      s_onRampTestHelper.mergeCCVLists(userSpecifiedCCVs, laneMandatedCCVs, new address[](0));
+
+    Client.CCV[] memory expectedRequired = new Client.CCV[](2);
+    expectedRequired[0] = userSpecifiedCCVs[0];
+    expectedRequired[1] = Client.CCV({ccvAddress: laneMandatedCCVs[0], args: ""});
+    _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
   }
 
   function test_mergeCCVLists_DedupUserAndMandatoryCCVs() public {
@@ -104,7 +131,8 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     laneMandatedCCVs[0] = makeAddr("laneMandatedCCV1");
     laneMandatedCCVs[1] = requiredCCV1; // This one is also in user specified list
 
-    address[] memory poolRequiredCCV = new address[](0);
+    address[] memory poolRequiredCCV = new address[](1);
+    poolRequiredCCV[0] = makeAddr("poolCCV1");
 
     Client.CCV[] memory userSpecifiedCCVs = new Client.CCV[](1);
     userSpecifiedCCVs[0] = Client.CCV({ccvAddress: requiredCCV1, args: "required1"});
@@ -112,9 +140,10 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     Client.CCV[] memory newRequiredCCVs =
       s_onRampTestHelper.mergeCCVLists(userSpecifiedCCVs, laneMandatedCCVs, poolRequiredCCV);
 
-    Client.CCV[] memory expectedRequired = new Client.CCV[](2);
+    Client.CCV[] memory expectedRequired = new Client.CCV[](3);
     expectedRequired[0] = Client.CCV({ccvAddress: requiredCCV1, args: userSpecifiedCCVs[0].args});
     expectedRequired[1] = Client.CCV({ccvAddress: laneMandatedCCVs[0], args: ""});
+    expectedRequired[2] = Client.CCV({ccvAddress: poolRequiredCCV[0], args: ""});
     _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
   }
 
@@ -134,6 +163,31 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     // Should result in only one instance of the CCV with user args preserved.
     Client.CCV[] memory expectedRequired = new Client.CCV[](1);
     expectedRequired[0] = Client.CCV({ccvAddress: requiredCCV1, args: userSpecifiedCCVs[0].args});
+    _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
+  }
+
+  function test_mergeCCVLists_PoolIncludesDefaults_DedupsAgainstUser() public {
+    address[] memory defaultCCVs = new address[](2);
+    defaultCCVs[0] = makeAddr("defaultCCV1");
+    defaultCCVs[1] = makeAddr("defaultCCV2");
+
+    address[] memory poolRequiredCCV = new address[](4);
+    poolRequiredCCV[0] = makeAddr("poolCCV1");
+    poolRequiredCCV[1] = makeAddr("poolCCV2");
+    poolRequiredCCV[2] = defaultCCVs[0];
+    poolRequiredCCV[3] = defaultCCVs[1];
+
+    Client.CCV[] memory userSpecifiedCCVs = new Client.CCV[](1);
+    userSpecifiedCCVs[0] = Client.CCV({ccvAddress: defaultCCVs[0], args: "userArgs"});
+
+    Client.CCV[] memory newRequiredCCVs =
+      s_onRampTestHelper.mergeCCVLists(userSpecifiedCCVs, new address[](0), poolRequiredCCV);
+
+    Client.CCV[] memory expectedRequired = new Client.CCV[](4);
+    expectedRequired[0] = Client.CCV({ccvAddress: defaultCCVs[0], args: "userArgs"});
+    expectedRequired[1] = Client.CCV({ccvAddress: poolRequiredCCV[0], args: ""});
+    expectedRequired[2] = Client.CCV({ccvAddress: poolRequiredCCV[1], args: ""});
+    expectedRequired[3] = Client.CCV({ccvAddress: defaultCCVs[1], args: ""});
     _assertCCVArraysEqual(newRequiredCCVs, expectedRequired);
   }
 }
