@@ -146,3 +146,44 @@ func FindPingPongCCIPSendSignerPDA(pingPongDemoProgram solana.PublicKey) (solana
 func FindNameAndVersionPDA(program solana.PublicKey) (solana.PublicKey, uint8, error) {
 	return solana.FindProgramAddress([][]byte{[]byte("name_version")}, program)
 }
+
+///////////////
+// MCMS PDAs //
+///////////////
+
+type PDASeed [32]byte
+
+func getPDA(programID solana.PublicKey, seeds [][]byte) solana.PublicKey {
+	pda, _, _ := solana.FindProgramAddress(seeds, programID)
+	return pda
+}
+
+func GetMCMSignerPDA(programID solana.PublicKey, msigID PDASeed) solana.PublicKey {
+	seeds := [][]byte{[]byte("multisig_signer"), msigID[:]}
+	return getPDA(programID, seeds)
+}
+
+func GetMCMConfigPDA(programID solana.PublicKey, msigID PDASeed) solana.PublicKey {
+	seeds := [][]byte{[]byte("multisig_config"), msigID[:]}
+	return getPDA(programID, seeds)
+}
+
+func GetMCMRootMetadataPDA(programID solana.PublicKey, msigID PDASeed) solana.PublicKey {
+	seeds := [][]byte{[]byte("root_metadata"), msigID[:]}
+	return getPDA(programID, seeds)
+}
+
+func GetMCMExpiringRootAndOpCountPDA(programID solana.PublicKey, pdaSeed PDASeed) solana.PublicKey {
+	seeds := [][]byte{[]byte("expiring_root_and_op_count"), pdaSeed[:]}
+	return getPDA(programID, seeds)
+}
+
+func GetTimelockConfigPDA(programID solana.PublicKey, timelockID PDASeed) solana.PublicKey {
+	seeds := [][]byte{[]byte("timelock_config"), timelockID[:]}
+	return getPDA(programID, seeds)
+}
+
+func GetTimelockSignerPDA(programID solana.PublicKey, timelockID PDASeed) solana.PublicKey {
+	seeds := [][]byte{[]byte("timelock_signer"), timelockID[:]}
+	return getPDA(programID, seeds)
+}
