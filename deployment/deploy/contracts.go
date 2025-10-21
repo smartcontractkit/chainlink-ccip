@@ -58,6 +58,15 @@ func DeployContracts(deployerReg *DeployerRegistry) cldf.ChangeSetV2[ContractDep
 
 func deployContractsVerify(_ *DeployerRegistry) func(cldf.Environment, ContractDeploymentConfig) error {
 	return func(e cldf.Environment, cfg ContractDeploymentConfig) error {
+		for selector, config := range cfg.Chains {
+			_, err := chain_selectors.GetSelectorFamily(selector)
+			if err != nil {
+				return fmt.Errorf("no selector %d found in environment: %w", selector, err)
+			}
+			if config.Version == nil {
+				return fmt.Errorf("no version specified for chain with selector %d", selector)
+			}
+		}
 		// TODO: implement
 		return nil
 	}

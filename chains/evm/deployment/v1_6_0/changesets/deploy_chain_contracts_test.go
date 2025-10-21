@@ -34,9 +34,23 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 			input: deployops.ContractDeploymentConfig{
 				MCMS: mcms.Input{},
 				Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
-					chain_selectors.ETHEREUM_MAINNET.Selector: {},
+					chain_selectors.ETHEREUM_MAINNET.Selector: {
+						Version: semver.MustParse("1.6.0"),
+					},
 				},
 			},
+		},
+		{
+			desc: "invalid version nil",
+			input: deployops.ContractDeploymentConfig{
+				MCMS: mcms.Input{},
+				Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+					chain_selectors.ETHEREUM_MAINNET.Selector: {
+						Version: nil,
+					},
+				},
+			},
+			expectedErr: "no version specified for chain with selector 5009297550715157269",
 		},
 		{
 			desc: "invalid chain selector",
@@ -46,7 +60,7 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 					12345: {},
 				},
 			},
-			expectedErr: "no EVM chain with selector 12345 found in environment",
+			expectedErr: "no selector 12345 found in environment: unknown chain selector 12345",
 		},
 	}
 
