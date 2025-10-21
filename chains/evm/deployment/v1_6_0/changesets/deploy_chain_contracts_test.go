@@ -1,19 +1,17 @@
 package changesets_test
 
 import (
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
@@ -28,26 +26,24 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 
 	tests := []struct {
 		desc        string
-		input       cs_core.WithMCMS[changesets.DeployChainContractsCfg]
+		input       deployops.ContractDeploymentConfig
 		expectedErr string
 	}{
 		{
 			desc: "valid input",
-			input: cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+			input: deployops.ContractDeploymentConfig{
 				MCMS: mcms.Input{},
-				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: chain_selectors.ETHEREUM_MAINNET.Selector,
-					Params:   sequences.ContractParams{},
+				Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+					chain_selectors.ETHEREUM_MAINNET.Selector: {},
 				},
 			},
 		},
 		{
 			desc: "invalid chain selector",
-			input: cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+			input: deployops.ContractDeploymentConfig{
 				MCMS: mcms.Input{},
-				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: 12345,
-					Params:   sequences.ContractParams{},
+				Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+					12345: {},
 				},
 			},
 			expectedErr: "no EVM chain with selector 12345 found in environment",
@@ -56,8 +52,8 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
-			err := changesets.DeployChainContracts(mcmsRegistry).VerifyPreconditions(*e, test.input)
+			dReg := deployops.GetRegistry()
+			err := deployops.DeployContracts(dReg).VerifyPreconditions(*e, test.input)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr, "Expected error containing %q but got none", test.expectedErr)
 			} else {
@@ -112,14 +108,19 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			require.NoError(t, err, "Failed to fetch addresses from datastore")
 			e.DataStore = ds.Seal() // Override datastore in environment to include existing addresses
 
-			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
-			out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+			dReg := deployops.GetRegistry()
+			out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 				MCMS: mcms.Input{},
-				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: chain_selectors.ETHEREUM_MAINNET.Selector,
-					Params: sequences.ContractParams{
-						FeeQuoter: fee_quoter.DefaultFeeQuoterParams(),
-						OffRamp:   offramp.DefaultOffRampParams(),
+				Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+					chain_selectors.ETHEREUM_MAINNET.Selector: {
+						// FEE QUOTER CONFIG
+						MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+						TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
+						LinkPremiumMultiplier:        9e17, // 0.9 ETH
+						NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
+						// OFFRAMP CONFIG
+						PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
+						GasForCallExactCheck:                    uint16(5000),
 					},
 				},
 			})

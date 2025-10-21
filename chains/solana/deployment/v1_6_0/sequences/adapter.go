@@ -12,8 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	laneapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 )
 
 func init() {

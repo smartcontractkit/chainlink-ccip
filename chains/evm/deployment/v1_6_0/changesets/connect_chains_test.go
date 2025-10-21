@@ -4,13 +4,11 @@ import (
 	"encoding/hex"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/changesets"
-	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
-	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
@@ -23,6 +21,7 @@ import (
 
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -141,14 +140,20 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 	require.NotNil(t, e, "Environment should be created")
 
 	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+	dReg := deployops.GetRegistry()
 	for _, chainSel := range chains {
-		out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
-			Cfg: changesets.DeployChainContractsCfg{
-				ChainSel: chainSel,
-				Params: sequences.ContractParams{
-					FeeQuoter: fqops.DefaultFeeQuoterParams(),
-					OffRamp:   offrampops.DefaultOffRampParams(),
+			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+				chainSel: {
+					// FEE QUOTER CONFIG
+					MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+					TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
+					LinkPremiumMultiplier:        9e17, // 0.9 ETH
+					NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
+					// OFFRAMP CONFIG
+					PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
+					GasForCallExactCheck:                    uint16(5000),
 				},
 			},
 		})

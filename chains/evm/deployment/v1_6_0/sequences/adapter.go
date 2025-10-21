@@ -14,6 +14,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 )
 
 func init() {
@@ -22,6 +23,7 @@ func init() {
 		panic(err)
 	}
 	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
+	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 }
 
 type EVMAdapter struct{}
