@@ -1,8 +1,6 @@
 package offramp
 
 import (
-	"time"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -59,10 +57,3 @@ var OffRampApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParam
 		return offRamp.ApplySourceChainConfigUpdates(opts, args)
 	},
 })
-
-func DefaultOffRampParams() OffRampParams {
-	return OffRampParams{
-		GasForCallExactCheck:                    uint16(5000),
-		PermissionLessExecutionThresholdSeconds: uint32((1 * time.Hour).Seconds()),
-	}
-}

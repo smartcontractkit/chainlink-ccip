@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -22,6 +23,7 @@ type MCMSDeploymentConfig struct {
 }
 
 type MCMSDeploymentConfigPerChain struct {
+	Version          *semver.Version  `json:"version"`
 	Canceller        mcmstypes.Config `json:"canceller"`
 	Bypasser         mcmstypes.Config `json:"bypasser"`
 	Proposer         mcmstypes.Config `json:"proposer"`
@@ -91,9 +93,9 @@ func deployMCMSApply(d *DeployerRegistry) func(cldf.Environment, MCMSDeploymentC
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			deployer, exists := d.GetDeployer(family, MCMSVersion)
+			deployer, exists := d.GetDeployer(family, mcmsCfg.Version)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, MCMSVersion.String())
+				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, mcmsCfg.Version.String())
 			}
 			// find existing addresses for this chain from the env
 			existingAddrs := d.ExistingAddressesForChain(e, selector)

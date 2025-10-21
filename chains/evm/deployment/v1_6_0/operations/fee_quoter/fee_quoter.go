@@ -92,16 +92,3 @@ func (c FeeQuoterParams) Validate() error {
 	}
 	return nil
 }
-
-func DefaultFeeQuoterParams() FeeQuoterParams {
-	return FeeQuoterParams{
-		MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-		TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
-		LinkPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
-		WethPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
-		TokenPriceFeedUpdates:          []fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
-		TokenTransferFeeConfigArgs:     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
-		MorePremiumMultiplierWeiPerEth: []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{},
-		DestChainConfigArgs:            []fee_quoter.FeeQuoterDestChainConfigArgs{},
-	}
-}

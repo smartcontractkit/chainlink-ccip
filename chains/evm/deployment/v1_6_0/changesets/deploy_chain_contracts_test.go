@@ -10,8 +10,8 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
@@ -109,10 +109,12 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			e.DataStore = ds.Seal() // Override datastore in environment to include existing addresses
 
 			dReg := deployops.GetRegistry()
+			version := semver.MustParse("1.6.0")
 			out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 				MCMS: mcms.Input{},
 				Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
 					chain_selectors.ETHEREUM_MAINNET.Selector: {
+						Version: version,
 						// FEE QUOTER CONFIG
 						MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
 						TokenPriceStalenessThreshold: uint32(24 * 60 * 60),

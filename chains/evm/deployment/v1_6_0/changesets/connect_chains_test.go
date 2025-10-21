@@ -20,8 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -141,11 +141,13 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 
 	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
 	dReg := deployops.GetRegistry()
+	version := semver.MustParse("1.6.0")
 	for _, chainSel := range chains {
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
 			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
 				chainSel: {
+					Version: version,
 					// FEE QUOTER CONFIG
 					MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
 					TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
@@ -163,7 +165,6 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 	}
 	evmEncoded, err := hex.DecodeString(ccipapi.EVMFamilySelector)
 	require.NoError(t, err, "Failed to decode EVM family selector")
-	laneVersion := semver.MustParse("1.6.0")
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e17),
@@ -178,7 +179,7 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
-				Version: laneVersion,
+				Version: version,
 				Source:  chain1,
 				Dest:    chain2,
 			},
@@ -189,11 +190,11 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 	src, dest := chains[0], chains[1]
 	srcFamily, err := chain_selectors.GetSelectorFamily(src)
 	require.NoError(t, err, "must get selector family for src")
-	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, laneVersion)
+	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, version)
 	require.True(t, exists, "must have ChainAdapter registered for src chain family")
 	destFamily, err := chain_selectors.GetSelectorFamily(dest)
 	require.NoError(t, err, "must get selector family for dest")
-	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, laneVersion)
+	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, version)
 	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
 	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
 }

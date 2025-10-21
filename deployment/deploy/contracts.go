@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -20,6 +21,7 @@ type ContractDeploymentConfig struct {
 }
 
 type ContractDeploymentConfigPerChain struct {
+	Version *semver.Version
 	// LINK TOKEN CONFIG
 	// token private key used to deploy the LINK token. Solana: base58 encoded private key
 	TokenPrivKey string
@@ -37,7 +39,7 @@ type ContractDeploymentConfigPerChain struct {
 	// Manual execution can be performed after this threshold (in seconds)
 	PermissionLessExecutionThresholdSeconds uint32
 	// EVM only.
-	GasForCallExactCheck			   uint16
+	GasForCallExactCheck uint16
 	// EVM only. Validates incoming messages to offramp
 	MessageInterceptor string
 	// RMN REMOTE CONFIG
@@ -70,9 +72,9 @@ func deployContractsApply(d *DeployerRegistry) func(cldf.Environment, ContractDe
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			deployer, exists := d.GetDeployer(family, MCMSVersion)
+			deployer, exists := d.GetDeployer(family, contractCfg.Version)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, MCMSVersion.String())
+				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, contractCfg.Version.String())
 			}
 			// find existing addresses for this chain from the env
 			existingAddrs := d.ExistingAddressesForChain(e, selector)

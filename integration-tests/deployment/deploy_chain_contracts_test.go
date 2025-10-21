@@ -18,9 +18,9 @@ import (
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
@@ -42,10 +42,12 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	mint, _ := solana.NewRandomPrivateKey()
 
 	dReg := mcmsapi.GetRegistry()
+	version := semver.MustParse("1.6.0")
 	_, err = mcmsapi.DeployContracts(dReg).Apply(*e, mcmsapi.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]mcmsapi.ContractDeploymentConfigPerChain{
 			chain_selectors.SOLANA_MAINNET.Selector: {
+				Version: version,
 				// LINK TOKEN CONFIG
 				// token private key used to deploy the LINK token. Solana: base58 encoded private key
 				TokenPrivKey: mint.String(),
@@ -64,6 +66,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
 		Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
 			chain_selectors.SOLANA_MAINNET.Selector: {
+				Version:          version,
 				Canceller:        mcmsapi.SingleGroupMCMSV2(),
 				Bypasser:         mcmsapi.SingleGroupMCMSV2(),
 				Proposer:         mcmsapi.SingleGroupMCMSV2(),
