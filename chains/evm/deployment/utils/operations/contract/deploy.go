@@ -233,13 +233,18 @@ func MaybeDeployContract[ARGS any](
 	input DeployInput[ARGS],
 	existingAddresses []datastore.AddressRef) (datastore.AddressRef, error) {
 	for _, ref := range existingAddresses {
+		if ref.ChainSelector != input.ChainSelector {
+			continue
+		}
 		if ref.Type == datastore.ContractType(input.TypeAndVersion.Type) &&
 			ref.Version.String() == input.TypeAndVersion.Version.String() {
 			if input.Qualifier != nil {
 				if ref.Qualifier == *input.Qualifier {
+					fmt.Println("Using existing address for", input.TypeAndVersion, "with qualifier", *input.Qualifier, "on chain", input.ChainSelector)
 					return ref, nil
 				}
 			} else {
+				fmt.Println("Using existing address for", input.TypeAndVersion, "on chain", input.ChainSelector)
 				return ref, nil
 			}
 		}

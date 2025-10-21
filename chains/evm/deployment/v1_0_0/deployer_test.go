@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
@@ -54,12 +55,15 @@ func SingleGroupMCMSV2(t *testing.T) mcmstypes.Config {
 
 func TestDeployMCMS(t *testing.T) {
 	t.Parallel()
-	selector := chainsel.TEST_90000001.Selector
+	selector1 := chainsel.TEST_90000001.Selector
+	selector2 := chainsel.TEST_90000002.Selector
 	env, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, []uint64{selector}),
+		environment.WithEVMSimulated(t, []uint64{selector1, selector2}),
 	)
 	require.NoError(t, err)
-	evmChain := env.BlockChains.EVMChains()[selector]
+	env.Logger = logger.Test(t)
+	evmChain1 := env.BlockChains.EVMChains()[selector1]
+	evmChain2 := env.BlockChains.EVMChains()[selector2]
 
 	evmDeployer := &EVMDeployer{}
 	dReg := v1_0.NewDeployerRegistry()
@@ -67,13 +71,21 @@ func TestDeployMCMS(t *testing.T) {
 	cs := v1_0.DeployMCMS(dReg)
 	output, err := cs.Apply(*env, v1_0.MCMSDeploymentConfig{
 		Chains: map[uint64]v1_0.MCMSDeploymentConfigPerChain{
-			selector: {
+			selector1: {
 				Canceller:        SingleGroupMCMSV2(t),
 				Bypasser:         SingleGroupMCMSV2(t),
 				Proposer:         SingleGroupMCMSV2(t),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
-				TimelockAdmin:    evmChain.DeployerKey.From,
+				TimelockAdmin:    evmChain1.DeployerKey.From,
+			},
+			selector2: {
+				Canceller:        SingleGroupMCMSV2(t),
+				Bypasser:         SingleGroupMCMSV2(t),
+				Proposer:         SingleGroupMCMSV2(t),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String("test"),
+				TimelockAdmin:    evmChain2.DeployerKey.From,
 			},
 		},
 	})
@@ -82,7 +94,7 @@ func TestDeployMCMS(t *testing.T) {
 	env.DataStore = output.DataStore.Seal()
 	// filter addresses for the test chain selector
 	proposerRef := env.DataStore.Addresses().Filter(
-		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByChainSelector(selector1),
 		datastore.AddressRefByType(datastore.ContractType(utils.ProposerManyChainMultisig)),
 		datastore.AddressRefByQualifier("test"),
 	)
@@ -90,7 +102,7 @@ func TestDeployMCMS(t *testing.T) {
 	require.NotEqual(t, common.Address{}, proposerRef[0].Address)
 
 	bypasserRef := env.DataStore.Addresses().Filter(
-		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByChainSelector(selector1),
 		datastore.AddressRefByType(datastore.ContractType(utils.BypasserManyChainMultisig)),
 		datastore.AddressRefByQualifier("test"),
 	)
@@ -98,7 +110,7 @@ func TestDeployMCMS(t *testing.T) {
 	require.NotEqual(t, common.Address{}, bypasserRef[0].Address)
 
 	cancellerRef := env.DataStore.Addresses().Filter(
-		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByChainSelector(selector1),
 		datastore.AddressRefByType(datastore.ContractType(utils.CancellerManyChainMultisig)),
 		datastore.AddressRefByQualifier("test"),
 	)
@@ -106,7 +118,7 @@ func TestDeployMCMS(t *testing.T) {
 	require.NotEqual(t, common.Address{}, cancellerRef[0].Address)
 
 	timelockRef := env.DataStore.Addresses().Filter(
-		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByChainSelector(selector1),
 		datastore.AddressRefByType(datastore.ContractType(utils.RBACTimelock)),
 		datastore.AddressRefByQualifier("test"),
 	)
@@ -114,7 +126,7 @@ func TestDeployMCMS(t *testing.T) {
 	require.NotEqual(t, common.Address{}, timelockRef[0].Address)
 
 	callProxyRef := env.DataStore.Addresses().Filter(
-		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByChainSelector(selector1),
 		datastore.AddressRefByType(datastore.ContractType(utils.CallProxy)),
 		datastore.AddressRefByQualifier("test"),
 	)
@@ -124,7 +136,7 @@ func TestDeployMCMS(t *testing.T) {
 	// query timelock and check the role assignments
 	timelockC, err := bindings.NewRBACTimelock(
 		common.HexToAddress(timelockRef[0].Address),
-		evmChain.Client)
+		evmChain1.Client)
 	require.NoError(t, err)
 
 	pRole, err := timelockC.PROPOSERROLE(&bind.CallOpts{Context: t.Context()})

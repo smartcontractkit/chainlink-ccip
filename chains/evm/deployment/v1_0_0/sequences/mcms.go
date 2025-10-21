@@ -12,13 +12,15 @@ import (
 	"github.com/smartcontractkit/mcms/sdk/evm"
 	"github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 )
 
 type SeqMCMSDeploymentCfg struct {
+	ChainSelector     uint64
 	ContractType      cldf.ContractType
 	MCMConfig         *types.Config
 	Label             *string
@@ -36,7 +38,7 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		switch in.ContractType {
 		case utils.ProposerManyChainMultisig:
 			mcmAddr, err = contract.MaybeDeployContract(b, ops.OpDeployProposerMCM, chain, contract.DeployInput[struct{}]{
-				ChainSelector:  chain.Selector,
+				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.ProposerManyChainMultisig, *semver.MustParse("1.0.0")),
 			}, in.ExistingAddresses)
@@ -45,7 +47,7 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 			}
 		case utils.BypasserManyChainMultisig:
 			mcmAddr, err = contract.MaybeDeployContract(b, ops.OpDeployBypasserMCM, chain, contract.DeployInput[struct{}]{
-				ChainSelector:  chain.Selector,
+				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.BypasserManyChainMultisig, *semver.MustParse("1.0.0")),
 			}, in.ExistingAddresses)
@@ -54,7 +56,7 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 			}
 		case utils.CancellerManyChainMultisig:
 			mcmAddr, err = contract.MaybeDeployContract(b, ops.OpDeployCancellerMCM, chain, contract.DeployInput[struct{}]{
-				ChainSelector:  chain.Selector,
+				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.CancellerManyChainMultisig, *semver.MustParse("1.0.0")),
 			}, in.ExistingAddresses)
@@ -72,7 +74,7 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		}
 		_, err = cldf_ops.ExecuteOperation(b, ops.OpEVMSetConfigMCM, chain,
 			contract.FunctionInput[ops.OpSetConfigMCMInput]{
-				ChainSelector: chain.Selector,
+				ChainSelector: in.ChainSelector,
 				Address:       common.HexToAddress(mcmAddr.Address),
 				Args: ops.OpSetConfigMCMInput{
 					SignerAddresses: signerAddresses,
@@ -85,6 +87,7 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
+
 		b.Logger.Infof("Deployed %s at address %s on chain %s", in.ContractType, mcmAddr.Address, chain.Name)
 		return sequences.OnChainOutput{
 			Addresses: []datastore.AddressRef{mcmAddr},
