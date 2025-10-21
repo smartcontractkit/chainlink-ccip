@@ -24,4 +24,14 @@ contract OnRampTestHelper is OnRamp {
   ) external pure returns (Client.CCV[] memory ccvs) {
     return _mergeCCVLists(userRequestedOrDefaultCCVs, laneMandatedCCVs, poolRequiredCCVs);
   }
+
+  function getCCVsForPool(
+    uint64 destChainSelector,
+    address token,
+    uint256 amount,
+    uint16 finality,
+    bytes memory tokenArgs
+  ) external view returns (address[] memory) {
+    return _getCCVsForPool(destChainSelector, token, amount, finality, tokenArgs);
+  }
 }
