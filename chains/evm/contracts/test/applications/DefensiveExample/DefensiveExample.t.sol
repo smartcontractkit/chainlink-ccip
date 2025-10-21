@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {DefensiveExample} from "../../../applications/DefensiveExample.sol";
 import {Client} from "../../../libraries/Client.sol";
-import {RouterSetup} from "../../router/Router/RouterSetup.t.sol";
+import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
