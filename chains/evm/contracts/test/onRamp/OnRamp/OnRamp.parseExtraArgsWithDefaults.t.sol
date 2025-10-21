@@ -12,7 +12,6 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
   address[] internal s_defaultCCVs;
   address[] internal s_laneMandatedCCVs;
-  address internal s_defaultExecutor;
   OnRamp.DestChainConfig internal s_destChainConfig;
 
   function setUp() public override {
@@ -37,8 +36,6 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
     s_laneMandatedCCVs = new address[](1);
     s_laneMandatedCCVs[0] = makeAddr("mandatedCCV1");
-
-    s_defaultExecutor = makeAddr("defaultExecutor");
 
     s_destChainConfig = OnRamp.DestChainConfig({
       router: s_sourceRouter,

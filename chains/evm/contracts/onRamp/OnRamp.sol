@@ -41,6 +41,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InvalidDestChainConfig(uint64 destChainSelector);
   error ReentrancyGuardReentrantCall();
   error InvalidOptionalCCVThreshold();
+  error DestinationChainNotSupported(uint64 destChainSelector);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -53,19 +54,22 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     bytes offRamp
   );
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
-  /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPMessageSent(
     uint64 indexed destChainSelector,
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
     bytes encodedMessage,
-    Receipt[] verifierReceipts,
-    Receipt executorReceipt,
-    bytes[] receiptBlobs
+    Receipt[] receipts,
+    bytes[] verifierBlobs
   );
 
+  struct CCIPMessageSentEventData {
+    bytes encodedMessage;
+    Receipt[] receipts;
+    bytes[] verifierBlobs;
+  }
+
   /// @dev Struct that contains the static configuration.
-  /// RMN depends on this struct, if changing, please notify the RMN maintainers.
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     uint64 chainSelector; // ────╮ Local chain selector.
@@ -76,8 +80,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev Struct that contains the dynamic configuration
   // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
-    address feeQuoter; // FeeQuoter address.
-    bool reentrancyGuardEntered; // Reentrancy protection.
+    address feeQuoter; // ───────────╮ FeeQuoter address.
+    bool reentrancyGuardEntered; // ─╯ Reentrancy protection.
     address feeAggregator; // Fee aggregator address.
   }
 
@@ -164,7 +168,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
     address originalSender
-  ) external returns (bytes32) {
+  ) external returns (bytes32 messageId) {
     // We rely on a reentrancy guard here due to the untrusted calls performed to the pools. This enables some
     // optimizations by not following the CEI pattern.
     if (s_dynamicConfig.reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
@@ -188,8 +192,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       tokenReceiver = abi.encode(message.receiver);
     }
 
-    // 2. get pool params, this potentially mutates CCV list.
-
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
@@ -207,7 +209,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       data: message.data
     });
 
-    address[] memory poolRequiredCCVs = new address[](0);
+    // 2. get pool params, this potentially mutates the CCV list.
+
+  address[] memory poolRequiredCCVs = new address[](0);
     if (message.tokenAmounts.length != 0) {
       poolRequiredCCVs = _getCCVsForPool(
         destChainSelector,
@@ -217,35 +221,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         resolvedExtraArgs.tokenArgs
       );
     }
-
     resolvedExtraArgs.ccvs = _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
 
-    // 3. getFee on all verifiers & executor.
+    // 3. getFee on all verifiers, pool and executor.
 
-    Receipt[] memory verifierReceipts = new Receipt[](resolvedExtraArgs.ccvs.length);
-
-    for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-      Client.CCV memory verifier = resolvedExtraArgs.ccvs[i];
-      verifierReceipts[i] = Receipt({
-        issuer: verifier.ccvAddress,
-        destGasLimit: 0, // TODO
-        destBytesOverhead: 0, // TODO
-        feeTokenAmount: 0, // TODO
-        extraArgs: verifier.args
-      });
-    }
-
-    Receipt memory executorReceipt = Receipt({
-      issuer: resolvedExtraArgs.executor,
-      destGasLimit: 0, // TODO
-      destBytesOverhead: 0, // TODO
-      feeTokenAmount: 0, // TODO
-      extraArgs: resolvedExtraArgs.executorArgs
-    });
-
-    // TODO: Handle the fee returned
-    // Currently only used for validations.
-    _getExecutorFee(resolvedExtraArgs, message, destChainSelector);
+    CCIPMessageSentEventData memory eventData;
+    // Populate receipts for verifiers, pool and executor in that order.
+    eventData.receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
     // 4. lockOrBurn
 
@@ -256,34 +238,29 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       );
     }
 
-    // created fresh locals like near the callsite to fix stack too deep.
-    address feeToken = message.feeToken;
-    uint256 feeTokenAmount2 = feeTokenAmount;
-    uint64 destChainSelector2 = destChainSelector;
-
     // 5. encode message and calculate messageId.
 
-    bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
-    bytes32 messageId = keccak256(encodedMessage);
-    bytes[] memory ccvBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
+    eventData.encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
+    messageId = keccak256(eventData.encodedMessage);
+
+    eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
     for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
       Client.CCV memory ccv = resolvedExtraArgs.ccvs[i];
-      ccvBlobs[i] = ICrossChainVerifierV1(ccv.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, feeToken, feeTokenAmount2, ccv.args
+      eventData.verifierBlobs[i] = ICrossChainVerifierV1(ccv.ccvAddress).forwardToVerifier(
+        address(this), newMessage, messageId, message.feeToken, feeTokenAmount, ccv.args
       );
     }
 
     // 7. emit event
     emit CCIPMessageSent(
-      destChainSelector2,
+      destChainSelector,
       newMessage.sequenceNumber,
       messageId,
-      encodedMessage,
-      verifierReceipts,
-      executorReceipt,
-      ccvBlobs
+      eventData.encodedMessage,
+      eventData.receipts,
+      eventData.verifierBlobs
     );
 
     s_dynamicConfig.reentrancyGuardEntered = false;
@@ -397,16 +374,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     return resolvedArgs;
-  }
-
-  function _getExecutorFee(
-    Client.EVMExtraArgsV3 memory resolvedExtraArgs,
-    Client.EVM2AnyMessage memory message,
-    uint64 destChainSelector
-  ) internal view returns (uint256) {
-    return IExecutor(resolvedExtraArgs.executor).getFee(
-      destChainSelector, message, resolvedExtraArgs.ccvs, resolvedExtraArgs.executorArgs
-    );
   }
 
   // ================================================================
@@ -634,12 +601,91 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @return feeTokenAmount The amount of fee token needed for the fee, in smallest denomination of the fee token.
   function getFee(
     uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata // message
+    Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount) {
-    if (i_rmnRemote.isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    if (address(destChainConfig.router) == address(0)) {
+      revert DestinationChainNotSupported(destChainSelector);
+    }
 
-    // TODO: Process msg & return fee
-    return 0;
+    Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
+    // Update the CCVs list to include lane mandated and pool required CCVs.
+    resolvedExtraArgs.ccvs = _mergeCCVLists(
+      resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector, message)
+    );
+
+    // We sum the fees for the verifier, executor and the pool (if any).
+    Receipt[] memory receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
+
+    uint256 destGasLimit = 0;
+    uint256 destBytesOverhead = 0;
+
+    // Sum all receipts.
+    for (uint256 i = 0; i < receipts.length; ++i) {
+      feeTokenAmount += receipts[i].feeTokenAmount;
+      destGasLimit += receipts[i].destGasLimit;
+      destBytesOverhead += receipts[i].destBytesOverhead;
+    }
+
+    // TODO: handle destBytes & gas
+
+    // TODO: it currently returns dollars, not fee token amount.
+    return feeTokenAmount;
+  }
+
+  function _getReceipts(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message,
+    Client.EVMExtraArgsV3 memory extraArgs
+  ) internal view returns (Receipt[] memory verifierReceipts) {
+    // Already ensure there's room for the token transfer and executor receipts.
+    verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
+
+    for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
+      Client.CCV memory verifier = extraArgs.ccvs[i];
+
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
+        verifier.ccvAddress
+      ).getFee(address(this), destChainSelector, message, verifier.args, extraArgs.finalityConfig);
+
+      verifierReceipts[i] = Receipt({
+        issuer: verifier.ccvAddress,
+        destGasLimit: gasForVerification,
+        destBytesOverhead: payloadSizeBytes,
+        feeTokenAmount: feeUSDCents,
+        extraArgs: verifier.args
+      });
+    }
+
+    // TODO gas & bytes for exec.
+    verifierReceipts[verifierReceipts.length - 1] = Receipt({
+      issuer: extraArgs.executor,
+      destGasLimit: 0,
+      destBytesOverhead: 0,
+      feeTokenAmount: _getExecutorFee(extraArgs, message, destChainSelector),
+      extraArgs: extraArgs.executorArgs
+    });
+
+    if (message.tokenAmounts.length > 0) {
+      // TODO pool fees
+      verifierReceipts[verifierReceipts.length - 2] = Receipt({
+        issuer: message.tokenAmounts[0].token,
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        feeTokenAmount: 0,
+        extraArgs: extraArgs.tokenArgs
+      });
+    }
+
+    return verifierReceipts;
+  }
+
+  function _getExecutorFee(
+    Client.EVMExtraArgsV3 memory extraArgs,
+    Client.EVM2AnyMessage memory message,
+    uint64 destChainSelector
+  ) internal view returns (uint256) {
+    return IExecutor(extraArgs.executor).getFee(destChainSelector, message, extraArgs.ccvs, extraArgs.executorArgs);
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
