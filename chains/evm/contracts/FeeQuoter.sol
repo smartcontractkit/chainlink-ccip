@@ -54,7 +54,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
 
   /// @dev Struct that contains the static configuration.
-  /// RMN depends on this struct, if changing, please notify the RMN maintainers.
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     uint96 maxFeeJuelsPerMsg; // ─╮ Maximum fee that can be charged for a message.
@@ -66,11 +65,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   struct DestChainConfig {
     bool isEnabled; // ────────────────────╮ Whether this destination chain is enabled.
     uint32 maxDataBytes; //                │ Maximum data payload size in bytes.
-    uint32 maxPerMsgGasLimit; //           │ Maximum gas limit for messages targeting EVMs.
+    uint32 maxPerMsgGasLimit; //           │ Maximum gas limit.
     uint32 destGasOverhead; //             │ Gas charged on top of the gasLimit to cover destination chain costs.
     uint8 destGasPerPayloadByteBase; //    │ Default dest-chain gas charged each byte of `data` payload.
     bytes4 chainFamilySelector; //         │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
-    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
+    // The following two properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
     uint16 defaultTokenFeeUSDCents; //     │ Default token fee charged per token transfer.
     uint32 defaultTokenDestGasOverhead; // │ Default gas charged to execute a token transfer on the destination chain.
     uint32 defaultTxGasLimit; //           │ Default gas limit for a tx.
@@ -933,7 +932,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   }
 
   /// @notice Returns the static FeeQuoter config.
-  /// @dev RMN depends on this function, if updated, please notify the RMN maintainers.
   /// @return staticConfig The static configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
     return StaticConfig({maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg, linkToken: i_linkToken});

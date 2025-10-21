@@ -111,9 +111,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
   struct Receipt {
-    address issuer; // The address of the entity that issued the receipt.
-    uint64 destGasLimit; // The gas limit for the actions taken on the destination chain for this entity.
-    uint32 destBytesOverhead; // The byte overhead for the actions taken on the destination chain for this entity.
+    address issuer; // ───────────╮ The address of the entity that issued the receipt.
+    uint64 destGasLimit; //       │ The gas limit for the actions taken on the destination chain for this entity.
+    uint32 destBytesOverhead; // ─╯ The byte overhead for the actions taken on the destination chain for this entity.
     uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
     bytes extraArgs; // Extra args that have been passed in on the source chain.
   }
@@ -197,7 +197,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // whereas MessageV1 expects just the raw bytes, so we strip the first 12 bytes.
       // TODO handle non-EVM chain families, maybe through fee quoter
       receiver: message.receiver[12:],
-      destBlob: "", // TODO for SVM
+      // Executor args hold security critical execution args, like Solana accounts or Sui object IDs. Because of this,
+      // they have to part of the message that is signed off on by the verifiers.
+      destBlob: resolvedExtraArgs.executorArgs,
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length), //  values are populated with _lockOrBurnSingleToken.
       data: message.data
     });
@@ -367,7 +369,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       resolvedArgs.executorArgs = extraArgs;
       resolvedArgs.ccvs = new Client.CCV[](destChainConfig.defaultCCVs.length);
       for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-        resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: extraArgs});
+        resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
       }
     }
 
@@ -668,12 +670,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       });
     }
 
-    // TODO gas & bytes for exec.
+    (uint16 usdCentsFee, uint64 execGasCost, uint32 execBytes) = _getExecutorFee(extraArgs, message, destChainSelector);
+
     verifierReceipts[verifierReceipts.length - 1] = Receipt({
       issuer: extraArgs.executor,
-      destGasLimit: 0,
-      destBytesOverhead: 0,
-      feeTokenAmount: _getExecutorFee(extraArgs, message, destChainSelector),
+      destGasLimit: execGasCost, // TODO add user gas limit
+      destBytesOverhead: execBytes,
+      feeTokenAmount: usdCentsFee,
       extraArgs: extraArgs.executorArgs
     });
 
@@ -693,10 +696,17 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   function _getExecutorFee(
     Client.EVMExtraArgsV3 memory extraArgs,
-    Client.EVM2AnyMessage memory message,
+    Client.EVM2AnyMessage calldata message,
     uint64 destChainSelector
-  ) internal view returns (uint256) {
-    return IExecutor(extraArgs.executor).getFee(destChainSelector, message, extraArgs.ccvs, extraArgs.executorArgs);
+  ) internal view returns (uint16 usdCentsFee, uint64 execGasCost, uint32 execBytes) {
+    return IExecutor(extraArgs.executor).getFee(
+      destChainSelector,
+      extraArgs.finalityConfig,
+      uint32(message.data.length),
+      uint8(message.tokenAmounts.length),
+      extraArgs.ccvs,
+      extraArgs.executorArgs
+    );
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
