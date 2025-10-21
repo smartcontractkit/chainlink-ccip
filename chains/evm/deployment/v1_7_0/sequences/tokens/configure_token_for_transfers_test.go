@@ -309,14 +309,14 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 // checkRemoteChainConfiguration verifies the configuration for a remote chain on the token pool
 func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remoteChainSel uint64, config tokens_core.RemoteChainConfig[[]byte, string]) {
 	// Check inbound rate limiter
-	inboundRateLimiter, err := tp.GetCurrentInboundRateLimiterState(nil, remoteChainSel)
+	inboundRateLimiter, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, inbound)
 	require.NoError(t, err, "Failed to get inbound rate limiter state")
 	require.Equal(t, config.InboundRateLimiterConfig.IsEnabled, inboundRateLimiter.IsEnabled, "Inbound rate limiter enabled state should match")
 	require.Equal(t, config.InboundRateLimiterConfig.Rate, inboundRateLimiter.Rate, "Inbound rate limiter rate should match")
 	require.Equal(t, config.InboundRateLimiterConfig.Capacity, inboundRateLimiter.Capacity, "Inbound rate limiter capacity should match")
 
 	// Check outbound rate limiter
-	outboundRateLimiter, err := tp.GetCurrentOutboundRateLimiterState(nil, remoteChainSel)
+	outboundRateLimiter, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, outbound)
 	require.NoError(t, err, "Failed to get outbound rate limiter state")
 	require.Equal(t, config.OutboundRateLimiterConfig.IsEnabled, outboundRateLimiter.IsEnabled, "Outbound rate limiter enabled state should match")
 	require.Equal(t, config.OutboundRateLimiterConfig.Rate, outboundRateLimiter.Rate, "Outbound rate limiter rate should match")
@@ -355,9 +355,9 @@ func assertCustomFinalityBucket(
 ) {
 	require.NotNil(t, expected, "expected custom finality config must be provided for selector %d", remoteChainSel)
 
-	outboundBucket, err := tp.GetCurrentOutboundCustomFinalityRateLimiterState(nil, remoteChainSel)
+	outboundBucket, err := tp.GetCurrentCustomFinalityRateLimiterState(nil, remoteChainSel, outbound)
 	require.NoError(t, err, "Failed to get outbound custom finality bucket for selector %d", remoteChainSel)
-	inboundBucket, err := tp.GetCurrentInboundCustomFinalityRateLimiterState(nil, remoteChainSel)
+	inboundBucket, err := tp.GetCurrentCustomFinalityRateLimiterState(nil, remoteChainSel, inbound)
 	require.NoError(t, err, "Failed to get inbound custom finality bucket for selector %d", remoteChainSel)
 
 	assertBucketMatchesConfig(t, outboundBucket, expected.Outbound)

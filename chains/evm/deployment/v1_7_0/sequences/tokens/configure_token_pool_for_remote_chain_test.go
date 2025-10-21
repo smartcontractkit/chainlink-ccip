@@ -49,13 +49,13 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 	require.Len(t, supportedChains, 1, "There should be 1 supported remote chain in the token pool")
 	require.Equal(t, remoteChainSel, supportedChains[0], "Remote chain in token pool should match expected")
 
-	inboundRateLimiterReport, err := tp.GetCurrentInboundRateLimiterState(nil, remoteChainSel)
+	inboundRateLimiterReport, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, inbound)
 	require.NoError(t, err, "Failed to get inbound rate limiter config from token pool")
 	require.Equal(t, input.RemoteChainConfig.InboundRateLimiterConfig.IsEnabled, inboundRateLimiterReport.IsEnabled, "Inbound rate limiter enabled state should match")
 	require.Equal(t, input.RemoteChainConfig.InboundRateLimiterConfig.Rate, inboundRateLimiterReport.Rate, "Inbound rate limiter rate should match")
 	require.Equal(t, input.RemoteChainConfig.InboundRateLimiterConfig.Capacity, inboundRateLimiterReport.Capacity, "Inbound rate limiter capacity should match")
 
-	outboundRateLimiterReport, err := tp.GetCurrentOutboundRateLimiterState(nil, remoteChainSel)
+	outboundRateLimiterReport, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, outbound)
 	require.NoError(t, err, "Failed to get outbound rate limiter config from token pool")
 	require.Equal(t, input.RemoteChainConfig.OutboundRateLimiterConfig.IsEnabled, outboundRateLimiterReport.IsEnabled, "Outbound rate limiter enabled state should match")
 	require.Equal(t, input.RemoteChainConfig.OutboundRateLimiterConfig.Rate, outboundRateLimiterReport.Rate, "Outbound rate limiter rate should match")

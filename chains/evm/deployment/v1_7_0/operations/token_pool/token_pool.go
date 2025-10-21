@@ -351,7 +351,7 @@ var GetCurrentInboundRateLimiterState = contract.NewRead(contract.ReadParams[uin
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterBucket, error) {
-		return tokenPool.GetCurrentInboundRateLimiterState(opts, args)
+		return tokenPool.GetCurrentRateLimiterState(opts, args, 1) // 1 = Inbound
 	},
 })
 
@@ -362,7 +362,7 @@ var GetCurrentOutboundRateLimiterState = contract.NewRead(contract.ReadParams[ui
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterBucket, error) {
-		return tokenPool.GetCurrentOutboundRateLimiterState(opts, args)
+		return tokenPool.GetCurrentRateLimiterState(opts, args, 0) // 0 = Outbound
 	},
 })
 

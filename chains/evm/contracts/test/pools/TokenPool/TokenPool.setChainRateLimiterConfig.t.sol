@@ -5,8 +5,6 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-
-import {IMessageTransmitter} from "../../../pools/USDC/interfaces/IMessageTransmitter.sol";
 import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
 
 contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
