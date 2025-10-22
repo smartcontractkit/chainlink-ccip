@@ -245,14 +245,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     eventData.encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
     messageId = keccak256(eventData.encodedMessage);
 
-    Client.CCV[] memory ccvs = resolvedExtraArgs.ccvs;
-    eventData.verifierBlobs = new bytes[](ccvs.length);
+    eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
     {
-      for (uint256 i = 0; i < ccvs.length; ++i) {
-        eventData.verifierBlobs[i] = ICrossChainVerifierV1(ccvs[i].ccvAddress).forwardToVerifier(
-          address(this), newMessage, messageId, message.feeToken, feeTokenAmount, ccvs[i].args
+      for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
+        eventData.verifierBlobs[i] = ICrossChainVerifierV1(resolvedExtraArgs.ccvs[i].ccvAddress).forwardToVerifier(
+          address(this), newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
         );
       }
     }
