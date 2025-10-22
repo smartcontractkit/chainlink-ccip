@@ -322,6 +322,19 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, ExecutorRef)
 
+		// Deploy ExecutorProxy
+		executorProxyRef, err := contract_utils.MaybeDeployContract(b, executor.DeployProxy, chain, contract.DeployInput[executor.ProxyConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(executor.ProxyType, *semver.MustParse("1.7.0")),
+			ChainSelector:  chain.Selector,
+			Args: executor.ProxyConstructorArgs{
+				ExecutorAddress: common.HexToAddress(ExecutorRef.Address),
+			},
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ExecutorProxy: %w", err)
+		}
+		addresses = append(addresses, executorProxyRef)
+
 		for _, mockReceiverParams := range input.ContractParams.MockReceivers {
 			requiredVerifiers, optionalVerifiers, err := getMockReceiverVerifiers(mockReceiverParams, addresses, input.ExistingAddresses)
 			if err != nil {

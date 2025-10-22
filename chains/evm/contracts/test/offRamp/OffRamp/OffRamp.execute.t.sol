@@ -58,9 +58,7 @@ contract OffRamp_execute is OffRampSetup {
 
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(
-        ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageHash, abi.encode("mock ccv data"))
-      ),
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageHash, abi.encode("mock ccv data"))),
       abi.encode(true)
     );
   }
@@ -214,7 +212,7 @@ contract OffRamp_execute is OffRampSetup {
     // Mock validateReport to pass initial checks.
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, ccvData[0])),
       abi.encode(true)
     );
 

@@ -251,7 +251,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     {
       for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
         eventData.verifierBlobs[i] = ICrossChainVerifierV1(resolvedExtraArgs.ccvs[i].ccvAddress).forwardToVerifier(
-          address(this), newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
+          newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
         );
       }
     }
@@ -657,7 +657,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
         verifier.ccvAddress
-      ).getFee(address(this), destChainSelector, message, verifier.args, extraArgs.finalityConfig);
+      ).getFee(destChainSelector, message, verifier.args, extraArgs.finalityConfig);
 
       verifierReceipts[i] = Receipt({
         issuer: verifier.ccvAddress,

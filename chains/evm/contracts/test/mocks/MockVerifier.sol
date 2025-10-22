@@ -24,7 +24,6 @@ contract MockVerifier is ICrossChainVerifierV1 {
   }
 
   function forwardToVerifier(
-    address,
     MessageV1Codec.MessageV1 calldata,
     bytes32,
     address,
@@ -35,7 +34,6 @@ contract MockVerifier is ICrossChainVerifierV1 {
   }
 
   function getFee(
-    address, // originalSender
     uint64, // destChainSelector
     Client.EVM2AnyMessage memory, // message
     bytes memory, // extraArgs
@@ -45,7 +43,6 @@ contract MockVerifier is ICrossChainVerifierV1 {
   }
 
   function verifyMessage(
-    address, // originalCaller
     MessageV1Codec.MessageV1 memory, // message
     bytes32 messageId, // messageId
     bytes memory ccvData // ccvData

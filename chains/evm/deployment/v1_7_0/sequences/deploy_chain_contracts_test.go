@@ -96,6 +96,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				rmn_proxy.ContractType:            false,
 				token_admin_registry.ContractType: false,
 				mock_receiver.ContractType:        false,
+				executor.ProxyType:                false,
 			}
 			for _, addr := range report.Output.Addresses {
 				exists[deployment.ContractType(addr.Type)] = true
