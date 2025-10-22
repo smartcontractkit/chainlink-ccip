@@ -23,7 +23,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedOutbound =
-      s_tokenPool.getRequiredCCVs(address(s_token), DEST_CHAIN_SELECTOR, 100, 0, "", IPoolV2.CCVDirection.Outbound);
+      s_tokenPool.getRequiredCCVs(address(s_token), DEST_CHAIN_SELECTOR, 100, 0, "", IPoolV2.MessageDirection.Outbound);
 
     assertEq(storedOutbound.length, outboundCCVs.length);
     assertEq(storedOutbound[0], outboundCCVs[0]);
@@ -53,14 +53,14 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedOutboundBelow = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount - 500, 0, "", IPoolV2.CCVDirection.Outbound
+      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount - 500, 0, "", IPoolV2.MessageDirection.Outbound
     );
     assertEq(storedOutboundBelow.length, 1);
     assertEq(storedOutboundBelow[0], outboundCCVs[0]);
 
     // Test with amount above threshold, should return base + additional CCVs.
     address[] memory storedOutboundAbove = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.CCVDirection.Outbound
+      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.MessageDirection.Outbound
     );
     assertEq(storedOutboundAbove.length, 2);
     assertEq(storedOutboundAbove[0], outboundCCVs[0]);
@@ -88,7 +88,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
 
     // Test with amount above threshold but no additional CCVs, should return only base CCVs.
     address[] memory storedOutbound = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.CCVDirection.Outbound
+      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.MessageDirection.Outbound
     );
     assertEq(storedOutbound.length, 1);
     assertEq(storedOutbound[0], outboundCCVs[0]);
@@ -111,7 +111,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedInbound =
-      s_tokenPool.getRequiredCCVs(address(s_token), DEST_CHAIN_SELECTOR, 100, 0, "", IPoolV2.CCVDirection.Inbound);
+      s_tokenPool.getRequiredCCVs(address(s_token), DEST_CHAIN_SELECTOR, 100, 0, "", IPoolV2.MessageDirection.Inbound);
 
     assertEq(storedInbound.length, inboundCCVs.length);
     assertEq(storedInbound[0], inboundCCVs[0]);
@@ -141,14 +141,14 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedInboundBelow = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount - 500, 0, "", IPoolV2.CCVDirection.Inbound
+      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount - 500, 0, "", IPoolV2.MessageDirection.Inbound
     );
     assertEq(storedInboundBelow.length, 1);
     assertEq(storedInboundBelow[0], inboundCCVs[0]);
 
     // Test with amount above threshold, should return base + additional CCVs.
     address[] memory storedInboundAbove = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.CCVDirection.Inbound
+      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.MessageDirection.Inbound
     );
     assertEq(storedInboundAbove.length, 2);
     assertEq(storedInboundAbove[0], inboundCCVs[0]);
@@ -176,7 +176,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
 
     // Test with amount above threshold but no additional CCVs, should return only base CCVs.
     address[] memory storedInbound = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.CCVDirection.Inbound
+      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.MessageDirection.Inbound
     );
     assertEq(storedInbound.length, 1);
     assertEq(storedInbound[0], inboundCCVs[0]);

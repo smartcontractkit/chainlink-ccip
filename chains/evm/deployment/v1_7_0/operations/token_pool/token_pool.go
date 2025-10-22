@@ -66,6 +66,18 @@ type DynamicConfigArgs struct {
 	ThresholdAmountForAdditionalCCVs *big.Int
 }
 
+type CustomFinalityRateLimitConfigArg struct {
+	RemoteChainSelector       uint64
+	OutboundRateLimiterConfig tokens.RateLimiterConfig
+	InboundRateLimiterConfig  tokens.RateLimiterConfig
+}
+
+type ApplyFinalityConfigArgs struct {
+	FinalityThreshold            uint16
+	CustomFinalityTransferFeeBps uint16
+	RateLimitConfigArgs          []CustomFinalityRateLimitConfigArg
+}
+
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "token-pool:deploy",
 	Version:          semver.MustParse("1.7.0"),
@@ -219,6 +231,50 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfigArgs,
 	},
 })
 
+var ApplyFinalityConfigUpdates = contract.NewWrite(contract.WriteParams[ApplyFinalityConfigArgs, *token_pool.TokenPool]{
+	Name:            "token-pool:apply-finality-config-updates",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Sets global custom-finality parameters and per-chain rate limiters on a TokenPool",
+	ContractType:    ContractType,
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, ApplyFinalityConfigArgs],
+	Validate:        func(ApplyFinalityConfigArgs) error { return nil },
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args ApplyFinalityConfigArgs) (*types.Transaction, error) {
+		customArgs := make([]token_pool.TokenPoolCustomFinalityRateLimitConfigArgs, 0, len(args.RateLimitConfigArgs))
+		for _, cfg := range args.RateLimitConfigArgs {
+			customArgs = append(customArgs, token_pool.TokenPoolCustomFinalityRateLimitConfigArgs{
+				RemoteChainSelector:       cfg.RemoteChainSelector,
+				OutboundRateLimiterConfig: token_pool.RateLimiterConfig(cfg.OutboundRateLimiterConfig),
+				InboundRateLimiterConfig:  token_pool.RateLimiterConfig(cfg.InboundRateLimiterConfig),
+			})
+		}
+		return tokenPool.ApplyFinalityConfigUpdates(opts, args.FinalityThreshold, args.CustomFinalityTransferFeeBps, customArgs)
+	},
+})
+
+var SetCustomFinalityRateLimitConfig = contract.NewWrite(contract.WriteParams[[]CustomFinalityRateLimitConfigArg, *token_pool.TokenPool]{
+	Name:            "token-pool:set-custom-finality-rate-limit-config",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Updates custom-finality rate limiter settings for selected remote chains on a TokenPool",
+	ContractType:    ContractType,
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, []CustomFinalityRateLimitConfigArg],
+	Validate:        func([]CustomFinalityRateLimitConfigArg) error { return nil },
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args []CustomFinalityRateLimitConfigArg) (*types.Transaction, error) {
+		customArgs := make([]token_pool.TokenPoolCustomFinalityRateLimitConfigArgs, 0, len(args))
+		for _, cfg := range args {
+			customArgs = append(customArgs, token_pool.TokenPoolCustomFinalityRateLimitConfigArgs{
+				RemoteChainSelector:       cfg.RemoteChainSelector,
+				OutboundRateLimiterConfig: token_pool.RateLimiterConfig(cfg.OutboundRateLimiterConfig),
+				InboundRateLimiterConfig:  token_pool.RateLimiterConfig(cfg.InboundRateLimiterConfig),
+			})
+		}
+		return tokenPool.SetCustomFinalityRateLimitConfig(opts, customArgs)
+	},
+})
+
 var ApplyAllowListUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowListUpdatesArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:apply-allowlist-updates",
 	Version:         semver.MustParse("1.7.0"),
@@ -295,7 +351,7 @@ var GetCurrentInboundRateLimiterState = contract.NewRead(contract.ReadParams[uin
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterBucket, error) {
-		return tokenPool.GetCurrentInboundRateLimiterState(opts, args)
+		return tokenPool.GetCurrentRateLimiterState(opts, args, 1) // 1 = Inbound
 	},
 })
 
@@ -306,7 +362,7 @@ var GetCurrentOutboundRateLimiterState = contract.NewRead(contract.ReadParams[ui
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterBucket, error) {
-		return tokenPool.GetCurrentOutboundRateLimiterState(opts, args)
+		return tokenPool.GetCurrentRateLimiterState(opts, args, 0) // 0 = Outbound
 	},
 })
 

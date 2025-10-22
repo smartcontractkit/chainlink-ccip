@@ -41,9 +41,9 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
 
     // Verify the configuration was stored correctly.
     address[] memory storedOutbound =
-      s_tokenPool.getRequiredCCVs(address(0), DEST_CHAIN_SELECTOR, 0, 0, "", IPoolV2.CCVDirection.Outbound);
+      s_tokenPool.getRequiredCCVs(address(0), DEST_CHAIN_SELECTOR, 0, 0, "", IPoolV2.MessageDirection.Outbound);
     address[] memory storedInbound =
-      s_tokenPool.getRequiredCCVs(address(0), DEST_CHAIN_SELECTOR, 0, 0, "", IPoolV2.CCVDirection.Inbound);
+      s_tokenPool.getRequiredCCVs(address(0), DEST_CHAIN_SELECTOR, 0, 0, "", IPoolV2.MessageDirection.Inbound);
 
     assertEq(storedOutbound.length, outboundCCVs.length);
     assertEq(storedOutbound[0], outboundCCVs[0]);

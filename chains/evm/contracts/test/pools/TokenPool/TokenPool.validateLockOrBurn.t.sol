@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+
 import {Pool} from "../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -40,7 +42,8 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, finalityThreshold);
 
-    RateLimiter.TokenBucket memory bucket = s_tokenPool.getFastOutboundBucket(DEST_CHAIN_SELECTOR);
+    RateLimiter.TokenBucket memory bucket =
+      s_tokenPool.getCurrentCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR, IPoolV2.MessageDirection.Outbound);
     assertEq(bucket.tokens, outboundFastConfig.capacity - lockOrBurnIn.amount);
   }
 

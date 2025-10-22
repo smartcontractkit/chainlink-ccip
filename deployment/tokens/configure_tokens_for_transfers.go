@@ -29,6 +29,8 @@ type TokenTransferConfig struct {
 	RegistryRef datastore.AddressRef
 	// RemoteChains specifies the remote chains to configure on the token pool.
 	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]
+	// FinalityConfig optionally overrides global custom-finality parameters on the pool.
+	FinalityConfig *FinalityConfig
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -88,6 +90,7 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 				RemoteChains:     remoteChains,
 				ExternalAdmin:    token.ExternalAdmin,
 				RegistryAddress:  registry.Address,
+				FinalityConfig:   token.FinalityConfig,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)
@@ -114,6 +117,7 @@ func convertRemoteChainConfig(
 	outCfg := RemoteChainConfig[[]byte, string]{
 		InboundRateLimiterConfig:  inCfg.InboundRateLimiterConfig,
 		OutboundRateLimiterConfig: inCfg.OutboundRateLimiterConfig,
+		CustomFinalityConfig:      inCfg.CustomFinalityConfig,
 	}
 	if inCfg.RemotePool != nil {
 		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)

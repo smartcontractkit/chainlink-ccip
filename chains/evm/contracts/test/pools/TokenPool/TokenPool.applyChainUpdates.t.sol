@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
@@ -35,12 +37,13 @@ contract TokenPool_applyChainUpdates is BaseTest {
     for (uint256 i = 0; i < chainUpdates.length; ++i) {
       assertTrue(s_tokenPool.isSupportedChain(chainUpdates[i].remoteChainSelector));
       RateLimiter.TokenBucket memory bkt =
-        s_tokenPool.getCurrentOutboundRateLimiterState(chainUpdates[i].remoteChainSelector);
+        s_tokenPool.getCurrentRateLimiterState(chainUpdates[i].remoteChainSelector, IPoolV2.MessageDirection.Outbound);
       assertEq(bkt.capacity, chainUpdates[i].outboundRateLimiterConfig.capacity);
       assertEq(bkt.rate, chainUpdates[i].outboundRateLimiterConfig.rate);
       assertEq(bkt.isEnabled, chainUpdates[i].outboundRateLimiterConfig.isEnabled);
 
-      bkt = s_tokenPool.getCurrentInboundRateLimiterState(chainUpdates[i].remoteChainSelector);
+      bkt =
+        s_tokenPool.getCurrentRateLimiterState(chainUpdates[i].remoteChainSelector, IPoolV2.MessageDirection.Inbound);
       assertEq(bkt.capacity, chainUpdates[i].inboundRateLimiterConfig.capacity);
       assertEq(bkt.rate, chainUpdates[i].inboundRateLimiterConfig.rate);
       assertEq(bkt.isEnabled, chainUpdates[i].inboundRateLimiterConfig.isEnabled);
