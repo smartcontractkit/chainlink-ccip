@@ -757,7 +757,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return (s_finalityConfig.finalityThreshold, s_finalityConfig.customFinalityTransferFeeBps);
   }
 
-  /// @notice Gets the current outbound custom-finality rate limiter state for a given remote chain.
+  /// @notice Gets the custom finality token bucket with its values for the block it was requested at.
   /// @param remoteChainSelector The remote chain selector.
   /// @param direction The message direction, either outbound or inbound.
   /// @return The token bucket reflecting the state at the time of the call.
