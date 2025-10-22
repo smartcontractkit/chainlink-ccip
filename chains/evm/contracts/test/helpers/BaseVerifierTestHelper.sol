@@ -26,12 +26,11 @@ contract BaseVerifierTestHelper is BaseVerifier {
     _withdrawFeeTokens(feeTokens, feeAggregator);
   }
 
-  function assertSenderIsAllowed(uint64 destChainSelector, address sender, address caller) external view {
-    _assertSenderIsAllowed(destChainSelector, sender, caller);
+  function assertSenderIsAllowed(uint64 destChainSelector, address sender) external view {
+    _assertSenderIsAllowed(destChainSelector, sender);
   }
 
   function forwardToVerifier(
-    address,
     MessageV1Codec.MessageV1 calldata,
     bytes32,
     address,
@@ -41,12 +40,7 @@ contract BaseVerifierTestHelper is BaseVerifier {
     return "";
   }
 
-  function verifyMessage(
-    address originalCaller,
-    MessageV1Codec.MessageV1 memory message,
-    bytes32 messageId,
-    bytes memory ccvData
-  ) external {}
+  function verifyMessage(MessageV1Codec.MessageV1 memory message, bytes32 messageId, bytes memory ccvData) external {}
 
   function typeAndVersion() external pure override returns (string memory) {
     return "BaseVerifierTestHelper 1.0.0";

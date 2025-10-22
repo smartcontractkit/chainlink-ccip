@@ -13,7 +13,7 @@ contract CommitteeVerifier_verifyMessage is CommitteeVerifierSetup {
     (bytes32 r, bytes32 s) = _signWithV27(PRIVATE_KEY_0, messageHash);
     bytes memory ccvData = abi.encodePacked(uint16(64), r, s);
 
-    s_committeeVerifier.verifyMessage(OWNER, message, messageHash, ccvData);
+    s_committeeVerifier.verifyMessage(message, messageHash, ccvData);
   }
 
   function test_verifyMessage_ForwardCompatibilityWithExtraData() public view {
@@ -26,7 +26,7 @@ contract CommitteeVerifier_verifyMessage is CommitteeVerifierSetup {
     (bytes32 r, bytes32 s) = _signWithV27(PRIVATE_KEY_0, messageHash);
     bytes memory ccvData = abi.encodePacked(uint16(64), r, s, extraFutureData);
 
-    s_committeeVerifier.verifyMessage(OWNER, message, messageHash, ccvData);
+    s_committeeVerifier.verifyMessage(message, messageHash, ccvData);
   }
 
   // Reverts
@@ -40,7 +40,7 @@ contract CommitteeVerifier_verifyMessage is CommitteeVerifierSetup {
 
     // Should revert with InvalidCCVData when ccvData is too short to contain signature length.
     vm.expectRevert(abi.encodeWithSelector(CommitteeVerifier.InvalidCCVData.selector));
-    s_committeeVerifier.verifyMessage(OWNER, message, messageHash, ccvData);
+    s_committeeVerifier.verifyMessage(message, messageHash, ccvData);
   }
 
   function test_verifyMessage_RevertWhen_InvalidCCVData_SignatureLengthExceedsCCVData() public {
@@ -52,6 +52,6 @@ contract CommitteeVerifier_verifyMessage is CommitteeVerifierSetup {
 
     // Should revert with InvalidCCVData when signature length exceeds available data.
     vm.expectRevert(abi.encodeWithSelector(CommitteeVerifier.InvalidCCVData.selector));
-    s_committeeVerifier.verifyMessage(OWNER, message, messageHash, ccvData);
+    s_committeeVerifier.verifyMessage(message, messageHash, ccvData);
   }
 }

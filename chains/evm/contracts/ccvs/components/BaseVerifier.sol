@@ -131,16 +131,12 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     }
   }
 
-  function _assertSenderIsAllowed(
-    uint64 destChainSelector,
-    address sender,
-    address verifierCaller
-  ) internal view virtual {
+  function _assertSenderIsAllowed(uint64 destChainSelector, address sender) internal view virtual {
     DestChainConfig storage destChainConfig = _getDestChainConfig(destChainSelector);
     // CCVs should query the OnRamp address from the router, this allows for OnRamp updates without touching CCVs
     // OnRamp address may be zero intentionally to pause, which should stop all messages.
-    if (verifierCaller != destChainConfig.router.getOnRamp(destChainSelector)) {
-      revert CallerIsNotARampOnRouter(verifierCaller);
+    if (msg.sender != destChainConfig.router.getOnRamp(destChainSelector)) {
+      revert CallerIsNotARampOnRouter(msg.sender);
     }
 
     if (destChainConfig.allowlistEnabled) {
@@ -191,7 +187,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   /// @inheritdoc ICrossChainVerifierV1
   function getFee(
-    address, // originalCaller
     uint64 destChainSelector,
     Client.EVM2AnyMessage memory, // message
     bytes memory, // extraArgs

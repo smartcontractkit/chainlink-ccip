@@ -9,7 +9,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
   function test_getFee() public view {
     Client.EVM2AnyMessage memory message;
     (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
-      s_baseVerifier.getFee(address(this), DEST_CHAIN_SELECTOR, message, "", 0);
+      s_baseVerifier.getFee(DEST_CHAIN_SELECTOR, message, "", 0);
 
     assertEq(feeUSDCents, DEFAULT_CCV_FEE_USD_CENTS);
     assertEq(gasForVerification, DEFAULT_CCV_GAS_LIMIT);
@@ -21,6 +21,6 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
     Client.EVM2AnyMessage memory message;
 
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.DestinationNotSupported.selector, wrongDestChainSelector));
-    s_baseVerifier.getFee(address(this), wrongDestChainSelector, message, "", 0);
+    s_baseVerifier.getFee(wrongDestChainSelector, message, "", 0);
   }
 }

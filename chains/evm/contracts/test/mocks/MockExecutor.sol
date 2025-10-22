@@ -7,7 +7,6 @@ import {Client} from "../../libraries/Client.sol";
 
 contract MockExecutor is IExecutor {
   function getFee(
-    address, // originalCaller
     uint64, // destChainSelector,
     Client.EVM2AnyMessage memory, // message,
     Client.CCV[] memory, // ccvs,

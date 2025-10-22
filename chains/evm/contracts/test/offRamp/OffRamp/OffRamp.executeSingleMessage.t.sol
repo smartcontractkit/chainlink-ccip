@@ -26,7 +26,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     bytes memory defaultCcvData = abi.encode("mock ccv data");
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageHash, defaultCcvData)),
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageHash, defaultCcvData)),
       abi.encode(true)
     );
 
@@ -188,9 +188,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
 
     // Mock CCV validateReport to fail/revert.
     vm.mockCallRevert(
-      s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (address(s_agg), message, messageId, ccvData[0])),
-      revertReason
+      s_defaultCCV, abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, ccvData[0])), revertReason
     );
 
     vm.expectRevert(revertReason);

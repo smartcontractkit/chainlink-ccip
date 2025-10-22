@@ -11,7 +11,7 @@ contract Executor_getFee is ExecutorSetup {
     Client.CCV[] memory ccvs = new Client.CCV[](1);
     ccvs[0] = Client.CCV({ccvAddress: INITIAL_CCV, args: ""});
 
-    uint256 fee = s_executor.getFee(address(this), INITIAL_DEST, message, ccvs, "");
+    uint256 fee = s_executor.getFee(INITIAL_DEST, message, ccvs, "");
     assertEq(fee, 0);
   }
 
@@ -21,7 +21,7 @@ contract Executor_getFee is ExecutorSetup {
     ccvs[0] = Client.CCV({ccvAddress: INITIAL_CCV, args: ""});
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidDestChain.selector, 999));
-    s_executor.getFee(address(this), 999, message, ccvs, "");
+    s_executor.getFee(999, message, ccvs, "");
   }
 
   function test_getFee_RevertWhen_UnsupportedRequiredCCV() public {
@@ -31,7 +31,7 @@ contract Executor_getFee is ExecutorSetup {
     ccvs[0] = Client.CCV({ccvAddress: unsupportedCCV, args: ""});
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidCCV.selector, unsupportedCCV));
-    s_executor.getFee(address(this), INITIAL_DEST, message, ccvs, "");
+    s_executor.getFee(INITIAL_DEST, message, ccvs, "");
   }
 
   function test_getFee_RevertWhen_ExceedsMaxCCVs() public {
@@ -41,6 +41,6 @@ contract Executor_getFee is ExecutorSetup {
     ccvs[1] = Client.CCV({ccvAddress: INITIAL_CCV, args: ""});
 
     vm.expectRevert(abi.encodeWithSelector(Executor.ExceedsMaxCCVs.selector, ccvs.length, INITIAL_MAX_CCVS));
-    s_executor.getFee(address(this), INITIAL_DEST, message, ccvs, "");
+    s_executor.getFee(INITIAL_DEST, message, ccvs, "");
   }
 }

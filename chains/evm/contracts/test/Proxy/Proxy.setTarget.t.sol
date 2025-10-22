@@ -19,7 +19,7 @@ contract Proxy_setTarget is ProxySetup {
     s_proxy.setTarget(address(0));
   }
 
-  function test_setTarget_RevertWhen_NotOwner() public {
+  function test_setTarget_RevertWhen_OnlyCallableByOwner() public {
     vm.stopPrank();
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
