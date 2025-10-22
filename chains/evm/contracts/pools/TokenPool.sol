@@ -1066,6 +1066,17 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return s_tokenTransferFeeConfig[destChainSelector];
   }
 
+  /// @notice Returns the token transfer fee details for a proposed transfer amount and finality.
+  function getTokenTransferFeeDetails(
+    address, // localToken
+    uint64 destChainSelector,
+    uint256 amount,
+    uint16 finality,
+    bytes calldata // tokenArgs
+  ) external view virtual returns (TokenTransferFeeDetails memory feeDetails) {
+    return _calculateTokenTransferFeeDetails(destChainSelector, amount, finality);
+  }
+
   /// @notice Withdraws all accumulated pool fees to the specified recipient.
   /// @dev For burn/mint pools, this transfers the entire token balance of the pool contract.
   /// lock/release pools should override this function with their own accounting mechanism.
@@ -1093,6 +1104,38 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return getToken().balanceOf(address(this));
   }
 
+  /// @notice Calculates the token transfer fee details for the provided lane and amount.
+  /// @param destChainSelector Destination chain selector identifying the fee lane.
+  /// @param amount Amount being transferred, denominated in the token managed by the pool.
+  /// @param finality Requested finality depth.
+  function _calculateTokenTransferFeeDetails(
+    uint64 destChainSelector,
+    uint256 amount,
+    uint16 finality
+  ) internal view returns (TokenTransferFeeDetails memory feeDetails) {
+    TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector];
+    if (!feeConfig.isEnabled) {
+      feeDetails.destinationAmount = amount;
+      //feeDetails.feeType = TokenTransferFeeType.None;
+      return feeDetails;
+    }
+
+    bool usesCustomFinality = finality != WAIT_FOR_FINALITY;
+    uint16 feeBps =
+      usesCustomFinality ? feeConfig.customFinalityTransferFeeBps : feeConfig.defaultFinalityTransferFeeBps;
+    uint32 usdFeeCents = usesCustomFinality ? feeConfig.customFinalityFeeUSDCents : feeConfig.defaultFinalityFeeUSDCents;
+
+    uint256 feeAmount = (amount * feeBps) / BPS_DIVIDER;
+
+    //feeDetails.feeType =
+    // usesCustomFinality ? TokenTransferFeeType.CustomFinalityBps : TokenTransferFeeType.DefaultFinalityBps;
+    feeDetails.tokenFeeBps = feeBps;
+    feeDetails.tokenFeeAmount = feeAmount;
+    feeDetails.destinationAmount = amount - feeAmount;
+    feeDetails.usdFeeCents = usdFeeCents;
+    return feeDetails;
+  }
+
   // @notice Applies any applicable fees to the lock or burn amount.
   /// @param lockOrBurnIn The original lock or burn request.
   /// @param finality The minimum block confirmation requested by the message. A value of zero (WAIT_FOR_FINALITY) applies default finality fees.
@@ -1100,15 +1143,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 finality
   ) internal view virtual returns (uint256 destAmount) {
-    TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
-    if (!feeConfig.isEnabled) {
-      return lockOrBurnIn.amount;
-    }
-
-    uint256 feeBps =
-      finality != WAIT_FOR_FINALITY ? feeConfig.customFinalityTransferFeeBps : feeConfig.defaultFinalityTransferFeeBps;
-
-    destAmount = lockOrBurnIn.amount - (lockOrBurnIn.amount * feeBps) / BPS_DIVIDER;
-    return destAmount;
+    TokenTransferFeeDetails memory feeDetails =
+      _calculateTokenTransferFeeDetails(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount, finality);
+    return feeDetails.destinationAmount;
   }
 }

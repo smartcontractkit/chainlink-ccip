@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+
 import {Pool} from "../../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -117,15 +119,27 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
   }
 
   function test_lockOrBurn_FeeNotApplied_LegacyLockOrBurn() public {
-    uint16 finalityThreshold = 5;
+    uint16 minBlockConfirmation = 5;
+    uint16 defaultFinalityTransferFeeBps = 100;
     uint16 customFinalityTransferFeeBps = 500;
     uint256 amount = 1000e18;
 
-    // Apply custom finality config with a fee
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(
-      finalityThreshold, customFinalityTransferFeeBps, new TokenPool.CustomFinalityRateLimitConfigArgs[](0)
-    );
+    s_tokenPool.applyFinalityConfigUpdates(minBlockConfirmation, new TokenPool.CustomFinalityRateLimitConfigArgs[](0));
+    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
+    feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
+        destGasOverhead: 50_000,
+        destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+        defaultFinalityFeeUSDCents: 0,
+        customFinalityFeeUSDCents: 0,
+        defaultFinalityTransferFeeBps: defaultFinalityTransferFeeBps,
+        customFinalityTransferFeeBps: customFinalityTransferFeeBps,
+        isEnabled: true
+      })
+    });
+    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       originalSender: OWNER,
