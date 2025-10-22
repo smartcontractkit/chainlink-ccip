@@ -66,3 +66,6 @@ func (r *DeployerRegistry) ExistingAddressesForChain(e cldf.Environment, chainSe
 	// filter addresses for the given chain selector
 	return e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSelector))
 }
+
+type ChainAdapter interface {
+}
