@@ -6,7 +6,7 @@ import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 
 contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
-  function testFuzz_validateMessage_Success(uint32 sourceDomain, uint64 nonce) public {
+  function testFuzz_validateMessage_Success(uint32 sourceDomain, uint64 nonce) public view {
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,
       sourceDomain: sourceDomain,

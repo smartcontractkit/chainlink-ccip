@@ -185,13 +185,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 1. parse extraArgs.
 
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
-    // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
-    bytes memory tokenReceiver =
-      IFeeQuoter(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
-    if (tokenReceiver.length == 0) {
-      tokenReceiver = abi.encode(message.receiver);
-    }
-
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
@@ -211,17 +204,20 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 2. get pool params, this potentially mutates the CCV list.
 
-    address[] memory poolRequiredCCVs = new address[](0);
-    if (message.tokenAmounts.length != 0) {
-      poolRequiredCCVs = _getCCVsForPool(
-        destChainSelector,
-        message.tokenAmounts[0].token,
-        message.tokenAmounts[0].amount,
-        resolvedExtraArgs.finalityConfig,
-        resolvedExtraArgs.tokenArgs
-      );
+    {
+      address[] memory poolRequiredCCVs = new address[](0);
+      if (message.tokenAmounts.length != 0) {
+        poolRequiredCCVs = _getCCVsForPool(
+          destChainSelector,
+          message.tokenAmounts[0].token,
+          message.tokenAmounts[0].amount,
+          resolvedExtraArgs.finalityConfig,
+          resolvedExtraArgs.tokenArgs
+        );
+      }
+      resolvedExtraArgs.ccvs =
+        _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
     }
-    resolvedExtraArgs.ccvs = _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
 
     // 3. getFee on all verifiers, pool and executor.
 
@@ -233,6 +229,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     if (message.tokenAmounts.length != 0) {
       if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
+      // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
+      bytes memory tokenReceiver =
+        IFeeQuoter(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
+      if (tokenReceiver.length == 0) {
+        tokenReceiver = abi.encode(message.receiver);
+      }
       newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
         message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
       );
@@ -246,13 +248,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
-    address feeToken = message.feeToken;
-    uint256 feeTokenAmount = feeTokenAmount;
-    for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-      Client.CCV memory ccv = resolvedExtraArgs.ccvs[i];
-      eventData.verifierBlobs[i] = ICrossChainVerifierV1(ccv.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, feeToken, feeTokenAmount, ccv.args
-      );
+    {
+      for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
+        eventData.verifierBlobs[i] = ICrossChainVerifierV1(resolvedExtraArgs.ccvs[i].ccvAddress).forwardToVerifier(
+          address(this), newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
+        );
+      }
     }
 
     // 7. emit event
