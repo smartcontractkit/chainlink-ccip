@@ -382,7 +382,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - if the sender is a valid onRamp
   /// - rate limiting for either default or custom-finality transfer messages.
   /// @param lockOrBurnIn The input to validate.
-  /// @param finality The finality depth requested by the message. A value of zero is used for default finality.
+  /// @param finality The minimum block confirmation requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
   function _validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) internal {
@@ -415,7 +415,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - rate limiting for either default or custom-finality transfer messages.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
-  /// @param finality The finality depth requested by the message. A value of zero is used for default finality.
+  /// @param finality The minimum block confirmation requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
   function _validateReleaseOrMint(
@@ -1036,6 +1036,12 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       uint64 destChainSelector = tokenTransferFeeConfigArgs[i].destChainSelector;
       TokenTransferFeeConfig calldata tokenTransferFeeConfig = tokenTransferFeeConfigArgs[i].tokenTransferFeeConfig;
+      if (tokenTransferFeeConfig.defaultFinalityTransferFeeBps >= BPS_DIVIDER) {
+        revert InvalidTransferFeeBps(tokenTransferFeeConfig.defaultFinalityTransferFeeBps);
+      }
+      if (tokenTransferFeeConfig.customFinalityTransferFeeBps >= BPS_DIVIDER) {
+        revert InvalidTransferFeeBps(tokenTransferFeeConfig.customFinalityTransferFeeBps);
+      }
       s_tokenTransferFeeConfig[destChainSelector] = tokenTransferFeeConfig;
       emit TokenTransferFeeConfigUpdated(destChainSelector, tokenTransferFeeConfig);
     }
@@ -1089,12 +1095,16 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   // @notice Applies any applicable fees to the lock or burn amount.
   /// @param lockOrBurnIn The original lock or burn request.
-  /// @param finality The finality depth requested by the message. A value of zero
+  /// @param finality The minimum block confirmation requested by the message. A value of zero (WAIT_FOR_FINALITY) applies default finality fees.
   function _applyFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 finality
   ) internal view virtual returns (uint256 destAmount) {
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
+    if (!feeConfig.isEnabled) {
+      return lockOrBurnIn.amount;
+    }
+
     uint256 feeBps =
       finality != WAIT_FOR_FINALITY ? feeConfig.customFinalityTransferFeeBps : feeConfig.defaultFinalityTransferFeeBps;
 
