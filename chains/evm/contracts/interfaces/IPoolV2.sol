@@ -10,10 +10,13 @@ import {Pool} from "../libraries/Pool.sol";
 /// Each pool type handles a different child token model e.g. lock/release, mint/burn.
 interface IPoolV2 is IPoolV1 {
   struct TokenTransferFeeConfig {
-    uint32 destGasOverhead; // ──╮ Gas charged to execute the token transfer on the destination chain.
-    uint32 destBytesOverhead; // │ Data availability bytes.
-    uint32 feeUSDCents; //       │ Fee to charge per token transfer, multiples of 0.01 USD.
-    bool isEnabled; // ──────────╯ Whether this token has custom transfer fees.
+    uint32 destGasOverhead; // ──────────────╮ Gas charged to execute the token transfer on the destination chain.
+    uint32 destBytesOverhead; //             │ Data availability bytes.
+    uint32 defaultFinalityFeeUSDCents; //    │ Fee to charge per token transfer, multiples of 0.01 USD.
+    uint32 customFinalityFeeUSDCents; //     │ Fee to charge per token transfer, multiples of 0.01 USD.
+    uint16 defaultFinalityTransferFeeBps; // │ Fee in basis points for default finality transfers [0-10_000].
+    uint16 customFinalityTransferFeeBps; //  │ Fee in basis points for custom finality transfers [0-10_000].
+    bool isEnabled; // ──────────────────────╯ Whether this token has custom transfer fees.
   }
 
   enum CCVDirection {
