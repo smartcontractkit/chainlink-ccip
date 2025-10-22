@@ -1,6 +1,5 @@
 package sequences_test
 
-/* TODO: Fix imports
 import (
 	"testing"
 
@@ -60,4 +59,3 @@ func TestResolveEVMChainDep(t *testing.T) {
 		})
 	}
 }
-*/

@@ -1,6 +1,5 @@
 package sequences
 
-/* TODO: Fix imports
 import (
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -74,4 +73,3 @@ func (a *EVMAdapter) GetRouterAddress(e *cldf.Environment, chainSelector uint64)
 	}
 	return addr, nil
 }
-*/

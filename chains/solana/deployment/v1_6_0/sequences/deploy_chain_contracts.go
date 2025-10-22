@@ -42,8 +42,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	func(b operations.Bundle, chain cldf_solana.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 
-		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
-
 		// Deploy LINK
 		linkRef, err := operations.ExecuteOperation(b, tokensops.DeployLINK, chain, input.ContractParams.LinkToken)
 		if err != nil {
