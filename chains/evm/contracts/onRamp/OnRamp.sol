@@ -670,8 +670,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       });
     }
 
-    (uint16 usdCentsFee, uint64 execGasCost, uint32 execBytes) = _getExecutorFee(extraArgs, message, destChainSelector);
-
+    (uint16 usdCentsFee, uint64 execGasCost, uint32 execBytes) = IExecutor(extraArgs.executor).getFee(
+      destChainSelector,
+      extraArgs.finalityConfig,
+      uint32(message.data.length),
+      uint8(message.tokenAmounts.length),
+      extraArgs.ccvs,
+      extraArgs.executorArgs
+    );
     verifierReceipts[verifierReceipts.length - 1] = Receipt({
       issuer: extraArgs.executor,
       destGasLimit: execGasCost, // TODO add user gas limit
@@ -692,21 +698,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     return verifierReceipts;
-  }
-
-  function _getExecutorFee(
-    Client.EVMExtraArgsV3 memory extraArgs,
-    Client.EVM2AnyMessage calldata message,
-    uint64 destChainSelector
-  ) internal view returns (uint16 usdCentsFee, uint64 execGasCost, uint32 execBytes) {
-    return IExecutor(extraArgs.executor).getFee(
-      destChainSelector,
-      extraArgs.finalityConfig,
-      uint32(message.data.length),
-      uint8(message.tokenAmounts.length),
-      extraArgs.ccvs,
-      extraArgs.executorArgs
-    );
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
