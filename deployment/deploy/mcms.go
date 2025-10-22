@@ -19,11 +19,11 @@ import (
 )
 
 type MCMSDeploymentConfig struct {
-	Chains map[uint64]MCMSDeploymentConfigPerChain `json:"chains"`
+	Chains  map[uint64]MCMSDeploymentConfigPerChain `json:"chains"`
+	Version *semver.Version                         `json:"version"`
 }
 
 type MCMSDeploymentConfigPerChain struct {
-	Version          *semver.Version  `json:"version"`
 	Canceller        mcmstypes.Config `json:"canceller"`
 	Bypasser         mcmstypes.Config `json:"bypasser"`
 	Proposer         mcmstypes.Config `json:"proposer"`
@@ -93,9 +93,9 @@ func deployMCMSApply(d *DeployerRegistry) func(cldf.Environment, MCMSDeploymentC
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			deployer, exists := d.GetDeployer(family, mcmsCfg.Version)
+			deployer, exists := d.GetDeployer(family, cfg.Version)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, mcmsCfg.Version.String())
+				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, cfg.Version.String())
 			}
 			// find existing addresses for this chain from the env
 			existingAddrs := d.ExistingAddressesForChain(e, selector)

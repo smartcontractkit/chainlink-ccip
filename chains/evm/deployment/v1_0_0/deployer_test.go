@@ -33,9 +33,9 @@ func TestDeployMCMS(t *testing.T) {
 	dReg.RegisterDeployer(chainsel.FamilyEVM, version, evmDeployer)
 	cs := deployops.DeployMCMS(dReg)
 	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		Version: version,
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector: {
-				Version:          version,
 				Canceller:        deployops.SingleGroupMCMSV2(),
 				Bypasser:         deployops.SingleGroupMCMSV2(),
 				Proposer:         deployops.SingleGroupMCMSV2(),
