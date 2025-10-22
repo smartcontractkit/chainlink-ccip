@@ -144,7 +144,7 @@ func TestFastCurse(t *testing.T) {
 
 	// deploy mcms
 	evmDeployer := &v1_0_0.EVMDeployer{}
-	dReg := v1_0.NewDeployerRegistry()
+	dReg := v1_0.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, v1_0.MCMSVersion, evmDeployer)
 	cs := v1_0.DeployMCMS(dReg)
 	evmChain1 := env.BlockChains.EVMChains()[chain1]
