@@ -6,6 +6,7 @@ import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IExecutor} from "../interfaces/IExecutor.sol";
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
+import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
@@ -20,6 +21,7 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 // TODO post process hooks?
@@ -39,6 +41,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InvalidDestChainConfig(uint64 destChainSelector);
   error ReentrancyGuardReentrantCall();
   error InvalidOptionalCCVThreshold();
+  error DestinationChainNotSupported(uint64 destChainSelector);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -51,19 +54,22 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     bytes offRamp
   );
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
-  /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPMessageSent(
     uint64 indexed destChainSelector,
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
     bytes encodedMessage,
-    Receipt[] verifierReceipts,
-    Receipt executorReceipt,
-    bytes[] receiptBlobs
+    Receipt[] receipts,
+    bytes[] verifierBlobs
   );
 
+  struct CCIPMessageSentEventData {
+    bytes encodedMessage;
+    Receipt[] receipts;
+    bytes[] verifierBlobs;
+  }
+
   /// @dev Struct that contains the static configuration.
-  /// RMN depends on this struct, if changing, please notify the RMN maintainers.
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     uint64 chainSelector; // ────╮ Local chain selector.
@@ -74,8 +80,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev Struct that contains the dynamic configuration
   // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
-    address feeQuoter; // FeeQuoter address.
-    bool reentrancyGuardEntered; // Reentrancy protection.
+    address feeQuoter; // ───────────╮ FeeQuoter address.
+    bool reentrancyGuardEntered; // ─╯ Reentrancy protection.
     address feeAggregator; // Fee aggregator address.
   }
 
@@ -162,7 +168,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
     address originalSender
-  ) external returns (bytes32) {
+  ) external returns (bytes32 messageId) {
     // We rely on a reentrancy guard here due to the untrusted calls performed to the pools. This enables some
     // optimizations by not following the CEI pattern.
     if (s_dynamicConfig.reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
@@ -179,15 +185,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 1. parse extraArgs.
 
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
-    // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
-    bytes memory tokenReceiver =
-      IFeeQuoter(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
-    if (tokenReceiver.length == 0) {
-      tokenReceiver = abi.encode(message.receiver);
-    }
-
-    // 2. get pool params, this potentially mutates CCV list.
-
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
@@ -205,73 +202,68 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       data: message.data
     });
 
-    resolvedExtraArgs.ccvs =
-      _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, _getCCVsForPool(destChainSelector));
+    // 2. get pool params, this potentially mutates the CCV list.
 
-    // 3. getFee on all verifiers & executor.
-
-    Receipt[] memory verifierReceipts = new Receipt[](resolvedExtraArgs.ccvs.length);
-
-    for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-      Client.CCV memory verifier = resolvedExtraArgs.ccvs[i];
-      verifierReceipts[i] = Receipt({
-        issuer: verifier.ccvAddress,
-        destGasLimit: 0, // TODO
-        destBytesOverhead: 0, // TODO
-        feeTokenAmount: 0, // TODO
-        extraArgs: verifier.args
-      });
+    {
+      address[] memory poolRequiredCCVs = new address[](0);
+      if (message.tokenAmounts.length != 0) {
+        poolRequiredCCVs = _getCCVsForPool(
+          destChainSelector,
+          message.tokenAmounts[0].token,
+          message.tokenAmounts[0].amount,
+          resolvedExtraArgs.finalityConfig,
+          resolvedExtraArgs.tokenArgs
+        );
+      }
+      resolvedExtraArgs.ccvs =
+        _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
     }
 
-    Receipt memory executorReceipt = Receipt({
-      issuer: resolvedExtraArgs.executor,
-      destGasLimit: 0, // TODO
-      destBytesOverhead: 0, // TODO
-      feeTokenAmount: 0, // TODO
-      extraArgs: resolvedExtraArgs.executorArgs
-    });
+    // 3. getFee on all verifiers, pool and executor.
 
-    // TODO: Handle the fee returned
-    // Currently only used for validations.
-    _getExecutorFee(resolvedExtraArgs, message, destChainSelector);
+    CCIPMessageSentEventData memory eventData;
+    // Populate receipts for verifiers, pool and executor in that order.
+    eventData.receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
     // 4. lockOrBurn
 
     if (message.tokenAmounts.length != 0) {
       if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
+      // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
+      bytes memory tokenReceiver =
+        IFeeQuoter(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
+      if (tokenReceiver.length == 0) {
+        tokenReceiver = abi.encode(message.receiver);
+      }
       newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
         message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
       );
     }
 
-    // created fresh locals like near the callsite to fix stack too deep.
-    address feeToken = message.feeToken;
-    uint256 feeTokenAmount2 = feeTokenAmount;
-    uint64 destChainSelector2 = destChainSelector;
-
     // 5. encode message and calculate messageId.
 
-    bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
-    bytes32 messageId = keccak256(encodedMessage);
-    bytes[] memory ccvBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
+    eventData.encodedMessage = MessageV1Codec._encodeMessageV1(newMessage);
+    messageId = keccak256(eventData.encodedMessage);
+
+    eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
-    for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-      Client.CCV memory ccv = resolvedExtraArgs.ccvs[i];
-      ccvBlobs[i] = ICrossChainVerifierV1(ccv.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, feeToken, feeTokenAmount2, ccv.args
-      );
+    {
+      for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
+        eventData.verifierBlobs[i] = ICrossChainVerifierV1(resolvedExtraArgs.ccvs[i].ccvAddress).forwardToVerifier(
+          address(this), newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
+        );
+      }
     }
 
     // 7. emit event
     emit CCIPMessageSent(
-      destChainSelector2,
+      destChainSelector,
       newMessage.sequenceNumber,
       messageId,
-      encodedMessage,
-      verifierReceipts,
-      executorReceipt,
-      ccvBlobs
+      eventData.encodedMessage,
+      eventData.receipts,
+      eventData.verifierBlobs
     );
 
     s_dynamicConfig.reentrancyGuardEntered = false;
@@ -282,18 +274,18 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @notice Merges lane mandated and pool required CCVs with user-provided CCVs.
   /// @dev This function assumes there are no duplicates in the userRequestedOrDefaultCCVs list.
   /// @dev There is no protocol-level requirement on the ordering of CCVs in the final list, but for determinism we
-  /// process user requested first, then lane-mandated second, pool-required.
+  /// process user requested first, then lane-mandated second, pool-required last.
   /// @param userRequestedOrDefaultCCVs User-provided required CCVs. Can not be empty, as defaults are applied earlier
   /// if needed. This list does not only contain addresses, but also arguments
   /// @param laneMandatedCCVs Lane mandated CCVs are always added, regardless of what a user/pool chooses. Can be empty.
-  /// @param poolRequiredCCVs Pool-specific required CCVs. Can be empty.
+  /// @param poolRequiredCCVs Pool-specific required CCVs.
   /// @return ccvs Updated list of CCVs.
   function _mergeCCVLists(
     Client.CCV[] memory userRequestedOrDefaultCCVs,
     address[] memory laneMandatedCCVs,
     address[] memory poolRequiredCCVs
   ) internal pure returns (Client.CCV[] memory ccvs) {
-    // Maximum possible CCVs to add
+    // Maximum possible CCVs: user + lane + pool.
     uint256 totalCCVs = userRequestedOrDefaultCCVs.length + laneMandatedCCVs.length + poolRequiredCCVs.length;
     ccvs = new Client.CCV[](totalCCVs);
     uint256 toBeAddedIndex = 0;
@@ -385,16 +377,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     return resolvedArgs;
-  }
-
-  function _getExecutorFee(
-    Client.EVMExtraArgsV3 memory resolvedExtraArgs,
-    Client.EVM2AnyMessage memory message,
-    uint64 destChainSelector
-  ) internal view returns (uint256) {
-    return IExecutor(resolvedExtraArgs.executor).getFee(
-      destChainSelector, message, resolvedExtraArgs.ccvs, resolvedExtraArgs.executorArgs
-    );
   }
 
   // ================================================================
@@ -553,12 +535,63 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     });
   }
 
-  // TODO this function currently returns the default CCVs.
+  /// @notice Gets the required CCVs from the pool for token transfers.
+  /// @dev Resolves address(0) returned by the pool into the destination defaults.
+  /// If the pool does not specify any CCVs, we fall back to the default CCVs.
+  /// @param destChainSelector The destination chain selector.
+  /// @param token The token address being transferred.
+  /// @param amount The amount of tokens being transferred.
+  /// @param finality The finality configuration from the message.
+  /// @param tokenArgs Additional token arguments from the message.
+  /// @return requiredCCVs The list of CCV addresses the pool requires with defaults expanded if requested.
   function _getCCVsForPool(
-    uint64 destChainSelector
-  ) internal view returns (address[] memory) {
-    // TODO pool call to get CCVs from IPoolV2 getRequiredCCVs
-    return s_destChainConfigs[destChainSelector].defaultCCVs;
+    uint64 destChainSelector,
+    address token,
+    uint256 amount,
+    uint16 finality,
+    bytes memory tokenArgs
+  ) internal view returns (address[] memory requiredCCVs) {
+    address[] memory defaultCCVs = s_destChainConfigs[destChainSelector].defaultCCVs;
+    IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(token));
+
+    // Pool not specifying CCVs or lacking V2 support falls back to destination defaults so the lane still enforces a
+    // minimum verifier set.
+    if (!IERC165(pool).supportsInterface(type(IPoolV2).interfaceId)) {
+      return defaultCCVs;
+    }
+
+    requiredCCVs = IPoolV2(address(pool)).getRequiredCCVs(
+      token, destChainSelector, amount, finality, tokenArgs, IPoolV2.CCVDirection.Outbound
+    );
+
+    if (requiredCCVs.length == 0) {
+      return defaultCCVs;
+    }
+
+    address[] memory resolvedCCVs = new address[](requiredCCVs.length + defaultCCVs.length);
+    uint256 writeIndex = 0;
+    bool includeDefaults = false;
+
+    for (uint256 i = 0; i < requiredCCVs.length; ++i) {
+      address poolCCV = requiredCCVs[i];
+      if (poolCCV == address(0)) {
+        includeDefaults = true;
+        continue;
+      }
+      resolvedCCVs[writeIndex++] = poolCCV;
+    }
+
+    if (includeDefaults) {
+      for (uint256 i = 0; i < defaultCCVs.length; ++i) {
+        resolvedCCVs[writeIndex++] = defaultCCVs[i];
+      }
+    }
+
+    assembly {
+      mstore(resolvedCCVs, writeIndex)
+    }
+
+    return resolvedCCVs;
   }
 
   // ================================================================
@@ -571,12 +604,99 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @return feeTokenAmount The amount of fee token needed for the fee, in smallest denomination of the fee token.
   function getFee(
     uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata // message
+    Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount) {
-    if (i_rmnRemote.isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    if (address(destChainConfig.router) == address(0)) {
+      revert DestinationChainNotSupported(destChainSelector);
+    }
 
-    // TODO: Process msg & return fee
-    return 0;
+    Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
+    // Update the CCVs list to include lane mandated and pool required CCVs.
+    address[] memory poolRequiredCCVs = new address[](0);
+    if (message.tokenAmounts.length != 0) {
+      poolRequiredCCVs = _getCCVsForPool(
+        destChainSelector,
+        message.tokenAmounts[0].token,
+        message.tokenAmounts[0].amount,
+        resolvedExtraArgs.finalityConfig,
+        resolvedExtraArgs.tokenArgs
+      );
+    }
+    resolvedExtraArgs.ccvs = _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
+
+    // We sum the fees for the verifier, executor and the pool (if any).
+    Receipt[] memory receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
+
+    uint256 destGasLimit = 0;
+    uint256 destBytesOverhead = 0;
+
+    // Sum all receipts.
+    for (uint256 i = 0; i < receipts.length; ++i) {
+      feeTokenAmount += receipts[i].feeTokenAmount;
+      destGasLimit += receipts[i].destGasLimit;
+      destBytesOverhead += receipts[i].destBytesOverhead;
+    }
+
+    // TODO: handle destBytes & gas
+
+    // TODO: it currently returns dollars, not fee token amount.
+    return feeTokenAmount;
+  }
+
+  function _getReceipts(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message,
+    Client.EVMExtraArgsV3 memory extraArgs
+  ) internal view returns (Receipt[] memory verifierReceipts) {
+    // Already ensure there's room for the token transfer and executor receipts.
+    verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
+
+    for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
+      Client.CCV memory verifier = extraArgs.ccvs[i];
+
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
+        verifier.ccvAddress
+      ).getFee(address(this), destChainSelector, message, verifier.args, extraArgs.finalityConfig);
+
+      verifierReceipts[i] = Receipt({
+        issuer: verifier.ccvAddress,
+        destGasLimit: gasForVerification,
+        destBytesOverhead: payloadSizeBytes,
+        feeTokenAmount: feeUSDCents,
+        extraArgs: verifier.args
+      });
+    }
+
+    // TODO gas & bytes for exec.
+    verifierReceipts[verifierReceipts.length - 1] = Receipt({
+      issuer: extraArgs.executor,
+      destGasLimit: 0,
+      destBytesOverhead: 0,
+      feeTokenAmount: _getExecutorFee(extraArgs, message, destChainSelector),
+      extraArgs: extraArgs.executorArgs
+    });
+
+    if (message.tokenAmounts.length > 0) {
+      // TODO pool fees
+      verifierReceipts[verifierReceipts.length - 2] = Receipt({
+        issuer: message.tokenAmounts[0].token,
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        feeTokenAmount: 0,
+        extraArgs: extraArgs.tokenArgs
+      });
+    }
+
+    return verifierReceipts;
+  }
+
+  function _getExecutorFee(
+    Client.EVMExtraArgsV3 memory extraArgs,
+    Client.EVM2AnyMessage memory message,
+    uint64 destChainSelector
+  ) internal view returns (uint256) {
+    return IExecutor(extraArgs.executor).getFee(destChainSelector, message, extraArgs.ccvs, extraArgs.executorArgs);
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.

@@ -37,11 +37,25 @@ func (r *DeployerRegistry) RegisterDeployer(chainFamily string, version *semver.
 	r.deployers[id] = deployer
 }
 
-func NewDeployerRegistry() *DeployerRegistry {
+func newDeployerRegistry() *DeployerRegistry {
 	return &DeployerRegistry{
 		mu:        sync.Mutex{},
 		deployers: make(map[string]Deployer),
 	}
+}
+
+var (
+	singletonRegistry *DeployerRegistry
+	once              sync.Once
+)
+
+// GetRegistry returns the global singleton instance.
+// The first call creates the registry; subsequent calls return the same pointer.
+func GetRegistry() *DeployerRegistry {
+	once.Do(func() {
+		singletonRegistry = newDeployerRegistry()
+	})
+	return singletonRegistry
 }
 
 func (r *DeployerRegistry) GetDeployer(chainFamily string, version *semver.Version) (Deployer, bool) {

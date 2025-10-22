@@ -3,45 +3,12 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
+
+import {MockPoolV2} from "../../mocks/MockPoolV2.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
-
-contract MockPoolV2 {
-  address[] internal s_requiredCCVs;
-
-  constructor(
-    address[] memory requiredCCVs
-  ) {
-    s_requiredCCVs = requiredCCVs;
-  }
-
-  function getRequiredCCVs(
-    address,
-    uint64,
-    uint256,
-    uint16,
-    bytes memory,
-    IPoolV2.CCVDirection direction
-  ) external view returns (address[] memory) {
-    if (direction != IPoolV2.CCVDirection.Inbound) revert("direction");
-    return s_requiredCCVs;
-  }
-
-  function supportsInterface(
-    bytes4 interfaceId
-  ) external pure returns (bool) {
-    return interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IERC165).interfaceId;
-  }
-}
-
 contract OffRamp_getCCVsFromPool is OffRampSetup {
-  address internal s_token;
-
-  function setUp() public override {
-    super.setUp();
-    s_token = makeAddr("token");
-  }
+  address internal s_token = makeAddr("token");
 
   function test_getCCVsFromPool_ReturnsDefaultCCVs_WhenPoolDoesNotSupportV2() public {
     address[] memory expectedCCVs = new address[](2);
@@ -85,9 +52,6 @@ contract OffRamp_getCCVsFromPool is OffRampSetup {
     address[] memory requiredCCVs
   ) internal returns (address) {
     address pool = address(new MockPoolV2(requiredCCVs));
-    vm.mockCall(pool, abi.encodeWithSignature("supportsInterface(bytes4)", type(IPoolV2).interfaceId), abi.encode(true));
-    vm.mockCall(pool, abi.encodeWithSignature("supportsInterface(bytes4)", type(IERC165).interfaceId), abi.encode(true));
-
     // Mock token admin registry to return the V2 pool
     vm.mockCall(
       address(s_tokenAdminRegistry),

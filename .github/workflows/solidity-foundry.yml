@@ -203,7 +203,7 @@ jobs:
           || needs.changes.outputs.non_src_changes == 'true' }}
         run: |
           forge --version
-          forge build
+          forge build --deny-warnings
         id: build
         working-directory: chains/evm
         env:

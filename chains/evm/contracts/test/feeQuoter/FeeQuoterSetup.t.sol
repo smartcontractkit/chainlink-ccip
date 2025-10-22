@@ -17,6 +17,7 @@ contract FeeQuoterSetup is TokenSetup {
   address internal constant CUSTOM_TOKEN_2 = address(bytes20(keccak256("CUSTOM_TOKEN_2")));
 
   uint32 internal constant MAX_DATA_SIZE = 30_000;
+  uint16 internal constant MAX_TOKENS_LENGTH = 1;
   uint32 internal constant MAX_GAS_LIMIT = 4_000_000;
 
   // OnRamp
@@ -25,6 +26,11 @@ contract FeeQuoterSetup is TokenSetup {
   uint8 internal constant DEST_GAS_PER_PAYLOAD_BYTE_BASE = 16;
 
   uint16 internal constant DEFAULT_TOKEN_FEE_USD_CENTS = 50;
+
+  // CommitteeVerifier
+  uint16 internal constant DEFAULT_CCV_FEE_USD_CENTS = 45;
+  uint32 internal constant DEFAULT_CCV_GAS_LIMIT = 7_500 * 6 + 5_000; // 6 sigs + buffer
+  uint32 internal constant DEFAULT_CCV_PAYLOAD_SIZE = 6 * 64 + 2 * 32; // 6 sigs + two slots for length
 
   // Use 16 gas per data availability byte in our tests.
   // This is an overestimation in OP stack, it ignores 4 gas per 0 byte rule.

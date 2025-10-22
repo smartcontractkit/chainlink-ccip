@@ -16,7 +16,10 @@ contract CommitteeVerifier_applyDestChainConfigUpdates is CommitteeVerifierSetup
     args[0] = BaseVerifier.DestChainConfigArgs({
       router: IRouter(router),
       destChainSelector: NEW_DEST_SELECTOR,
-      allowlistEnabled: true
+      allowlistEnabled: true,
+      feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
+      gasForVerification: DEFAULT_CCV_GAS_LIMIT,
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
 
     vm.expectEmit();
@@ -37,7 +40,10 @@ contract CommitteeVerifier_applyDestChainConfigUpdates is CommitteeVerifierSetup
     args[0] = BaseVerifier.DestChainConfigArgs({
       router: s_router,
       destChainSelector: NEW_DEST_SELECTOR,
-      allowlistEnabled: false
+      allowlistEnabled: false,
+      feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
+      gasForVerification: DEFAULT_CCV_GAS_LIMIT,
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
 
     vm.stopPrank();
