@@ -17,6 +17,7 @@ var (
 	SolChainSelector = ccipocr3.ChainSelector(sel.SOLANA_DEVNET.Selector)
 	EvmChainSelector = ccipocr3.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 	AptChainSelector = ccipocr3.ChainSelector(sel.APTOS_TESTNET.Selector)
+	TonChainSelector = ccipocr3.ChainSelector(sel.TON_TESTNET.Selector)
 )
 
 func TestDeviates(t *testing.T) {
@@ -196,6 +197,13 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
 			chainSelector:  AptChainSelector,
 			exp:            big.NewInt(0 * 1 * 1e10), // gasprice * USD per APT * (USD / APT)
+		},
+		{
+			name:           "ton base case",
+			sourceGasPrice: big.NewInt(400),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(2), big.NewInt(1e18)),
+			chainSelector:  TonChainSelector,
+			exp:            big.NewInt(400 * 2 * 1e9),
 		},
 	}
 
