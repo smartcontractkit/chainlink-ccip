@@ -1,4 +1,4 @@
-package v1_0
+package deploy
 
 import (
 	"fmt"
@@ -14,11 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-var (
-	MCMSVersion = semver.MustParse("1.0.0")
-)
-
 type Deployer interface {
+	DeployChainContracts() *cldf_ops.Sequence[ContractDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployMCMS() *cldf_ops.Sequence[MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
