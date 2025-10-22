@@ -1,10 +1,12 @@
 package v1_0
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -33,6 +35,40 @@ type MCMSDeploymentConfigPerChainWithAddress struct {
 	MCMSDeploymentConfigPerChain
 	ChainSelector     uint64
 	ExistingAddresses []datastore.AddressRef
+}
+
+var (
+	// testXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
+	// in tests.
+	testXXXMCMSSigner *ecdsa.PrivateKey
+)
+
+func init() {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	testXXXMCMSSigner = key
+}
+
+func SingleGroupTimelockConfigV2() MCMSDeploymentConfigPerChain {
+	return MCMSDeploymentConfigPerChain{
+		Canceller:        SingleGroupMCMSV2(),
+		Bypasser:         SingleGroupMCMSV2(),
+		Proposer:         SingleGroupMCMSV2(),
+		TimelockMinDelay: big.NewInt(0),
+	}
+}
+
+func SingleGroupMCMSV2() mcmstypes.Config {
+	publicKey := testXXXMCMSSigner.Public().(*ecdsa.PublicKey)
+	// Convert the public key to an Ethereum address
+	address := crypto.PubkeyToAddress(*publicKey)
+	c, err := mcmstypes.NewConfig(1, []common.Address{address}, []mcmstypes.Config{})
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 func DeployMCMS(deployerReg *DeployerRegistry) cldf.ChangeSetV2[MCMSDeploymentConfig] {

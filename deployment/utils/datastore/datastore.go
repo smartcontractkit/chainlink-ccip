@@ -3,7 +3,9 @@ package datastore
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 // FormatFn is a function that formats a datastore.AddressRef into a specific type T.
@@ -68,4 +70,24 @@ func findRef(ds datastore.DataStore, ref datastore.AddressRef) (datastore.Addres
 // FullRef returns the entire datastore.AddressRef
 func FullRef(ref datastore.AddressRef) (datastore.AddressRef, error) {
 	return ref, nil
+}
+
+func GetAddressRef(
+	input []datastore.AddressRef,
+	contractType cldf.ContractType,
+	contractVersion *semver.Version,
+	contractQualifier string) datastore.AddressRef {
+	for _, ref := range input {
+		if ref.Type == datastore.ContractType(contractType) &&
+			ref.Version.Equal(contractVersion) {
+			if contractQualifier != "" {
+				if ref.Qualifier == contractQualifier {
+					return ref
+				}
+			} else {
+				return ref
+			}
+		}
+	}
+	return datastore.AddressRef{}
 }
