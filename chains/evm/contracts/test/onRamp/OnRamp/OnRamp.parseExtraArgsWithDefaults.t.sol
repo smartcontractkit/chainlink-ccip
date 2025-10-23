@@ -99,12 +99,11 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     Client.EVMExtraArgsV3 memory result =
       s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, legacyExtraArgs);
 
-    // Default CCVs should be used with V2 args passed to each CCV (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(s_defaultCCVs.length, result.ccvs.length);
-    assertEq(s_defaultCCVs[0], result.ccvs[0].ccvAddress);
-    assertEq(legacyExtraArgs, result.ccvs[0].args);
-    assertEq(s_defaultCCVs[1], result.ccvs[1].ccvAddress);
-    assertEq(legacyExtraArgs, result.ccvs[1].args);
+    assertEq(result.ccvs[0].ccvAddress, s_defaultCCVs[0]);
+    assertEq(result.ccvs[0].args, "", "ccv args 0");
+    assertEq(result.ccvs[1].ccvAddress, s_defaultCCVs[1]);
+    assertEq(result.ccvs[1].args, "", "ccv args 1");
 
     // V2 args should be set as executor args.
     assertEq(legacyExtraArgs, result.executorArgs);

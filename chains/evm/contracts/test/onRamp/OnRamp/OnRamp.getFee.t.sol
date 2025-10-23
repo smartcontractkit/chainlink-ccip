@@ -9,20 +9,20 @@ import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 contract OnRamp_getFee is OnRampSetup {
-  uint256 internal constant MOCKED_DEFAULT_CCV_FEE = 1e18;
-  uint256 internal constant MOCKED_DEFAULT_EXECUTOR_FEE = 2e20;
+  uint16 internal constant MOCKED_DEFAULT_CCV_FEE_USD_CENTS = 5_00;
+  uint16 internal constant MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS = 4_25;
 
   function setUp() public virtual override {
     super.setUp();
 
-    _mockVerifierFee(s_defaultCCV, MOCKED_DEFAULT_CCV_FEE, DEFAULT_CCV_GAS_LIMIT, DEFAULT_CCV_PAYLOAD_SIZE);
-    _mockExecutorFee(s_defaultExecutor, MOCKED_DEFAULT_EXECUTOR_FEE);
+    _mockVerifierFee(s_defaultCCV, MOCKED_DEFAULT_CCV_FEE_USD_CENTS, DEFAULT_CCV_GAS_LIMIT, DEFAULT_CCV_PAYLOAD_SIZE);
+    _mockExecutorFee(s_defaultExecutor, MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS, 0, 0);
   }
 
   function _mockVerifierFee(
     address verifier,
-    uint256 feeUSDCents,
-    uint32 gasForVerification,
+    uint16 feeUSDCents,
+    uint64 gasForVerification,
     uint32 payloadSizeBytes
   ) internal {
     vm.mockCall(
@@ -32,8 +32,17 @@ contract OnRamp_getFee is OnRampSetup {
     );
   }
 
-  function _mockExecutorFee(address executor, uint256 fee) internal {
-    vm.mockCall(executor, abi.encodeWithSelector(IExecutor.getFee.selector), abi.encode(fee));
+  function _mockExecutorFee(
+    address executor,
+    uint16 feeUSDCents,
+    uint64 gasForVerification,
+    uint32 payloadSizeBytes
+  ) internal {
+    vm.mockCall(
+      executor,
+      abi.encodeWithSelector(IExecutor.getFee.selector),
+      abi.encode(feeUSDCents, gasForVerification, payloadSizeBytes)
+    );
   }
 
   function test_getFee_WithV3ExtraArgs_EmptyCCVs_UsesDefaults() public view {
@@ -48,12 +57,12 @@ contract OnRamp_getFee is OnRampSetup {
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
     // Should use default CCV + executor.
-    assertEq(MOCKED_DEFAULT_CCV_FEE + MOCKED_DEFAULT_EXECUTOR_FEE, feeAmount);
+    assertEq(MOCKED_DEFAULT_CCV_FEE_USD_CENTS + MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS, feeAmount);
   }
 
   function test_getFee_WithV3ExtraArgs_CustomCCV_SkipsDefaults() public {
     address newVerifier = makeAddr("custom_verifier");
-    uint256 differentFee = 12345;
+    uint16 differentFee = 123_45;
     _mockVerifierFee(newVerifier, differentFee, DEFAULT_CCV_GAS_LIMIT, DEFAULT_CCV_PAYLOAD_SIZE);
 
     Client.CCV[] memory ccvs = new Client.CCV[](1);
@@ -64,12 +73,12 @@ contract OnRamp_getFee is OnRampSetup {
 
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
-    assertEq(differentFee + MOCKED_DEFAULT_EXECUTOR_FEE, feeAmount);
+    assertEq(differentFee + MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS, feeAmount);
   }
 
   function test_getFee_WithLaneMandatedCCVs() public {
     address mandatedVerifier = makeAddr("mandated_verifier");
-    uint256 mandatedFee = 150;
+    uint16 mandatedFee = 1_50;
 
     _mockVerifierFee(mandatedVerifier, mandatedFee, 0, 0);
 
@@ -94,17 +103,17 @@ contract OnRamp_getFee is OnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
-    assertEq(MOCKED_DEFAULT_CCV_FEE + MOCKED_DEFAULT_EXECUTOR_FEE + mandatedFee, feeAmount);
+    assertEq(MOCKED_DEFAULT_CCV_FEE_USD_CENTS + MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS + mandatedFee, feeAmount);
   }
 
   function test_getFee_WithCustomExecutorAndCCVs() public {
     address customExecutor = makeAddr("custom_executor_2");
     address verifier = makeAddr("verifier_with_executor");
 
-    uint256 differentExecutorFee = 300;
-    uint256 differentVerifierFee = 200;
+    uint16 differentExecutorFee = 300;
+    uint16 differentVerifierFee = 200;
 
-    _mockExecutorFee(customExecutor, differentExecutorFee);
+    _mockExecutorFee(customExecutor, differentExecutorFee, 0, 0);
     _mockVerifierFee(verifier, differentVerifierFee, 0, 0);
 
     Client.CCV[] memory ccvs = new Client.CCV[](1);

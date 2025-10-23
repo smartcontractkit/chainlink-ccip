@@ -23,8 +23,45 @@ library Client {
     bytes data; // Data payload.
     EVMTokenAmount[] tokenAmounts; // Token transfers.
     address feeToken; // Address of feeToken. address(0) means you will send msg.value.
-    bytes extraArgs; // Populate this with _argsToBytes(EVMExtraArgsV2).
+    bytes extraArgs; // Populate this with _argsToBytes(EVMExtraArgsV3).
   }
+
+  bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
+
+  struct EVMExtraArgsV3 {
+    CCV[] ccvs;
+    /// @notice The finality config, 0 means the default finality that the CCV considers final. Any non-zero value means
+    /// a block depth.
+    uint16 finalityConfig;
+    address executor;
+    bytes executorArgs;
+    bytes tokenArgs;
+  }
+
+  function _argsToBytes(
+    EVMExtraArgsV3 memory extraArgs
+  ) internal pure returns (bytes memory bts) {
+    return abi.encodeWithSelector(GENERIC_EXTRA_ARGS_V3_TAG, extraArgs);
+  }
+
+  struct SVMExecutorArgsV1 {
+    bytes32 tokenReceiver;
+    // TODO Use ATA or raw account flag
+    bool useATA;
+    uint64 accountIsWritableBitmap;
+    // Additional accounts needed for execution of CCIP receiver. Must be empty if message.receiver is zero.
+    // Token transfer related accounts are specified in the token pool lookup table on SVM.
+    bytes32[] accounts;
+  }
+
+  struct SuiExecutorArgsV1 {
+    bytes32 tokenReceiver;
+    bytes32[] receiverObjectIds;
+  }
+
+  // ================================================================
+  // │                           Legacy                             │
+  // ================================================================
 
   // Tag to indicate only a gas limit. Only usable for EVM as destination chain.
   bytes4 public constant EVM_EXTRA_ARGS_V1_TAG = 0x97a657c9;
@@ -42,7 +79,7 @@ library Client {
   // Tag to indicate a gas limit (or dest chain equivalent processing units) and Out Of Order Execution. This tag is
   // available for multiple chain families. If there is no chain family specific tag, this is the default available
   // for a chain.
-  // Note: not available for Solana VM based chains.
+  // Note: not available for Solana or Sui VM based chains.
   bytes4 public constant GENERIC_EXTRA_ARGS_V2_TAG = 0x181dcf10;
 
   /// @param gasLimit: gas limit for the callback on the destination chain.
@@ -145,23 +182,5 @@ library Client {
     /// @param args The args are the arguments that the verifier contract expects. They are opaque to CCIP and are only
     /// used in the CCV.
     bytes args;
-  }
-
-  bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
-
-  struct EVMExtraArgsV3 {
-    CCV[] ccvs;
-    /// @notice The finality config, 0 means the default finality that the CCV considers final. Any non-zero value means
-    /// a block depth.
-    uint16 finalityConfig;
-    address executor;
-    bytes executorArgs;
-    bytes tokenArgs;
-  }
-
-  function _argsToBytes(
-    EVMExtraArgsV3 memory extraArgs
-  ) internal pure returns (bytes memory bts) {
-    return abi.encodeWithSelector(GENERIC_EXTRA_ARGS_V3_TAG, extraArgs);
   }
 }

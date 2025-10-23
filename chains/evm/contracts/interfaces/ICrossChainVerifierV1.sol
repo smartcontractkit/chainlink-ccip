@@ -40,7 +40,7 @@ interface ICrossChainVerifierV1 is IERC165 {
     Client.EVM2AnyMessage memory message,
     bytes memory extraArgs,
     uint16 finalityConfig
-  ) external view returns (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes);
+  ) external view returns (uint16 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes);
 
   /// @notice Message sending, verifier hook.
   /// @param message Decoded MessageV1 structure for the message being sent.

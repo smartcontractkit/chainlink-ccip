@@ -26,7 +26,7 @@ contract Executor_applyAllowedCCVUpdates is ExecutorSetup {
       }
     }
     assertTrue(found, "New ccv should be supported");
-    assertTrue(s_executor.isCCVAllowlistEnabled(), "CCV allowlist should be enabled");
+    assertTrue(s_executor.getDynamicConfig().ccvAllowlistEnabled, "CCV allowlist should be enabled");
   }
 
   function test_applyAllowedCCVUpdates_AddExistingChain() public {
@@ -70,7 +70,7 @@ contract Executor_applyAllowedCCVUpdates is ExecutorSetup {
     emit Executor.CCVAllowlistUpdated(false);
     s_executor.applyAllowedCCVUpdates(new address[](0), new address[](0), false);
 
-    assertFalse(s_executor.isCCVAllowlistEnabled(), "CCV allowlist should be disabled");
+    assertFalse(s_executor.getDynamicConfig().ccvAllowlistEnabled, "CCV allowlist should be disabled");
   }
 
   function test_applyAllowedCCVUpdates_RevertWhen_NotOwner() public {

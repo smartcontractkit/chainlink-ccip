@@ -106,6 +106,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 							},
 							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
 							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+							ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
 						},
 					},
 				},
@@ -175,7 +176,13 @@ func TestConfigureChainForLanes(t *testing.T) {
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Len(t, ExecutorDestChains.Output, 1, "There should be one dest chain on Executor")
-			require.Equal(t, remoteChainSelector, ExecutorDestChains.Output[0], "Dest chain selector on Executor should match remote chain selector")
+			expectedExecConfig := testsetup.CreateBasicExecutorDestChainConfig()
+			gotExecConfig := ExecutorDestChains.Output[0].Config
+			require.Equal(t, remoteChainSelector, ExecutorDestChains.Output[0].DestChainSelector, "Dest chain selector on Executor should match remote chain selector")
+			require.Equal(t, expectedExecConfig.UsdCentsFee, gotExecConfig.UsdCentsFee, "UsdCentsFee in Executor dest chain config should match")
+			require.Equal(t, expectedExecConfig.BaseExecGas, gotExecConfig.BaseExecGas, "BaseExecGas in Executor dest chain config should match")
+			require.Equal(t, expectedExecConfig.DestAddressLengthBytes, gotExecConfig.DestAddressLengthBytes, "DestAddressLengthBytes in Executor dest chain config should match")
+			require.True(t, gotExecConfig.Enabled, "Dest chain selector on Executor should be enabled")
 
 			/////////////////////////////////////////
 			// Try sending CCIP message /////////////

@@ -76,6 +76,7 @@ type FeeQuoterParams struct {
 type ExecutorParams struct {
 	Version       *semver.Version
 	MaxCCVsPerMsg uint8
+	DynamicConfig executor.SetDynamicConfigArgs
 }
 
 type ContractParams struct {
@@ -295,7 +296,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				ChainSelector:     chain.Selector,
 				ExistingAddresses: input.ExistingAddresses,
 				Params:            committeeVerifierParams,
-				FeeQuoter:         common.HexToAddress(feeQuoterRef.Address),
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
@@ -315,6 +315,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: executor.ConstructorArgs{
 				MaxCCVsPerMsg: input.ContractParams.Executor.MaxCCVsPerMsg,
+				DynamicConfig: input.ContractParams.Executor.DynamicConfig,
 			},
 		}, input.ExistingAddresses)
 		if err != nil {

@@ -114,6 +114,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       // TODO when v3 extra args are passed in
       extraArgs: isLegacyExtraArgs ? message.extraArgs : bytes("")
     });
+    messageV1.destBlob = receipts[receipts.length - 1].extraArgs;
 
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
@@ -204,7 +205,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         feeTokenAmount: feeUSDCents,
         destGasLimit: gasForVerification,
         destBytesOverhead: payloadSizeBytes,
-        extraArgs: message.extraArgs
+        extraArgs: ""
       });
     }
 
