@@ -295,7 +295,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				ChainSelector:     chain.Selector,
 				ExistingAddresses: input.ExistingAddresses,
 				Params:            committeeVerifierParams,
-				FeeQuoter:         common.HexToAddress(feeQuoterRef.Address),
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)

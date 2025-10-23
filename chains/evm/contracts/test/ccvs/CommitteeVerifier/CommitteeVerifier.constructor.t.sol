@@ -6,7 +6,6 @@ import {CommitteeVerifierSetup} from "./CommitteeVerifierSetup.t.sol";
 
 contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
   function test_constructor() public {
-    address expectedFeeQuoter = address(s_feeQuoter);
     address expectedFeeAggregator = FEE_AGGREGATOR;
     address expectedAllowlistAdmin = ALLOWLIST_ADMIN;
 
