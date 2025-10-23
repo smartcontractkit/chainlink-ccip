@@ -36,10 +36,9 @@ func (r *DeployerRegistry) RegisterDeployer(chainFamily string, version *semver.
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	id := utils.NewRegistererID(chainFamily, version)
-	if _, exists := r.deployers[id]; exists {
-		panic("Deployer already registered for " + id)
+	if _, exists := r.deployers[id]; !exists {
+		r.deployers[id] = deployer
 	}
-	r.deployers[id] = deployer
 }
 
 func newDeployerRegistry() *DeployerRegistry {

@@ -32,10 +32,9 @@ func (r *ChainAdapterRegistry) RegisterAdapter(chainFamily string, version *semv
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	id := utils.NewRegistererID(chainFamily, version)
-	if _, exists := r.adapters[id]; exists {
-		panic("ChainAdapter already registered for " + id)
+	if _, exists := r.adapters[id]; !exists {
+		r.adapters[id] = adapter
 	}
-	r.adapters[id] = adapter
 }
 
 func (r *ChainAdapterRegistry) GetAdapterByChainSelector(chainSelector uint64, version *semver.Version) (ChainAdapter, error) {
