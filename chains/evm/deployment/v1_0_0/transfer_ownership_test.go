@@ -144,7 +144,7 @@ func TestTransferOwnership(t *testing.T) {
 	}
 	// register chain adapter
 	cr := v1_0.GetTransferOwnershipRegistry()
-	evmAdapter := &adapters.EVMChainAdapter{}
+	evmAdapter := &adapters.EVMTransferOwnershipAdapter{}
 	cr.RegisterAdapter(chainsel.FamilyEVM, transferOwnershipInput.AdapterVersion, evmAdapter)
 	mcmsRegistry := changesets.NewMCMSReaderRegistry()
 	evmMCMSReader := &adapters.EVMMCMSReader{}

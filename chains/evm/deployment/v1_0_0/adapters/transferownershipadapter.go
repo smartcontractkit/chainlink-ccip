@@ -18,11 +18,11 @@ import (
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 )
 
-type EVMChainAdapter struct {
+type EVMTransferOwnershipAdapter struct {
 	timelockAddr map[uint64]common.Address
 }
 
-func (a *EVMChainAdapter) InitializeTimelockAddress(e deployment.Environment, input mcms.Input) error {
+func (a *EVMTransferOwnershipAdapter) InitializeTimelockAddress(e deployment.Environment, input mcms.Input) error {
 	evmChains := e.BlockChains.EVMChains()
 	a.timelockAddr = make(map[uint64]common.Address)
 	for sel := range evmChains {
@@ -35,7 +35,7 @@ func (a *EVMChainAdapter) InitializeTimelockAddress(e deployment.Environment, in
 	return nil
 }
 
-func (a *EVMChainAdapter) SequenceTransferOwnershipViaMCMS() *cldf_ops.Sequence[api.TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *EVMTransferOwnershipAdapter) SequenceTransferOwnershipViaMCMS() *cldf_ops.Sequence[api.TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-seq-transfer-ownership-via-mcms",
 		semver.MustParse("1.0.0"),
@@ -72,7 +72,7 @@ func (a *EVMChainAdapter) SequenceTransferOwnershipViaMCMS() *cldf_ops.Sequence[
 		})
 }
 
-func (a *EVMChainAdapter) ShouldAcceptOwnershipWithTransferOwnership(e deployment.Environment, in api.TransferOwnershipPerChainInput) (bool, error) {
+func (a *EVMTransferOwnershipAdapter) ShouldAcceptOwnershipWithTransferOwnership(e deployment.Environment, in api.TransferOwnershipPerChainInput) (bool, error) {
 	chain, ok := e.BlockChains.EVMChains()[in.ChainSelector]
 	if !ok {
 		return false, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
@@ -84,7 +84,7 @@ func (a *EVMChainAdapter) ShouldAcceptOwnershipWithTransferOwnership(e deploymen
 	return true, nil
 }
 
-func (a *EVMChainAdapter) SequenceAcceptOwnership() *cldf_ops.Sequence[api.TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *EVMTransferOwnershipAdapter) SequenceAcceptOwnership() *cldf_ops.Sequence[api.TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-seq-accept-ownership",
 		semver.MustParse("1.0.0"),
