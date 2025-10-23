@@ -10,7 +10,7 @@ contract Executor_getMaxCCVsPerMessage is ExecutorSetup {
     assertEq(maxCCVs, INITIAL_MAX_CCVS);
 
     uint8 newMaxCCVs = INITIAL_MAX_CCVS + 5;
-    s_executor = new Executor(newMaxCCVs);
+    s_executor = new Executor(newMaxCCVs, 0);
     maxCCVs = s_executor.getMaxCCVsPerMessage();
     assertEq(maxCCVs, newMaxCCVs);
   }
@@ -18,6 +18,6 @@ contract Executor_getMaxCCVsPerMessage is ExecutorSetup {
   function test_constructor_RevertWhen_InvalidMaxPossibleCCVsPerMsg() public {
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidMaxPossibleCCVsPerMsg.selector, 0));
 
-    new Executor(0);
+    new Executor(0, 0);
   }
 }

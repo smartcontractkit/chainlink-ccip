@@ -7,12 +7,15 @@ import {Client} from "../libraries/Client.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 /// @notice The Executor configures the supported destination chains and CCV limits for an executor.
 contract Executor is IExecutor, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
+  using SafeERC20 for IERC20;
 
   error ExceedsMaxCCVs(uint256 provided, uint256 max);
   error InvalidCCV(address ccv);
@@ -27,12 +30,13 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   event DestChainAdded(uint64 indexed destChainSelector, RemoteChainConfig config);
   event DestChainRemoved(uint64 indexed destChainSelector);
   event MaxCCVsPerMsgSet(uint8 maxCCVsPerMsg);
+  event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
+  event MinBlockConfirmationsSet(uint16 minBlockConfirmations);
 
   struct RemoteChainConfig {
     uint16 usdCentsFee; // ──────────╮ The fee changed by the executor for processing messages to this chain, USD cents.
     uint32 baseExecGas; //           │ The base gas cost to execute messages, excluding pool/CCV/receiver gas.
     uint8 destAddressLengthBytes; // │ The length of addresses on the destination chain, in bytes.
-    uint16 minBlockConfirmations; // │ The minimum number of block confirmations required before executing messages to this chain.
     bool enabled; // ────────────────╯ Whether or not this destination chain is enabled.
   }
 
@@ -48,6 +52,10 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   uint8 internal immutable i_maxCCVsPerMsg;
   /// @notice Whether or not the CCV allowlist is enabled.
   bool internal s_ccvAllowlistEnabled;
+  /// @notice The minimum number of block confirmations allowed, with 0 always being accepted as it means 'finality tag
+  /// or chain equivalent'. It is up to the CCVs to respect this minimum, but the executor can restrict what a user can
+  /// request from a CCV.
+  uint16 internal s_minBlockConfirmations;
   /// @notice The set of CCVs that the executor supports.
   EnumerableSet.AddressSet internal s_allowedCCVs;
   /// @notice The set of destination chains that the executor supports.
@@ -55,13 +63,13 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   /// @notice The remote chain configurations for supported destination chains.
   mapping(uint64 => RemoteChainConfig) internal s_remoteChainConfigs;
 
-  constructor(
-    uint8 maxCCVsPerMsg
-  ) {
+  constructor(uint8 maxCCVsPerMsg, uint16 minBlockConfirmations) {
     if (maxCCVsPerMsg == 0) {
       revert InvalidMaxPossibleCCVsPerMsg(maxCCVsPerMsg);
     }
     i_maxCCVsPerMsg = maxCCVsPerMsg;
+    // Zero is a valid value for minBlockConfirmations, indicating that finality is requested.
+    s_minBlockConfirmations = minBlockConfirmations;
   }
 
   // ================================================================
@@ -70,13 +78,13 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
 
   /// @notice Gets the maximum number of CCVs that can be used in a single message.
   /// @return maxCCVsPerMsg The maximum number of CCVs.
-  function getMaxCCVsPerMessage() external view returns (uint8 maxCCVsPerMsg) {
+  function getMaxCCVsPerMessage() external view virtual returns (uint8 maxCCVsPerMsg) {
     return i_maxCCVsPerMsg;
   }
 
   /// @notice Returns the list of destination chains that the executor supports.
   /// @return destChains The list of destination chain selectors.
-  function getDestChains() external view returns (RemoteChainConfigArgs[] memory) {
+  function getDestChains() external view virtual returns (RemoteChainConfigArgs[] memory) {
     uint256 numberOfChains = s_allowedDestChains.length();
     RemoteChainConfigArgs[] memory destChains = new RemoteChainConfigArgs[](numberOfChains);
     for (uint256 i = 0; i < numberOfChains; ++i) {
@@ -92,7 +100,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   function applyDestChainUpdates(
     uint64[] calldata destChainSelectorsToRemove,
     RemoteChainConfigArgs[] calldata destChainSelectorsToAdd
-  ) external onlyOwner {
+  ) external virtual onlyOwner {
     for (uint256 i = 0; i < destChainSelectorsToRemove.length; ++i) {
       uint64 destChainSelector = destChainSelectorsToRemove[i];
       if (s_allowedDestChains.remove(destChainSelector)) {
@@ -113,15 +121,31 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     }
   }
 
+  /// @inheritdoc IExecutor
+  function getMinBlockConfirmations() external view virtual returns (uint16) {
+    return s_minBlockConfirmations;
+  }
+
+  /// @notice Sets the minimum number of block confirmations that's allowed to be requested.
+  /// @param minBlockConfirmations The minimum number of block confirmations allowed to be requested.
+  function setMinBlockConfirmations(
+    uint16 minBlockConfirmations
+  ) external virtual onlyOwner {
+    // Zero is a valid value for minBlockConfirmations, indicating that finality is requested.
+    s_minBlockConfirmations = minBlockConfirmations;
+
+    emit MinBlockConfirmationsSet(minBlockConfirmations);
+  }
+
   /// @notice Returns whether or not the CCV allowlist is enabled.
   /// @return enabled The enablement status.
-  function isCCVAllowlistEnabled() external view returns (bool) {
+  function isCCVAllowlistEnabled() external view virtual returns (bool) {
     return s_ccvAllowlistEnabled;
   }
 
   /// @notice Returns the list of CCVs that the executor supports.
   /// @return ccvs The list of CCV addresses.
-  function getAllowedCCVs() external view returns (address[] memory) {
+  function getAllowedCCVs() external view virtual returns (address[] memory) {
     return s_allowedCCVs.values();
   }
 
@@ -133,7 +157,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     address[] calldata ccvsToRemove,
     address[] calldata ccvsToAdd,
     bool ccvAllowlistEnabled
-  ) external onlyOwner {
+  ) external virtual onlyOwner {
     for (uint256 i = 0; i < ccvsToRemove.length; ++i) {
       if (s_allowedCCVs.remove(ccvsToRemove[i])) {
         emit CCVRemoved(ccvsToRemove[i]);
@@ -160,8 +184,6 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   // │                             Fees                             │
   // ================================================================
 
-  // TODO: Needs fee token withdrawal function once fees are implemented
-
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   /// @param destChainSelector The destination chain selector.
   /// @param requestedBlockDepth The requested block depth for the message. `0` indicates waiting for finality.
@@ -178,13 +200,13 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     uint8 numberOfTokens,
     Client.CCV[] calldata ccvs,
     bytes calldata extraArgs
-  ) external view returns (uint16 usdCentsFee, uint32 execGasCost, uint32 execBytes) {
+  ) external view virtual returns (uint16 usdCentsFee, uint32 execGasCost, uint32 execBytes) {
     RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[destChainSelector];
     if (!remoteChainConfig.enabled) {
       revert InvalidDestChain(destChainSelector);
     }
-    if (requestedBlockDepth != 0 && requestedBlockDepth < remoteChainConfig.minBlockConfirmations) {
-      revert Executor__RequestedBlockDepthTooLow(requestedBlockDepth, remoteChainConfig.minBlockConfirmations);
+    if (requestedBlockDepth != 0 && requestedBlockDepth < s_minBlockConfirmations) {
+      revert Executor__RequestedBlockDepthTooLow(requestedBlockDepth, s_minBlockConfirmations);
     }
 
     if (s_ccvAllowlistEnabled) {
@@ -200,6 +222,8 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
       revert ExceedsMaxCCVs(ccvs.length, i_maxCCVsPerMsg);
     }
 
+    // Since the message payload is the same on source and destination chains with the V1 codec, we can use the
+    // same calculation for execBytes on destination.
     execBytes = uint32(
       MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + extraArgs.length
         + (MessageV1Codec.MESSAGE_V1_REMOTE_CHAIN_ADDRESSES * remoteChainConfig.destAddressLengthBytes)
@@ -212,5 +236,18 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     execGasCost += remoteChainConfig.baseExecGas;
 
     return (remoteChainConfig.usdCentsFee, execGasCost, execBytes);
+  }
+
+  function withdrawFeeTokens(address[] calldata feeTokens, address feeAggregator) external virtual onlyOwner {
+    for (uint256 i = 0; i < feeTokens.length; ++i) {
+      IERC20 feeToken = IERC20(feeTokens[i]);
+      uint256 feeTokenBalance = feeToken.balanceOf(address(this));
+
+      if (feeTokenBalance > 0) {
+        feeToken.safeTransfer(feeAggregator, feeTokenBalance);
+
+        emit FeeTokenWithdrawn(feeAggregator, address(feeToken), feeTokenBalance);
+      }
+    }
   }
 }

@@ -17,7 +17,7 @@ contract ExecutorSetup is BaseTest {
   function setUp() public override {
     super.setUp();
 
-    s_executor = new Executor(INITIAL_MAX_CCVS);
+    s_executor = new Executor(INITIAL_MAX_CCVS, MIN_BLOCK_CONFIRMATIONS);
 
     address[] memory ccvs = new address[](1);
     ccvs[0] = INITIAL_CCV;
@@ -29,7 +29,6 @@ contract ExecutorSetup is BaseTest {
       usdCentsFee: DEFAULT_EXEC_FEE_USD_CENTS,
       baseExecGas: DEFAULT_EXEC_GAS,
       destAddressLengthBytes: EVM_ADDRESS_LENGTH,
-      minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS,
       enabled: true
     });
 
