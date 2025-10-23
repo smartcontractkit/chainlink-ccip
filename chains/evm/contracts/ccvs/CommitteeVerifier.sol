@@ -19,9 +19,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   event ConfigSet(DynamicConfig dynamicConfig);
 
   /// @dev Defines upgradeable configuration parameters.
-  // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
-    address feeQuoter; // The contract used to quote fees on source.
     address feeAggregator; // Entity capable of withdrawing fees.
     address allowlistAdmin; // Entity capable adding or removing allowed senders.
   }
@@ -96,7 +94,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) internal {
-    if (dynamicConfig.feeQuoter == address(0) || dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
+    if (dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
 
     s_dynamicConfig = dynamicConfig;
 

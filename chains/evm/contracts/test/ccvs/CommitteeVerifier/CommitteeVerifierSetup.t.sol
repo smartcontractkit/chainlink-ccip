@@ -38,25 +38,16 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
   }
 
   /// @notice Helper to create a minimal dynamic config.
-  function _createBasicDynamicConfigArgs() internal view returns (CommitteeVerifier.DynamicConfig memory) {
-    return CommitteeVerifier.DynamicConfig({
-      feeQuoter: address(s_feeQuoter),
-      feeAggregator: FEE_AGGREGATOR,
-      allowlistAdmin: ALLOWLIST_ADMIN
-    });
+  function _createBasicDynamicConfigArgs() internal pure returns (CommitteeVerifier.DynamicConfig memory) {
+    return CommitteeVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN});
   }
 
   /// @notice Helper to create a dynamic config with custom addresses.
   function _createDynamicConfigArgs(
-    address feeQuoter,
     address feeAggregator,
     address allowlistAdmin
   ) internal pure returns (CommitteeVerifier.DynamicConfig memory) {
-    return CommitteeVerifier.DynamicConfig({
-      feeQuoter: feeQuoter,
-      feeAggregator: feeAggregator,
-      allowlistAdmin: allowlistAdmin
-    });
+    return CommitteeVerifier.DynamicConfig({feeAggregator: feeAggregator, allowlistAdmin: allowlistAdmin});
   }
 
   function _generateBasicMessageV1() internal pure returns (MessageV1Codec.MessageV1 memory, bytes32 messageId) {

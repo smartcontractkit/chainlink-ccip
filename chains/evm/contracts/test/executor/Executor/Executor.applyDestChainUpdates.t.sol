@@ -16,7 +16,6 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
         usdCentsFee: DEFAULT_EXEC_FEE_USD_CENTS,
         baseExecGas: DEFAULT_EXEC_GAS,
         destAddressLengthBytes: EVM_ADDRESS_LENGTH,
-        minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS,
         enabled: true
       })
     });
@@ -30,7 +29,6 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
     assertEq(a.config.usdCentsFee, b.config.usdCentsFee);
     assertEq(a.config.baseExecGas, b.config.baseExecGas);
     assertEq(a.config.destAddressLengthBytes, b.config.destAddressLengthBytes);
-    assertEq(a.config.minBlockConfirmations, b.config.minBlockConfirmations);
     assertEq(a.config.enabled, b.config.enabled);
   }
 
