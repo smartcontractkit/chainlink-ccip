@@ -22,19 +22,18 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   error InvalidDestChain(uint64 destChainSelector);
   error Executor__RequestedBlockDepthTooLow(uint16 requestedBlockDepth, uint16 minBlockConfirmations);
   error InvalidMaxPossibleCCVsPerMsg(uint256 maxPossibleCCVsPerMsg);
-  error ZeroAddressNotAllowed();
+  error InvalidConfig();
 
   event CCVAllowlistUpdated(bool enabled);
   event CCVAdded(address indexed ccv);
   event CCVRemoved(address indexed ccv);
   event DestChainAdded(uint64 indexed destChainSelector, RemoteChainConfig config);
   event DestChainRemoved(uint64 indexed destChainSelector);
-  event MaxCCVsPerMsgSet(uint8 maxCCVsPerMsg);
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
-  event MinBlockConfirmationsSet(uint16 minBlockConfirmations);
+  event ConfigSet(DynamicConfig dynamicConfig);
 
   struct RemoteChainConfig {
-    uint16 usdCentsFee; // ──────────╮ The fee changed by the executor for processing messages to this chain, USD cents.
+    uint16 usdCentsFee; // ──────────╮ The fee charged by the executor for processing messages to this chain, USD cents.
     uint32 baseExecGas; //           │ The base gas cost to execute messages, excluding pool/CCV/receiver gas.
     uint8 destAddressLengthBytes; // │ The length of addresses on the destination chain, in bytes.
     bool enabled; // ────────────────╯ Whether or not this destination chain is enabled.
@@ -45,17 +44,19 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     RemoteChainConfig config;
   }
 
+  struct DynamicConfig {
+    address feeAggregator; // ──────╮ Address to send withdrawn fees to.
+    uint16 minBlockConfirmations; // │ Minimum number of block confirmations allowed (0 = finality).
+    bool ccvAllowlistEnabled; // ────╯ Whether the CCV allowlist is enabled.
+  }
+
   string public constant typeAndVersion = "Executor 1.7.0-dev";
 
   /// @notice Limits the number of CCVs that the executor needs to search for results from.
   /// @dev Max(required CCVs + optional CCVs).
   uint8 internal immutable i_maxCCVsPerMsg;
-  /// @notice Whether or not the CCV allowlist is enabled.
-  bool internal s_ccvAllowlistEnabled;
-  /// @notice The minimum number of block confirmations allowed, with 0 always being accepted as it means 'finality tag
-  /// or chain equivalent'. It is up to the CCVs to respect this minimum, but the executor can restrict what a user can
-  /// request from a CCV.
-  uint16 internal s_minBlockConfirmations;
+  /// @notice Dynamic configuration.
+  DynamicConfig internal s_dynamicConfig;
   /// @notice The set of CCVs that the executor supports.
   EnumerableSet.AddressSet internal s_allowedCCVs;
   /// @notice The set of destination chains that the executor supports.
@@ -63,13 +64,12 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   /// @notice The remote chain configurations for supported destination chains.
   mapping(uint64 => RemoteChainConfig) internal s_remoteChainConfigs;
 
-  constructor(uint8 maxCCVsPerMsg, uint16 minBlockConfirmations) {
+  constructor(uint8 maxCCVsPerMsg, DynamicConfig memory dynamicConfig) {
     if (maxCCVsPerMsg == 0) {
       revert InvalidMaxPossibleCCVsPerMsg(maxCCVsPerMsg);
     }
     i_maxCCVsPerMsg = maxCCVsPerMsg;
-    // Zero is a valid value for minBlockConfirmations, indicating that finality is requested.
-    s_minBlockConfirmations = minBlockConfirmations;
+    _setDynamicConfig(dynamicConfig);
   }
 
   // ================================================================
@@ -121,26 +121,37 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     }
   }
 
+  /// @notice Returns the dynamic configuration.
+  /// @return dynamicConfig The dynamic configuration.
+  function getDynamicConfig() external view virtual returns (DynamicConfig memory) {
+    return s_dynamicConfig;
+  }
+
+  /// @notice Sets the dynamic configuration.
+  /// @param dynamicConfig The dynamic configuration.
+  function setDynamicConfig(
+    DynamicConfig memory dynamicConfig
+  ) external virtual onlyOwner {
+    _setDynamicConfig(dynamicConfig);
+  }
+
+  /// @notice Internal function to set the dynamic configuration.
+  /// @param dynamicConfig The dynamic configuration.
+  function _setDynamicConfig(
+    DynamicConfig memory dynamicConfig
+  ) internal {
+    if (dynamicConfig.feeAggregator == address(0)) {
+      revert InvalidConfig();
+    }
+    // Zero is a valid value for minBlockConfirmations, indicating that finality is requested.
+    s_dynamicConfig = dynamicConfig;
+
+    emit ConfigSet(dynamicConfig);
+  }
+
   /// @inheritdoc IExecutor
   function getMinBlockConfirmations() external view virtual returns (uint16) {
-    return s_minBlockConfirmations;
-  }
-
-  /// @notice Sets the minimum number of block confirmations that's allowed to be requested.
-  /// @param minBlockConfirmations The minimum number of block confirmations allowed to be requested.
-  function setMinBlockConfirmations(
-    uint16 minBlockConfirmations
-  ) external virtual onlyOwner {
-    // Zero is a valid value for minBlockConfirmations, indicating that finality is requested.
-    s_minBlockConfirmations = minBlockConfirmations;
-
-    emit MinBlockConfirmationsSet(minBlockConfirmations);
-  }
-
-  /// @notice Returns whether or not the CCV allowlist is enabled.
-  /// @return enabled The enablement status.
-  function isCCVAllowlistEnabled() external view virtual returns (bool) {
-    return s_ccvAllowlistEnabled;
+    return s_dynamicConfig.minBlockConfirmations;
   }
 
   /// @notice Returns the list of CCVs that the executor supports.
@@ -174,8 +185,8 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
       }
     }
 
-    if (s_ccvAllowlistEnabled != ccvAllowlistEnabled) {
-      s_ccvAllowlistEnabled = ccvAllowlistEnabled;
+    if (s_dynamicConfig.ccvAllowlistEnabled != ccvAllowlistEnabled) {
+      s_dynamicConfig.ccvAllowlistEnabled = ccvAllowlistEnabled;
       emit CCVAllowlistUpdated(ccvAllowlistEnabled);
     }
   }
@@ -205,11 +216,11 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     if (!remoteChainConfig.enabled) {
       revert InvalidDestChain(destChainSelector);
     }
-    if (requestedBlockDepth != 0 && requestedBlockDepth < s_minBlockConfirmations) {
-      revert Executor__RequestedBlockDepthTooLow(requestedBlockDepth, s_minBlockConfirmations);
+    if (requestedBlockDepth != 0 && requestedBlockDepth < s_dynamicConfig.minBlockConfirmations) {
+      revert Executor__RequestedBlockDepthTooLow(requestedBlockDepth, s_dynamicConfig.minBlockConfirmations);
     }
 
-    if (s_ccvAllowlistEnabled) {
+    if (s_dynamicConfig.ccvAllowlistEnabled) {
       for (uint256 i = 0; i < ccvs.length; ++i) {
         address ccvAddress = ccvs[i].ccvAddress;
         if (!s_allowedCCVs.contains(ccvAddress)) {
@@ -238,7 +249,12 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     return (remoteChainConfig.usdCentsFee, execGasCost, execBytes);
   }
 
-  function withdrawFeeTokens(address[] calldata feeTokens, address feeAggregator) external virtual onlyOwner {
+  /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
+  /// @param feeTokens The fee tokens to withdraw.
+  function withdrawFeeTokens(
+    address[] calldata feeTokens
+  ) external virtual onlyOwner {
+    address feeAggregator = s_dynamicConfig.feeAggregator;
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       IERC20 feeToken = IERC20(feeTokens[i]);
       uint256 feeTokenBalance = feeToken.balanceOf(address(this));
