@@ -45,7 +45,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   }
 
   struct DynamicConfig {
-    address feeAggregator; // ──────╮ Address to send withdrawn fees to.
+    address feeAggregator; // ───────╮ Address to send withdrawn fees to.
     uint16 minBlockConfirmations; // │ Minimum number of block confirmations allowed (0 = finality).
     bool ccvAllowlistEnabled; // ────╯ Whether the CCV allowlist is enabled.
   }

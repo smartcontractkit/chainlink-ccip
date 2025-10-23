@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Executor} from "../../../Executor/Executor.sol";
+import {Executor} from "../../../executor/Executor.sol";
 import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
