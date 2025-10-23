@@ -67,7 +67,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 					{
 						Router:            common.BytesToAddress(input.Source.Router),
 						DestChainSelector: input.Dest.Selector,
-						AllowlistEnabled:  input.Source.AllowListEnabled,
+						AllowlistEnabled:  input.Dest.AllowListEnabled,
 					},
 				},
 			},
@@ -110,7 +110,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		b.Logger.Info("EVM Configuring lane leg as destination:", input)
 
 		result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
-			Address: common.BytesToAddress(input.Source.OffRamp),
+			Address: common.BytesToAddress(input.Dest.OffRamp),
 			UpdatesByChain: map[uint64][]offramp.OffRampSourceChainConfigArgs{
 				input.Dest.Selector: {
 					{
