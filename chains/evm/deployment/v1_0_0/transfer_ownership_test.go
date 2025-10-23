@@ -200,7 +200,6 @@ func TestTransferOwnership(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
 	require.Equal(t, 1, len(output.MCMSTimelockProposals))
-	// TODO execute the proposal and verify ownership transfer
 	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 	// now check the owner of the routers is the timelock
