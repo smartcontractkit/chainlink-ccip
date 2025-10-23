@@ -38,8 +38,8 @@ type DeployInput[ARGS any] struct {
 	// The deployment operation must define bytecode for this type and version.
 	TypeAndVersion deployment.TypeAndVersion `json:"typeAndVersion"`
 	// Qualifier is an optional string to differentiate between multiple deployments of
-	//	the same contract type and version on the same chain.
-	// if provided, it is stored in the AddressRef returned by the operation.
+	// the same contract type and version on the same chain. If provided, it is stored
+	// in the AddressRef returned by the operation.
 	Qualifier *string `json:"qualifier,omitempty"`
 	// Args are the parameters passed to the contract constructor.
 	Args ARGS `json:"args"`
@@ -233,18 +233,13 @@ func MaybeDeployContract[ARGS any](
 	input DeployInput[ARGS],
 	existingAddresses []datastore.AddressRef) (datastore.AddressRef, error) {
 	for _, ref := range existingAddresses {
-		if ref.ChainSelector != input.ChainSelector {
-			continue
-		}
 		if ref.Type == datastore.ContractType(input.TypeAndVersion.Type) &&
 			ref.Version.String() == input.TypeAndVersion.Version.String() {
 			if input.Qualifier != nil {
 				if ref.Qualifier == *input.Qualifier {
-					fmt.Println("Using existing address for", input.TypeAndVersion, "with qualifier", *input.Qualifier, "on chain", input.ChainSelector)
 					return ref, nil
 				}
 			} else {
-				fmt.Println("Using existing address for", input.TypeAndVersion, "on chain", input.ChainSelector)
 				return ref, nil
 			}
 		}
