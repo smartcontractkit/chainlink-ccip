@@ -6,7 +6,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -67,7 +70,7 @@ func TestTransferOwnership(t *testing.T) {
 	require.Greater(t, len(output.Reports), 0)
 	ds := output.DataStore
 	// deploy router on both chains, then transfer ownership to the timelock
-
+	routerAddrs := make(map[uint64]common.Address)
 	for _, sel := range []uint64{selector1, selector2} {
 		evmChain := env.BlockChains.EVMChains()[sel]
 		// mock wrapped native and rmnproxy address
@@ -88,6 +91,7 @@ func TestTransferOwnership(t *testing.T) {
 			ChainSelector: sel,
 			Address:       deployRouterOp.Output.Address,
 		}))
+		routerAddrs[sel] = common.HexToAddress(deployRouterOp.Output.Address)
 	}
 	env.DataStore = ds.Seal()
 	timelockAddrs := make(map[uint64]string)
@@ -155,4 +159,17 @@ func TestTransferOwnership(t *testing.T) {
 	require.Greater(t, len(output.Reports), 0)
 	require.Equal(t, 1, len(output.MCMSTimelockProposals))
 	// TODO execute the proposal and verify ownership transfer
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	// now check the owner of the routers is the timelock
+	for _, sel := range []uint64{selector1, selector2} {
+		evmChain := env.BlockChains.EVMChains()[sel]
+		r, err := router.NewRouter(routerAddrs[sel], evmChain.Client)
+		require.NoError(t, err)
+		owner, err := r.Owner(&bind.CallOpts{
+			Context: t.Context(),
+		})
+		require.NoError(t, err)
+		require.Equal(t, common.HexToAddress(timelockAddrs[sel]), owner, "owner mismatch on chain %d", sel)
+	}
 }
