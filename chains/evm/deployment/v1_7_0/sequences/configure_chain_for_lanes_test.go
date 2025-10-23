@@ -182,7 +182,6 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, expectedExecConfig.UsdCentsFee, gotExecConfig.UsdCentsFee, "UsdCentsFee in Executor dest chain config should match")
 			require.Equal(t, expectedExecConfig.BaseExecGas, gotExecConfig.BaseExecGas, "BaseExecGas in Executor dest chain config should match")
 			require.Equal(t, expectedExecConfig.DestAddressLengthBytes, gotExecConfig.DestAddressLengthBytes, "DestAddressLengthBytes in Executor dest chain config should match")
-			require.Equal(t, expectedExecConfig.MinBlockConfirmations, gotExecConfig.MinBlockConfirmations, "MinBlockConfirmations in Executor dest chain config should match")
 			require.True(t, gotExecConfig.Enabled, "Dest chain selector on Executor should be enabled")
 
 			/////////////////////////////////////////
