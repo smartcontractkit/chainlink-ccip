@@ -19,7 +19,7 @@ var (
 	MCMSVersion              = semver.MustParse("1.0.0")
 	singletonRegistry        *DeployerRegistry
 	once                     sync.Once
-	singletonAdapterRegistry *ChainAdapterRegistry
+	singletonAdapterRegistry *TransferOwnershipAdapterRegistry
 	chainAdapterOnce         sync.Once
 )
 
@@ -78,10 +78,6 @@ func (r *DeployerRegistry) Blockchain(e cldf.Environment, chainSelector uint64) 
 func (r *DeployerRegistry) ExistingAddressesForChain(e cldf.Environment, chainSelector uint64) []datastore.AddressRef {
 	// filter addresses for the given chain selector
 	return e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSelector))
-}
-
-type ChainAdapter interface {
-	TransferOwnershipAdapter
 }
 
 type TransferOwnershipAdapter interface {

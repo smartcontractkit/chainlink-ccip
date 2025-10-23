@@ -25,11 +25,11 @@ type TransferOwnershipPerChainInput struct {
 	ProposedOwner string
 }
 
-func AcceptOwnershipChangeset(cr *ChainAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[TransferOwnershipInput] {
+func AcceptOwnershipChangeset(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[TransferOwnershipInput] {
 	return cldf.CreateChangeSet(acceptOwnershipApply(cr, mcmsRegistry), acceptOwnershipVerify(cr, mcmsRegistry))
 }
 
-func acceptOwnershipApply(cr *ChainAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, TransferOwnershipInput) (cldf.ChangesetOutput, error) {
+func acceptOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, TransferOwnershipInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input TransferOwnershipInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
@@ -64,7 +64,7 @@ func acceptOwnershipApply(cr *ChainAdapterRegistry, mcmsRegistry *changesets.MCM
 	}
 }
 
-func acceptOwnershipVerify(cr *ChainAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, TransferOwnershipInput) error {
+func acceptOwnershipVerify(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, TransferOwnershipInput) error {
 	return func(e cldf.Environment, input TransferOwnershipInput) error {
 		if err := input.MCMS.Validate(); err != nil {
 			return err
@@ -73,11 +73,11 @@ func acceptOwnershipVerify(cr *ChainAdapterRegistry, mcmsRegistry *changesets.MC
 	}
 }
 
-func TransferOwnershipChangeset(cr *ChainAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[TransferOwnershipInput] {
+func TransferOwnershipChangeset(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[TransferOwnershipInput] {
 	return cldf.CreateChangeSet(transferOwnershipApply(cr, mcmsRegistry), transferOwnershipVerify(cr, mcmsRegistry))
 }
 
-func transferOwnershipApply(cr *ChainAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, TransferOwnershipInput) (cldf.ChangesetOutput, error) {
+func transferOwnershipApply(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, TransferOwnershipInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input TransferOwnershipInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
@@ -124,7 +124,7 @@ func transferOwnershipApply(cr *ChainAdapterRegistry, mcmsRegistry *changesets.M
 	}
 }
 
-func transferOwnershipVerify(cr *ChainAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, TransferOwnershipInput) error {
+func transferOwnershipVerify(cr *TransferOwnershipAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, TransferOwnershipInput) error {
 	return func(e cldf.Environment, input TransferOwnershipInput) error {
 		if err := input.MCMS.Validate(); err != nil {
 			return err

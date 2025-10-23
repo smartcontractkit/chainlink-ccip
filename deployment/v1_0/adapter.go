@@ -9,26 +9,26 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
-type ChainAdapterRegistry struct {
+type TransferOwnershipAdapterRegistry struct {
 	mu       sync.Mutex
-	adapters map[string]ChainAdapter
+	adapters map[string]TransferOwnershipAdapter
 }
 
-func newChainAdapterRegistry() *ChainAdapterRegistry {
-	return &ChainAdapterRegistry{
+func newTransferOwnershipRegistry() *TransferOwnershipAdapterRegistry {
+	return &TransferOwnershipAdapterRegistry{
 		mu:       sync.Mutex{},
-		adapters: make(map[string]ChainAdapter),
+		adapters: make(map[string]TransferOwnershipAdapter),
 	}
 }
 
-func GetChainAdapterRegistry() *ChainAdapterRegistry {
+func GetTransferOwnershipRegistry() *TransferOwnershipAdapterRegistry {
 	chainAdapterOnce.Do(func() {
-		singletonAdapterRegistry = newChainAdapterRegistry()
+		singletonAdapterRegistry = newTransferOwnershipRegistry()
 	})
 	return singletonAdapterRegistry
 }
 
-func (r *ChainAdapterRegistry) RegisterAdapter(chainFamily string, version *semver.Version, adapter ChainAdapter) {
+func (r *TransferOwnershipAdapterRegistry) RegisterAdapter(chainFamily string, version *semver.Version, adapter TransferOwnershipAdapter) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	id := utils.NewRegistererID(chainFamily, version)
@@ -37,7 +37,7 @@ func (r *ChainAdapterRegistry) RegisterAdapter(chainFamily string, version *semv
 	}
 }
 
-func (r *ChainAdapterRegistry) GetAdapterByChainSelector(chainSelector uint64, version *semver.Version) (ChainAdapter, error) {
+func (r *TransferOwnershipAdapterRegistry) GetAdapterByChainSelector(chainSelector uint64, version *semver.Version) (TransferOwnershipAdapter, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	chainFamily, err := chain_selectors.GetSelectorFamily(chainSelector)

@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	routerops1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -45,17 +46,17 @@ func TestTransferOwnership(t *testing.T) {
 	output, err := cs.Apply(*env, v1_0.MCMSDeploymentConfig{
 		Chains: map[uint64]v1_0.MCMSDeploymentConfigPerChain{
 			selector1: {
-				Canceller:        v1_0.SingleGroupMCMSV2(),
-				Bypasser:         v1_0.SingleGroupMCMSV2(),
-				Proposer:         v1_0.SingleGroupMCMSV2(),
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
 				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			selector2: {
-				Canceller:        v1_0.SingleGroupMCMSV2(),
-				Bypasser:         v1_0.SingleGroupMCMSV2(),
-				Proposer:         v1_0.SingleGroupMCMSV2(),
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
 				TimelockAdmin:    evmChain2.DeployerKey.From,
@@ -142,7 +143,7 @@ func TestTransferOwnership(t *testing.T) {
 		},
 	}
 	// register chain adapter
-	cr := v1_0.GetChainAdapterRegistry()
+	cr := v1_0.GetTransferOwnershipRegistry()
 	evmAdapter := &adapters.EVMChainAdapter{}
 	cr.RegisterAdapter(chainsel.FamilyEVM, transferOwnershipInput.AdapterVersion, evmAdapter)
 	mcmsRegistry := changesets.NewMCMSReaderRegistry()

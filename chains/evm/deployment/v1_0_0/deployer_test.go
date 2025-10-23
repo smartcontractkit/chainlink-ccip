@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 )
@@ -38,17 +39,17 @@ func TestDeployMCMS(t *testing.T) {
 	output, err := cs.Apply(*env, v1_0.MCMSDeploymentConfig{
 		Chains: map[uint64]v1_0.MCMSDeploymentConfigPerChain{
 			selector1: {
-				Canceller:        v1_0.SingleGroupMCMSV2(),
-				Bypasser:         v1_0.SingleGroupMCMSV2(),
-				Proposer:         v1_0.SingleGroupMCMSV2(),
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
 				TimelockAdmin:    evmChain1.DeployerKey.From,
 			},
 			selector2: {
-				Canceller:        v1_0.SingleGroupMCMSV2(),
-				Bypasser:         v1_0.SingleGroupMCMSV2(),
-				Proposer:         v1_0.SingleGroupMCMSV2(),
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
 				TimelockAdmin:    evmChain2.DeployerKey.From,
