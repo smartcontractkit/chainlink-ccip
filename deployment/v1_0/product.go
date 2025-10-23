@@ -11,11 +11,16 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 var (
-	MCMSVersion = semver.MustParse("1.0.0")
+	MCMSVersion              = semver.MustParse("1.0.0")
+	singletonRegistry        *DeployerRegistry
+	once                     sync.Once
+	singletonAdapterRegistry *ChainAdapterRegistry
+	chainAdapterOnce         sync.Once
 )
 
 type Deployer interface {
@@ -43,11 +48,6 @@ func newDeployerRegistry() *DeployerRegistry {
 		deployers: make(map[string]Deployer),
 	}
 }
-
-var (
-	singletonRegistry *DeployerRegistry
-	once              sync.Once
-)
 
 // GetRegistry returns the global singleton instance.
 // The first call creates the registry; subsequent calls return the same pointer.
@@ -82,4 +82,12 @@ func (r *DeployerRegistry) ExistingAddressesForChain(e cldf.Environment, chainSe
 }
 
 type ChainAdapter interface {
+	TransferOwnershipAdapter
+}
+
+type TransferOwnershipAdapter interface {
+	InitializeTimelockAddress(e cldf.Environment, input mcms.Input) error
+	SequenceTransferOwnershipViaMCMS() *cldf_ops.Sequence[TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SequenceAcceptOwnership() *cldf_ops.Sequence[TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	ShouldAcceptOwnershipWithTransferOwnership(e cldf.Environment, in TransferOwnershipPerChainInput) (bool, error)
 }
