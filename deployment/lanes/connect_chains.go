@@ -58,36 +58,31 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 				chainB  *ChainDefinition
 				adapter LaneAdapter
 			}
-			for _, pair := range []lanePair{
-				{chainA: src, chainB: dest, adapter: srcAdapter},
-				{chainA: dest, chainB: src, adapter: destAdapter},
-			} {
-				configureLaneReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, pair.adapter.ConfigureLaneLegAsSource(), e.BlockChains, UpdateLanesInput{
-					Source:       pair.chainA,
-					Dest:         pair.chainB,
-					IsDisabled:   lane.IsDisabled,
-					TestRouter:   lane.TestRouter,
-					ExtraConfigs: lane.ExtraConfigs,
-				})
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", src.Selector, err)
-				}
-				batchOps = append(batchOps, configureLaneReport.Output.BatchOps...)
-				reports = append(reports, configureLaneReport.ExecutionReports...)
-
-				configureLaneReport, err = cldf_ops.ExecuteSequence(e.OperationsBundle, pair.adapter.ConfigureLaneLegAsDest(), e.BlockChains, UpdateLanesInput{
-					Source:       pair.chainA,
-					Dest:         pair.chainB,
-					IsDisabled:   lane.IsDisabled,
-					TestRouter:   lane.TestRouter,
-					ExtraConfigs: lane.ExtraConfigs,
-				})
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure lane leg as on chain with selector %d: %w", dest.Selector, err)
-				}
-				batchOps = append(batchOps, configureLaneReport.Output.BatchOps...)
-				reports = append(reports, configureLaneReport.ExecutionReports...)
+			configureLaneReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, srcAdapter.adapter.ConfigureLaneLegAsSource(), e.BlockChains, UpdateLanesInput{
+				Source:       src,
+				Dest:         dest,
+				IsDisabled:   lane.IsDisabled,
+				TestRouter:   lane.TestRouter,
+				ExtraConfigs: lane.ExtraConfigs,
+			})
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", src.Selector, err)
 			}
+			batchOps = append(batchOps, configureLaneReport.Output.BatchOps...)
+			reports = append(reports, configureLaneReport.ExecutionReports...)
+
+			configureLaneReport, err = cldf_ops.ExecuteSequence(e.OperationsBundle, destAdapter.adapter.ConfigureLaneLegAsDest(), e.BlockChains, UpdateLanesInput{
+				Source:       src,
+				Dest:         dest,
+				IsDisabled:   lane.IsDisabled,
+				TestRouter:   lane.TestRouter,
+				ExtraConfigs: lane.ExtraConfigs,
+			})
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure lane leg as on chain with selector %d: %w", dest.Selector, err)
+			}
+			batchOps = append(batchOps, configureLaneReport.Output.BatchOps...)
+			reports = append(reports, configureLaneReport.ExecutionReports...)
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
