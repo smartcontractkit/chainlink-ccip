@@ -57,6 +57,8 @@ type RemoteChainConfig struct {
 	CommitteeVerifierDestChainConfig CommitteeVerifierDestChainConfig
 	// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
 	FeeQuoterDestChainConfig fee_quoter.DestChainConfig
+	// ExecutorDestChainConfig configures the Executor for this remote chain
+	ExecutorDestChainConfig executor.RemoteChainConfig
 }
 
 type ConfigureChainForLanesInput struct {
@@ -93,7 +95,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
-		destChainSelectorsPerExecutor := make(map[common.Address][]uint64)
+		destChainSelectorsPerExecutor := make(map[common.Address][]executor.RemoteChainConfigArgs)
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			offRampArgs = append(offRampArgs, offramp.SourceChainConfigArgs{
 				Router:              input.Router,
@@ -138,9 +140,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				OffRamp:             input.OffRamp,
 			})
 			if destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] == nil {
-				destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] = []uint64{}
+				destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] = []executor.RemoteChainConfigArgs{}
 			}
-			destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] = append(destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor], remoteSelector)
+			destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] = append(destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor], executor.RemoteChainConfigArgs{
+				DestChainSelector: remoteSelector,
+				Config:            remoteConfig.ExecutorDestChainConfig,
+			})
 		}
 
 		// ApplySourceChainConfigUpdates on OffRamp
