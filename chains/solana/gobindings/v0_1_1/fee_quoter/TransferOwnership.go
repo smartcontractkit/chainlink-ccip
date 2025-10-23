@@ -84,7 +84,7 @@ func (inst *TransferOwnership) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.NewOwner == nil {
-			return errors.New("ProposedOwner parameter is not set")
+			return errors.New("NewOwner parameter is not set")
 		}
 	}
 
@@ -110,7 +110,7 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ProposedOwner", *inst.NewOwner))
+						paramsBranch.Child(ag_format.Param("NewOwner", *inst.NewOwner))
 					})
 
 					// Accounts of the instruction:
@@ -123,7 +123,7 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj TransferOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ProposedOwner` param:
+	// Serialize `NewOwner` param:
 	err = encoder.Encode(obj.NewOwner)
 	if err != nil {
 		return err
@@ -131,7 +131,7 @@ func (obj TransferOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 func (obj *TransferOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ProposedOwner`:
+	// Deserialize `NewOwner`:
 	err = decoder.Decode(&obj.NewOwner)
 	if err != nil {
 		return err

@@ -318,7 +318,7 @@ type TransferOwnershipParams struct {
 }
 
 func (obj TransferOwnershipParams) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ProposedOwner` param:
+	// Serialize `NewOwner` param:
 	err = encoder.Encode(obj.NewOwner)
 	if err != nil {
 		return err
@@ -327,7 +327,7 @@ func (obj TransferOwnershipParams) MarshalWithEncoder(encoder *ag_binary.Encoder
 }
 
 func (obj *TransferOwnershipParams) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ProposedOwner`:
+	// Deserialize `NewOwner`:
 	err = decoder.Decode(&obj.NewOwner)
 	if err != nil {
 		return err
