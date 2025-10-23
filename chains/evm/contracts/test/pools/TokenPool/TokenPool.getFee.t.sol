@@ -3,13 +3,14 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
+import {Client} from "../../../libraries/Client.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
-contract TokenPoolV2_getTokenTransferFeeDetails is TokenPoolV2Setup {
-  function test_getTokenTransferFeeDetails_DefaultFinality() public {
-    uint256 amount = 1000e6;
+contract TokenPoolV2_getFee is TokenPoolV2Setup {
+  function test_getFee_DefaultFinality() public {
+    Client.EVM2AnyMessage memory message = _buildMessage();
     uint16 defaultFeeBps = 250; // 2.50%
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
@@ -27,18 +28,17 @@ contract TokenPoolV2_getTokenTransferFeeDetails is TokenPoolV2Setup {
     vm.startPrank(OWNER);
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
 
-    IPoolV2.TokenTransferFeeDetails memory feeDetails =
-      s_tokenPool.getTokenTransferFeeDetails(address(s_token), DEST_CHAIN_SELECTOR, amount, 0, "");
+    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
 
-    assertEq(feeDetails.tokenFeeBps, defaultFeeBps);
-    uint256 expectedFeeAmount = (amount * defaultFeeBps) / BPS_DIVIDER;
-    assertEq(feeDetails.tokenFeeAmount, expectedFeeAmount);
-    assertEq(feeDetails.destinationAmount, amount - expectedFeeAmount);
-    assertEq(feeDetails.usdFeeCents, feeConfig.defaultFinalityFeeUSDCents);
+    assertEq(usdFeeCents, feeConfig.defaultFinalityFeeUSDCents);
+    assertEq(destGasOverhead, feeConfig.destGasOverhead);
+    assertEq(destBytesOverhead, feeConfig.destBytesOverhead);
+    assertEq(tokenFeeBps, defaultFeeBps);
   }
 
-  function test_getTokenTransferFeeDetails_CustomFinality() public {
-    uint256 amount = 1_500e6;
+  function test_getFee_CustomFinality() public {
+    Client.EVM2AnyMessage memory message = _buildMessage();
     uint16 customFeeBps = 400; // 4%
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 60_000,
@@ -56,25 +56,33 @@ contract TokenPoolV2_getTokenTransferFeeDetails is TokenPoolV2Setup {
     vm.startPrank(OWNER);
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
 
-    uint16 finality = 5;
-    IPoolV2.TokenTransferFeeDetails memory feeDetails =
-      s_tokenPool.getTokenTransferFeeDetails(address(s_token), DEST_CHAIN_SELECTOR, amount, finality, "");
+    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, message, 5, "");
 
-    assertEq(feeDetails.tokenFeeBps, customFeeBps);
-    uint256 expectedFeeAmount = (amount * customFeeBps) / BPS_DIVIDER;
-    assertEq(feeDetails.tokenFeeAmount, expectedFeeAmount);
-    assertEq(feeDetails.destinationAmount, amount - expectedFeeAmount);
-    assertEq(feeDetails.usdFeeCents, feeConfig.customFinalityFeeUSDCents);
+    assertEq(usdFeeCents, feeConfig.customFinalityFeeUSDCents);
+    assertEq(destGasOverhead, feeConfig.destGasOverhead);
+    assertEq(destBytesOverhead, feeConfig.destBytesOverhead);
+    assertEq(tokenFeeBps, customFeeBps);
   }
 
-  function test_getTokenTransferFeeDetails_DisabledConfig() public view {
-    uint256 amount = 777e6;
-    IPoolV2.TokenTransferFeeDetails memory feeDetails =
-      s_tokenPool.getTokenTransferFeeDetails(address(s_token), DEST_CHAIN_SELECTOR, amount, 0, "");
+  function test_getFee_DisabledConfig() public view {
+    Client.EVM2AnyMessage memory message = _buildMessage();
 
-    assertEq(feeDetails.tokenFeeBps, 0);
-    assertEq(feeDetails.tokenFeeAmount, 0);
-    assertEq(feeDetails.destinationAmount, amount);
-    assertEq(feeDetails.usdFeeCents, 0);
+    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
+
+    assertEq(usdFeeCents, 0);
+    assertEq(destGasOverhead, 0);
+    assertEq(destBytesOverhead, 0);
+    assertEq(tokenFeeBps, 0);
+  }
+
+  function _buildMessage() internal pure returns (Client.EVM2AnyMessage memory message) {
+    message.receiver = abi.encode(address(0xBEEF));
+    message.data = "";
+    message.tokenAmounts = new Client.EVMTokenAmount[](0);
+    message.feeToken = address(0);
+    message.extraArgs = "";
+    return message;
   }
 }

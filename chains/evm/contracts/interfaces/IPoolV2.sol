@@ -20,15 +20,6 @@ interface IPoolV2 is IPoolV1 {
     bool isEnabled; // ──────────────────────╯ Whether this token has custom transfer fees.
   }
 
-  struct TokenTransferFeeDetails {
-    // Zero values across the fee fields indicate that no fee is presently applied (either the config is disabled or the
-    // configured rate/crumb is zero for the provided inputs).
-    uint16 tokenFeeBps; // ╮ Basis points charged in token terms.
-    uint32 usdFeeCents; // ╯ USD-denominated flat fee associated with the transfer.
-    uint256 tokenFeeAmount; // Amount deducted from the transfer in token units.
-    uint256 destinationAmount; // Amount that will arrive on the destination chain after fees denominated in the source token's decimals.
-  }
-
   enum CCVDirection {
     Outbound,
     Inbound
@@ -87,19 +78,16 @@ interface IPoolV2 is IPoolV1 {
     bytes calldata tokenArgs
   ) external view returns (TokenTransferFeeConfig memory feeConfig);
 
-  /// @notice Returns the token transfer fee details for a proposed transfer.
-  /// @param localToken The address of the local token.
-  /// @param destChainSelector The chain selector of the destination chain.
-  /// @param amount The amount of tokens being transferred.
-  /// @param finality The requested finality configuration.
-  /// @param tokenArgs Additional token arguments supplied by the caller.
-  /// @return feeDetails A struct describing the applied fees and destination amount. Zero-valued fields indicate that
-  /// no fee is deducted for the requested parameters (e.g. disabled config or zero rates).
-  function getTokenTransferFeeDetails(
+  /// @notice Returns the pool fee parameters that will apply to a transfer.
+  /// @return feeUSDCents Flat fee charged in USD cents (crumbs) for this transfer.
+  /// @return destGasOverhead Destination gas charged for accounting in the cost model.
+  /// @return destBytesOverhead Destination calldata size attributed to the transfer.
+  /// @return tokenFeeBps Bps charged in token units. Value of zero implies no in-token fee.
+  function getFee(
     address localToken,
     uint64 destChainSelector,
-    uint256 amount,
+    Client.EVM2AnyMessage calldata message,
     uint16 finality,
     bytes calldata tokenArgs
-  ) external view returns (TokenTransferFeeDetails memory feeDetails);
+  ) external view returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps);
 }
