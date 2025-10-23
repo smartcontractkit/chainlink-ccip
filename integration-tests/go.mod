@@ -25,7 +25,7 @@ require (
 	github.com/ethereum/go-ethereum v1.16.2
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/smartcontractkit/chain-selectors v1.0.72
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251023111348-3bbda7da92e6
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251023123408-ae4fdca50598
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20251021182606-ee6ba95227d7
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20251021182606-ee6ba95227d7
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-20251021182606-ee6ba95227d7

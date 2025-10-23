@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Executor} from "../../../executor/Executor.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
+
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract ExecutorSetup is BaseTest {

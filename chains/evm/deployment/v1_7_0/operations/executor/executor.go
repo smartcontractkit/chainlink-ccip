@@ -16,8 +16,8 @@ var ContractType cldf_deployment.ContractType = "Executor"
 var ProxyType cldf_deployment.ContractType = "ExecutorProxy"
 
 type ConstructorArgs struct {
-	MaxCCVsPerMsg         uint8
-	MinBlockConfirmations uint16
+	MaxCCVsPerMsg uint8
+	DynamicConfig executor.ExecutorDynamicConfig
 }
 
 type ProxyConstructorArgs struct {
@@ -39,9 +39,7 @@ type ApplyAllowedCCVUpdatesArgs struct {
 	AllowlistEnabled bool
 }
 
-type SetMinBlockConfirmationsArgs struct {
-	MinBlockConfirmations uint16
-}
+type SetDynamicConfigArgs = executor.ExecutorDynamicConfig
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "executor:deploy",
@@ -97,17 +95,17 @@ var ApplyAllowedCCVUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowed
 	},
 })
 
-var SetMinBlockConfirmations = contract.NewWrite(contract.WriteParams[uint16, *executor.Executor]{
+var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigArgs, *executor.Executor]{
 	Name:            "executor:set-min-block-confirmations",
 	Version:         semver.MustParse("1.7.0"),
 	Description:     "Sets the minimum block confirmations on the Executor",
 	ContractType:    ContractType,
 	ContractABI:     executor.ExecutorABI,
 	NewContract:     executor.NewExecutor,
-	IsAllowedCaller: contract.OnlyOwner[*executor.Executor, uint16],
-	Validate:        func(uint16) error { return nil },
-	CallContract: func(Executor *executor.Executor, opts *bind.TransactOpts, args uint16) (*types.Transaction, error) {
-		return Executor.SetMinBlockConfirmations(opts, args)
+	IsAllowedCaller: contract.OnlyOwner[*executor.Executor, SetDynamicConfigArgs],
+	Validate:        func(SetDynamicConfigArgs) error { return nil },
+	CallContract: func(Executor *executor.Executor, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
+		return Executor.SetDynamicConfig(opts, args)
 	},
 })
 
