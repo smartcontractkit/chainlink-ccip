@@ -30,6 +30,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 )
 
+// TestTransferOwnership tests transferring ownership of deployed contracts via MCMS timelocks.
+// It deploys MCMS contracts on two EVM chains, deploys routers, transfers ownership of routers from deployer key to the timelock,
+// then transfers ownership from the first timelock to a second timelock.
 func TestTransferOwnership(t *testing.T) {
 	t.Parallel()
 	selector1 := chainsel.TEST_90000001.Selector
@@ -45,8 +48,8 @@ func TestTransferOwnership(t *testing.T) {
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := v1_0.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, v1_0.MCMSVersion, evmDeployer)
-	cs := v1_0.DeployMCMS(dReg)
-	output, err := cs.Apply(*env, v1_0.MCMSDeploymentConfig{
+	deployMCMS := v1_0.DeployMCMS(dReg)
+	output, err := deployMCMS.Apply(*env, v1_0.MCMSDeploymentConfig{
 		Chains: map[uint64]v1_0.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -69,6 +72,37 @@ func TestTransferOwnership(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
 	ds := output.DataStore
+
+	// deploy another timelock so that later we can transfer ownership to it from first timelock
+	output, err = deployMCMS.Apply(*env, v1_0.MCMSDeploymentConfig{
+		Chains: map[uint64]v1_0.MCMSDeploymentConfigPerChain{
+			selector1: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String("test1"),
+				TimelockAdmin:    evmChain1.DeployerKey.From,
+			},
+			selector2: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String("test1"),
+				TimelockAdmin:    evmChain2.DeployerKey.From,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	addresses, err := output.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	for _, addr := range addresses {
+		t.Logf("Adding address %s of type %s on chain %d to datastore", addr.Address, addr.Type, addr.ChainSelector)
+		require.NoError(t, ds.Addresses().Add(addr))
+	}
+
 	// deploy router on both chains, then transfer ownership to the timelock
 	routerAddrs := make(map[uint64]common.Address)
 	for _, sel := range []uint64{selector1, selector2} {
@@ -95,6 +129,7 @@ func TestTransferOwnership(t *testing.T) {
 	}
 	env.DataStore = ds.Seal()
 	timelockAddrs := make(map[uint64]string)
+	newTimelockAddrs := make(map[uint64]string)
 	for _, sel := range []uint64{selector1, selector2} {
 		timelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 			Type:      datastore.ContractType(deploymentutils.RBACTimelock),
@@ -103,6 +138,13 @@ func TestTransferOwnership(t *testing.T) {
 		}, sel, datastore_utils.FullRef)
 		require.NoError(t, err)
 		timelockAddrs[sel] = timelockRef.Address
+		newTimelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+			Type:      datastore.ContractType(deploymentutils.RBACTimelock),
+			Qualifier: "test1",
+			Version:   semver.MustParse("1.0.0"),
+		}, sel, datastore_utils.FullRef)
+		require.NoError(t, err)
+		newTimelockAddrs[sel] = newTimelockRef.Address
 	}
 	transferOwnershipInput := v1_0.TransferOwnershipInput{
 		ChainInputs: []v1_0.TransferOwnershipPerChainInput{
@@ -171,5 +213,97 @@ func TestTransferOwnership(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, common.HexToAddress(timelockAddrs[sel]), owner, "owner mismatch on chain %d", sel)
+		t.Logf("Ownership of router on chain %d successfully transferred to timelock %s", sel, timelockAddrs[sel])
+	}
+
+	// now transfer ownership from first timelock to second timelock
+	// the mcms input should denote the first timelock address
+	transferOwnershipInput = v1_0.TransferOwnershipInput{
+		ChainInputs: []v1_0.TransferOwnershipPerChainInput{
+			{
+				ChainSelector: selector1,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(routerops1_2.ContractType),
+						Version: semver.MustParse("1.2.0"),
+					},
+				},
+				ProposedOwner: newTimelockAddrs[selector1],
+			},
+			{
+				ChainSelector: selector2,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(routerops1_2.ContractType),
+						Version: semver.MustParse("1.2.0"),
+					},
+				},
+				ProposedOwner: newTimelockAddrs[selector2],
+			},
+		},
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			MCMSAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
+				Qualifier: "test",
+				Version:   semver.MustParse("1.0.0"),
+			},
+			TimelockAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(deploymentutils.RBACTimelock),
+				Qualifier: "test",
+				Version:   semver.MustParse("1.0.0"),
+			},
+			Description: "Transfer ownership test",
+		},
+	}
+	transferOwnershipChangeset = v1_0.TransferOwnershipChangeset(cr, mcmsRegistry)
+	output, err = transferOwnershipChangeset.Apply(*env, transferOwnershipInput)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	// now accept ownership from the new timelock, the mcms input should denote new timelock address
+	transferOwnershipInput.MCMS = mcms.Input{
+		OverridePreviousRoot: false,
+		ValidUntil:           3759765795,
+		TimelockDelay:        mcms_types.MustParseDuration("0s"),
+		TimelockAction:       mcms_types.TimelockActionSchedule,
+		MCMSAddressRef: datastore.AddressRef{
+			Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
+			Qualifier: "test1", // new mcms qualifier
+			Version:   semver.MustParse("1.0.0"),
+		},
+		TimelockAddressRef: datastore.AddressRef{
+			Type:      datastore.ContractType(deploymentutils.RBACTimelock),
+			Qualifier: "test1", // new timelock qualifier
+			Version:   semver.MustParse("1.0.0"),
+		},
+		Description: "Transfer ownership test",
+	}
+	acceptOwnershipChangeset := v1_0.AcceptOwnershipChangeset(cr, mcmsRegistry)
+	output, err = acceptOwnershipChangeset.Apply(*env, transferOwnershipInput)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	// now check the owner of the routers is the new timelock
+	for _, sel := range []uint64{selector1, selector2} {
+		evmChain := env.BlockChains.EVMChains()[sel]
+		r, err := router.NewRouter(routerAddrs[sel], evmChain.Client)
+		require.NoError(t, err)
+		owner, err := r.Owner(&bind.CallOpts{
+			Context: t.Context(),
+		})
+		require.NoError(t, err)
+		require.Equal(t, common.HexToAddress(newTimelockAddrs[sel]), owner, "owner mismatch on chain %d", sel)
+		t.Logf("Ownership of router on chain %d successfully transferred to new timelock %s", sel, newTimelockAddrs[sel])
 	}
 }
