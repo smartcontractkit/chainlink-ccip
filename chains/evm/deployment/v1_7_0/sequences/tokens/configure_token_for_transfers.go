@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -51,7 +52,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		}
 
 		// Register the token with the token admin registry
-		registerTokenReport, err := cldf_ops.ExecuteSequence(b, RegisterToken, chain, RegisterTokenInput{
+		registerTokenReport, err := cldf_ops.ExecuteSequence(b, v1_5_0.RegisterToken, chain, v1_5_0.RegisterTokenInput{
 			ChainSelector:             input.ChainSelector,
 			TokenAddress:              tokenAddress.Output,
 			TokenPoolAddress:          common.HexToAddress(input.TokenPoolAddress),

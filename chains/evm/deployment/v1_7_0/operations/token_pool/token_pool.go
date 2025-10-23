@@ -8,9 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
-	bnm_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
+	burn_mint_token_pool_v1_7_0_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	burn_mint_token_pool_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/token_pool"
+	burn_mint_token_pool_v1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
@@ -70,10 +71,13 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "token-pool:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys various TokenPool contracts (i.e. BurnMint, LockRelease)",
-	ContractMetadata: bnm_bindings.BurnMintTokenPoolMetaData, // Just to get the expected constructor args
+	ContractMetadata: burn_mint_token_pool_latest.BurnMintTokenPoolMetaData, // Just to get the expected constructor args
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(burn_mint_token_pool.ContractType, *semver.MustParse("1.7.0")).String(): {
-			EVM: common.FromHex(bnm_bindings.BurnMintTokenPoolBin),
+		cldf_deployment.NewTypeAndVersion(burn_mint_token_pool_v1_7_0_ops.ContractType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(burn_mint_token_pool_latest.BurnMintTokenPoolBin),
+		},
+		cldf_deployment.NewTypeAndVersion(burn_mint_token_pool_v1_7_0_ops.ContractType, *semver.MustParse("1.6.1")).String(): {
+			EVM: common.FromHex(burn_mint_token_pool_v1_6_1.BurnMintTokenPoolBin),
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },

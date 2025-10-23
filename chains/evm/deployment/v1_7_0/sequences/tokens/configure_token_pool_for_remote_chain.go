@@ -56,21 +56,23 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		for i, addr := range input.RemoteChainConfig.OutboundCCVs {
 			outboundCCVs[i] = common.HexToAddress(addr)
 		}
-		setCCVsReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyCCVConfigUpdates, chain, evm_contract.FunctionInput[[]token_pool.CCVConfigArg]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-			Args: []token_pool.CCVConfigArg{
-				{
-					RemoteChainSelector: input.RemoteChainSelector,
-					OutboundCCVs:        outboundCCVs,
-					InboundCCVs:         inboundCCVs,
+		if len(inboundCCVs) > 0 || len(outboundCCVs) > 0 {
+			setCCVsReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyCCVConfigUpdates, chain, evm_contract.FunctionInput[[]token_pool.CCVConfigArg]{
+				ChainSelector: input.ChainSelector,
+				Address:       input.TokenPoolAddress,
+				Args: []token_pool.CCVConfigArg{
+					{
+						RemoteChainSelector: input.RemoteChainSelector,
+						OutboundCCVs:        outboundCCVs,
+						InboundCCVs:         inboundCCVs,
+					},
 				},
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set CCVs: %w", err)
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set CCVs: %w", err)
+			}
+			writes = append(writes, setCCVsReport.Output)
 		}
-		writes = append(writes, setCCVsReport.Output)
 
 		// Get remote chains that are currently supported by the token pools
 		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[any]{
