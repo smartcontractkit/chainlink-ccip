@@ -1,7 +1,6 @@
 package deployment_test
 
 import (
-	"context"
 	"math/big"
 	"testing"
 
@@ -9,11 +8,11 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -23,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0"
 	routerops1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	rmnremoteops1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
@@ -36,12 +34,7 @@ func TestFastCurse(t *testing.T) {
 		environment.WithEVMSimulated(t, []uint64{chain1, chain2}),
 	)
 	require.NoError(t, err)
-	lggr := logger.Test(t)
-	bundle := cldf_ops.NewBundle(
-		func() context.Context { return t.Context() },
-		lggr,
-		cldf_ops.NewMemoryReporter(),
-	)
+	bundle := env.OperationsBundle
 	// deploy RMN 1.5 on chain1 and RMN 1.6 on chain2, set up routers, etc.
 	chain := env.BlockChains.EVMChains()[chain1]
 	deployRMNOp, err := cldf_ops.ExecuteOperation(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
@@ -143,7 +136,7 @@ func TestFastCurse(t *testing.T) {
 	}
 
 	// deploy mcms
-	evmDeployer := &v1_0_0.EVMDeployer{}
+	evmDeployer := &adapters.EVMDeployer{}
 	dReg := v1_0.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, v1_0.MCMSVersion, evmDeployer)
 	cs := v1_0.DeployMCMS(dReg)

@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 )
@@ -30,7 +31,7 @@ func TestDeployMCMS(t *testing.T) {
 	evmChain1 := env.BlockChains.EVMChains()[selector1]
 	evmChain2 := env.BlockChains.EVMChains()[selector2]
 
-	evmDeployer := &EVMDeployer{}
+	evmDeployer := &adapters.EVMDeployer{}
 	dReg := v1_0.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, v1_0.MCMSVersion, evmDeployer)
 	cs := v1_0.DeployMCMS(dReg)

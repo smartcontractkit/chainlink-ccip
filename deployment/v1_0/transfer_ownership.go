@@ -8,6 +8,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -40,6 +41,14 @@ func acceptOwnershipApply(cr *ChainAdapterRegistry, mcmsRegistry *changesets.MCM
 			err = adapter.InitializeTimelockAddress(e, input.MCMS)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
+			}
+			// if partial refs are provided, resolve to full refs
+			for i, contractRef := range perChainInputs.ContractRef {
+				fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, contractRef, perChainInputs.ChainSelector, datastore_utils.FullRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, err
+				}
+				perChainInputs.ContractRef[i] = fullRef
 			}
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.SequenceAcceptOwnership(), e.BlockChains, perChainInputs)
 			if err != nil {
@@ -80,6 +89,14 @@ func transferOwnershipApply(cr *ChainAdapterRegistry, mcmsRegistry *changesets.M
 			err = adapter.InitializeTimelockAddress(e, input.MCMS)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
+			}
+			// if partial refs are provided, resolve to full refs
+			for i, contractRef := range perChainInputs.ContractRef {
+				fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, contractRef, perChainInputs.ChainSelector, datastore_utils.FullRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, err
+				}
+				perChainInputs.ContractRef[i] = fullRef
 			}
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.SequenceTransferOwnershipViaMCMS(), e.BlockChains, perChainInputs)
 			if err != nil {
