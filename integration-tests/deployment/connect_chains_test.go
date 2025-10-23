@@ -196,8 +196,8 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,
-				Source:  chain1,
-				Dest:    chain2,
+				ChainA:  chain1,
+				ChainB:  chain2,
 			},
 		},
 	})

@@ -112,13 +112,13 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.OffRamp),
 			UpdatesByChain: map[uint64][]offramp.OffRampSourceChainConfigArgs{
-				input.Source.Selector: {
+				input.Dest.Selector: {
 					{
-						Router:                    common.BytesToAddress(input.Source.Router),
-						SourceChainSelector:       input.Dest.Selector,
-						OnRamp:                    input.Dest.OnRamp,
+						Router:                    common.BytesToAddress(input.Dest.Router),
+						SourceChainSelector:       input.Source.Selector,
+						OnRamp:                    input.Source.OnRamp,
 						IsEnabled:                 !input.IsDisabled,
-						IsRMNVerificationDisabled: !input.Dest.RMNVerificationEnabled,
+						IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 					},
 				},
 			},
@@ -129,8 +129,8 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		b.Logger.Info("Destination configs updated on OffRamps")
 
 		offrampUpdate := router.OffRamp{
-			SourceChainSelector: input.Dest.Selector,
-			OffRamp:             common.BytesToAddress(input.Dest.OffRamp),
+			SourceChainSelector: input.Source.Selector,
+			OffRamp:             common.BytesToAddress(input.Source.OffRamp),
 		}
 		var offRampAdds []router.OffRamp
 		var offRampRemoves []router.OffRamp
@@ -140,9 +140,9 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			offRampAdds = []router.OffRamp{offrampUpdate}
 		}
 		result, err = sequences.RunAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
-			Address: common.BytesToAddress(input.Source.Router),
+			Address: common.BytesToAddress(input.Dest.Router),
 			UpdatesByChain: map[uint64]router.ApplyRampsUpdatesArgs{
-				input.Source.Selector: {
+				input.Dest.Selector: {
 					OffRampAdds:    offRampAdds,
 					OffRampRemoves: offRampRemoves,
 				},
