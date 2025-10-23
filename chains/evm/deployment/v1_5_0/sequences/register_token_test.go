@@ -1,30 +1,32 @@
-package tokens_test
+package sequences_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRegisterToken(t *testing.T) {
 	tests := []struct {
 		desc        string
-		makeInput   func(chainSel uint64, tokenAddress, tokenPoolAddress, tokenAdminRegistryAddress common.Address) tokens.RegisterTokenInput
+		makeInput   func(chainSel uint64, tokenAddress, tokenPoolAddress, tokenAdminRegistryAddress common.Address) sequences.RegisterTokenInput
 		expectedErr string
 	}{
 		{
 			desc: "happy path - no external admin",
-			makeInput: func(chainSel uint64, tokenAddress, tokenPoolAddress, tokenAdminRegistryAddress common.Address) tokens.RegisterTokenInput {
-				return tokens.RegisterTokenInput{
+			makeInput: func(chainSel uint64, tokenAddress, tokenPoolAddress, tokenAdminRegistryAddress common.Address) sequences.RegisterTokenInput {
+				return sequences.RegisterTokenInput{
 					ChainSelector:             chainSel,
 					TokenAddress:              tokenAddress,
 					TokenPoolAddress:          tokenPoolAddress,
@@ -36,8 +38,8 @@ func TestRegisterToken(t *testing.T) {
 		},
 		{
 			desc: "happy path - external admin",
-			makeInput: func(chainSel uint64, tokenAddress, tokenPoolAddress, tokenAdminRegistryAddress common.Address) tokens.RegisterTokenInput {
-				return tokens.RegisterTokenInput{
+			makeInput: func(chainSel uint64, tokenAddress, tokenPoolAddress, tokenAdminRegistryAddress common.Address) sequences.RegisterTokenInput {
+				return sequences.RegisterTokenInput{
 					ChainSelector:             chainSel,
 					TokenAddress:              tokenAddress,
 					TokenPoolAddress:          tokenPoolAddress,
@@ -58,47 +60,53 @@ func TestRegisterToken(t *testing.T) {
 			require.NoError(t, err, "Failed to create environment")
 			require.NotNil(t, e, "Environment should be created")
 
-			// Deploy chain
-			chainReport, err := operations.ExecuteSequence(
+			// Deploy token admin registry
+			tokenAdminRegistryReport, err := operations.ExecuteOperation(
 				e.OperationsBundle,
-				sequences.DeployChainContracts,
+				token_admin_registry.Deploy,
 				e.BlockChains.EVMChains()[chainSel],
-				sequences.DeployChainContractsInput{
+				evm_contract.DeployInput[token_admin_registry.ConstructorArgs]{
 					ChainSelector:  chainSel,
-					ContractParams: testsetup.CreateBasicContractParams(),
+					TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
 				},
 			)
-			require.NoError(t, err, "ExecuteSequence should not error")
+			require.NoError(t, err, "ExecuteOperation should not error")
+			tokenAdminRegistryAddress := common.HexToAddress(tokenAdminRegistryReport.Output.Address)
 
-			// Deploy token and token pool
-			tokenAndPoolReport, err := operations.ExecuteSequence(
-				e.OperationsBundle,
-				tokens.DeployBurnMintTokenAndPool,
-				e.BlockChains.EVMChains()[chainSel],
-				basicDeployBurnMintTokenAndPoolInput(chainReport),
+			// Deploy token
+			tokenAddress, tx, _, err := burn_mint_erc20.DeployBurnMintERC20(
+				e.BlockChains.EVMChains()[chainSel].DeployerKey,
+				e.BlockChains.EVMChains()[chainSel].Client,
+				"Test Token",
+				"TEST",
+				18,
+				big.NewInt(1000000000000000000),
+				big.NewInt(0),
 			)
-			require.NoError(t, err, "ExecuteSequence should not error")
-			tokenAddress := tokenAndPoolReport.Output.Addresses[0].Address
-			tokenPoolAddress := tokenAndPoolReport.Output.Addresses[1].Address
+			require.NoError(t, err, "DeployBurnMintERC20 should not error")
+			_, err = e.BlockChains.EVMChains()[chainSel].Confirm(tx)
+			require.NoError(t, err, "Confirm should not error")
 
-			// Register token
-			var tokenAdminRegistryAddress string
-			for _, addr := range chainReport.Output.Addresses {
-				if addr.Type == datastore.ContractType(token_admin_registry.ContractType) {
-					tokenAdminRegistryAddress = addr.Address
-				}
-			}
-			require.NotEmpty(t, tokenAdminRegistryAddress, "Token admin registry address should be found")
+			// Deploy token pool
+			tokenPoolAddress, tx, _, err := burn_mint_token_pool.DeployBurnMintTokenPool(
+				e.BlockChains.EVMChains()[chainSel].DeployerKey,
+				e.BlockChains.EVMChains()[chainSel].Client,
+				tokenAddress,
+				18,
+				[]common.Address{},
+				common.HexToAddress("0x01"),
+				common.HexToAddress("0x02"),
+			)
 
 			input := test.makeInput(
 				chainSel,
-				common.HexToAddress(tokenAddress),
-				common.HexToAddress(tokenPoolAddress),
-				common.HexToAddress(tokenAdminRegistryAddress),
+				tokenAddress,
+				tokenPoolAddress,
+				tokenAdminRegistryAddress,
 			)
 			_, err = operations.ExecuteSequence(
 				e.OperationsBundle,
-				tokens.RegisterToken,
+				sequences.RegisterToken,
 				e.BlockChains.EVMChains()[chainSel],
 				input,
 			)
@@ -116,8 +124,8 @@ func TestRegisterToken(t *testing.T) {
 				e.BlockChains.EVMChains()[chainSel],
 				evm_contract.FunctionInput[common.Address]{
 					ChainSelector: chainSel,
-					Address:       common.HexToAddress(tokenAdminRegistryAddress),
-					Args:          common.HexToAddress(tokenAddress),
+					Address:       tokenAdminRegistryAddress,
+					Args:          tokenAddress,
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
