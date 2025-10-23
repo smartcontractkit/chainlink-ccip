@@ -17,11 +17,11 @@ contract Executor_setMinBlockConfirmations is ExecutorSetup {
     assertEq(s_executor.getMinBlockConfirmations(), newMinBlockConfirmations);
   }
 
-  function test_constructor_RevertWhen_OnlyOwner() public {
+  function test_setMinBlockConfirmations_RevertWhen_OnlyOwner() public {
     vm.stopPrank();
 
     vm.expectRevert(abi.encodeWithSelector(Ownable2Step.OnlyCallableByOwner.selector, 0));
 
-    new Executor(0, 0);
+    s_executor.setMinBlockConfirmations(0);
   }
 }

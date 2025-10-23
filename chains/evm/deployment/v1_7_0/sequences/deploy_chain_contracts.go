@@ -74,8 +74,9 @@ type FeeQuoterParams struct {
 }
 
 type ExecutorParams struct {
-	Version       *semver.Version
-	MaxCCVsPerMsg uint8
+	Version               *semver.Version
+	MaxCCVsPerMsg         uint8
+	MinBlockConfirmations uint16
 }
 
 type ContractParams struct {
@@ -313,7 +314,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			TypeAndVersion: deployment.NewTypeAndVersion(executor.ContractType, *input.ContractParams.Executor.Version),
 			ChainSelector:  chain.Selector,
 			Args: executor.ConstructorArgs{
-				MaxCCVsPerMsg: input.ContractParams.Executor.MaxCCVsPerMsg,
+				MaxCCVsPerMsg:         input.ContractParams.Executor.MaxCCVsPerMsg,
+				MinBlockConfirmations: input.ContractParams.Executor.MinBlockConfirmations,
 			},
 		}, input.ExistingAddresses)
 		if err != nil {

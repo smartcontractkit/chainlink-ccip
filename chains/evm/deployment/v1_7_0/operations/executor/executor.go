@@ -16,7 +16,8 @@ var ContractType cldf_deployment.ContractType = "Executor"
 var ProxyType cldf_deployment.ContractType = "ExecutorProxy"
 
 type ConstructorArgs struct {
-	MaxCCVsPerMsg uint8
+	MaxCCVsPerMsg         uint8
+	MinBlockConfirmations uint16
 }
 
 type ProxyConstructorArgs struct {
@@ -36,6 +37,10 @@ type ApplyAllowedCCVUpdatesArgs struct {
 	CCVsToAdd        []common.Address
 	CCVsToRemove     []common.Address
 	AllowlistEnabled bool
+}
+
+type SetMinBlockConfirmationsArgs struct {
+	MinBlockConfirmations uint16
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
@@ -89,6 +94,20 @@ var ApplyAllowedCCVUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowed
 	Validate:        func(ApplyAllowedCCVUpdatesArgs) error { return nil },
 	CallContract: func(Executor *executor.Executor, opts *bind.TransactOpts, args ApplyAllowedCCVUpdatesArgs) (*types.Transaction, error) {
 		return Executor.ApplyAllowedCCVUpdates(opts, args.CCVsToRemove, args.CCVsToAdd, args.AllowlistEnabled)
+	},
+})
+
+var SetMinBlockConfirmations = contract.NewWrite(contract.WriteParams[uint16, *executor.Executor]{
+	Name:            "executor:set-min-block-confirmations",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Sets the minimum block confirmations on the Executor",
+	ContractType:    ContractType,
+	ContractABI:     executor.ExecutorABI,
+	NewContract:     executor.NewExecutor,
+	IsAllowedCaller: contract.OnlyOwner[*executor.Executor, uint16],
+	Validate:        func(uint16) error { return nil },
+	CallContract: func(Executor *executor.Executor, opts *bind.TransactOpts, args uint16) (*types.Transaction, error) {
+		return Executor.SetMinBlockConfirmations(opts, args)
 	},
 })
 

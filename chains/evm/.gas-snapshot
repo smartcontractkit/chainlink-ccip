@@ -34,7 +34,7 @@ CCVConfigValidation_validateDefaultAndMandatedCCVs:test_validateDefaultAndMandat
 CommitteeVerifier_applyAllowlistUpdates:test_applyAllowlistUpdates_AsAllowlistAdmin() (gas: 93093)
 CommitteeVerifier_applyAllowlistUpdates:test_applyAllowlistUpdates_AsOwner() (gas: 94653)
 CommitteeVerifier_applyDestChainConfigUpdates:test_applyDestChainConfigUpdates() (gas: 47083)
-CommitteeVerifier_constructor:test_constructor() (gas: 2055263)
+CommitteeVerifier_constructor:test_constructor() (gas: 2053135)
 CommitteeVerifier_forwardToVerifier:test_forwardToVerifier() (gas: 29460)
 CommitteeVerifier_setDynamicConfig:test_setDynamicConfig() (gas: 30125)
 CommitteeVerifier_updateStorageLocation:test_updateStorageLocation() (gas: 23029)

@@ -34,7 +34,6 @@ func CreateBasicExecutorDestChainConfig() executor.RemoteChainConfig {
 		UsdCentsFee:            50,
 		BaseExecGas:            100_000,
 		DestAddressLengthBytes: 20,
-		MinBlockConfirmations:  1,
 		Enabled:                true,
 	}
 }
@@ -73,8 +72,9 @@ func CreateBasicContractParams() sequences.ContractParams {
 			FeeAggregator: common.HexToAddress("0x01"),
 		},
 		Executor: sequences.ExecutorParams{
-			Version:       semver.MustParse("1.7.0"),
-			MaxCCVsPerMsg: 10,
+			Version:               semver.MustParse("1.7.0"),
+			MaxCCVsPerMsg:         10,
+			MinBlockConfirmations: 5,
 		},
 		FeeQuoter: sequences.FeeQuoterParams{
 			Version:                        semver.MustParse("1.7.0"),
