@@ -17,14 +17,14 @@ import (
 )
 
 func TestWithDatastore(t *testing.T) {
-	b := changesets.NewOutputBuilder(deployment.Environment{}, changesets.NewMCMSReaderRegistry())
+	b := changesets.NewOutputBuilder(deployment.Environment{}, changesets.GetRegistry())
 	out, err := b.WithDataStore(datastore.NewMemoryDataStore()).Build(mcms.Input{})
 	require.NoError(t, err, "Build should not error")
 	require.NotNil(t, out.DataStore, "DataStore should be set in ChangesetOutput")
 }
 
 func TestWithReports(t *testing.T) {
-	b := changesets.NewOutputBuilder(deployment.Environment{}, changesets.NewMCMSReaderRegistry())
+	b := changesets.NewOutputBuilder(deployment.Environment{}, changesets.GetRegistry())
 	reports := []operations.Report[any, any]{
 		{},
 	}
@@ -50,7 +50,7 @@ func TestWithBatchOps(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	registry := changesets.NewMCMSReaderRegistry()
+	registry := changesets.GetRegistry()
 	registry.RegisterMCMSReader("evm", &MockReader{})
 	b := changesets.NewOutputBuilder(deployment.Environment{
 		DataStore: ds.Seal(),

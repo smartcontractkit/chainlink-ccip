@@ -123,7 +123,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 				DataStore:        ds.Seal(),
 			}
 
-			registry := changesets.NewMCMSReaderRegistry()
+			registry := changesets.GetRegistry()
 			registry.RegisterMCMSReader("evm", &MockReader{})
 			changeset := changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[sequences.OnChainOutput, int, sequences.OnChainOutput]{
 				Sequence:     mockSequence,

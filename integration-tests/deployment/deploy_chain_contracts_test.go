@@ -64,7 +64,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 	cs := mcmsapi.DeployMCMS(dReg)
 	output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
-		Version: version,
+		AdapterVersion: version,
 		Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
 			chain_selectors.SOLANA_MAINNET.Selector: {
 				Canceller:        mcmsapi.SingleGroupMCMSV2(),

@@ -531,7 +531,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
 			// Register MCMS reader
-			mcmsRegistry := changesets.NewMCMSReaderRegistry()
+			mcmsRegistry := changesets.GetRegistry()
 			mcmsRegistry.RegisterMCMSReader("evm", &MockReader{})
 
 			// Register token adapter with appropriate error condition
