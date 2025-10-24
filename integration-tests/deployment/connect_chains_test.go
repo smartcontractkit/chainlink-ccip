@@ -4,29 +4,22 @@ import (
 	"encoding/hex"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	evm_changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/changesets"
-	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
-	evmofframpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/changesets"
-	solana_changesets "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/changesets"
-	solanafqqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
-	solanaofframpops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
-	tokenops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	solanasequences "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -126,7 +119,7 @@ func checkBidirectionalLaneConnectivity(
 
 	feeQuoterDestConfig, err := feeQuoterOnDest.GetDestChainConfig(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get dest chain config from feeQuoter")
-	require.Equal(t, sequences.TranslateFQ(solanaChain.FeeQuoterDestChainConfig), feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
+	require.Equal(t, evmsequences.TranslateFQ(solanaChain.FeeQuoterDestChainConfig), feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
 
 	price, err := feeQuoterOnDest.GetDestinationChainGasPrice(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get price from feeQuoter")
@@ -145,6 +138,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	solanaChains := []uint64{
 		chain_selectors.SOLANA_MAINNET.Selector,
 	}
+	allChains := append(evmChains, solanaChains...)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, evmChains),
 		environment.WithSolanaContainer(t, solanaChains, programsPath, solanaProgramIDs),
@@ -154,34 +148,28 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	e.DataStore = ds.Seal() // Add preloaded contracts to env datastore
 
 	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
-	for _, chainSel := range evmChains {
-		out, err := evm_changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[evm_changesets.DeployChainContractsCfg]{
-			MCMS: mcms.Input{},
-			Cfg: evm_changesets.DeployChainContractsCfg{
-				ChainSel: chainSel,
-				Params: evmsequences.ContractParams{
-					FeeQuoter: evmfqops.DefaultFeeQuoterParams(),
-					OffRamp:   evmofframpops.DefaultOffRampParams(),
-				},
-			},
-		})
-		require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
-		out.DataStore.Merge(e.DataStore)
-		e.DataStore = out.DataStore.Seal()
-	}
-	for _, chainSel := range solanaChains {
+	dReg := deployops.GetRegistry()
+	version := semver.MustParse("1.6.0")
+	for _, chainSel := range allChains {
 		mint, _ := solana.NewRandomPrivateKey()
-		out, err := solana_changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
-			Cfg: solana_changesets.DeployChainContractsCfg{
-				ChainSel: chainSel,
-				Params: solanasequences.ContractParams{
-					FeeQuoter: solanafqqops.DefaultParams(),
-					OffRamp:   solanaofframpops.DefaultParams(),
-					LinkToken: tokenops.Params{
-						TokenPrivKey:  mint,
-						TokenDecimals: 9,
-					},
+			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+				chainSel: {
+					Version: version,
+					// LINK TOKEN CONFIG
+					// token private key used to deploy the LINK token. Solana: base58 encoded private key
+					TokenPrivKey: mint.String(),
+					// token decimals used to deploy the LINK token
+					TokenDecimals: 9,
+					// FEE QUOTER CONFIG
+					MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+					TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
+					LinkPremiumMultiplier:        9e17, // 0.9 ETH
+					NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
+					// OFFRAMP CONFIG
+					PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
+					GasForCallExactCheck:                    uint16(5000),
 				},
 			},
 		})
@@ -193,7 +181,6 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	require.NoError(t, err, "Failed to decode EVM family selector")
 	svmEncoded, err := hex.DecodeString(ccipapi.SVMFamilySelector)
 	require.NoError(t, err, "Failed to decode SVM family selector")
-	laneVersion := semver.MustParse("1.6.0")
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.SOLANA_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e17),
@@ -208,7 +195,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
-				Version: laneVersion,
+				Version: version,
 				Source:  chain1,
 				Dest:    chain2,
 			},
@@ -218,11 +205,11 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	laneRegistry := lanesapi.GetLaneAdapterRegistry()
 	srcFamily, err := chain_selectors.GetSelectorFamily(chain1.Selector)
 	require.NoError(t, err, "must get selector family for src")
-	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, laneVersion)
+	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, version)
 	require.True(t, exists, "must have ChainAdapter registered for src chain family")
 	destFamily, err := chain_selectors.GetSelectorFamily(chain2.Selector)
 	require.NoError(t, err, "must get selector family for dest")
-	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, laneVersion)
+	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, version)
 	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
 	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
 }

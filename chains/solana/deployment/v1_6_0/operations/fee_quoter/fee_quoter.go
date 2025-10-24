@@ -3,7 +3,6 @@ package fee_quoter
 import (
 	"context"
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	bin "github.com/gagliardetto/binary"
@@ -167,27 +166,4 @@ type Params struct {
 	Router            solana.PublicKey
 	OffRamp           solana.PublicKey
 	LinkToken         solana.PublicKey
-}
-
-func DefaultParams() Params {
-	defaultLow, defaultHigh := GetHighLowBits(big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)))
-	return Params{
-		MaxFeeJuelsPerMsg: bin.Uint128{
-			Lo:         defaultLow,
-			Hi:         defaultHigh,
-			Endianness: nil,
-		},
-	}
-}
-
-func GetHighLowBits(n *big.Int) (low, high uint64) {
-	mask := big.NewInt(0).SetUint64(0xFFFFFFFFFFFFFFFF) // 64-bit mask
-
-	lowBig := big.NewInt(0).And(n, mask)
-	low = lowBig.Uint64()
-
-	highBig := big.NewInt(0).Rsh(n, 64) // Shift right by 64 bits
-	high = highBig.Uint64()
-
-	return low, high
 }
