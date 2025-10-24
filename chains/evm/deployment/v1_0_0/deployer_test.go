@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -37,6 +38,7 @@ func TestDeployMCMS(t *testing.T) {
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
 	cs := deployops.DeployMCMS(dReg)
 	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		Version: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),

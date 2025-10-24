@@ -51,6 +51,7 @@ func TestTransferOwnership(t *testing.T) {
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
 	deployMCMS := deploy.DeployMCMS(dReg)
 	output, err := deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
+		Version: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -76,6 +77,7 @@ func TestTransferOwnership(t *testing.T) {
 
 	// deploy another timelock so that later we can transfer ownership to it from first timelock
 	output, err = deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
+		Version: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
