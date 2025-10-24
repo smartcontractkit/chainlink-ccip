@@ -51,7 +51,6 @@ func TestWithBatchOps(t *testing.T) {
 	require.NoError(t, err)
 
 	registry := changesets.GetRegistry()
-	registry.RegisterMCMSReader("evm", &MockReader{})
 	b := changesets.NewOutputBuilder(deployment.Environment{
 		DataStore: ds.Seal(),
 	}, registry)

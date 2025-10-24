@@ -29,6 +29,12 @@ func (m *MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input 
 	}, nil
 }
 
+// only register once for tests
+func init() {
+	registry := changesets.GetRegistry()
+	registry.RegisterMCMSReader("evm", &MockReader{})
+}
+
 var mockSequence = operations.NewSequence(
 	"mock-sequence",
 	semver.MustParse("1.0.0"),
@@ -95,7 +101,6 @@ func TestNewFromOnChainSequence(t *testing.T) {
 		},
 	}
 	registry := changesets.GetRegistry()
-	registry.RegisterMCMSReader("evm", &MockReader{})
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
