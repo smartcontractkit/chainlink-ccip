@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
@@ -100,18 +99,6 @@ contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidSourcePoolAddress.selector, abi.encode(invalidPool)));
     vm.startPrank(s_allowedOffRamp);
     s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 0);
-  }
-
-  function _applyCustomFinalityConfig(uint16 finalityThreshold, uint16 customFinalityTransferFeeBps) internal {
-    TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
-      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24})
-    });
-    vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, customFinalityTransferFeeBps, rateLimitArgs);
   }
 
   function _buildReleaseOrMintIn(

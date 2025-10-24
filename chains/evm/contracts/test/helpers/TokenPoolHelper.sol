@@ -2,14 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../libraries/Pool.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 contract TokenPoolHelper is TokenPool {
-  using EnumerableSet for EnumerableSet.Bytes32Set;
-
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
@@ -38,8 +36,21 @@ contract TokenPoolHelper is TokenPool {
     _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
   }
 
-  function validateReleaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn, uint256 localAmount) external {
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
+  function validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) external {
+    _validateLockOrBurn(lockOrBurnIn, finality);
+  }
+
+  function validateReleaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint256 localAmount,
+    uint16 finality
+  ) external returns (uint256) {
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, finality);
+    return localAmount;
+  }
+
+  function applyFee(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) external view returns (uint256) {
+    return _applyFee(lockOrBurnIn, finality);
   }
 
   function onlyOnRampModifier(
@@ -52,5 +63,21 @@ contract TokenPoolHelper is TokenPool {
     uint64 remoteChainSelector
   ) external view {
     _onlyOffRamp(remoteChainSelector);
+  }
+
+  function getCustomFinalityConfig() external view returns (uint16 minBlockConfirmation) {
+    return s_finalityConfig.minBlockConfirmation;
+  }
+
+  function getFastOutboundBucket(
+    uint64 remoteChainSelector
+  ) external view returns (RateLimiter.TokenBucket memory bucket) {
+    return s_finalityConfig.outboundRateLimiterConfig[remoteChainSelector];
+  }
+
+  function getFastInboundBucket(
+    uint64 remoteChainSelector
+  ) external view returns (RateLimiter.TokenBucket memory bucket) {
+    return s_finalityConfig.inboundRateLimiterConfig[remoteChainSelector];
   }
 }
