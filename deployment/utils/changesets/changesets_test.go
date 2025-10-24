@@ -94,6 +94,8 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			},
 		},
 	}
+	registry := changesets.GetRegistry()
+	registry.RegisterMCMSReader("evm", &MockReader{})
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
@@ -123,8 +125,6 @@ func TestNewFromOnChainSequence(t *testing.T) {
 				DataStore:        ds.Seal(),
 			}
 
-			registry := changesets.GetRegistry()
-			registry.RegisterMCMSReader("evm", &MockReader{})
 			changeset := changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[sequences.OnChainOutput, int, sequences.OnChainOutput]{
 				Sequence:     mockSequence,
 				ResolveInput: test.resolveInput,
