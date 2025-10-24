@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -13,8 +14,8 @@ import (
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
 	"github.com/stretchr/testify/require"
 
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 )
 
 func TestDeployMCMS(t *testing.T) {
@@ -27,15 +28,17 @@ func TestDeployMCMS(t *testing.T) {
 	evmChain := env.BlockChains.EVMChains()[selector]
 
 	evmDeployer := &EVMDeployer{}
-	dReg := v1_0.GetRegistry()
-	dReg.RegisterDeployer(chainsel.FamilyEVM, v1_0.MCMSVersion, evmDeployer)
-	cs := v1_0.DeployMCMS(dReg)
-	output, err := cs.Apply(*env, v1_0.MCMSDeploymentConfig{
-		Chains: map[uint64]v1_0.MCMSDeploymentConfigPerChain{
+	dReg := deployops.GetRegistry()
+	version := semver.MustParse("1.0.0")
+	dReg.RegisterDeployer(chainsel.FamilyEVM, version, evmDeployer)
+	cs := deployops.DeployMCMS(dReg)
+	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		Version: version,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
 			selector: {
-				Canceller:        v1_0.SingleGroupMCMSV2(),
-				Bypasser:         v1_0.SingleGroupMCMSV2(),
-				Proposer:         v1_0.SingleGroupMCMSV2(),
+				Canceller:        deployops.SingleGroupMCMSV2(),
+				Bypasser:         deployops.SingleGroupMCMSV2(),
+				Proposer:         deployops.SingleGroupMCMSV2(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String("test"),
 				TimelockAdmin:    evmChain.DeployerKey.From,
