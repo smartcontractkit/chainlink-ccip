@@ -5,6 +5,8 @@ import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
+
+import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
@@ -58,7 +60,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   error InvalidTransmitterInProxy();
   error InvalidPreviousPool();
   error InvalidMessageLength(uint256 length);
-  error InvalidCCTPVersion(CCTPVersion expected, CCTPVersion got);
 
   // This data is supplied from offchain and contains everything needed to mint the USDC tokens on the destination chain
   // through CCTP.
@@ -74,34 +75,13 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     uint32 domainIdentifier; // Unique domain ID
     uint64 destChainSelector; // The destination chain for this domain
     bool enabled; // Whether the domain is enabled
-  }
-
-  enum CCTPVersion {
-    UNDEFINED,
-    CCTP_V1,
-    CCTP_V2
-  }
-
-  // Note: Since this struct never exists in storage, only in memory after an ABI-decoding, proper struct-packing
-  // is not necessary and field ordering has been defined so as to best support off-chain code.
-  // solhint-disable-next-line gas-struct-packing
-  struct SourceTokenDataPayload {
-    uint64 nonce; // Nonce of the message (used only in CCTP V1).
-    uint32 sourceDomain; // Source domain of the message.
-    CCTPVersion cctpVersion; // CCTP version for acquiring off-chain attestations.
-    uint256 amount; // Amount of USDC burned/minted via CCTP.
-    uint32 destinationDomain; // Destination domain of the message.
-    bytes32 mintRecipient; // Address to mint to on the destination chain (end-user or pool PDA)
-    address burnToken; // Local USDC token address
-    bytes32 destinationCaller; // TransmitterProxy of the destination chain
-    uint256 maxFee; // Max fee for the message (should be 0; no fast transfers)
-    uint32 minFinalityThreshold; // Minimum confirmation threshold before attestation (should be 2000).
+    bool useLegacySourcePoolDataFormat; // Whether to use the legacy source pool data format
   }
 
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
   uint32 public immutable i_supportedUSDCVersion;
 
-  // The local USDC config
+  // The local USDC config.
   ITokenMessenger public immutable i_tokenMessenger;
   CCTPMessageTransmitterProxy public immutable i_messageTransmitterProxy;
   uint32 public immutable i_localDomainIdentifier;
@@ -114,10 +94,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   /// pool version 1.5.1, this is the destination chain's token pool.
   // solhint-disable-next-line gas-struct-packing
   struct Domain {
-    bytes32 allowedCaller; //      Address allowed to mint on the domain
-    bytes32 mintRecipient; //      Address to mint to on the destination chain
-    uint32 domainIdentifier; // ──╮ Unique domain ID
-    bool enabled; // ─────────────╯ Whether the domain is enabled
+    bytes32 allowedCaller; //                 Address allowed to mint on the domain
+    bytes32 mintRecipient; //                 Address to mint to on the destination chain
+    uint32 domainIdentifier; // ────────────╮ Unique domain ID
+    bool enabled; //                        | Whether the domain is enabled
+    bool useLegacySourcePoolDataFormat; // ─╯ Whether to use the legacy source pool data format for chains that
+      // have not yet been updated to the new source pool data format.
   }
 
   // A mapping of CCIP chain identifiers to destination domains
@@ -173,7 +155,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "USDCTokenPool 1.6.3-dev";
+    return "USDCTokenPool 1.6.x-dev";
   }
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
@@ -216,25 +198,28 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       amount: lockOrBurnIn.amount
     });
 
-    // Since this pool only utilizes CTTP V1, which does not support maxFee or minFinalityThreshold,
-    // we set them to 0. They are maintained in the struct for compatibility with CCTP V2, and ignored in the offchain
-    // code and destination token pool for V1 messages.
-    SourceTokenDataPayload memory sourceTokenDataPayload = SourceTokenDataPayload({
-      nonce: nonce,
-      sourceDomain: i_localDomainIdentifier,
-      cctpVersion: CCTPVersion.CCTP_V1,
-      amount: lockOrBurnIn.amount,
-      destinationDomain: domain.domainIdentifier,
-      mintRecipient: decodedReceiver,
-      burnToken: address(i_token),
-      destinationCaller: domain.allowedCaller,
-      maxFee: 0,
-      minFinalityThreshold: 0
-    });
+    bytes memory sourcePoolData;
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: i_localDomainIdentifier});
+
+    // The useLegacySourcePoolDataFormat flag is set to false for chains that have been updated to the new source pool
+    // data format. When the lane is updated, the flag should be set to false.
+    if (domain.useLegacySourcePoolDataFormat) {
+      // Since not all lanes will be updated to the new source pool data format simultaneously, it is important to support
+      // the legacy format until such a time as the lane can support it. Otherwise, the destination pool would not be able
+      // to parse the source pool data and all messages originating from this updated token pool would be rejected.
+
+      // It is safe to have the legacy format still be supported temporarily, as the USDCTokenPoolProxy will convert
+      // the legacy format to the new format before releaseOrMint() is called. Once all lanes in CCIP are updated to
+      // the new format and CCTP V2, this branch can be safely removed.
+      sourcePoolData = abi.encode(sourceTokenDataPayload);
+    } else {
+      sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(sourceTokenDataPayload);
+    }
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(sourceTokenDataPayload)
+      destPoolData: sourcePoolData
     });
   }
 
@@ -256,17 +241,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     _validateCaller();
   }
 
-  /// @notice Mint tokens from the pool to the recipient
-  /// * sourceTokenData is part of the verified message and passed directly from
-  /// the offRamp so it is guaranteed to be what the lockOrBurn pool released on the
-  /// source chain. It contains (nonce, sourceDomain) which is guaranteed by CCTP
-  /// to be unique.
-  /// * offchainTokenData is untrusted (can be supplied by manual execution), but we assert
-  /// that (nonce, sourceDomain) is equal to the message's (nonce, sourceDomain) and
-  /// receiveMessage will assert that Attestation contains a valid attestation signature
-  /// for that message, including its (nonce, sourceDomain). This way, the only
-  /// non-reverting offchainTokenData that can be supplied is a valid attestation for the
-  /// specific message that was sent on source.
+  /// @inheritdoc TokenPool
+  /// @dev This function proxies the message to the message transmitter, which will mint the tokens through CCTP's contracts.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
@@ -275,14 +251,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
-    // Note: This decoding will be done on the new SourceTokenDataPayload struct,
-    // which has been altered to support both CCTP V1 and CCTP V2. Attempting to
-    // call releaseOrMint on this contract, with a sourcePoolData from a previous
-    // version will revert. However, this should never occur, as the USDC Proxy
-    // which receives the message first, should never call this pool with that data,
-    // instead formatting the message to the new format if necessary.
-    SourceTokenDataPayload memory sourceTokenDataPayload =
-      abi.decode(releaseOrMintIn.sourcePoolData, (SourceTokenDataPayload));
+    // Decode the source pool data from its raw bytes into a SourceTokenDataPayloadV0 struct that can be
+    // more easily validated. Since the USDCTokenPoolProxy that sits between this pool and the offRamp will convert
+    // the legacy format to the new format, this operation is safe to perform, as a message originating from a legacy
+    // pool will be converted to the new format before this decoding function is called.
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(releaseOrMintIn.sourcePoolData);
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
@@ -318,7 +292,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   ///     * messageBody           dynamic    bytes      116
   function _validateMessage(
     bytes memory usdcMessage,
-    SourceTokenDataPayload memory sourceTokenData
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenData
   ) internal view virtual {
     // 116 is the minimum length of a valid USDC message. Since destinationCaller must be checked for the
     // previous pool, this ensures it can be parsed correctly and that the message is not too short.
@@ -349,12 +323,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       sourceDomain := mload(add(usdcMessage, 8)) // 4 + 4 = 8
       destinationDomain := mload(add(usdcMessage, 12)) // 8 + 4 = 12
       nonce := mload(add(usdcMessage, 20)) // 12 + 8 = 20
-    }
-
-    // This pool only supports CCTP V1, so we check that the version is correct. In the V2-Compatible
-    // pool, this check will be be for CCTPVersion.CCTP_V2.
-    if (sourceTokenData.cctpVersion != CCTPVersion.CCTP_V1) {
-      revert InvalidCCTPVersion(CCTPVersion.CCTP_V1, sourceTokenData.cctpVersion);
     }
 
     if (sourceDomain != sourceTokenData.sourceDomain) {
@@ -395,7 +363,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
         allowedCaller: domain.allowedCaller,
         mintRecipient: domain.mintRecipient,
         domainIdentifier: domain.domainIdentifier,
-        enabled: domain.enabled
+        enabled: domain.enabled,
+        useLegacySourcePoolDataFormat: domain.useLegacySourcePoolDataFormat
       });
     }
     emit DomainsSet(domains);

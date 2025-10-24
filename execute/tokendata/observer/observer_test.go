@@ -28,6 +28,7 @@ func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
 		mockAddrCodec,
 	)
 	require.NoError(t, err)
