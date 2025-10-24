@@ -9,22 +9,13 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-<<<<<<< HEAD:chains/evm/deployment/v1_0_0/deployer.go
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
-	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-=======
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
->>>>>>> 3b300c8ba (Transfer Ownership changeset (#1322)):chains/evm/deployment/v1_0_0/adapters/deployer.go
 )
 
 type EVMDeployer struct{}
