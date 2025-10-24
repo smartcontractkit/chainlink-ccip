@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 
-	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -163,7 +163,7 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 		out.DataStore.Merge(e.DataStore)
 		e.DataStore = out.DataStore.Seal()
 	}
-	evmEncoded, err := hex.DecodeString(ccipapi.EVMFamilySelector)
+	evmEncoded, err := hex.DecodeString(cciputils.EVMFamilySelector)
 	require.NoError(t, err, "Failed to decode EVM family selector")
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,

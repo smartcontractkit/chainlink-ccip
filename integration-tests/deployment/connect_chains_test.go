@@ -11,9 +11,9 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
@@ -25,8 +25,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 
-	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -177,9 +177,9 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		out.DataStore.Merge(e.DataStore)
 		e.DataStore = out.DataStore.Seal()
 	}
-	evmEncoded, err := hex.DecodeString(ccipapi.EVMFamilySelector)
+	evmEncoded, err := hex.DecodeString(cciputils.EVMFamilySelector)
 	require.NoError(t, err, "Failed to decode EVM family selector")
-	svmEncoded, err := hex.DecodeString(ccipapi.SVMFamilySelector)
+	svmEncoded, err := hex.DecodeString(cciputils.SVMFamilySelector)
 	require.NoError(t, err, "Failed to decode SVM family selector")
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.SOLANA_MAINNET.Selector,
