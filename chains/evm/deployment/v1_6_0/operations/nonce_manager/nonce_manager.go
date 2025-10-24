@@ -11,6 +11,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "NonceManager"
+var Version *semver.Version = semver.MustParse("1.6.0")
 
 type ConstructorArgs struct {
 	AuthorizedCallers []common.Address
@@ -24,10 +25,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "nonce-manager:deploy",
 	Version:          semver.MustParse("1.6.0"),
 	Description:      "Deploys the NonceManager contract",
-	ContractType:     ContractType,
 	ContractMetadata: nonce_manager.NonceManagerMetaData,
-	BytecodeByVersion: map[string]contract.Bytecode{
-		semver.MustParse("1.6.0").String(): {EVM: common.FromHex(nonce_manager.NonceManagerBin)},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.6.0")).String(): {
+			EVM: common.FromHex(nonce_manager.NonceManagerBin),
+		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
@@ -39,7 +41,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	ContractType:    ContractType,
 	ContractABI:     nonce_manager.NonceManagerABI,
 	NewContract:     nonce_manager.NewNonceManager,
-	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager],
+	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return nonceManager.ApplyAuthorizedCallerUpdates(opts, args)
@@ -53,7 +55,7 @@ var ApplyPreviousRampUpdates = contract.NewWrite(contract.WriteParams[[]Previous
 	ContractType:    ContractType,
 	ContractABI:     nonce_manager.NonceManagerABI,
 	NewContract:     nonce_manager.NewNonceManager,
-	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager],
+	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, []PreviousRampsArgs],
 	Validate:        func([]PreviousRampsArgs) error { return nil },
 	CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args []PreviousRampsArgs) (*types.Transaction, error) {
 		return nonceManager.ApplyPreviousRampsUpdates(opts, args)

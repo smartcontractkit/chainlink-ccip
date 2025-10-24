@@ -9,12 +9,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/globals"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/bytes"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 )
 
@@ -192,7 +192,7 @@ func BuildSetOCR3ConfigArgs(
 	donID uint32,
 	ccipHome *ccip_home.CCIPHome,
 	destSelector uint64,
-	configType globals.ConfigType,
+	configType utils.ConfigType,
 ) ([]MultiOCR3BaseOCRConfigArgs, error) {
 	chainCfg, err := ccipHome.GetChainConfig(nil, destSelector)
 	if err != nil {
@@ -210,12 +210,12 @@ func BuildSetOCR3ConfigArgs(
 		configForOCR3 := ocrConfig.ActiveConfig
 		// we expect only an active config
 		switch configType {
-		case globals.ConfigTypeActive:
+		case utils.ConfigTypeActive:
 			if ocrConfig.ActiveConfig.ConfigDigest == [32]byte{} {
 				return nil, fmt.Errorf("invalid OCR3 config state, expected active config, donID: %d, activeConfig: %v, candidateConfig: %v",
 					donID, hexutil.Encode(ocrConfig.ActiveConfig.ConfigDigest[:]), hexutil.Encode(ocrConfig.CandidateConfig.ConfigDigest[:]))
 			}
-		case globals.ConfigTypeCandidate:
+		case utils.ConfigTypeCandidate:
 			if ocrConfig.CandidateConfig.ConfigDigest == [32]byte{} {
 				return nil, fmt.Errorf("invalid OCR3 config state, expected candidate config, donID: %d, activeConfig: %v, candidateConfig: %v",
 					donID, hexutil.Encode(ocrConfig.ActiveConfig.ConfigDigest[:]), hexutil.Encode(ocrConfig.CandidateConfig.ConfigDigest[:]))
