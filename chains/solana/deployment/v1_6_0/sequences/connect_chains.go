@@ -72,18 +72,18 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
 		b.Logger.Info("SVM Configuring lane leg as destination:", input)
-		feeQuoterAddress := solana.PublicKeyFromBytes(input.Source.FeeQuoter)
-		offRampAddress := solana.PublicKeyFromBytes(input.Source.OffRamp)
-		ccipRouterProgram := solana.PublicKeyFromBytes(input.Source.Router)
+		feeQuoterAddress := solana.PublicKeyFromBytes(input.Dest.FeeQuoter)
+		offRampAddress := solana.PublicKeyFromBytes(input.Dest.OffRamp)
+		ccipRouterProgram := solana.PublicKeyFromBytes(input.Dest.Router)
 		fee_quoter.SetProgramID(feeQuoterAddress)
 		ccip_offramp.SetProgramID(offRampAddress)
 		ccip_router.SetProgramID(ccipRouterProgram)
 
 		// OffRamp must be added to Router before initialization
-		out, err := operations.ExecuteOperation(b, routerops.AddOffRamp, chains.SolanaChains()[input.Source.Selector], routerops.ConnectChainsParams{
+		out, err := operations.ExecuteOperation(b, routerops.AddOffRamp, chains.SolanaChains()[input.Dest.Selector], routerops.ConnectChainsParams{
 			Router:              ccipRouterProgram,
 			OffRamp:             offRampAddress,
-			RemoteChainSelector: input.Dest.Selector,
+			RemoteChainSelector: input.Source.Selector,
 			AllowlistEnabled:    input.Source.AllowListEnabled,
 			AllowedSenders:      TranslateAllowlist(input.Source.AllowList),
 		})
@@ -94,10 +94,10 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
 
 		// Add DestChain to OffRamp
-		_, err = operations.ExecuteOperation(b, offrampops.ConnectChains, chains.SolanaChains()[input.Source.Selector], offrampops.ConnectChainsParams{
-			RemoteChainSelector: input.Dest.Selector,
+		_, err = operations.ExecuteOperation(b, offrampops.ConnectChains, chains.SolanaChains()[input.Dest.Selector], offrampops.ConnectChainsParams{
+			RemoteChainSelector: input.Source.Selector,
 			OffRamp:             offRampAddress,
-			SourceOnRamp:        input.Dest.OffRamp,
+			SourceOnRamp:        input.Source.OffRamp,
 			EnabledAsSource:     !input.IsDisabled,
 		})
 		if err != nil {
