@@ -1,13 +1,11 @@
 package deploy
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -39,40 +37,6 @@ type MCMSDeploymentConfigPerChainWithAddress struct {
 	ExistingAddresses []datastore.AddressRef
 }
 
-var (
-	// testXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
-	// in tests.
-	testXXXMCMSSigner *ecdsa.PrivateKey
-)
-
-func init() {
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		panic(err)
-	}
-	testXXXMCMSSigner = key
-}
-
-func SingleGroupTimelockConfigV2() MCMSDeploymentConfigPerChain {
-	return MCMSDeploymentConfigPerChain{
-		Canceller:        SingleGroupMCMSV2(),
-		Bypasser:         SingleGroupMCMSV2(),
-		Proposer:         SingleGroupMCMSV2(),
-		TimelockMinDelay: big.NewInt(0),
-	}
-}
-
-func SingleGroupMCMSV2() mcmstypes.Config {
-	publicKey := testXXXMCMSSigner.Public().(*ecdsa.PublicKey)
-	// Convert the public key to an Ethereum address
-	address := crypto.PubkeyToAddress(*publicKey)
-	c, err := mcmstypes.NewConfig(1, []common.Address{address}, []mcmstypes.Config{})
-	if err != nil {
-		panic(err)
-	}
-	return c
-}
-
 func DeployMCMS(deployerReg *DeployerRegistry) cldf.ChangeSetV2[MCMSDeploymentConfig] {
 	return cldf.CreateChangeSet(deployMCMSApply(deployerReg), deployMCMSVerify(deployerReg))
 }
@@ -80,6 +44,9 @@ func DeployMCMS(deployerReg *DeployerRegistry) cldf.ChangeSetV2[MCMSDeploymentCo
 func deployMCMSVerify(_ *DeployerRegistry) func(cldf.Environment, MCMSDeploymentConfig) error {
 	return func(e cldf.Environment, cfg MCMSDeploymentConfig) error {
 		// TODO: implement
+		if cfg.Version == nil {
+			return fmt.Errorf("version is required for MCMS deployment verification")
+		}
 		return nil
 	}
 }
@@ -110,9 +77,10 @@ func deployMCMSApply(d *DeployerRegistry) func(cldf.Environment, MCMSDeploymentC
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy MCMS on chain with selector %d: %w", selector, err)
 			}
+
 			for _, r := range deployReport.Output.Addresses {
 				if err := ds.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 				}
 			}
 			reports = append(reports, deployReport.ExecutionReports...)

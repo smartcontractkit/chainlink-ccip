@@ -1,4 +1,4 @@
-package v1_0_0
+package adapters
 
 import (
 	"fmt"
@@ -9,12 +9,13 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
-	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
+	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 )
 
 type EVMDeployer struct{}
@@ -36,6 +37,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			}
 			// deploy and configure the proposer MCM
 			seqInput := seq.SeqMCMSDeploymentCfg{
+				ChainSelector:     in.ChainSelector,
 				ContractType:      utils.ProposerManyChainMultisig,
 				MCMConfig:         &in.Proposer,
 				Qualifier:         in.Qualifier,
@@ -53,6 +55,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			proposerAddr := report.Output.Addresses[0]
 			// deploy and configure the bypasser MCM
 			seqInput = seq.SeqMCMSDeploymentCfg{
+				ChainSelector:     in.ChainSelector,
 				ContractType:      utils.BypasserManyChainMultisig,
 				MCMConfig:         &in.Bypasser,
 				Qualifier:         in.Qualifier,
@@ -70,6 +73,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			bypasserAddr := report.Output.Addresses[0]
 			// deploy and configure the canceller MCM
 			seqInput = seq.SeqMCMSDeploymentCfg{
+				ChainSelector:     in.ChainSelector,
 				ContractType:      utils.CancellerManyChainMultisig,
 				MCMConfig:         &in.Canceller,
 				Qualifier:         in.Qualifier,
@@ -86,7 +90,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			output.Addresses = append(output.Addresses, report.Output.Addresses...)
 			cancellerAddr := report.Output.Addresses[0]
 			// deploy timelock
-			deployReport, err := cldf_ops.ExecuteOperation(b, ops.OpDeployTimelock, evmChain, contract.DeployInput[ops.OpDeployTimelockInput]{
+			timelockAddr, err := contract.MaybeDeployContract(b, ops.OpDeployTimelock, evmChain, contract.DeployInput[ops.OpDeployTimelockInput]{
 				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.RBACTimelock, *semver.MustParse("1.0.0")),
@@ -99,36 +103,33 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 					// Add Executor later after call proxy is deployed
 					Executors: []common.Address{},
 				},
-			})
+			}, in.ExistingAddresses)
 			if err != nil {
 				return sequtil.OnChainOutput{}, fmt.Errorf("failed to deploy timelock on chain %d: %w", in.ChainSelector, err)
 			}
-			output.Addresses = append(output.Addresses, deployReport.Output)
-			timelockAddr := deployReport.Output.Address
 			b.Logger.Infof("Deployed Timelock at address %s on chain %s", timelockAddr, evmChain.Name)
 			// deploy call proxy with timelock
-			callProxyRep, err := cldf_ops.ExecuteOperation(b, ops.OpDeployCallProxy, evmChain, contract.DeployInput[ops.OpDeployCallProxyInput]{
+			callProxyAddr, err := contract.MaybeDeployContract(b, ops.OpDeployCallProxy, evmChain, contract.DeployInput[ops.OpDeployCallProxyInput]{
 				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
 				TypeAndVersion: cldf.NewTypeAndVersion(utils.CallProxy, *semver.MustParse("1.0.0")),
 				Args: ops.OpDeployCallProxyInput{
-					TimelockAddress: common.HexToAddress(timelockAddr),
+					TimelockAddress: common.HexToAddress(timelockAddr.Address),
 				},
-			})
+			}, in.ExistingAddresses)
 			if err != nil {
 				return sequtil.OnChainOutput{}, fmt.Errorf("failed to deploy call proxy on chain %d: %w", in.ChainSelector, err)
 			}
-			output.Addresses = append(output.Addresses, callProxyRep.Output)
-			callProxyAddr := callProxyRep.Output.Address
 			b.Logger.Infof("Deployed Call Proxy at address %s on chain %s", callProxyAddr, evmChain.Name)
+			output.Addresses = append(output.Addresses, timelockAddr, callProxyAddr)
 
 			// now that call proxy is deployed, we can add it as executor to the timelock
 			_, err = cldf_ops.ExecuteOperation(b, ops.OpGrantRoleTimelock, evmChain, contract.FunctionInput[ops.OpGrantRoleTimelockInput]{
 				ChainSelector: in.ChainSelector,
-				Address:       common.HexToAddress(timelockAddr),
+				Address:       common.HexToAddress(timelockAddr.Address),
 				Args: ops.OpGrantRoleTimelockInput{
 					RoleID:  ops.EXECUTOR_ROLE.ID,
-					Account: common.HexToAddress(callProxyAddr),
+					Account: common.HexToAddress(callProxyAddr.Address),
 				},
 			})
 			if err != nil {

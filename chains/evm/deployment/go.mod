@@ -8,10 +8,9 @@ replace (
 
 	// Make sure we're working with the latest chainlink-ccip
 	github.com/smartcontractkit/chainlink-ccip => ../../../
-
-	// Make sure we're working with the latest chainlink-ccip/deployment
-	github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment
 )
+
+replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
