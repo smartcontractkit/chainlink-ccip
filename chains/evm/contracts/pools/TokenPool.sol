@@ -534,9 +534,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return s_remoteChainConfigs[remoteChainSelector].remotePools.contains(keccak256(remotePoolAddress));
   }
 
-  /// @notice Gets the token address on the remote chain.
-  /// @param remoteChainSelector Remote chain selector.
-  /// @dev To support non-evm chains, this value is encoded into bytes
+  /// @inheritdoc IPoolV2
   function getRemoteToken(
     uint64 remoteChainSelector
   ) public view returns (bytes memory) {
