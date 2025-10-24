@@ -526,14 +526,13 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 			expectedSequenceErrorMsg: "sequence execution failed",
 		},
 	}
+	// Register MCMS reader
+	mcmsRegistry := changesets.GetRegistry()
+	mcmsRegistry.RegisterMCMSReader("evm", &MockReader{})
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
-			// Register MCMS reader
-			mcmsRegistry := changesets.GetRegistry()
-			mcmsRegistry.RegisterMCMSReader("evm", &MockReader{})
-
 			// Register token adapter with appropriate error condition
 			tokenAdapterRegistry := tokens.NewTokenAdapterRegistry()
 			mockAdapter := &transfersTest_MockTokenAdapter{}
