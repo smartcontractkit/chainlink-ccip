@@ -44,8 +44,8 @@ func DeployMCMS(deployerReg *DeployerRegistry) cldf.ChangeSetV2[MCMSDeploymentCo
 func deployMCMSVerify(_ *DeployerRegistry) func(cldf.Environment, MCMSDeploymentConfig) error {
 	return func(e cldf.Environment, cfg MCMSDeploymentConfig) error {
 		// TODO: implement
-		if cfg.Version == nil {
-			return fmt.Errorf("version is required for MCMS deployment verification")
+		if cfg.AdapterVersion == nil {
+			return fmt.Errorf("adapter version is required for MCMS deployment verification")
 		}
 		return nil
 	}
