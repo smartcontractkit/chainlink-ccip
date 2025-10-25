@@ -7,7 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -18,10 +18,10 @@ type LaneAdapter interface {
 
 	// helpers to expose lower level functionality if needed
 	// needed for populating values in chain specific configs
-	GetOnRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error)
-	GetOffRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error)
-	GetRouterAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error)
-	GetFQAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error)
+	GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 }
 
 type laneAdapterID string

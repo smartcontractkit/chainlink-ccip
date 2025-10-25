@@ -27,6 +27,7 @@ var OCR3Version = *semver.MustParse("1.6.0")
 
 type SetOCR3ConfigInput struct {
 	ChainSelector uint64
+	Datastore     datastore.DataStore
 	Configs       map[ccipocr3.PluginType]OCR3ConfigArgs
 }
 
