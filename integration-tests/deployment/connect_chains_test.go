@@ -147,7 +147,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	require.NotNil(t, e, "Environment should be created")
 	e.DataStore = ds.Seal() // Add preloaded contracts to env datastore
 
-	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+	mcmsRegistry := cs_core.GetRegistry()
 	dReg := deployops.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	for _, chainSel := range allChains {
