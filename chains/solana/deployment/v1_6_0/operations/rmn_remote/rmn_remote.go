@@ -1,6 +1,7 @@
 package rmn_remote
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -46,12 +47,13 @@ var Initialize = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
+		authority := GetAuthority(chain, input.RMNRemote)
 		rmnRemoteConfigPDA, _, _ := state.FindRMNRemoteConfigPDA(input.RMNRemote)
 		rmnRemoteCursesPDA, _, _ := state.FindRMNRemoteCursesPDA(input.RMNRemote)
 		instruction, err := rmn_remote.NewInitializeInstruction(
 			rmnRemoteConfigPDA,
 			rmnRemoteCursesPDA,
-			chain.DeployerKey.PublicKey(),
+			authority,
 			solana.SystemProgramID,
 			input.RMNRemote,
 			programData.Address,
@@ -66,6 +68,16 @@ var Initialize = operations.NewOperation(
 		return sequences.OnChainOutput{}, nil
 	},
 )
+
+func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
+	programData := rmn_remote.Config{}
+	rmnRemoteConfigPDA, _, _ := state.FindRMNRemoteConfigPDA(program)
+	err := chain.GetAccountDataBorshInto(context.Background(), rmnRemoteConfigPDA, &programData)
+	if err != nil {
+		return chain.DeployerKey.PublicKey()
+	}
+	return programData.Owner
+}
 
 type Params struct {
 	RMNRemote solana.PublicKey

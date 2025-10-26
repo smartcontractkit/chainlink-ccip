@@ -56,6 +56,7 @@ var Initialize = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
+		authority := GetAuthority(chain, input.Router)
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		instruction, err := ccip_router.NewInitializeInstruction(
 			chain.Selector,
@@ -64,7 +65,7 @@ var Initialize = operations.NewOperation(
 			input.LinkToken,
 			input.RMNRemote,
 			routerConfigPDA,
-			chain.DeployerKey.PublicKey(),
+			authority,
 			solana.SystemProgramID,
 			input.Router,
 			programData.Address,
@@ -173,7 +174,13 @@ var AddOffRamp = operations.NewOperation(
 )
 
 func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
-	return chain.DeployerKey.PublicKey()
+	programData := ccip_router.Config{}
+	routerConfigPDA, _, _ := state.FindConfigPDA(program)
+	err := chain.GetAccountDataBorshInto(context.Background(), routerConfigPDA, &programData)
+	if err != nil {
+		return chain.DeployerKey.PublicKey()
+	}
+	return programData.Owner
 }
 
 type Params struct {

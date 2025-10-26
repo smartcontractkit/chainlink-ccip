@@ -66,6 +66,7 @@ var Initialize = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
+		authority := GetAuthority(chain, input.OffRamp)
 		table, err := common.SetupLookupTable(
 			context.Background(),
 			chain.Client,
@@ -92,7 +93,7 @@ var Initialize = operations.NewOperation(
 			input.RMNRemote,
 			table,
 			offRampStatePDA,
-			chain.DeployerKey.PublicKey(),
+			authority,
 			solana.SystemProgramID,
 			input.OffRamp,
 			programData.Address,
@@ -117,12 +118,13 @@ var InitializeConfig = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
+		authority := GetAuthority(chain, input.OffRamp)
 		offRampConfigPDA, _, _ := state.FindOfframpConfigPDA(input.OffRamp)
 		instruction, err := ccip_offramp.NewInitializeConfigInstruction(
 			chain.Selector,
 			input.EnableExecutionAfter,
 			offRampConfigPDA,
-			chain.DeployerKey.PublicKey(),
+			authority,
 			solana.SystemProgramID,
 			input.OffRamp,
 			programData.Address,
@@ -210,5 +212,11 @@ var ConnectChains = operations.NewOperation(
 )
 
 func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
-	return chain.DeployerKey.PublicKey()
+	programData := ccip_offramp.Config{}
+	offRampConfigPDA, _, _ := state.FindOfframpConfigPDA(program)
+	err := chain.GetAccountDataBorshInto(context.Background(), offRampConfigPDA, &programData)
+	if err != nil {
+		return chain.DeployerKey.PublicKey()
+	}
+	return programData.Owner
 }

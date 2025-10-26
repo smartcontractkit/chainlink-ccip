@@ -55,13 +55,14 @@ var Initialize = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
+		authority := GetAuthority(chain, input.FeeQuoter)
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
 		instruction, err := fee_quoter.NewInitializeInstruction(
 			input.MaxFeeJuelsPerMsg,
 			input.Router,
 			feeQuoterConfigPDA,
 			input.LinkToken,
-			chain.DeployerKey.PublicKey(),
+			authority,
 			solana.SystemProgramID,
 			input.FeeQuoter,
 			programData.Address,
@@ -126,7 +127,7 @@ var ConnectChains = operations.NewOperation(
 				input.DestChainConfig,
 				feeQuoterConfigPDA,
 				fqRemoteChainPDA,
-				chain.DeployerKey.PublicKey(),
+				authority,
 			).ValidateAndBuild()
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to build update dest chain instruction: %w", err)
@@ -157,7 +158,13 @@ var ConnectChains = operations.NewOperation(
 )
 
 func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
-	return chain.DeployerKey.PublicKey()
+	programData := fee_quoter.Config{}
+	feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(program)
+	err := chain.GetAccountDataBorshInto(context.Background(), feeQuoterConfigPDA, &programData)
+	if err != nil {
+		return chain.DeployerKey.PublicKey()
+	}
+	return programData.Owner
 }
 
 type Params struct {
