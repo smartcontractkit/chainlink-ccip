@@ -86,9 +86,9 @@ go test -v -run TestE2ELoad/services_chaos
 ### On-Chain Monitoring
 Implement any on-chain transformations in [CollectAndObserveEvents](monitoring.go) + define `promauto`
 
-Then upload all the metrics to a local `Prometheus` or `Loki`
+Then upload all the metrics to a local `Prometheus` or `Loki` for default selectors (chains 1337 and 2337)
 ```
-upload-on-chain-metrics
+upload-on-chain-metrics 3379446385462418246 12922642891491394802
 ```
 Go to [dashboards](dashboards) and render your metrics, default `Loki` stream is `{job="on-chain"}`
 

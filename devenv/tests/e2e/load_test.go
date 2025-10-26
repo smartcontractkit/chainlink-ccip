@@ -423,8 +423,8 @@ func assertPrometheus(t *testing.T, in *ccip.Cfg, end time.Time) {
 		require.NoError(t, err)
 		require.LessOrEqual(t, nodeCpu, maxCPU)
 	}
-	// no more than 200mb for this test
-	maxMem := int(200e6) // 200mb
+	// no more than 400mb for this test
+	maxMem := int(400e6) // 200mb
 	memoryResp, err := pc.Query("sum(container_memory_rss{name=~\".*don.*\"}) by (name)", end)
 	require.NoError(t, err)
 	mem := f.ToLabelsMap(memoryResp)

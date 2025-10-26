@@ -44,6 +44,11 @@ func getSubCommands(parent string) []prompt.Suggest {
 		return []prompt.Suggest{
 			{Text: "addresses", Description: "Print all smart-contract addresses data (CLDF)"},
 		}
+	case "upload-on-chain-metrics":
+		return []prompt.Suggest{
+			{Text: "3379446385462418246 12922642891491394802", Description: "upload events for Anvil 1337 -> Anvil 2337"},
+			{Text: "12922642891491394802 3379446385462418246", Description: "upload events for Anvil 1337 <- Anvil 2337"},
+		}
 	case "bs":
 		return []prompt.Suggest{
 			{Text: "up", Description: "Spin up Blockscout and listen to dst chain (8555)"},
