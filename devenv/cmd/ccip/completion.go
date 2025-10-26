@@ -21,9 +21,6 @@ func getCommands() []prompt.Suggest {
 		{Text: "db", Description: "Inspect Databases"},
 		{Text: "upload-on-chain-metrics", Description: "Temporarily serves all on-chain metrics as a Prometheus metrics endpoint so they can be scraped"},
 		{Text: "exit", Description: "Exit the interactive shell"},
-		{Text: "deploy-commit-contracts", Description: "Deploy contracts for a new commit verifier"},
-		{Text: "deploy-mock-receiver", Description: "Deploy a mock receiver contract to a given chain selector with a specific config"},
-		{Text: "send", Description: "Send an example CCIP ArgsV2/V3 message from one chain to another"},
 	}
 }
 
@@ -75,7 +72,6 @@ func getSubCommands(parent string) []prompt.Suggest {
 			{Text: "env.toml", Description: "Spin up Anvil <> Anvil local chains, all services, 4 CL nodes"},
 			{Text: "env.toml,env-cl-rebuild.toml", Description: "(Rebuild local CL Docker image) Spin up Anvil <> Anvil local chains, all services, 4 CL nodes"},
 			{Text: "env.toml,env-geth.toml", Description: "Spin up Geth <> Geth local chains (clique), all services, 4 CL nodes"},
-			{Text: "env.toml,env-fuji-fantom.toml", Description: "Spin up testnets: Fuji <> Fantom, all services, 4 CL nodes"},
 		}
 	default:
 		return []prompt.Suggest{}

@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ const (
 func TestE2ESmoke(t *testing.T) {
 	in, err := ccip.LoadOutput[ccip.Cfg]("../../env-out.toml")
 	require.NoError(t, err)
-	ctx := ccip.Plog.WithContext(t.Context())
+	ctx := context.Background()
 	l := zerolog.Ctx(ctx)
 
 	chainIDs, wsURLs := make([]string, 0), make([]string, 0)
@@ -62,7 +63,7 @@ func TestE2ESmoke(t *testing.T) {
 				name:                     "src->dst msg execution eoa receiver",
 				fromSelector:             selectors[0],
 				toSelector:               selectors[1],
-				receiver:                 mustGetEOAReceiverAddress(t, c, selectors[1]),
+				receiver:                 mustGetEOAReceiverAddress(t, ctx, c, selectors[1]),
 				expectFail:               false,
 				numExpectedVerifications: 1,
 			},
@@ -70,7 +71,7 @@ func TestE2ESmoke(t *testing.T) {
 				name:                     "dst->src msg execution eoa receiver",
 				fromSelector:             selectors[1],
 				toSelector:               selectors[0],
-				receiver:                 mustGetEOAReceiverAddress(t, c, selectors[0]),
+				receiver:                 mustGetEOAReceiverAddress(t, ctx, c, selectors[0]),
 				expectFail:               false,
 				numExpectedVerifications: 1,
 			},
@@ -83,8 +84,8 @@ func TestE2ESmoke(t *testing.T) {
 	})
 }
 
-func mustGetEOAReceiverAddress(t *testing.T, c *ccipEVM.CCIP16EVM, chainSelector uint64) protocol.UnknownAddress {
-	receiver, err := c.GetEOAReceiverAddress(chainSelector)
+func mustGetEOAReceiverAddress(t *testing.T, ctx context.Context, c *ccipEVM.CCIP16EVM, chainSelector uint64) protocol.UnknownAddress {
+	receiver, err := c.GetEOAReceiverAddress(ctx, chainSelector)
 	require.NoError(t, err)
 	return receiver
 }

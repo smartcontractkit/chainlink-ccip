@@ -1,0 +1,4 @@
+blockscout/
+compose/
+env-out.toml
+dashboards/dummy.json

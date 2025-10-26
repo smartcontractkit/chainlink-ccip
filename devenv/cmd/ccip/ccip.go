@@ -227,8 +227,6 @@ var testCmd = &cobra.Command{
 			testPattern = "TestE2ELoad/reorg"
 		case "chaos":
 			testPattern = "TestE2ELoad/chaos"
-		case "indexer-load":
-			testPattern = "TestIndexerLoad"
 		default:
 			return fmt.Errorf("test suite %s is unknown, choose between smoke or load", args[0])
 		}
@@ -238,17 +236,7 @@ var testCmd = &cobra.Command{
 		}
 		defer os.Chdir(originalDir)
 
-		if isServiceLoadTest(testPattern) {
-			if err := os.Chdir("tests/services/load"); err != nil {
-				return fmt.Errorf("failed to change to tests/services/load directory: %w", err)
-			}
-		} else {
-			if err := os.Chdir("tests/e2e"); err != nil {
-				return fmt.Errorf("failed to change to tests/e2e directory: %w", err)
-			}
-		}
-		
-		if err := os.Chdir("tests/e2e"); err != nil {
+		if err := os.Chdir("./tests/e2e"); err != nil {
 			return fmt.Errorf("failed to change to tests/e2e directory: %w", err)
 		}
 
@@ -431,8 +419,4 @@ func main() {
 		ccipde.Plog.Err(err).Send()
 		os.Exit(1)
 	}
-}
-
-func isServiceLoadTest(testPattern string) bool {
-	return testPattern == "TestIndexerLoad"
 }

@@ -2,8 +2,10 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -20,6 +22,7 @@ import (
 	ccipEVM "github.com/smartcontractkit/chainlink-ccip/ccip-evm"
 	cciptestinterfaces "github.com/smartcontractkit/chainlink-ccip/cciptestinterfaces"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
+	f "github.com/smartcontractkit/chainlink-testing-framework/framework"
 )
 
 type ChaosTestCase struct {
@@ -153,6 +156,7 @@ func TestE2ELoad(t *testing.T) {
 
 	ctx := ccip.Plog.WithContext(context.Background())
 	l := zerolog.Ctx(ctx)
+	
 	chainIDs, wsURLs := make([]string, 0), make([]string, 0)
 	for _, bc := range in.Blockchains {
 		chainIDs = append(chainIDs, bc.ChainID)
@@ -165,42 +169,44 @@ func TestE2ELoad(t *testing.T) {
 	t.Run("clean", func(t *testing.T) {
 		// just a clean load test to measure performance
 		rps := int64(5)
-		testDuration := 30 * time.Second
+		loadDuration := 30 * time.Second
 
-		p, _ := createLoadProfile(in, rps, testDuration, e, selectors, impl, srcChain, dstChain)
+		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impl, srcChain, dstChain)
 
 		_, err = p.Run(true)
 		require.NoError(t, err)
-
-		// show example assertions for Loki/Prometheus
+		
+		assertLoki(t, in, time.Now())
+		assertPrometheus(t, in, time.Now())
 	})
 
 	t.Run("rpc latency", func(t *testing.T) {
 		// 400ms latency for any RPC node
-		_, err = chaos.ExecPumba("netem --tc-image=ghcr.io/alexei-led/pumba-debian-nettools --duration=150s delay --time=400 re2:blockchain-node-.*", 0*time.Second)
+		_, err = chaos.ExecPumba("netem --tc-image=ghcr.io/alexei-led/pumba-debian-nettools --duration=30s delay --time=400 re2:blockchain-node-.*", 0*time.Second)
 		require.NoError(t, err)
 
 		rps := int64(1)
-		testDuration := 120 * time.Second
+		loadDuration := 30 * time.Second
 
-		p, _ := createLoadProfile(in, rps, testDuration, e, selectors, impl, srcChain, dstChain)
+		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impl, srcChain, dstChain)
 
 		_, err = p.Run(true)
 		require.NoError(t, err)
 
-		// assertions
+		assertLoki(t, in, time.Now())
+		assertPrometheus(t, in, time.Now())
 	})
 
 	t.Run("gas", func(t *testing.T) {
 		rps := int64(1)
-		testDuration := 5 * time.Minute
+		loadDuration := 30 * time.Second
 
-		p, _ := createLoadProfile(in, rps, testDuration, e, selectors, impl, srcChain, dstChain)
+		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impl, srcChain, dstChain)
 
 		_, err = p.Run(false)
 		require.NoError(t, err)
 
-		waitBetweenTests := 30 * time.Second
+		waitBetweenTests := 5 * time.Second
 
 		tcs := []GasTestCase{
 			{
@@ -247,15 +253,17 @@ func TestE2ELoad(t *testing.T) {
 			})
 		}
 		p.Wait()
-
-		// assert
+		
+		assertLoki(t, in, time.Now())
+		assertPrometheus(t, in, time.Now())
 	})
 
 	t.Run("reorgs", func(t *testing.T) {
+		// env-geth.toml is required for the environment!
 		rps := int64(1)
-		testDuration := 5 * time.Minute
+		loadDuration := 120 * time.Second
 
-		p, _ := createLoadProfile(in, rps, testDuration, e, selectors, impl, srcChain, dstChain)
+		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impl, srcChain, dstChain)
 
 		_, err = p.Run(false)
 		require.NoError(t, err)
@@ -318,12 +326,13 @@ func TestE2ELoad(t *testing.T) {
 		}
 		p.Wait()
 
-		// assertions
+		assertLoki(t, in, time.Now())
+		assertPrometheus(t, in, time.Now())
 	})
 
 	t.Run("services_chaos", func(t *testing.T) {
 		rps := int64(1)
-		testDuration := 5 * time.Minute
+		loadDuration := 90 * time.Second
 
 		tcs := []ChaosTestCase{
 			{
@@ -356,7 +365,7 @@ func TestE2ELoad(t *testing.T) {
 				name: "One slow CL node",
 				run: func() error {
 					_, err = chaos.ExecPumba(
-						"netem --tc-image=ghcr.io/alexei-led/pumba-debian-nettools --duration=1m delay --time=1000 re2:don-node1",
+						"netem --tc-image=ghcr.io/alexei-led/pumba-debian-nettools --duration=30s delay --time=1000 re2:don-node1",
 						30*time.Second,
 					)
 					return err
@@ -365,7 +374,7 @@ func TestE2ELoad(t *testing.T) {
 			},
 		}
 
-		p, _ := createLoadProfile(in, rps, testDuration, e, selectors, impl, srcChain, dstChain)
+		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impl, srcChain, dstChain)
 
 		_, err = p.Run(false)
 		require.NoError(t, err)
@@ -381,6 +390,48 @@ func TestE2ELoad(t *testing.T) {
 		}
 		p.Wait()
 
-		// assertions
+		assertLoki(t, in, time.Now())
+		assertPrometheus(t, in, time.Now())
 	})
+}
+
+// assertLoki this is an example method demonstrating how we can grep logs to assert
+func assertLoki(t *testing.T, in *ccip.Cfg, end time.Time) {
+	logs, err := f.NewLokiQueryClient(f.LocalLokiBaseURL, "", f.BasicAuth{}, f.QueryParams{
+		Query:     "{job=\"ctf\",container=\"don-node1\"}",
+		StartTime: end.Add(-time.Minute),
+		EndTime:   end,
+		Limit:     100,
+	}).QueryRange(context.Background())
+	require.NoError(t, err)
+	fmt.Println(logs)
+}
+
+// assertPrometheus is an example method demonstrating how we can assert Prometheus metrics
+func assertPrometheus(t *testing.T, in *ccip.Cfg, end time.Time) {
+	pc := f.NewPrometheusQueryClient(f.LocalPrometheusBaseURL)
+	// no more than 10% CPU for this test
+	maxCPU := 10.0
+	cpuResp, err := pc.Query("sum(rate(container_cpu_usage_seconds_total{name=~\".*don.*\"}[5m])) by (name) *100", end)
+	require.NoError(t, err)
+	cpu := f.ToLabelsMap(cpuResp)
+	for i := 0; i < in.NodeSets[0].Nodes; i++ {
+		nodeLabel := fmt.Sprintf("name:don-node%d", i)
+		nodeCpu, err := strconv.ParseFloat(cpu[nodeLabel][0].(string), 64)
+		ccip.Plog.Info().Int("Node", i).Float64("CPU", nodeCpu).Msg("CPU usage percentage")
+		require.NoError(t, err)
+		require.LessOrEqual(t, nodeCpu, maxCPU)
+	}
+	// no more than 200mb for this test
+	maxMem := int(200e6) // 200mb
+	memoryResp, err := pc.Query("sum(container_memory_rss{name=~\".*don.*\"}) by (name)", end)
+	require.NoError(t, err)
+	mem := f.ToLabelsMap(memoryResp)
+	for i := 0; i < in.NodeSets[0].Nodes; i++ {
+		nodeLabel := fmt.Sprintf("name:don-node%d", i)
+		nodeMem, err := strconv.Atoi(mem[nodeLabel][0].(string))
+		ccip.Plog.Info().Int("Node", i).Int("Memory", nodeMem).Msg("Total memory")
+		require.NoError(t, err)
+		require.LessOrEqual(t, nodeMem, maxMem)
+	}
 }
