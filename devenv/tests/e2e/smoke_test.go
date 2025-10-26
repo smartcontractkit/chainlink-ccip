@@ -1,27 +1,14 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
-	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
-)
-
-const (
-	// See Internal.sol for the full enum values.
-	MessageExecutionStateSuccess uint8 = 2
-	MessageExecutionStateFailed  uint8 = 3
-
-	defaultSentTimeout = 10 * time.Second
-	defaultExecTimeout = 40 * time.Second
 )
 
 func TestE2ESmoke(t *testing.T) {
@@ -85,10 +72,4 @@ func TestE2ESmoke(t *testing.T) {
 			})
 		}
 	})
-}
-
-func mustGetEOAReceiverAddress(t *testing.T, ctx context.Context, c *ccipEVM.CCIP16EVM, chainSelector uint64) protocol.UnknownAddress {
-	receiver, err := c.GetEOAReceiverAddress(ctx, chainSelector)
-	require.NoError(t, err)
-	return receiver
 }

@@ -30,7 +30,6 @@ require (
 require (
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/google/uuid v1.6.0
-	github.com/smartcontractkit/chainlink-ccv/protocol v0.0.0-20251014173230-2214b48b3385
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.1
 )
 

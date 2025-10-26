@@ -53,7 +53,7 @@ go test -v -run TestE2ESmoke
 Spin up the observability stack first
 ```bash
 export LOKI_URL=http://localhost:3030/loki/api/v1/push
-ccv obs u -f
+ccip obs u -f
 ```
 
 Go to `tests/e2e` directory and run
@@ -95,7 +95,7 @@ Go to [dashboards](dashboards) and render your metrics, default `Loki` stream is
 ## Docker Desktop on Linux
 
 Some special considerations are needed in order to use Docker Desktop on Linux
-with the ccv command because the socket location is moved to the users home
+with the ccip command because the socket location is moved to the users home
 directory.
 
 This can be fixed by creating a symlink in the standard location.
