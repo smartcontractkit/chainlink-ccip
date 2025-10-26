@@ -1,0 +1,16 @@
+set fallback
+
+# Default: show available recipes
+default:
+    just --list
+
+clean:
+    rm -rf compose/ blockscout/
+
+# Install pre-commit hooks
+pre-commit:
+    pre-commit install
+
+# Rebuild CLI
+cli:
+    pushd cmd/ccip > /dev/null && go install -ldflags="-X main.Version=1.0.0" . && popd > /dev/null

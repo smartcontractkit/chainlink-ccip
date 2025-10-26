@@ -1,0 +1,11 @@
+[[blockchains]]
+  container_name = "blockchain-src"
+  chain_id = "1337"
+  port = "8545"
+  type = "geth"
+
+[[blockchains]]
+  container_name = "blockchain-dst"
+  chain_id = "2337"
+  port = "8555"
+  type = "geth"
