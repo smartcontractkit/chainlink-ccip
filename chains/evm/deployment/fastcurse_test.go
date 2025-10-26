@@ -144,7 +144,7 @@ func TestFastCurse(t *testing.T) {
 	evmChain1 := env.BlockChains.EVMChains()[chain1]
 	evmChain2 := env.BlockChains.EVMChains()[chain2]
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
-		Version: semver.MustParse("1.0.0"),
+		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			chain1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
