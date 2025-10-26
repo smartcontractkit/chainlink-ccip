@@ -8,7 +8,6 @@ import (
 
 	"go.uber.org/zap"
 
-	cciptestinterfaces "github.com/smartcontractkit/chainlink-ccip/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider/rpcclient"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -19,7 +18,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
-	ccipEVM "github.com/smartcontractkit/chainlink-ccip/ccip-evm"
+	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 )
 
 type CLDF struct {
@@ -103,7 +102,7 @@ func NewDefaultCLDFBundle(e *deployment.Environment) operations.Bundle {
 	)
 }
 
-func NewCCIPImplFromNetwork(typ string) (cciptestinterfaces.CCIP16ProductConfiguration, error) {
+func NewCCIPImplFromNetwork(typ string) (CCIP16ProductConfiguration, error) {
 	switch typ {
 	case "anvil", "geth":
 		return &ccipEVM.CCIP16EVM{}, nil

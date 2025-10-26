@@ -11,13 +11,13 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-connections v0.6.0 // indirect
-	github.com/ethereum/go-ethereum v1.16.3 // indirect
+	github.com/ethereum/go-ethereum v1.16.3
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/prometheus/client_golang v1.23.0
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.72
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251021190514-4e4a22b89e39
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20251021190514-4e4a22b89e39 // indirect
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20251021190514-4e4a22b89e39
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250929154511-1f5fbda7ae76
 	github.com/smartcontractkit/chainlink-deployments-framework v0.56.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.33
@@ -28,6 +28,8 @@ require (
 )
 
 require (
+	github.com/go-resty/resty/v2 v2.16.5
+	github.com/google/uuid v1.6.0
 	github.com/smartcontractkit/chainlink-ccv/protocol v0.0.0-20251014173230-2214b48b3385
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.1
 )
@@ -145,7 +147,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.27.0 // indirect
 	github.com/go-redsync/redsync/v4 v4.13.0 // indirect
-	github.com/go-resty/resty/v2 v2.16.5 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
@@ -161,7 +162,6 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect

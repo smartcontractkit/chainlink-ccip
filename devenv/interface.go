@@ -1,4 +1,4 @@
-package cciptestinterfaces
+package ccip
 
 import (
 	"context"

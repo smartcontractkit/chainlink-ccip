@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	cciptestinterfaces "github.com/smartcontractkit/chainlink-ccip/cciptestinterfaces"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 	f "github.com/smartcontractkit/chainlink-testing-framework/framework"
 )
@@ -48,10 +47,10 @@ type SentMessage struct {
 type EVMTXGun struct {
 	cfg  *ccip.Cfg
 	e    *deployment.Environment
-	impl cciptestinterfaces.CCIP16ProductConfiguration
+	impl ccip.CCIP16ProductConfiguration
 }
 
-func NewEVMTransactionGun(cfg *ccip.Cfg, e *deployment.Environment, selectors []uint64, impl cciptestinterfaces.CCIP16ProductConfiguration, s, d evm.Chain) *EVMTXGun {
+func NewEVMTransactionGun(cfg *ccip.Cfg, e *deployment.Environment, selectors []uint64, impl ccip.CCIP16ProductConfiguration, s, d evm.Chain) *EVMTXGun {
 	return &EVMTXGun{
 		cfg:  cfg,
 		e:    e,
@@ -114,7 +113,7 @@ func gasControlFunc(t *testing.T, r *rpc.RPCClient, blockPace time.Duration) {
 	}
 }
 
-func createLoadProfile(in *ccip.Cfg, rps int64, testDuration time.Duration, e *deployment.Environment, selectors []uint64, impl cciptestinterfaces.CCIP16ProductConfiguration, s, d evm.Chain) (*wasp.Profile, *EVMTXGun) {
+func createLoadProfile(in *ccip.Cfg, rps int64, testDuration time.Duration, e *deployment.Environment, selectors []uint64, impl ccip.CCIP16ProductConfiguration, s, d evm.Chain) (*wasp.Profile, *EVMTXGun) {
 	gun := NewEVMTransactionGun(in, e, selectors, impl, s, d)
 	profile := wasp.NewProfile().
 		Add(wasp.NewGenerator(&wasp.Config{
@@ -160,7 +159,7 @@ func TestE2ELoad(t *testing.T) {
 		wsURLs = append(wsURLs, bc.Out.Nodes[0].ExternalWSUrl)
 	}
 
-	impls := make([]cciptestinterfaces.CCIP16ProductConfiguration, 0)
+	impls := make([]ccip.CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
 		i, err := ccip.NewCCIPImplFromNetwork(bc.Out.Type)
 		require.NoError(t, err)

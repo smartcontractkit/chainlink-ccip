@@ -14,7 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
-	ccipEVM "github.com/smartcontractkit/chainlink-ccip/ccip-evm"
+	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	ccipde "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 

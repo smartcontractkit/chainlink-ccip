@@ -11,8 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
-	ccipEVM "github.com/smartcontractkit/chainlink-ccip/ccip-evm"
-	"github.com/smartcontractkit/chainlink-ccip/cciptestinterfaces"
+	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 
@@ -38,7 +37,7 @@ func TestE2ESmoke(t *testing.T) {
 	selectors, e, err := ccip.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
 	require.NoError(t, err)
 
-	impls := make([]cciptestinterfaces.CCIP16ProductConfiguration, 0)
+	impls := make([]ccip.CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
 		i, err := ccip.NewCCIPImplFromNetwork(bc.Out.Type)
 		require.NoError(t, err)
@@ -56,8 +55,8 @@ func TestE2ESmoke(t *testing.T) {
 			name         string
 			fromSelector uint64
 			toSelector   uint64
-			implOne      cciptestinterfaces.CCIP16ProductConfiguration
-			implTwo      cciptestinterfaces.CCIP16ProductConfiguration
+			implOne      ccip.CCIP16ProductConfiguration
+			implTwo      ccip.CCIP16ProductConfiguration
 		}
 
 		tcs := []testcase{

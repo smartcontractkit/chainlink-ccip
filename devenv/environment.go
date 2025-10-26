@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	cciptestinterfaces "github.com/smartcontractkit/chainlink-ccip/cciptestinterfaces"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
 
@@ -96,7 +95,7 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, err
 	}
 
-	impls := make([]cciptestinterfaces.CCIP16ProductConfiguration, 0)
+	impls := make([]CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
 		impl, err := NewCCIPImplFromNetwork(bc.Type)
 		if err != nil {
