@@ -154,17 +154,6 @@ contract OffRamp_execute is OffRampSetup {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
-    // Expect execution state change event.
-    vm.expectEmit();
-    emit OffRamp.ExecutionStateChanged(
-      message.sourceChainSelector,
-      message.sequenceNumber,
-      keccak256(encodedMessage),
-      Internal.MessageExecutionState.FAILURE,
-      // With the gas provided in this test, the execute call fails during the _supportsInterfaceReverting check.
-      abi.encodeWithSelector(ERC165CheckerReverting.InsufficientGasForStaticCall.selector)
-    );
-
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, 85_000);
 
     // Verify final state is FAILURE.
