@@ -36,6 +36,8 @@ type Observable interface {
 
 // Chains provides methods to interact with a set of chains that have CCIP deployed.
 type Chains interface {
+	// SetCLDF sets CLDF environment
+	SetCLDF(e *deployment.Environment)
 	// GetEOAReceiverAddress gets an EOA receiver address for the provided chain selector.
 	GetEOAReceiverAddress(ctx context.Context, chainSelector uint64) ([]byte, error)
 	// SendMessage sends a CCIP message from src to dest with the specified message options.

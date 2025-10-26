@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -19,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	ccipEVM "github.com/smartcontractkit/chainlink-ccip/ccip-evm"
 	cciptestinterfaces "github.com/smartcontractkit/chainlink-ccip/cciptestinterfaces"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 	f "github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -154,28 +152,32 @@ func TestE2ELoad(t *testing.T) {
 	b := ccip.NewDefaultCLDFBundle(e)
 	e.OperationsBundle = b
 
-	ctx := ccip.Plog.WithContext(context.Background())
-	l := zerolog.Ctx(ctx)
-	
+	// ctx := ccip.Plog.WithContext(context.Background())
+
 	chainIDs, wsURLs := make([]string, 0), make([]string, 0)
 	for _, bc := range in.Blockchains {
 		chainIDs = append(chainIDs, bc.ChainID)
 		wsURLs = append(wsURLs, bc.Out.Nodes[0].ExternalWSUrl)
 	}
 
-	impl, err := ccipEVM.NewCCIP16EVM(ctx, *l, e, chainIDs, wsURLs)
-	require.NoError(t, err)
+	impls := make([]cciptestinterfaces.CCIP16ProductConfiguration, 0)
+	for _, bc := range in.Blockchains {
+		i, err := ccip.NewCCIPImplFromNetwork(bc.Out.Type)
+		require.NoError(t, err)
+		i.SetCLDF(e)
+		impls = append(impls, i)
+	}
 
 	t.Run("clean", func(t *testing.T) {
 		// just a clean load test to measure performance
 		rps := int64(5)
 		loadDuration := 30 * time.Second
 
-		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impl, srcChain, dstChain)
+		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impls[0], srcChain, dstChain)
 
 		_, err = p.Run(true)
 		require.NoError(t, err)
-		
+
 		assertLoki(t, in, time.Now())
 		assertPrometheus(t, in, time.Now())
 	})
@@ -188,7 +190,7 @@ func TestE2ELoad(t *testing.T) {
 		rps := int64(1)
 		loadDuration := 30 * time.Second
 
-		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impl, srcChain, dstChain)
+		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impls[0], srcChain, dstChain)
 
 		_, err = p.Run(true)
 		require.NoError(t, err)
@@ -201,7 +203,7 @@ func TestE2ELoad(t *testing.T) {
 		rps := int64(1)
 		loadDuration := 30 * time.Second
 
-		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impl, srcChain, dstChain)
+		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impls[0], srcChain, dstChain)
 
 		_, err = p.Run(false)
 		require.NoError(t, err)
@@ -253,7 +255,7 @@ func TestE2ELoad(t *testing.T) {
 			})
 		}
 		p.Wait()
-		
+
 		assertLoki(t, in, time.Now())
 		assertPrometheus(t, in, time.Now())
 	})
@@ -263,7 +265,7 @@ func TestE2ELoad(t *testing.T) {
 		rps := int64(1)
 		loadDuration := 120 * time.Second
 
-		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impl, srcChain, dstChain)
+		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impls[0], srcChain, dstChain)
 
 		_, err = p.Run(false)
 		require.NoError(t, err)
@@ -374,7 +376,7 @@ func TestE2ELoad(t *testing.T) {
 			},
 		}
 
-		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impl, srcChain, dstChain)
+		p, _ := createLoadProfile(in, rps, loadDuration, e, selectors, impls[0], srcChain, dstChain)
 
 		_, err = p.Run(false)
 		require.NoError(t, err)

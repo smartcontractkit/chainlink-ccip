@@ -11,6 +11,26 @@ clean:
 pre-commit:
     pre-commit install
 
+# Clone and build job-distributor Docker image
+build-jd-docker:
+    #!/usr/bin/env bash
+    set -e
+    REPO_URL="git@github.com:smartcontractkit/job-distributor.git"
+    REPO_DIR="job-distributor/"
+    IMAGE_NAME="job-distributor:local"
+    DOCKERFILE="e2e/Dockerfile.e2e"
+    if docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+        echo "Docker image $IMAGE_NAME already exists, skipping build..."
+    else
+        echo "Cloning repository... check for 2-factor authentication"
+        git clone "$REPO_URL" "$REPO_DIR"
+        echo "Building Docker image..."
+        cd "$REPO_DIR" && docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" .
+        cd ..
+        rm -rf job-distributor/
+    fi
+    echo "Done!"
+
 # Rebuild CLI
 cli:
     pushd cmd/ccip > /dev/null && go install -ldflags="-X main.Version=1.0.0" . && popd > /dev/null

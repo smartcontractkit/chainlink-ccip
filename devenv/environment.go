@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cciptestinterfaces "github.com/smartcontractkit/chainlink-ccip/cciptestinterfaces"
@@ -61,6 +62,7 @@ const (
 
 type Cfg struct {
 	CLDF               CLDF                `toml:"cldf"                  validate:"required"`
+	JD                 *jd.Input           `toml:"jd"`
 	Blockchains        []*blockchain.Input `toml:"blockchains"           validate:"required"`
 	NodeSets           []*ns.Input         `toml:"nodesets"              validate:"required"`
 	CLNodesFundingETH  float64             `toml:"cl_nodes_funding_eth"`
@@ -125,6 +127,13 @@ func NewEnvironment() (*Cfg, error) {
 		nodeSpec.Node.TestConfigOverrides = allConfigs
 	}
 	Plog.Info().Msg("Nodes network configuration is generated")
+
+	_, err = jd.NewJD(in.JD)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create job distributor: %w", err)
+	}
+	
+	// connect JD to nodes here
 
 	tr.Record("[changeset] configured nodes network")
 	_, err = ns.NewSharedDBNodeSet(in.NodeSets[0], nil)

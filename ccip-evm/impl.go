@@ -29,18 +29,20 @@ var ccipMessageSentTopic = onramp.OnRampCCIPMessageSent{}.Topic()
 
 type CCIP16EVM struct {
 	e                      *deployment.Environment
-	logger                 zerolog.Logger
 	chainDetailsBySelector map[uint64]chainsel.ChainDetails
 	ethClients             map[uint64]*ethclient.Client
 }
 
 // NewCCIP16EVM creates new smart-contracts wrappers with utility functions for CCIP16EVM implementation.
-func NewCCIP16EVM(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, chainIDs, wsURLs []string) (*CCIP16EVM, error) {
+func NewCCIP16EVM(ctx context.Context, e *deployment.Environment) (*CCIP16EVM, error) {
 	_ = zerolog.Ctx(ctx)
 	return &CCIP16EVM{
-		e:      e,
-		logger: logger,
+		e: e,
 	}, nil
+}
+
+func (m *CCIP16EVM) SetCLDF(e *deployment.Environment) {
+	m.e = e
 }
 
 func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields any, opts any) error {

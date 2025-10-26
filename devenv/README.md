@@ -15,12 +15,14 @@
 ## Components
 
 - x2 Anvil chains
+- JobDistributor
 - NodeSet (4 nodes)
 
 ## Install
 All build command are run using [Justfile](https://github.com/casey/just?tab=readme-ov-file#cross-platform), start with installing it
 ```
 brew install just # click the link above if you are not on OS X
+just build-jd-docker
 just cli
 ```
 
@@ -51,7 +53,7 @@ go test -v -run TestE2ESmoke
 Spin up the observability stack first
 ```bash
 export LOKI_URL=http://localhost:3030/loki/api/v1/push
-ccv obs u
+ccv obs u -f
 ```
 
 Go to `tests/e2e` directory and run

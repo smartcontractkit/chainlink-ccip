@@ -10,9 +10,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/client"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -23,7 +20,7 @@ import (
 
 const (
 	LocalWASPLoadDashboard = "http://localhost:3000/d/WASPLoadTests/wasp-load-test?orgId=1&from=now-5m&to=now&refresh=5s"
-	LocalCCIPDashboard      = "http://localhost:3000/d/f8a04cef-653f-46d3-86df-87c532300672/ccip-services?orgId=1&refresh=5s"
+	LocalCCIPDashboard     = "http://localhost:3000/d/f8a04cef-653f-46d3-86df-87c532300672/ccip-services?orgId=1&refresh=5s"
 )
 
 var rootCmd = &cobra.Command{
@@ -301,8 +298,7 @@ var monitorContractsCmd = &cobra.Command{
 			return fmt.Errorf("failed to create CLDF operations environment: %w", err)
 		}
 		ctx = ccipde.Plog.WithContext(ctx)
-		l := zerolog.Ctx(ctx)
-		impl, err := ccipEVM.NewCCIP16EVM(ctx, *l, e, chainIDs, wsURLs)
+		impl, err := ccipEVM.NewCCIP16EVM(ctx, e)
 		if err != nil {
 			return fmt.Errorf("failed to create CCIP16EVM: %w", err)
 		}
@@ -314,49 +310,6 @@ var monitorContractsCmd = &cobra.Command{
 			return err
 		}
 		ccipde.Plog.Info().Str("Dashboard", LocalCCIPDashboard).Msg("Metrics upload finished")
-		return nil
-	},
-}
-
-var txInfoCmd = &cobra.Command{
-	Use:   "tx-receipt <tx hash>",
-	Short: "Get transaction receipt information",
-	Args:  cobra.RangeArgs(1, 1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			return fmt.Errorf("expected 1 argument (tx hash), got %d", len(args))
-		}
-		txHash := common.HexToHash(args[0])
-		ctx := ccipde.Plog.WithContext(cmd.Context())
-		in, err := ccipde.LoadOutput[ccipde.Cfg]("env-out.toml")
-		if err != nil {
-			return fmt.Errorf("failed to load environment output: %w", err)
-		}
-
-		var found bool
-		for _, bc := range in.Blockchains {
-			if found {
-				break
-			}
-			client, err := ethclient.Dial(bc.Out.Nodes[0].ExternalWSUrl)
-			if err != nil {
-				return fmt.Errorf("failed to dial client: %w", err)
-			}
-			receipt, err := client.TransactionReceipt(ctx, txHash)
-			if err != nil {
-				continue
-			}
-			tx, _, err := client.TransactionByHash(ctx, txHash)
-			if err != nil {
-				continue
-			}
-			// check gas specified in the transaction and gas used in the receipt
-			ccipde.Plog.Info().Msgf("gas specified in tx: %d, gas used in receipt: %d", tx.Gas(), receipt.GasUsed)
-			found = true
-		}
-		if !found {
-			return fmt.Errorf("transaction not found in any of the enabled chains")
-		}
 		return nil
 	},
 }
@@ -390,7 +343,6 @@ func init() {
 
 	// on-chain monitoring
 	rootCmd.AddCommand(monitorContractsCmd)
-	rootCmd.AddCommand(txInfoCmd)
 }
 
 func checkDockerIsRunning() {
