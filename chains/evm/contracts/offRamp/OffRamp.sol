@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
+
+import {ICrossChainVerifierResolver} from "../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
@@ -282,7 +284,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        ICrossChainVerifierV1(ccvsToQuery[i]).verifyMessage({
+        address ccvAddress = ccvsToQuery[i];
+        if (ccvAddress._supportsInterfaceReverting(type(ICrossChainVerifierResolver).interfaceId)) {
+          ccvAddress = ICrossChainVerifierResolver(ccvAddress).getInboundImplementation(ccvData[ccvDataIndex[i]]);
+        }
+        ICrossChainVerifierV1(ccvAddress).verifyMessage({
           message: message,
           messageId: messageId,
           ccvData: ccvData[ccvDataIndex[i]]

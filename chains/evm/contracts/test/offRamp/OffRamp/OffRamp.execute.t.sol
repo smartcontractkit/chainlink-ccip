@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 
 import {Router} from "../../../Router.sol";
+import {ERC165CheckerReverting} from "../../../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
@@ -160,7 +161,8 @@ contract OffRamp_execute is OffRampSetup {
       message.sequenceNumber,
       keccak256(encodedMessage),
       Internal.MessageExecutionState.FAILURE,
-      "" // empty because there is no error when a tx runs out of gas.
+      // With the gas provided in this test, the execute call fails during the _supportsInterfaceReverting check.
+      abi.encodeWithSelector(ERC165CheckerReverting.InsufficientGasForStaticCall.selector)
     );
 
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, 85_000);

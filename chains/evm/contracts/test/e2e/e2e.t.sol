@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Proxy} from "../../Proxy.sol";
 import {Router} from "../../Router.sol";
 import {CommitteeVerifier} from "../../ccvs/CommitteeVerifier.sol";
+import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -19,6 +21,8 @@ contract e2e is OnRampSetup {
 
   address internal s_destVerifier;
   address internal s_userSpecifiedCCV;
+
+  bytes4 internal constant VERIFIER_VERSION = 0x12345678;
 
   function setUp() public virtual override {
     super.setUp();
@@ -47,7 +51,15 @@ contract e2e is OnRampSetup {
     });
     committeeVerifier.applyDestChainConfigUpdates(destChainConfigs);
 
-    s_userSpecifiedCCV = address(committeeVerifier);
+    VersionedVerifierResolver srcVerifierResolver = new VersionedVerifierResolver();
+    VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
+      new VersionedVerifierResolver.OutboundImplementationArgs[](1);
+    outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      verifier: address(committeeVerifier)
+    });
+    srcVerifierResolver.applyOutboundImplementationUpdates(new uint64[](0), outboundImpls);
+    s_userSpecifiedCCV = address(new Proxy(address(srcVerifierResolver)));
 
     // OffRamp side
     s_offRamp = new OffRampHelper(
@@ -59,7 +71,15 @@ contract e2e is OnRampSetup {
       })
     );
 
-    s_destVerifier = address(new MockVerifier(""));
+    VersionedVerifierResolver destVerifierResolver = new VersionedVerifierResolver();
+    VersionedVerifierResolver.InboundImplementationArgs[] memory inboundImpls =
+      new VersionedVerifierResolver.InboundImplementationArgs[](1);
+    inboundImpls[0] = VersionedVerifierResolver.InboundImplementationArgs({
+      version: VERIFIER_VERSION,
+      verifier: address(new MockVerifier(""))
+    });
+    destVerifierResolver.applyInboundImplementationUpdates(new bytes4[](0), inboundImpls);
+    s_destVerifier = address(new Proxy(address(destVerifierResolver)));
 
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = s_destVerifier;
@@ -126,6 +146,8 @@ contract e2e is OnRampSetup {
 
     address[] memory ccvAddresses = new address[](1);
     ccvAddresses[0] = s_destVerifier;
+    bytes[] memory ccvData = new bytes[](1);
+    ccvData[0] = abi.encodePacked(VERIFIER_VERSION);
 
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged({
@@ -137,6 +159,6 @@ contract e2e is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1));
+    s_offRamp.execute(encodedMessage, ccvAddresses, ccvData);
   }
 }
