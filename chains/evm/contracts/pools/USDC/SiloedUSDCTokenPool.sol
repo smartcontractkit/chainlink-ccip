@@ -120,12 +120,12 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
   /// @inheritdoc SiloedLockReleaseTokenPool
   /// @dev This function is overridden to encode the LOCK_RELEASE_FLAG into the destPoolData, as the destination pool
-  /// will be a
+  /// will be a BurnMintWithLockReleaseFlagTokenPool and may need to be processed by a proxy first.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    // Call the parent contract's lockOrBurn function to get the base output. All functionality of this function
-    // is inherited from the parent contract except for the destPoolData.
+    // Call the parent contract's lockOrBurn function to get the base output. All functionality of this child
+    // is inherited from the parent contract except for the overwritten destPoolData.
     Pool.LockOrBurnOutV1 memory baseOutput = super.lockOrBurn(lockOrBurnIn);
 
     // Encode the LOCK_RELEASE_FLAG into the destPoolData
