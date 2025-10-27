@@ -114,10 +114,10 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
       if (args.destChainSelector == 0) {
         revert InvalidDestChain(args.destChainSelector);
       }
-      if (s_allowedDestChains.add(args.destChainSelector)) {
-        s_remoteChainConfigs[args.destChainSelector] = args.config;
-        emit DestChainAdded(args.destChainSelector, args.config);
-      }
+
+      s_allowedDestChains.add(args.destChainSelector);
+      s_remoteChainConfigs[args.destChainSelector] = args.config;
+      emit DestChainAdded(args.destChainSelector, args.config);
     }
   }
 

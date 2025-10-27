@@ -21,17 +21,6 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
     });
   }
 
-  function _assertRemoteChainConfigEqual(
-    Executor.RemoteChainConfigArgs memory a,
-    Executor.RemoteChainConfigArgs memory b
-  ) internal pure {
-    assertEq(a.destChainSelector, b.destChainSelector);
-    assertEq(a.config.usdCentsFee, b.config.usdCentsFee);
-    assertEq(a.config.baseExecGas, b.config.baseExecGas);
-    assertEq(a.config.destAddressLengthBytes, b.config.destAddressLengthBytes);
-    assertEq(a.config.enabled, b.config.enabled);
-  }
-
   function test_applyDestChainUpdates_AddNewChain() public {
     uint64 newChainSelector = DEST_CHAIN_SELECTOR + 1;
     Executor.RemoteChainConfigArgs[] memory newRemote = new Executor.RemoteChainConfigArgs[](1);
@@ -47,7 +36,11 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
     bool found = false;
     for (uint256 i = 0; i < currentDestChains.length; ++i) {
       if (currentDestChains[i].destChainSelector == newChainSelector) {
-        _assertRemoteChainConfigEqual(newRemote[0], currentDestChains[i]);
+        assertEq(newRemote[0].destChainSelector, currentDestChains[i].destChainSelector);
+        assertEq(newRemote[0].config.usdCentsFee, currentDestChains[i].config.usdCentsFee);
+        assertEq(newRemote[0].config.baseExecGas, currentDestChains[i].config.baseExecGas);
+        assertEq(newRemote[0].config.destAddressLengthBytes, currentDestChains[i].config.destAddressLengthBytes);
+        assertEq(newRemote[0].config.enabled, currentDestChains[i].config.enabled);
         found = true;
         break;
       }
@@ -59,9 +52,10 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
     Executor.RemoteChainConfigArgs[] memory newDests = new Executor.RemoteChainConfigArgs[](1);
     newDests[0] = _generateRemoteChainConfig(DEST_CHAIN_SELECTOR);
 
-    vm.recordLogs();
+    vm.expectEmit();
+    emit Executor.DestChainAdded(DEST_CHAIN_SELECTOR, newDests[0].config);
+
     s_executor.applyDestChainUpdates(new uint64[](0), newDests);
-    assertEq(0, vm.getRecordedLogs().length);
 
     Executor.RemoteChainConfigArgs[] memory currentDestChains = s_executor.getDestChains();
     assertEq(1, currentDestChains.length);

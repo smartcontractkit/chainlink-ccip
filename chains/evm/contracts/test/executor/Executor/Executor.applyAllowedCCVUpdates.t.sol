@@ -8,6 +8,8 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 
 contract Executor_applyAllowedCCVUpdates is ExecutorSetup {
   function test_applyAllowedCCVUpdates_AddNewCCV() public {
+    uint256 initLength = s_executor.getDestChains().length;
+
     address[] memory newCCVs = new address[](1);
     address newCCV = makeAddr("newCCV");
     newCCVs[0] = newCCV;
@@ -17,7 +19,7 @@ contract Executor_applyAllowedCCVUpdates is ExecutorSetup {
     s_executor.applyAllowedCCVUpdates(new address[](0), newCCVs, true);
 
     address[] memory currentCCVs = s_executor.getAllowedCCVs();
-    assertEq(currentCCVs.length, 2);
+    assertEq(currentCCVs.length, initLength + newCCVs.length);
     bool found = false;
     for (uint256 i = 0; i < currentCCVs.length; ++i) {
       if (currentCCVs[i] == newCCV) {
