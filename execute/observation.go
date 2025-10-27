@@ -311,7 +311,7 @@ func (p *Plugin) readMessagesForReport(
 	return msgs, nil
 }
 
-// createEmptyMessageWithIDAndSeqNum creates a message with just the sequence number set
+// createEmptyMessageWithIDAndSeqNum creates a message with just the message ID and sequence number set in the header.
 func createEmptyMessageWithIDAndSeqNum(msg cciptypes.Message) cciptypes.Message {
 	return cciptypes.Message{
 		Header: cciptypes.RampMessageHeader{

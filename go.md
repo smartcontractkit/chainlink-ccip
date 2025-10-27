@@ -69,7 +69,6 @@ flowchart LR
 	chainlink-ccip --> chainlink-protos/rmn/v1.6/go
 	click chainlink-ccip href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/chains/evm/deployment --> chainlink-ccip/deployment
-	chainlink-ccip/chains/evm/deployment --> chainlink-evm
 	click chainlink-ccip/chains/evm/deployment href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/chains/solana --> chainlink-ccip
 	chainlink-ccip/chains/solana --> chainlink-ccip/chains/solana/gobindings
@@ -81,6 +80,7 @@ flowchart LR
 	chainlink-ccip/cmd/carpenter --> chainlink-ccip
 	click chainlink-ccip/cmd/carpenter href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/deployment --> chainlink-deployments-framework
+	chainlink-ccip/deployment --> chainlink-evm
 	click chainlink-ccip/deployment href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/integration-tests --> chainlink-ccip/chains/evm/deployment
 	chainlink-ccip/integration-tests --> chainlink-ccip/chains/solana/deployment

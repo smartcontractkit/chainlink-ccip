@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
@@ -212,10 +211,4 @@ var ConnectChains = operations.NewOperation(
 
 func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
 	return chain.DeployerKey.PublicKey()
-}
-
-func DefaultParams() Params {
-	return Params{
-		EnableExecutionAfter: int64((20 * time.Minute).Seconds()),
-	}
 }
