@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -25,6 +26,15 @@ func CreateBasicFeeQuoterDestChainConfig() fee_quoter.DestChainConfig {
 		DefaultTxGasLimit:           200_000,
 		NetworkFeeUSDCents:          10,
 		ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c}, // EVM
+	}
+}
+
+func CreateBasicExecutorDestChainConfig() executor.RemoteChainConfig {
+	return executor.RemoteChainConfig{
+		UsdCentsFee:            50,
+		BaseExecGas:            100_000,
+		DestAddressLengthBytes: 20,
+		Enabled:                true,
 	}
 }
 
@@ -64,6 +74,11 @@ func CreateBasicContractParams() sequences.ContractParams {
 		Executor: sequences.ExecutorParams{
 			Version:       semver.MustParse("1.7.0"),
 			MaxCCVsPerMsg: 10,
+			DynamicConfig: executor.SetDynamicConfigArgs{
+				FeeAggregator:         common.HexToAddress("0x01"),
+				MinBlockConfirmations: 1,
+				CcvAllowlistEnabled:   false,
+			},
 		},
 		FeeQuoter: sequences.FeeQuoterParams{
 			Version:                        semver.MustParse("1.7.0"),
