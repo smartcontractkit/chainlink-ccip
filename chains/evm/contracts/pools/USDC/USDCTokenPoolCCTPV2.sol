@@ -18,10 +18,12 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 /// deposit function. Since both pools use a message transmitter proxy, which will use the same
 /// function selector, the releaseOrMint function does not need to be overridden.
 contract USDCTokenPoolCCTPV2 is USDCTokenPool {
+
   error InvalidMinFinalityThreshold(uint32 expected, uint32 got);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 got);
   error InvalidDepositHash(bytes32 expected, bytes32 got);
   error InvalidBurnToken(address expected, address got);
+  error InvalidMinFee(uint256 minFee);
 
   /// @dev CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;
@@ -64,6 +66,13 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       revert InvalidReceiver(lockOrBurnIn.receiver);
     }
 
+    try i_tokenMessenger.minFee() returns (uint256 minFee) {
+      if (minFee > MAX_FEE) {
+        revert InvalidMinFee(minFee);
+      }
+    } catch {}
+
+
     bytes32 decodedReceiver;
     // For EVM chains, the mintRecipient is not used, but is needed for Solana, where the mintRecipient will
     // be a PDA owned by the pool, and will forward the tokens to its final destination after minting.
@@ -77,7 +86,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     i_tokenMessenger.depositForBurn(
       lockOrBurnIn.amount,
       domain.domainIdentifier,
-      decodedReceiver,
+    decodedReceiver,
       address(i_token),
       domain.allowedCaller,
       MAX_FEE,
@@ -166,8 +175,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ///     * sender                     32         bytes32   44
   ///     * recipient                  32         bytes32   76
   ///     * destinationCaller          32         bytes32   108
-  ///     * minFinalityThreshold       32         uint32    140
-  ///     * finalityThresholdExecuted  32         uint32    144
+  ///     * minFinalityThreshold       4         uint32     140
+  ///     * finalityThresholdExecuted  4         uint32     144
   ///     * messageBody                dynamic    bytes     148
 
   /// @dev Message Body for USDC.

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../libraries/Pool.sol";
+import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -90,7 +91,9 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // No excluded tokens is the common path, as it means no migration has occured yet, and any released
     // tokens should come from the stored token balance of previously deposited tokens.
     if (excludedTokens == 0) {
-      if (localAmount > remoteConfig.tokenBalance) revert InsufficientLiquidity(remoteConfig.tokenBalance, localAmount);
+      if (localAmount > remoteConfig.tokenBalance) {
+        revert InsufficientLiquidity(remoteConfig.tokenBalance, localAmount);
+      }
 
       remoteConfig.tokenBalance -= localAmount;
 
@@ -115,8 +118,27 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }
 
+  /// @inheritdoc SiloedLockReleaseTokenPool
+  /// @dev This function is overridden to encode the LOCK_RELEASE_FLAG into the destPoolData, as the destination pool
+  /// will be a
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
+    // Call the parent contract's lockOrBurn function to get the base output. All functionality of this function
+    // is inherited from the parent contract except for the destPoolData.
+    Pool.LockOrBurnOutV1 memory baseOutput = super.lockOrBurn(lockOrBurnIn);
+
+    // Encode the LOCK_RELEASE_FLAG into the destPoolData
+    baseOutput.destPoolData = abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
+
+    return baseOutput;
+  }
+
   /// @dev This function is overridden to prevent providing liquidity to a chain that has already been migrated, and thus should use CCTP-proper instead of a Lock/Release mechanism.
-  function _provideLiquidity(uint64 remoteChainSelector, uint256 amount) internal override {
+  function _provideLiquidity(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal override {
     if (s_migratedChains.contains(remoteChainSelector)) {
       revert TokenLockingNotAllowedAfterMigration(remoteChainSelector);
     }
@@ -212,7 +234,10 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// an attestation on the source-chain to mint. In that instance it should use provided liquidity that was designated
   /// @dev This function should ONLY be called on the home chain, where tokens are locked, NOT on the remote chain
   /// and strict scrutiny should be applied to ensure that the amount of tokens excluded is accurate.
-  function excludeTokensFromBurn(uint64 remoteChainSelector, uint256 amount) external onlyOwner {
+  function excludeTokensFromBurn(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) external onlyOwner {
     if (s_proposedUSDCMigrationChain != remoteChainSelector) revert NoMigrationProposalPending();
 
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;

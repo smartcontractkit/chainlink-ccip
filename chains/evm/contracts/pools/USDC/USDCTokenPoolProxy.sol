@@ -72,7 +72,11 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
 
   string public constant override typeAndVersion = "USDCTokenPoolProxy 1.6.x-dev";
 
-  constructor(IERC20 token, PoolAddresses memory pools, address router) {
+  constructor(
+    IERC20 token,
+    PoolAddresses memory pools,
+    address router
+  ) {
     // Note: It is not required that every pool address be set, as this proxy may be deployed on a chain which does not
     // support a specific version of CCTP. As a result only the token and router are enforced to be non-zero.
     if (address(token) == address(0) || router == address(0)) {
@@ -146,7 +150,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
   function supportsInterface(
     bytes4 interfaceId
   ) public pure override returns (bool) {
-    return interfaceId == type(IPoolV1).interfaceId || interfaceId == type(IERC165).interfaceId;
+    return interfaceId == type(IPoolV1).interfaceId || interfaceId == Pool.CCIP_POOL_V1
+      || interfaceId == type(IERC165).interfaceId;
   }
 
   /// @inheritdoc IPoolV1
