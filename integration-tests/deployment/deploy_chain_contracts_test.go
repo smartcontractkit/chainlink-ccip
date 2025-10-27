@@ -105,7 +105,7 @@ var solanaContracts = map[string]datastore.ContractType{
 	"ccip_offramp":      datastore.ContractType(offrampops.ContractType),
 	"rmn_remote":        datastore.ContractType(rmnremoteops.ContractType),
 	"mcm":               datastore.ContractType(mcmsops.McmProgramType),
-	"timelock":          datastore.ContractType(mcmsops.TimelockProgramType),
+	"timelock":          datastore.ContractType(utils.TimelockProgramType),
 	"access_controller": datastore.ContractType(mcmsops.AccessControllerProgramType),
 }
 
