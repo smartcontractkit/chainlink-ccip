@@ -32,7 +32,6 @@ type DeployCommitteeVerifierInput struct {
 	ChainSelector     uint64
 	ExistingAddresses []datastore.AddressRef
 	Params            CommitteeVerifierParams
-	FeeQuoter         common.Address
 }
 
 var DeployCommitteeVerifier = cldf_ops.NewSequence(
@@ -53,7 +52,6 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ConstructorArgs{
 				DynamicConfig: committee_verifier.DynamicConfig{
-					FeeQuoter:      input.FeeQuoter,
 					FeeAggregator:  input.Params.FeeAggregator,
 					AllowlistAdmin: input.Params.AllowlistAdmin,
 				},
