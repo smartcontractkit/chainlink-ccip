@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 
 import {Router} from "../../../Router.sol";
-import {ERC165CheckerReverting} from "../../../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
