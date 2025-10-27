@@ -19,7 +19,10 @@ const (
 )
 
 var (
-	ErrZeroAddress = errors.New("address cannot be zero address")
+	ErrZeroAddress         = errors.New("address cannot be zero address")
+	ErrNoAdapterRegistered = func(family string, version *semver.Version) error {
+		return fmt.Errorf("no adapter registered for chain family %s and version %s", family, version.String())
+	}
 )
 
 func NewRegistererID(chainFamily string, version *semver.Version) string {
