@@ -123,7 +123,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   struct CustomFinalityConfig {
-    uint16 minBlockConfirmation; // Minimum block conformation on the source chain that token issuers
+    uint16 minBlockConfirmation; // Minimum block confirmation on the source chain that token issuers
     //                              consider sufficiently secure (0 means the default finality).
 
     // Separate buckets provide isolated rate limits for custom-finality transfers, as their risk profiles differ from default transfers.
@@ -1064,7 +1064,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return s_tokenTransferFeeConfig[destChainSelector];
   }
 
-  /// @Inheritdoc IPoolV2
+  /// @inheritdoc IPoolV2
   /// @notice Returns the pool fee parameters that will apply to a transfer.
   function getFee(
     uint64 destChainSelector,
