@@ -57,3 +57,17 @@ var OffRampApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParam
 		return offRamp.ApplySourceChainConfigUpdates(opts, args)
 	},
 })
+
+var OffRampSetOcr3 = contract.NewWrite(contract.WriteParams[[]offramp.MultiOCR3BaseOCRConfigArgs, *offramp.OffRamp]{
+	Name:            "offramp:set-ocr3",
+	Version:         Version,
+	Description:     "Sets the OCR3 configuration on the OffRamp 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     offramp.OffRampABI,
+	NewContract:     offramp.NewOffRamp,
+	IsAllowedCaller: contract.OnlyOwner[*offramp.OffRamp, []offramp.MultiOCR3BaseOCRConfigArgs],
+	Validate:        func([]offramp.MultiOCR3BaseOCRConfigArgs) error { return nil },
+	CallContract: func(offRamp *offramp.OffRamp, opts *bind.TransactOpts, args []offramp.MultiOCR3BaseOCRConfigArgs) (*types.Transaction, error) {
+		return offRamp.SetOCR3Configs(opts, args)
+	},
+})

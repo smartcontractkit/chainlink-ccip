@@ -26,6 +26,7 @@ var (
 type Deployer interface {
 	DeployChainContracts() *cldf_ops.Sequence[ContractDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployMCMS() *cldf_ops.Sequence[MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SetOCR3Config() *cldf_ops.Sequence[SetOCR3ConfigInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 type DeployerRegistry struct {
