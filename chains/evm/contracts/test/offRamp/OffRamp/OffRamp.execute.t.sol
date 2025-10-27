@@ -72,6 +72,7 @@ contract OffRamp_execute is OffRampSetup {
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
       //
       finality: 0,
+      gasLimit: 200_000,
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "",

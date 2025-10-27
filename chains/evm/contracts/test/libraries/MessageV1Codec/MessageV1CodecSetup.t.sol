@@ -21,6 +21,7 @@ contract MessageV1CodecSetup is Test {
       onRampAddress: abi.encodePacked(address(0x1234567890123456789012345678901234567890)),
       offRampAddress: abi.encodePacked(address(0x0987654321098765432109876543210987654321)),
       finality: 1000,
+      gasLimit: 200000,
       sender: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
       receiver: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
       destBlob: "test blob",
@@ -35,6 +36,7 @@ contract MessageV1CodecSetup is Test {
       sourcePoolAddress: hex"1234567890abcdef",
       sourceTokenAddress: hex"abcdef1234567890",
       destTokenAddress: hex"fedcba0987654321",
+      tokenReceiver: hex"aabbccddeeff",
       extraData: hex"deadbeef"
     });
   }
@@ -50,6 +52,7 @@ contract MessageV1CodecSetup is Test {
     assertEq(expected.onRampAddress, actual.onRampAddress, "onRampAddress mismatch");
     assertEq(expected.offRampAddress, actual.offRampAddress, "offRampAddress mismatch");
     assertEq(expected.finality, actual.finality, "finality mismatch");
+    assertEq(expected.gasLimit, actual.gasLimit, "gasLimit mismatch");
     assertEq(expected.sender, actual.sender, "sender mismatch");
     assertEq(expected.receiver, actual.receiver, "receiver mismatch");
     assertEq(expected.destBlob, actual.destBlob, "destBlob mismatch");
@@ -82,6 +85,11 @@ contract MessageV1CodecSetup is Test {
       expected.destTokenAddress,
       actual.destTokenAddress,
       string(abi.encodePacked("tokenTransfer[", indexStr, "].destTokenAddress mismatch"))
+    );
+    assertEq(
+      expected.tokenReceiver,
+      actual.tokenReceiver,
+      string(abi.encodePacked("tokenTransfer[", indexStr, "].tokenReceiver mismatch"))
     );
     assertEq(
       expected.extraData, actual.extraData, string(abi.encodePacked("tokenTransfer[", indexStr, "].extraData mismatch"))

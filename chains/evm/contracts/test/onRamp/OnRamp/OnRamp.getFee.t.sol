@@ -119,8 +119,15 @@ contract OnRamp_getFee is OnRampSetup {
     Client.CCV[] memory ccvs = new Client.CCV[](1);
     ccvs[0] = Client.CCV({ccvAddress: verifier, args: ""});
 
-    Client.EVMExtraArgsV3 memory extraArgsV3 =
-      Client.EVMExtraArgsV3({ccvs: ccvs, finalityConfig: 12, executor: customExecutor, executorArgs: "", tokenArgs: ""});
+    Client.EVMExtraArgsV3 memory extraArgsV3 = Client.EVMExtraArgsV3({
+      ccvs: ccvs,
+      finalityConfig: 12,
+      gasLimit: GAS_LIMIT,
+      executor: customExecutor,
+      executorArgs: "",
+      tokenReceiver: "",
+      tokenArgs: ""
+    });
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgsV3));

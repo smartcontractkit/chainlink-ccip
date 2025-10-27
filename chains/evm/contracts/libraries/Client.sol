@@ -33,8 +33,10 @@ library Client {
     /// @notice The finality config, 0 means the default finality that the CCV considers final. Any non-zero value means
     /// a block depth.
     uint16 finalityConfig;
+    uint32 gasLimit;
     address executor;
     bytes executorArgs;
+    bytes tokenReceiver;
     bytes tokenArgs;
   }
 
@@ -45,7 +47,6 @@ library Client {
   }
 
   struct SVMExecutorArgsV1 {
-    bytes32 tokenReceiver;
     // TODO Use ATA or raw account flag
     bool useATA;
     uint64 accountIsWritableBitmap;
@@ -55,7 +56,6 @@ library Client {
   }
 
   struct SuiExecutorArgsV1 {
-    bytes32 tokenReceiver;
     bytes32[] receiverObjectIds;
   }
 

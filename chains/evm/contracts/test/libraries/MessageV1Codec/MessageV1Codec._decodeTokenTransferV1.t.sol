@@ -24,6 +24,7 @@ contract MessageV1Codec__decodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: "",
       sourceTokenAddress: "",
       destTokenAddress: "",
+      tokenReceiver: "",
       extraData: ""
     });
 
@@ -54,6 +55,7 @@ contract MessageV1Codec__decodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: maxAddressLength,
       sourceTokenAddress: maxAddressLength,
       destTokenAddress: maxAddressLength,
+      tokenReceiver: maxAddressLength,
       extraData: maxExtraDataLength
     });
 
@@ -75,12 +77,14 @@ contract MessageV1Codec__decodeTokenTransferV1 is MessageV1CodecSetup {
     bytes memory sourcePoolAddress,
     bytes memory sourceTokenAddress,
     bytes memory destTokenAddress,
+    bytes memory tokenReceiver,
     bytes memory extraData
   ) public view {
     // Bound inputs to valid ranges
     vm.assume(sourcePoolAddress.length <= type(uint8).max);
     vm.assume(sourceTokenAddress.length <= type(uint8).max);
     vm.assume(destTokenAddress.length <= type(uint8).max);
+    vm.assume(tokenReceiver.length <= type(uint8).max);
     vm.assume(extraData.length <= type(uint16).max);
 
     MessageV1Codec.TokenTransferV1 memory originalTransfer = MessageV1Codec.TokenTransferV1({
@@ -88,6 +92,7 @@ contract MessageV1Codec__decodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: sourcePoolAddress,
       sourceTokenAddress: sourceTokenAddress,
       destTokenAddress: destTokenAddress,
+      tokenReceiver: tokenReceiver,
       extraData: extraData
     });
 
@@ -98,6 +103,7 @@ contract MessageV1Codec__decodeTokenTransferV1 is MessageV1CodecSetup {
     assertEq(keccak256(sourcePoolAddress), keccak256(decoded.sourcePoolAddress));
     assertEq(keccak256(sourceTokenAddress), keccak256(decoded.sourceTokenAddress));
     assertEq(keccak256(destTokenAddress), keccak256(decoded.destTokenAddress));
+    assertEq(keccak256(tokenReceiver), keccak256(decoded.tokenReceiver));
     assertEq(keccak256(extraData), keccak256(decoded.extraData));
   }
 
@@ -224,12 +230,46 @@ contract MessageV1Codec__decodeTokenTransferV1 is MessageV1CodecSetup {
     s_helper.decodeTokenTransferV1(partialData);
   }
 
-  function test__decodeTokenTransferV1_RevertWhen_TruncatedAtExtraDataLength() public {
-    bytes memory partialData = new bytes(1 + 32 + 1 + 8 + 1 + 8 + 1 + 8 + 1); // Missing extraData length (2 bytes needed)
+  function test__decodeTokenTransferV1_RevertWhen_TruncatedAtTokenReceiverLength() public {
+    bytes memory partialData = new bytes(1 + 32 + 1 + 8 + 1 + 8 + 1 + 8); // Missing tokenReceiver length
     partialData[0] = 0x01; // Valid version
     partialData[33] = 0x08; // Source pool length = 8
     partialData[42] = 0x08; // Source token length = 8
     partialData[51] = 0x08; // Dest token length = 8
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MessageV1Codec.InvalidDataLength.selector,
+        MessageV1Codec.EncodingErrorLocation.TOKEN_TRANSFER_TOKEN_RECEIVER_LENGTH
+      )
+    );
+    s_helper.decodeTokenTransferV1(partialData);
+  }
+
+  function test__decodeTokenTransferV1_RevertWhen_TruncatedAtTokenReceiverContent() public {
+    bytes memory partialData = new bytes(1 + 32 + 1 + 8 + 1 + 8 + 1 + 8 + 1 + 4); // Missing tokenReceiver content
+    partialData[0] = 0x01; // Valid version
+    partialData[33] = 0x08; // Source pool length = 8
+    partialData[42] = 0x08; // Source token length = 8
+    partialData[51] = 0x08; // Dest token length = 8
+    partialData[60] = 0x08; // Token receiver length = 8, but only 4 bytes provided
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MessageV1Codec.InvalidDataLength.selector,
+        MessageV1Codec.EncodingErrorLocation.TOKEN_TRANSFER_TOKEN_RECEIVER_CONTENT
+      )
+    );
+    s_helper.decodeTokenTransferV1(partialData);
+  }
+
+  function test__decodeTokenTransferV1_RevertWhen_TruncatedAtExtraDataLength() public {
+    bytes memory partialData = new bytes(1 + 32 + 1 + 8 + 1 + 8 + 1 + 8 + 1 + 8 + 1); // Missing extraData length (2 bytes needed)
+    partialData[0] = 0x01; // Valid version
+    partialData[33] = 0x08; // Source pool length = 8
+    partialData[42] = 0x08; // Source token length = 8
+    partialData[51] = 0x08; // Dest token length = 8
+    partialData[60] = 0x08; // Token receiver length = 8
 
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -240,13 +280,14 @@ contract MessageV1Codec__decodeTokenTransferV1 is MessageV1CodecSetup {
   }
 
   function test__decodeTokenTransferV1_RevertWhen_TruncatedAtExtraDataContent() public {
-    bytes memory partialData = new bytes(1 + 32 + 1 + 8 + 1 + 8 + 1 + 8 + 2 + 5); // Missing extraData content
+    bytes memory partialData = new bytes(1 + 32 + 1 + 8 + 1 + 8 + 1 + 8 + 1 + 8 + 2 + 5); // Missing extraData content
     partialData[0] = 0x01; // Valid version
     partialData[33] = 0x08; // Source pool length = 8
     partialData[42] = 0x08; // Source token length = 8
     partialData[51] = 0x08; // Dest token length = 8
-    partialData[60] = 0x00; // Extra data length high byte = 0
-    partialData[61] = 0x0A; // Extra data length low byte = 10, but only 5 bytes provided
+    partialData[60] = 0x08; // Token receiver length = 8
+    partialData[69] = 0x00; // Extra data length high byte = 0
+    partialData[70] = 0x0A; // Extra data length low byte = 10, but only 5 bytes provided
 
     vm.expectRevert(
       abi.encodeWithSelector(

@@ -54,8 +54,10 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
       ccvs: userRequiredCCVs,
       finalityConfig: 0,
+      gasLimit: GAS_LIMIT,
       executor: makeAddr("userExecutor"),
       executorArgs: "execArgs",
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       tokenArgs: "tokenArgs"
     });
 

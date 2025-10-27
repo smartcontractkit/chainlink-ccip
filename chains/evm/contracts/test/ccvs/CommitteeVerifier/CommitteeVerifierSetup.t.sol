@@ -58,6 +58,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
       onRampAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
       finality: 100,
+      gasLimit: 200000,
       sender: abi.encodePacked(address(0x3333333333333333333333333333333333333333)),
       receiver: abi.encodePacked(address(0x4444444444444444444444444444444444444444)),
       destBlob: "",

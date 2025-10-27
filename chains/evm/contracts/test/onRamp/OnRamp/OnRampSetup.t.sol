@@ -79,6 +79,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       onRampAddress: abi.encodePacked(address(s_onRamp)),
       offRampAddress: abi.encodePacked(address(s_offRampOnRemoteChain)),
       finality: 0,
+      gasLimit: GAS_LIMIT,
       sender: abi.encodePacked(originalSender),
       receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
       destBlob: "",
@@ -93,6 +94,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         sourcePoolAddress: abi.encodePacked(s_sourcePoolByToken[token]),
         sourceTokenAddress: abi.encodePacked(token),
         destTokenAddress: abi.encodePacked(s_destTokenBySourceToken[token]),
+        tokenReceiver: abi.encodePacked(abi.decode(message.receiver, (address))),
         extraData: abi.encode(IERC20Metadata(token).decimals())
       });
     }
@@ -104,7 +106,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     if (isLegacyExtraArgs) {
       receipts = _computeVerifierReceiptsLegacyArgs(message, destChainConfig.defaultCCVs);
     } else {
-      receipts = this.computeVerifierReceiptsArgsV3(message, destChainConfig.defaultCCVs);
+      (receipts, messageV1.gasLimit) = this.computeVerifierReceiptsArgsV3(message, destChainConfig.defaultCCVs);
     }
     receipts[receipts.length - 1] = OnRamp.Receipt({
       issuer: destChainConfig.defaultExecutor,
@@ -128,7 +130,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   function computeVerifierReceiptsArgsV3(
     Client.EVM2AnyMessage calldata message,
     address[] calldata defaultCCVs
-  ) external view returns (OnRamp.Receipt[] memory verifierReceipts) {
+  ) external view returns (OnRamp.Receipt[] memory verifierReceipts, uint32 gasLimit) {
     Client.EVMExtraArgsV3 memory extraArgsV3 = abi.decode(message.extraArgs[4:], (Client.EVMExtraArgsV3));
     uint256 userDefinedCCVCount = extraArgsV3.ccvs.length;
 
@@ -186,7 +188,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       });
     }
 
-    return verifierReceipts;
+    return (verifierReceipts, extraArgsV3.gasLimit);
   }
 
   function _computeVerifierReceiptsLegacyArgs(
@@ -228,8 +230,10 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     return Client.EVMExtraArgsV3({
       ccvs: ccvs,
       finalityConfig: 12,
+      gasLimit: GAS_LIMIT,
       executor: address(0), // No executor specified.
       executorArgs: "",
+      tokenReceiver: TOKEN_RECEIVER,
       tokenArgs: ""
     });
   }

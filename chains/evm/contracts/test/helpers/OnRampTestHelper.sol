@@ -12,7 +12,7 @@ contract OnRampTestHelper is OnRamp {
   function parseExtraArgsWithDefaults(
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) external pure returns (Client.EVMExtraArgsV3 memory) {
+  ) external view returns (Client.EVMExtraArgsV3 memory) {
     return _parseExtraArgsWithDefaults(destChainConfig, extraArgs);
   }
 

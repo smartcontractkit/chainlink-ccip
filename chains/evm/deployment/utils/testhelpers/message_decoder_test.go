@@ -13,7 +13,7 @@ import (
 
 func TestDecodeString(t *testing.T) {
 	// Load a hex-encoded CCIP message (v1) from a string
-	hexMessage := "0100000000000000010000000000000002000000000000000114912cf1ee1d4a3a302dfc64d70bd023e6839a5dd814baa5fa2b829e9c90d06cd4824ccb54f550386ebc00001400007e64e1fb0c487f25dd6d3601ff6af8d32e4e1400007e64e1fb0c487f25dd6d3601ff6af8d32e4e00000082010000000000000000000000000000000000000000000000000de0b6b3a764000014ce4ec7b524851e51d5c55eefbbb8e58e8ce2515f14e55c1374bc6a38cea4e86f3a7e5b1cf17db5418514e2c2bb2f43b91f65b5519708e340310394c72d8f00200000000000000000000000000000000000000000000000000000000000000012000d65326520746573742064617461"
+	hexMessage := "0100000000000000010000000000000002000000000000000114912cf1ee1d4a3a302dfc64d70bd023e6839a5dd814baa5fa2b829e9c90d06cd4824ccb54f550386ebc000000030d401400007e64e1fb0c487f25dd6d3601ff6af8d32e4e1400007e64e1fb0c487f25dd6d3601ff6af8d32e4e000000a3010000000000000000000000000000000000000000000000000de0b6b3a764000014ce4ec7b524851e51d5c55eefbbb8e58e8ce2515f14e55c1374bc6a38cea4e86f3a7e5b1cf17db5418514e2c2bb2f43b91f65b5519708e340310394c72d8f2000000000000000000000000000007e64e1fb0c487f25dd6d3601ff6af8d32e4e00200000000000000000000000000000000000000000000000000000000000000012000d65326520746573742064617461,,"
 	encodedMessage, err := hex.DecodeString(hexMessage)
 	require.NoError(t, err, "Failed to decode hex message")
 
@@ -37,6 +37,7 @@ type MessageV1 struct {
 	OnRampAddress       []byte
 	OffRampAddress      []byte
 	Finality            uint16
+	GasLimit            uint32
 	Sender              []byte
 	Receiver            []byte
 	DestBlob            []byte
@@ -51,6 +52,7 @@ type TokenTransferV1 struct {
 	SourcePoolAddress  []byte
 	SourceTokenAddress []byte
 	DestTokenAddress   []byte
+	TokenReceiver      []byte
 	ExtraData          []byte
 }
 
@@ -113,6 +115,13 @@ func DecodeMessageV1(encoded []byte) (*MessageV1, error) {
 	}
 	msg.Finality = binary.BigEndian.Uint16(encoded[offset : offset+2])
 	offset += 2
+
+	// gasLimit (4 bytes, big endian)
+	if offset+4 > len(encoded) {
+		return nil, fmt.Errorf("gasLimit out of bounds")
+	}
+	msg.GasLimit = binary.BigEndian.Uint32(encoded[offset : offset+4])
+	offset += 4
 
 	// senderLength and sender
 	if offset >= len(encoded) {
@@ -255,6 +264,19 @@ func DecodeTokenTransferV1(encoded []byte, offset int) (*TokenTransferV1, int, e
 	copy(tt.DestTokenAddress, encoded[offset:offset+destTokenLen])
 	offset += destTokenLen
 
+	// tokenReceiverLength and tokenReceiver
+	if offset >= len(encoded) {
+		return nil, 0, fmt.Errorf("tokenReceiver length out of bounds")
+	}
+	tokenReceiverLen := int(encoded[offset])
+	offset++
+	if offset+tokenReceiverLen > len(encoded) {
+		return nil, 0, fmt.Errorf("tokenReceiver address out of bounds")
+	}
+	tt.TokenReceiver = make([]byte, tokenReceiverLen)
+	copy(tt.TokenReceiver, encoded[offset:offset+tokenReceiverLen])
+	offset += tokenReceiverLen
+
 	// extraDataLength and extraData
 	if offset+2 > len(encoded) {
 		return nil, 0, fmt.Errorf("extraData length out of bounds")
@@ -285,6 +307,7 @@ func PrettyPrintMessage(msg *MessageV1) string {
 
 	s += "User Controlled Data:\n"
 	s += fmt.Sprintf("  Finality:              %d\n", msg.Finality)
+	s += fmt.Sprintf("  Gas Limit:             %d\n", msg.GasLimit)
 	s += fmt.Sprintf("  Sender:                %s\n", formatAddress(msg.Sender))
 	s += fmt.Sprintf("  Receiver:              %s\n", formatAddress(msg.Receiver))
 	s += fmt.Sprintf("  Dest Blob:             %s (%d bytes)\n", formatHex(msg.DestBlob), len(msg.DestBlob))
@@ -298,6 +321,7 @@ func PrettyPrintMessage(msg *MessageV1) string {
 		s += fmt.Sprintf("    Source Pool:         %s\n", formatAddress(tt.SourcePoolAddress))
 		s += fmt.Sprintf("    Source Token:        %s\n", formatAddress(tt.SourceTokenAddress))
 		s += fmt.Sprintf("    Dest Token:          %s\n", formatAddress(tt.DestTokenAddress))
+		s += fmt.Sprintf("    Token Receiver:      %s\n", formatAddress(tt.TokenReceiver))
 		s += fmt.Sprintf("    Extra Data:          %s (%d bytes)\n", formatHex(tt.ExtraData), len(tt.ExtraData))
 	}
 	s += "\n"
@@ -370,6 +394,11 @@ func TestMessageDecoding(t *testing.T) {
 	binary.BigEndian.PutUint16(finality, 100)
 	encoded = append(encoded, finality...)
 
+	// Gas Limit (4 bytes): 200000
+	gasLimit := make([]byte, 4)
+	binary.BigEndian.PutUint32(gasLimit, 200000)
+	encoded = append(encoded, gasLimit...)
+
 	// Sender Address (1 byte length + 20 bytes address)
 	senderAddr := common.HexToAddress("0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa")
 	encoded = append(encoded, 20) // length
@@ -413,6 +442,11 @@ func TestMessageDecoding(t *testing.T) {
 	tokenTransfer = append(tokenTransfer, 20) // length
 	tokenTransfer = append(tokenTransfer, destTokenAddr.Bytes()...)
 
+	// Token Receiver Address (1 byte length + 20 bytes address)
+	tokenReceiverAddr := common.HexToAddress("0x4444444444444444444444444444444444444444")
+	tokenTransfer = append(tokenTransfer, 20) // length
+	tokenTransfer = append(tokenTransfer, tokenReceiverAddr.Bytes()...)
+
 	// Extra Data (2 bytes length + 4 bytes content)
 	extraData := []byte{0xde, 0xad, 0xbe, 0xef}
 	extraDataLen := make([]byte, 2)
@@ -447,6 +481,7 @@ func TestMessageDecoding(t *testing.T) {
 		require.Equal(t, onRampAddr.Bytes(), msg.OnRampAddress)
 		require.Equal(t, offRampAddr.Bytes(), msg.OffRampAddress)
 		require.Equal(t, uint16(100), msg.Finality)
+		require.Equal(t, uint32(200000), msg.GasLimit)
 		require.Equal(t, senderAddr.Bytes(), msg.Sender)
 		require.Equal(t, receiverAddr.Bytes(), msg.Receiver)
 		require.Empty(t, msg.DestBlob)
@@ -459,6 +494,7 @@ func TestMessageDecoding(t *testing.T) {
 		require.Equal(t, sourcePoolAddr.Bytes(), tt.SourcePoolAddress)
 		require.Equal(t, sourceTokenAddr.Bytes(), tt.SourceTokenAddress)
 		require.Equal(t, destTokenAddr.Bytes(), tt.DestTokenAddress)
+		require.Equal(t, tokenReceiverAddr.Bytes(), tt.TokenReceiver)
 		require.Equal(t, extraData, tt.ExtraData)
 
 		// Verify data payload
@@ -491,6 +527,9 @@ func TestMessageDecoding(t *testing.T) {
 
 		// Finality
 		minEncoded = append(minEncoded, finality...)
+
+		// Gas Limit
+		minEncoded = append(minEncoded, gasLimit...)
 
 		// Sender and receiver
 		minEncoded = append(minEncoded, 20)

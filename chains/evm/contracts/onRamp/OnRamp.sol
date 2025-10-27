@@ -111,7 +111,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
   struct Receipt {
-    address issuer; // ───────────╮ The address of the entity that issued the receipt.
+    // The address of the entity that issued the receipt. For token receipts this is the token address, not the pool.
+    // for verifiers and executors, this is the user specified value, even if the call is ultimately handled by some
+    // underlying contract.
+    address issuer; // ───────────╮
     uint64 destGasLimit; //       │ The gas limit for the actions taken on the destination chain for this entity.
     uint32 destBytesOverhead; // ─╯ The byte overhead for the actions taken on the destination chain for this entity.
     uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
@@ -192,6 +195,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       onRampAddress: abi.encodePacked(address(this)),
       offRampAddress: destChainConfig.offRamp,
       finality: resolvedExtraArgs.finalityConfig,
+      gasLimit: resolvedExtraArgs.gasLimit,
       sender: abi.encodePacked(originalSender),
       // The user encodes the receiver with abi.encode when creating EVM2AnyMessage
       // whereas MessageV1 expects just the raw bytes, so we strip the first 12 bytes.
@@ -231,14 +235,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     if (message.tokenAmounts.length != 0) {
       if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
-      // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
-      bytes memory tokenReceiver =
-        IFeeQuoter(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
-      if (tokenReceiver.length == 0) {
-        tokenReceiver = abi.encode(message.receiver);
-      }
       newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
-        message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
+        message.tokenAmounts[0],
+        destChainSelector,
+        resolvedExtraArgs.tokenReceiver.length > 0 ? resolvedExtraArgs.tokenReceiver : message.receiver,
+        originalSender,
+        resolvedExtraArgs.tokenArgs
       );
     }
 
@@ -342,7 +344,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function _parseExtraArgsWithDefaults(
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) internal pure returns (Client.EVMExtraArgsV3 memory resolvedArgs) {
+  ) internal view returns (Client.EVMExtraArgsV3 memory resolvedArgs) {
     if (extraArgs.length >= 4 && bytes4(extraArgs[0:4]) == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV3));
 
@@ -371,6 +373,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
         resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
       }
+
+      // The tokenReceiver is parsed from the old SVM/Sui extraArgs
+      resolvedArgs.tokenReceiver = IFeeQuoter(s_dynamicConfig.feeQuoter).resolveTokenReceiver(extraArgs);
     }
 
     // When users don't specify an executor, default executor is chosen.
@@ -533,6 +538,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       destTokenAddress: IFeeQuoter(s_dynamicConfig.feeQuoter).validateEncodedAddressAndEncodePacked(
         destChainSelector, poolReturnData.destTokenAddress
       ),
+      tokenReceiver: receiver,
       extraData: poolReturnData.destPoolData
     });
   }
