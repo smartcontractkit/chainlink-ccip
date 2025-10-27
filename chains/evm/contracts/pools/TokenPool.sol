@@ -1064,11 +1064,13 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return s_tokenTransferFeeConfig[destChainSelector];
   }
 
+  /// @Inheritdoc IPoolV2
   /// @notice Returns the pool fee parameters that will apply to a transfer.
   function getFee(
-    address, // localToken
     uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata, // message
+    address, // localToken
+    uint256, // amount
+    address, // feeToken
     uint16 finality,
     bytes calldata // tokenArgs
   )

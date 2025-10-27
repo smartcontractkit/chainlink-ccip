@@ -79,14 +79,21 @@ interface IPoolV2 is IPoolV1 {
   ) external view returns (TokenTransferFeeConfig memory feeConfig);
 
   /// @notice Returns the pool fee parameters that will apply to a transfer.
+  /// @param destChainSelector The destination lane selector.
+  /// @param localToken The local asset being transferred.
+  /// @param amount The amount of tokens being bridged on this lane.
+  /// @param feeToken The token used to pay the execution fee (crumbs are charged in this denomination).
+  /// @param finality Requested finality depth.
+  /// @param tokenArgs Opaque token arguments supplied by the caller.
   /// @return feeUSDCents Flat fee charged in USD cents (crumbs) for this transfer.
   /// @return destGasOverhead Destination gas charged for accounting in the cost model.
   /// @return destBytesOverhead Destination calldata size attributed to the transfer.
   /// @return tokenFeeBps Bps charged in token units. Value of zero implies no in-token fee.
   function getFee(
-    address localToken,
     uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata message,
+    address localToken,
+    uint256 amount,
+    address feeToken,
     uint16 finality,
     bytes calldata tokenArgs
   ) external view returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps);

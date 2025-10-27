@@ -3,14 +3,12 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
-import {Client} from "../../../libraries/Client.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
 contract TokenPoolV2_getFee is TokenPoolV2Setup {
   function test_getFee_DefaultFinality() public {
-    Client.EVM2AnyMessage memory message = _buildMessage();
     uint16 defaultFeeBps = 250; // 2.50%
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
@@ -28,8 +26,9 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
     vm.startPrank(OWNER);
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
 
+    uint256 amount = 1_000e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
+      s_tokenPool.getFee(DEST_CHAIN_SELECTOR, address(s_token), amount, address(0), 0, "");
 
     assertEq(usdFeeCents, feeConfig.defaultFinalityFeeUSDCents);
     assertEq(destGasOverhead, feeConfig.destGasOverhead);
@@ -38,7 +37,6 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
   }
 
   function test_getFee_CustomFinality() public {
-    Client.EVM2AnyMessage memory message = _buildMessage();
     uint16 customFeeBps = 400; // 4%
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 60_000,
@@ -56,8 +54,9 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
     vm.startPrank(OWNER);
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
 
+    uint256 amount = 1_500e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, message, 5, "");
+      s_tokenPool.getFee(DEST_CHAIN_SELECTOR, address(s_token), amount, address(0), 5, "");
 
     assertEq(usdFeeCents, feeConfig.customFinalityFeeUSDCents);
     assertEq(destGasOverhead, feeConfig.destGasOverhead);
@@ -66,23 +65,13 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
   }
 
   function test_getFee_DisabledConfig() public view {
-    Client.EVM2AnyMessage memory message = _buildMessage();
-
+    uint256 amount = 777e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
+      s_tokenPool.getFee(DEST_CHAIN_SELECTOR, address(s_token), amount, address(0), 0, "");
 
     assertEq(usdFeeCents, 0);
     assertEq(destGasOverhead, 0);
     assertEq(destBytesOverhead, 0);
     assertEq(tokenFeeBps, 0);
-  }
-
-  function _buildMessage() internal pure returns (Client.EVM2AnyMessage memory message) {
-    message.receiver = abi.encode(address(0xBEEF));
-    message.data = "";
-    message.tokenAmounts = new Client.EVMTokenAmount[](0);
-    message.feeToken = address(0);
-    message.extraArgs = "";
-    return message;
   }
 }
