@@ -82,7 +82,7 @@ interface IPoolV2 is IPoolV1 {
   /// @param destChainSelector The destination lane selector.
   /// @param localToken The local asset being transferred.
   /// @param amount The amount of tokens being bridged on this lane.
-  /// @param feeToken The token used to pay the execution fee (crumbs are charged in this denomination).
+  /// @param feeToken The token used to pay feeUSDCents.
   /// @param blockConfirmationRequested Requested block confirmation.
   /// @param tokenArgs Opaque token arguments supplied by the caller.
   /// @return feeUSDCents Flat fee charged in USD cents (crumbs) for this transfer.
