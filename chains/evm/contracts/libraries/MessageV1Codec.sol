@@ -11,6 +11,23 @@ library MessageV1Codec {
   error InvalidEncodingVersion(uint8 version);
 
   uint256 public constant MAX_NUMBER_OF_TOKENS = 1;
+  // Base size of a MessageV1 without variable length fields.
+  uint256 public constant MESSAGE_V1_BASE_SIZE = 1 + 8 + 8 + 8 + 1 + 1 + 2 + 1 + 1 + 2 + 2 + 2;
+  // The base size plus 20 bytes for sender and 20 bytes for onRamp addresses.
+  // To be added:
+  // - receiver, offRamp and destBlob are dest chain specific
+  // - data is user specified
+  // - token transfer is optional and has variable size fields
+  uint256 public constant MESSAGE_V1_EVM_SOURCE_BASE_SIZE = MESSAGE_V1_BASE_SIZE + 20 + 20;
+  uint256 public constant MESSAGE_V1_REMOTE_CHAIN_ADDRESSES = 2;
+
+  // Base size of a TokenTransferV1 without variable length fields.
+  uint256 public constant TOKEN_TRANSFER_V1_BASE_SIZE = 32 + 1 + 1 + 1 + 2;
+  // The base size plus 20 bytes for sourcePool, 20 bytes for sourceToken.
+  // To be added:
+  // - destToken is dest chain specific
+  // - extraData is a variable length field that is billed separately
+  uint256 public constant TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE = TOKEN_TRANSFER_V1_BASE_SIZE + 20 + 20;
 
   enum EncodingErrorLocation {
     // Message-level components.
