@@ -21,20 +21,22 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     uint16 minBlockConfirmation = 8;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
-    TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
+    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.CustomBlockConfirmationRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(minBlockConfirmation, rateLimitArgs);
+    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(minBlockConfirmation, rateLimitArgs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
     vm.expectEmit();
-    emit TokenPool.CustomFinalityOutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
+    emit TokenPool.CustomBlockConfirmationOutboundRateLimitConsumed(
+      DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount
+    );
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, minBlockConfirmation);
@@ -61,15 +63,15 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
   function _applyCustomFinalityConfig(
     uint16 minBlockConfirmation
   ) internal {
-    TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
+    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.CustomBlockConfirmationRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24})
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(minBlockConfirmation, rateLimitArgs);
+    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(minBlockConfirmation, rateLimitArgs);
   }
 
   function _buildLockOrBurnIn(

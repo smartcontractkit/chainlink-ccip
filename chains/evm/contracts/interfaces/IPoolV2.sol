@@ -10,14 +10,14 @@ import {Pool} from "../libraries/Pool.sol";
 /// Each pool type handles a different child token model e.g. lock/release, mint/burn.
 interface IPoolV2 is IPoolV1 {
   struct TokenTransferFeeConfig {
-    uint32 destGasOverhead; // ──────────────╮ Gas charged to execute the token transfer on the destination chain.
-    uint32 destBytesOverhead; //             │ Data availability bytes.
-    uint32 defaultFinalityFeeUSDCents; //    │ Fee to charge for default finality token transfer, multiples of 0.01 USD.
-    uint32 customFinalityFeeUSDCents; //     │ Fee to charge for custom finality token transfer, multiples of 0.01 USD.
-    //                                       │ The following two fee is deducted from the transferred asset, not added on top.
-    uint16 defaultFinalityTransferFeeBps; // │ Fee in basis points for default finality transfers [0-10_000].
-    uint16 customFinalityTransferFeeBps; //  │ Fee in basis points for custom finality transfers [0-10_000].
-    bool isEnabled; // ──────────────────────╯ Whether this token has custom transfer fees.
+    uint32 destGasOverhead; // ───────────────────────╮ Gas charged to execute the token transfer on the destination chain.
+    uint32 destBytesOverhead; //                      │ Data availability bytes.
+    uint32 defaultBlockConfirmationFeeUSDCents; //    │ Fee to charge for token transfer with default block confirmation, multiples of 0.01 USD.
+    uint32 customBlockConfirmationFeeUSDCents; //     │ Fee to charge for token transfer with custom block confirmation, multiples of 0.01 USD.
+    //                                                │ The following two fee is deducted from the transferred asset, not added on top.
+    uint16 defaultBlockConfirmationTransferFeeBps; // │ Fee in basis points for default finality transfers [0-10_000].
+    uint16 customBlockConfirmationTransferFeeBps; //  │ Fee in basis points for custom finality transfers [0-10_000].
+    bool isEnabled; // ───────────────────────────────╯ Whether this token has custom transfer fees.
   }
 
   enum CCVDirection {
@@ -83,7 +83,7 @@ interface IPoolV2 is IPoolV1 {
   /// @param localToken The local asset being transferred.
   /// @param amount The amount of tokens being bridged on this lane.
   /// @param feeToken The token used to pay the execution fee (crumbs are charged in this denomination).
-  /// @param finality Requested finality depth.
+  /// @param blockConfirmationRequested Requested block confirmation.
   /// @param tokenArgs Opaque token arguments supplied by the caller.
   /// @return feeUSDCents Flat fee charged in USD cents (crumbs) for this transfer.
   /// @return destGasOverhead Destination gas charged for accounting in the cost model.
@@ -94,7 +94,7 @@ interface IPoolV2 is IPoolV1 {
     address localToken,
     uint256 amount,
     address feeToken,
-    uint16 finality,
+    uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external view returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps);
 

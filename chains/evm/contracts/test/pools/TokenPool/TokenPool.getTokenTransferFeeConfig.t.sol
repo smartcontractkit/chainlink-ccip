@@ -13,10 +13,10 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: 32,
-      defaultFinalityFeeUSDCents: 100, // $1.00
-      customFinalityFeeUSDCents: 150, // $1.50
-      defaultFinalityTransferFeeBps: 123,
-      customFinalityTransferFeeBps: 456,
+      defaultBlockConfirmationFeeUSDCents: 100, // $1.00
+      customBlockConfirmationFeeUSDCents: 150, // $1.50
+      defaultBlockConfirmationTransferFeeBps: 123,
+      customBlockConfirmationTransferFeeBps: 456,
       isEnabled: true
     });
 
@@ -34,10 +34,10 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     assertEq(returnedFeeConfig.isEnabled, feeConfig.isEnabled);
     assertEq(returnedFeeConfig.destGasOverhead, feeConfig.destGasOverhead);
     assertEq(returnedFeeConfig.destBytesOverhead, feeConfig.destBytesOverhead);
-    assertEq(returnedFeeConfig.defaultFinalityFeeUSDCents, feeConfig.defaultFinalityFeeUSDCents);
-    assertEq(returnedFeeConfig.customFinalityFeeUSDCents, feeConfig.customFinalityFeeUSDCents);
-    assertEq(returnedFeeConfig.defaultFinalityTransferFeeBps, feeConfig.defaultFinalityTransferFeeBps);
-    assertEq(returnedFeeConfig.customFinalityTransferFeeBps, feeConfig.customFinalityTransferFeeBps);
+    assertEq(returnedFeeConfig.defaultBlockConfirmationFeeUSDCents, feeConfig.defaultBlockConfirmationFeeUSDCents);
+    assertEq(returnedFeeConfig.customBlockConfirmationFeeUSDCents, feeConfig.customBlockConfirmationFeeUSDCents);
+    assertEq(returnedFeeConfig.defaultBlockConfirmationTransferFeeBps, feeConfig.defaultBlockConfirmationTransferFeeBps);
+    assertEq(returnedFeeConfig.customBlockConfirmationTransferFeeBps, feeConfig.customBlockConfirmationTransferFeeBps);
   }
 
   function test_getTokenTransferFeeConfig_DeleteConfig() public {
@@ -56,9 +56,9 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     assertEq(tokenTransferFeeConfig.isEnabled, false);
     assertEq(tokenTransferFeeConfig.destGasOverhead, 0);
     assertEq(tokenTransferFeeConfig.destBytesOverhead, 0);
-    assertEq(tokenTransferFeeConfig.defaultFinalityFeeUSDCents, 0);
-    assertEq(tokenTransferFeeConfig.customFinalityFeeUSDCents, 0);
-    assertEq(tokenTransferFeeConfig.defaultFinalityTransferFeeBps, 0);
-    assertEq(tokenTransferFeeConfig.customFinalityTransferFeeBps, 0);
+    assertEq(tokenTransferFeeConfig.defaultBlockConfirmationFeeUSDCents, 0);
+    assertEq(tokenTransferFeeConfig.customBlockConfirmationFeeUSDCents, 0);
+    assertEq(tokenTransferFeeConfig.defaultBlockConfirmationTransferFeeBps, 0);
+    assertEq(tokenTransferFeeConfig.customBlockConfirmationTransferFeeBps, 0);
   }
 }

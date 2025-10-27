@@ -120,22 +120,24 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
 
   function test_lockOrBurn_FeeNotApplied_LegacyLockOrBurn() public {
     uint16 minBlockConfirmation = 5;
-    uint16 defaultFinalityTransferFeeBps = 100;
-    uint16 customFinalityTransferFeeBps = 500;
+    uint16 defaultBlockConfirmationTransferFeeBps = 100;
+    uint16 customBlockConfirmationTransferFeeBps = 500;
     uint256 amount = 1000e18;
 
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(minBlockConfirmation, new TokenPool.CustomFinalityRateLimitConfigArgs[](0));
+    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(
+      minBlockConfirmation, new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](0)
+    );
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultFinalityFeeUSDCents: 0,
-        customFinalityFeeUSDCents: 0,
-        defaultFinalityTransferFeeBps: defaultFinalityTransferFeeBps,
-        customFinalityTransferFeeBps: customFinalityTransferFeeBps,
+        defaultBlockConfirmationFeeUSDCents: 0,
+        customBlockConfirmationFeeUSDCents: 0,
+        defaultBlockConfirmationTransferFeeBps: defaultBlockConfirmationTransferFeeBps,
+        customBlockConfirmationTransferFeeBps: customBlockConfirmationTransferFeeBps,
         isEnabled: true
       })
     });

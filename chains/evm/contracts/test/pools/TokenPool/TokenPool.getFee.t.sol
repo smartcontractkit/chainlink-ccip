@@ -13,10 +13,10 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultFinalityFeeUSDCents: 75,
-      customFinalityFeeUSDCents: 125,
-      defaultFinalityTransferFeeBps: defaultFeeBps,
-      customFinalityTransferFeeBps: 400,
+      defaultBlockConfirmationFeeUSDCents: 75,
+      customBlockConfirmationFeeUSDCents: 125,
+      defaultBlockConfirmationTransferFeeBps: defaultFeeBps,
+      customBlockConfirmationTransferFeeBps: 400,
       isEnabled: true
     });
 
@@ -30,7 +30,7 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
       s_tokenPool.getFee(DEST_CHAIN_SELECTOR, address(s_token), amount, address(0), 0, "");
 
-    assertEq(usdFeeCents, feeConfig.defaultFinalityFeeUSDCents);
+    assertEq(usdFeeCents, feeConfig.defaultBlockConfirmationFeeUSDCents);
     assertEq(destGasOverhead, feeConfig.destGasOverhead);
     assertEq(destBytesOverhead, feeConfig.destBytesOverhead);
     assertEq(tokenFeeBps, defaultFeeBps);
@@ -41,10 +41,10 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 60_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultFinalityFeeUSDCents: 80,
-      customFinalityFeeUSDCents: 150,
-      defaultFinalityTransferFeeBps: 0,
-      customFinalityTransferFeeBps: customFeeBps,
+      defaultBlockConfirmationFeeUSDCents: 80,
+      customBlockConfirmationFeeUSDCents: 150,
+      defaultBlockConfirmationTransferFeeBps: 0,
+      customBlockConfirmationTransferFeeBps: customFeeBps,
       isEnabled: true
     });
 
@@ -58,7 +58,7 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
       s_tokenPool.getFee(DEST_CHAIN_SELECTOR, address(s_token), amount, address(0), 5, "");
 
-    assertEq(usdFeeCents, feeConfig.customFinalityFeeUSDCents);
+    assertEq(usdFeeCents, feeConfig.customBlockConfirmationFeeUSDCents);
     assertEq(destGasOverhead, feeConfig.destGasOverhead);
     assertEq(destBytesOverhead, feeConfig.destBytesOverhead);
     assertEq(tokenFeeBps, customFeeBps);

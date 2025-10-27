@@ -65,19 +65,19 @@ contract TokenPoolHelper is TokenPool {
     _onlyOffRamp(remoteChainSelector);
   }
 
-  function getCustomFinalityConfig() external view returns (uint16 minBlockConfirmation) {
-    return s_finalityConfig.minBlockConfirmation;
+  function getCustomMinBlockConfirmation() external view returns (uint16 minBlockConfirmation) {
+    return s_customBlockConfirmationConfig.minBlockConfirmation;
   }
 
   function getFastOutboundBucket(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory bucket) {
-    return s_finalityConfig.outboundRateLimiterConfig[remoteChainSelector];
+    return s_customBlockConfirmationConfig.outboundRateLimiterConfig[remoteChainSelector];
   }
 
   function getFastInboundBucket(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory bucket) {
-    return s_finalityConfig.inboundRateLimiterConfig[remoteChainSelector];
+    return s_customBlockConfirmationConfig.inboundRateLimiterConfig[remoteChainSelector];
   }
 }

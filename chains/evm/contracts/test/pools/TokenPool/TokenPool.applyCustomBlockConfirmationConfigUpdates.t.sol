@@ -6,24 +6,24 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
-  function test_applyFinalityConfigUpdates() public {
+contract TokenPoolV2_applyCustomBlockConfirmationConfigUpdates is TokenPoolV2Setup {
+  function test_applyCustomBlockConfirmationConfigUpdates() public {
     uint16 minBlockConfirmation = 100;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
-    TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
+    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.CustomBlockConfirmationRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
 
     vm.expectEmit();
-    emit TokenPool.CustomFinalityMinimumBlockConfirmationUpdated(minBlockConfirmation);
-    s_tokenPool.applyFinalityConfigUpdates(minBlockConfirmation, rateLimitArgs);
+    emit TokenPool.CustomBlockConfirmationUpdated(minBlockConfirmation);
+    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(minBlockConfirmation, rateLimitArgs);
 
-    uint16 storedMinBlockConfirmation = s_tokenPool.getCustomFinalityConfig();
+    uint16 storedMinBlockConfirmation = s_tokenPool.getCustomMinBlockConfirmation();
     assertEq(storedMinBlockConfirmation, minBlockConfirmation);
 
     RateLimiter.TokenBucket memory outboundBucket = s_tokenPool.getFastOutboundBucket(DEST_CHAIN_SELECTOR);
@@ -42,15 +42,15 @@ contract TokenPoolV2_applyFinalityConfigUpdates is TokenPoolV2Setup {
   }
 
   // Reverts
-  function test_applyFinalityConfigUpdates_RevertWhen_OnlyCallableByOwner() public {
+  function test_applyCustomBlockConfirmationConfigUpdates_RevertWhen_OnlyCallableByOwner() public {
     vm.stopPrank();
     vm.prank(STRANGER);
 
     uint16 minBlockConfirmation = 100;
-    TokenPool.CustomFinalityRateLimitConfigArgs[] memory emptyRateLimitArgs =
-      new TokenPool.CustomFinalityRateLimitConfigArgs[](0);
+    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory emptyRateLimitArgs =
+      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](0);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_tokenPool.applyFinalityConfigUpdates(minBlockConfirmation, emptyRateLimitArgs);
+    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(minBlockConfirmation, emptyRateLimitArgs);
   }
 }

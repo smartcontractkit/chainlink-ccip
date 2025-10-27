@@ -13,10 +13,10 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultFinalityFeeUSDCents: 100, // $1.00
-      customFinalityFeeUSDCents: 150, // $1.50
-      defaultFinalityTransferFeeBps: 100, // 1%
-      customFinalityTransferFeeBps: 200, // 2%
+      defaultBlockConfirmationFeeUSDCents: 100, // $1.00
+      customBlockConfirmationFeeUSDCents: 150, // $1.50
+      defaultBlockConfirmationTransferFeeBps: 100, // 1%
+      customBlockConfirmationTransferFeeBps: 200, // 2%
       isEnabled: true
     });
 
@@ -36,10 +36,10 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultFinalityFeeUSDCents: 100,
-      customFinalityFeeUSDCents: 150,
-      defaultFinalityTransferFeeBps: 100,
-      customFinalityTransferFeeBps: 200,
+      defaultBlockConfirmationFeeUSDCents: 100,
+      customBlockConfirmationFeeUSDCents: 150,
+      defaultBlockConfirmationTransferFeeBps: 100,
+      customBlockConfirmationTransferFeeBps: 200,
       isEnabled: true
     });
 
@@ -77,10 +77,10 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultFinalityFeeUSDCents: 0,
-      customFinalityFeeUSDCents: 0,
-      defaultFinalityTransferFeeBps: uint16(BPS_DIVIDER),
-      customFinalityTransferFeeBps: 0,
+      defaultBlockConfirmationFeeUSDCents: 0,
+      customBlockConfirmationFeeUSDCents: 0,
+      defaultBlockConfirmationTransferFeeBps: uint16(BPS_DIVIDER),
+      customBlockConfirmationTransferFeeBps: 0,
       isEnabled: true
     });
 
@@ -96,10 +96,10 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultFinalityFeeUSDCents: 0,
-      customFinalityFeeUSDCents: 0,
-      defaultFinalityTransferFeeBps: 0,
-      customFinalityTransferFeeBps: uint16(BPS_DIVIDER),
+      defaultBlockConfirmationFeeUSDCents: 0,
+      customBlockConfirmationFeeUSDCents: 0,
+      defaultBlockConfirmationTransferFeeBps: 0,
+      customBlockConfirmationTransferFeeBps: uint16(BPS_DIVIDER),
       isEnabled: true
     });
 
