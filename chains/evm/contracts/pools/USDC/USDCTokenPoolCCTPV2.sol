@@ -18,12 +18,11 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 /// deposit function. Since both pools use a message transmitter proxy, which will use the same
 /// function selector, the releaseOrMint function does not need to be overridden.
 contract USDCTokenPoolCCTPV2 is USDCTokenPool {
-
   error InvalidMinFinalityThreshold(uint32 expected, uint32 got);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 got);
   error InvalidDepositHash(bytes32 expected, bytes32 got);
   error InvalidBurnToken(address expected, address got);
-  error InvalidMinFee(uint256 minFee);
+  error InvalidMinFee(uint256 maxAcceptableFee, uint256 actualFee);
 
   /// @dev CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;
@@ -66,12 +65,17 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
       revert InvalidReceiver(lockOrBurnIn.receiver);
     }
 
+    // Some CCTP-V2 chains support a configurable fee switch, but not all. It is therefore
+    // necessary to check via a try-catch block. If the call reverts, then the fee switch is not supported and the
+    // standard transfer fee will be zero, and no further action is required.
     try i_tokenMessenger.minFee() returns (uint256 minFee) {
+      // This token pool only supports zero-fee standard transfers. If the minFee is non-zero
+      // then the function should revert as the message may not be able to be successfully
+      // delivered on destination due to unexpected minting fees.
       if (minFee > MAX_FEE) {
-        revert InvalidMinFee(minFee);
+        revert InvalidMinFee(MAX_FEE, minFee);
       }
     } catch {}
-
 
     bytes32 decodedReceiver;
     // For EVM chains, the mintRecipient is not used, but is needed for Solana, where the mintRecipient will
@@ -86,7 +90,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     i_tokenMessenger.depositForBurn(
       lockOrBurnIn.amount,
       domain.domainIdentifier,
-    decodedReceiver,
+      decodedReceiver,
       address(i_token),
       domain.allowedCaller,
       MAX_FEE,

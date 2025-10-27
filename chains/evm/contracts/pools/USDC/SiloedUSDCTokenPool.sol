@@ -135,10 +135,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   }
 
   /// @dev This function is overridden to prevent providing liquidity to a chain that has already been migrated, and thus should use CCTP-proper instead of a Lock/Release mechanism.
-  function _provideLiquidity(
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) internal override {
+  function _provideLiquidity(uint64 remoteChainSelector, uint256 amount) internal override {
     if (s_migratedChains.contains(remoteChainSelector)) {
       revert TokenLockingNotAllowedAfterMigration(remoteChainSelector);
     }
@@ -234,10 +231,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// an attestation on the source-chain to mint. In that instance it should use provided liquidity that was designated
   /// @dev This function should ONLY be called on the home chain, where tokens are locked, NOT on the remote chain
   /// and strict scrutiny should be applied to ensure that the amount of tokens excluded is accurate.
-  function excludeTokensFromBurn(
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) external onlyOwner {
+  function excludeTokensFromBurn(uint64 remoteChainSelector, uint256 amount) external onlyOwner {
     if (s_proposedUSDCMigrationChain != remoteChainSelector) revert NoMigrationProposalPending();
 
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;

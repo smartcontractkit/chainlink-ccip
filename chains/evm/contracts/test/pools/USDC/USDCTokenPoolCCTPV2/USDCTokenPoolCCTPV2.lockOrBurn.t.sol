@@ -291,9 +291,17 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     vm.startPrank(s_routerAllowedOnRamp);
     uint256 amount = 1000;
 
-    vm.mockCall(address(s_mockUSDCTokenMessenger), abi.encodeWithSelector(ITokenMessenger.minFee.selector), abi.encode(1));
+    vm.mockCall(
+      address(s_mockUSDCTokenMessenger),
+      abi.encodeWithSelector(ITokenMessenger.minFee.selector),
+      abi.encode(s_usdcTokenPool.MAX_FEE() + 1)
+    );
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolCCTPV2.InvalidMinFee.selector, 1));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPoolCCTPV2.InvalidMinFee.selector, s_usdcTokenPool.MAX_FEE(), s_usdcTokenPool.MAX_FEE() + 1
+      )
+    );
 
     s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
