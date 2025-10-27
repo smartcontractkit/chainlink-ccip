@@ -94,7 +94,6 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-
 		b.Logger.Infof("Deployed %s at address %s on chain %s", in.ContractType, mcmAddr.Address, chain.Name)
 		return sequences.OnChainOutput{
 			Addresses: []datastore.AddressRef{mcmAddr},

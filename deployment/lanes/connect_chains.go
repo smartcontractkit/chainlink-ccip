@@ -5,6 +5,7 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -45,18 +46,18 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", chainBFamily)
 			}
-			err = populateAddresses(&e, chainA, chainAAdapter)
+			err = populateAddresses(e.DataStore, chainA, chainAAdapter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for src chain %d: %w", chainA.Selector, err)
 			}
-			err = populateAddresses(&e, chainB, chainBAdapter)
+			err = populateAddresses(e.DataStore, chainB, chainBAdapter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", chainB.Selector, err)
 			}
 			type lanePair struct {
-				src  *ChainDefinition
-				dest  *ChainDefinition
-				srcAdapter LaneAdapter
+				src         *ChainDefinition
+				dest        *ChainDefinition
+				srcAdapter  LaneAdapter
 				destAdapter LaneAdapter
 			}
 			for _, pair := range []lanePair{
@@ -98,21 +99,21 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	}
 }
 
-func populateAddresses(e *cldf.Environment, chainDef *ChainDefinition, adapter LaneAdapter) error {
+func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter) error {
 	var err error
-	chainDef.OnRamp, err = adapter.GetOnRampAddress(e, chainDef.Selector)
+	chainDef.OnRamp, err = adapter.GetOnRampAddress(ds, chainDef.Selector)
 	if err != nil {
 		return fmt.Errorf("error fetching onramp address for chain %d: %w", chainDef.Selector, err)
 	}
-	chainDef.OffRamp, err = adapter.GetOffRampAddress(e, chainDef.Selector)
+	chainDef.OffRamp, err = adapter.GetOffRampAddress(ds, chainDef.Selector)
 	if err != nil {
 		return fmt.Errorf("error fetching offramp address for chain %d: %w", chainDef.Selector, err)
 	}
-	chainDef.FeeQuoter, err = adapter.GetFQAddress(e, chainDef.Selector)
+	chainDef.FeeQuoter, err = adapter.GetFQAddress(ds, chainDef.Selector)
 	if err != nil {
 		return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
 	}
-	chainDef.Router, err = adapter.GetRouterAddress(e, chainDef.Selector)
+	chainDef.Router, err = adapter.GetRouterAddress(ds, chainDef.Selector)
 	if err != nil {
 		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
 	}

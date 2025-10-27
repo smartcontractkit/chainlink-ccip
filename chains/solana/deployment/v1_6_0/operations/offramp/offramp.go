@@ -12,7 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -39,6 +41,11 @@ type ConnectChainsParams struct {
 	RemoteChainSelector uint64
 	SourceOnRamp        []byte
 	EnabledAsSource     bool
+}
+
+type SetOcr3Params struct {
+	OffRamp            solana.PublicKey
+	SetOCR3ConfigInput deployops.SetOCR3ConfigInput
 }
 
 var Deploy = operations.NewOperation(
@@ -168,6 +175,7 @@ var ConnectChains = operations.NewOperation(
 			IsEnabled: input.EnabledAsSource,
 		}
 		var ixn solana.Instruction
+		batches := make([]types.BatchOperation, 0)
 		if isUpdate {
 			ixn, err = ccip_offramp.NewUpdateSourceChainConfigInstruction(
 				input.RemoteChainSelector,
@@ -196,9 +204,22 @@ var ConnectChains = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
 			}
 		}
-		err = chain.Confirm([]solana.Instruction{ixn})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+		if authority != chain.DeployerKey.PublicKey() {
+			b, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.OffRamp.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			batches = append(batches, b)
+		} else {
+			err = chain.Confirm([]solana.Instruction{ixn})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			}
 		}
 		sourceRef := datastore.AddressRef{
 			Address:       offRampSourceChainPDA.String(),
@@ -207,8 +228,83 @@ var ConnectChains = operations.NewOperation(
 			Version:       Version,
 		}
 		return sequences.OnChainOutput{
+			BatchOps:  batches,
 			Addresses: []datastore.AddressRef{sourceRef},
 		}, nil
+	},
+)
+
+var SetOcr3 = operations.NewOperation(
+	"off-ramp:set-ocr3",
+	Version,
+	"Sets the OCR3 configuration for the OffRamp 1.6.0 contract",
+	func(b operations.Bundle, chain cldf_solana.Chain, input SetOcr3Params) (sequences.OnChainOutput, error) {
+		authority := GetAuthority(chain, input.OffRamp)
+		batches := make([]types.BatchOperation, 0)
+		offRampConfigPDA, _, _ := state.FindOfframpConfigPDA(input.OffRamp)
+		offRampStatePDA, _, _ := state.FindOfframpStatePDA(input.OffRamp)
+		for _, arg := range input.SetOCR3ConfigInput.Configs {
+			var ocrType ccip_offramp.OcrPluginType
+			switch arg.PluginType {
+			case ccipocr3.PluginTypeCCIPCommit:
+				ocrType = ccip_offramp.Commit_OcrPluginType
+			case ccipocr3.PluginTypeCCIPExec:
+				ocrType = ccip_offramp.Execution_OcrPluginType
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported OCR plugin type: %d", arg.PluginType)
+			}
+
+			var signerAddresses [][20]byte
+			var transmitterAddresses []solana.PublicKey
+			for _, signer := range arg.Signers {
+				var solanaSigner [20]uint8
+				if len(signer) != 20 {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid signer length: %d", len(signer))
+				}
+				copy(solanaSigner[:], signer)
+				signerAddresses = append(signerAddresses, solanaSigner)
+			}
+			for _, transmitter := range arg.Transmitters {
+				solanaTransmitter := solana.PublicKeyFromBytes(transmitter)
+				transmitterAddresses = append(transmitterAddresses, solanaTransmitter)
+			}
+
+			instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
+				ocrType,
+				ccip_offramp.Ocr3ConfigInfo{
+					ConfigDigest:                   arg.ConfigDigest,
+					F:                              arg.F,
+					IsSignatureVerificationEnabled: btoi(arg.IsSignatureVerificationEnabled),
+				},
+				signerAddresses,
+				transmitterAddresses,
+				offRampConfigPDA,
+				offRampStatePDA,
+				authority,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build set OCR3 config instruction: %w", err)
+			}
+			if authority != chain.DeployerKey.PublicKey() {
+				b, err := utils.BuildMCMSBatchOperation(
+					chain.Selector,
+					[]solana.Instruction{instruction},
+					input.OffRamp.String(),
+					ContractType.String(),
+				)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+				}
+				batches = append(batches, b)
+			} else {
+				err = chain.Confirm([]solana.Instruction{instruction})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm set OCR3 config: %w", err)
+				}
+			}
+		}
+
+		return sequences.OnChainOutput{BatchOps: batches}, nil
 	},
 )
 
@@ -284,6 +380,13 @@ var AcceptOwnership = operations.NewOperation(
 		return sequences.OnChainOutput{}, nil
 	},
 )
+
+func btoi(b bool) uint8 {
+	if b {
+		return 1
+	}
+	return 0
+}
 
 func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
 	programData := ccip_offramp.Config{}

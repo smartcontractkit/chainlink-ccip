@@ -6,7 +6,6 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
@@ -31,12 +30,12 @@ type SolanaAdapter struct {
 	timelockAddr map[uint64]solana.PublicKey
 }
 
-func (a *SolanaAdapter) GetOnRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
-	return a.GetRouterAddress(e, chainSelector)
+func (a *SolanaAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	return a.GetRouterAddress(ds, chainSelector)
 }
 
-func (a *SolanaAdapter) GetOffRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+func (a *SolanaAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(offramp.ContractType),
 		Version:       offramp.Version,
@@ -47,8 +46,8 @@ func (a *SolanaAdapter) GetOffRampAddress(e *cldf.Environment, chainSelector uin
 	return addr, nil
 }
 
-func (a *SolanaAdapter) GetFQAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+func (a *SolanaAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(fee_quoter.ContractType),
 		Version:       fee_quoter.Version,
@@ -59,8 +58,8 @@ func (a *SolanaAdapter) GetFQAddress(e *cldf.Environment, chainSelector uint64) 
 	return addr, nil
 }
 
-func (a *SolanaAdapter) GetRouterAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+func (a *SolanaAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),
 		Version:       router.Version,
