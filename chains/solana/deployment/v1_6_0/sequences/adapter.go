@@ -2,6 +2,7 @@ package sequences
 
 import (
 	"github.com/Masterminds/semver/v3"
+	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -23,9 +24,12 @@ func init() {
 	}
 	laneapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
 	deployapi.GetRegistry().RegisterDeployer(chain_selectors.FamilySolana, v, &SolanaAdapter{})
+	deployapi.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
 }
 
-type SolanaAdapter struct{}
+type SolanaAdapter struct {
+	timelockAddr map[uint64]solana.PublicKey
+}
 
 func (a *SolanaAdapter) GetOnRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
 	return a.GetRouterAddress(e, chainSelector)

@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -174,19 +175,19 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 	proposerRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		utils.ProposerManyChainMultisig,
-		mcmsops.Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	cancellerRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		utils.CancellerManyChainMultisig,
-		mcmsops.Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	bypasserRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		utils.BypasserManyChainMultisig,
-		mcmsops.Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	proposerPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(proposerRef.Address)))
