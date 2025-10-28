@@ -2,11 +2,10 @@ package tokenprice
 
 import (
 	"context"
-	"sort"
+	"maps"
+	"slices"
 	"sync"
 	"time"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -128,7 +127,7 @@ func (b *baseObserver) observeFeedTokenPrices(ctx context.Context, lggr logger.L
 		return cciptypes.TokenPriceMap{}
 	}
 
-	tokensToQuery := maps.Keys(b.offChainCfg.TokenInfo)
+	tokensToQuery := slices.Collect(maps.Keys(b.offChainCfg.TokenInfo))
 	lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
 	tokenPrices, err := b.tokenPriceReader.GetFeedPricesUSD(ctx, tokensToQuery)
 	if err != nil {
@@ -158,9 +157,8 @@ func (b *baseObserver) observeFeeQuoterTokenUpdates(
 		return map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{}
 	}
 
-	tokensToQuery := maps.Keys(b.offChainCfg.TokenInfo)
 	// sort tokens to query to ensure deterministic order
-	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
+	tokensToQuery := slices.Sorted(maps.Keys(b.offChainCfg.TokenInfo))
 	lggr.Infow("observing fee quoter token updates")
 	priceUpdates, err := b.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery, b.destChain)
 	if err != nil {

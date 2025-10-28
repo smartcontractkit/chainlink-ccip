@@ -102,6 +102,17 @@ func CalculateUsdPerUnitGas(
 		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
 		return new(big.Int).Div(tmp, big.NewInt(1e18)), nil
 
+	case chainsel.FamilyTon:
+		// In TON, sourceGasPrice is denoted in nanoton/gas or 1e-9 TON/gas.
+		// TON has 9 decimals, usdPerFeeCoin represents 1e18 USD * 1e9 / nanoton.
+		// To get 1e18 USD/gas, we have
+		//   sourceGasPrice * usdPerFeeCoin / 1e18
+		//     = (nanoton / gas) * (1e18 USD * 1e9 / nanoton) / 1e18
+		//     = 1e18 USD * 1e9 / gas / 1e9
+		//     = 1e18 USD / gas
+		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+		return new(big.Int).Div(tmp, big.NewInt(1e9)), nil
+
 	default:
 		return nil, fmt.Errorf("unsupported family %s", family)
 	}

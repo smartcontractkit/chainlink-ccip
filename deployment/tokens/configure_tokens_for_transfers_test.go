@@ -95,6 +95,11 @@ func (ma *transfersTest_MockTokenAdapter) ConfigureTokenForTransfersSequence() *
 }
 
 func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
+	if poolRef.Address == "" {
+		// Address in pool ref MUST be populated before this adapter method gets called.
+		// Most implementations will require the pool address in order to fetch the token address.
+		return nil, errors.New("pool ref address is empty")
+	}
 	if ma.deriveTokenErrorMsg != "" {
 		return nil, errors.New(ma.deriveTokenErrorMsg)
 	}
