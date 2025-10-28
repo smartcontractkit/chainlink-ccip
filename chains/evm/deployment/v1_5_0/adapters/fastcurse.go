@@ -32,19 +32,28 @@ func NewCurseAdapter() *CurseAdapter {
 	return &CurseAdapter{}
 }
 
-func (ca *CurseAdapter) Initialize(e cldf.Environment) error {
-	ca.rmnAddressCache = make(map[uint64]common.Address)
-	ca.routerAddressCache = make(map[uint64]common.Address)
-	for _, chain := range e.BlockChains.EVMChains() {
+func (ca *CurseAdapter) Initialize(e cldf.Environment, selector uint64) error {
+	if ca.rmnAddressCache == nil {
+		ca.rmnAddressCache = make(map[uint64]common.Address)
+	}
+	if ca.routerAddressCache == nil {
+		ca.routerAddressCache = make(map[uint64]common.Address)
+	}
+	chain, ok := e.BlockChains.EVMChains()[selector]
+	if !ok {
+		return fmt.Errorf("no EVM chain found for selector %d", selector)
+	}
+	if _, exists := ca.rmnAddressCache[chain.Selector]; !exists {
 		rmnAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(ops.ContractType),
-			Version: semver.MustParse("1.6.0"),
+			Version: semver.MustParse("1.5.0"),
 		}, chain.ChainSelector(), evmds.ToEVMAddress)
 		if err != nil {
 			return err
 		}
 		ca.rmnAddressCache[chain.Selector] = rmnAddr
-
+	}
+	if _, exists := ca.routerAddressCache[chain.Selector]; !exists {
 		routerAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(routerops.ContractType),
 			Version: semver.MustParse("1.2.0"),
@@ -67,7 +76,6 @@ func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint
 	if !ok {
 		return false, fmt.Errorf("no EVM chain found for selector %d", selector)
 	}
-
 	isCursedRep, err := cldf_ops.ExecuteOperation(e.OperationsBundle, ops.IsCursed, chain, contract.FunctionInput[api.Subject]{
 		ChainSelector: chain.Selector,
 		Address:       rmnAddr,
