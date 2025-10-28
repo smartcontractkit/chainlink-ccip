@@ -168,7 +168,7 @@ func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int, tim
 	if err != nil {
 		return nil, fmt.Errorf("failed to init timelock: %w", err)
 	}
-	return []cldf_datastore.AddressRef{ref.Output}, nil
+	return ref.Output, nil
 }
 
 func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.PublicKey) error {

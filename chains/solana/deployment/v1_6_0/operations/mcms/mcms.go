@@ -34,7 +34,6 @@ var (
 	TimelockProgramName = "timelock"
 	TimelockProgramSize = 1 * 1024 * 1024
 
-	McmProgramType cldf_deployment.ContractType = "ManyChainMultiSigProgram"
 	McmProgramName                              = "mcm"
 	McmProgramSize                              = 1 * 1024 * 1024
 
@@ -87,7 +86,7 @@ var McmDeploy = operations.NewOperation(
 			b,
 			chain,
 			input,
-			McmProgramType,
+			utils.McmProgramType,
 			common_utils.Version_1_6_0,
 			"",
 			McmProgramName,
@@ -159,6 +158,7 @@ type (
 )
 
 func initAccessController(b operations.Bundle, deps Deps, in InitAccessControllerInput) (cldf_datastore.AddressRef, error) {
+	access_controller.SetProgramID(in.AccessController)
 	// Should be one of the AccessControllerAccount types
 	ref := datastore.GetAddressRef(
 		deps.ExistingAddresses,
@@ -245,6 +245,7 @@ func initializeAccessController(
 }
 
 func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.AddressRef, error) {
+	mcm.SetProgramID(in.MCM)
 	// Should be one of:
 	// BypasserManyChainMultisig
 	// CancellerManyChainMultisig
@@ -342,7 +343,8 @@ func initializeMCM(b operations.Bundle, deps Deps, mcmProgram solana.PublicKey, 
 	return nil
 }
 
-func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (cldf_datastore.AddressRef, error) {
+func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) ([]cldf_datastore.AddressRef, error) {
+	timelock.SetProgramID(in.Timelock)
 	// Should be one of:
 	// RBACTimelock
 	ref := datastore.GetAddressRef(
@@ -360,9 +362,9 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (cldf_da
 		err := deps.Chain.GetAccountDataBorshInto(b.GetContext(), timelockConfigPDA, &timelockConfig)
 		if err == nil {
 			b.Logger.Infow("timelock config already initialized, skipping initialization", "chain", deps.Chain.String())
-			return cldf_datastore.AddressRef{}, nil
+			return []cldf_datastore.AddressRef{}, nil
 		}
-		return cldf_datastore.AddressRef{}, fmt.Errorf("unable to read timelock ConfigPDA account config %s", timelockConfigPDA.String())
+		return []cldf_datastore.AddressRef{}, fmt.Errorf("unable to read timelock ConfigPDA account config %s", timelockConfigPDA.String())
 	}
 
 	b.Logger.Infow("timelock config not initialized, initializing", "chain", deps.Chain.String())
@@ -372,15 +374,27 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (cldf_da
 
 	err := initializeTimelock(b, deps, in.Timelock, seed, in.MinDelay)
 	if err != nil {
-		return cldf_datastore.AddressRef{}, fmt.Errorf("failed to initialize timelock: %w", err)
+		return []cldf_datastore.AddressRef{}, fmt.Errorf("failed to initialize timelock: %w", err)
 	}
 
-	return cldf_datastore.AddressRef{
-		Address:       string(seed[:]),
-		ChainSelector: deps.Chain.Selector,
-		Type:          cldf_datastore.ContractType(in.ContractType),
-		Qualifier:     deps.Qualifier,
-		Version:       common_utils.Version_1_6_0,
+	return []cldf_datastore.AddressRef{
+		{
+			Address: mcms_solana.ContractAddress(
+				solana.MustPublicKeyFromBase58(in.Timelock.String()),
+				mcms_solana.PDASeed([]byte(seed[:])),
+			),
+			ChainSelector: deps.Chain.Selector,
+			Type:          cldf_datastore.ContractType(utils.TimelockCompositeAddress),
+			Qualifier:     deps.Qualifier,
+			Version:       common_utils.Version_1_6_0,
+		},
+		{
+			Address:       string(seed[:]),
+			ChainSelector: deps.Chain.Selector,
+			Type:          cldf_datastore.ContractType(in.ContractType),
+			Qualifier:     deps.Qualifier,
+			Version:       common_utils.Version_1_6_0,
+		},
 	}, nil
 }
 

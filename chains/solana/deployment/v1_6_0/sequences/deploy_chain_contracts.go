@@ -13,10 +13,6 @@ import (
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -80,10 +76,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		offRampAddress := solana.MustPublicKeyFromBase58(offRampRef.Output.Address)
 		rmnRemoteAddress := solana.MustPublicKeyFromBase58(rmnRemoteRef.Output.Address)
 		ccipRouterProgram := solana.MustPublicKeyFromBase58(routerRef.Output.Address)
-		fee_quoter.SetProgramID(feeQuoterAddress)
-		ccip_offramp.SetProgramID(offRampAddress)
-		ccip_router.SetProgramID(ccipRouterProgram)
-		rmn_remote.SetProgramID(rmnRemoteAddress)
 
 		// Initialize FeeQuoter
 		lowBits, highBits := GetHighLowBits(input.MaxFeeJuelsPerMsg)

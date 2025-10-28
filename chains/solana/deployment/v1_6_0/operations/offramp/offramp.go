@@ -70,6 +70,7 @@ var Initialize = operations.NewOperation(
 	Version,
 	"Initializes the OffRamp 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
+		ccip_offramp.SetProgramID(input.OffRamp)
 		programData, err := utils.GetSolProgramData(chain, input.OffRamp)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
@@ -122,6 +123,7 @@ var InitializeConfig = operations.NewOperation(
 	Version,
 	"Initializes the config of the OffRamp 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
+		ccip_offramp.SetProgramID(input.OffRamp)
 		programData, err := utils.GetSolProgramData(chain, input.OffRamp)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
@@ -153,6 +155,7 @@ var ConnectChains = operations.NewOperation(
 	Version,
 	"Connects the OffRamp 1.6.0 contract to other chains",
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
+		ccip_offramp.SetProgramID(input.OffRamp)
 		isUpdate := false
 		authority := GetAuthority(chain, input.OffRamp)
 		offRampConfigPDA, _, _ := state.FindOfframpConfigPDA(input.OffRamp)
@@ -239,6 +242,7 @@ var SetOcr3 = operations.NewOperation(
 	Version,
 	"Sets the OCR3 configuration for the OffRamp 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input SetOcr3Params) (sequences.OnChainOutput, error) {
+		ccip_offramp.SetProgramID(input.OffRamp)
 		authority := GetAuthority(chain, input.OffRamp)
 		batches := make([]types.BatchOperation, 0)
 		offRampConfigPDA, _, _ := state.FindOfframpConfigPDA(input.OffRamp)
@@ -313,6 +317,7 @@ var TransferOwnership = operations.NewOperation(
 	Version,
 	"Transfers ownership of the OffRamp 1.6.0 contract to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
+		ccip_offramp.SetProgramID(input.Program)
 		authority := GetAuthority(chain, input.Program)
 		if authority != input.CurrentOwner {
 			return sequences.OnChainOutput{}, fmt.Errorf("current owner %s does not match on-chain authority %s", input.CurrentOwner.String(), authority.String())
@@ -352,6 +357,7 @@ var AcceptOwnership = operations.NewOperation(
 	Version,
 	"Accepts ownership of the OffRamp 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
+		ccip_offramp.SetProgramID(input.Program)
 		configPDA, _, _ := state.FindConfigPDA(input.Program)
 		ixn, err := ccip_offramp.NewAcceptOwnershipInstruction(
 			configPDA,

@@ -52,6 +52,7 @@ var Initialize = operations.NewOperation(
 	Version,
 	"Initializes the FeeQuoter 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.FeeQuoter)
 		programData, err := utils.GetSolProgramData(chain, input.FeeQuoter)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
@@ -84,6 +85,7 @@ var AddPriceUpdater = operations.NewOperation(
 	Version,
 	"Adds a price updater to the FeeQuoter 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.FeeQuoter)
 		authority := GetAuthority(chain, input.FeeQuoter)
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
 		offRampBillingSignerPDA, _, _ := state.FindOfframpBillingSignerPDA(input.OffRamp)
@@ -111,6 +113,7 @@ var ConnectChains = operations.NewOperation(
 	Version,
 	"Connects the FeeQuoter 1.6.0 contract to other chains",
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.FeeQuoter)
 		isUpdate := false
 		authority := GetAuthority(chain, input.FeeQuoter)
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
@@ -163,6 +166,7 @@ var TransferOwnership = operations.NewOperation(
 	Version,
 	"Transfers ownership of the FeeQuoter 1.6.0 contract to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.Program)
 		authority := GetAuthority(chain, input.Program)
 		if authority != input.CurrentOwner {
 			return sequences.OnChainOutput{}, fmt.Errorf("current owner %s does not match on-chain authority %s", input.CurrentOwner.String(), authority.String())
@@ -202,6 +206,7 @@ var AcceptOwnership = operations.NewOperation(
 	Version,
 	"Accepts ownership of the FeeQuoter 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.Program)
 		configPDA, _, _ := state.FindConfigPDA(input.Program)
 		ixn, err := fee_quoter.NewAcceptOwnershipInstruction(
 			configPDA,

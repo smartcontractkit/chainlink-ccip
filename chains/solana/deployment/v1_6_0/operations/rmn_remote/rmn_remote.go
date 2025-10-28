@@ -44,6 +44,7 @@ var Initialize = operations.NewOperation(
 	Version,
 	"Initializes the RMNRemote 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
+		rmn_remote.SetProgramID(input.RMNRemote)
 		programData, err := utils.GetSolProgramData(chain, input.RMNRemote)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
@@ -75,6 +76,7 @@ var TransferOwnership = operations.NewOperation(
 	Version,
 	"Transfers ownership of the RMNRemote 1.6.0 contract to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
+		rmn_remote.SetProgramID(input.Program)
 		authority := GetAuthority(chain, input.Program)
 		if authority != input.CurrentOwner {
 			return sequences.OnChainOutput{}, fmt.Errorf("current owner %s does not match on-chain authority %s", input.CurrentOwner.String(), authority.String())
@@ -116,6 +118,7 @@ var AcceptOwnership = operations.NewOperation(
 	Version,
 	"Accepts ownership of the RMNRemote 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
+		rmn_remote.SetProgramID(input.Program)
 		configPDA, _, _ := state.FindConfigPDA(input.Program)
 		ixn, err := rmn_remote.NewAcceptOwnershipInstruction(
 			configPDA,
