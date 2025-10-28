@@ -11,20 +11,28 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	adaptersv1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
+	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	routerops1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
+	adaptersv1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	rmnremoteops1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 )
 
@@ -36,6 +44,7 @@ func TestFastCurse(t *testing.T) {
 	)
 	require.NoError(t, err)
 	bundle := env.OperationsBundle
+	var rmnAddress, rmnRemoteAddress common.Address
 	// deploy RMN 1.5 on chain1 and RMN 1.6 on chain2, set up routers, etc.
 	chain := env.BlockChains.EVMChains()[chain1]
 	deployRMNOp, err := cldf_ops.ExecuteOperation(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
@@ -65,6 +74,7 @@ func TestFastCurse(t *testing.T) {
 		ChainSelector: chain1,
 		Address:       deployRMNOp.Output.Address,
 	}))
+	rmnAddress = common.HexToAddress(deployRMNOp.Output.Address)
 	// deploy RMNRemote 1.6 on chain2
 	chain = env.BlockChains.EVMChains()[chain2]
 	deployRMNRemoteOp, err := cldf_ops.ExecuteOperation(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
@@ -82,6 +92,7 @@ func TestFastCurse(t *testing.T) {
 		ChainSelector: chain2,
 		Address:       deployRMNRemoteOp.Output.Address,
 	}))
+	rmnRemoteAddress = common.HexToAddress(deployRMNRemoteOp.Output.Address)
 	// deploy router in both chains
 	for _, sel := range []uint64{chain1, chain2} {
 		evmChain := env.BlockChains.EVMChains()[sel]
@@ -168,9 +179,165 @@ func TestFastCurse(t *testing.T) {
 	// store addresses in ds
 	allAddrRefs, err := output.DataStore.Addresses().Fetch()
 	require.NoError(t, err)
+	timelockAddrs := make(map[uint64]string)
 	for _, addrRef := range allAddrRefs {
 		require.NoError(t, ds.Addresses().Add(addrRef))
+		if addrRef.Type == datastore.ContractType(deploymentutils.RBACTimelock) {
+			timelockAddrs[addrRef.ChainSelector] = addrRef.Address
+		}
+	}
+	// update env datastore
+	env.DataStore = ds.Seal()
+	// transfer ownership of RMN and RMNRemote to respective MCMS
+	transferOwnershipInput := deploy.TransferOwnershipInput{
+		ChainInputs: []deploy.TransferOwnershipPerChainInput{
+			{
+				ChainSelector: chain1,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(rmnops1_5.ContractType),
+						Version: semver.MustParse("1.5.0"),
+					},
+				},
+				ProposedOwner: timelockAddrs[chain1],
+			},
+			{
+				ChainSelector: chain2,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(rmnremoteops1_6.ContractType),
+						Version: semver.MustParse("1.6.0"),
+					},
+				},
+				ProposedOwner: timelockAddrs[chain2],
+			},
+		},
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			MCMSAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
+				Qualifier: "test",
+				Version:   semver.MustParse("1.0.0"),
+			},
+			TimelockAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(deploymentutils.RBACTimelock),
+				Qualifier: "test",
+				Version:   semver.MustParse("1.0.0"),
+			},
+			Description: "Transfer ownership to timelock for fast curse test",
+		},
 	}
 
-	env.DataStore = ds.Seal()
+	// register chain adapter
+	cr := deploy.GetTransferOwnershipRegistry()
+	evmAdapter := &adapters.EVMTransferOwnershipAdapter{}
+	cr.RegisterAdapter(chainsel.FamilyEVM, transferOwnershipInput.AdapterVersion, evmAdapter)
+	mcmsRegistry := changesets.NewMCMSReaderRegistry()
+	evmMCMSReader := &adapters.EVMMCMSReader{}
+	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, evmMCMSReader)
+	transferOwnershipChangeset := deploy.TransferOwnershipChangeset(cr, mcmsRegistry)
+	output, err = transferOwnershipChangeset.Apply(*env, transferOwnershipInput)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+	t.Logf("Transferred ownership of RMN and RMNRemote to respective MCMS")
+	// now generate a curse proposal
+	curseCfg := fastcurse.RMNCurseConfig{
+		CurseActions: []fastcurse.CurseActionInput{
+			{
+				IsGlobalCurse:        false,
+				ChainSelector:        chain1,
+				SubjectChainSelector: chain2,
+				Version:              semver.MustParse("1.5.0"),
+			},
+			{
+				IsGlobalCurse:        false,
+				ChainSelector:        chain2,
+				SubjectChainSelector: chain1,
+				Version:              semver.MustParse("1.6.0"),
+			},
+		},
+		Force: false,
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			MCMSAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
+				Qualifier: "test",
+				Version:   semver.MustParse("1.0.0"),
+			},
+			TimelockAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(deploymentutils.RBACTimelock),
+				Qualifier: "test",
+				Version:   semver.MustParse("1.0.0"),
+			},
+			Description: "Curse proposal for fast curse test",
+		},
+	}
+	curseReg := fastcurse.GetCurseRegistry()
+	adv1_6_0 := adaptersv1_6_0.NewCurseAdapter()
+	adv1_5_0 := adaptersv1_5_0.NewCurseAdapter()
+	crInput1_6_0 := fastcurse.CurseRegistryInput{
+		CursingFamily:       chainsel.FamilyEVM,
+		CursingVersion:      semver.MustParse("1.6.0"),
+		SubjectFamily:       chainsel.FamilyEVM,
+		CurseAdapter:        adaptersv1_6_0.NewCurseAdapter(),
+		CurseSubjectAdapter: adaptersv1_6_0.NewCurseAdapter(),
+	}
+	crInput1_5_0 := fastcurse.CurseRegistryInput{
+		CursingFamily:       chainsel.FamilyEVM,
+		CursingVersion:      semver.MustParse("1.5.0"),
+		SubjectFamily:       chainsel.FamilyEVM,
+		CurseAdapter:        adaptersv1_5_0.NewCurseAdapter(),
+		CurseSubjectAdapter: adaptersv1_5_0.NewCurseAdapter(),
+	}
+	curseReg.RegisterNewCurse(crInput1_6_0)
+	curseReg.RegisterNewCurse(crInput1_5_0)
+	curseChangeset := fastcurse.CurseChangeset(curseReg, mcmsRegistry)
+	output, err = curseChangeset.Apply(*env, curseCfg)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	// check that the subjects were actually cursed
+	rmnC, err := rmn_contract.NewRMNContract(rmnAddress, evmChain1.Client)
+	require.NoError(t, err)
+	isCursed, err := rmnC.IsCursed(nil, adv1_5_0.SelectorToSubject(chain2))
+	require.NoError(t, err)
+	require.True(t, isCursed, "subject on chain2 should be cursed on rmn in chain1")
+
+	rmnRemoteC, err := rmn_remote.NewRMNRemote(rmnRemoteAddress, evmChain2.Client)
+	require.NoError(t, err)
+	isCursed, err = rmnRemoteC.IsCursed(nil, adv1_6_0.SelectorToSubject(chain1))
+	require.NoError(t, err)
+	require.True(t, isCursed, "subject on chain1 should be cursed on rmnremote in chain2")
+	t.Logf("Subjects successfully cursed %x on chain1 %d and %x on chain2 %d", adv1_5_0.SelectorToSubject(chain2), chain1, adv1_6_0.SelectorToSubject(chain1), chain2)
+
+	// Now uncurse the subjects
+	// reset the operation bundle to clear any cached values
+	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
+	uncurseChangeset := fastcurse.UncurseChangeset(curseReg, mcmsRegistry)
+	output, err = uncurseChangeset.Apply(*env, curseCfg)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	// check that the subjects were actually uncursed
+	isCursed, err = rmnC.IsCursed(nil, adv1_5_0.SelectorToSubject(chain2))
+	require.NoError(t, err)
+	require.False(t, isCursed, "subject on chain2 should be uncursed on rmn in chain1")
+
+	isCursed, err = rmnRemoteC.IsCursed(nil, adv1_6_0.SelectorToSubject(chain1))
+	require.NoError(t, err)
+	require.False(t, isCursed, "subject on chain1 should be uncursed on rmnremote in chain2")
+	t.Logf("Subjects successfully uncursed %x on chain1 %d and %x on chain2 %d", adv1_5_0.SelectorToSubject(chain2), chain1, adv1_6_0.SelectorToSubject(chain1), chain2)
 }

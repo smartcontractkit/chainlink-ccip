@@ -15,8 +15,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
+var (
+	singletonCurseRegistry *CurseRegistry
+	curseRegistryOnce      sync.Once
+)
+
 type CurseAdapter interface {
-	Initialize(e cldf.Environment) error
+	Initialize(e cldf.Environment, selector uint64) error
 	// IsSubjectCursedOnChain has the default RMN behavior.
 	// Returns true if subject is cursed or chain is globally cursed. False otherwise.
 	IsSubjectCursedOnChain(e cldf.Environment, selector uint64, subject Subject) (bool, error)
@@ -27,7 +32,7 @@ type CurseAdapter interface {
 	// For example, in case of EVM 1.6 chains, this could check if the RMNRemote contract is deployed on the chain
 	IsCurseEnabledForChain(e cldf.Environment, selector uint64) (bool, error)
 	// SubjectToSelector converts a Subject to a chain selector
-	SubjectToSelector(subject Subject) uint64
+	SubjectToSelector(subject Subject) (uint64, error)
 	// Curse returns the sequence to curse subjects on a chain
 	Curse() *cldf_ops.Sequence[CurseInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	// Uncurse returns the sequence to lift the curse on subjects on a chain
@@ -53,12 +58,19 @@ type CurseRegistry struct {
 	CurseSubjects map[string]CurseSubjectAdapter
 }
 
-func NewCurseRegistry() *CurseRegistry {
+func newCurseRegistry() *CurseRegistry {
 	return &CurseRegistry{
 		mu:            sync.Mutex{},
 		CurseAdapters: make(map[string]CurseAdapter),
 		CurseSubjects: make(map[string]CurseSubjectAdapter),
 	}
+}
+
+func GetCurseRegistry() *CurseRegistry {
+	curseRegistryOnce.Do(func() {
+		singletonCurseRegistry = newCurseRegistry()
+	})
+	return singletonCurseRegistry
 }
 
 func (c *CurseRegistry) RegisterNewCurse(
@@ -109,6 +121,10 @@ func (cr *CurseRegistry) groupRMNSubjectBySelector(e cldf.Environment, rmnSubjec
 		// Skip self-curse
 		if s.SubjectChainSelector == s.ChainSelector {
 			continue
+		}
+		err = adapter.Initialize(e, s.ChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize curse adapter for chain selector %d: %w", s.ChainSelector, err)
 		}
 		// Check if curse is enabled on chain
 		cursable, err := adapter.IsCurseEnabledForChain(e, s.ChainSelector)
