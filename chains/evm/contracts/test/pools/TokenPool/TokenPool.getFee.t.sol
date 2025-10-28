@@ -69,7 +69,7 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
 
   // Reverts
 
-  function test_getFee_RevertWhen_BlockConfirmationBelowMinimum() public {
+  function test_getFee_RevertWhen_InvalidMinBlockConfirmation() public {
     uint16 minBlockConfirmation = 10;
 
     vm.startPrank(OWNER);
