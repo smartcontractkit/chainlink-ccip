@@ -8,6 +8,10 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/gagliardetto/solana-go"
+	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	evmofframpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	evmonrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
@@ -179,4 +183,82 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 		"",
 	)
 	require.Equal(t, timelockSigner, rmnremoteops.GetAuthority(chain, solana.MustPublicKeyFromBase58(program.Address)))
+}
+
+func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector uint64) {
+	chain := e.BlockChains.EVMChains()[selector]
+	timelockAddrs := make(map[uint64]string)
+	for _, addrRef := range e.DataStore.Addresses().Filter() {
+		if addrRef.Type == datastore.ContractType(common_utils.RBACTimelock) {
+			timelockAddrs[addrRef.ChainSelector] = addrRef.Address
+		}
+	}
+	mcmsInput := mcmsapi.TransferOwnershipInput{
+		ChainInputs: []mcmsapi.TransferOwnershipPerChainInput{
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(evmfqops.ContractType),
+						Version: evmfqops.Version,
+					},
+				},
+				ProposedOwner: timelockAddrs[chain.Selector],
+			},
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(evmrouterops.ContractType),
+						Version: evmrouterops.Version,
+					},
+				},
+				ProposedOwner: timelockAddrs[chain.Selector],
+			},
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(evmofframpops.ContractType),
+						Version: evmofframpops.Version,
+					},
+				},
+				ProposedOwner: timelockAddrs[chain.Selector],
+			},
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(evmonrampops.ContractType),
+						Version: evmonrampops.Version,
+					},
+				},
+				ProposedOwner: timelockAddrs[chain.Selector],
+			},
+		},
+		AdapterVersion: semver.MustParse("1.6.0"),
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			MCMSAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(common_utils.ProposerManyChainMultisig),
+				Qualifier: common_utils.CLLQualifier,
+				Version:   semver.MustParse("1.0.0"),
+			},
+			TimelockAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(common_utils.RBACTimelock),
+				Version:   semver.MustParse("1.0.0"),
+				Qualifier: common_utils.CLLQualifier,
+			},
+			Description: "Transfer ownership test",
+		},
+	}
+
+	transferOutput, err := mcmsapi.TransferOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
+	require.NoError(t, err)
+	require.Greater(t, len(transferOutput.Reports), 0)
+	require.Equal(t, 1, len(transferOutput.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *e, transferOutput.MCMSTimelockProposals, false)
 }

@@ -183,8 +183,10 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		out.DataStore.Merge(e.DataStore)
 		e.DataStore = out.DataStore.Seal()
 	}
+	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 	evmEncoded, err := hex.DecodeString(cciputils.EVMFamilySelector)
 	require.NoError(t, err, "Failed to decode EVM family selector")
 	svmEncoded, err := hex.DecodeString(cciputils.SVMFamilySelector)
