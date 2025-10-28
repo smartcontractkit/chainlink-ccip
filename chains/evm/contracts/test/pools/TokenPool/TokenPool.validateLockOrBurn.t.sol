@@ -20,57 +20,61 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
-    uint16 finalityThreshold = 8;
-    uint16 customFinalityTransferFeeBps = 500; // 5%
+    uint16 minBlockConfirmation = 8;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
-    TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
+    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.CustomBlockConfirmationRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, customFinalityTransferFeeBps, rateLimitArgs);
+    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(minBlockConfirmation, rateLimitArgs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
     vm.expectEmit();
-    emit TokenPool.CustomFinalityOutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
+    emit TokenPool.CustomBlockConfirmationOutboundRateLimitConsumed(
+      DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount
+    );
 
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, finalityThreshold);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, minBlockConfirmation);
 
     RateLimiter.TokenBucket memory bucket =
       s_tokenPool.getCurrentCustomFinalityRateLimiterState(DEST_CHAIN_SELECTOR, IPoolV2.MessageDirection.Outbound);
     assertEq(bucket.tokens, outboundFastConfig.capacity - lockOrBurnIn.amount);
   }
 
-  function test_validateLockOrBurn_RevertWhen_InvalidFinality() public {
-    uint16 finalityThreshold = 5;
-    uint16 customFinalityTransferFeeBps = 500;
-    _applyCustomFinalityConfig(finalityThreshold, customFinalityTransferFeeBps);
+  function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmation() public {
+    uint16 minBlockConfirmation = 5;
+    _applyCustomFinalityConfig(minBlockConfirmation);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
     vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.InvalidFinality.selector, finalityThreshold - 1, finalityThreshold)
+      abi.encodeWithSelector(
+        TokenPool.InvalidMinBlockConfirmation.selector, minBlockConfirmation - 1, minBlockConfirmation
+      )
     );
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, finalityThreshold - 1);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, minBlockConfirmation - 1);
   }
 
-  function _applyCustomFinalityConfig(uint16 finalityThreshold, uint16 customFinalityTransferFeeBps) internal {
-    TokenPool.CustomFinalityRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.CustomFinalityRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.CustomFinalityRateLimitConfigArgs({
+  function _applyCustomFinalityConfig(
+    uint16 minBlockConfirmation
+  ) internal {
+    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.CustomBlockConfirmationRateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24})
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyFinalityConfigUpdates(finalityThreshold, customFinalityTransferFeeBps, rateLimitArgs);
+    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(minBlockConfirmation, rateLimitArgs);
   }
 
   function _buildLockOrBurnIn(
