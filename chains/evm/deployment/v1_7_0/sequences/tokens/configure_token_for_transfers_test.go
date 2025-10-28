@@ -92,7 +92,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 					},
 					OutboundCCVs: []string{"0x789"},
 					InboundCCVs:  []string{"0xabc"},
-					CustomFinalityConfig: &tokens_core.CustomFinalityRateLimiterConfig{
+					CustomBlockConfirmationConfig: &tokens_core.CustomBlockConfirmationRateLimiterConfig{
 						Inbound: tokens_core.RateLimiterConfig{
 							IsEnabled: true,
 							Capacity:  big.NewInt(600),
@@ -120,7 +120,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 					},
 					OutboundCCVs: []string{"0xdef"},
 					InboundCCVs:  []string{"0x012"},
-					CustomFinalityConfig: &tokens_core.CustomFinalityRateLimiterConfig{
+					CustomBlockConfirmationConfig: &tokens_core.CustomBlockConfirmationRateLimiterConfig{
 						Inbound: tokens_core.RateLimiterConfig{
 							IsEnabled: true,
 							Capacity:  big.NewInt(800),
@@ -136,9 +136,8 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			},
 			ExternalAdmin:   "", // Use internal admin
 			RegistryAddress: tokenAdminRegistryAddress,
-			FinalityConfig: &tokens_core.FinalityConfig{
-				FinalityThreshold:            12,
-				CustomFinalityTransferFeeBps: 345,
+			CustomBlockConfirmationConfig: &tokens_core.CustomBlockConfirmationConfig{
+				MinBlockConfirmation: 12,
 			},
 		}
 
@@ -169,13 +168,12 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		// Verify configuration for second remote chain
 		checkRemoteChainConfiguration(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2])
 
-		customFinalityConfig, err := tp.GetCustomFinalityConfig(nil)
-		require.NoError(t, err, "Failed to get custom finality config")
-		require.Equal(t, input.FinalityConfig.FinalityThreshold, customFinalityConfig.FinalityThreshold, "Finality threshold should match input")
-		require.Equal(t, input.FinalityConfig.CustomFinalityTransferFeeBps, customFinalityConfig.CustomFinalityTransferFeeBps, "Custom finality fee should match input")
+		minBlockConfirmation, err := tp.GetConfiguredMinBlockConfirmation(nil)
+		require.NoError(t, err, "Failed to get configured min block confirmation")
+		require.Equal(t, input.CustomBlockConfirmationConfig.MinBlockConfirmation, minBlockConfirmation, "Min block confirmation should match input")
 
-		assertCustomFinalityBucket(t, tp, remoteChainSel1, input.RemoteChains[remoteChainSel1].CustomFinalityConfig)
-		assertCustomFinalityBucket(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2].CustomFinalityConfig)
+		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel1, input.RemoteChains[remoteChainSel1].CustomBlockConfirmationConfig)
+		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2].CustomBlockConfirmationConfig)
 
 		// Verify token registration in token admin registry
 		tokenConfigReport, err := operations.ExecuteOperation(
@@ -269,7 +267,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 					},
 					OutboundCCVs: []string{"0x999"},
 					InboundCCVs:  []string{"0xaa0"},
-					CustomFinalityConfig: &tokens_core.CustomFinalityRateLimiterConfig{
+					CustomBlockConfirmationConfig: &tokens_core.CustomBlockConfirmationRateLimiterConfig{
 						Inbound: tokens_core.RateLimiterConfig{
 							IsEnabled: true,
 							Capacity:  big.NewInt(111),
@@ -298,26 +296,26 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		tp, err := tp_bindings.NewTokenPool(common.HexToAddress(tokenPoolAddress), e.BlockChains.EVMChains()[chainSel].Client)
 		require.NoError(t, err, "Failed to instantiate token pool contract")
 
-		customFinalityConfig, err := tp.GetCustomFinalityConfig(nil)
-		require.NoError(t, err, "Failed to get custom finality config")
-		require.Equal(t, uint16(0), customFinalityConfig.FinalityThreshold, "Finality threshold should remain default")
-		require.Equal(t, uint16(0), customFinalityConfig.CustomFinalityTransferFeeBps, "Custom finality fee should remain default")
-		assertCustomFinalityBucket(t, tp, remoteChainSel, input.RemoteChains[remoteChainSel].CustomFinalityConfig)
+		minBlockConfirmation, err := tp.GetConfiguredMinBlockConfirmation(nil)
+		require.NoError(t, err, "Failed to get configured min block confirmation")
+		require.Equal(t, uint16(0), minBlockConfirmation, "Min block confirmation should remain default")
+		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel, input.RemoteChains[remoteChainSel].CustomBlockConfirmationConfig)
 	})
 }
 
 // checkRemoteChainConfiguration verifies the configuration for a remote chain on the token pool
 func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remoteChainSel uint64, config tokens_core.RemoteChainConfig[[]byte, string]) {
+	rateLimiterStates, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel)
+	require.NoError(t, err, "Failed to get rate limiter state")
+
 	// Check inbound rate limiter
-	inboundRateLimiter, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, inbound)
-	require.NoError(t, err, "Failed to get inbound rate limiter state")
+	inboundRateLimiter := rateLimiterStates.InboundRateLimiterState
 	require.Equal(t, config.InboundRateLimiterConfig.IsEnabled, inboundRateLimiter.IsEnabled, "Inbound rate limiter enabled state should match")
 	require.Equal(t, config.InboundRateLimiterConfig.Rate, inboundRateLimiter.Rate, "Inbound rate limiter rate should match")
 	require.Equal(t, config.InboundRateLimiterConfig.Capacity, inboundRateLimiter.Capacity, "Inbound rate limiter capacity should match")
 
 	// Check outbound rate limiter
-	outboundRateLimiter, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, outbound)
-	require.NoError(t, err, "Failed to get outbound rate limiter state")
+	outboundRateLimiter := rateLimiterStates.OutboundRateLimiterState
 	require.Equal(t, config.OutboundRateLimiterConfig.IsEnabled, outboundRateLimiter.IsEnabled, "Outbound rate limiter enabled state should match")
 	require.Equal(t, config.OutboundRateLimiterConfig.Rate, outboundRateLimiter.Rate, "Outbound rate limiter rate should match")
 	require.Equal(t, config.OutboundRateLimiterConfig.Capacity, outboundRateLimiter.Capacity, "Outbound rate limiter capacity should match")
@@ -347,21 +345,19 @@ func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remo
 	}
 }
 
-func assertCustomFinalityBucket(
+func assertCustomBlockConfirmationBucket(
 	t *testing.T,
 	tp *tp_bindings.TokenPool,
 	remoteChainSel uint64,
-	expected *tokens_core.CustomFinalityRateLimiterConfig,
+	expected *tokens_core.CustomBlockConfirmationRateLimiterConfig,
 ) {
-	require.NotNil(t, expected, "expected custom finality config must be provided for selector %d", remoteChainSel)
+	require.NotNil(t, expected, "expected custom block confirmation config must be provided for selector %d", remoteChainSel)
 
-	outboundBucket, err := tp.GetCurrentCustomFinalityRateLimiterState(nil, remoteChainSel, outbound)
-	require.NoError(t, err, "Failed to get outbound custom finality bucket for selector %d", remoteChainSel)
-	inboundBucket, err := tp.GetCurrentCustomFinalityRateLimiterState(nil, remoteChainSel, inbound)
-	require.NoError(t, err, "Failed to get inbound custom finality bucket for selector %d", remoteChainSel)
+	states, err := tp.GetCurrentCustomBlockConfirmationRateLimiterState(nil, remoteChainSel)
+	require.NoError(t, err, "Failed to get custom block confirmation buckets for selector %d", remoteChainSel)
 
-	assertBucketMatchesConfig(t, outboundBucket, expected.Outbound)
-	assertBucketMatchesConfig(t, inboundBucket, expected.Inbound)
+	assertBucketMatchesConfig(t, states.OutboundRateLimiterState, expected.Outbound)
+	assertBucketMatchesConfig(t, states.InboundRateLimiterState, expected.Inbound)
 }
 
 func assertBucketMatchesConfig(t *testing.T, actual tp_bindings.RateLimiterTokenBucket, expected tokens_core.RateLimiterConfig) {

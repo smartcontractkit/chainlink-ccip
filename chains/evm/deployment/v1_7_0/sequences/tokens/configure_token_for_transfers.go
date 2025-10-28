@@ -30,7 +30,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		// Configure remote chains on the token pool as specified
 		// This means adding any remote chains not already added, removing any remote chains that are no longer desired,
 		// or modifying rate limiters on any existing remote chains.
-		customFinalityArgs := make([]token_pool.CustomFinalityRateLimitConfigArg, 0, len(input.RemoteChains))
+		customBlockConfirmationArgs := make([]token_pool.CustomBlockConfirmationRateLimitConfigArg, 0, len(input.RemoteChains))
 		for destChainSelector, remoteChainConfig := range input.RemoteChains {
 			configureTokenPoolForRemoteChainReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
 				ChainSelector:       input.ChainSelector,
@@ -43,9 +43,9 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			}
 			ops = append(ops, configureTokenPoolForRemoteChainReport.Output.BatchOps...)
 
-			if remoteChainConfig.CustomFinalityConfig != nil {
-				cfg := remoteChainConfig.CustomFinalityConfig
-				customFinalityArgs = append(customFinalityArgs, token_pool.CustomFinalityRateLimitConfigArg{
+			if remoteChainConfig.CustomBlockConfirmationConfig != nil {
+				cfg := remoteChainConfig.CustomBlockConfirmationConfig
+				customBlockConfirmationArgs = append(customBlockConfirmationArgs, token_pool.CustomBlockConfirmationRateLimitConfigArg{
 					RemoteChainSelector:       destChainSelector,
 					OutboundRateLimiterConfig: cfg.Outbound,
 					InboundRateLimiterConfig:  cfg.Inbound,
@@ -53,38 +53,37 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			}
 		}
 
-		finalityWrites := make([]evm_contract.WriteOutput, 0, 1)
-		if input.FinalityConfig != nil {
-			applyFinalityReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyFinalityConfigUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyFinalityConfigArgs]{
+		blockConfirmationWrites := make([]evm_contract.WriteOutput, 0, 1)
+		if input.CustomBlockConfirmationConfig != nil {
+			applyConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyCustomBlockConfirmationConfigUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyCustomBlockConfirmationConfigArgs]{
 				ChainSelector: input.ChainSelector,
 				Address:       common.HexToAddress(input.TokenPoolAddress),
-				Args: token_pool.ApplyFinalityConfigArgs{
-					FinalityThreshold:            input.FinalityConfig.FinalityThreshold,
-					CustomFinalityTransferFeeBps: input.FinalityConfig.CustomFinalityTransferFeeBps,
-					RateLimitConfigArgs:          customFinalityArgs,
+				Args: token_pool.ApplyCustomBlockConfirmationConfigArgs{
+					MinBlockConfirmation: input.CustomBlockConfirmationConfig.MinBlockConfirmation,
+					RateLimitConfigArgs:  customBlockConfirmationArgs,
 				},
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply finality config updates on token pool %s: %w", input.TokenPoolAddress, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply custom block confirmation config updates on token pool %s: %w", input.TokenPoolAddress, err)
 			}
-			finalityWrites = append(finalityWrites, applyFinalityReport.Output)
-		} else if len(customFinalityArgs) > 0 {
-			setCustomFinalityReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetCustomFinalityRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.CustomFinalityRateLimitConfigArg]{
+			blockConfirmationWrites = append(blockConfirmationWrites, applyConfigReport.Output)
+		} else if len(customBlockConfirmationArgs) > 0 {
+			setConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetCustomBlockConfirmationRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.CustomBlockConfirmationRateLimitConfigArg]{
 				ChainSelector: input.ChainSelector,
 				Address:       common.HexToAddress(input.TokenPoolAddress),
-				Args:          customFinalityArgs,
+				Args:          customBlockConfirmationArgs,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set custom finality rate limits on token pool %s: %w", input.TokenPoolAddress, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set custom block confirmation rate limits on token pool %s: %w", input.TokenPoolAddress, err)
 			}
-			finalityWrites = append(finalityWrites, setCustomFinalityReport.Output)
+			blockConfirmationWrites = append(blockConfirmationWrites, setConfigReport.Output)
 		}
-		if len(finalityWrites) > 0 {
-			finalityBatch, err := evm_contract.NewBatchOperationFromWrites(finalityWrites)
+		if len(blockConfirmationWrites) > 0 {
+			blockConfirmationBatch, err := evm_contract.NewBatchOperationFromWrites(blockConfirmationWrites)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for finality configuration: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for custom block confirmation configuration: %w", err)
 			}
-			ops = append(ops, finalityBatch)
+			ops = append(ops, blockConfirmationBatch)
 		}
 
 		tokenAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[any]{

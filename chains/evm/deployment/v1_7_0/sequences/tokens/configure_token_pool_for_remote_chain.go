@@ -7,15 +7,19 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/token_pool"
+	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/token_pool"
+
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -105,24 +109,17 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			// Only proceed further if we do NOT need to remove and re-add the chain
 			if len(removes) == 0 {
 				// Check existing rate limiters
-				inboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentInboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
+				rateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
 					Args:          input.RemoteChainSelector,
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get inbound rate limiter state: %w", err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get rate limiter state: %w", err)
 				}
-				outboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentOutboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-					Args:          input.RemoteChainSelector,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get outbound rate limiter state: %w", err)
-				}
+				currentStates := rateLimiterStateReport.Output
 				// Update the rate limiters if they do not match the desired config
-				if !rateLimiterConfigsEqual(inboundRateLimiterReport.Output, input.RemoteChainConfig.InboundRateLimiterConfig) || !rateLimiterConfigsEqual(outboundRateLimiterReport.Output, input.RemoteChainConfig.OutboundRateLimiterConfig) {
+				if !rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, input.RemoteChainConfig.InboundRateLimiterConfig) || !rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, input.RemoteChainConfig.OutboundRateLimiterConfig) {
 					setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetChainRateLimiterConfigs, chain, evm_contract.FunctionInput[[]token_pool.SetChainRateLimiterConfigArg]{
 						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
@@ -211,7 +208,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 )
 
 // rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.
-func rateLimiterConfigsEqual(current token_pool.RateLimiterBucket, desired tokens.RateLimiterConfig) bool {
+func rateLimiterConfigsEqual(current tp_bindings.RateLimiterTokenBucket, desired tokens.RateLimiterConfig) bool {
 	return current.IsEnabled == desired.IsEnabled &&
 		current.Capacity == desired.Capacity &&
 		current.Rate == desired.Rate

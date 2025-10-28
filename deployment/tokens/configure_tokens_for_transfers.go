@@ -29,8 +29,8 @@ type TokenTransferConfig struct {
 	RegistryRef datastore.AddressRef
 	// RemoteChains specifies the remote chains to configure on the token pool.
 	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]
-	// FinalityConfig optionally overrides global custom-finality parameters on the pool.
-	FinalityConfig *FinalityConfig
+	// CustomBlockConfirmationConfig optionally overrides global custom block confirmation parameters on the pool.
+	CustomBlockConfirmationConfig *CustomBlockConfirmationConfig
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -85,12 +85,12 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 				}
 			}
 			configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-				ChainSelector:    token.ChainSelector,
-				TokenPoolAddress: tokenPool.Address,
-				RemoteChains:     remoteChains,
-				ExternalAdmin:    token.ExternalAdmin,
-				RegistryAddress:  registry.Address,
-				FinalityConfig:   token.FinalityConfig,
+				ChainSelector:                 token.ChainSelector,
+				TokenPoolAddress:              tokenPool.Address,
+				RemoteChains:                  remoteChains,
+				ExternalAdmin:                 token.ExternalAdmin,
+				RegistryAddress:               registry.Address,
+				CustomBlockConfirmationConfig: token.CustomBlockConfirmationConfig,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)
@@ -115,9 +115,9 @@ func convertRemoteChainConfig(
 	inCfg RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef],
 ) (RemoteChainConfig[[]byte, string], error) {
 	outCfg := RemoteChainConfig[[]byte, string]{
-		InboundRateLimiterConfig:  inCfg.InboundRateLimiterConfig,
-		OutboundRateLimiterConfig: inCfg.OutboundRateLimiterConfig,
-		CustomFinalityConfig:      inCfg.CustomFinalityConfig,
+		InboundRateLimiterConfig:      inCfg.InboundRateLimiterConfig,
+		OutboundRateLimiterConfig:     inCfg.OutboundRateLimiterConfig,
+		CustomBlockConfirmationConfig: inCfg.CustomBlockConfirmationConfig,
 	}
 	if inCfg.RemotePool != nil {
 		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
