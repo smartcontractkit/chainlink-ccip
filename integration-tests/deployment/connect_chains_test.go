@@ -15,15 +15,20 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -178,6 +183,8 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		out.DataStore.Merge(e.DataStore)
 		e.DataStore = out.DataStore.Seal()
 	}
+	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 	evmEncoded, err := hex.DecodeString(cciputils.EVMFamilySelector)
 	require.NoError(t, err, "Failed to decode EVM family selector")
 	svmEncoded, err := hex.DecodeString(cciputils.SVMFamilySelector)
@@ -193,7 +200,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
 	}
 
-	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,
@@ -201,8 +208,26 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 				ChainB:  chain2,
 			},
 		},
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			MCMSAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(utils.McmProgramType),
+				Qualifier: common_utils.CLLQualifier,
+				Version:   semver.MustParse("1.6.0"),
+			},
+			TimelockAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(utils.TimelockCompositeAddress),
+				Version:   semver.MustParse("1.6.0"),
+				Qualifier: common_utils.CLLQualifier,
+			},
+			Description: "Connect Chains",
+		},
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
+	testhelpers.ProcessTimelockProposals(t, *e, connectOut.MCMSTimelockProposals, false)
 	laneRegistry := lanesapi.GetLaneAdapterRegistry()
 	srcFamily, err := chain_selectors.GetSelectorFamily(chain1.Selector)
 	require.NoError(t, err, "must get selector family for src")
