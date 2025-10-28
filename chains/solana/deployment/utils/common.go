@@ -21,10 +21,9 @@ import (
 const (
 	TimelockProgramType cldf_deployment.ContractType = "RBACTimelockProgram"
 	McmProgramType      cldf_deployment.ContractType = "ManyChainMultiSigProgram"
+	// special type for Solana that encodes PDA seed usage
+	TimelockCompositeAddress cldf_deployment.ContractType = "RBACTimelockProgramCompositeAddress"
 )
-
-// special type for Solana that encodes PDA seed usage
-const TimelockCompositeAddress cldf_deployment.ContractType = "RBACTimelockProgramCompositeAddress"
 
 // Common parameters for transferring ownership of a program
 type TransferOwnershipParams struct {
