@@ -17,8 +17,8 @@ import (
 )
 
 type MCMSDeploymentConfig struct {
-	Chains  map[uint64]MCMSDeploymentConfigPerChain `json:"chains"`
-	Version *semver.Version                         `json:"version"`
+	Chains         map[uint64]MCMSDeploymentConfigPerChain `json:"chains"`
+	AdapterVersion *semver.Version                         `json:"adapterVersion"`
 }
 
 type MCMSDeploymentConfigPerChain struct {
@@ -44,8 +44,8 @@ func DeployMCMS(deployerReg *DeployerRegistry) cldf.ChangeSetV2[MCMSDeploymentCo
 func deployMCMSVerify(_ *DeployerRegistry) func(cldf.Environment, MCMSDeploymentConfig) error {
 	return func(e cldf.Environment, cfg MCMSDeploymentConfig) error {
 		// TODO: implement
-		if cfg.Version == nil {
-			return fmt.Errorf("version is required for MCMS deployment verification")
+		if cfg.AdapterVersion == nil {
+			return fmt.Errorf("adapter version is required for MCMS deployment verification")
 		}
 		return nil
 	}
@@ -60,9 +60,9 @@ func deployMCMSApply(d *DeployerRegistry) func(cldf.Environment, MCMSDeploymentC
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			deployer, exists := d.GetDeployer(family, cfg.Version)
+			deployer, exists := d.GetDeployer(family, cfg.AdapterVersion)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, cfg.Version.String())
+				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, cfg.AdapterVersion.String())
 			}
 			// find existing addresses for this chain from the env
 			existingAddrs := d.ExistingAddressesForChain(e, selector)

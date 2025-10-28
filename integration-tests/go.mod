@@ -32,6 +32,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20251014191100-bad58388f0c9
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-deployments-framework v0.56.0
+	github.com/smartcontractkit/mcms v0.25.0
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -229,7 +230,6 @@ require (
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d // indirect
-	github.com/smartcontractkit/mcms v0.25.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/stephenlacy/go-ethereum-hdwallet v0.0.0-20230913225845-a4fa94429863 // indirect
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect

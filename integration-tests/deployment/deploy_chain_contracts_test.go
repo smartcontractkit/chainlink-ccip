@@ -23,10 +23,13 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 func TestDeployChainContracts_Apply(t *testing.T) {
@@ -67,7 +70,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 	cs := mcmsapi.DeployMCMS(dReg)
 	output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
-		Version: version,
+		AdapterVersion: version,
 		Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
 			chain_selectors.SOLANA_MAINNET.Selector: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -80,7 +83,138 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
+	output.DataStore.Merge(e.DataStore)
 	e.DataStore = output.DataStore.Seal()
+	chain := e.BlockChains.SolanaChains()[chain_selectors.SOLANA_MAINNET.Selector]
+	timelockSigner := utils.GetTimelockSignerPDA(
+		e.DataStore.Addresses().Filter(),
+		common_utils.CLLQualifier)
+	mcmSigner := utils.GetMCMSignerPDA(
+		e.DataStore.Addresses().Filter(),
+		common_utils.CLLQualifier,
+	)
+	timelockCompositeAddress := utils.GetTimelockCompositeAddress(
+		e.DataStore.Addresses().Filter(),
+		common_utils.CLLQualifier)
+	err = utils.FundSolanaAccounts(
+		context.Background(),
+		[]solana.PublicKey{timelockSigner, mcmSigner},
+		100,
+		chain.Client,
+	)
+	require.NoError(t, err)
+	t.Logf("Timelock Signer PDA: %s", timelockSigner.String())
+	t.Logf("Timelock Composite Address: %s", timelockCompositeAddress)
+	mcmsInput := mcmsapi.TransferOwnershipInput{
+		ChainInputs: []mcmsapi.TransferOwnershipPerChainInput{
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(routerops.ContractType),
+						Version: routerops.Version,
+					},
+				},
+				CurrentOwner:  chain.DeployerKey.PublicKey().String(),
+				ProposedOwner: timelockSigner.String(),
+			},
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(offrampops.ContractType),
+						Version: offrampops.Version,
+					},
+				},
+				CurrentOwner:  chain.DeployerKey.PublicKey().String(),
+				ProposedOwner: timelockSigner.String(),
+			},
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(fqops.ContractType),
+						Version: fqops.Version,
+					},
+				},
+				CurrentOwner:  chain.DeployerKey.PublicKey().String(),
+				ProposedOwner: timelockSigner.String(),
+			},
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(rmnremoteops.ContractType),
+						Version: rmnremoteops.Version,
+					},
+				},
+				CurrentOwner:  chain.DeployerKey.PublicKey().String(),
+				ProposedOwner: timelockSigner.String(),
+			},
+		},
+		AdapterVersion: semver.MustParse("1.6.0"),
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			MCMSAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(utils.McmProgramType),
+				Qualifier: common_utils.CLLQualifier,
+				Version:   semver.MustParse("1.6.0"),
+			},
+			TimelockAddressRef: datastore.AddressRef{
+				Type:      datastore.ContractType(utils.TimelockCompositeAddress),
+				Version:   semver.MustParse("1.6.0"),
+				Qualifier: common_utils.CLLQualifier,
+			},
+			Description: "Transfer ownership test",
+		},
+	}
+
+	transferOutput, err := mcmsapi.TransferOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
+	require.NoError(t, err)
+	require.Greater(t, len(transferOutput.Reports), 0)
+	require.Equal(t, 0, len(transferOutput.MCMSTimelockProposals))
+
+	acceptOutput, err := mcmsapi.AcceptOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
+	require.NoError(t, err)
+	require.Greater(t, len(acceptOutput.Reports), 0)
+	require.Equal(t, 1, len(acceptOutput.MCMSTimelockProposals))
+
+	testhelpers.ProcessTimelockProposals(t, *e, acceptOutput.MCMSTimelockProposals, false)
+	// router verify
+	program := datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		routerops.ContractType,
+		common_utils.Version_1_6_0,
+		"",
+	)
+	require.Equal(t, timelockSigner, routerops.GetAuthority(chain, solana.MustPublicKeyFromBase58(program.Address)))
+	// offramp verify
+	program = datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		offrampops.ContractType,
+		common_utils.Version_1_6_0,
+		"",
+	)
+	require.Equal(t, timelockSigner, offrampops.GetAuthority(chain, solana.MustPublicKeyFromBase58(program.Address)))
+	// fee quoter verify
+	program = datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		fqops.ContractType,
+		common_utils.Version_1_6_0,
+		"",
+	)
+	require.Equal(t, timelockSigner, fqops.GetAuthority(chain, solana.MustPublicKeyFromBase58(program.Address)))
+	// rmn remote verify
+	program = datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		rmnremoteops.ContractType,
+		common_utils.Version_1_6_0,
+		"",
+	)
+	require.Equal(t, timelockSigner, rmnremoteops.GetAuthority(chain, solana.MustPublicKeyFromBase58(program.Address)))
 }
 
 var solanaProgramIDs = map[string]string{
@@ -104,8 +238,8 @@ var solanaContracts = map[string]datastore.ContractType{
 	"fee_quoter":        datastore.ContractType(fqops.ContractType),
 	"ccip_offramp":      datastore.ContractType(offrampops.ContractType),
 	"rmn_remote":        datastore.ContractType(rmnremoteops.ContractType),
-	"mcm":               datastore.ContractType(mcmsops.McmProgramType),
-	"timelock":          datastore.ContractType(mcmsops.TimelockProgramType),
+	"mcm":               datastore.ContractType(utils.McmProgramType),
+	"timelock":          datastore.ContractType(utils.TimelockProgramType),
 	"access_controller": datastore.ContractType(mcmsops.AccessControllerProgramType),
 }
 

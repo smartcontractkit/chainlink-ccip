@@ -45,6 +45,10 @@ var (
 	}
 )
 
+var (
+	Version_1_6_0 = semver.MustParse("1.6.0")
+)
+
 func NewRegistererID(chainFamily string, version *semver.Version) string {
 	return fmt.Sprintf("%s-%s", chainFamily, version.String())
 }
