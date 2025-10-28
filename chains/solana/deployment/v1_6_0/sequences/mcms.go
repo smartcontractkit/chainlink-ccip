@@ -55,9 +55,6 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 			accessControllerAddress := solana.MustPublicKeyFromBase58(accessControllerRef.Output.Address)
 			mcmAddress := solana.MustPublicKeyFromBase58(mcmRef.Output.Address)
 			timelockAddress := solana.MustPublicKeyFromBase58(timelockRef.Output.Address)
-			access_controller.SetProgramID(accessControllerAddress)
-			mcm.SetProgramID(mcmAddress)
-			timelock.SetProgramID(timelockAddress)
 
 			deps := mcmsops.Deps{
 				Chain:             chain,
