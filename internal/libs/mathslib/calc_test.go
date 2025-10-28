@@ -221,6 +221,7 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 			chainSelector:  SuiChainSelector,
 			exp:            big.NewInt(0),
 		},
+		{
 			name:           "ton base case",
 			sourceGasPrice: big.NewInt(400),
 			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(2), big.NewInt(1e18)),
