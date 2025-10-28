@@ -16,19 +16,15 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
       defaultBlockConfirmationFeeUSDCents: 75,
       customBlockConfirmationFeeUSDCents: 125,
       defaultBlockConfirmationTransferFeeBps: defaultFeeBps,
-      customBlockConfirmationTransferFeeBps: 400,
-      isEnabled: true
+      customBlockConfirmationTransferFeeBps: 400
     });
 
-    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
-    feeConfigArgs[0] =
-      TokenPool.TokenTransferFeeConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, tokenTransferFeeConfig: feeConfig});
     vm.startPrank(OWNER);
-    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+    _applyFeeConfig(feeConfig);
 
     uint256 amount = 1_000e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
-      s_tokenPool.getFee(DEST_CHAIN_SELECTOR, address(s_token), amount, address(0), 0, "");
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), 0, "");
 
     assertEq(usdFeeCents, feeConfig.defaultBlockConfirmationFeeUSDCents);
     assertEq(destGasOverhead, feeConfig.destGasOverhead);
@@ -44,19 +40,15 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
       defaultBlockConfirmationFeeUSDCents: 80,
       customBlockConfirmationFeeUSDCents: 150,
       defaultBlockConfirmationTransferFeeBps: 0,
-      customBlockConfirmationTransferFeeBps: customFeeBps,
-      isEnabled: true
+      customBlockConfirmationTransferFeeBps: customFeeBps
     });
 
-    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
-    feeConfigArgs[0] =
-      TokenPool.TokenTransferFeeConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, tokenTransferFeeConfig: feeConfig});
     vm.startPrank(OWNER);
-    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+    _applyFeeConfig(feeConfig);
 
     uint256 amount = 1_500e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
-      s_tokenPool.getFee(DEST_CHAIN_SELECTOR, address(s_token), amount, address(0), 5, "");
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), 5, "");
 
     assertEq(usdFeeCents, feeConfig.customBlockConfirmationFeeUSDCents);
     assertEq(destGasOverhead, feeConfig.destGasOverhead);
@@ -64,14 +56,56 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
     assertEq(tokenFeeBps, customFeeBps);
   }
 
-  function test_getFee_DisabledConfig() public view {
+  function test_getFee_NoConfig() public view {
     uint256 amount = 777e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps) =
-      s_tokenPool.getFee(DEST_CHAIN_SELECTOR, address(s_token), amount, address(0), 0, "");
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), 0, "");
 
     assertEq(usdFeeCents, 0);
     assertEq(destGasOverhead, 0);
     assertEq(destBytesOverhead, 0);
     assertEq(tokenFeeBps, 0);
+  }
+
+  // Reverts
+
+  function test_getFee_RevertWhen_BlockConfirmationBelowMinimum() public {
+    uint16 minBlockConfirmation = 10;
+
+    vm.startPrank(OWNER);
+    // Set custom block confirmation config with minimum of 10 blocks
+    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(
+      minBlockConfirmation, new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](0)
+    );
+
+    IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
+      destGasOverhead: 50_000,
+      destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+      defaultBlockConfirmationFeeUSDCents: 75,
+      customBlockConfirmationFeeUSDCents: 125,
+      defaultBlockConfirmationTransferFeeBps: 100,
+      customBlockConfirmationTransferFeeBps: 200
+    });
+    _applyFeeConfig(feeConfig);
+    vm.stopPrank();
+
+    uint256 amount = 1_000e6;
+    uint16 requestedBlockConfirmation = 5; // Less than minimum of 10
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        TokenPool.InvalidMinBlockConfirmation.selector, requestedBlockConfirmation, minBlockConfirmation
+      )
+    );
+    s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), requestedBlockConfirmation, "");
+  }
+
+  function _applyFeeConfig(
+    IPoolV2.TokenTransferFeeConfig memory feeConfig
+  ) internal {
+    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
+    feeConfigArgs[0] =
+      TokenPool.TokenTransferFeeConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, tokenTransferFeeConfig: feeConfig});
+    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
   }
 }

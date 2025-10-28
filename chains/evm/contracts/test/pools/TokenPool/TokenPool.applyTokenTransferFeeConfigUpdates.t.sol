@@ -16,8 +16,7 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
       defaultBlockConfirmationFeeUSDCents: 100, // $1.00
       customBlockConfirmationFeeUSDCents: 150, // $1.50
       defaultBlockConfirmationTransferFeeBps: 100, // 1%
-      customBlockConfirmationTransferFeeBps: 200, // 2%
-      isEnabled: true
+      customBlockConfirmationTransferFeeBps: 200 // 2%
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -39,8 +38,7 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
       defaultBlockConfirmationFeeUSDCents: 100,
       customBlockConfirmationFeeUSDCents: 150,
       defaultBlockConfirmationTransferFeeBps: 100,
-      customBlockConfirmationTransferFeeBps: 200,
-      isEnabled: true
+      customBlockConfirmationTransferFeeBps: 200
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -80,8 +78,7 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
       defaultBlockConfirmationFeeUSDCents: 0,
       customBlockConfirmationFeeUSDCents: 0,
       defaultBlockConfirmationTransferFeeBps: uint16(BPS_DIVIDER),
-      customBlockConfirmationTransferFeeBps: 0,
-      isEnabled: true
+      customBlockConfirmationTransferFeeBps: 0
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -99,8 +96,7 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
       defaultBlockConfirmationFeeUSDCents: 0,
       customBlockConfirmationFeeUSDCents: 0,
       defaultBlockConfirmationTransferFeeBps: 0,
-      customBlockConfirmationTransferFeeBps: uint16(BPS_DIVIDER),
-      isEnabled: true
+      customBlockConfirmationTransferFeeBps: uint16(BPS_DIVIDER)
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);

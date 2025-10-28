@@ -16,8 +16,7 @@ interface IPoolV2 is IPoolV1 {
     uint32 customBlockConfirmationFeeUSDCents; //     │ Fee to charge for token transfer with custom block confirmation, multiples of 0.01 USD.
     //                                                │ The following two fee is deducted from the transferred asset, not added on top.
     uint16 defaultBlockConfirmationTransferFeeBps; // │ Fee in basis points for default finality transfers [0-10_000].
-    uint16 customBlockConfirmationTransferFeeBps; //  │ Fee in basis points for custom finality transfers [0-10_000].
-    bool isEnabled; // ───────────────────────────────╯ Whether this token has custom transfer fees.
+    uint16 customBlockConfirmationTransferFeeBps; // ─╯ Fee in basis points for custom finality transfers [0-10_000].
   }
 
   enum CCVDirection {
@@ -79,8 +78,8 @@ interface IPoolV2 is IPoolV1 {
   ) external view returns (TokenTransferFeeConfig memory feeConfig);
 
   /// @notice Returns the pool fee parameters that will apply to a transfer.
-  /// @param destChainSelector The destination lane selector.
   /// @param localToken The local asset being transferred.
+  /// @param destChainSelector The destination lane selector.
   /// @param amount The amount of tokens being bridged on this lane.
   /// @param feeToken The token used to pay feeUSDCents.
   /// @param blockConfirmationRequested Requested block confirmation.
@@ -90,8 +89,8 @@ interface IPoolV2 is IPoolV1 {
   /// @return destBytesOverhead Destination calldata size attributed to the transfer.
   /// @return tokenFeeBps Bps charged in token units. Value of zero implies no in-token fee.
   function getFee(
-    uint64 destChainSelector,
     address localToken,
+    uint64 destChainSelector,
     uint256 amount,
     address feeToken,
     uint16 blockConfirmationRequested,
