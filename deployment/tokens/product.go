@@ -38,16 +38,16 @@ type RateLimiterConfig struct {
 	Rate *big.Int
 }
 
-// CustomFinalityRateLimiterConfig encapsulates rate limiter settings applied to custom-finality transfers.
-type CustomFinalityRateLimiterConfig struct {
+// CustomBlockConfirmationRateLimiterConfig encapsulates rate limiter settings applied to
+// custom block confirmation transfers.
+type CustomBlockConfirmationRateLimiterConfig struct {
 	Inbound  RateLimiterConfig
 	Outbound RateLimiterConfig
 }
 
-// FinalityConfig captures global custom-finality parameters for a token pool.
-type FinalityConfig struct {
-	FinalityThreshold            uint16
-	CustomFinalityTransferFeeBps uint16
+// CustomBlockConfirmationConfig captures global custom block confirmation parameters for a token pool.
+type CustomBlockConfirmationConfig struct {
+	MinBlockConfirmation uint16
 }
 
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
@@ -65,8 +65,9 @@ type RemoteChainConfig[R any, CCV any] struct {
 	OutboundCCVs []CCV
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.
 	InboundCCVs []CCV
-	// CustomFinalityConfig optionally overrides the rate limiter behaviour for custom-finality transfers.
-	CustomFinalityConfig *CustomFinalityRateLimiterConfig
+	// CustomBlockConfirmationConfig optionally overrides the rate limiter behaviour for
+	// transfers that request a custom block confirmation depth.
+	CustomBlockConfirmationConfig *CustomBlockConfirmationRateLimiterConfig
 }
 
 // ConfigureTokenForTransfersInput is the input for the ConfigureTokenForTransfers sequence.
@@ -81,8 +82,8 @@ type ConfigureTokenForTransfersInput struct {
 	ExternalAdmin string
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
 	RegistryAddress string
-	// FinalityConfig optionally overrides global custom-finality parameters on the pool.
-	FinalityConfig *FinalityConfig
+	// CustomBlockConfirmationConfig optionally overrides global custom block confirmation parameters on the pool.
+	CustomBlockConfirmationConfig *CustomBlockConfirmationConfig
 }
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
