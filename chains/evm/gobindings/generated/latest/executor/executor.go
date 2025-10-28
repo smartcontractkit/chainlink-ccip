@@ -33,29 +33,34 @@ type ClientCCV struct {
 	Args       []byte
 }
 
-type ClientEVM2AnyMessage struct {
-	Receiver     []byte
-	Data         []byte
-	TokenAmounts []ClientEVMTokenAmount
-	FeeToken     common.Address
-	ExtraArgs    []byte
+type ExecutorDynamicConfig struct {
+	FeeAggregator         common.Address
+	MinBlockConfirmations uint16
+	CcvAllowlistEnabled   bool
 }
 
-type ClientEVMTokenAmount struct {
-	Token  common.Address
-	Amount *big.Int
+type ExecutorRemoteChainConfig struct {
+	UsdCentsFee            uint16
+	BaseExecGas            uint32
+	DestAddressLengthBytes uint8
+	Enabled                bool
+}
+
+type ExecutorRemoteChainConfigArgs struct {
+	DestChainSelector uint64
+	Config            ExecutorRemoteChainConfig
 }
 
 var ExecutorMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"maxCCVsPerMsg\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAllowedCCVUpdates\",\"inputs\":[{\"name\":\"ccvsToRemove\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"ccvsToAdd\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"ccvAllowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyDestChainUpdates\",\"inputs\":[{\"name\":\"destChainSelectorsToRemove\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"destChainSelectorsToAdd\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAllowedCCVs\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDestChains\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFee\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Client.EVM2AnyMessage\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"struct Client.EVMTokenAmount[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"feeToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"extraArgs\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"ccvs\",\"type\":\"tuple[]\",\"internalType\":\"struct Client.CCV[]\",\"components\":[{\"name\":\"ccvAddress\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"args\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getMaxCCVsPerMsg\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isCCVAllowlistEnabled\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setMaxCCVsPerMsg\",\"inputs\":[{\"name\":\"maxCCVsPerMsg\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"CCVAdded\",\"inputs\":[{\"name\":\"ccv\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCVAllowlistUpdated\",\"inputs\":[{\"name\":\"enabled\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCVRemoved\",\"inputs\":[{\"name\":\"ccv\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DestChainAdded\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DestChainRemoved\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"MaxCCVsPerMsgSet\",\"inputs\":[{\"name\":\"maxCCVsPerMsg\",\"type\":\"uint8\",\"indexed\":false,\"internalType\":\"uint8\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ExceedsMaxCCVs\",\"inputs\":[{\"name\":\"provided\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"max\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidCCV\",\"inputs\":[{\"name\":\"ccv\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidDestChain\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidMaxPossibleCCVsPerMsg\",\"inputs\":[{\"name\":\"maxPossibleCCVsPerMsg\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]}]",
-	Bin: "0x6080346100e157601f61138138819003918201601f19168301916001600160401b038311848410176100e6578084926020946040528339810103126100e1575160ff8116908181036100e15733156100d0576001549082156100bb576001600160a81b03199091163360ff60a01b19161760a09190911b60ff60a01b16176001556040519081527fcd39dd44d856487a5d3ff100b17da01d09fd38f56a6bc6c1430458ec9cd31bd890602090a160405161128490816100fd8239f35b82631f3f959360e01b60005260045260246000fd5b639b15e16f60e01b60005260046000fd5b600080fd5b634e487b7160e01b600052604160045260246000fdfe608080604052600436101561001357600080fd5b60003560e01c908163181f5a7714610c5c57508063240b96e914610b13578063336e545a146108c657806339405842146107d957806379ba5097146106f05780638da5cb5b1461069e5780639dd507231461065a5780639f01e1641461044e578063a422fdb5146102cb578063a68c61a6146101dd578063f2fde38b146100ea5763fe3b4b1a146100a357600080fd5b346100e55760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e557602060ff60015460a01c16604051908152f35b600080fd5b346100e55760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e55760043573ffffffffffffffffffffffffffffffffffffffff81168091036100e557610142610e6a565b3381146101b357807fffffffffffffffffffffffff0000000000000000000000000000000000000000600054161760005573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b346100e55760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e5576040518060206002549283815201809260026000527f405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace9060005b8181106102b5575050508161025c910382610d6b565b6040519182916020830190602084525180915260408301919060005b818110610286575050500390f35b825173ffffffffffffffffffffffffffffffffffffffff16845285945060209384019390920191600101610278565b8254845260209093019260019283019201610246565b346100e55760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e55760043567ffffffffffffffff81116100e55761031a903690600401610dac565b9060243567ffffffffffffffff81116100e55761033b903690600401610dac565b919092610346610e6a565b60005b8181106103f35750505060005b81811061035f57005b67ffffffffffffffff61037b610376838587610df5565b610e55565b1680156103c657908161038f60019361121d565b61039b575b5001610356565b7f6e9c954f174a6a41806c1779c207ed29eb3266ba1d60230290dd88ee6a8fb65f600080a284610394565b7f020a07e50000000000000000000000000000000000000000000000000000000060005260045260246000fd5b8067ffffffffffffffff61040d6103766001948688610df5565b1661041781611092565b610423575b5001610349565b7ff74668182f6a521d1a362a6bbc8344cac3a467bab207cdabbaf39e503edef6a1600080a28661041c565b346100e55760807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e55760043567ffffffffffffffff81168091036100e55760243567ffffffffffffffff81116100e5577ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc60a091360301126100e55760443567ffffffffffffffff81116100e5576104f0903690600401610dac565b9160643567ffffffffffffffff81116100e557366023820112156100e557806004013567ffffffffffffffff81116100e557369101602401116100e557806000526005602052604060002054156103c6575060015460ff8160a81c1661059c575b60ff915060a01c169081811161056c57602060405160008152f35b7ff2d323530000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b916000907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc183360301915b8181101561064d5760008160051b850135848112156106495761060073ffffffffffffffffffffffffffffffffffffffff918701610e34565b16808252600360205260408220541561061d5750506001016105c7565b602492507fa409d83e000000000000000000000000000000000000000000000000000000008252600452fd5b5080fd5b5092905060ff9150610551565b346100e55760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e557602060ff60015460a81c166040519015158152f35b346100e55760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e557602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b346100e55760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e55760005473ffffffffffffffffffffffffffffffffffffffff811633036107af577fffffffffffffffffffffffff00000000000000000000000000000000000000006001549133828416176001551660005573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b346100e55760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e55760043560ff8116908181036100e55761081f610e6a565b8115610898577fcd39dd44d856487a5d3ff100b17da01d09fd38f56a6bc6c1430458ec9cd31bd8916020917fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff74ff00000000000000000000000000000000000000006001549260a01b16911617600155604051908152a1005b507f1f3f95930000000000000000000000000000000000000000000000000000000060005260045260246000fd5b346100e55760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e55760043567ffffffffffffffff81116100e557610915903690600401610dac565b9060243567ffffffffffffffff81116100e557610936903690600401610dac565b9091604435938415158095036100e55761094e610e6a565b60005b818110610a8b5750505060005b8181106109eb57836001548160ff8260a81c1615150361097a57005b816020917fffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffffff75ff0000000000000000000000000000000000000000007fd9e9ee812485edbbfab1d848c2c025cd0d1da3f7b9dcf38edf78c40ec4810ed89560a81b16911617600155604051908152a1005b73ffffffffffffffffffffffffffffffffffffffff610a13610a0e838587610df5565b610e34565b168015610a5e579081610a276001936111bd565b610a33575b500161095e565b7fba540b0c7a674c7f1716e91e0e0a2390ebb27755267c72e0807812b93f3bf00e600080a285610a2c565b7fa409d83e0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b80610aba73ffffffffffffffffffffffffffffffffffffffff610ab4610a0e6001958789610df5565b16610ecd565b610ac5575b01610951565b73ffffffffffffffffffffffffffffffffffffffff610ae8610a0e838688610df5565b167fbc743a2d04de950d86944633fbe825e492514eef584678e9fa97f3e939cf605e600080a2610abf565b346100e55760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e557600454610b4e81610ddd565b90610b5c6040519283610d6b565b808252610b6881610ddd565b907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe060208401920136833760045460005b828110610bef5783856040519182916020830190602084525180915260408301919060005b818110610bcc575050500390f35b825167ffffffffffffffff16845285945060209384019390920191600101610bbe565b600082821015610c2f576020816004849352200167ffffffffffffffff6000915416908651831015610c2f5750600582901b860160200152600101610b99565b807f4e487b7100000000000000000000000000000000000000000000000000000000602492526032600452fd5b346100e55760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100e5576040810181811067ffffffffffffffff821117610d3c57604052601281527f4578656375746f7220312e372e302d6465760000000000000000000000000000602082015260405190602082528181519182602083015260005b838110610d245750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f836000604080968601015201168101030190f35b60208282018101516040878401015285935001610ce4565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff821117610d3c57604052565b9181601f840112156100e55782359167ffffffffffffffff83116100e5576020808501948460051b0101116100e557565b67ffffffffffffffff8111610d3c5760051b60200190565b9190811015610e055760051b0190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b3573ffffffffffffffffffffffffffffffffffffffff811681036100e55790565b3567ffffffffffffffff811681036100e55790565b73ffffffffffffffffffffffffffffffffffffffff600154163303610e8b57565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b8054821015610e055760005260206000200190600090565b600081815260036020526040902054801561108b577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff810181811161105c57600254907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820191821161105c57818103610fed575b5050506002548015610fbe577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01610f7b816002610eb5565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b19169055600255600052600360205260006040812055600190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b611044610ffe61100f936002610eb5565b90549060031b1c9283926002610eb5565b81939154907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b90556000526003602052604060002055388080610f42565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b5050600090565b600081815260056020526040902054801561108b577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff810181811161105c57600454907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820191821161105c57818103611183575b5050506004548015610fbe577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01611140816004610eb5565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b19169055600455600052600560205260006040812055600190565b6111a561119461100f936004610eb5565b90549060031b1c9283926004610eb5565b90556000526005602052604060002055388080611107565b806000526003602052604060002054156000146112175760025468010000000000000000811015610d3c576111fe61100f8260018594016002556002610eb5565b9055600254906000526003602052604060002055600190565b50600090565b806000526005602052604060002054156000146112175760045468010000000000000000811015610d3c5761125e61100f8260018594016004556004610eb5565b905560045490600052600560205260406000205560019056fea164736f6c634300081a000a",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"maxCCVsPerMsg\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"dynamicConfig\",\"type\":\"tuple\",\"internalType\":\"struct Executor.DynamicConfig\",\"components\":[{\"name\":\"feeAggregator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"minBlockConfirmations\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"ccvAllowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAllowedCCVUpdates\",\"inputs\":[{\"name\":\"ccvsToRemove\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"ccvsToAdd\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"ccvAllowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyDestChainUpdates\",\"inputs\":[{\"name\":\"destChainSelectorsToRemove\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"destChainSelectorsToAdd\",\"type\":\"tuple[]\",\"internalType\":\"struct Executor.RemoteChainConfigArgs[]\",\"components\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"struct Executor.RemoteChainConfig\",\"components\":[{\"name\":\"usdCentsFee\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"baseExecGas\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destAddressLengthBytes\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAllowedCCVs\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDestChains\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"tuple[]\",\"internalType\":\"struct Executor.RemoteChainConfigArgs[]\",\"components\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"struct Executor.RemoteChainConfig\",\"components\":[{\"name\":\"usdCentsFee\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"baseExecGas\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destAddressLengthBytes\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDynamicConfig\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Executor.DynamicConfig\",\"components\":[{\"name\":\"feeAggregator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"minBlockConfirmations\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"ccvAllowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFee\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"requestedBlockDepth\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"dataLength\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"numberOfTokens\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"ccvs\",\"type\":\"tuple[]\",\"internalType\":\"struct Client.CCV[]\",\"components\":[{\"name\":\"ccvAddress\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"args\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"extraArgs\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"usdCentsFee\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"execGasCost\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"execBytes\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getMaxCCVsPerMessage\",\"inputs\":[],\"outputs\":[{\"name\":\"maxCCVsPerMsg\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getMinBlockConfirmations\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint16\",\"internalType\":\"uint16\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setDynamicConfig\",\"inputs\":[{\"name\":\"dynamicConfig\",\"type\":\"tuple\",\"internalType\":\"struct Executor.DynamicConfig\",\"components\":[{\"name\":\"feeAggregator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"minBlockConfirmations\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"ccvAllowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"withdrawFeeTokens\",\"inputs\":[{\"name\":\"feeTokens\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"CCVAdded\",\"inputs\":[{\"name\":\"ccv\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCVAllowlistUpdated\",\"inputs\":[{\"name\":\"enabled\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCVRemoved\",\"inputs\":[{\"name\":\"ccv\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ConfigSet\",\"inputs\":[{\"name\":\"dynamicConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct Executor.DynamicConfig\",\"components\":[{\"name\":\"feeAggregator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"minBlockConfirmations\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"ccvAllowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DestChainAdded\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"config\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct Executor.RemoteChainConfig\",\"components\":[{\"name\":\"usdCentsFee\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"baseExecGas\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destAddressLengthBytes\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DestChainRemoved\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeeTokenWithdrawn\",\"inputs\":[{\"name\":\"receiver\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"feeToken\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ExceedsMaxCCVs\",\"inputs\":[{\"name\":\"provided\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"max\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"Executor__RequestedBlockDepthTooLow\",\"inputs\":[{\"name\":\"requestedBlockDepth\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"minBlockConfirmations\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]},{\"type\":\"error\",\"name\":\"InvalidCCV\",\"inputs\":[{\"name\":\"ccv\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidConfig\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidDestChain\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidMaxPossibleCCVsPerMsg\",\"inputs\":[{\"name\":\"maxPossibleCCVsPerMsg\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]}]",
+	Bin: "0x60a0604052346101c957604051611e7438819003601f8101601f191683016001600160401b038111848210176101ce5783928291604052833981010390608082126101c95780519060ff8216928383036101c957606090601f1901126101c95760405191606083016001600160401b038111848210176101ce5760405260208201516001600160a01b03811681036101c957835260408201519161ffff831683036101c95760208401928352606001519384151585036101c9576040840194855233156101b857600180546001600160a01b0319163317905580156101a4575060805281516001600160a01b03161561019357905160028054835185516001600160b81b03199092166001600160a01b039490941693841760a09190911b61ffff60a01b161790151560b01b60ff60b01b1617905560408051918252915161ffff16602082015291511515908201527f4c475597c445491197895d935b9c8eaf2c59a575d8a4577ed31a8bbb48b6589290606090a1604051611c8f90816101e5823960805181818161073901526109ca0152f35b6306b7c75960e31b60005260046000fd5b631f3f959360e01b60005260045260246000fd5b639b15e16f60e01b60005260046000fd5b600080fd5b634e487b7160e01b600052604160045260246000fdfe6080604052600436101561001257600080fd5b60003560e01c8063181f5a7714611524578063240b96e9146112e4578063336e545a1461109c5780634c3281c514610f0d5780635cb80c5d14610bac5780637437ff9f14610ad757806379ba5097146109ee578063845024141461099257806384f369ce146106255780638da5cb5b146105d3578063a68c61a6146104e5578063a8eb211e146101ee578063b8d5005e146101ab5763f2fde38b146100b657600080fd5b346101a65760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a65773ffffffffffffffffffffffffffffffffffffffff6101026116ba565b61010a6117dc565b1633811461017c57807fffffffffffffffffffffffff0000000000000000000000000000000000000000600054161760005573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b600080fd5b346101a65760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a657602061ffff60025460a01c16604051908152f35b346101a65760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a65760043567ffffffffffffffff81116101a65761023d90369060040161167a565b6024359167ffffffffffffffff83116101a657366023840112156101a65782600401359167ffffffffffffffff83116101a65736602460a08502860101116101a6576102876117dc565b60005b8181106104755750505060005b818110156104735760a08102830160006024820167ffffffffffffffff6102bd826117c7565b1615610435576102de67ffffffffffffffff6102d8836117c7565b16611b60565b5067ffffffffffffffff6102f1826117c7565b1682526007602052604082209160448401359261ffff84169485850361043157815493606482013563ffffffff81169081810361042d5760848401359260ff8416948585036104295760a401359586151598898803610425579267ffffffffffffffff61040260809a979460019f9e9d9a97948d9a978f7f16ff55d9c2b936d957d46720f10be4133f749fc879cf8c30bdc15b07539c56ab9f907fffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000067ff000000000000007fffffffffffffffffffffffffffffffffffffffffffffffff00ffffffffffffff9360381b169316171665ffffffff00008760101b161766ff0000000000008960301b16171790556117c7565b169a6040519850885250602087015250604085015250506060820152a201610297565b8880fd5b8780fd5b8580fd5b8280fd5b9067ffffffffffffffff61044a6024936117c7565b7f020a07e500000000000000000000000000000000000000000000000000000000835216600452fd5b005b8067ffffffffffffffff61049461048f6001948688611789565b6117c7565b1661049e816119d5565b6104aa575b500161028a565b806000526007602052600060408120557ff74668182f6a521d1a362a6bbc8344cac3a467bab207cdabbaf39e503edef6a1600080a2866104a3565b346101a65760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a6576040518060206003549283815201809260036000527fc2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b9060005b8181106105bd57505050816105649103826115d1565b6040519182916020830190602084525180915260408301919060005b81811061058e575050500390f35b825173ffffffffffffffffffffffffffffffffffffffff16845285945060209384019390920191600101610580565b825484526020909301926001928301920161054e565b346101a65760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a657602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b346101a65760c07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a65760043567ffffffffffffffff81168091036101a6576106716116dd565b6044359063ffffffff82168092036101a6576064359160ff83168093036101a65760843567ffffffffffffffff81116101a6576106b290369060040161167a565b9060a4359367ffffffffffffffff85116101a657366023860112156101a65784600401359467ffffffffffffffff86116101a65760248636920101116101a6578660005260076020526107086040600020611749565b96606088015115610965575061ffff1680151580610953575b610918575060ff60025460b01c16610855575b5060ff7f00000000000000000000000000000000000000000000000000000000000000001690818111610825575050604d019081604d116107f657610778916117ba565b60408301805190919060ff916101fe6107959260011b16906117ba565b915116604d019182604d116107f6578281029281840414901517156107f65763ffffffff916107c3916117ba565b1663ffffffff6020830151169063ffffffff82116107f65761ffff60609351169160405192835260208301526040820152f35b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b7ff2d323530000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b93909491926000937fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc186360301945b8781101561090a5760008160051b88013587811215610906576108bd73ffffffffffffffffffffffffffffffffffffffff918a01611799565b1680825260046020526040822054156108da575050600101610884565b602492507fa409d83e000000000000000000000000000000000000000000000000000000008252600452fd5b5080fd5b509295919450925085610734565b61ffff60025460a01c16907f2dba20cf0000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b5061ffff60025460a01c168110610721565b7f020a07e50000000000000000000000000000000000000000000000000000000060005260045260246000fd5b346101a65760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a657602060405160ff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b346101a65760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a65760005473ffffffffffffffffffffffffffffffffffffffff81163303610aad577fffffffffffffffffffffffff00000000000000000000000000000000000000006001549133828416176001551660005573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b346101a65760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a657600060408051610b15816115b5565b8281528260208201520152610ba8604051610b2f816115b5565b60ff60025473ffffffffffffffffffffffffffffffffffffffff8116835261ffff8160a01c16602084015260b01c161515604082015260405191829182919091604080606083019473ffffffffffffffffffffffffffffffffffffffff815116845261ffff602082015116602085015201511515910152565b0390f35b346101a65760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a65760043567ffffffffffffffff81116101a657610bfb90369060040161167a565b90610c046117dc565b73ffffffffffffffffffffffffffffffffffffffff600254169160005b818110610c2a57005b73ffffffffffffffffffffffffffffffffffffffff610c52610c4d838587611789565b611799565b1690604051917f70a08231000000000000000000000000000000000000000000000000000000008352306004840152602083602481845afa928315610f0157600093610ecb575b5082610cab575b506001915001610c21565b6040519260208401937fa9059cbb00000000000000000000000000000000000000000000000000000000855287602482015281604482015260448152610cf26064826115d1565b600080604096875193610d0589866115d1565b602085527f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c65646020860152519082875af1883d15610ebd57503d90600067ffffffffffffffff8311610e90575091818a949360207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f610da09601160191610d8f8a5193846115d1565b82523d6000602084013e5b86611bba565b805180610ddc575b505060207f508d7d183612c18fc339b42618912b9fa3239f631dd7ec0671f950200a0fa66e9160019651908152a385610ca0565b8192949596935090602091810103126101a657602001518015908115036101a657610e0d5792919086908880610da8565b608490517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e60448201527f6f742073756363656564000000000000000000000000000000000000000000006064820152fd5b807f4e487b7100000000000000000000000000000000000000000000000000000000602492526041600452fd5b9291610da091606090610d9a565b90926020823d8211610ef9575b81610ee5602093836115d1565b81010312610ef65750519186610c99565b80fd5b3d9150610ed8565b6040513d6000823e3d90fd5b346101a65760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a6576000604051610f4a816115b5565b610f526116ba565b8152610f5c6116dd565b60208201908152610f6b6116ab565b9060408301918252610f7b6117dc565b73ffffffffffffffffffffffffffffffffffffffff8351161561107457825160028054925193517fffffffffffffffffff000000000000000000000000000000000000000000000090931673ffffffffffffffffffffffffffffffffffffffff90921691821760a09490941b75ffff0000000000000000000000000000000000000000169390931791151560b01b76ff0000000000000000000000000000000000000000000016919091179091556040805191825260208084015161ffff1690830152918201511515918101919091527f4c475597c445491197895d935b9c8eaf2c59a575d8a4577ed31a8bbb48b6589290606090a180f35b6004847f35be3ac8000000000000000000000000000000000000000000000000000000008152fd5b346101a65760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a65760043567ffffffffffffffff81116101a6576110eb90369060040161167a565b9060243567ffffffffffffffff81116101a65761110c90369060040161167a565b90916111166116ab565b9361111f6117dc565b60005b81811061125c5750505060005b8181106111c15783600254901515908160ff8260b01c1615150361114f57005b816020917fffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffffffff76ff000000000000000000000000000000000000000000007fd9e9ee812485edbbfab1d848c2c025cd0d1da3f7b9dcf38edf78c40ec4810ed89560b01b16911617600255604051908152a1005b73ffffffffffffffffffffffffffffffffffffffff6111e4610c4d838587611789565b16801561122f5790816111f8600193611b00565b611204575b500161112f565b7fba540b0c7a674c7f1716e91e0e0a2390ebb27755267c72e0807812b93f3bf00e600080a2856111fd565b7fa409d83e0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b8061128b73ffffffffffffffffffffffffffffffffffffffff611285610c4d6001958789611789565b1661183f565b611296575b01611122565b73ffffffffffffffffffffffffffffffffffffffff6112b9610c4d838688611789565b167fbc743a2d04de950d86944633fbe825e492514eef584678e9fa97f3e939cf605e600080a2611290565b346101a65760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a65760055461131f816116ee565b9061132d60405192836115d1565b8082527fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe061135a826116ee565b0160005b81811061149b5750506005549060005b8181106113fe578360405180916020820160208352815180915260206040840192019060005b8181106113a2575050500390f35b91935091602060a0600192606083885167ffffffffffffffff8151168452015161ffff8151168584015263ffffffff8582015116604084015260ff60408201511682840152015115156080820152019401910191849392611394565b60008382101561146e5790604081602084600560019652200167ffffffffffffffff600091541661142f8489611706565b515267ffffffffffffffff6114448489611706565b5151168152600760205220611466602061145e8489611706565b510191611749565b90520161136e565b807f4e487b7100000000000000000000000000000000000000000000000000000000602492526032600452fd5b60405190604082019180831067ffffffffffffffff8411176114f557602092604052600081526040516114cd81611599565b600081526000848201526000604082015260006060820152838201528282870101520161135e565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b346101a65760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101a657610ba8604080519061156581836115d1565b601282527f4578656375746f7220312e372e302d646576000000000000000000000000000060208301525191829182611612565b6080810190811067ffffffffffffffff8211176114f557604052565b6060810190811067ffffffffffffffff8211176114f557604052565b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff8211176114f557604052565b9190916020815282519283602083015260005b8481106116645750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f8460006040809697860101520116010190565b8060208092840101516040828601015201611625565b9181601f840112156101a65782359167ffffffffffffffff83116101a6576020808501948460051b0101116101a657565b6044359081151582036101a657565b6004359073ffffffffffffffffffffffffffffffffffffffff821682036101a657565b6024359061ffff821682036101a657565b67ffffffffffffffff81116114f55760051b60200190565b805182101561171a5760209160051b010190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b9060405161175681611599565b606060ff82945461ffff8116845263ffffffff8160101c166020850152818160301c16604085015260381c161515910152565b919081101561171a5760051b0190565b3573ffffffffffffffffffffffffffffffffffffffff811681036101a65790565b919082018092116107f657565b3567ffffffffffffffff811681036101a65790565b73ffffffffffffffffffffffffffffffffffffffff6001541633036117fd57565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b805482101561171a5760005260206000200190600090565b60008181526004602052604090205480156119ce577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff81018181116107f657600354907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82019182116107f65781810361195f575b5050506003548015611930577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff016118ed816003611827565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b19169055600355600052600460205260006040812055600190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b6119b6611970611981936003611827565b90549060031b1c9283926003611827565b81939154907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b905560005260046020526040600020553880806118b4565b5050600090565b60008181526006602052604090205480156119ce577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff81018181116107f657600554907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82019182116107f657818103611ac6575b5050506005548015611930577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01611a83816005611827565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b19169055600555600052600660205260006040812055600190565b611ae8611ad7611981936005611827565b90549060031b1c9283926005611827565b90556000526006602052604060002055388080611a4a565b80600052600460205260406000205415600014611b5a57600354680100000000000000008110156114f557611b416119818260018594016003556003611827565b9055600354906000526004602052604060002055600190565b50600090565b80600052600660205260406000205415600014611b5a57600554680100000000000000008110156114f557611ba16119818260018594016005556005611827565b9055600554906000526006602052604060002055600190565b91929015611c355750815115611bce575090565b3b15611bd75790565b60646040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152fd5b825190915015611c485750805190602001fd5b611c7e906040519182917f08c379a000000000000000000000000000000000000000000000000000000000835260048301611612565b0390fdfea164736f6c634300081a000a",
 }
 
 var ExecutorABI = ExecutorMetaData.ABI
 
 var ExecutorBin = ExecutorMetaData.Bin
 
-func DeployExecutor(auth *bind.TransactOpts, backend bind.ContractBackend, maxCCVsPerMsg uint8) (common.Address, *types.Transaction, *Executor, error) {
+func DeployExecutor(auth *bind.TransactOpts, backend bind.ContractBackend, maxCCVsPerMsg uint8, dynamicConfig ExecutorDynamicConfig) (common.Address, *types.Transaction, *Executor, error) {
 	parsed, err := ExecutorMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -64,7 +69,7 @@ func DeployExecutor(auth *bind.TransactOpts, backend bind.ContractBackend, maxCC
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ExecutorBin), backend, maxCCVsPerMsg)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ExecutorBin), backend, maxCCVsPerMsg, dynamicConfig)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -209,53 +214,84 @@ func (_Executor *ExecutorCallerSession) GetAllowedCCVs() ([]common.Address, erro
 	return _Executor.Contract.GetAllowedCCVs(&_Executor.CallOpts)
 }
 
-func (_Executor *ExecutorCaller) GetDestChains(opts *bind.CallOpts) ([]uint64, error) {
+func (_Executor *ExecutorCaller) GetDestChains(opts *bind.CallOpts) ([]ExecutorRemoteChainConfigArgs, error) {
 	var out []interface{}
 	err := _Executor.contract.Call(opts, &out, "getDestChains")
 
 	if err != nil {
-		return *new([]uint64), err
+		return *new([]ExecutorRemoteChainConfigArgs), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new([]uint64)).(*[]uint64)
+	out0 := *abi.ConvertType(out[0], new([]ExecutorRemoteChainConfigArgs)).(*[]ExecutorRemoteChainConfigArgs)
 
 	return out0, err
 
 }
 
-func (_Executor *ExecutorSession) GetDestChains() ([]uint64, error) {
+func (_Executor *ExecutorSession) GetDestChains() ([]ExecutorRemoteChainConfigArgs, error) {
 	return _Executor.Contract.GetDestChains(&_Executor.CallOpts)
 }
 
-func (_Executor *ExecutorCallerSession) GetDestChains() ([]uint64, error) {
+func (_Executor *ExecutorCallerSession) GetDestChains() ([]ExecutorRemoteChainConfigArgs, error) {
 	return _Executor.Contract.GetDestChains(&_Executor.CallOpts)
 }
 
-func (_Executor *ExecutorCaller) GetFee(opts *bind.CallOpts, destChainSelector uint64, arg1 ClientEVM2AnyMessage, ccvs []ClientCCV, arg3 []byte) (*big.Int, error) {
+func (_Executor *ExecutorCaller) GetDynamicConfig(opts *bind.CallOpts) (ExecutorDynamicConfig, error) {
 	var out []interface{}
-	err := _Executor.contract.Call(opts, &out, "getFee", destChainSelector, arg1, ccvs, arg3)
+	err := _Executor.contract.Call(opts, &out, "getDynamicConfig")
 
 	if err != nil {
-		return *new(*big.Int), err
+		return *new(ExecutorDynamicConfig), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+	out0 := *abi.ConvertType(out[0], new(ExecutorDynamicConfig)).(*ExecutorDynamicConfig)
 
 	return out0, err
 
 }
 
-func (_Executor *ExecutorSession) GetFee(destChainSelector uint64, arg1 ClientEVM2AnyMessage, ccvs []ClientCCV, arg3 []byte) (*big.Int, error) {
-	return _Executor.Contract.GetFee(&_Executor.CallOpts, destChainSelector, arg1, ccvs, arg3)
+func (_Executor *ExecutorSession) GetDynamicConfig() (ExecutorDynamicConfig, error) {
+	return _Executor.Contract.GetDynamicConfig(&_Executor.CallOpts)
 }
 
-func (_Executor *ExecutorCallerSession) GetFee(destChainSelector uint64, arg1 ClientEVM2AnyMessage, ccvs []ClientCCV, arg3 []byte) (*big.Int, error) {
-	return _Executor.Contract.GetFee(&_Executor.CallOpts, destChainSelector, arg1, ccvs, arg3)
+func (_Executor *ExecutorCallerSession) GetDynamicConfig() (ExecutorDynamicConfig, error) {
+	return _Executor.Contract.GetDynamicConfig(&_Executor.CallOpts)
 }
 
-func (_Executor *ExecutorCaller) GetMaxCCVsPerMsg(opts *bind.CallOpts) (uint8, error) {
+func (_Executor *ExecutorCaller) GetFee(opts *bind.CallOpts, destChainSelector uint64, requestedBlockDepth uint16, dataLength uint32, numberOfTokens uint8, ccvs []ClientCCV, extraArgs []byte) (GetFee,
+
+	error) {
 	var out []interface{}
-	err := _Executor.contract.Call(opts, &out, "getMaxCCVsPerMsg")
+	err := _Executor.contract.Call(opts, &out, "getFee", destChainSelector, requestedBlockDepth, dataLength, numberOfTokens, ccvs, extraArgs)
+
+	outstruct := new(GetFee)
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.UsdCentsFee = *abi.ConvertType(out[0], new(uint16)).(*uint16)
+	outstruct.ExecGasCost = *abi.ConvertType(out[1], new(uint32)).(*uint32)
+	outstruct.ExecBytes = *abi.ConvertType(out[2], new(uint32)).(*uint32)
+
+	return *outstruct, err
+
+}
+
+func (_Executor *ExecutorSession) GetFee(destChainSelector uint64, requestedBlockDepth uint16, dataLength uint32, numberOfTokens uint8, ccvs []ClientCCV, extraArgs []byte) (GetFee,
+
+	error) {
+	return _Executor.Contract.GetFee(&_Executor.CallOpts, destChainSelector, requestedBlockDepth, dataLength, numberOfTokens, ccvs, extraArgs)
+}
+
+func (_Executor *ExecutorCallerSession) GetFee(destChainSelector uint64, requestedBlockDepth uint16, dataLength uint32, numberOfTokens uint8, ccvs []ClientCCV, extraArgs []byte) (GetFee,
+
+	error) {
+	return _Executor.Contract.GetFee(&_Executor.CallOpts, destChainSelector, requestedBlockDepth, dataLength, numberOfTokens, ccvs, extraArgs)
+}
+
+func (_Executor *ExecutorCaller) GetMaxCCVsPerMessage(opts *bind.CallOpts) (uint8, error) {
+	var out []interface{}
+	err := _Executor.contract.Call(opts, &out, "getMaxCCVsPerMessage")
 
 	if err != nil {
 		return *new(uint8), err
@@ -267,34 +303,34 @@ func (_Executor *ExecutorCaller) GetMaxCCVsPerMsg(opts *bind.CallOpts) (uint8, e
 
 }
 
-func (_Executor *ExecutorSession) GetMaxCCVsPerMsg() (uint8, error) {
-	return _Executor.Contract.GetMaxCCVsPerMsg(&_Executor.CallOpts)
+func (_Executor *ExecutorSession) GetMaxCCVsPerMessage() (uint8, error) {
+	return _Executor.Contract.GetMaxCCVsPerMessage(&_Executor.CallOpts)
 }
 
-func (_Executor *ExecutorCallerSession) GetMaxCCVsPerMsg() (uint8, error) {
-	return _Executor.Contract.GetMaxCCVsPerMsg(&_Executor.CallOpts)
+func (_Executor *ExecutorCallerSession) GetMaxCCVsPerMessage() (uint8, error) {
+	return _Executor.Contract.GetMaxCCVsPerMessage(&_Executor.CallOpts)
 }
 
-func (_Executor *ExecutorCaller) IsCCVAllowlistEnabled(opts *bind.CallOpts) (bool, error) {
+func (_Executor *ExecutorCaller) GetMinBlockConfirmations(opts *bind.CallOpts) (uint16, error) {
 	var out []interface{}
-	err := _Executor.contract.Call(opts, &out, "isCCVAllowlistEnabled")
+	err := _Executor.contract.Call(opts, &out, "getMinBlockConfirmations")
 
 	if err != nil {
-		return *new(bool), err
+		return *new(uint16), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+	out0 := *abi.ConvertType(out[0], new(uint16)).(*uint16)
 
 	return out0, err
 
 }
 
-func (_Executor *ExecutorSession) IsCCVAllowlistEnabled() (bool, error) {
-	return _Executor.Contract.IsCCVAllowlistEnabled(&_Executor.CallOpts)
+func (_Executor *ExecutorSession) GetMinBlockConfirmations() (uint16, error) {
+	return _Executor.Contract.GetMinBlockConfirmations(&_Executor.CallOpts)
 }
 
-func (_Executor *ExecutorCallerSession) IsCCVAllowlistEnabled() (bool, error) {
-	return _Executor.Contract.IsCCVAllowlistEnabled(&_Executor.CallOpts)
+func (_Executor *ExecutorCallerSession) GetMinBlockConfirmations() (uint16, error) {
+	return _Executor.Contract.GetMinBlockConfirmations(&_Executor.CallOpts)
 }
 
 func (_Executor *ExecutorCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
@@ -365,28 +401,28 @@ func (_Executor *ExecutorTransactorSession) ApplyAllowedCCVUpdates(ccvsToRemove 
 	return _Executor.Contract.ApplyAllowedCCVUpdates(&_Executor.TransactOpts, ccvsToRemove, ccvsToAdd, ccvAllowlistEnabled)
 }
 
-func (_Executor *ExecutorTransactor) ApplyDestChainUpdates(opts *bind.TransactOpts, destChainSelectorsToRemove []uint64, destChainSelectorsToAdd []uint64) (*types.Transaction, error) {
+func (_Executor *ExecutorTransactor) ApplyDestChainUpdates(opts *bind.TransactOpts, destChainSelectorsToRemove []uint64, destChainSelectorsToAdd []ExecutorRemoteChainConfigArgs) (*types.Transaction, error) {
 	return _Executor.contract.Transact(opts, "applyDestChainUpdates", destChainSelectorsToRemove, destChainSelectorsToAdd)
 }
 
-func (_Executor *ExecutorSession) ApplyDestChainUpdates(destChainSelectorsToRemove []uint64, destChainSelectorsToAdd []uint64) (*types.Transaction, error) {
+func (_Executor *ExecutorSession) ApplyDestChainUpdates(destChainSelectorsToRemove []uint64, destChainSelectorsToAdd []ExecutorRemoteChainConfigArgs) (*types.Transaction, error) {
 	return _Executor.Contract.ApplyDestChainUpdates(&_Executor.TransactOpts, destChainSelectorsToRemove, destChainSelectorsToAdd)
 }
 
-func (_Executor *ExecutorTransactorSession) ApplyDestChainUpdates(destChainSelectorsToRemove []uint64, destChainSelectorsToAdd []uint64) (*types.Transaction, error) {
+func (_Executor *ExecutorTransactorSession) ApplyDestChainUpdates(destChainSelectorsToRemove []uint64, destChainSelectorsToAdd []ExecutorRemoteChainConfigArgs) (*types.Transaction, error) {
 	return _Executor.Contract.ApplyDestChainUpdates(&_Executor.TransactOpts, destChainSelectorsToRemove, destChainSelectorsToAdd)
 }
 
-func (_Executor *ExecutorTransactor) SetMaxCCVsPerMsg(opts *bind.TransactOpts, maxCCVsPerMsg uint8) (*types.Transaction, error) {
-	return _Executor.contract.Transact(opts, "setMaxCCVsPerMsg", maxCCVsPerMsg)
+func (_Executor *ExecutorTransactor) SetDynamicConfig(opts *bind.TransactOpts, dynamicConfig ExecutorDynamicConfig) (*types.Transaction, error) {
+	return _Executor.contract.Transact(opts, "setDynamicConfig", dynamicConfig)
 }
 
-func (_Executor *ExecutorSession) SetMaxCCVsPerMsg(maxCCVsPerMsg uint8) (*types.Transaction, error) {
-	return _Executor.Contract.SetMaxCCVsPerMsg(&_Executor.TransactOpts, maxCCVsPerMsg)
+func (_Executor *ExecutorSession) SetDynamicConfig(dynamicConfig ExecutorDynamicConfig) (*types.Transaction, error) {
+	return _Executor.Contract.SetDynamicConfig(&_Executor.TransactOpts, dynamicConfig)
 }
 
-func (_Executor *ExecutorTransactorSession) SetMaxCCVsPerMsg(maxCCVsPerMsg uint8) (*types.Transaction, error) {
-	return _Executor.Contract.SetMaxCCVsPerMsg(&_Executor.TransactOpts, maxCCVsPerMsg)
+func (_Executor *ExecutorTransactorSession) SetDynamicConfig(dynamicConfig ExecutorDynamicConfig) (*types.Transaction, error) {
+	return _Executor.Contract.SetDynamicConfig(&_Executor.TransactOpts, dynamicConfig)
 }
 
 func (_Executor *ExecutorTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
@@ -399,6 +435,18 @@ func (_Executor *ExecutorSession) TransferOwnership(to common.Address) (*types.T
 
 func (_Executor *ExecutorTransactorSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
 	return _Executor.Contract.TransferOwnership(&_Executor.TransactOpts, to)
+}
+
+func (_Executor *ExecutorTransactor) WithdrawFeeTokens(opts *bind.TransactOpts, feeTokens []common.Address) (*types.Transaction, error) {
+	return _Executor.contract.Transact(opts, "withdrawFeeTokens", feeTokens)
+}
+
+func (_Executor *ExecutorSession) WithdrawFeeTokens(feeTokens []common.Address) (*types.Transaction, error) {
+	return _Executor.Contract.WithdrawFeeTokens(&_Executor.TransactOpts, feeTokens)
+}
+
+func (_Executor *ExecutorTransactorSession) WithdrawFeeTokens(feeTokens []common.Address) (*types.Transaction, error) {
+	return _Executor.Contract.WithdrawFeeTokens(&_Executor.TransactOpts, feeTokens)
 }
 
 type ExecutorCCVAddedIterator struct {
@@ -772,6 +820,123 @@ func (_Executor *ExecutorFilterer) ParseCCVRemoved(log types.Log) (*ExecutorCCVR
 	return event, nil
 }
 
+type ExecutorConfigSetIterator struct {
+	Event *ExecutorConfigSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *ExecutorConfigSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(ExecutorConfigSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(ExecutorConfigSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *ExecutorConfigSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *ExecutorConfigSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type ExecutorConfigSet struct {
+	DynamicConfig ExecutorDynamicConfig
+	Raw           types.Log
+}
+
+func (_Executor *ExecutorFilterer) FilterConfigSet(opts *bind.FilterOpts) (*ExecutorConfigSetIterator, error) {
+
+	logs, sub, err := _Executor.contract.FilterLogs(opts, "ConfigSet")
+	if err != nil {
+		return nil, err
+	}
+	return &ExecutorConfigSetIterator{contract: _Executor.contract, event: "ConfigSet", logs: logs, sub: sub}, nil
+}
+
+func (_Executor *ExecutorFilterer) WatchConfigSet(opts *bind.WatchOpts, sink chan<- *ExecutorConfigSet) (event.Subscription, error) {
+
+	logs, sub, err := _Executor.contract.WatchLogs(opts, "ConfigSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(ExecutorConfigSet)
+				if err := _Executor.contract.UnpackLog(event, "ConfigSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_Executor *ExecutorFilterer) ParseConfigSet(log types.Log) (*ExecutorConfigSet, error) {
+	event := new(ExecutorConfigSet)
+	if err := _Executor.contract.UnpackLog(event, "ConfigSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
 type ExecutorDestChainAddedIterator struct {
 	Event *ExecutorDestChainAdded
 
@@ -834,6 +999,7 @@ func (it *ExecutorDestChainAddedIterator) Close() error {
 
 type ExecutorDestChainAdded struct {
 	DestChainSelector uint64
+	Config            ExecutorRemoteChainConfig
 	Raw               types.Log
 }
 
@@ -1026,8 +1192,8 @@ func (_Executor *ExecutorFilterer) ParseDestChainRemoved(log types.Log) (*Execut
 	return event, nil
 }
 
-type ExecutorMaxCCVsPerMsgSetIterator struct {
-	Event *ExecutorMaxCCVsPerMsgSet
+type ExecutorFeeTokenWithdrawnIterator struct {
+	Event *ExecutorFeeTokenWithdrawn
 
 	contract *bind.BoundContract
 	event    string
@@ -1038,7 +1204,7 @@ type ExecutorMaxCCVsPerMsgSetIterator struct {
 	fail error
 }
 
-func (it *ExecutorMaxCCVsPerMsgSetIterator) Next() bool {
+func (it *ExecutorFeeTokenWithdrawnIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -1047,7 +1213,7 @@ func (it *ExecutorMaxCCVsPerMsgSetIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ExecutorMaxCCVsPerMsgSet)
+			it.Event = new(ExecutorFeeTokenWithdrawn)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1062,7 +1228,7 @@ func (it *ExecutorMaxCCVsPerMsgSetIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(ExecutorMaxCCVsPerMsgSet)
+		it.Event = new(ExecutorFeeTokenWithdrawn)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1077,32 +1243,52 @@ func (it *ExecutorMaxCCVsPerMsgSetIterator) Next() bool {
 	}
 }
 
-func (it *ExecutorMaxCCVsPerMsgSetIterator) Error() error {
+func (it *ExecutorFeeTokenWithdrawnIterator) Error() error {
 	return it.fail
 }
 
-func (it *ExecutorMaxCCVsPerMsgSetIterator) Close() error {
+func (it *ExecutorFeeTokenWithdrawnIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type ExecutorMaxCCVsPerMsgSet struct {
-	MaxCCVsPerMsg uint8
-	Raw           types.Log
+type ExecutorFeeTokenWithdrawn struct {
+	Receiver common.Address
+	FeeToken common.Address
+	Amount   *big.Int
+	Raw      types.Log
 }
 
-func (_Executor *ExecutorFilterer) FilterMaxCCVsPerMsgSet(opts *bind.FilterOpts) (*ExecutorMaxCCVsPerMsgSetIterator, error) {
+func (_Executor *ExecutorFilterer) FilterFeeTokenWithdrawn(opts *bind.FilterOpts, receiver []common.Address, feeToken []common.Address) (*ExecutorFeeTokenWithdrawnIterator, error) {
 
-	logs, sub, err := _Executor.contract.FilterLogs(opts, "MaxCCVsPerMsgSet")
+	var receiverRule []interface{}
+	for _, receiverItem := range receiver {
+		receiverRule = append(receiverRule, receiverItem)
+	}
+	var feeTokenRule []interface{}
+	for _, feeTokenItem := range feeToken {
+		feeTokenRule = append(feeTokenRule, feeTokenItem)
+	}
+
+	logs, sub, err := _Executor.contract.FilterLogs(opts, "FeeTokenWithdrawn", receiverRule, feeTokenRule)
 	if err != nil {
 		return nil, err
 	}
-	return &ExecutorMaxCCVsPerMsgSetIterator{contract: _Executor.contract, event: "MaxCCVsPerMsgSet", logs: logs, sub: sub}, nil
+	return &ExecutorFeeTokenWithdrawnIterator{contract: _Executor.contract, event: "FeeTokenWithdrawn", logs: logs, sub: sub}, nil
 }
 
-func (_Executor *ExecutorFilterer) WatchMaxCCVsPerMsgSet(opts *bind.WatchOpts, sink chan<- *ExecutorMaxCCVsPerMsgSet) (event.Subscription, error) {
+func (_Executor *ExecutorFilterer) WatchFeeTokenWithdrawn(opts *bind.WatchOpts, sink chan<- *ExecutorFeeTokenWithdrawn, receiver []common.Address, feeToken []common.Address) (event.Subscription, error) {
 
-	logs, sub, err := _Executor.contract.WatchLogs(opts, "MaxCCVsPerMsgSet")
+	var receiverRule []interface{}
+	for _, receiverItem := range receiver {
+		receiverRule = append(receiverRule, receiverItem)
+	}
+	var feeTokenRule []interface{}
+	for _, feeTokenItem := range feeToken {
+		feeTokenRule = append(feeTokenRule, feeTokenItem)
+	}
+
+	logs, sub, err := _Executor.contract.WatchLogs(opts, "FeeTokenWithdrawn", receiverRule, feeTokenRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1112,8 +1298,8 @@ func (_Executor *ExecutorFilterer) WatchMaxCCVsPerMsgSet(opts *bind.WatchOpts, s
 			select {
 			case log := <-logs:
 
-				event := new(ExecutorMaxCCVsPerMsgSet)
-				if err := _Executor.contract.UnpackLog(event, "MaxCCVsPerMsgSet", log); err != nil {
+				event := new(ExecutorFeeTokenWithdrawn)
+				if err := _Executor.contract.UnpackLog(event, "FeeTokenWithdrawn", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1134,9 +1320,9 @@ func (_Executor *ExecutorFilterer) WatchMaxCCVsPerMsgSet(opts *bind.WatchOpts, s
 	}), nil
 }
 
-func (_Executor *ExecutorFilterer) ParseMaxCCVsPerMsgSet(log types.Log) (*ExecutorMaxCCVsPerMsgSet, error) {
-	event := new(ExecutorMaxCCVsPerMsgSet)
-	if err := _Executor.contract.UnpackLog(event, "MaxCCVsPerMsgSet", log); err != nil {
+func (_Executor *ExecutorFilterer) ParseFeeTokenWithdrawn(log types.Log) (*ExecutorFeeTokenWithdrawn, error) {
+	event := new(ExecutorFeeTokenWithdrawn)
+	if err := _Executor.contract.UnpackLog(event, "FeeTokenWithdrawn", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -1415,6 +1601,12 @@ func (_Executor *ExecutorFilterer) ParseOwnershipTransferred(log types.Log) (*Ex
 	return event, nil
 }
 
+type GetFee struct {
+	UsdCentsFee uint16
+	ExecGasCost uint32
+	ExecBytes   uint32
+}
+
 func (ExecutorCCVAdded) Topic() common.Hash {
 	return common.HexToHash("0xba540b0c7a674c7f1716e91e0e0a2390ebb27755267c72e0807812b93f3bf00e")
 }
@@ -1427,16 +1619,20 @@ func (ExecutorCCVRemoved) Topic() common.Hash {
 	return common.HexToHash("0xbc743a2d04de950d86944633fbe825e492514eef584678e9fa97f3e939cf605e")
 }
 
+func (ExecutorConfigSet) Topic() common.Hash {
+	return common.HexToHash("0x4c475597c445491197895d935b9c8eaf2c59a575d8a4577ed31a8bbb48b65892")
+}
+
 func (ExecutorDestChainAdded) Topic() common.Hash {
-	return common.HexToHash("0x6e9c954f174a6a41806c1779c207ed29eb3266ba1d60230290dd88ee6a8fb65f")
+	return common.HexToHash("0x16ff55d9c2b936d957d46720f10be4133f749fc879cf8c30bdc15b07539c56ab")
 }
 
 func (ExecutorDestChainRemoved) Topic() common.Hash {
 	return common.HexToHash("0xf74668182f6a521d1a362a6bbc8344cac3a467bab207cdabbaf39e503edef6a1")
 }
 
-func (ExecutorMaxCCVsPerMsgSet) Topic() common.Hash {
-	return common.HexToHash("0xcd39dd44d856487a5d3ff100b17da01d09fd38f56a6bc6c1430458ec9cd31bd8")
+func (ExecutorFeeTokenWithdrawn) Topic() common.Hash {
+	return common.HexToHash("0x508d7d183612c18fc339b42618912b9fa3239f631dd7ec0671f950200a0fa66e")
 }
 
 func (ExecutorOwnershipTransferRequested) Topic() common.Hash {
@@ -1454,13 +1650,17 @@ func (_Executor *Executor) Address() common.Address {
 type ExecutorInterface interface {
 	GetAllowedCCVs(opts *bind.CallOpts) ([]common.Address, error)
 
-	GetDestChains(opts *bind.CallOpts) ([]uint64, error)
+	GetDestChains(opts *bind.CallOpts) ([]ExecutorRemoteChainConfigArgs, error)
 
-	GetFee(opts *bind.CallOpts, destChainSelector uint64, arg1 ClientEVM2AnyMessage, ccvs []ClientCCV, arg3 []byte) (*big.Int, error)
+	GetDynamicConfig(opts *bind.CallOpts) (ExecutorDynamicConfig, error)
 
-	GetMaxCCVsPerMsg(opts *bind.CallOpts) (uint8, error)
+	GetFee(opts *bind.CallOpts, destChainSelector uint64, requestedBlockDepth uint16, dataLength uint32, numberOfTokens uint8, ccvs []ClientCCV, extraArgs []byte) (GetFee,
 
-	IsCCVAllowlistEnabled(opts *bind.CallOpts) (bool, error)
+		error)
+
+	GetMaxCCVsPerMessage(opts *bind.CallOpts) (uint8, error)
+
+	GetMinBlockConfirmations(opts *bind.CallOpts) (uint16, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
@@ -1470,11 +1670,13 @@ type ExecutorInterface interface {
 
 	ApplyAllowedCCVUpdates(opts *bind.TransactOpts, ccvsToRemove []common.Address, ccvsToAdd []common.Address, ccvAllowlistEnabled bool) (*types.Transaction, error)
 
-	ApplyDestChainUpdates(opts *bind.TransactOpts, destChainSelectorsToRemove []uint64, destChainSelectorsToAdd []uint64) (*types.Transaction, error)
+	ApplyDestChainUpdates(opts *bind.TransactOpts, destChainSelectorsToRemove []uint64, destChainSelectorsToAdd []ExecutorRemoteChainConfigArgs) (*types.Transaction, error)
 
-	SetMaxCCVsPerMsg(opts *bind.TransactOpts, maxCCVsPerMsg uint8) (*types.Transaction, error)
+	SetDynamicConfig(opts *bind.TransactOpts, dynamicConfig ExecutorDynamicConfig) (*types.Transaction, error)
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
+
+	WithdrawFeeTokens(opts *bind.TransactOpts, feeTokens []common.Address) (*types.Transaction, error)
 
 	FilterCCVAdded(opts *bind.FilterOpts, ccv []common.Address) (*ExecutorCCVAddedIterator, error)
 
@@ -1494,6 +1696,12 @@ type ExecutorInterface interface {
 
 	ParseCCVRemoved(log types.Log) (*ExecutorCCVRemoved, error)
 
+	FilterConfigSet(opts *bind.FilterOpts) (*ExecutorConfigSetIterator, error)
+
+	WatchConfigSet(opts *bind.WatchOpts, sink chan<- *ExecutorConfigSet) (event.Subscription, error)
+
+	ParseConfigSet(log types.Log) (*ExecutorConfigSet, error)
+
 	FilterDestChainAdded(opts *bind.FilterOpts, destChainSelector []uint64) (*ExecutorDestChainAddedIterator, error)
 
 	WatchDestChainAdded(opts *bind.WatchOpts, sink chan<- *ExecutorDestChainAdded, destChainSelector []uint64) (event.Subscription, error)
@@ -1506,11 +1714,11 @@ type ExecutorInterface interface {
 
 	ParseDestChainRemoved(log types.Log) (*ExecutorDestChainRemoved, error)
 
-	FilterMaxCCVsPerMsgSet(opts *bind.FilterOpts) (*ExecutorMaxCCVsPerMsgSetIterator, error)
+	FilterFeeTokenWithdrawn(opts *bind.FilterOpts, receiver []common.Address, feeToken []common.Address) (*ExecutorFeeTokenWithdrawnIterator, error)
 
-	WatchMaxCCVsPerMsgSet(opts *bind.WatchOpts, sink chan<- *ExecutorMaxCCVsPerMsgSet) (event.Subscription, error)
+	WatchFeeTokenWithdrawn(opts *bind.WatchOpts, sink chan<- *ExecutorFeeTokenWithdrawn, receiver []common.Address, feeToken []common.Address) (event.Subscription, error)
 
-	ParseMaxCCVsPerMsgSet(log types.Log) (*ExecutorMaxCCVsPerMsgSet, error)
+	ParseFeeTokenWithdrawn(log types.Log) (*ExecutorFeeTokenWithdrawn, error)
 
 	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*ExecutorOwnershipTransferRequestedIterator, error)
 

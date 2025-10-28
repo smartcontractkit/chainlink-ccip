@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {Router} from "../../Router.sol";
 import {CommitteeVerifier} from "../../ccvs/CommitteeVerifier.sol";
-import {VerifierProxy} from "../../ccvs/VerifierProxy.sol";
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -29,12 +28,7 @@ contract e2e is OnRampSetup {
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     CommitteeVerifier committeeVerifier = new CommitteeVerifier(
-      CommitteeVerifier.DynamicConfig({
-        feeQuoter: address(s_feeQuoter),
-        feeAggregator: address(1),
-        allowlistAdmin: address(0)
-      }),
-      ""
+      CommitteeVerifier.DynamicConfig({feeAggregator: address(1), allowlistAdmin: address(0)}), ""
     );
 
     BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
@@ -48,7 +42,7 @@ contract e2e is OnRampSetup {
     });
     committeeVerifier.applyDestChainConfigUpdates(destChainConfigs);
 
-    s_userSpecifiedCCV = address(new VerifierProxy(address(committeeVerifier)));
+    s_userSpecifiedCCV = address(committeeVerifier);
 
     // OffRamp side
     s_offRamp = new OffRampHelper(

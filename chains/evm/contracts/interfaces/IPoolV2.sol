@@ -73,4 +73,11 @@ interface IPoolV2 is IPoolV1 {
     uint16 finality,
     bytes calldata tokenArgs
   ) external view returns (TokenTransferFeeConfig memory feeConfig);
+
+  /// @notice Gets the token address on the remote chain.
+  /// @param remoteChainSelector Remote chain selector.
+  /// @dev To support non-evm chains, this value is encoded into bytes.
+  function getRemoteToken(
+    uint64 remoteChainSelector
+  ) external view returns (bytes memory);
 }

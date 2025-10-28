@@ -1,4 +1,4 @@
-package tokens
+package sequences
 
 import (
 	"fmt"
@@ -39,7 +39,7 @@ func (c RegisterTokenInput) Validate(chain evm.Chain) error {
 
 var RegisterToken = cldf_ops.NewSequence(
 	"register-token",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("1.5.0"),
 	"Registers a token with CCIP via the token admin registry",
 	func(b operations.Bundle, chain evm.Chain, input RegisterTokenInput) (output sequences.OnChainOutput, err error) {
 		if err := input.Validate(chain); err != nil {

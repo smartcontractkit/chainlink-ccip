@@ -1,19 +1,25 @@
 package operations
 
 import (
+	"encoding/json"
+	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	evmutils "github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 )
 
 var (
@@ -52,6 +58,26 @@ type OpDeployCallProxyInput struct {
 type OpGrantRoleTimelockInput struct {
 	Account common.Address `json:"account"`
 	RoleID  [32]byte       `json:"roleID"`
+}
+
+type OpTransferOwnershipInput struct {
+	ChainSelector   uint64
+	TimelockAddress common.Address
+	Address         common.Address
+	ProposedOwner   common.Address
+	ContractType    cldf_deployment.ContractType
+}
+
+type OpEVMOwnershipDeps struct {
+	Chain    cldf_evm.Chain
+	OwnableC OwnershipTranferable
+}
+
+type OwnershipTranferable interface {
+	Owner(opts *bind.CallOpts) (common.Address, error)
+	TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error)
+	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
+	Address() common.Address
 }
 
 var OpDeployTimelock = contract.NewDeploy(contract.DeployParams[OpDeployTimelockInput]{
@@ -165,3 +191,142 @@ var OpGrantRoleTimelock = contract.NewWrite(contract.WriteParams[OpGrantRoleTime
 		return timelock.GrantRole(opts, input.RoleID, input.Account)
 	},
 })
+
+var OpTransferOwnership = operations.NewOperation(
+	"evm-transfer-ownership",
+	semver.MustParse("1.0.0"),
+	"Transfer ownership of an ownable contract to the specified address",
+	func(b operations.Bundle, deps OpEVMOwnershipDeps, in OpTransferOwnershipInput) (contract.WriteOutput, error) {
+		currentOwner, err := deps.OwnableC.Owner(&bind.CallOpts{
+			Context: b.GetContext(),
+		})
+		if err != nil {
+			return contract.WriteOutput{}, fmt.Errorf(
+				"failed to get current owner of contract %T: %w",
+				in.Address.Hex(),
+				err,
+			)
+		}
+		var opts *bind.TransactOpts
+		allowed := false
+		// if current owner is deployer, we can send the tx directly
+		if currentOwner == deps.Chain.DeployerKey.From {
+			opts = deps.Chain.DeployerKey
+			allowed = true
+		} else if currentOwner == in.TimelockAddress {
+			allowed = false
+			opts = cldf_deployment.SimTransactOpts()
+		} else {
+			return contract.WriteOutput{}, fmt.Errorf(
+				"current owner %s is neither deployer %s nor timelock %s for contract %T",
+				currentOwner.Hex(),
+				deps.Chain.DeployerKey.From.Hex(),
+				in.TimelockAddress.Hex(),
+				in.Address.Hex(),
+			)
+		}
+		// if current owner is timelock, we return the mcms transaction
+		// if not, we execute the transfer directly through deployer
+		tx, err := deps.OwnableC.TransferOwnership(opts, common.HexToAddress(in.ProposedOwner.Hex()))
+		if allowed {
+			_, err = cldf_deployment.ConfirmIfNoError(deps.Chain, tx, err)
+			if err != nil {
+				return contract.WriteOutput{}, fmt.Errorf(
+					"failed to transfer ownership of contract %T: %w",
+					in.Address.Hex(),
+					err,
+				)
+			}
+			b.Logger.Infof("Transferred ownership of contract %T to %s", in.Address.Hex(), in.ProposedOwner.Hex())
+			return contract.WriteOutput{
+				ChainSelector: in.ChainSelector,
+				ExecInfo: &contract.ExecInfo{
+					Hash: tx.Hash().String(),
+				},
+			}, nil
+		} else {
+			if err != nil {
+				return contract.WriteOutput{}, fmt.Errorf(
+					"failed to generate tx data for transfer ownership of contract %T to %s via timelock %s: %w",
+					in.Address.Hex(),
+					in.ProposedOwner.Hex(),
+					in.TimelockAddress.Hex(),
+					err,
+				)
+			}
+			b.Logger.Infof("Generated transfer ownership tx data for contract %T to %s via timelock %s",
+				in.Address.Hex(), in.ProposedOwner.Hex(), in.TimelockAddress.Hex())
+			return contract.WriteOutput{
+				ChainSelector: in.ChainSelector,
+				Tx: mcms_types.Transaction{
+					OperationMetadata: mcms_types.OperationMetadata{
+						ContractType: string(in.ContractType),
+					},
+					To:               in.Address.Hex(),
+					Data:             tx.Data(),
+					AdditionalFields: json.RawMessage(`{"value": 0}`),
+				},
+			}, nil
+		}
+	})
+
+var OpAcceptOwnership = operations.NewOperation(
+	"evm-accept-ownership",
+	semver.MustParse("1.0.0"),
+	"Accepts ownership of an ownable contract Via the Timelock contract",
+	func(b operations.Bundle, deps OpEVMOwnershipDeps, in OpTransferOwnershipInput) (contract.WriteOutput, error) {
+		var opts *bind.TransactOpts
+		var allowed bool
+		if in.ProposedOwner == deps.Chain.DeployerKey.From {
+			opts = deps.Chain.DeployerKey
+			allowed = true
+		} else if in.ProposedOwner == in.TimelockAddress {
+			allowed = false
+			opts = cldf_deployment.SimTransactOpts()
+		} else {
+			return contract.WriteOutput{}, fmt.Errorf(
+				"proposed owner %s is neither deployer %s nor timelock %s for contract %T",
+				in.ProposedOwner.Hex(),
+				deps.Chain.DeployerKey.From.Hex(),
+				in.TimelockAddress.Hex(),
+				in.Address.Hex(),
+			)
+		}
+		tx, err := deps.OwnableC.AcceptOwnership(opts)
+		if allowed {
+			_, err = cldf_deployment.ConfirmIfNoError(deps.Chain, tx, err)
+			if err != nil {
+				return contract.WriteOutput{}, fmt.Errorf(
+					"failed to accept ownership of contract %T: %w",
+					in.Address.Hex(),
+					err,
+				)
+			}
+			return contract.WriteOutput{
+				ChainSelector: in.ChainSelector,
+				ExecInfo: &contract.ExecInfo{
+					Hash: tx.Hash().String(),
+				},
+			}, nil
+		} else {
+			if err != nil {
+				return contract.WriteOutput{}, fmt.Errorf(
+					"failed to generate tx data to Accept ownership of contract %T via timelock %s: %w",
+					in.Address.Hex(),
+					in.TimelockAddress.Hex(),
+					err,
+				)
+			}
+			return contract.WriteOutput{
+				ChainSelector: in.ChainSelector,
+				Tx: mcms_types.Transaction{
+					OperationMetadata: mcms_types.OperationMetadata{
+						ContractType: string(in.ContractType),
+					},
+					To:               in.Address.Hex(),
+					Data:             tx.Data(),
+					AdditionalFields: json.RawMessage(`{"value": 0}`),
+				},
+			}, nil
+		}
+	})

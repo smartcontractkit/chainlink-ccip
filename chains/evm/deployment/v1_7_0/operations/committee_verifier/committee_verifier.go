@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/verifier_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/proxy"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -62,10 +62,10 @@ var DeployProxy = contract.NewDeploy(contract.DeployParams[ProxyConstructorArgs]
 	Name:             "committee-verifier-proxy:deploy",
 	Version:          semver.MustParse("1.7.0"),
 	Description:      "Deploys the CommitteeVerifierProxy contract",
-	ContractMetadata: verifier_proxy.VerifierProxyMetaData,
+	ContractMetadata: proxy.ProxyMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(ProxyType, *semver.MustParse("1.7.0")).String(): {
-			EVM: common.FromHex(verifier_proxy.VerifierProxyBin),
+			EVM: common.FromHex(proxy.ProxyBin),
 		},
 	},
 	Validate: func(ProxyConstructorArgs) error { return nil },

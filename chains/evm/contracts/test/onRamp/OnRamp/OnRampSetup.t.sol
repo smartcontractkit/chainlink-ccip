@@ -114,6 +114,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       // TODO when v3 extra args are passed in
       extraArgs: isLegacyExtraArgs ? message.extraArgs : bytes("")
     });
+    messageV1.destBlob = receipts[receipts.length - 1].extraArgs;
 
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
@@ -138,7 +139,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     for (uint256 i = 0; i < userDefinedCCVCount; ++i) {
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
         extraArgsV3.ccvs[i].ccvAddress
-      ).getFee(address(this), DEST_CHAIN_SELECTOR, message, extraArgsV3.ccvs[i].args, extraArgsV3.finalityConfig);
+      ).getFee(DEST_CHAIN_SELECTOR, message, extraArgsV3.ccvs[i].args, extraArgsV3.finalityConfig);
 
       verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
         issuer: extraArgsV3.ccvs[i].ccvAddress,
@@ -163,8 +164,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         continue;
       }
 
-      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(defaultCCVs[i])
-        .getFee(address(this), DEST_CHAIN_SELECTOR, message, "", extraArgsV3.finalityConfig);
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
+        ICrossChainVerifierV1(defaultCCVs[i]).getFee(DEST_CHAIN_SELECTOR, message, "", extraArgsV3.finalityConfig);
 
       verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
         issuer: defaultCCVs[i],
@@ -197,14 +198,14 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
     for (uint256 i = 0; i < defaultCCVs.length; ++i) {
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
-        ICrossChainVerifierV1(defaultCCVs[i]).getFee(address(this), DEST_CHAIN_SELECTOR, message, "", 0);
+        ICrossChainVerifierV1(defaultCCVs[i]).getFee(DEST_CHAIN_SELECTOR, message, "", 0);
 
       verifierReceipts[i] = OnRamp.Receipt({
         issuer: defaultCCVs[i],
         feeTokenAmount: feeUSDCents,
         destGasLimit: gasForVerification,
         destBytesOverhead: payloadSizeBytes,
-        extraArgs: message.extraArgs
+        extraArgs: ""
       });
     }
 

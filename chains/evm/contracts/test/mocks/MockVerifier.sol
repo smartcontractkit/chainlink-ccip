@@ -24,7 +24,6 @@ contract MockVerifier is ICrossChainVerifierV1 {
   }
 
   function forwardToVerifier(
-    address,
     MessageV1Codec.MessageV1 calldata,
     bytes32,
     address,
@@ -35,17 +34,15 @@ contract MockVerifier is ICrossChainVerifierV1 {
   }
 
   function getFee(
-    address, // originalSender
     uint64, // destChainSelector
     Client.EVM2AnyMessage memory, // message
     bytes memory, // extraArgs
     uint16 // finalityConfig
-  ) external pure returns (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) {
+  ) external pure returns (uint16 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) {
     return (0, 0, 0);
   }
 
   function verifyMessage(
-    address, // originalCaller
     MessageV1Codec.MessageV1 memory, // message
     bytes32 messageId, // messageId
     bytes memory ccvData // ccvData

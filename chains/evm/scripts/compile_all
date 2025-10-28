@@ -64,7 +64,7 @@ function getOptimizations() {
 }
 
 
-compileContract ccvs/VerifierProxy
+compileContract Proxy
 compileContract ccvs/CommitteeVerifier
 compileContract onRamp/OnRamp
 compileContract executor/Executor

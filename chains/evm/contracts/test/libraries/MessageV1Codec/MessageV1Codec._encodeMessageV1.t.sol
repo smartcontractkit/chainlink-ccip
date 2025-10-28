@@ -118,6 +118,29 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.MessageV1 memory decodedMessage = s_helper.decodeMessageV1(encoded);
 
     _assertMessageEqual(originalMessage, decodedMessage);
+    vm.assertEq(encoded.length, MessageV1Codec.MESSAGE_V1_BASE_SIZE);
+  }
+
+  function test__encodeMessageV1_EVMSource() public view {
+    MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
+      sourceChainSelector: 0,
+      destChainSelector: 0,
+      sequenceNumber: 0,
+      onRampAddress: abi.encodePacked(address(0)),
+      offRampAddress: "",
+      finality: 0,
+      sender: abi.encodePacked(address(0)),
+      receiver: "",
+      destBlob: "",
+      tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
+      data: ""
+    });
+
+    bytes memory encoded = s_helper.encodeMessageV1(originalMessage);
+    MessageV1Codec.MessageV1 memory decodedMessage = s_helper.decodeMessageV1(encoded);
+
+    _assertMessageEqual(originalMessage, decodedMessage);
+    vm.assertEq(encoded.length, MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE);
   }
 
   // Reverts

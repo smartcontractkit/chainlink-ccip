@@ -19,9 +19,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   event ConfigSet(DynamicConfig dynamicConfig);
 
   /// @dev Defines upgradeable configuration parameters.
-  // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
-    address feeQuoter; // The contract used to quote fees on source.
     address feeAggregator; // Entity capable of withdrawing fees.
     address allowlistAdmin; // Entity capable adding or removing allowed senders.
   }
@@ -40,7 +38,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   /// @inheritdoc ICrossChainVerifierV1
   function forwardToVerifier(
-    address originalCaller,
     MessageV1Codec.MessageV1 calldata message,
     bytes32, // messageId
     address, // feeToken
@@ -49,7 +46,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   ) external view returns (bytes memory verifierReturnData) {
     // For EVM, sender is expected to be 20 bytes.
     address senderAddress = address(bytes20(message.sender));
-    _assertSenderIsAllowed(message.destChainSelector, senderAddress, originalCaller);
+    _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
     // TODO: Process msg & return verifier data
     return "";
@@ -57,7 +54,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   /// @inheritdoc ICrossChainVerifierV1
   function verifyMessage(
-    address, // originalCaller
     MessageV1Codec.MessageV1 calldata, // message
     bytes32 messageHash,
     bytes calldata ccvData
@@ -98,7 +94,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) internal {
-    if (dynamicConfig.feeQuoter == address(0) || dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
+    if (dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
 
     s_dynamicConfig = dynamicConfig;
 

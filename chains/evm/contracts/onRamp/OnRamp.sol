@@ -111,9 +111,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
   struct Receipt {
-    address issuer; // The address of the entity that issued the receipt.
-    uint64 destGasLimit; // The gas limit for the actions taken on the destination chain for this entity.
-    uint32 destBytesOverhead; // The byte overhead for the actions taken on the destination chain for this entity.
+    address issuer; // ───────────╮ The address of the entity that issued the receipt.
+    uint64 destGasLimit; //       │ The gas limit for the actions taken on the destination chain for this entity.
+    uint32 destBytesOverhead; // ─╯ The byte overhead for the actions taken on the destination chain for this entity.
     uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
     bytes extraArgs; // Extra args that have been passed in on the source chain.
   }
@@ -185,13 +185,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 1. parse extraArgs.
 
     Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
-    // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
-    bytes memory tokenReceiver =
-      IFeeQuoter(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
-    if (tokenReceiver.length == 0) {
-      tokenReceiver = abi.encode(message.receiver);
-    }
-
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
@@ -204,24 +197,29 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // whereas MessageV1 expects just the raw bytes, so we strip the first 12 bytes.
       // TODO handle non-EVM chain families, maybe through fee quoter
       receiver: message.receiver[12:],
-      destBlob: "", // TODO for SVM
+      // Executor args hold security critical execution args, like Solana accounts or Sui object IDs. Because of this,
+      // they have to part of the message that is signed off on by the verifiers.
+      destBlob: resolvedExtraArgs.executorArgs,
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length), //  values are populated with _lockOrBurnSingleToken.
       data: message.data
     });
 
     // 2. get pool params, this potentially mutates the CCV list.
 
-    address[] memory poolRequiredCCVs = new address[](0);
-    if (message.tokenAmounts.length != 0) {
-      poolRequiredCCVs = _getCCVsForPool(
-        destChainSelector,
-        message.tokenAmounts[0].token,
-        message.tokenAmounts[0].amount,
-        resolvedExtraArgs.finalityConfig,
-        resolvedExtraArgs.tokenArgs
-      );
+    {
+      address[] memory poolRequiredCCVs = new address[](0);
+      if (message.tokenAmounts.length != 0) {
+        poolRequiredCCVs = _getCCVsForPool(
+          destChainSelector,
+          message.tokenAmounts[0].token,
+          message.tokenAmounts[0].amount,
+          resolvedExtraArgs.finalityConfig,
+          resolvedExtraArgs.tokenArgs
+        );
+      }
+      resolvedExtraArgs.ccvs =
+        _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
     }
-    resolvedExtraArgs.ccvs = _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
 
     // 3. getFee on all verifiers, pool and executor.
 
@@ -233,6 +231,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     if (message.tokenAmounts.length != 0) {
       if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
+      // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
+      bytes memory tokenReceiver =
+        IFeeQuoter(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
+      if (tokenReceiver.length == 0) {
+        tokenReceiver = abi.encode(message.receiver);
+      }
       newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
         message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
       );
@@ -246,13 +250,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
-    address feeToken = message.feeToken;
-    uint256 feeTokenAmount = feeTokenAmount;
-    for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-      Client.CCV memory ccv = resolvedExtraArgs.ccvs[i];
-      eventData.verifierBlobs[i] = ICrossChainVerifierV1(ccv.ccvAddress).forwardToVerifier(
-        address(this), newMessage, messageId, feeToken, feeTokenAmount, ccv.args
-      );
+    {
+      for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
+        eventData.verifierBlobs[i] = ICrossChainVerifierV1(resolvedExtraArgs.ccvs[i].ccvAddress).forwardToVerifier(
+          newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
+        );
+      }
     }
 
     // 7. emit event
@@ -366,7 +369,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       resolvedArgs.executorArgs = extraArgs;
       resolvedArgs.ccvs = new Client.CCV[](destChainConfig.defaultCCVs.length);
       for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-        resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: extraArgs});
+        resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
       }
     }
 
@@ -656,7 +659,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
         verifier.ccvAddress
-      ).getFee(address(this), destChainSelector, message, verifier.args, extraArgs.finalityConfig);
+      ).getFee(destChainSelector, message, verifier.args, extraArgs.finalityConfig);
 
       verifierReceipts[i] = Receipt({
         issuer: verifier.ccvAddress,
@@ -667,12 +670,19 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       });
     }
 
-    // TODO gas & bytes for exec.
+    (uint16 usdCentsFee, uint64 execGasCost, uint32 execBytes) = IExecutor(extraArgs.executor).getFee(
+      destChainSelector,
+      extraArgs.finalityConfig,
+      uint32(message.data.length),
+      uint8(message.tokenAmounts.length),
+      extraArgs.ccvs,
+      extraArgs.executorArgs
+    );
     verifierReceipts[verifierReceipts.length - 1] = Receipt({
       issuer: extraArgs.executor,
-      destGasLimit: 0,
-      destBytesOverhead: 0,
-      feeTokenAmount: _getExecutorFee(extraArgs, message, destChainSelector),
+      destGasLimit: execGasCost, // TODO add user gas limit
+      destBytesOverhead: execBytes,
+      feeTokenAmount: usdCentsFee,
       extraArgs: extraArgs.executorArgs
     });
 
@@ -688,14 +698,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     return verifierReceipts;
-  }
-
-  function _getExecutorFee(
-    Client.EVMExtraArgsV3 memory extraArgs,
-    Client.EVM2AnyMessage memory message,
-    uint64 destChainSelector
-  ) internal view returns (uint256) {
-    return IExecutor(extraArgs.executor).getFee(destChainSelector, message, extraArgs.ccvs, extraArgs.executorArgs);
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
