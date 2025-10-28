@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 
@@ -134,7 +134,7 @@ func (ca *CurseAdapter) Curse() *cldf_ops.Sequence[api.CurseInput, sequences.OnC
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get config details for RMN at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
 			}
-			curseID, err := generateCurseID(cfgDetailsOp.Output.Version)
+			curseID, err := generateCurseID(cfgDetailsOp.Output.Version, in.Subjects)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to generate curse ID for RMN at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
 			}
@@ -209,13 +209,27 @@ func (ca *CurseAdapter) Uncurse() *cldf_ops.Sequence[api.CurseInput, sequences.O
 		})
 }
 
-func generateCurseID(cfgVersion uint32) ([16]byte, error) {
+func generateCurseID(cfgVersion uint32, subjects [][16]byte) ([16]byte, error) {
 	var out [16]byte
 
-	_, err := rand.Read(out[4:])
+	h := sha256.New()
+
+	// Include cfgVersion
+	err := binary.Write(h, binary.BigEndian, cfgVersion)
 	if err != nil {
-		return [16]byte{}, fmt.Errorf("failed to generate random bytes for curse ID: %w", err)
+		return [16]byte{}, err
 	}
+
+	// Include all subjects in deterministic order
+	for _, s := range subjects {
+		h.Write(s[:])
+	}
+
+	sum := h.Sum(nil)
+
+	// Copy first 16 bytes of hash into output
+	copy(out[:], sum[:16])
+
 	binary.BigEndian.PutUint32(out[0:4], cfgVersion)
 
 	return out, nil
