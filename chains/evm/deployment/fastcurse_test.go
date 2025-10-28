@@ -236,7 +236,7 @@ func TestFastCurse(t *testing.T) {
 	cr := deploy.GetTransferOwnershipRegistry()
 	evmAdapter := &adapters.EVMTransferOwnershipAdapter{}
 	cr.RegisterAdapter(chainsel.FamilyEVM, transferOwnershipInput.AdapterVersion, evmAdapter)
-	mcmsRegistry := changesets.NewMCMSReaderRegistry()
+	mcmsRegistry := changesets.GetRegistry()
 	evmMCMSReader := &adapters.EVMMCMSReader{}
 	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, evmMCMSReader)
 	transferOwnershipChangeset := deploy.TransferOwnershipChangeset(cr, mcmsRegistry)
