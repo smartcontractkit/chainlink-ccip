@@ -7,12 +7,11 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	mcmsops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/access_controller"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/mcm"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -54,9 +53,6 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 			accessControllerAddress := solana.MustPublicKeyFromBase58(accessControllerRef.Output.Address)
 			mcmAddress := solana.MustPublicKeyFromBase58(mcmRef.Output.Address)
 			timelockAddress := solana.MustPublicKeyFromBase58(timelockRef.Output.Address)
-			access_controller.SetProgramID(accessControllerAddress)
-			mcm.SetProgramID(mcmAddress)
-			timelock.SetProgramID(timelockAddress)
 
 			deps := mcmsops.Deps{
 				Chain:             chain,
@@ -167,26 +163,26 @@ func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int, tim
 	if err != nil {
 		return nil, fmt.Errorf("failed to init timelock: %w", err)
 	}
-	return []cldf_datastore.AddressRef{ref.Output}, nil
+	return ref.Output, nil
 }
 
 func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.PublicKey) error {
 	proposerRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		utils.ProposerManyChainMultisig,
-		mcmsops.Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	cancellerRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		utils.CancellerManyChainMultisig,
-		mcmsops.Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	bypasserRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		utils.BypasserManyChainMultisig,
-		mcmsops.Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	proposerPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(proposerRef.Address)))

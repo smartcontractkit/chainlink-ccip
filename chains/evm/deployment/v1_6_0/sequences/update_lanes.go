@@ -82,7 +82,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			OnRamp:            common.BytesToAddress(input.Source.OnRamp),
 		}
 		if input.IsDisabled {
-			onrampUpdate.OnRamp = common.Address{}
+			onrampUpdate.OnRamp = common.HexToAddress("0x0")
 		}
 		result, err = sequences.RunAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.Router),
@@ -130,7 +130,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 
 		offrampUpdate := router.OffRamp{
 			SourceChainSelector: input.Source.Selector,
-			OffRamp:             common.BytesToAddress(input.Source.OffRamp),
+			OffRamp:             common.BytesToAddress(input.Dest.OffRamp),
 		}
 		var offRampAdds []router.OffRamp
 		var offRampRemoves []router.OffRamp

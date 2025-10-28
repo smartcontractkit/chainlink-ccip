@@ -29,10 +29,24 @@ type MCMSReaderRegistry struct {
 	m  map[string]MCMSReader
 }
 
-func NewMCMSReaderRegistry() *MCMSReaderRegistry {
+func newMCMSReaderRegistry() *MCMSReaderRegistry {
 	return &MCMSReaderRegistry{
 		m: make(map[string]MCMSReader),
 	}
+}
+
+var (
+	singletonRegistry *MCMSReaderRegistry
+	once              sync.Once
+)
+
+// GetRegistry returns the global singleton instance.
+// The first call creates the registry; subsequent calls return the same pointer.
+func GetRegistry() *MCMSReaderRegistry {
+	once.Do(func() {
+		singletonRegistry = newMCMSReaderRegistry()
+	})
+	return singletonRegistry
 }
 
 // RegisterMCMSReader registers an MCMSReader for a specific chain family.

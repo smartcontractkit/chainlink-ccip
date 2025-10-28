@@ -29,17 +29,26 @@ func NewCurseAdapter() *CurseAdapter {
 	return &CurseAdapter{}
 }
 
-func (ca *CurseAdapter) Initialize(e cldf.Environment) error {
-	ca.rmnAddressCache = make(map[uint64]common.Address)
-	ca.routerAddressCache = make(map[uint64]common.Address)
+func (ca *CurseAdapter) Initialize(e cldf.Environment, selector uint64) error {
+	if ca.rmnAddressCache == nil {
+		ca.rmnAddressCache = make(map[uint64]common.Address)
+	}
+	if ca.routerAddressCache == nil {
+		ca.routerAddressCache = make(map[uint64]common.Address)
+	}
 
-	for _, chain := range e.BlockChains.EVMChains() {
+	chain, ok := e.BlockChains.EVMChains()[selector]
+	if !ok {
+		return fmt.Errorf("no EVM chain found for selector %d", selector)
+	}
+	if _, exists := ca.rmnAddressCache[chain.Selector]; !exists {
 		rmnAddr, err := rmnAddressOnChain(e, chain.Selector)
 		if err != nil {
 			return fmt.Errorf("failed to find RMN address on chain %d: %w", chain.Selector, err)
 		}
 		ca.rmnAddressCache[chain.Selector] = rmnAddr
-
+	}
+	if _, exists := ca.routerAddressCache[chain.Selector]; !exists {
 		routerAddr, err := routerAddressOnChain(e, chain.Selector)
 		if err != nil {
 			return fmt.Errorf("failed to find router address on chain %d: %w", chain.Selector, err)
@@ -90,7 +99,7 @@ func (ca *CurseAdapter) IsCurseEnabledForChain(e cldf.Environment, selector uint
 	// locate rmn address on chain
 	_, ok := ca.rmnAddressCache[selector]
 	if !ok {
-		return false, fmt.Errorf("no RMN address cached for chain %d", selector)
+		return false, fmt.Errorf("no RMNRemote address cached for chain %d", selector)
 	}
 	return true, nil
 }

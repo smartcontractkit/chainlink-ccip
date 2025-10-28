@@ -25,6 +25,11 @@ func (a *EVMDeployer) DeployChainContracts() *cldf_ops.Sequence[ccipapi.Contract
 	return nil
 }
 
+func (a *EVMDeployer) SetOCR3Config() *cldf_ops.Sequence[ccipapi.SetOCR3ConfigInput, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	// Not implemented for the 1.0.0 deployer
+	return nil
+}
+
 func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequtil.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"deploy-mcms",

@@ -9,8 +9,6 @@ import (
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -30,9 +28,6 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		feeQuoterAddress := solana.PublicKeyFromBytes(input.Source.FeeQuoter)
 		offRampAddress := solana.PublicKeyFromBytes(input.Source.OffRamp)
 		ccipRouterProgram := solana.PublicKeyFromBytes(input.Source.Router)
-		fee_quoter.SetProgramID(feeQuoterAddress)
-		ccip_offramp.SetProgramID(offRampAddress)
-		ccip_router.SetProgramID(ccipRouterProgram)
 
 		// Add FeeQuoter
 		out, err := operations.ExecuteOperation(b, fqops.ConnectChains, chains.SolanaChains()[input.Source.Selector], fqops.ConnectChainsParams{
@@ -72,12 +67,8 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
 		b.Logger.Info("SVM Configuring lane leg as destination:", input)
-		feeQuoterAddress := solana.PublicKeyFromBytes(input.Dest.FeeQuoter)
 		offRampAddress := solana.PublicKeyFromBytes(input.Dest.OffRamp)
 		ccipRouterProgram := solana.PublicKeyFromBytes(input.Dest.Router)
-		fee_quoter.SetProgramID(feeQuoterAddress)
-		ccip_offramp.SetProgramID(offRampAddress)
-		ccip_router.SetProgramID(ccipRouterProgram)
 
 		// OffRamp must be added to Router before initialization
 		out, err := operations.ExecuteOperation(b, routerops.AddOffRamp, chains.SolanaChains()[input.Dest.Selector], routerops.ConnectChainsParams{
