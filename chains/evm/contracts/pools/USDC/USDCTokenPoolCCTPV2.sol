@@ -68,7 +68,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // Some CCTP-V2 chains support a configurable fee switch, but not all. It is therefore
     // necessary to check via a try-catch block. If the call reverts, then the fee switch is not supported and the
     // standard transfer fee will be zero, and no further action is required.
-    try i_tokenMessenger.minFee() returns (uint256 minFee) {
+    try i_tokenMessenger.getMinFeeAmount(lockOrBurnIn.amount) returns (uint256 minFee) {
       // This token pool only supports zero-fee standard transfers. If the minFee is non-zero
       // then the function should revert as the message may not be able to be successfully
       // delivered on destination due to unexpected minting fees.

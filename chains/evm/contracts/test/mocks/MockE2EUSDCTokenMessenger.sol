@@ -124,7 +124,9 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
   }
 
   /// @dev This function is only available for CCTP V2
-  function minFee() external pure returns (uint256) {
+  function getMinFeeAmount(
+    uint256
+  ) external pure returns (uint256) {
     return 0;
   }
 

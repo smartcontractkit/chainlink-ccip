@@ -112,5 +112,7 @@ interface ITokenMessenger {
   /// Returns the minimum fee required for a deposit for burn message.
   /// @dev This function is only available for CCTP V2, and not every CCTP-V2 compatible
   /// chain supports this configurable fee switch.
-  function minFee() external view returns (uint256);
+  function getMinFeeAmount(
+    uint256 amount
+  ) external view returns (uint256);
 }

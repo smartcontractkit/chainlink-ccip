@@ -136,14 +136,16 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
   }
 
-  function test_lockOrBurn_minFeeNotSupported() public {
+  function test_lockOrBurn_MinFeeNotSupported() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
     uint256 amount = 1000;
     s_USDCToken.transfer(address(s_usdcTokenPool), amount);
 
     vm.startPrank(s_routerAllowedOnRamp);
 
-    vm.mockCallRevert(address(s_mockUSDCTokenMessenger), abi.encodeWithSelector(ITokenMessenger.minFee.selector), "");
+    vm.mockCallRevert(
+      address(s_mockUSDCTokenMessenger), abi.encodeWithSelector(ITokenMessenger.getMinFeeAmount.selector), ""
+    );
 
     s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
@@ -293,7 +295,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
 
     vm.mockCall(
       address(s_mockUSDCTokenMessenger),
-      abi.encodeWithSelector(ITokenMessenger.minFee.selector),
+      abi.encodeWithSelector(ITokenMessenger.getMinFeeAmount.selector),
       abi.encode(s_usdcTokenPool.MAX_FEE() + 1)
     );
 
