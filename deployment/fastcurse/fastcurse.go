@@ -15,8 +15,7 @@ import (
 type RMNCurseConfig struct {
 	CurseActions []CurseActionInput
 	// Use this if you want to include curse subject even when they are already cursed (CurseChangeset) or already uncursed (UncurseChangeset)
-	Force  bool
-	Reason string
+	Force bool
 	// MCMS configures the resulting proposal.
 	MCMS mcms.Input
 }
@@ -53,12 +52,6 @@ func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) 
 	return func(e cldf.Environment, cfg RMNCurseConfig) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
-		for _, adapter := range cr.CurseAdapters {
-			err := adapter.Initialize(e)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize necessary curse adapter addresses: %w", err)
-			}
-		}
 		// Group curse actions by chain selector
 		grouped, err := cr.groupRMNSubjectBySelector(e, cfg.CurseActions)
 		if err != nil {
@@ -106,23 +99,17 @@ func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry
 	return func(e cldf.Environment, cfg RMNCurseConfig) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
-		for _, adapter := range cr.CurseAdapters {
-			err := adapter.Initialize(e)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize necessary curse adapter addresses: %w", err)
-			}
-		}
 		// Group curse actions by chain selector
 		grouped, err := cr.groupRMNSubjectBySelector(e, cfg.CurseActions)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to group curse actions: %w", err)
 		}
+
 		for selector, curseDetail := range grouped {
 			adapter := curseDetail.curseAdapter
 			subjects := curseDetail.subjects
 			alreadyCursedSubjects := make([]Subject, 0)
 			for _, subject := range subjects {
-				// Only curse the subjects that are cursed
 				cursed, err := adapter.IsSubjectCursedOnChain(e, selector, subject)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to check if subject %x is cursed on chain with selector %d: %w", subject, selector, err)

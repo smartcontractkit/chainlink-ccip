@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 
@@ -32,19 +32,28 @@ func NewCurseAdapter() *CurseAdapter {
 	return &CurseAdapter{}
 }
 
-func (ca *CurseAdapter) Initialize(e cldf.Environment) error {
-	ca.rmnAddressCache = make(map[uint64]common.Address)
-	ca.routerAddressCache = make(map[uint64]common.Address)
-	for _, chain := range e.BlockChains.EVMChains() {
+func (ca *CurseAdapter) Initialize(e cldf.Environment, selector uint64) error {
+	if ca.rmnAddressCache == nil {
+		ca.rmnAddressCache = make(map[uint64]common.Address)
+	}
+	if ca.routerAddressCache == nil {
+		ca.routerAddressCache = make(map[uint64]common.Address)
+	}
+	chain, ok := e.BlockChains.EVMChains()[selector]
+	if !ok {
+		return fmt.Errorf("no EVM chain found for selector %d", selector)
+	}
+	if _, exists := ca.rmnAddressCache[chain.Selector]; !exists {
 		rmnAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(ops.ContractType),
-			Version: semver.MustParse("1.6.0"),
+			Version: semver.MustParse("1.5.0"),
 		}, chain.ChainSelector(), evmds.ToEVMAddress)
 		if err != nil {
 			return err
 		}
 		ca.rmnAddressCache[chain.Selector] = rmnAddr
-
+	}
+	if _, exists := ca.routerAddressCache[chain.Selector]; !exists {
 		routerAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(routerops.ContractType),
 			Version: semver.MustParse("1.2.0"),
@@ -67,7 +76,6 @@ func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint
 	if !ok {
 		return false, fmt.Errorf("no EVM chain found for selector %d", selector)
 	}
-
 	isCursedRep, err := cldf_ops.ExecuteOperation(e.OperationsBundle, ops.IsCursed, chain, contract.FunctionInput[api.Subject]{
 		ChainSelector: chain.Selector,
 		Address:       rmnAddr,
@@ -126,7 +134,7 @@ func (ca *CurseAdapter) Curse() *cldf_ops.Sequence[api.CurseInput, sequences.OnC
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get config details for RMN at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
 			}
-			curseID, err := generateCurseID(cfgDetailsOp.Output.Version)
+			curseID, err := generateCurseID(cfgDetailsOp.Output.Version, in.Subjects)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to generate curse ID for RMN at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
 			}
@@ -201,13 +209,27 @@ func (ca *CurseAdapter) Uncurse() *cldf_ops.Sequence[api.CurseInput, sequences.O
 		})
 }
 
-func generateCurseID(cfgVersion uint32) ([16]byte, error) {
+func generateCurseID(cfgVersion uint32, subjects [][16]byte) ([16]byte, error) {
 	var out [16]byte
 
-	_, err := rand.Read(out[4:])
+	h := sha256.New()
+
+	// Include cfgVersion
+	err := binary.Write(h, binary.BigEndian, cfgVersion)
 	if err != nil {
-		return [16]byte{}, fmt.Errorf("failed to generate random bytes for curse ID: %w", err)
+		return [16]byte{}, err
 	}
+
+	// Include all subjects in deterministic order
+	for _, s := range subjects {
+		h.Write(s[:])
+	}
+
+	sum := h.Sum(nil)
+
+	// Copy first 16 bytes of hash into output
+	copy(out[:], sum[:16])
+
 	binary.BigEndian.PutUint32(out[0:4], cfgVersion)
 
 	return out, nil
