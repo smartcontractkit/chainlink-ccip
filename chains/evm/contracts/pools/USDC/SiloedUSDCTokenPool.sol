@@ -119,7 +119,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   }
 
   /// @inheritdoc SiloedLockReleaseTokenPool
-  /// @dev This function is overridden to encode the LOCK_RELEASE_FLAG into the destPoolData, as the destination pool
+  /// @dev This function is overridden to encode the LOCK_RELEASE_FLAG into the destPoolData, as the destination pool.
   /// will be a BurnMintWithLockReleaseFlagTokenPool and may need to be processed by a proxy first.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn

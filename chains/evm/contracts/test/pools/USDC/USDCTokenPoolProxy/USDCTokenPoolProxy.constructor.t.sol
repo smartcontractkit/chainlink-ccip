@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV1} from "../../../../interfaces/IPool.sol";
-import {Pool} from "../../../../libraries/Pool.sol";
 
+import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
