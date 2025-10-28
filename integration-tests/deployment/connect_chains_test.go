@@ -11,6 +11,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
@@ -87,8 +88,8 @@ func checkBidirectionalLaneConnectivity(
 
 	routerOnDestAddr, err := evmAdapter.GetRouterAddress(e.DataStore, evmChain.Selector)
 	require.NoError(t, err, "must get router from destAdapter")
-	// routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
-	// require.NoError(t, err, "must instantiate router")
+	routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
+	require.NoError(t, err, "must instantiate router")
 
 	destChainConfig, err := onRampDest.GetDestChainConfig(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get dest chain config from onRamp")
@@ -106,9 +107,9 @@ func checkBidirectionalLaneConnectivity(
 	require.Equal(t, routerOnSrcAddr, srcChainConfig.OnRamp, "remote onRamp must be set on offRamp")
 	// require.Equal(t, routerOnSrcAddr, srcChainConfig.Router.Bytes(), "router must equal expected")
 
-	// isOffRamp, err := routerOnDest.IsOffRamp(nil, solanaChain.Selector, common.Address(offRampOnSrcAddr))
-	// require.NoError(t, err, "must check if router has offRamp")
-	// require.Equal(t, !disable, isOffRamp, "isOffRamp result must equal expected")
+	isOffRamp, err := routerOnDest.IsOffRamp(nil, solanaChain.Selector, common.Address(offRampDestAddr))
+	require.NoError(t, err, "must check if router has offRamp")
+	require.Equal(t, !disable, isOffRamp, "isOffRamp result must equal expected")
 	// onRampOnRouter, err := routerOnDest.GetOnRamp(nil, solanaChain.Selector)
 	// require.NoError(t, err, "must get onRamp from router")
 	// onRampAddr := routerOnSrcAddr
