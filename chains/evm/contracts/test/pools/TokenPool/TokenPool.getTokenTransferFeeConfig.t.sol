@@ -16,8 +16,7 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
       defaultBlockConfirmationFeeUSDCents: 100, // $1.00
       customBlockConfirmationFeeUSDCents: 150, // $1.50
       defaultBlockConfirmationTransferFeeBps: 123,
-      customBlockConfirmationTransferFeeBps: 456,
-      isEnabled: true
+      customBlockConfirmationTransferFeeBps: 456
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -31,7 +30,6 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     IPoolV2.TokenTransferFeeConfig memory returnedFeeConfig =
       s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
 
-    assertEq(returnedFeeConfig.isEnabled, feeConfig.isEnabled);
     assertEq(returnedFeeConfig.destGasOverhead, feeConfig.destGasOverhead);
     assertEq(returnedFeeConfig.destBytesOverhead, feeConfig.destBytesOverhead);
     assertEq(returnedFeeConfig.defaultBlockConfirmationFeeUSDCents, feeConfig.defaultBlockConfirmationFeeUSDCents);
@@ -47,13 +45,12 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     emit TokenPool.TokenTransferFeeConfigDeleted(DEST_CHAIN_SELECTOR);
     s_tokenPool.applyTokenTransferFeeConfigUpdates(new TokenPool.TokenTransferFeeConfigArgs[](0), toDelete);
 
-    // Test getting the disabled config
+    // Test getting the deleted config
     Client.EVM2AnyMessage memory message;
     IPoolV2.TokenTransferFeeConfig memory tokenTransferFeeConfig =
       s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
 
     // assert default values are returned
-    assertEq(tokenTransferFeeConfig.isEnabled, false);
     assertEq(tokenTransferFeeConfig.destGasOverhead, 0);
     assertEq(tokenTransferFeeConfig.destBytesOverhead, 0);
     assertEq(tokenTransferFeeConfig.defaultBlockConfirmationFeeUSDCents, 0);

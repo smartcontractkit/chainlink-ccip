@@ -45,7 +45,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   error InvalidDestBytesOverhead(uint32 destBytesOverhead);
   error InvalidMinBlockConfirmation(uint16 requested, uint16 minBlockConfirmation);
-  error TokenTransferFeeConfigNotEnabled(uint64 destChainSelector);
   error InvalidTransferFeeBps(uint256 bps);
   error InvalidMinBlockConfirmationConfig();
   error CallerIsNotARampOnRouter(address caller);
@@ -382,28 +381,24 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - if the sender is a valid onRamp
   /// - rate limiting for either default or custom block confirmation transfer messages.
   /// @param lockOrBurnIn The input to validate.
-  /// @param finality The minimum block confirmation requested by the message. A value of zero is used for default finality.
+  /// @param blockConfirmationRequested The minimum block confirmation requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
-  function _validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) internal {
+  function _validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 blockConfirmationRequested) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
     _checkAllowList(lockOrBurnIn.originalSender);
 
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
-    CustomBlockConfirmationConfig storage finalityConfig = s_customBlockConfirmationConfig;
     uint256 amount = lockOrBurnIn.amount;
-    if (finality != WAIT_FOR_FINALITY && finalityConfig.minBlockConfirmation != WAIT_FOR_FINALITY) {
-      if (finality < finalityConfig.minBlockConfirmation) {
-        revert InvalidMinBlockConfirmation(finality, finalityConfig.minBlockConfirmation);
+    if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
+      uint16 minBlockConfirmationConfigured = s_customBlockConfirmationConfig.minBlockConfirmation;
+      if (minBlockConfirmationConfigured != 0) {
+        if (blockConfirmationRequested < minBlockConfirmationConfigured) {
+          revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
+        }
+        _consumeCustomBlockConfirmationOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
       }
-
-      finalityConfig.outboundRateLimiterConfig[lockOrBurnIn.remoteChainSelector]._consume(
-        amount, lockOrBurnIn.localToken
-      );
-      emit CustomBlockConfirmationOutboundRateLimitConsumed(
-        lockOrBurnIn.remoteChainSelector, lockOrBurnIn.localToken, amount
-      );
     } else {
       _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     }
@@ -417,13 +412,13 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - rate limiting for either default or custom block confirmation transfer messages.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
-  /// @param finality The minimum block confirmation requested by the message. A value of zero is used for default finality.
+  /// @param blockConfirmationRequested The minimum block confirmation requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
   function _validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    uint16 finality
+    uint16 blockConfirmationRequested
   ) internal {
     if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
@@ -433,14 +428,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     if (!isRemotePool(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress)) {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
-
-    if (finality != WAIT_FOR_FINALITY) {
-      s_customBlockConfirmationConfig.inboundRateLimiterConfig[releaseOrMintIn.remoteChainSelector]._consume(
-        localAmount, releaseOrMintIn.localToken
-      );
-      emit CustomBlockConfirmationInboundRateLimitConsumed(
-        releaseOrMintIn.remoteChainSelector, releaseOrMintIn.localToken, localAmount
-      );
+    if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
+      _consumeCustomBlockConfirmationInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
     } else {
       _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
     }
@@ -717,18 +706,43 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return s_rateLimitAdmin;
   }
 
-  /// @notice Consumes outbound rate limiting capacity in this pool
-  function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
+  /// @notice Consumes outbound rate limiting capacity in this pool.
+  function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._consume(amount, address(i_token));
 
     emit OutboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
   }
 
-  /// @notice Consumes inbound rate limiting capacity in this pool
-  function _consumeInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
+  /// @notice Consumes inbound rate limiting capacity in this pool.
+  function _consumeInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._consume(amount, address(i_token));
 
     emit InboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
+  }
+
+  /// @notice Consumes custom block confirmation outbound rate limiting capacity in this pool.
+  function _consumeCustomBlockConfirmationOutboundRateLimit(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal virtual {
+    s_customBlockConfirmationConfig.outboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
+
+    emit CustomBlockConfirmationOutboundRateLimitConsumed({
+      token: address(i_token),
+      remoteChainSelector: remoteChainSelector,
+      amount: amount
+    });
+  }
+
+  /// @notice Consumes custom block confirmation inbound rate limiting capacity in this pool.
+  function _consumeCustomBlockConfirmationInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
+    s_customBlockConfirmationConfig.inboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
+
+    emit CustomBlockConfirmationInboundRateLimitConsumed({
+      token: address(i_token),
+      remoteChainSelector: remoteChainSelector,
+      amount: amount
+    });
   }
 
   /// @notice Returns the outbound and inbound rate limiter state for the given remote chain at the time of the call.
@@ -1099,8 +1113,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @inheritdoc IPoolV2
   /// @notice Returns the pool fee parameters that will apply to a transfer.
   function getFee(
-    uint64 destChainSelector,
     address, // localToken
+    uint64 destChainSelector,
     uint256, // amount
     address, // feeToken
     uint16 blockConfirmationRequested,
@@ -1112,20 +1126,25 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps)
   {
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector];
-    if (!feeConfig.isEnabled) {
-      return (0, 0, 0, 0);
+    if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
+      if (blockConfirmationRequested < s_customBlockConfirmationConfig.minBlockConfirmation) {
+        revert InvalidMinBlockConfirmation(
+          blockConfirmationRequested, s_customBlockConfirmationConfig.minBlockConfirmation
+        );
+      }
+      return (
+        feeConfig.customBlockConfirmationFeeUSDCents,
+        feeConfig.destGasOverhead,
+        feeConfig.destBytesOverhead,
+        feeConfig.customBlockConfirmationTransferFeeBps
+      );
     }
-
-    bool usesCustomBlockConfirmation = blockConfirmationRequested != WAIT_FOR_FINALITY;
-    feeUSDCents = usesCustomBlockConfirmation
-      ? feeConfig.customBlockConfirmationFeeUSDCents
-      : feeConfig.defaultBlockConfirmationFeeUSDCents;
-    destGasOverhead = feeConfig.destGasOverhead;
-    destBytesOverhead = feeConfig.destBytesOverhead;
-    tokenFeeBps = usesCustomBlockConfirmation
-      ? feeConfig.customBlockConfirmationTransferFeeBps
-      : feeConfig.defaultBlockConfirmationTransferFeeBps;
-    return (feeUSDCents, destGasOverhead, destBytesOverhead, tokenFeeBps);
+    return (
+      feeConfig.defaultBlockConfirmationFeeUSDCents,
+      feeConfig.destGasOverhead,
+      feeConfig.destBytesOverhead,
+      feeConfig.defaultBlockConfirmationTransferFeeBps
+    );
   }
 
   /// @notice Withdraws all accumulated pool fees to the specified recipient.
@@ -1154,27 +1173,32 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function getAccumulatedFees() public view virtual returns (uint256) {
     return getToken().balanceOf(address(this));
   }
-
-  // @notice Applies any applicable fees to the lock or burn amount.
+  /// @dev Deducts the fee from the transferred amount based on the configured basis points (not added on top).
   /// @param lockOrBurnIn The original lock or burn request.
-  /// @param blockConfirmationRequested The minimum block confirmation requested by the message. A value of zero (WAIT_FOR_FINALITY) applies default finality fees.
+  /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
+  /// A value of zero (WAIT_FOR_FINALITY) applies default finality fees.
+  /// @return destAmount The amount after fee deduction.
+
   function _applyFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested
   ) internal view virtual returns (uint256 destAmount) {
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
-    if (!feeConfig.isEnabled) {
-      return lockOrBurnIn.amount;
+
+    // Determine which fee basis points to apply based on finality type.
+    uint16 tokenFeeBps;
+    if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
+      tokenFeeBps = feeConfig.customBlockConfirmationTransferFeeBps;
+    } else {
+      tokenFeeBps = feeConfig.defaultBlockConfirmationTransferFeeBps;
     }
 
-    bool usesCustomBlockConfirmation = blockConfirmationRequested != WAIT_FOR_FINALITY;
-    uint16 tokenFeeBps = usesCustomBlockConfirmation
-      ? feeConfig.customBlockConfirmationTransferFeeBps
-      : feeConfig.defaultBlockConfirmationTransferFeeBps;
+    // If no percentage-based fee is configured, return the full amount.
     if (tokenFeeBps == 0) {
       return lockOrBurnIn.amount;
     }
 
+    // Calculate and deduct the fee from the transfer amount.
     uint256 feeAmount = (lockOrBurnIn.amount * tokenFeeBps) / BPS_DIVIDER;
     return lockOrBurnIn.amount - feeAmount;
   }
