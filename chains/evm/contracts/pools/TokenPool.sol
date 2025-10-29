@@ -760,9 +760,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     )
   {
     RemoteChainConfig storage config = s_remoteChainConfigs[remoteChainSelector];
-    outboundRateLimiterState = config.outboundRateLimiterConfig._currentTokenBucketState();
-    inboundRateLimiterState = config.inboundRateLimiterConfig._currentTokenBucketState();
-    return (outboundRateLimiterState, inboundRateLimiterState);
+    return (
+      config.outboundRateLimiterConfig._currentTokenBucketState(),
+      config.inboundRateLimiterConfig._currentTokenBucketState()
+    );
   }
 
   /// @notice Returns the minimum block confirmations configured for custom block confirmation transfers.
@@ -786,9 +787,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     )
   {
     CustomBlockConfirmationConfig storage config = s_customBlockConfirmationConfig;
-    outboundRateLimiterState = config.outboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState();
-    inboundRateLimiterState = config.inboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState();
-    return (outboundRateLimiterState, inboundRateLimiterState);
+    return (
+      config.outboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState(),
+      config.inboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState()
+    );
   }
 
   /// @notice Sets multiple chain rate limiter configs.
