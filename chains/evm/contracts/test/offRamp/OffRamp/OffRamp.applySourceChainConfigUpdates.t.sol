@@ -46,10 +46,10 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       })
     );
 
-    s_agg.applySourceChainConfigUpdates(configs);
+    s_offRamp.applySourceChainConfigUpdates(configs);
 
-    OffRamp.SourceChainConfig memory config1 = s_agg.getSourceChainConfig(chain1);
-    OffRamp.SourceChainConfig memory config2 = s_agg.getSourceChainConfig(chain2);
+    OffRamp.SourceChainConfig memory config1 = s_offRamp.getSourceChainConfig(chain1);
+    OffRamp.SourceChainConfig memory config2 = s_offRamp.getSourceChainConfig(chain2);
 
     assertEq(address(config1.router), address(configs[0].router));
     assertEq(address(config2.router), address(configs[1].router));
@@ -85,9 +85,9 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     configs[0].defaultCCV[1] = makeAddr("ccv2");
     configs[0].laneMandatedCCVs[0] = makeAddr("mandatedCCV");
 
-    s_agg.applySourceChainConfigUpdates(configs);
+    s_offRamp.applySourceChainConfigUpdates(configs);
 
-    OffRamp.SourceChainConfig memory config = s_agg.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
+    OffRamp.SourceChainConfig memory config = s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
     assertEq(config.isEnabled, false);
     assertEq(config.defaultCCVs.length, 2);
     assertEq(config.laneMandatedCCVs.length, 1);
@@ -106,7 +106,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     configs[0].defaultCCV[0] = makeAddr("ccv");
 
     vm.expectRevert(OffRamp.ZeroChainSelectorNotAllowed.selector);
-    s_agg.applySourceChainConfigUpdates(configs);
+    s_offRamp.applySourceChainConfigUpdates(configs);
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_Router() public {
@@ -122,7 +122,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     configs[0].defaultCCV[0] = makeAddr("ccv");
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
-    s_agg.applySourceChainConfigUpdates(configs);
+    s_offRamp.applySourceChainConfigUpdates(configs);
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_DefaultCCV() public {
@@ -137,7 +137,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     });
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
-    s_agg.applySourceChainConfigUpdates(configs);
+    s_offRamp.applySourceChainConfigUpdates(configs);
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_OnRamp() public {
@@ -153,13 +153,13 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     configs[0].defaultCCV[0] = makeAddr("ccv");
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
-    s_agg.applySourceChainConfigUpdates(configs);
+    s_offRamp.applySourceChainConfigUpdates(configs);
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_OnlyCallableByOwner() public {
     vm.stopPrank();
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
 
-    s_agg.applySourceChainConfigUpdates(new OffRamp.SourceChainConfigArgs[](0));
+    s_offRamp.applySourceChainConfigUpdates(new OffRamp.SourceChainConfigArgs[](0));
   }
 }

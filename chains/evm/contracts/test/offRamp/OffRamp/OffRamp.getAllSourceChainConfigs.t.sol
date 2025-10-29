@@ -6,7 +6,7 @@ import {OffRampSetup} from "./OffRampSetup.t.sol";
 
 contract OffRamp_getAllSourceChainConfigs is OffRampSetup {
   function test_getAllSourceChainConfigs_ReturnsSingleChain() public view {
-    (uint64[] memory selectors, OffRamp.SourceChainConfig[] memory configs) = s_agg.getAllSourceChainConfigs();
+    (uint64[] memory selectors, OffRamp.SourceChainConfig[] memory configs) = s_offRamp.getAllSourceChainConfigs();
 
     assertEq(selectors.length, 1);
     assertEq(configs.length, 1);
@@ -32,9 +32,9 @@ contract OffRamp_getAllSourceChainConfigs is OffRampSetup {
     });
     configs[0].defaultCCV[0] = makeAddr("ccv2");
 
-    s_agg.applySourceChainConfigUpdates(configs);
+    s_offRamp.applySourceChainConfigUpdates(configs);
 
-    (uint64[] memory selectors, OffRamp.SourceChainConfig[] memory chainConfigs) = s_agg.getAllSourceChainConfigs();
+    (uint64[] memory selectors, OffRamp.SourceChainConfig[] memory chainConfigs) = s_offRamp.getAllSourceChainConfigs();
 
     assertEq(selectors.length, 2);
     assertEq(chainConfigs.length, 2);

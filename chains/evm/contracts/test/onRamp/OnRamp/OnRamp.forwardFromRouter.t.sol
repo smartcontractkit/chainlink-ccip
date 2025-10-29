@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
+
 import {Client} from "../../../libraries/Client.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
@@ -90,5 +92,22 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
   function test_forwardFromRouter_RevertWhen_RouterMustSetOriginalSender() public {
     vm.expectRevert(OnRamp.RouterMustSetOriginalSender.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 1e17, address(0));
+  }
+
+  function test_forwardFromRouter_RevertWhen_DestChainNotSupportedByCCV() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    vm.mockCall(
+      address(s_defaultCCV),
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector, DEST_CHAIN_SELECTOR),
+      abi.encode(address(0))
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        OnRamp.DestinationChainNotSupportedByCCV.selector, address(s_defaultCCV), DEST_CHAIN_SELECTOR
+      )
+    );
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
   }
 }

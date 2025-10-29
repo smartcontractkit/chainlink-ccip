@@ -15,7 +15,8 @@ contract CommitteeVerifier_forwardToVerifier is CommitteeVerifierSetup {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _generateBasicMessageV1();
 
     vm.prank(s_onRamp);
-    s_committeeVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 1000, "");
+    bytes memory returnData = s_committeeVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 1000, "");
+    assertEq(returnData, abi.encodePacked(s_committeeVerifier.versionTag()));
   }
 
   function test_forwardToVerifier_RevertWhen_CallerIsNotARampOnRouter() public {

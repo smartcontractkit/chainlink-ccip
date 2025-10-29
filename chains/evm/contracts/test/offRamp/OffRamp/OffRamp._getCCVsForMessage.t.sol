@@ -99,7 +99,7 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
 
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = _setCCVsOnPool(poolCCVs);
 
-    (address[] memory requiredCCVs,,) = s_agg.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, tokenAmounts, 0);
+    (address[] memory requiredCCVs,,) = s_offRamp.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, tokenAmounts, 0);
 
     assertEq(_onlyUniques(requiredCCVs).length, requiredCCVs.length, "still has duplicates");
 

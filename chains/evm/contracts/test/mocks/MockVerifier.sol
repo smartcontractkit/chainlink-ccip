@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../interfaces/ICrossChainVerifierV1.sol";
 
 import {Client} from "../../libraries/Client.sol";
@@ -8,7 +9,7 @@ import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
-contract MockVerifier is ICrossChainVerifierV1 {
+contract MockVerifier is ICrossChainVerifierResolver, ICrossChainVerifierV1 {
   bytes private s_verifierResult;
 
   constructor(
@@ -50,5 +51,18 @@ contract MockVerifier is ICrossChainVerifierV1 {
 
   function getStorageLocation() external pure override returns (string memory) {
     return "mock://ccv";
+  }
+
+  function getInboundImplementation(
+    bytes calldata // ccvData
+  ) external view returns (address) {
+    return address(this);
+  }
+
+  function getOutboundImplementation(
+    uint64, // destChainSelector
+    bytes memory // extraArgs
+  ) external view returns (address) {
+    return address(this);
   }
 }

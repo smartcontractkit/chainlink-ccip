@@ -12,7 +12,7 @@ import (
 
 var ContractType cldf_deployment.ContractType = "Proxy"
 
-var SetRamp = contract.NewWrite(contract.WriteParams[common.Address, *proxy.Proxy]{
+var SetTarget = contract.NewWrite(contract.WriteParams[common.Address, *proxy.Proxy]{
 	Name:            "proxy:set-target",
 	Version:         semver.MustParse("1.7.0"),
 	Description:     "Set the target address on the proxy",

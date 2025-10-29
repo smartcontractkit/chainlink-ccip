@@ -73,8 +73,9 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 
 			// Expect both contract types to be present
 			exists := map[deployment.ContractType]bool{
-				deployment.ContractType(committee_verifier.ContractType): false,
-				deployment.ContractType(committee_verifier.ProxyType):    false,
+				deployment.ContractType(committee_verifier.ContractType):      false,
+				deployment.ContractType(committee_verifier.ResolverType):      false,
+				deployment.ContractType(committee_verifier.ResolverProxyType): false,
 			}
 			for _, addr := range report.Output.Addresses {
 				exists[deployment.ContractType(addr.Type)] = true
@@ -146,8 +147,9 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 
 	// Expect both contract types to be present
 	exists := map[deployment.ContractType]bool{
-		deployment.ContractType(committee_verifier.ContractType): false,
-		deployment.ContractType(committee_verifier.ProxyType):    false,
+		deployment.ContractType(committee_verifier.ContractType):      false,
+		deployment.ContractType(committee_verifier.ResolverType):      false,
+		deployment.ContractType(committee_verifier.ResolverProxyType): false,
 	}
 	for _, addr := range report.Output.Addresses {
 		exists[deployment.ContractType(addr.Type)] = true
@@ -290,7 +292,9 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 
 	alphaCV, ok := find(addrs1, datastore.ContractType(committee_verifier.ContractType), "alpha")
 	require.True(t, ok)
-	alphaProxy, ok := find(addrs1, datastore.ContractType(committee_verifier.ProxyType), "alpha")
+	alphaResolver, ok := find(addrs1, datastore.ContractType(committee_verifier.ResolverType), "alpha")
+	require.True(t, ok)
+	alphaResolverProxy, ok := find(addrs1, datastore.ContractType(committee_verifier.ResolverProxyType), "alpha")
 	require.True(t, ok)
 
 	// Second run with qualifier "beta", passing previous addresses as existing
@@ -311,11 +315,14 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 
 	betaCV, ok := find(addrs2, datastore.ContractType(committee_verifier.ContractType), "beta")
 	require.True(t, ok)
-	betaProxy, ok := find(addrs2, datastore.ContractType(committee_verifier.ProxyType), "beta")
+	betaResolver, ok := find(addrs2, datastore.ContractType(committee_verifier.ResolverType), "beta")
+	require.True(t, ok)
+	betaResolverProxy, ok := find(addrs2, datastore.ContractType(committee_verifier.ResolverProxyType), "beta")
 	require.True(t, ok)
 
 	require.NotEqual(t, alphaCV.Address, betaCV.Address, "expected different addresses for different qualifiers")
-	require.NotEqual(t, alphaProxy.Address, betaProxy.Address, "expected different addresses for different qualifiers")
+	require.NotEqual(t, alphaResolver.Address, betaResolver.Address, "expected different addresses for different qualifiers")
+	require.NotEqual(t, alphaResolverProxy.Address, betaResolverProxy.Address, "expected different addresses for different qualifiers")
 
 	// Third run reusing qualifier "alpha" should return the same alpha addresses
 	report3, err := operations.ExecuteSequence(
@@ -333,9 +340,12 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 
 	reAlphaCV, ok := find(addrs3, datastore.ContractType(committee_verifier.ContractType), "alpha")
 	require.True(t, ok)
-	reAlphaProxy, ok := find(addrs3, datastore.ContractType(committee_verifier.ProxyType), "alpha")
+	reAlphaResolver, ok := find(addrs3, datastore.ContractType(committee_verifier.ResolverType), "alpha")
+	require.True(t, ok)
+	reAlphaResolverProxy, ok := find(addrs3, datastore.ContractType(committee_verifier.ResolverProxyType), "alpha")
 	require.True(t, ok)
 
 	require.Equal(t, alphaCV.Address, reAlphaCV.Address, "expected same address when reusing qualifier")
-	require.Equal(t, alphaProxy.Address, reAlphaProxy.Address, "expected same address when reusing qualifier")
+	require.Equal(t, alphaResolver.Address, reAlphaResolver.Address, "expected same address when reusing qualifier")
+	require.Equal(t, alphaResolverProxy.Address, reAlphaResolverProxy.Address, "expected same address when reusing qualifier")
 }
