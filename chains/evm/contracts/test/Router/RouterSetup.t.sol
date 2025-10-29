@@ -3,7 +3,9 @@ pragma solidity ^0.8.24;
 
 import {IEVM2AnyOnRampClient} from "../../interfaces/IEVM2AnyOnRampClient.sol";
 
+import {Proxy} from "../../Proxy.sol";
 import {Router} from "../../Router.sol";
+import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {MockExecutor} from "../mocks/MockExecutor.sol";
@@ -34,7 +36,15 @@ contract RouterSetup is FeeQuoterSetup {
     );
 
     address[] memory defaultCCVs = new address[](1);
-    defaultCCVs[0] = address(new MockVerifier(""));
+    VersionedVerifierResolver verifierResolver = new VersionedVerifierResolver();
+    VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
+      new VersionedVerifierResolver.OutboundImplementationArgs[](1);
+    outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      verifier: address(new Proxy(address(new MockVerifier(""))))
+    });
+    verifierResolver.applyOutboundImplementationUpdates(outboundImpls);
+    defaultCCVs[0] = address(verifierResolver);
 
     OnRamp.DestChainConfigArgs[] memory destChainConfigs = new OnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = OnRamp.DestChainConfigArgs({

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 import {IExecutor} from "../../../interfaces/IExecutor.sol";
 
@@ -25,6 +26,11 @@ contract OnRamp_getFee is OnRampSetup {
     uint64 gasForVerification,
     uint32 payloadSizeBytes
   ) internal {
+    vm.mockCall(
+      verifier,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector, DEST_CHAIN_SELECTOR),
+      abi.encode(verifier)
+    );
     vm.mockCall(
       verifier,
       abi.encodeWithSelector(ICrossChainVerifierV1.getFee.selector),

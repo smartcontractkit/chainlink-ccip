@@ -2,14 +2,17 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../../interfaces/ICrossChainVerifierV1.sol";
+import {IVersionedVerifier} from "../../interfaces/IVersionedVerifier.sol";
 
 import {Client} from "../../libraries/Client.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
-contract MockVerifier is ICrossChainVerifierV1 {
+contract MockVerifier is ICrossChainVerifierV1, IVersionedVerifier {
   bytes private s_verifierResult;
+
+  bytes4 public constant VERSION_TAG = 0x12345678;
 
   constructor(
     bytes memory verifierResult

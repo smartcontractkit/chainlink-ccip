@@ -2,9 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageReceiverV2.sol";
+import {IVersionedVerifier} from "../../../interfaces/IVersionedVerifier.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
+import {Proxy} from "../../../Proxy.sol";
+import {VersionedVerifierResolver} from "../../../ccvs/VersionedVerifierResolver.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
@@ -15,11 +18,24 @@ contract OffRampSetup is BaseTest {
   address internal s_tokenAdminRegistry;
 
   bytes internal constant ON_RAMP = abi.encodePacked("onRamp");
+  bytes4 internal constant VERIFIER_VERSION = 0x12345678;
 
   function setUp() public virtual override {
     BaseTest.setUp();
 
-    s_defaultCCV = makeAddr("defaultCCV");
+    VersionedVerifierResolver resolver = new VersionedVerifierResolver();
+    VersionedVerifierResolver.InboundImplementationArgs[] memory inboundImpls =
+      new VersionedVerifierResolver.InboundImplementationArgs[](1);
+    inboundImpls[0] =
+      VersionedVerifierResolver.InboundImplementationArgs({version: VERIFIER_VERSION, verifier: makeAddr("defaultCCV")});
+    vm.mockCall(
+      inboundImpls[0].verifier,
+      abi.encodeWithSelector(IVersionedVerifier.VERSION_TAG.selector),
+      abi.encode(VERIFIER_VERSION)
+    );
+    resolver.applyInboundImplementationUpdates(inboundImpls);
+    s_defaultCCV = address(new Proxy(address(resolver)));
+
     s_tokenAdminRegistry = makeAddr("tokenAdminRegistry");
 
     s_agg = new OffRampHelper(

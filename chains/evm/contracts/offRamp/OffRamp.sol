@@ -15,17 +15,19 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
-import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
+
 import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.0.2/token/ERC20/IERC20.sol";
+
+import {ERC165Checker} from "@openzeppelin/contracts@5.0.2/utils/introspection/ERC165Checker.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
-  using ERC165CheckerReverting for address;
+  using ERC165Checker for address;
   using EnumerableSet for EnumerableSet.UintSet;
 
   error ZeroChainSelectorNotAllowed();
@@ -284,11 +286,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        address ccvAddress = ccvsToQuery[i];
-        if (ccvAddress._supportsInterfaceReverting(type(ICrossChainVerifierResolver).interfaceId)) {
-          ccvAddress = ICrossChainVerifierResolver(ccvAddress).getInboundImplementation(ccvData[ccvDataIndex[i]]);
-        }
-        ICrossChainVerifierV1(ccvAddress).verifyMessage({
+        address implAddress =
+          ICrossChainVerifierResolver(ccvsToQuery[i]).getInboundImplementation(ccvData[ccvDataIndex[i]]);
+        ICrossChainVerifierV1(implAddress).verifyMessage({
           message: message,
           messageId: messageId,
           ccvData: ccvData[ccvDataIndex[i]]
@@ -319,7 +319,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // which checks for sufficient gas before making the external call.
     if (
       (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
-        || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
+        || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
     uint256 g = gasleft();
@@ -567,7 +567,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // If the receiver is a contract
     if (receiver.code.length != 0) {
       // And the contract implements the IAny2EVMMessageReceiverV2 interface.
-      if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
+      if (receiver.supportsInterface(type(IAny2EVMMessageReceiverV2).interfaceId)) {
         (requiredCCV, optionalCCVs, optionalThreshold) =
           IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
 
@@ -601,7 +601,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   ) internal view returns (address[] memory requiredCCV) {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
 
-    if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
+    if (pool.supportsInterface(type(IPoolV2).interfaceId)) {
       requiredCCV = IPoolV2(pool).getRequiredCCVs(
         localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.CCVDirection.Inbound
       );
@@ -649,11 +649,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     // Check V2 first, as it is the most recent version of the pool interface.
-    if (localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V2)) {
+    if (localPoolAddress.supportsInterface(Pool.CCIP_POOL_V2)) {
       // TODO write IPoolV2
     }
 
-    if (!localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V1)) {
+    if (!localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
       // If the pool does not support the v1 interface, we revert.
       revert NotACompatiblePool(localPoolAddress);
     }

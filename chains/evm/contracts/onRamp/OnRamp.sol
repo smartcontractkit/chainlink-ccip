@@ -12,7 +12,6 @@ import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
-import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
@@ -32,7 +31,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
-  using ERC165CheckerReverting for address;
 
   error CannotSendZeroTokens();
   error UnsupportedToken(address token);
@@ -253,14 +251,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
-    // 6. call each verifier.
+    // 6. resolve and call each verifier.
     {
       for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-        address ccvAddress = resolvedExtraArgs.ccvs[i].ccvAddress;
-        if (ccvAddress._supportsInterfaceReverting(type(ICrossChainVerifierResolver).interfaceId)) {
-          ccvAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(destChainSelector);
-        }
-        eventData.verifierBlobs[i] = ICrossChainVerifierV1(ccvAddress).forwardToVerifier(
+        address implAddress =
+          ICrossChainVerifierResolver(resolvedExtraArgs.ccvs[i].ccvAddress).getOutboundImplementation(destChainSelector);
+        eventData.verifierBlobs[i] = ICrossChainVerifierV1(implAddress).forwardToVerifier(
           newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
         );
       }
@@ -664,14 +660,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
       Client.CCV memory verifier = extraArgs.ccvs[i];
-      if (verifier.ccvAddress._supportsInterfaceReverting(type(ICrossChainVerifierResolver).interfaceId)) {
-        verifier.ccvAddress =
-          ICrossChainVerifierResolver(verifier.ccvAddress).getOutboundImplementation(destChainSelector);
-      }
+      address implAddress =
+        ICrossChainVerifierResolver(verifier.ccvAddress).getOutboundImplementation(destChainSelector);
 
-      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
-        verifier.ccvAddress
-      ).getFee(destChainSelector, message, verifier.args, extraArgs.finalityConfig);
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
+        ICrossChainVerifierV1(implAddress).getFee(destChainSelector, message, verifier.args, extraArgs.finalityConfig);
 
       verifierReceipts[i] = Receipt({
         issuer: verifier.ccvAddress,

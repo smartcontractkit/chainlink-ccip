@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
-
 /// @notice Resolves and returns the appropriate verifier contract for the given outbound / inbound traffic.
-interface ICrossChainVerifierResolver is IERC165 {
+interface ICrossChainVerifierResolver {
   /// @notice Returns the appropriate verifier contract based on the given ccvData.
   /// @dev The OffRamp is responsible for calling this function using the ccvData it receives from the executor.
   /// If the verifier specified by the executor is actually a resolver, the OffRamp will call this function to get the actual verifier contract.

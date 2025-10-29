@@ -6,7 +6,8 @@ import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.s
 
 import {Client} from "../../../libraries/Client.sol";
 
-import {ERC165CheckerReverting} from "../../../libraries/ERC165CheckerReverting.sol";
+import {Proxy} from "../../../Proxy.sol";
+import {VersionedVerifierResolver} from "../../../ccvs/VersionedVerifierResolver.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
@@ -17,8 +18,6 @@ import {MockVerifier} from "../../mocks/MockVerifier.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract OnRampSetup is FeeQuoterFeeSetup {
-  using ERC165CheckerReverting for address;
-
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
 
   OnRamp internal s_onRamp;
@@ -42,7 +41,15 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
-    s_defaultCCV = address(new MockVerifier(""));
+    VersionedVerifierResolver verifierResolver = new VersionedVerifierResolver();
+    VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
+      new VersionedVerifierResolver.OutboundImplementationArgs[](1);
+    outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      verifier: address(new Proxy(address(new MockVerifier(""))))
+    });
+    verifierResolver.applyOutboundImplementationUpdates(outboundImpls);
+    s_defaultCCV = address(verifierResolver);
     s_defaultExecutor = address(new MockExecutor());
 
     address[] memory defaultCCVs = new address[](1);
@@ -143,10 +150,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     uint256 currentVerifierIndex = 0;
     for (uint256 i = 0; i < userDefinedCCVCount; ++i) {
       address ccvAddress = extraArgsV3.ccvs[i].ccvAddress;
-      if (ccvAddress._supportsInterfaceReverting(type(ICrossChainVerifierResolver).interfaceId)) {
-        ccvAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(DEST_CHAIN_SELECTOR);
-      }
-      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(ccvAddress)
+      address implAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(DEST_CHAIN_SELECTOR);
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(implAddress)
         .getFee(DEST_CHAIN_SELECTOR, message, extraArgsV3.ccvs[i].args, extraArgsV3.finalityConfig);
 
       verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
@@ -172,15 +177,12 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         continue;
       }
 
-      address ccvAddress = defaultCCVs[i];
-      if (ccvAddress._supportsInterfaceReverting(type(ICrossChainVerifierResolver).interfaceId)) {
-        ccvAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(DEST_CHAIN_SELECTOR);
-      }
+      address implAddress = ICrossChainVerifierResolver(defaultCCVs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR);
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
-        ICrossChainVerifierV1(ccvAddress).getFee(DEST_CHAIN_SELECTOR, message, "", extraArgsV3.finalityConfig);
+        ICrossChainVerifierV1(implAddress).getFee(DEST_CHAIN_SELECTOR, message, "", extraArgsV3.finalityConfig);
 
       verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
-        issuer: ccvAddress,
+        issuer: defaultCCVs[i],
         feeTokenAmount: feeUSDCents,
         destGasLimit: gasForVerification,
         destBytesOverhead: payloadSizeBytes,
@@ -210,11 +212,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
     for (uint256 i = 0; i < defaultCCVs.length; ++i) {
       address ccvAddress = defaultCCVs[i];
-      if (ccvAddress._supportsInterfaceReverting(type(ICrossChainVerifierResolver).interfaceId)) {
-        ccvAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(DEST_CHAIN_SELECTOR);
-      }
+      address implAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(DEST_CHAIN_SELECTOR);
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
-        ICrossChainVerifierV1(ccvAddress).getFee(DEST_CHAIN_SELECTOR, message, "", 0);
+        ICrossChainVerifierV1(implAddress).getFee(DEST_CHAIN_SELECTOR, message, "", 0);
 
       verifierReceipts[i] = OnRamp.Receipt({
         issuer: ccvAddress,

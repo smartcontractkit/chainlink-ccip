@@ -53,7 +53,7 @@ contract e2e is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       verifier: address(committeeVerifier)
     });
-    srcVerifierResolver.applyOutboundImplementationUpdates(new uint64[](0), outboundImpls);
+    srcVerifierResolver.applyOutboundImplementationUpdates(outboundImpls);
     s_userSpecifiedCCV = address(new Proxy(address(srcVerifierResolver)));
 
     // OffRamp side
@@ -73,7 +73,7 @@ contract e2e is OnRampSetup {
       version: VERIFIER_VERSION,
       verifier: address(new MockVerifier(""))
     });
-    destVerifierResolver.applyInboundImplementationUpdates(new bytes4[](0), inboundImpls);
+    destVerifierResolver.applyInboundImplementationUpdates(inboundImpls);
     s_destVerifier = address(new Proxy(address(destVerifierResolver)));
 
     address[] memory defaultCCVs = new address[](1);
@@ -122,6 +122,8 @@ contract e2e is OnRampSetup {
       seqNum: expectedSeqNum,
       originalSender: OWNER
     });
+
+    verifierBlobs[0] = abi.encodePacked(bytes4(0x49ff34ed));
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({

@@ -1,37 +1,54 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IVersionedVerifier} from "../../../interfaces/IVersionedVerifier.sol";
+
 import {VersionedVerifierResolver} from "../../../ccvs/VersionedVerifierResolver.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
 contract VersionedVerifierResolverSetup is BaseTest {
-  bytes4 internal constant INITIAL_VERSION = bytes4(0x12345678);
-  bytes4 internal constant UNKNOWN_VERSION = bytes4(0x87654321);
-  uint64 internal constant INITIAL_DEST_CHAIN_SELECTOR = 1;
-  uint64 internal constant UNKNOWN_DEST_CHAIN_SELECTOR = 2;
+  bytes4 internal constant INITIAL_VERSION_1 = bytes4(0x11111111);
+  bytes4 internal constant INITIAL_VERSION_2 = bytes4(0x22222222);
+  bytes4 internal constant UNKNOWN_VERSION = bytes4(0x98989898);
+  uint64 internal constant INITIAL_DEST_CHAIN_SELECTOR_1 = 1;
+  uint64 internal constant INITIAL_DEST_CHAIN_SELECTOR_2 = 2;
+  uint64 internal constant UNKNOWN_DEST_CHAIN_SELECTOR = 999;
 
   VersionedVerifierResolver internal s_versionedVerifierResolver;
-  address internal s_initialVerifier;
+  address internal s_initialVerifier1;
+  address internal s_initialVerifier2;
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_initialVerifier = makeAddr("MockVerifier");
-
+    s_initialVerifier1 = makeAddr("InitialVerifier1");
+    s_initialVerifier2 = makeAddr("InitialVerifier2");
     s_versionedVerifierResolver = new VersionedVerifierResolver();
 
     VersionedVerifierResolver.InboundImplementationArgs[] memory inboundImplementations =
-      new VersionedVerifierResolver.InboundImplementationArgs[](1);
+      new VersionedVerifierResolver.InboundImplementationArgs[](2);
     inboundImplementations[0] =
-      VersionedVerifierResolver.InboundImplementationArgs({version: INITIAL_VERSION, verifier: s_initialVerifier});
-    s_versionedVerifierResolver.applyInboundImplementationUpdates(new bytes4[](0), inboundImplementations);
+      VersionedVerifierResolver.InboundImplementationArgs({version: INITIAL_VERSION_1, verifier: s_initialVerifier1});
+    inboundImplementations[1] =
+      VersionedVerifierResolver.InboundImplementationArgs({version: INITIAL_VERSION_2, verifier: s_initialVerifier2});
+    vm.mockCall(
+      s_initialVerifier1, abi.encodeWithSelector(IVersionedVerifier.VERSION_TAG.selector), abi.encode(INITIAL_VERSION_1)
+    );
+    vm.mockCall(
+      s_initialVerifier2, abi.encodeWithSelector(IVersionedVerifier.VERSION_TAG.selector), abi.encode(INITIAL_VERSION_2)
+    );
+    s_versionedVerifierResolver.applyInboundImplementationUpdates(inboundImplementations);
 
     VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImplementations =
-      new VersionedVerifierResolver.OutboundImplementationArgs[](1);
+      new VersionedVerifierResolver.OutboundImplementationArgs[](2);
     outboundImplementations[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: INITIAL_DEST_CHAIN_SELECTOR,
-      verifier: s_initialVerifier
+      destChainSelector: INITIAL_DEST_CHAIN_SELECTOR_1,
+      verifier: s_initialVerifier1
     });
-    s_versionedVerifierResolver.applyOutboundImplementationUpdates(new uint64[](0), outboundImplementations);
+    outboundImplementations[1] = VersionedVerifierResolver.OutboundImplementationArgs({
+      destChainSelector: INITIAL_DEST_CHAIN_SELECTOR_2,
+      verifier: s_initialVerifier2
+    });
+    s_versionedVerifierResolver.applyOutboundImplementationUpdates(outboundImplementations);
   }
 }

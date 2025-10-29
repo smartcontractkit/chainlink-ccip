@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 /// forge-config: default.allow_internal_expect_revert = true
 
+import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
@@ -187,6 +188,9 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     bytes memory revertReason = "CCV validation failed";
 
     // Mock CCV validateReport to fail/revert.
+    vm.mockCall(
+      s_defaultCCV, abi.encodeCall(ICrossChainVerifierResolver.getInboundImplementation, ""), abi.encode(s_defaultCCV)
+    );
     vm.mockCallRevert(
       s_defaultCCV, abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, ccvData[0])), revertReason
     );
