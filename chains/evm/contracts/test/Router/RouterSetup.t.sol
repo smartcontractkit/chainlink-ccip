@@ -3,9 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IEVM2AnyOnRampClient} from "../../interfaces/IEVM2AnyOnRampClient.sol";
 
-import {Proxy} from "../../Proxy.sol";
 import {Router} from "../../Router.sol";
-import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {MockExecutor} from "../mocks/MockExecutor.sol";

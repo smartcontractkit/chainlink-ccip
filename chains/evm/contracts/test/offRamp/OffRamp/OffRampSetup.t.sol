@@ -2,17 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageReceiverV2.sol";
-import {IVersionedVerifier} from "../../../interfaces/IVersionedVerifier.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
-import {Proxy} from "../../../Proxy.sol";
-
-import {VersionedVerifierResolver} from "../../../ccvs/VersionedVerifierResolver.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
-import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
 contract OffRampSetup is BaseTest {
   OffRampHelper internal s_agg;

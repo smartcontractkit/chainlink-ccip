@@ -6,8 +6,6 @@ import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.s
 
 import {Client} from "../../../libraries/Client.sol";
 
-import {Proxy} from "../../../Proxy.sol";
-import {VersionedVerifierResolver} from "../../../ccvs/VersionedVerifierResolver.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
