@@ -768,7 +768,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @notice Returns the minimum block confirmations configured for custom block confirmation transfers.
   /// @return blockConfirmationConfigured The configured minimum block confirmations.
-  function getConfiguredMinBlockConfirmation() external view returns (uint16 blockConfirmationConfigured) {
+  function getMinBlockConfirmation() external view returns (uint16 blockConfirmationConfigured) {
     return s_customBlockConfirmationConfig.minBlockConfirmation;
   }
 
