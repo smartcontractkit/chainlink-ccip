@@ -87,6 +87,7 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 								PayloadSizeBytes:          6*64 + 2*32,
 							},
 							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+							AddressBytesLength:       20,
 						},
 					},
 				},

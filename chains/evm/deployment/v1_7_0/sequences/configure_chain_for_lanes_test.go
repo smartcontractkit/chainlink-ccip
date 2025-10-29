@@ -107,6 +107,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
 							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
 							ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+							AddressBytesLength:       20,
 						},
 					},
 				},

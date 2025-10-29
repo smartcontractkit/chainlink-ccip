@@ -227,7 +227,7 @@ OffRamp_ensureCCVQuorumIsReached:test_ensureCCVQuorumIsReached_Success_OptionalC
 OffRamp_execute:test_execute() (gas: 112358)
 OffRamp_execute:test_execute_InsufficientGasToCompleteTx_setsToFailure() (gas: 92951)
 OffRamp_execute:test_execute_ReentrancyGuardReentrantCall_Fails() (gas: 1085732)
-OffRamp_execute:test_execute_RunsOutOfGasAndSetsStateToFailure() (gas: 92983)
+OffRamp_execute:test_execute_RunsOutOfGasAndSetsStateToFailure() (gas: 97983)
 OffRamp_execute:test_execute_WithReceiver() (gas: 443249)
 OffRamp_getAllSourceChainConfigs:test_getAllSourceChainConfigs_ReturnsMultipleChains() (gas: 225901)
 OffRamp_getAllSourceChainConfigs:test_getAllSourceChainConfigs_ReturnsSingleChain() (gas: 38310)

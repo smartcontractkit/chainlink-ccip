@@ -154,7 +154,6 @@ contract OffRamp_execute is OffRampSetup {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
-    // Expect execution state change event.
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
@@ -164,7 +163,7 @@ contract OffRamp_execute is OffRampSetup {
       "" // empty because there is no error when a tx runs out of gas.
     );
 
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, 85_000);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, 90000);
 
     // Verify final state is FAILURE.
     assertEq(
