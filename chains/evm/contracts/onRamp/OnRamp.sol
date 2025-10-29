@@ -104,7 +104,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   // solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector.
-    IRouter router; // Source router address  that is allowed to send messages to the destination chain.
+    IRouter router; // ────────────╮ Source router address  that is allowed to send messages to the destination chain.
+    uint8 addressBytesLength; // ──╯ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address defaultExecutor;
@@ -337,10 +338,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @notice This function takes in a raw dest chain address and validates the address is valid for the destination
   /// chain. User supplied addresses on EVM are always abi.encoded. This function strips the abi encoding to have a
   /// chain agnostic address.
+  /// @param rawAddress The raw dest chain address provided by the user.
+  /// @param addressBytesLength The expected length of the address on the destination chain.
+  /// @return validatedAddress The validated dest chain address, stripped of any abi encoding.
   function _validateDestChainAddress(
     bytes calldata rawAddress,
     uint8 addressBytesLength
-  ) internal view returns (bytes memory validatedAddress) {
+  ) internal pure returns (bytes memory validatedAddress) {
     if (addressBytesLength < 32) {
       // We have to account for padding as traditionally EVM addresses have been provided abi encoded.
       if (rawAddress.length > 32) {
@@ -351,7 +355,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       if (rawAddress.length == 32) {
         // abi encoding can explain this, now we need to check if the first (32 - addressBytesLength) bytes are zero. If
         // so, we strip them and return the unencoded address.
-        return rawAddress[32 - addressBytesLength:];
+        if (bytes32(rawAddress[0:(32 - addressBytesLength)]) != bytes32(0)) {
+          revert InvalidDestChainAddress(rawAddress);
+        }
+        return rawAddress[(32 - addressBytesLength):];
       }
       // If the rawAddress is smaller than 32 bytes we assume there's no padding involved and we fall back to the
       // general check below that ensures the length must match exactly.
@@ -465,7 +472,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       DestChainConfigArgs calldata destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArg.destChainSelector;
 
-      if (destChainSelector == 0 || destChainSelector == i_localChainSelector) {
+      if (
+        destChainSelector == 0 || destChainSelector == i_localChainSelector
+          || destChainConfigArg.addressBytesLength == 0
+      ) {
         revert InvalidDestChainConfig(destChainSelector);
       }
 
@@ -477,6 +487,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain.
       destChainConfig.router = destChainConfigArg.router;
+      destChainConfig.addressBytesLength = destChainConfigArg.addressBytesLength;
       destChainConfig.defaultCCVs = destChainConfigArg.defaultCCVs;
       destChainConfig.laneMandatedCCVs = destChainConfigArg.laneMandatedCCVs;
       // Require a default executor so messages that rely on older/defaulted args still resolve to a concrete

@@ -40,6 +40,7 @@ contract RouterSetup is FeeQuoterSetup {
     destChainConfigs[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
       defaultExecutor: address(new MockExecutor()),

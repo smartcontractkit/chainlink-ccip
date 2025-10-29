@@ -47,6 +47,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
       defaultExecutor: s_defaultExecutor,

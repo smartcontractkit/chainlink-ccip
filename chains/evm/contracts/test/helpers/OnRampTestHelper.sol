@@ -35,4 +35,12 @@ contract OnRampTestHelper is OnRamp {
   ) external view returns (address[] memory) {
     return _getCCVsForPool(destChainSelector, token, amount, finality, tokenArgs);
   }
+
+  /// @notice Exposes the internal _validateDestChainAddress function for testing.
+  function validateDestChainAddress(
+    bytes calldata rawAddress,
+    uint8 addressBytesLength
+  ) external pure returns (bytes memory) {
+    return _validateDestChainAddress(rawAddress, addressBytesLength);
+  }
 }

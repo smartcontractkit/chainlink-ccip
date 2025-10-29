@@ -27,7 +27,7 @@ library MessageV1Codec {
   // Base size of a TokenTransferV1 without variable length fields.
   // 1 (version) + 32 (amount) + 1 (sourcePoolLen) + 1 (sourceTokenLen) + 1 (destTokenLen) +
   // 1 (tokenReceiverLen) + 2 (extraDataLen)
-  uint256 public constant TOKEN_TRANSFER_V1_BASE_SIZE = 32 + 1 + 1 + 1 + 1 + 2;
+  uint256 public constant TOKEN_TRANSFER_V1_BASE_SIZE = 1 + 32 + 1 + 1 + 1 + 1 + 2;
   // The base size plus 20 bytes for sourcePool, 20 bytes for sourceToken.
   // To be added:
   // - destToken is dest chain specific
