@@ -36,15 +36,7 @@ contract RouterSetup is FeeQuoterSetup {
     );
 
     address[] memory defaultCCVs = new address[](1);
-    VersionedVerifierResolver verifierResolver = new VersionedVerifierResolver();
-    VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
-      new VersionedVerifierResolver.OutboundImplementationArgs[](1);
-    outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      verifier: address(new Proxy(address(new MockVerifier(""))))
-    });
-    verifierResolver.applyOutboundImplementationUpdates(outboundImpls);
-    defaultCCVs[0] = address(verifierResolver);
+    defaultCCVs[0] = address(new MockVerifier(""));
 
     OnRamp.DestChainConfigArgs[] memory destChainConfigs = new OnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = OnRamp.DestChainConfigArgs({

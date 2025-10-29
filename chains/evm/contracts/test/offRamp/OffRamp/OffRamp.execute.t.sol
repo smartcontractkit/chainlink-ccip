@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
-import {IVersionedVerifier} from "../../../interfaces/IVersionedVerifier.sol";
 
 import {Proxy} from "../../../Proxy.sol";
 import {Router} from "../../../Router.sol";
@@ -61,6 +61,11 @@ contract OffRamp_execute is OffRampSetup {
 
     vm.mockCall(
       s_defaultCCV,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getInboundImplementation.selector, abi.encode("mock ccv data")),
+      abi.encode(s_defaultCCV)
+    );
+    vm.mockCall(
+      s_defaultCCV,
       abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageHash, abi.encode("mock ccv data"))),
       abi.encode(true)
     );
@@ -87,7 +92,7 @@ contract OffRamp_execute is OffRampSetup {
     MessageV1Codec.MessageV1 memory message
   ) internal view returns (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) {
     ccvData = new bytes[](1);
-    ccvData[0] = abi.encodePacked(VERIFIER_VERSION, "mock ccv data");
+    ccvData[0] = abi.encode("mock ccv data");
     return (MessageV1Codec._encodeMessageV1(message), _arrayOf(s_defaultCCV), ccvData);
   }
 
@@ -171,31 +176,16 @@ contract OffRamp_execute is OffRampSetup {
 
   function test_execute_ReentrancyGuardReentrantCall_Fails() public {
     // Create a malicious CCV that will call back into execute during validation.
-    VersionedVerifierResolver maliciousResolver = new VersionedVerifierResolver();
-    VersionedVerifierResolver.InboundImplementationArgs[] memory inboundImpls =
-      new VersionedVerifierResolver.InboundImplementationArgs[](1);
-    inboundImpls[0] = VersionedVerifierResolver.InboundImplementationArgs({
-      version: VERIFIER_VERSION,
-      verifier: address(new ReentrantCCV(address(s_agg)))
-    });
-    vm.mockCall(
-      inboundImpls[0].verifier,
-      abi.encodeWithSelector(IVersionedVerifier.VERSION_TAG.selector),
-      abi.encode(VERIFIER_VERSION)
-    );
-    maliciousResolver.applyInboundImplementationUpdates(inboundImpls);
-    address maliciousCCV = address(new Proxy(address(maliciousResolver)));
+    ReentrantCCV maliciousCCV = new ReentrantCCV(address(s_agg));
 
     // Update report to use malicious CCV.
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage,,) = _getReportComponents(message);
 
     address[] memory ccvs = new address[](2);
-    ccvs[0] = maliciousCCV;
+    ccvs[0] = address(maliciousCCV);
     ccvs[1] = s_defaultCCV;
     bytes[] memory ccvData = new bytes[](2);
-    ccvData[0] = abi.encodePacked(VERIFIER_VERSION);
-    ccvData[1] = abi.encodePacked(VERIFIER_VERSION);
 
     _setGetCCVsReturnData(address(bytes20(message.receiver)), message.sourceChainSelector, ccvs, new address[](0), 0);
 

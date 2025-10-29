@@ -41,15 +41,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         feeAggregator: FEE_AGGREGATOR
       })
     );
-    VersionedVerifierResolver verifierResolver = new VersionedVerifierResolver();
-    VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
-      new VersionedVerifierResolver.OutboundImplementationArgs[](1);
-    outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      verifier: address(new Proxy(address(new MockVerifier(""))))
-    });
-    verifierResolver.applyOutboundImplementationUpdates(outboundImpls);
-    s_defaultCCV = address(verifierResolver);
+    s_defaultCCV = address(new MockVerifier(""));
     s_defaultExecutor = address(new MockExecutor());
 
     address[] memory defaultCCVs = new address[](1);
