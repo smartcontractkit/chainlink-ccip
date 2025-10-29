@@ -745,6 +745,31 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     });
   }
 
+  /// @notice Consumes custom block confirmation outbound rate limiting capacity in this pool.
+  function _consumeCustomBlockConfirmationOutboundRateLimit(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal virtual {
+    s_customBlockConfirmationConfig.outboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
+
+    emit CustomBlockConfirmationOutboundRateLimitConsumed({
+      token: address(i_token),
+      remoteChainSelector: remoteChainSelector,
+      amount: amount
+    });
+  }
+
+  /// @notice Consumes custom block confirmation inbound rate limiting capacity in this pool.
+  function _consumeCustomBlockConfirmationInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
+    s_customBlockConfirmationConfig.inboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
+
+    emit CustomBlockConfirmationInboundRateLimitConsumed({
+      token: address(i_token),
+      remoteChainSelector: remoteChainSelector,
+      amount: amount
+    });
+  }
+
   /// @notice Returns the outbound and inbound rate limiter state for the given remote chain at the time of the call.
   /// @param remoteChainSelector The remote chain selector.
   /// @return outboundRateLimiterState The outbound token bucket.
