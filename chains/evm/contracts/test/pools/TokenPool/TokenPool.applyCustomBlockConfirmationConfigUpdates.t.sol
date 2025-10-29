@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {RateLimiter} from "../../../libraries/RateLimiter.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
+import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
+
+contract TokenPoolV2_applyCustomBlockConfirmationConfigUpdates is TokenPoolV2Setup {
+  function test_applyCustomBlockConfirmationConfigUpdates() public {
+    uint16 minBlockConfirmation = 100;
+    RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
+    RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
+    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory rateLimitArgs =
+      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.CustomBlockConfirmationRateLimitConfigArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      outboundRateLimiterConfig: outboundFastConfig,
+      inboundRateLimiterConfig: inboundFastConfig
+    });
+
+    vm.expectEmit();
+    emit TokenPool.CustomBlockConfirmationUpdated(minBlockConfirmation);
+    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(minBlockConfirmation, rateLimitArgs);
+
+    uint16 storedMinBlockConfirmation = s_tokenPool.getCustomMinBlockConfirmation();
+    assertEq(storedMinBlockConfirmation, minBlockConfirmation);
+
+    RateLimiter.TokenBucket memory outboundBucket = s_tokenPool.getFastOutboundBucket(DEST_CHAIN_SELECTOR);
+    assertTrue(outboundBucket.isEnabled);
+    assertEq(outboundBucket.capacity, outboundFastConfig.capacity);
+    assertEq(outboundBucket.rate, outboundFastConfig.rate);
+    assertEq(outboundBucket.tokens, outboundFastConfig.capacity);
+    assertEq(outboundBucket.lastUpdated, uint32(block.timestamp));
+
+    RateLimiter.TokenBucket memory inboundBucket = s_tokenPool.getFastInboundBucket(DEST_CHAIN_SELECTOR);
+    assertTrue(inboundBucket.isEnabled);
+    assertEq(inboundBucket.capacity, inboundFastConfig.capacity);
+    assertEq(inboundBucket.rate, inboundFastConfig.rate);
+    assertEq(inboundBucket.tokens, inboundFastConfig.capacity);
+    assertEq(inboundBucket.lastUpdated, uint32(block.timestamp));
+  }
+
+  // Reverts
+  function test_applyCustomBlockConfirmationConfigUpdates_RevertWhen_OnlyCallableByOwner() public {
+    vm.stopPrank();
+    vm.prank(STRANGER);
+
+    uint16 minBlockConfirmation = 100;
+    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory emptyRateLimitArgs =
+      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](0);
+
+    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
+    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(minBlockConfirmation, emptyRateLimitArgs);
+  }
+}

@@ -10,10 +10,13 @@ import {Pool} from "../libraries/Pool.sol";
 /// Each pool type handles a different child token model e.g. lock/release, mint/burn.
 interface IPoolV2 is IPoolV1 {
   struct TokenTransferFeeConfig {
-    uint32 destGasOverhead; // ──╮ Gas charged to execute the token transfer on the destination chain.
-    uint32 destBytesOverhead; // │ Data availability bytes.
-    uint32 feeUSDCents; //       │ Fee to charge per token transfer, multiples of 0.01 USD.
-    bool isEnabled; // ──────────╯ Whether this token has custom transfer fees.
+    uint32 destGasOverhead; // ───────────────────────╮ Gas charged to execute the token transfer on the destination chain.
+    uint32 destBytesOverhead; //                      │ Data availability bytes.
+    uint32 defaultBlockConfirmationFeeUSDCents; //    │ Fee to charge for token transfer with default block confirmation, multiples of 0.01 USD.
+    uint32 customBlockConfirmationFeeUSDCents; //     │ Fee to charge for token transfer with custom block confirmation, multiples of 0.01 USD.
+    //                                                │ The following two fee is deducted from the transferred asset, not added on top.
+    uint16 defaultBlockConfirmationTransferFeeBps; // │ Fee in basis points for default finality transfers [0-10_000].
+    uint16 customBlockConfirmationTransferFeeBps; // ─╯ Fee in basis points for custom finality transfers [0-10_000].
   }
 
   enum CCVDirection {
@@ -73,6 +76,26 @@ interface IPoolV2 is IPoolV1 {
     uint16 finality,
     bytes calldata tokenArgs
   ) external view returns (TokenTransferFeeConfig memory feeConfig);
+
+  /// @notice Returns the pool fee parameters that will apply to a transfer.
+  /// @param localToken The local asset being transferred.
+  /// @param destChainSelector The destination lane selector.
+  /// @param amount The amount of tokens being bridged on this lane.
+  /// @param feeToken The token used to pay feeUSDCents.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Opaque token arguments supplied by the caller.
+  /// @return feeUSDCents Flat fee charged in USD cents (crumbs) for this transfer.
+  /// @return destGasOverhead Destination gas charged for accounting in the cost model.
+  /// @return destBytesOverhead Destination calldata size attributed to the transfer.
+  /// @return tokenFeeBps Bps charged in token units. Value of zero implies no in-token fee.
+  function getFee(
+    address localToken,
+    uint64 destChainSelector,
+    uint256 amount,
+    address feeToken,
+    uint16 blockConfirmationRequested,
+    bytes calldata tokenArgs
+  ) external view returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps);
 
   /// @notice Gets the token address on the remote chain.
   /// @param remoteChainSelector Remote chain selector.

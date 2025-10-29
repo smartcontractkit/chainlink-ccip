@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 import {Router} from "../../../Router.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
-import {TokenPoolV2Helper} from "../../helpers/TokenPoolV2Helper.sol";
+import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract TokenPoolV2Setup is BaseTest {
   BurnMintERC20 internal s_token;
-  TokenPoolV2Helper internal s_tokenPool;
+  TokenPoolHelper internal s_tokenPool;
   uint16 internal constant BPS_DIVIDER = 10_000;
   address public s_sender = makeAddr("sender");
   bytes public s_receiver = abi.encode(makeAddr("receiver"));
@@ -25,7 +25,7 @@ contract TokenPoolV2Setup is BaseTest {
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_tokenPool = new TokenPoolV2Helper(
+    s_tokenPool = new TokenPoolHelper(
       s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
     );
 
