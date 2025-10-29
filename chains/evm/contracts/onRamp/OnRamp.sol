@@ -33,6 +33,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   using USDPriceWith18Decimals for uint224;
 
   error CannotSendZeroTokens();
+  error DestinationChainNotSupportedByCCV(address ccvAddress, uint64 destChainSelector);
   error UnsupportedToken(address token);
   error CanOnlySendOneTokenPerMessage();
   error MustBeCalledByRouter();
@@ -254,8 +255,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 6. resolve and call each verifier.
     {
       for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-        address implAddress =
-          ICrossChainVerifierResolver(resolvedExtraArgs.ccvs[i].ccvAddress).getOutboundImplementation(destChainSelector);
+        address ccvAddress = resolvedExtraArgs.ccvs[i].ccvAddress;
+        address implAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(destChainSelector);
+        if (implAddress == address(0)) {
+          revert DestinationChainNotSupportedByCCV(ccvAddress, destChainSelector);
+        }
         eventData.verifierBlobs[i] = ICrossChainVerifierV1(implAddress).forwardToVerifier(
           newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
         );
@@ -662,6 +666,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       Client.CCV memory verifier = extraArgs.ccvs[i];
       address implAddress =
         ICrossChainVerifierResolver(verifier.ccvAddress).getOutboundImplementation(destChainSelector);
+      if (implAddress == address(0)) {
+        revert DestinationChainNotSupportedByCCV(verifier.ccvAddress, destChainSelector);
+      }
 
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
         ICrossChainVerifierV1(implAddress).getFee(destChainSelector, message, verifier.args, extraArgs.finalityConfig);

@@ -10,7 +10,6 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 /// @dev On source, the destChainSelector of a message is used to determine the verifier implementation to apply.
 /// On destination, we must use the verifier version was applied on source, parsing this version from the ccvData.
 contract VersionedVerifierResolver is ICrossChainVerifierResolver, Ownable2StepMsgSender {
-  error InvalidCCVDataLength();
   error InvalidDestChainSelector(uint64 destChainSelector);
   error VersionMismatch(address verifier, bytes4 expected, bytes4 got);
 
@@ -39,7 +38,7 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, Ownable2StepM
     bytes calldata ccvData
   ) external view returns (address) {
     if (ccvData.length < 4) {
-      revert InvalidCCVDataLength();
+      return address(0);
     }
     return s_inboundImplementations[bytes4(ccvData[:4])];
   }

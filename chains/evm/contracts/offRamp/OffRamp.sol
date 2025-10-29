@@ -51,6 +51,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
   error InvalidOnRamp(bytes expected, bytes got);
+  error InboundImplementationNotFound(address ccvAddress, bytes ccvData);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -288,6 +289,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         address implAddress =
           ICrossChainVerifierResolver(ccvsToQuery[i]).getInboundImplementation(ccvData[ccvDataIndex[i]]);
+        if (implAddress == address(0)) {
+          revert InboundImplementationNotFound(ccvsToQuery[i], ccvData[ccvDataIndex[i]]);
+        }
         ICrossChainVerifierV1(implAddress).verifyMessage({
           message: message,
           messageId: messageId,
