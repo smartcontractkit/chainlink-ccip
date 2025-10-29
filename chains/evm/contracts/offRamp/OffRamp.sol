@@ -607,7 +607,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     if (pool.supportsInterface(type(IPoolV2).interfaceId)) {
       requiredCCV = IPoolV2(pool).getRequiredCCVs(
-        localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.CCVDirection.Inbound
+        localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.MessageDirection.Inbound
       );
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
     }

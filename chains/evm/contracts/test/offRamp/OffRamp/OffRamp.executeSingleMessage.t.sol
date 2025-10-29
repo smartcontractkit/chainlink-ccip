@@ -114,7 +114,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     vm.mockCall(
       pool,
       abi.encodeCall(
-        IPoolV2.getRequiredCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, 0, "", IPoolV2.CCVDirection.Inbound)
+        IPoolV2.getRequiredCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, 0, "", IPoolV2.MessageDirection.Inbound)
       ),
       abi.encode(_arrayOf(poolRequiredCCV))
     );

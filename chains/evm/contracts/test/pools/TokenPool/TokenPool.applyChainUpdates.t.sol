@@ -34,16 +34,15 @@ contract TokenPool_applyChainUpdates is BaseTest {
 
     for (uint256 i = 0; i < chainUpdates.length; ++i) {
       assertTrue(s_tokenPool.isSupportedChain(chainUpdates[i].remoteChainSelector));
-      RateLimiter.TokenBucket memory bkt =
-        s_tokenPool.getCurrentOutboundRateLimiterState(chainUpdates[i].remoteChainSelector);
-      assertEq(bkt.capacity, chainUpdates[i].outboundRateLimiterConfig.capacity);
-      assertEq(bkt.rate, chainUpdates[i].outboundRateLimiterConfig.rate);
-      assertEq(bkt.isEnabled, chainUpdates[i].outboundRateLimiterConfig.isEnabled);
+      (RateLimiter.TokenBucket memory outboundState, RateLimiter.TokenBucket memory inboundState) =
+        s_tokenPool.getCurrentRateLimiterState(chainUpdates[i].remoteChainSelector);
+      assertEq(outboundState.capacity, chainUpdates[i].outboundRateLimiterConfig.capacity);
+      assertEq(outboundState.rate, chainUpdates[i].outboundRateLimiterConfig.rate);
+      assertEq(outboundState.isEnabled, chainUpdates[i].outboundRateLimiterConfig.isEnabled);
 
-      bkt = s_tokenPool.getCurrentInboundRateLimiterState(chainUpdates[i].remoteChainSelector);
-      assertEq(bkt.capacity, chainUpdates[i].inboundRateLimiterConfig.capacity);
-      assertEq(bkt.rate, chainUpdates[i].inboundRateLimiterConfig.rate);
-      assertEq(bkt.isEnabled, chainUpdates[i].inboundRateLimiterConfig.isEnabled);
+      assertEq(inboundState.capacity, chainUpdates[i].inboundRateLimiterConfig.capacity);
+      assertEq(inboundState.rate, chainUpdates[i].inboundRateLimiterConfig.rate);
+      assertEq(inboundState.isEnabled, chainUpdates[i].inboundRateLimiterConfig.isEnabled);
     }
   }
 

@@ -254,25 +254,22 @@ func TestTokenAdapter(t *testing.T) {
 				}
 				require.Equal(t, remoteChainSel, chainSupportReport.Output[0], "Remote chain in token pool should match expected")
 
-				inboundRateLimiterReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentInboundRateLimiterState, evmChain, contract.FunctionInput[uint64]{
-					ChainSelector: chainSel,
-					Address:       tokenPoolAddr,
-					Args:          remoteChainSel,
-				})
-				require.NoError(t, err, "Failed to get inbound rate limiter config from token pool")
-				require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.IsEnabled, inboundRateLimiterReport.Output.IsEnabled, "Inbound rate limiter enabled state should match")
-				require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.Rate, inboundRateLimiterReport.Output.Rate, "Inbound rate limiter rate should match")
-				require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.Capacity, inboundRateLimiterReport.Output.Capacity, "Inbound rate limiter capacity should match")
-
-				outboundRateLimiterReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentOutboundRateLimiterState, evmChain, contract.FunctionInput[uint64]{
-					ChainSelector: chainSel,
-					Address:       tokenPoolAddr,
-					Args:          remoteChainSel,
-				})
-				require.NoError(t, err, "Failed to get outbound rate limiter config from token pool")
-				require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.IsEnabled, outboundRateLimiterReport.Output.IsEnabled, "Outbound rate limiter enabled state should match")
-				require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.Rate, outboundRateLimiterReport.Output.Rate, "Outbound rate limiter rate should match")
-				require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.Capacity, outboundRateLimiterReport.Output.Capacity, "Outbound rate limiter capacity should match")
+				// GetCurrentRateLimiterState is only available in version 1.7.0+
+				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("1.7.0")) {
+					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[uint64]{
+						ChainSelector: chainSel,
+						Address:       tokenPoolAddr,
+						Args:          remoteChainSel,
+					})
+					require.NoError(t, err, "Failed to get rate limiter config from token pool")
+					currentStates := rateLimiterStateReport.Output
+					require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.Rate, currentStates.InboundRateLimiterState.Rate, "Inbound rate limiter rate should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Capacity, "Inbound rate limiter capacity should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.Rate, currentStates.OutboundRateLimiterState.Rate, "Outbound rate limiter rate should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Capacity, "Outbound rate limiter capacity should match")
+				}
 
 				// Chain A has a 1.7.0 token pool so should have set CCVs
 				if chainSel == chainA {

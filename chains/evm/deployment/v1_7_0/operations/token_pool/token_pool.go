@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	burn_mint_token_pool_v1_7_0_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
 	burn_mint_token_pool_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
@@ -48,7 +49,6 @@ type RemotePoolArgs struct {
 	RemotePoolAddress   []byte
 }
 
-type RateLimiterBucket = token_pool.RateLimiterTokenBucket
 type DynamicConfig = token_pool.GetDynamicConfig
 
 type SetChainRateLimiterConfigArg struct {
@@ -65,6 +65,17 @@ type ApplyAllowListUpdatesArgs struct {
 type DynamicConfigArgs struct {
 	Router                           common.Address
 	ThresholdAmountForAdditionalCCVs *big.Int
+}
+
+type CustomBlockConfirmationRateLimitConfigArg struct {
+	RemoteChainSelector       uint64
+	OutboundRateLimiterConfig tokens.RateLimiterConfig
+	InboundRateLimiterConfig  tokens.RateLimiterConfig
+}
+
+type ApplyCustomBlockConfirmationConfigArgs struct {
+	MinBlockConfirmation uint16
+	RateLimitConfigArgs  []CustomBlockConfirmationRateLimitConfigArg
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
@@ -223,6 +234,60 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfigArgs,
 	},
 })
 
+var ApplyCustomBlockConfirmationConfigUpdates = contract.NewWrite(contract.WriteParams[ApplyCustomBlockConfirmationConfigArgs, *token_pool.TokenPool]{
+	Name:            "token-pool:apply-custom-block-confirmation-config-updates",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Sets the global custom block confirmation depth and per-chain rate limiters on a TokenPool",
+	ContractType:    ContractType,
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, ApplyCustomBlockConfirmationConfigArgs],
+	Validate:        func(ApplyCustomBlockConfirmationConfigArgs) error { return nil },
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args ApplyCustomBlockConfirmationConfigArgs) (*types.Transaction, error) {
+		rateLimitArgs := make([]token_pool.TokenPoolCustomBlockConfirmationRateLimitConfigArgs, 0, len(args.RateLimitConfigArgs))
+		for _, cfg := range args.RateLimitConfigArgs {
+			rateLimitArgs = append(rateLimitArgs, token_pool.TokenPoolCustomBlockConfirmationRateLimitConfigArgs{
+				RemoteChainSelector:       cfg.RemoteChainSelector,
+				OutboundRateLimiterConfig: token_pool.RateLimiterConfig(cfg.OutboundRateLimiterConfig),
+				InboundRateLimiterConfig:  token_pool.RateLimiterConfig(cfg.InboundRateLimiterConfig),
+			})
+		}
+		return tokenPool.ApplyCustomBlockConfirmationConfigUpdates(opts, args.MinBlockConfirmation, rateLimitArgs)
+	},
+})
+
+var SetCustomBlockConfirmationRateLimitConfig = contract.NewWrite(contract.WriteParams[[]CustomBlockConfirmationRateLimitConfigArg, *token_pool.TokenPool]{
+	Name:         "token-pool:set-custom-block-confirmation-rate-limit-config",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Updates custom block confirmation rate limiter settings for selected remote chains on a TokenPool",
+	ContractType: ContractType,
+	ContractABI:  token_pool.TokenPoolABI,
+	NewContract:  token_pool.NewTokenPool,
+	IsAllowedCaller: func(contract *token_pool.TokenPool, opts *bind.CallOpts, caller common.Address, _ []CustomBlockConfirmationRateLimitConfigArg) (bool, error) {
+		owner, err := contract.Owner(opts)
+		if err != nil {
+			return false, err
+		}
+		rateLimitAdmin, err := contract.GetRateLimitAdmin(opts)
+		if err != nil {
+			return false, err
+		}
+		return caller == owner || caller == rateLimitAdmin, nil
+	},
+	Validate: func([]CustomBlockConfirmationRateLimitConfigArg) error { return nil },
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args []CustomBlockConfirmationRateLimitConfigArg) (*types.Transaction, error) {
+		rateLimitArgs := make([]token_pool.TokenPoolCustomBlockConfirmationRateLimitConfigArgs, 0, len(args))
+		for _, cfg := range args {
+			rateLimitArgs = append(rateLimitArgs, token_pool.TokenPoolCustomBlockConfirmationRateLimitConfigArgs{
+				RemoteChainSelector:       cfg.RemoteChainSelector,
+				OutboundRateLimiterConfig: token_pool.RateLimiterConfig(cfg.OutboundRateLimiterConfig),
+				InboundRateLimiterConfig:  token_pool.RateLimiterConfig(cfg.InboundRateLimiterConfig),
+			})
+		}
+		return tokenPool.SetCustomBlockConfirmationRateLimitConfig(opts, rateLimitArgs)
+	},
+})
+
 var ApplyAllowListUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowListUpdatesArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:apply-allowlist-updates",
 	Version:         semver.MustParse("1.7.0"),
@@ -292,25 +357,40 @@ var GetRateLimitAdmin = contract.NewRead(contract.ReadParams[any, common.Address
 	},
 })
 
-var GetCurrentInboundRateLimiterState = contract.NewRead(contract.ReadParams[uint64, RateLimiterBucket, *token_pool.TokenPool]{
-	Name:         "token-pool:get-current-inbound-rate-limiter-state",
+type RateLimiterStates = token_pool.GetCurrentRateLimiterState
+
+var GetCurrentRateLimiterState = contract.NewRead(contract.ReadParams[uint64, RateLimiterStates, *token_pool.TokenPool]{
+	Name:         "token-pool:get-current-rate-limiter-state",
 	Version:      semver.MustParse("1.7.0"),
-	Description:  "Gets the current inbound rate limiter state for a given remote chain selector on a TokenPool",
+	Description:  "Gets both outbound and inbound rate limiter states for a given remote chain selector",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterBucket, error) {
-		return tokenPool.GetCurrentInboundRateLimiterState(opts, args)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterStates, error) {
+		return tokenPool.GetCurrentRateLimiterState(opts, args)
 	},
 })
 
-var GetCurrentOutboundRateLimiterState = contract.NewRead(contract.ReadParams[uint64, RateLimiterBucket, *token_pool.TokenPool]{
-	Name:         "token-pool:get-current-outbound-rate-limiter-state",
+var GetMinBlockConfirmation = contract.NewRead(contract.ReadParams[any, uint16, *token_pool.TokenPool]{
+	Name:         "token-pool:get-configured-min-block-confirmation",
 	Version:      semver.MustParse("1.7.0"),
-	Description:  "Gets the current outbound rate limiter state for a given remote chain selector on a TokenPool",
+	Description:  "Gets the globally configured minimum block confirmations for custom block confirmation transfers",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (RateLimiterBucket, error) {
-		return tokenPool.GetCurrentOutboundRateLimiterState(opts, args)
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (uint16, error) {
+		return tokenPool.GetMinBlockConfirmation(opts)
+	},
+})
+
+type CustomBlockConfirmationRateLimiterStates = token_pool.GetCurrentCustomBlockConfirmationRateLimiterState
+
+var GetCurrentCustomBlockConfirmationRateLimiterState = contract.NewRead(contract.ReadParams[uint64, CustomBlockConfirmationRateLimiterStates, *token_pool.TokenPool]{
+	Name:         "token-pool:get-current-custom-block-confirmation-rate-limiter-state",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Gets the outbound and inbound custom block confirmation rate limiter states for a remote chain",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (CustomBlockConfirmationRateLimiterStates, error) {
+		return tokenPool.GetCurrentCustomBlockConfirmationRateLimiterState(opts, args)
 	},
 })
 

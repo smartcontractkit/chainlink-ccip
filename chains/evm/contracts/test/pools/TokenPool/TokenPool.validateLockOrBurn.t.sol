@@ -41,8 +41,9 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, minBlockConfirmation);
 
-    RateLimiter.TokenBucket memory bucket = s_tokenPool.getFastOutboundBucket(DEST_CHAIN_SELECTOR);
-    assertEq(bucket.tokens, outboundFastConfig.capacity - lockOrBurnIn.amount);
+    (RateLimiter.TokenBucket memory outboundBucket,) =
+      s_tokenPool.getCurrentCustomBlockConfirmationRateLimiterState(DEST_CHAIN_SELECTOR);
+    assertEq(outboundBucket.tokens, outboundFastConfig.capacity - lockOrBurnIn.amount);
   }
 
   function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmation() public {
