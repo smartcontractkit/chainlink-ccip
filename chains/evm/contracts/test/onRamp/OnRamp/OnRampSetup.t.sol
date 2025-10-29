@@ -114,9 +114,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       destGasLimit: 0,
       destBytesOverhead: 0,
       // TODO when v3 extra args are passed in
-      extraArgs: isLegacyExtraArgs ? message.extraArgs : bytes("")
+      extraArgs: bytes("")
     });
-    messageV1.destBlob = receipts[receipts.length - 1].extraArgs;
 
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),

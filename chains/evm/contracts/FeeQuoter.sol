@@ -845,14 +845,42 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     return destExecDataPerToken;
   }
 
-  function resolveTokenReceiver(
+  function resolveLegacyArgs(
+    uint64 destChainSelector,
     bytes calldata extraArgs
-  ) external pure returns (bytes memory tokenReceiver) {
-    if (extraArgs.length < 4 || bytes4(extraArgs[:4]) != Client.SVM_EXTRA_ARGS_V1_TAG) {
-      return (bytes(""));
+  ) external view returns (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) {
+    DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
+    if (
+      destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
+    ) {
+      return (
+        "",
+        uint32(
+          _parseGenericExtraArgsFromBytes(
+            extraArgs, destChainConfig.defaultTxGasLimit, destChainConfig.maxPerMsgGasLimit
+          ).gasLimit
+        ),
+        ""
+      );
+    }
+    if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
+      Client.SVMExtraArgsV1 memory svmArgs = abi.decode(extraArgs[4:], (Client.SVMExtraArgsV1));
+      bytes memory execArgs = new bytes(8 + 2 + svmArgs.accounts.length * 32);
+      // TODO fill SVM args
+
+      return (abi.encode(svmArgs.tokenReceiver), svmArgs.computeUnits, execArgs);
+    }
+    if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
+      Client.SuiExtraArgsV1 memory suiArgs = _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit);
+      bytes memory execArgs = new bytes(2 + suiArgs.receiverObjectIds.length * 32);
+      // TODO fill Sui args
+
+      return (abi.encode(suiArgs.tokenReceiver), uint32(suiArgs.gasLimit), execArgs);
     }
 
-    return abi.encode(abi.decode(extraArgs[4:], (Client.SVMExtraArgsV1)).tokenReceiver);
+    revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
   }
 
   function validateEncodedAddressAndEncodePacked(

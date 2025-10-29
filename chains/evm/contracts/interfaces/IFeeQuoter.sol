@@ -115,9 +115,10 @@ interface IFeeQuoter {
   /// @return feeTokens The tokens set as fee tokens.
   function getFeeTokens() external view returns (address[] memory);
 
-  function resolveTokenReceiver(
+  function resolveLegacyArgs(
+    uint64 destChainSelector,
     bytes calldata extraArgs
-  ) external view returns (bytes memory tokenReceiver);
+  ) external view returns (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs);
 
   function validateEncodedAddressAndEncodePacked(
     uint64 destChainSelector,
