@@ -381,22 +381,24 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - if the sender is a valid onRamp
   /// - rate limiting for either default or custom block confirmation transfer messages.
   /// @param lockOrBurnIn The input to validate.
-  /// @param finality The minimum block confirmation requested by the message. A value of zero is used for default finality.
+  /// @param blockConfirmationRequested The minimum block confirmation requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
-  function _validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) internal {
+  function _validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 blockConfirmationRequested) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
     _checkAllowList(lockOrBurnIn.originalSender);
 
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
-    CustomBlockConfirmationConfig storage finalityConfig = s_customBlockConfirmationConfig;
     uint256 amount = lockOrBurnIn.amount;
-    if (finality != WAIT_FOR_FINALITY && finalityConfig.minBlockConfirmation != WAIT_FOR_FINALITY) {
-      if (finality < finalityConfig.minBlockConfirmation) {
-        revert InvalidMinBlockConfirmation(finality, finalityConfig.minBlockConfirmation);
+    if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
+      uint16 minBlockConfirmationConfigured = s_customBlockConfirmationConfig.minBlockConfirmation;
+      if (minBlockConfirmationConfigured != 0) {
+        if (blockConfirmationRequested < minBlockConfirmationConfigured) {
+          revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
+        }
+        _consumeCustomBlockConfirmationOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
       }
-      _consumeCustomBlockConfirmationOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     } else {
       _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     }
@@ -410,13 +412,13 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - rate limiting for either default or custom block confirmation transfer messages.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
-  /// @param finality The minimum block confirmation requested by the message. A value of zero is used for default finality.
+  /// @param blockConfirmationRequested The minimum block confirmation requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
   function _validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
-    uint16 finality
+    uint16 blockConfirmationRequested
   ) internal {
     if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
@@ -426,7 +428,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     if (!isRemotePool(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.sourcePoolAddress)) {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
-    if (finality != WAIT_FOR_FINALITY) {
+    if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
       _consumeCustomBlockConfirmationInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
     } else {
       _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
