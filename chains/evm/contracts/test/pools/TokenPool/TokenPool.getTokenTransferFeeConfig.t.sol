@@ -11,10 +11,12 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
   function test_getTokenTransferFeeConfig() public {
     // Set up a fee config first.
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
-      destGasOverhead: 50000,
+      destGasOverhead: 50_000,
       destBytesOverhead: 32,
-      feeUSDCents: 100, // $1.00
-      isEnabled: true
+      defaultBlockConfirmationFeeUSDCents: 100, // $1.00
+      customBlockConfirmationFeeUSDCents: 150, // $1.50
+      defaultBlockConfirmationTransferFeeBps: 123,
+      customBlockConfirmationTransferFeeBps: 456
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -28,10 +30,12 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     IPoolV2.TokenTransferFeeConfig memory returnedFeeConfig =
       s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
 
-    assertEq(returnedFeeConfig.isEnabled, feeConfig.isEnabled);
     assertEq(returnedFeeConfig.destGasOverhead, feeConfig.destGasOverhead);
     assertEq(returnedFeeConfig.destBytesOverhead, feeConfig.destBytesOverhead);
-    assertEq(returnedFeeConfig.feeUSDCents, feeConfig.feeUSDCents);
+    assertEq(returnedFeeConfig.defaultBlockConfirmationFeeUSDCents, feeConfig.defaultBlockConfirmationFeeUSDCents);
+    assertEq(returnedFeeConfig.customBlockConfirmationFeeUSDCents, feeConfig.customBlockConfirmationFeeUSDCents);
+    assertEq(returnedFeeConfig.defaultBlockConfirmationTransferFeeBps, feeConfig.defaultBlockConfirmationTransferFeeBps);
+    assertEq(returnedFeeConfig.customBlockConfirmationTransferFeeBps, feeConfig.customBlockConfirmationTransferFeeBps);
   }
 
   function test_getTokenTransferFeeConfig_DeleteConfig() public {
@@ -41,15 +45,17 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     emit TokenPool.TokenTransferFeeConfigDeleted(DEST_CHAIN_SELECTOR);
     s_tokenPool.applyTokenTransferFeeConfigUpdates(new TokenPool.TokenTransferFeeConfigArgs[](0), toDelete);
 
-    // Test getting the disabled config
+    // Test getting the deleted config
     Client.EVM2AnyMessage memory message;
     IPoolV2.TokenTransferFeeConfig memory tokenTransferFeeConfig =
       s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
 
     // assert default values are returned
-    assertEq(tokenTransferFeeConfig.isEnabled, false);
     assertEq(tokenTransferFeeConfig.destGasOverhead, 0);
     assertEq(tokenTransferFeeConfig.destBytesOverhead, 0);
-    assertEq(tokenTransferFeeConfig.feeUSDCents, 0);
+    assertEq(tokenTransferFeeConfig.defaultBlockConfirmationFeeUSDCents, 0);
+    assertEq(tokenTransferFeeConfig.customBlockConfirmationFeeUSDCents, 0);
+    assertEq(tokenTransferFeeConfig.defaultBlockConfirmationTransferFeeBps, 0);
+    assertEq(tokenTransferFeeConfig.customBlockConfirmationTransferFeeBps, 0);
   }
 }
