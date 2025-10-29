@@ -40,6 +40,14 @@ contract VersionedVerifierResolver_applyOutboundImplementationUpdates is Version
     assertEq(s_versionedVerifierResolver.getOutboundImplementation(newDestChainSelector), addedVerifier);
     assertEq(s_versionedVerifierResolver.getOutboundImplementation(INITIAL_DEST_CHAIN_SELECTOR_1), updatedVerifier);
     assertEq(s_versionedVerifierResolver.getOutboundImplementation(INITIAL_DEST_CHAIN_SELECTOR_2), address(0));
+
+    uint64[] memory supportedDestChains = s_versionedVerifierResolver.getSupportedDestChains();
+    assertEq(supportedDestChains.length, 2);
+    for (uint256 i = 0; i < supportedDestChains.length; ++i) {
+      if (supportedDestChains[i] != newDestChainSelector && supportedDestChains[i] != INITIAL_DEST_CHAIN_SELECTOR_1) {
+        revert("Unexpected supported dest chain");
+      }
+    }
   }
 
   function test_applyOutboundImplementationUpdates_RevertWhen_OnlyCallableByOwner() public {

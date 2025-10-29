@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
-import {IVersionedVerifier} from "../interfaces/IVersionedVerifier.sol";
 
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
@@ -12,13 +11,7 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 
 /// @notice The CommitteeVerifier is a contract that handles lane-specific fee logic and message verification.
 /// @dev Source and destination responsibilities are combined to enable a single proxy address for a CCV on each chain.
-contract CommitteeVerifier is
-  Ownable2StepMsgSender,
-  ICrossChainVerifierV1,
-  SignatureQuorumValidator,
-  BaseVerifier,
-  IVersionedVerifier
-{
+contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, SignatureQuorumValidator, BaseVerifier {
   error InvalidConfig();
   error InvalidCCVData();
   error OnlyCallableByOwnerOrAllowlistAdmin();
@@ -34,7 +27,7 @@ contract CommitteeVerifier is
   // STATIC CONFIG
   string public constant override typeAndVersion = "CommitteeVerifier 1.7.0-dev";
   /// @dev The preimage is bytes4(keccak256("CommitteeVerifier 1.7.0"))
-  bytes4 public constant VERSION_TAG = 0x49ff34ed;
+  bytes4 internal constant VERSION_TAG = 0x49ff34ed;
   /// @dev The number of bytes allocated to encoding the signature length within the ccvData.
   uint256 internal constant SIGNATURE_LENGTH_BYTES = 2;
 
@@ -141,6 +134,11 @@ contract CommitteeVerifier is
     emit BaseVerifier.StorageLocationUpdated(s_storageLocation, newLocation);
 
     s_storageLocation = newLocation;
+  }
+
+  /// @notice Exposes the version tag.
+  function versionTag() public pure returns (bytes4) {
+    return VERSION_TAG;
   }
 
   // ================================================================

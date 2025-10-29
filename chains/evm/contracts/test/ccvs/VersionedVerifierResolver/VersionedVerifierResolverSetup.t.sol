@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IVersionedVerifier} from "../../../interfaces/IVersionedVerifier.sol";
-
 import {VersionedVerifierResolver} from "../../../ccvs/VersionedVerifierResolver.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
@@ -31,12 +29,6 @@ contract VersionedVerifierResolverSetup is BaseTest {
       VersionedVerifierResolver.InboundImplementationArgs({version: INITIAL_VERSION_1, verifier: s_initialVerifier1});
     inboundImplementations[1] =
       VersionedVerifierResolver.InboundImplementationArgs({version: INITIAL_VERSION_2, verifier: s_initialVerifier2});
-    vm.mockCall(
-      s_initialVerifier1, abi.encodeWithSelector(IVersionedVerifier.VERSION_TAG.selector), abi.encode(INITIAL_VERSION_1)
-    );
-    vm.mockCall(
-      s_initialVerifier2, abi.encodeWithSelector(IVersionedVerifier.VERSION_TAG.selector), abi.encode(INITIAL_VERSION_2)
-    );
     s_versionedVerifierResolver.applyInboundImplementationUpdates(inboundImplementations);
 
     VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImplementations =

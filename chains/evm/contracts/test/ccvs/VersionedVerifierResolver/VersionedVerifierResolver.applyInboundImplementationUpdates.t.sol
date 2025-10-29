@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IVersionedVerifier} from "../../../interfaces/IVersionedVerifier.sol";
-
 import {VersionedVerifierResolver} from "../../../ccvs/VersionedVerifierResolver.sol";
 import {VersionedVerifierResolverSetup} from "./VersionedVerifierResolverSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
@@ -27,10 +25,6 @@ contract VersionedVerifierResolver_applyInboundImplementationUpdates is Versione
     vm.expectEmit();
     emit VersionedVerifierResolver.InboundImplementationRemoved(INITIAL_VERSION_2);
 
-    vm.mockCall(addedVerifier, abi.encodeWithSelector(IVersionedVerifier.VERSION_TAG.selector), abi.encode(newVersion));
-    vm.mockCall(
-      updatedVerifier, abi.encodeWithSelector(IVersionedVerifier.VERSION_TAG.selector), abi.encode(INITIAL_VERSION_1)
-    );
     s_versionedVerifierResolver.applyInboundImplementationUpdates(impls);
 
     assertEq(s_versionedVerifierResolver.getInboundImplementationForVersion(newVersion), addedVerifier);
@@ -39,6 +33,14 @@ contract VersionedVerifierResolver_applyInboundImplementationUpdates is Versione
     assertEq(s_versionedVerifierResolver.getInboundImplementation(abi.encodePacked(INITIAL_VERSION_1)), updatedVerifier);
     assertEq(s_versionedVerifierResolver.getInboundImplementationForVersion(INITIAL_VERSION_2), address(0));
     assertEq(s_versionedVerifierResolver.getInboundImplementation(abi.encodePacked(INITIAL_VERSION_2)), address(0));
+
+    bytes4[] memory supportedVersions = s_versionedVerifierResolver.getSupportedVerifierVersions();
+    assertEq(supportedVersions.length, 2);
+    for (uint256 i = 0; i < supportedVersions.length; ++i) {
+      if (supportedVersions[i] != newVersion && supportedVersions[i] != INITIAL_VERSION_1) {
+        revert("Unexpected supported version");
+      }
+    }
   }
 
   function test_applyInboundImplementationUpdates_RevertWhen_OnlyCallableByOwner() public {
@@ -49,17 +51,12 @@ contract VersionedVerifierResolver_applyInboundImplementationUpdates is Versione
     );
   }
 
-  function test_applyInboundImplementationUpdates_RevertWhen_VersionMismatch() public {
-    bytes4 expected = 0x01010101;
-    bytes4 inputted = 0x02020202;
+  function test_applyInboundImplementationUpdates_RevertWhen_InvalidVersion() public {
     address newVerifier = makeAddr("NewVerifier");
     VersionedVerifierResolver.InboundImplementationArgs[] memory impls =
       new VersionedVerifierResolver.InboundImplementationArgs[](1);
-    impls[0] = VersionedVerifierResolver.InboundImplementationArgs({version: inputted, verifier: newVerifier});
-    vm.mockCall(newVerifier, abi.encodeWithSelector(IVersionedVerifier.VERSION_TAG.selector), abi.encode(expected));
-    vm.expectRevert(
-      abi.encodeWithSelector(VersionedVerifierResolver.VersionMismatch.selector, newVerifier, expected, inputted)
-    );
+    impls[0] = VersionedVerifierResolver.InboundImplementationArgs({version: bytes4(0), verifier: newVerifier});
+    vm.expectRevert(abi.encodeWithSelector(VersionedVerifierResolver.InvalidVersion.selector, bytes4(0)));
     s_versionedVerifierResolver.applyInboundImplementationUpdates(impls);
   }
 }
