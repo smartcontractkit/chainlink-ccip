@@ -20,7 +20,7 @@ contract MockPoolV2 {
     uint256,
     uint16,
     bytes memory,
-    IPoolV2.CCVDirection
+    IPoolV2.MessageDirection
   ) external view returns (address[] memory) {
     return s_requiredCCVs;
   }

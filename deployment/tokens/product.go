@@ -38,6 +38,18 @@ type RateLimiterConfig struct {
 	Rate *big.Int
 }
 
+// CustomBlockConfirmationRateLimiterConfig encapsulates rate limiter settings applied to
+// custom block confirmation transfers.
+type CustomBlockConfirmationRateLimiterConfig struct {
+	Inbound  RateLimiterConfig
+	Outbound RateLimiterConfig
+}
+
+// CustomBlockConfirmationConfig captures global custom block confirmation parameters for a token pool.
+type CustomBlockConfirmationConfig struct {
+	MinBlockConfirmation uint16
+}
+
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
 type RemoteChainConfig[R any, CCV any] struct {
 	// The token on the remote chain.
@@ -53,6 +65,9 @@ type RemoteChainConfig[R any, CCV any] struct {
 	OutboundCCVs []CCV
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.
 	InboundCCVs []CCV
+	// CustomBlockConfirmationConfig optionally overrides the rate limiter behaviour for
+	// transfers that request a custom block confirmation depth.
+	CustomBlockConfirmationConfig *CustomBlockConfirmationRateLimiterConfig
 }
 
 // ConfigureTokenForTransfersInput is the input for the ConfigureTokenForTransfers sequence.
@@ -67,6 +82,8 @@ type ConfigureTokenForTransfersInput struct {
 	ExternalAdmin string
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
 	RegistryAddress string
+	// CustomBlockConfirmationConfig optionally overrides global custom block confirmation parameters on the pool.
+	CustomBlockConfirmationConfig *CustomBlockConfirmationConfig
 }
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.

@@ -563,7 +563,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     requiredCCVs = IPoolV2(address(pool)).getRequiredCCVs(
-      token, destChainSelector, amount, finality, tokenArgs, IPoolV2.CCVDirection.Outbound
+      token, destChainSelector, amount, finality, tokenArgs, IPoolV2.MessageDirection.Outbound
     );
 
     if (requiredCCVs.length == 0) {

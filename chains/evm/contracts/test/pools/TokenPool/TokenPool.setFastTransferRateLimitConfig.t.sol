@@ -19,13 +19,13 @@ contract TokenPoolV2_setCustomBlockConfirmationRateLimitConfig is TokenPoolV2Set
 
     s_tokenPool.setCustomBlockConfirmationRateLimitConfig(args);
 
-    RateLimiter.TokenBucket memory outboundBucket = s_tokenPool.getFastOutboundBucket(DEST_CHAIN_SELECTOR);
+    (RateLimiter.TokenBucket memory outboundBucket, RateLimiter.TokenBucket memory inboundBucket) =
+      s_tokenPool.getCurrentCustomBlockConfirmationRateLimiterState(DEST_CHAIN_SELECTOR);
     assertTrue(outboundBucket.isEnabled);
     assertEq(outboundBucket.capacity, outboundConfig.capacity);
     assertEq(outboundBucket.rate, outboundConfig.rate);
     assertEq(outboundBucket.tokens, outboundConfig.capacity);
 
-    RateLimiter.TokenBucket memory inboundBucket = s_tokenPool.getFastInboundBucket(DEST_CHAIN_SELECTOR);
     assertTrue(inboundBucket.isEnabled);
     assertEq(inboundBucket.capacity, inboundConfig.capacity);
     assertEq(inboundBucket.rate, inboundConfig.rate);

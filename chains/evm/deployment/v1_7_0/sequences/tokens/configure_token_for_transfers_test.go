@@ -92,6 +92,18 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 					},
 					OutboundCCVs: []string{"0x789"},
 					InboundCCVs:  []string{"0xabc"},
+					CustomBlockConfirmationConfig: &tokens_core.CustomBlockConfirmationRateLimiterConfig{
+						Inbound: tokens_core.RateLimiterConfig{
+							IsEnabled: true,
+							Capacity:  big.NewInt(600),
+							Rate:      big.NewInt(60),
+						},
+						Outbound: tokens_core.RateLimiterConfig{
+							IsEnabled: true,
+							Capacity:  big.NewInt(700),
+							Rate:      big.NewInt(70),
+						},
+					},
 				},
 				remoteChainSel2: {
 					RemoteToken: common.LeftPadBytes(common.FromHex("0x321"), 32),
@@ -108,10 +120,25 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 					},
 					OutboundCCVs: []string{"0xdef"},
 					InboundCCVs:  []string{"0x012"},
+					CustomBlockConfirmationConfig: &tokens_core.CustomBlockConfirmationRateLimiterConfig{
+						Inbound: tokens_core.RateLimiterConfig{
+							IsEnabled: true,
+							Capacity:  big.NewInt(800),
+							Rate:      big.NewInt(80),
+						},
+						Outbound: tokens_core.RateLimiterConfig{
+							IsEnabled: true,
+							Capacity:  big.NewInt(900),
+							Rate:      big.NewInt(90),
+						},
+					},
 				},
 			},
 			ExternalAdmin:   "", // Use internal admin
 			RegistryAddress: tokenAdminRegistryAddress,
+			CustomBlockConfirmationConfig: &tokens_core.CustomBlockConfirmationConfig{
+				MinBlockConfirmation: 12,
+			},
 		}
 
 		// Execute the configure token for transfers sequence
@@ -140,6 +167,13 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		// Verify configuration for second remote chain
 		checkRemoteChainConfiguration(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2])
+
+		minBlockConfirmation, err := tp.GetMinBlockConfirmation(nil)
+		require.NoError(t, err, "Failed to get configured min block confirmation")
+		require.Equal(t, input.CustomBlockConfirmationConfig.MinBlockConfirmation, minBlockConfirmation, "Min block confirmation should match input")
+
+		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel1, input.RemoteChains[remoteChainSel1].CustomBlockConfirmationConfig)
+		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2].CustomBlockConfirmationConfig)
 
 		// Verify token registration in token admin registry
 		tokenConfigReport, err := operations.ExecuteOperation(
@@ -172,20 +206,116 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		require.NoError(t, err, "ExecuteOperation should not error")
 		require.Equal(t, common.HexToAddress(tokenAddress), actualTokenAddress.Output, "Token address should match")
 	})
+
+	t.Run("applies custom finality rate limit config when global finality unchanged", func(t *testing.T) {
+		chainSel := uint64(5009297550715157269)
+		remoteChainSel := uint64(4949039107694359620)
+
+		e, err := environment.New(t.Context(),
+			environment.WithEVMSimulated(t, []uint64{chainSel}),
+		)
+		require.NoError(t, err, "Failed to create environment")
+		require.NotNil(t, e, "Environment should be created")
+
+		chainReport, err := operations.ExecuteSequence(
+			e.OperationsBundle,
+			sequences.DeployChainContracts,
+			e.BlockChains.EVMChains()[chainSel],
+			sequences.DeployChainContractsInput{
+				ChainSelector:  chainSel,
+				ContractParams: testsetup.CreateBasicContractParams(),
+			},
+		)
+		require.NoError(t, err, "ExecuteSequence should not error")
+
+		tokenAndPoolReport, err := operations.ExecuteSequence(
+			e.OperationsBundle,
+			tokens.DeployBurnMintTokenAndPool,
+			e.BlockChains.EVMChains()[chainSel],
+			basicDeployBurnMintTokenAndPoolInput(chainReport),
+		)
+		require.NoError(t, err, "ExecuteSequence should not error")
+		require.Len(t, tokenAndPoolReport.Output.Addresses, 2, "Expected 2 addresses (token and pool)")
+
+		tokenPoolAddress := tokenAndPoolReport.Output.Addresses[1].Address
+
+		var tokenAdminRegistryAddress string
+		for _, addr := range chainReport.Output.Addresses {
+			if addr.Type == datastore.ContractType(token_admin_registry.ContractType) {
+				tokenAdminRegistryAddress = addr.Address
+				break
+			}
+		}
+		require.NotEmpty(t, tokenAdminRegistryAddress, "Token admin registry address should be found")
+
+		input := tokens_core.ConfigureTokenForTransfersInput{
+			ChainSelector:    chainSel,
+			TokenPoolAddress: tokenPoolAddress,
+			RemoteChains: map[uint64]tokens_core.RemoteChainConfig[[]byte, string]{
+				remoteChainSel: {
+					RemoteToken: common.LeftPadBytes(common.FromHex("0x777"), 32),
+					RemotePool:  common.LeftPadBytes(common.FromHex("0x888"), 32),
+					InboundRateLimiterConfig: tokens_core.RateLimiterConfig{
+						IsEnabled: true,
+						Capacity:  big.NewInt(5000),
+						Rate:      big.NewInt(500),
+					},
+					OutboundRateLimiterConfig: tokens_core.RateLimiterConfig{
+						IsEnabled: true,
+						Capacity:  big.NewInt(6000),
+						Rate:      big.NewInt(600),
+					},
+					OutboundCCVs: []string{"0x999"},
+					InboundCCVs:  []string{"0xaa0"},
+					CustomBlockConfirmationConfig: &tokens_core.CustomBlockConfirmationRateLimiterConfig{
+						Inbound: tokens_core.RateLimiterConfig{
+							IsEnabled: true,
+							Capacity:  big.NewInt(111),
+							Rate:      big.NewInt(11),
+						},
+						Outbound: tokens_core.RateLimiterConfig{
+							IsEnabled: true,
+							Capacity:  big.NewInt(222),
+							Rate:      big.NewInt(22),
+						},
+					},
+				},
+			},
+			ExternalAdmin:   "",
+			RegistryAddress: tokenAdminRegistryAddress,
+		}
+
+		_, err = operations.ExecuteSequence(
+			e.OperationsBundle,
+			tokens.ConfigureTokenForTransfers,
+			e.BlockChains,
+			input,
+		)
+		require.NoError(t, err, "ExecuteSequence should not error")
+
+		tp, err := tp_bindings.NewTokenPool(common.HexToAddress(tokenPoolAddress), e.BlockChains.EVMChains()[chainSel].Client)
+		require.NoError(t, err, "Failed to instantiate token pool contract")
+
+		minBlockConfirmation, err := tp.GetMinBlockConfirmation(nil)
+		require.NoError(t, err, "Failed to get configured min block confirmation")
+		require.Equal(t, uint16(0), minBlockConfirmation, "Min block confirmation should remain default")
+		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel, input.RemoteChains[remoteChainSel].CustomBlockConfirmationConfig)
+	})
 }
 
 // checkRemoteChainConfiguration verifies the configuration for a remote chain on the token pool
 func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remoteChainSel uint64, config tokens_core.RemoteChainConfig[[]byte, string]) {
+	rateLimiterStates, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel)
+	require.NoError(t, err, "Failed to get rate limiter state")
+
 	// Check inbound rate limiter
-	inboundRateLimiter, err := tp.GetCurrentInboundRateLimiterState(nil, remoteChainSel)
-	require.NoError(t, err, "Failed to get inbound rate limiter state")
+	inboundRateLimiter := rateLimiterStates.InboundRateLimiterState
 	require.Equal(t, config.InboundRateLimiterConfig.IsEnabled, inboundRateLimiter.IsEnabled, "Inbound rate limiter enabled state should match")
 	require.Equal(t, config.InboundRateLimiterConfig.Rate, inboundRateLimiter.Rate, "Inbound rate limiter rate should match")
 	require.Equal(t, config.InboundRateLimiterConfig.Capacity, inboundRateLimiter.Capacity, "Inbound rate limiter capacity should match")
 
 	// Check outbound rate limiter
-	outboundRateLimiter, err := tp.GetCurrentOutboundRateLimiterState(nil, remoteChainSel)
-	require.NoError(t, err, "Failed to get outbound rate limiter state")
+	outboundRateLimiter := rateLimiterStates.OutboundRateLimiterState
 	require.Equal(t, config.OutboundRateLimiterConfig.IsEnabled, outboundRateLimiter.IsEnabled, "Outbound rate limiter enabled state should match")
 	require.Equal(t, config.OutboundRateLimiterConfig.Rate, outboundRateLimiter.Rate, "Outbound rate limiter rate should match")
 	require.Equal(t, config.OutboundRateLimiterConfig.Capacity, outboundRateLimiter.Capacity, "Outbound rate limiter capacity should match")
@@ -213,4 +343,41 @@ func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remo
 	for _, ccv := range config.OutboundCCVs {
 		require.Contains(t, outboundCCVs, common.HexToAddress(ccv), "Outbound CCV should be in the list of required outbound CCVs")
 	}
+}
+
+func assertCustomBlockConfirmationBucket(
+	t *testing.T,
+	tp *tp_bindings.TokenPool,
+	remoteChainSel uint64,
+	expected *tokens_core.CustomBlockConfirmationRateLimiterConfig,
+) {
+	require.NotNil(t, expected, "expected custom block confirmation config must be provided for selector %d", remoteChainSel)
+
+	states, err := tp.GetCurrentCustomBlockConfirmationRateLimiterState(nil, remoteChainSel)
+	require.NoError(t, err, "Failed to get custom block confirmation buckets for selector %d", remoteChainSel)
+
+	assertBucketMatchesConfig(t, states.OutboundRateLimiterState, expected.Outbound)
+	assertBucketMatchesConfig(t, states.InboundRateLimiterState, expected.Inbound)
+}
+
+func assertBucketMatchesConfig(t *testing.T, actual tp_bindings.RateLimiterTokenBucket, expected tokens_core.RateLimiterConfig) {
+	require.Equal(t, expected.IsEnabled, actual.IsEnabled, "Rate limiter enabled mismatch")
+
+	expectedCapacity := big.NewInt(0)
+	if expected.Capacity != nil {
+		expectedCapacity = expected.Capacity
+	}
+	if actual.Capacity == nil {
+		actual.Capacity = big.NewInt(0)
+	}
+	require.Zero(t, expectedCapacity.Cmp(actual.Capacity), "Rate limiter capacity mismatch")
+
+	expectedRate := big.NewInt(0)
+	if expected.Rate != nil {
+		expectedRate = expected.Rate
+	}
+	if actual.Rate == nil {
+		actual.Rate = big.NewInt(0)
+	}
+	require.Zero(t, expectedRate.Cmp(actual.Rate), "Rate limiter rate mismatch")
 }

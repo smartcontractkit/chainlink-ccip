@@ -745,20 +745,52 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     });
   }
 
-  /// @notice Gets the token bucket with its values for the block it was requested at.
-  /// @return The token bucket.
-  function getCurrentOutboundRateLimiterState(
+  /// @notice Returns the outbound and inbound rate limiter state for the given remote chain at the time of the call.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @return outboundRateLimiterState The outbound token bucket.
+  /// @return inboundRateLimiterState The inbound token bucket.
+  function getCurrentRateLimiterState(
     uint64 remoteChainSelector
-  ) external view returns (RateLimiter.TokenBucket memory) {
-    return s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._currentTokenBucketState();
+  )
+    external
+    view
+    returns (
+      RateLimiter.TokenBucket memory outboundRateLimiterState,
+      RateLimiter.TokenBucket memory inboundRateLimiterState
+    )
+  {
+    RemoteChainConfig storage config = s_remoteChainConfigs[remoteChainSelector];
+    return (
+      config.outboundRateLimiterConfig._currentTokenBucketState(),
+      config.inboundRateLimiterConfig._currentTokenBucketState()
+    );
   }
 
-  /// @notice Gets the token bucket with its values for the block it was requested at.
-  /// @return The token bucket.
-  function getCurrentInboundRateLimiterState(
+  /// @notice Returns the minimum block confirmations configured for custom block confirmation transfers.
+  /// @return blockConfirmationConfigured The configured minimum block confirmations.
+  function getMinBlockConfirmation() external view returns (uint16 blockConfirmationConfigured) {
+    return s_customBlockConfirmationConfig.minBlockConfirmation;
+  }
+
+  /// @notice Returns the outbound and inbound custom block confirmation rate limiter state for the given remote chain.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @return outboundRateLimiterState The outbound token bucket.
+  /// @return inboundRateLimiterState The inbound token bucket.
+  function getCurrentCustomBlockConfirmationRateLimiterState(
     uint64 remoteChainSelector
-  ) external view returns (RateLimiter.TokenBucket memory) {
-    return s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._currentTokenBucketState();
+  )
+    external
+    view
+    returns (
+      RateLimiter.TokenBucket memory outboundRateLimiterState,
+      RateLimiter.TokenBucket memory inboundRateLimiterState
+    )
+  {
+    CustomBlockConfirmationConfig storage config = s_customBlockConfirmationConfig;
+    return (
+      config.outboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState(),
+      config.inboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState()
+    );
   }
 
   /// @notice Sets multiple chain rate limiter configs.
@@ -1001,10 +1033,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     uint256 amount,
     uint16, // finality
     bytes calldata, // extraData
-    IPoolV2.CCVDirection direction
+    IPoolV2.MessageDirection direction
   ) external view virtual returns (address[] memory requiredCCVs) {
     CCVConfig storage config = s_verifierConfig[remoteChainSelector];
-    if (direction == IPoolV2.CCVDirection.Inbound) {
+    if (direction == IPoolV2.MessageDirection.Inbound) {
       return _resolveRequiredCCVs(config.inboundCCVs, config.inboundCCVsToAddAboveThreshold, amount);
     }
     return _resolveRequiredCCVs(config.outboundCCVs, config.outboundCCVsToAddAboveThreshold, amount);

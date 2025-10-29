@@ -15,8 +15,10 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
     newTime = uint32(bound(newTime, block.timestamp + 1, type(uint32).max));
     vm.warp(newTime);
 
-    uint256 oldOutboundTokens = s_tokenPool.getCurrentOutboundRateLimiterState(DEST_CHAIN_SELECTOR).tokens;
-    uint256 oldInboundTokens = s_tokenPool.getCurrentInboundRateLimiterState(DEST_CHAIN_SELECTOR).tokens;
+    (RateLimiter.TokenBucket memory outboundBefore, RateLimiter.TokenBucket memory inboundBefore) =
+      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR);
+    uint256 oldOutboundTokens = outboundBefore.tokens;
+    uint256 oldInboundTokens = inboundBefore.tokens;
 
     RateLimiter.Config memory newOutboundConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
     RateLimiter.Config memory newInboundConfig =
@@ -33,19 +35,19 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
 
     uint256 expectedTokens = RateLimiter._min(newOutboundConfig.capacity, oldOutboundTokens);
 
-    RateLimiter.TokenBucket memory bucket = s_tokenPool.getCurrentOutboundRateLimiterState(DEST_CHAIN_SELECTOR);
-    assertEq(bucket.capacity, newOutboundConfig.capacity);
-    assertEq(bucket.rate, newOutboundConfig.rate);
-    assertEq(bucket.tokens, expectedTokens);
-    assertEq(bucket.lastUpdated, newTime);
+    (RateLimiter.TokenBucket memory outboundAfter, RateLimiter.TokenBucket memory inboundAfter) =
+      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR);
+    assertEq(outboundAfter.capacity, newOutboundConfig.capacity);
+    assertEq(outboundAfter.rate, newOutboundConfig.rate);
+    assertEq(outboundAfter.tokens, expectedTokens);
+    assertEq(outboundAfter.lastUpdated, newTime);
 
     expectedTokens = RateLimiter._min(newInboundConfig.capacity, oldInboundTokens);
 
-    bucket = s_tokenPool.getCurrentInboundRateLimiterState(DEST_CHAIN_SELECTOR);
-    assertEq(bucket.capacity, newInboundConfig.capacity);
-    assertEq(bucket.rate, newInboundConfig.rate);
-    assertEq(bucket.tokens, expectedTokens);
-    assertEq(bucket.lastUpdated, newTime);
+    assertEq(inboundAfter.capacity, newInboundConfig.capacity);
+    assertEq(inboundAfter.rate, newInboundConfig.rate);
+    assertEq(inboundAfter.tokens, expectedTokens);
+    assertEq(inboundAfter.lastUpdated, newTime);
   }
 
   // Reverts
