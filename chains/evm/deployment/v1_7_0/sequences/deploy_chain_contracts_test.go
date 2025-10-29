@@ -83,20 +83,21 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			require.Len(t, report.Output.BatchOps[1].Transactions, 0, "Expected no transactions in second batch operation")
 
 			exists := map[deployment.ContractType]bool{
-				rmn_remote.ContractType:           false,
-				router.ContractType:               false,
-				executor.ContractType:             false,
-				link.ContractType:                 false,
-				weth.ContractType:                 false,
-				committee_verifier.ContractType:   false,
-				onramp.ContractType:               false,
-				offramp.ContractType:              false,
-				fee_quoter.ContractType:           false,
-				committee_verifier.ProxyType:      false,
-				rmn_proxy.ContractType:            false,
-				token_admin_registry.ContractType: false,
-				mock_receiver.ContractType:        false,
-				executor.ProxyType:                false,
+				rmn_remote.ContractType:              false,
+				router.ContractType:                  false,
+				executor.ContractType:                false,
+				link.ContractType:                    false,
+				weth.ContractType:                    false,
+				committee_verifier.ContractType:      false,
+				onramp.ContractType:                  false,
+				offramp.ContractType:                 false,
+				fee_quoter.ContractType:              false,
+				committee_verifier.ResolverType:      false,
+				committee_verifier.ResolverProxyType: false,
+				rmn_proxy.ContractType:               false,
+				token_admin_registry.ContractType:    false,
+				mock_receiver.ContractType:           false,
+				executor.ProxyType:                   false,
 			}
 			for _, addr := range report.Output.Addresses {
 				exists[deployment.ContractType(addr.Type)] = true

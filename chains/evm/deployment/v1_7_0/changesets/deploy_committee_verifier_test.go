@@ -120,8 +120,10 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 
 	alphaCV, ok := find(addrs1, datastore.ContractType(committee_verifier.ContractType), "alpha")
 	require.True(t, ok, "committee verifier (alpha) not found in first run output")
-	alphaProxy, ok := find(addrs1, datastore.ContractType(committee_verifier.ProxyType), "alpha")
-	require.True(t, ok, "committee verifier proxy (alpha) not found in first run output")
+	alphaResolver, ok := find(addrs1, datastore.ContractType(committee_verifier.ResolverType), "alpha")
+	require.True(t, ok, "committee verifier resolver (alpha) not found in first run output")
+	alphaResolverProxy, ok := find(addrs1, datastore.ContractType(committee_verifier.ResolverProxyType), "alpha")
+	require.True(t, ok, "committee verifier resolver proxy (alpha) not found in first run output")
 
 	// 2) Second run with qualifier "beta"; seed env with first run addresses so they are considered existing
 	dsSeed := datastore.NewMemoryDataStore()
@@ -146,12 +148,15 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 
 	betaCV, ok := find(addrs2, datastore.ContractType(committee_verifier.ContractType), "beta")
 	require.True(t, ok, "committee verifier (beta) not found in second run output")
-	betaProxy, ok := find(addrs2, datastore.ContractType(committee_verifier.ProxyType), "beta")
-	require.True(t, ok, "committee verifier proxy (beta) not found in second run output")
+	betaResolver, ok := find(addrs2, datastore.ContractType(committee_verifier.ResolverType), "beta")
+	require.True(t, ok, "committee verifier resolver (beta) not found in second run output")
+	betaResolverProxy, ok := find(addrs2, datastore.ContractType(committee_verifier.ResolverProxyType), "beta")
+	require.True(t, ok, "committee verifier resolver proxy (beta) not found in second run output")
 
 	// Ensure addresses differ across qualifiers
 	require.NotEqual(t, alphaCV.Address, betaCV.Address, "expected different CommitteeVerifier addresses for different qualifiers")
-	require.NotEqual(t, alphaProxy.Address, betaProxy.Address, "expected different CommitteeVerifierProxy addresses for different qualifiers")
+	require.NotEqual(t, alphaResolver.Address, betaResolver.Address, "expected different CommitteeVerifierResolver addresses for different qualifiers")
+	require.NotEqual(t, alphaResolverProxy.Address, betaResolverProxy.Address, "expected different CommitteeVerifierResolverProxy addresses for different qualifiers")
 
 	// 3) Third run re-using qualifier "alpha" should be idempotent (returns existing alpha addresses)
 	dsUnion := datastore.NewMemoryDataStore()
@@ -177,10 +182,13 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 
 	reAlphaCV, ok := find(addrs3, datastore.ContractType(committee_verifier.ContractType), "alpha")
 	require.True(t, ok)
-	reAlphaProxy, ok := find(addrs3, datastore.ContractType(committee_verifier.ProxyType), "alpha")
+	reAlphaResolver, ok := find(addrs3, datastore.ContractType(committee_verifier.ResolverType), "alpha")
+	require.True(t, ok)
+	reAlphaResolverProxy, ok := find(addrs3, datastore.ContractType(committee_verifier.ResolverProxyType), "alpha")
 	require.True(t, ok)
 
 	// Should return the same addresses as first run for the same qualifier
 	require.Equal(t, alphaCV.Address, reAlphaCV.Address, "expected same CommitteeVerifier address when reusing qualifier")
-	require.Equal(t, alphaProxy.Address, reAlphaProxy.Address, "expected same CommitteeVerifierProxy address when reusing qualifier")
+	require.Equal(t, alphaResolver.Address, reAlphaResolver.Address, "expected same CommitteeVerifierResolver address when reusing qualifier")
+	require.Equal(t, alphaResolverProxy.Address, reAlphaResolverProxy.Address, "expected same CommitteeVerifierResolverProxy address when reusing qualifier")
 }

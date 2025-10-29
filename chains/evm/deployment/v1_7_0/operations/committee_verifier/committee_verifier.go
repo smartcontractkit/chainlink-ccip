@@ -8,12 +8,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 var ContractType cldf_deployment.ContractType = "CommitteeVerifier"
 
-var ProxyType cldf_deployment.ContractType = "CommitteeVerifierProxy"
+var ResolverType cldf_deployment.ContractType = "CommitteeVerifierResolver"
+
+var ResolverProxyType cldf_deployment.ContractType = "CommitteeVerifierResolverProxy"
 
 type DynamicConfig = committee_verifier.CommitteeVerifierDynamicConfig
 
@@ -22,8 +25,10 @@ type ConstructorArgs struct {
 	StorageLocation string
 }
 
-type ProxyConstructorArgs struct {
-	RampAddress common.Address
+type ResolverConstructorArgs struct{}
+
+type ResolverProxyConstructorArgs struct {
+	ResolverAddress common.Address
 }
 
 type SetDynamicConfigArgs struct {
@@ -58,17 +63,30 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
-var DeployProxy = contract.NewDeploy(contract.DeployParams[ProxyConstructorArgs]{
-	Name:             "committee-verifier-proxy:deploy",
+var DeployResolver = contract.NewDeploy(contract.DeployParams[ResolverConstructorArgs]{
+	Name:             "committee-verifier-resolver:deploy",
 	Version:          semver.MustParse("1.7.0"),
-	Description:      "Deploys the CommitteeVerifierProxy contract",
+	Description:      "Deploys the CommitteeVerifierResolver contract",
+	ContractMetadata: versioned_verifier_resolver.VersionedVerifierResolverMetaData,
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ResolverType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
+		},
+	},
+	Validate: func(ResolverConstructorArgs) error { return nil },
+})
+
+var DeployResolverProxy = contract.NewDeploy(contract.DeployParams[ResolverProxyConstructorArgs]{
+	Name:             "committee-verifier-resolver-proxy:deploy",
+	Version:          semver.MustParse("1.7.0"),
+	Description:      "Deploys the CommitteeVerifierResolverProxy contract",
 	ContractMetadata: proxy.ProxyMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ProxyType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ResolverProxyType, *semver.MustParse("1.7.0")).String(): {
 			EVM: common.FromHex(proxy.ProxyBin),
 		},
 	},
-	Validate: func(ProxyConstructorArgs) error { return nil },
+	Validate: func(ResolverProxyConstructorArgs) error { return nil },
 })
 
 var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigArgs, *committee_verifier.CommitteeVerifier]{
@@ -149,5 +167,16 @@ var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainC
 	NewContract:  committee_verifier.NewCommitteeVerifier,
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args uint64) (DestChainConfig, error) {
 		return committeeVerifier.GetDestChainConfig(opts, args)
+	},
+})
+
+var GetVersionTag = contract.NewRead(contract.ReadParams[any, [4]byte, *committee_verifier.CommitteeVerifier]{
+	Name:         "committee-verifier:get-version-tag",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Gets the version tag of the CommitteeVerifier contract",
+	ContractType: ContractType,
+	NewContract:  committee_verifier.NewCommitteeVerifier,
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args any) ([4]byte, error) {
+		return committeeVerifier.VERSIONTAG(opts)
 	},
 })
