@@ -5,7 +5,6 @@ import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifi
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 
 import {Client} from "../../../libraries/Client.sol";
-
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
@@ -201,13 +200,12 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     verifierReceipts = new OnRamp.Receipt[](defaultCCVs.length + message.tokenAmounts.length + 1);
 
     for (uint256 i = 0; i < defaultCCVs.length; ++i) {
-      address ccvAddress = defaultCCVs[i];
-      address implAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(DEST_CHAIN_SELECTOR);
+      address implAddress = ICrossChainVerifierResolver(defaultCCVs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR);
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
         ICrossChainVerifierV1(implAddress).getFee(DEST_CHAIN_SELECTOR, message, "", 0);
 
       verifierReceipts[i] = OnRamp.Receipt({
-        issuer: ccvAddress,
+        issuer: defaultCCVs[i],
         feeTokenAmount: feeUSDCents,
         destGasLimit: gasForVerification,
         destBytesOverhead: payloadSizeBytes,
