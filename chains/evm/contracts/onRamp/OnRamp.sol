@@ -202,7 +202,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       finality: resolvedExtraArgs.finalityConfig,
       gasLimit: resolvedExtraArgs.gasLimit,
       sender: abi.encodePacked(originalSender),
-      receiver: _validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
+      receiver: validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
       // Executor args hold security critical execution args, like Solana accounts or Sui object IDs. Because of this,
       // they have to part of the message that is signed off on by the verifiers.
       destBlob: resolvedExtraArgs.executorArgs,
@@ -341,10 +341,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param rawAddress The raw dest chain address provided by the user.
   /// @param addressBytesLength The expected length of the address on the destination chain.
   /// @return validatedAddress The validated dest chain address, stripped of any abi encoding.
-  function _validateDestChainAddress(
+  function validateDestChainAddress(
     bytes calldata rawAddress,
     uint8 addressBytesLength
-  ) internal pure returns (bytes memory validatedAddress) {
+  ) public pure returns (bytes memory validatedAddress) {
     if (addressBytesLength < 32) {
       // We have to account for padding as traditionally EVM addresses have been provided abi encoded.
       if (rawAddress.length > 32) {
@@ -573,8 +573,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       amount: tokenAndAmount.amount,
       sourcePoolAddress: abi.encodePacked(address(sourcePool)),
       sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
-      destTokenAddress: IFeeQuoter(s_dynamicConfig.feeQuoter).validateEncodedAddressAndEncodePacked(
-        destChainSelector, poolReturnData.destTokenAddress
+      destTokenAddress: this.validateDestChainAddress(
+        poolReturnData.destTokenAddress, s_destChainConfigs[destChainSelector].addressBytesLength
       ),
       tokenReceiver: receiver,
       extraData: poolReturnData.destPoolData

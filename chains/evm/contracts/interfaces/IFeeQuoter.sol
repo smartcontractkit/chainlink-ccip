@@ -119,9 +119,4 @@ interface IFeeQuoter {
     uint64 destChainSelector,
     bytes calldata extraArgs
   ) external view returns (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs);
-
-  function validateEncodedAddressAndEncodePacked(
-    uint64 destChainSelector,
-    bytes calldata addr
-  ) external view returns (bytes memory);
 }
