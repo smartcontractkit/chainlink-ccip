@@ -60,7 +60,8 @@ contract MockVerifier is ICrossChainVerifierResolver, ICrossChainVerifierV1 {
   }
 
   function getOutboundImplementation(
-    uint64 // destChainSelector
+    uint64, // destChainSelector
+    bytes memory // extraArgs
   ) external view returns (address) {
     return address(this);
   }

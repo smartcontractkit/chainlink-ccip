@@ -68,7 +68,8 @@ contract ReentrantCCV is ICrossChainVerifierV1, ICrossChainVerifierResolver {
   }
 
   function getOutboundImplementation(
-    uint64 // destChainSelector
+    uint64, // destChainSelector
+    bytes memory // extraArgs
   ) external view returns (address) {
     return address(this);
   }

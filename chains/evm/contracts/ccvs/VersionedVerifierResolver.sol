@@ -75,7 +75,8 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
 
   /// @inheritdoc ICrossChainVerifierResolver
   function getOutboundImplementation(
-    uint64 destChainSelector
+    uint64 destChainSelector,
+    bytes memory // extraArgs
   ) external view returns (address) {
     return s_destChainToOutboundImplementation[destChainSelector];
   }

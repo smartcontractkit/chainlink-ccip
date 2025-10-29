@@ -139,7 +139,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     uint256 currentVerifierIndex = 0;
     for (uint256 i = 0; i < userDefinedCCVCount; ++i) {
       address ccvAddress = extraArgsV3.ccvs[i].ccvAddress;
-      address implAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(DEST_CHAIN_SELECTOR);
+      address implAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(DEST_CHAIN_SELECTOR, "");
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(implAddress)
         .getFee(DEST_CHAIN_SELECTOR, message, extraArgsV3.ccvs[i].args, extraArgsV3.finalityConfig);
 
@@ -166,7 +166,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         continue;
       }
 
-      address implAddress = ICrossChainVerifierResolver(defaultCCVs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR);
+      address implAddress =
+        ICrossChainVerifierResolver(defaultCCVs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR, "");
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
         ICrossChainVerifierV1(implAddress).getFee(DEST_CHAIN_SELECTOR, message, "", extraArgsV3.finalityConfig);
 
@@ -200,7 +201,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     verifierReceipts = new OnRamp.Receipt[](defaultCCVs.length + message.tokenAmounts.length + 1);
 
     for (uint256 i = 0; i < defaultCCVs.length; ++i) {
-      address implAddress = ICrossChainVerifierResolver(defaultCCVs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR);
+      address implAddress =
+        ICrossChainVerifierResolver(defaultCCVs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR, "");
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
         ICrossChainVerifierV1(implAddress).getFee(DEST_CHAIN_SELECTOR, message, "", 0);
 

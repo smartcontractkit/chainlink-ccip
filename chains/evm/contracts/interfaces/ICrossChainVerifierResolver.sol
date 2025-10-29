@@ -19,8 +19,7 @@ interface ICrossChainVerifierResolver {
   /// If the verifier specified by the sender is actually a resolver, the OnRamp will call this function to get the actual verifier contract.
   /// For example, resolvers can maintain a simple mapping of destChainSelector to verifier contract address.
   /// @param destChainSelector The destChainSelector for a message.
+  /// @param extraArgs Extra arguments that can be used by the resolver to determine the correct verifier contract.
   /// @return verifierAddress The address of the verifier contract.
-  function getOutboundImplementation(
-    uint64 destChainSelector
-  ) external view returns (address);
+  function getOutboundImplementation(uint64 destChainSelector, bytes memory extraArgs) external view returns (address);
 }

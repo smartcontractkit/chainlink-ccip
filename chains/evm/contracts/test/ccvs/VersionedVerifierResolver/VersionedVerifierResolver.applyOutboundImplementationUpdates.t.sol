@@ -37,9 +37,9 @@ contract VersionedVerifierResolver_applyOutboundImplementationUpdates is Version
 
     s_versionedVerifierResolver.applyOutboundImplementationUpdates(impls);
 
-    assertEq(s_versionedVerifierResolver.getOutboundImplementation(newDestChainSelector), addedVerifier);
-    assertEq(s_versionedVerifierResolver.getOutboundImplementation(INITIAL_DEST_CHAIN_SELECTOR_1), updatedVerifier);
-    assertEq(s_versionedVerifierResolver.getOutboundImplementation(INITIAL_DEST_CHAIN_SELECTOR_2), address(0));
+    assertEq(s_versionedVerifierResolver.getOutboundImplementation(newDestChainSelector, ""), addedVerifier);
+    assertEq(s_versionedVerifierResolver.getOutboundImplementation(INITIAL_DEST_CHAIN_SELECTOR_1, ""), updatedVerifier);
+    assertEq(s_versionedVerifierResolver.getOutboundImplementation(INITIAL_DEST_CHAIN_SELECTOR_2, ""), address(0));
 
     uint64[] memory supportedDestChains = s_versionedVerifierResolver.getSupportedDestChains();
     assertEq(supportedDestChains.length, 2);

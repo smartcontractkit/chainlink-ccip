@@ -255,7 +255,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     {
       for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
         address ccvAddress = resolvedExtraArgs.ccvs[i].ccvAddress;
-        address implAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(destChainSelector);
+        address implAddress = ICrossChainVerifierResolver(ccvAddress).getOutboundImplementation(
+          destChainSelector, resolvedExtraArgs.ccvs[i].args
+        );
         if (implAddress == address(0)) {
           revert DestinationChainNotSupportedByCCV(ccvAddress, destChainSelector);
         }
@@ -664,7 +666,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
       Client.CCV memory verifier = extraArgs.ccvs[i];
       address implAddress =
-        ICrossChainVerifierResolver(verifier.ccvAddress).getOutboundImplementation(destChainSelector);
+        ICrossChainVerifierResolver(verifier.ccvAddress).getOutboundImplementation(destChainSelector, verifier.args);
       if (implAddress == address(0)) {
         revert DestinationChainNotSupportedByCCV(verifier.ccvAddress, destChainSelector);
       }
