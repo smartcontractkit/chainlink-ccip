@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	burn_mint_token_pool_v1_7_0_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
 	burn_mint_token_pool_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
@@ -369,14 +370,14 @@ var GetCurrentRateLimiterState = contract.NewRead(contract.ReadParams[uint64, Ra
 	},
 })
 
-var GetConfiguredMinBlockConfirmation = contract.NewRead(contract.ReadParams[any, uint16, *token_pool.TokenPool]{
+var GetMinBlockConfirmation = contract.NewRead(contract.ReadParams[any, uint16, *token_pool.TokenPool]{
 	Name:         "token-pool:get-configured-min-block-confirmation",
 	Version:      semver.MustParse("1.7.0"),
 	Description:  "Gets the globally configured minimum block confirmations for custom block confirmation transfers",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (uint16, error) {
-		return tokenPool.GetConfiguredMinBlockConfirmation(opts)
+		return tokenPool.GetMinBlockConfirmation(opts)
 	},
 })
 
