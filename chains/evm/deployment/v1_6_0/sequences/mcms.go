@@ -7,6 +7,7 @@ import (
 	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -35,4 +36,14 @@ func (a *EVMAdapter) SequenceAcceptOwnership() *cldf_ops.Sequence[api.TransferOw
 func (r *EVMAdapter) GetChainMetadata(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (mcms_types.ChainMetadata, error) {
 	evmDeployer := &evm1_0_0.EVMMCMSReader{}
 	return evmDeployer.GetChainMetadata(e, chainSelector, input)
+}
+
+func (r *EVMAdapter) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error) {
+	evmDeployer := &evm1_0_0.EVMMCMSReader{}
+	return evmDeployer.GetTimelockRef(e, chainSelector, input)
+}
+
+func (r *EVMAdapter) GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error) {
+	evmDeployer := &evm1_0_0.EVMMCMSReader{}
+	return evmDeployer.GetMCMSRef(e, chainSelector, input)
 }

@@ -26,7 +26,12 @@ func (a *EVMTransferOwnershipAdapter) InitializeTimelockAddress(e deployment.Env
 	evmChains := e.BlockChains.EVMChains()
 	timelockAddr = make(map[uint64]common.Address)
 	for sel := range evmChains {
-		addr, err := datastore_utils.FindAndFormatRef(e.DataStore, input.TimelockAddressRef, sel, evm_datastore_utils.ToEVMAddress)
+		reader := &EVMMCMSReader{}
+		timelockRef, err := reader.GetTimelockRef(e, sel, input)
+		if err != nil {
+			return fmt.Errorf("failed to get timelock ref for chain %d: %w", sel, err)
+		}
+		addr, err := datastore_utils.FindAndFormatRef(e.DataStore, timelockRef, sel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
 			return fmt.Errorf("failed to find timelock address for chain %d: %w", sel, err)
 		}

@@ -72,14 +72,6 @@ func TestWithBatchOps(t *testing.T) {
 		TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
 		Description:          "Proposal",
-		MCMSAddressRef: datastore.AddressRef{
-			Type:    "MCM",
-			Version: semver.MustParse("1.0.0"),
-		},
-		TimelockAddressRef: datastore.AddressRef{
-			Type:    "Timelock",
-			Version: semver.MustParse("1.0.0"),
-		},
 	})
 	require.NoError(t, err, "Build should not error")
 	require.Len(t, out.MCMSTimelockProposals, 1, "Proposal should exist")

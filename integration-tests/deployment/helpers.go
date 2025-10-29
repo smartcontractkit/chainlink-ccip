@@ -7,6 +7,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -31,6 +32,12 @@ import (
 )
 
 func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64) {
+	// For EVM only, set the timelock admin
+	var timelockAdmin common.Address
+	chain1, ok := e.BlockChains.EVMChains()[selector]
+	if ok {
+		timelockAdmin = chain1.DeployerKey.From
+	}
 	dReg := mcmsapi.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	cs := mcmsapi.DeployMCMS(dReg)
@@ -43,6 +50,7 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64) {
 				Proposer:         testhelpers.SingleGroupMCMS(),
 				TimelockMinDelay: big.NewInt(0),
 				Qualifier:        ptr.String(common_utils.CLLQualifier),
+				TimelockAdmin:    timelockAdmin,
 			},
 		},
 	})
@@ -126,17 +134,8 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			MCMSAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(utils.McmProgramType),
-				Qualifier: common_utils.CLLQualifier,
-				Version:   semver.MustParse("1.6.0"),
-			},
-			TimelockAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(utils.TimelockCompositeAddress),
-				Version:   semver.MustParse("1.6.0"),
-				Qualifier: common_utils.CLLQualifier,
-			},
-			Description: "Transfer ownership test",
+			Qualifier:            common_utils.CLLQualifier,
+			Description:          "Transfer ownership test",
 		},
 	}
 
@@ -240,19 +239,10 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
 			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("1s"),
+			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			MCMSAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(common_utils.ProposerManyChainMultisig),
-				Qualifier: common_utils.CLLQualifier,
-				Version:   semver.MustParse("1.0.0"),
-			},
-			TimelockAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(common_utils.RBACTimelock),
-				Version:   semver.MustParse("1.0.0"),
-				Qualifier: common_utils.CLLQualifier,
-			},
-			Description: "Transfer ownership test",
+			Qualifier:            common_utils.CLLQualifier,
+			Description:          "Transfer ownership test",
 		},
 	}
 

@@ -21,6 +21,10 @@ type MCMSReader interface {
 	// GetChainMetadata returns the chain metadata for a given MCMS input.
 	// Each chain family defines its own implementation of this method.
 	GetChainMetadata(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (mcms_types.ChainMetadata, error)
+	// GetTimelockRef returns the timelock contract address reference for a given MCMS input.
+	GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error)
+	// GetMCMSRef returns the MCMS contract address reference for a given MCMS input.
+	GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error)
 }
 
 // MCMSReaderRegistry maintains a registry of MCMS readers.
@@ -121,7 +125,7 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 		return b.changesetOutput, nil
 	}
 
-	timelockAddresses, err := b.getTimelockAddresses(input.TimelockAddressRef, b.batchOps)
+	timelockAddresses, err := b.getTimelockAddresses(input, b.batchOps)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get timelock addresses: %w", err)
 	}
@@ -154,13 +158,25 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 
 // getTimelockAddresses resolves the timelock contract addresses for each chain selector in the list of batch operations.
 func (b *OutputBuilder) getTimelockAddresses(
-	timelockRef datastore.AddressRef,
+	input mcms_utils.Input,
 	ops []mcms_types.BatchOperation,
 ) (map[mcms_types.ChainSelector]string, error) {
 	timelocks := make(map[mcms_types.ChainSelector]string)
 	for _, op := range ops {
 		if _, exists := timelocks[op.ChainSelector]; exists {
 			continue // Already resolved timelock for this chain selector
+		}
+		family, err := chain_selectors.GetSelectorFamily(uint64(op.ChainSelector))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", op.ChainSelector, err)
+		}
+		reader, ok := b.registry.GetMCMSReader(family)
+		if !ok {
+			return nil, fmt.Errorf("no MCMS reader registered for chain family '%s'", family)
+		}
+		timelockRef, err := reader.GetTimelockRef(b.environment, uint64(op.ChainSelector), input)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get timelock ref for chain with selector %d: %w", op.ChainSelector, err)
 		}
 		fullTimelockRef, err := datastore_utils.FindAndFormatRef(
 			b.environment.DataStore,

@@ -23,22 +23,11 @@ func (r *EVMMCMSReader) GetChainMetadata(e deployment.Environment, chainSelector
 		return mcms_types.ChainMetadata{}, fmt.Errorf("EVM chain with selector %d not found", chainSelector)
 	}
 	inspector := mcmsevmsdk.NewInspector(chain.Client)
-	// find mcms address
-	// if contract type is specified not empty, populate contract type from TimelockAction
-	if input.MCMSAddressRef.Type == "" {
-		switch input.TimelockAction {
-		case mcms_types.TimelockActionSchedule:
-			input.MCMSAddressRef.Type = datastore.ContractType(utils.ProposerManyChainMultisig)
-		case mcms_types.TimelockActionBypass:
-			input.MCMSAddressRef.Type = datastore.ContractType(utils.BypasserManyChainMultisig)
-		case mcms_types.TimelockActionCancel:
-			input.MCMSAddressRef.Type = datastore.ContractType(utils.CancellerManyChainMultisig)
-		default:
-			return mcms_types.ChainMetadata{}, fmt.Errorf("unsupported timelock action: %s", input.TimelockAction)
-		}
+	mcmsAddr, err := r.GetMCMSRef(e, chainSelector, input)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to get MCMS address for chain %d: %w", chainSelector, err)
 	}
-
-	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, input.MCMSAddressRef, chainSelector, evm_datastore_utils.ToEVMAddress)
+	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, mcmsAddr, chainSelector, evm_datastore_utils.ToEVMAddress)
 	if err != nil {
 		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to find MCMS address for chain %d: %w", chainSelector, err)
 	}
@@ -55,4 +44,37 @@ func (r *EVMMCMSReader) GetChainMetadata(e deployment.Environment, chainSelector
 		StartingOpCount: opCount,
 		MCMAddress:      mcmAddr,
 	}, nil
+}
+
+func (r *EVMMCMSReader) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error) {
+	timelockRef := datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		utils.RBACTimelock,
+		Version,
+		input.Qualifier,
+	)
+	return timelockRef, nil
+}
+
+func (r *EVMMCMSReader) GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error) {
+	// find mcms address
+	// populate contract type from TimelockAction
+	var addrType datastore.ContractType
+	switch input.TimelockAction {
+	case mcms_types.TimelockActionSchedule:
+		addrType = datastore.ContractType(utils.ProposerManyChainMultisig)
+	case mcms_types.TimelockActionBypass:
+		addrType = datastore.ContractType(utils.BypasserManyChainMultisig)
+	case mcms_types.TimelockActionCancel:
+		addrType = datastore.ContractType(utils.CancellerManyChainMultisig)
+	default:
+		return datastore.AddressRef{}, fmt.Errorf("unsupported timelock action type: %s", input.TimelockAction)
+	}
+	mcmAddress := datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		deployment.ContractType(addrType),
+		Version,
+		input.Qualifier,
+	)
+	return mcmAddress, nil
 }
