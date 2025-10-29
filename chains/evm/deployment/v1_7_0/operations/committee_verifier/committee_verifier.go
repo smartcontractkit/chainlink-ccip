@@ -177,6 +177,6 @@ var GetVersionTag = contract.NewRead(contract.ReadParams[any, [4]byte, *committe
 	ContractType: ContractType,
 	NewContract:  committee_verifier.NewCommitteeVerifier,
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args any) ([4]byte, error) {
-		return committeeVerifier.VERSIONTAG(opts)
+		return committeeVerifier.VersionTag(opts)
 	},
 })

@@ -180,7 +180,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			// Check outbound implementation on CommitteeVerifierResolver
 			boundResolver, err := versioned_verifier_resolver.NewVersionedVerifierResolver(committeeVerifierResolver, evmChain.Client)
 			require.NoError(t, err, "Failed to instantiate VersionedVerifierResolver")
-			outboundImpl, err := boundResolver.GetOutboundImplementation(&bind.CallOpts{Context: t.Context()}, remoteChainSelector)
+			outboundImpl, err := boundResolver.GetOutboundImplementation(&bind.CallOpts{Context: t.Context()}, remoteChainSelector, []byte{})
 			require.NoError(t, err, "GetOutboundImplementation should not error")
 			require.Equal(t, committeeVerifier.Hex(), outboundImpl.Hex(), "Outbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
 
