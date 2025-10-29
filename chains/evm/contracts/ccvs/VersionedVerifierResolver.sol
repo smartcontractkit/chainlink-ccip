@@ -3,13 +3,14 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../interfaces/ICrossChainVerifierResolver.sol";
 import {IVersionedVerifier} from "../interfaces/IVersionedVerifier.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 /// @notice Resolves and returns the appropriate verifier contract for the given outbound / inbound traffic.
 /// @dev On source, the destChainSelector of a message is used to determine the verifier implementation to apply.
 /// On destination, we must use the verifier version was applied on source, parsing this version from the ccvData.
-contract VersionedVerifierResolver is ICrossChainVerifierResolver, Ownable2StepMsgSender {
+contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersion, Ownable2StepMsgSender {
   error InvalidDestChainSelector(uint64 destChainSelector);
   error VersionMismatch(address verifier, bytes4 expected, bytes4 got);
 
@@ -27,6 +28,8 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, Ownable2StepM
     uint64 destChainSelector; // ──╮ Destination chain selector.
     address verifier; // ──────────╯ Address of the verifier contract.
   }
+
+  string public constant override typeAndVersion = "VersionedVerifierResolver 1.7.0-dev";
 
   /// @notice maps verifier versions to their implementation addresses, applied to inbound traffic.
   mapping(bytes4 version => address verifier) private s_inboundImplementations;

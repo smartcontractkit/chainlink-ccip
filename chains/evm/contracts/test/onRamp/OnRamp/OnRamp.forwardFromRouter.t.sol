@@ -97,9 +97,6 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
   function test_forwardFromRouter_RevertWhen_DestChainNotSupportedByCCV() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
-    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
-    _evmMessageToEvent({message: message, destChainSelector: DEST_CHAIN_SELECTOR, seqNum: 1, originalSender: STRANGER});
-
     vm.mockCall(
       address(s_defaultCCV),
       abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector, DEST_CHAIN_SELECTOR),
