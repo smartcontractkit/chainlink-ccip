@@ -49,7 +49,7 @@ contract OffRamp_execute is OffRampSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_gasBoundedExecuteCaller = new GasBoundedExecuteCaller(address(s_agg));
+    s_gasBoundedExecuteCaller = new GasBoundedExecuteCaller(address(s_offRamp));
 
     MessageV1Codec.MessageV1 memory message = _getMessage();
 
@@ -114,7 +114,7 @@ contract OffRamp_execute is OffRampSetup {
     assertEq(
       uint256(Internal.MessageExecutionState.SUCCESS),
       uint256(
-        s_agg.getExecutionState(
+        s_offRamp.getExecutionState(
           message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
@@ -129,7 +129,7 @@ contract OffRamp_execute is OffRampSetup {
 
     // Set OffRamp as a valid OffRamp on the Router.
     Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
-    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_agg)});
+    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
 
     // Expect execution state change event.
@@ -148,7 +148,7 @@ contract OffRamp_execute is OffRampSetup {
     assertEq(
       uint256(Internal.MessageExecutionState.SUCCESS),
       uint256(
-        s_agg.getExecutionState(
+        s_offRamp.getExecutionState(
           message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
@@ -165,7 +165,7 @@ contract OffRamp_execute is OffRampSetup {
     assertEq(
       uint256(Internal.MessageExecutionState.FAILURE),
       uint256(
-        s_agg.getExecutionState(
+        s_offRamp.getExecutionState(
           message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
@@ -174,7 +174,7 @@ contract OffRamp_execute is OffRampSetup {
 
   function test_execute_ReentrancyGuardReentrantCall_Fails() public {
     // Create a malicious CCV that will call back into execute during validation.
-    ReentrantCCV maliciousCCV = new ReentrantCCV(address(s_agg));
+    ReentrantCCV maliciousCCV = new ReentrantCCV(address(s_offRamp));
 
     // Update report to use malicious CCV.
     MessageV1Codec.MessageV1 memory message = _getMessage();
@@ -214,8 +214,8 @@ contract OffRamp_execute is OffRampSetup {
 
     // Mock executeSingleMessage to revert with NOT_ENOUGH_GAS_FOR_CALL_SIG.
     vm.mockCallRevert(
-      address(s_agg),
-      abi.encodeWithSelector(s_agg.executeSingleMessage.selector),
+      address(s_offRamp),
+      abi.encodeWithSelector(s_offRamp.executeSingleMessage.selector),
       abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
     );
 
@@ -310,13 +310,13 @@ contract OffRamp_execute is OffRampSetup {
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
     // Execute the message successfully first time.
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    s_offRamp.execute(encodedMessage, ccvs, ccvData);
 
     // Verify it's in SUCCESS state.
     assertEq(
       uint256(Internal.MessageExecutionState.SUCCESS),
       uint256(
-        s_agg.getExecutionState(
+        s_offRamp.getExecutionState(
           message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
@@ -331,7 +331,7 @@ contract OffRamp_execute is OffRampSetup {
         message.sequenceNumber
       )
     );
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    s_offRamp.execute(encodedMessage, ccvs, ccvData);
   }
 
   function test_execute_RevertWhen_ExecuteSingleMessageFails() public {
@@ -340,7 +340,7 @@ contract OffRamp_execute is OffRampSetup {
     bytes memory revertReason = "ExecuteSingleMessage failed";
 
     // Mock executeSingleMessage to revert.
-    vm.mockCallRevert(address(s_agg), abi.encodeWithSelector(s_agg.executeSingleMessage.selector), revertReason);
+    vm.mockCallRevert(address(s_offRamp), abi.encodeWithSelector(s_offRamp.executeSingleMessage.selector), revertReason);
 
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged(
@@ -353,13 +353,13 @@ contract OffRamp_execute is OffRampSetup {
 
     // The message should succeed but set execution state to FAILURE due to executeSingleMessage revert.
     // This verifies that execution failures are handled gracefully.
-    s_agg.execute(encodedMessage, ccvs, ccvData);
+    s_offRamp.execute(encodedMessage, ccvs, ccvData);
 
     // Verify message state changed to FAILURE
     assertEq(
       uint256(Internal.MessageExecutionState.FAILURE),
       uint256(
-        s_agg.getExecutionState(
+        s_offRamp.getExecutionState(
           SOURCE_CHAIN_SELECTOR, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
         )
       )
