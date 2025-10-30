@@ -112,7 +112,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     receipts[receipts.length - 1] = OnRamp.Receipt({
       issuer: destChainConfig.defaultExecutor,
       feeTokenAmount: 0, // Matches current OnRamp event behavior
-      destGasLimit: 0,
+      destGasLimit: GAS_LIMIT,
       destBytesOverhead: 0,
       // TODO when v3 extra args are passed in
       extraArgs: bytes("")

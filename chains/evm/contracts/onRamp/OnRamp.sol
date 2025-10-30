@@ -726,7 +726,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     );
     verifierReceipts[verifierReceipts.length - 1] = Receipt({
       issuer: extraArgs.executor,
-      destGasLimit: execGasCost, // TODO add user gas limit
+      destGasLimit: execGasCost + extraArgs.gasLimit,
       destBytesOverhead: execBytes,
       feeTokenAmount: usdCentsFee,
       extraArgs: extraArgs.executorArgs
