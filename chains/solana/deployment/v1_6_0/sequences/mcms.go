@@ -169,18 +169,21 @@ func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int, tim
 func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.PublicKey) error {
 	proposerRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.ChainSelector(),
 		utils.ProposerManyChainMultisig,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	cancellerRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.ChainSelector(),
 		utils.CancellerManyChainMultisig,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	bypasserRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.ChainSelector(),
 		utils.BypasserManyChainMultisig,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,

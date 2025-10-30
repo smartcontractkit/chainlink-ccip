@@ -104,6 +104,7 @@ var ConnectChains = operations.NewOperation(
 			AllowListEnabled: input.AllowlistEnabled,
 		}
 		var ixn solana.Instruction
+		batches := make([]types.BatchOperation, 0)
 		if isUpdate {
 			ixn, err = ccip_router.NewUpdateDestChainConfigInstruction(
 				input.RemoteChainSelector,
@@ -133,17 +134,31 @@ var ConnectChains = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
 			}
 		}
-		err = chain.Confirm([]solana.Instruction{ixn})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
-		}
 		sourceRef := datastore.AddressRef{
 			Address:       routerDestChainPDA.String(),
 			ChainSelector: chain.Selector,
 			Type:          datastore.ContractType(DestChainType),
 			Version:       Version,
 		}
+		if authority != chain.DeployerKey.PublicKey() {
+			b, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Router.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			batches = append(batches, b)
+		} else {
+			err = chain.Confirm([]solana.Instruction{ixn})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			}
+		}
 		return sequences.OnChainOutput{
+			BatchOps:  batches,
 			Addresses: []datastore.AddressRef{sourceRef},
 		}, nil
 	},
@@ -169,6 +184,19 @@ var AddOffRamp = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
 		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Router.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)

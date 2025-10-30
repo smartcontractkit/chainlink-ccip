@@ -219,17 +219,8 @@ func TestFastCurse(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			MCMSAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			TimelockAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			Description: "Transfer ownership to timelock for fast curse test",
+			Qualifier:            "test",
+			Description:          "Transfer ownership to timelock for fast curse test",
 		},
 	}
 
@@ -269,17 +260,8 @@ func TestFastCurse(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			MCMSAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			TimelockAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			Description: "Curse proposal for fast curse test",
+			Qualifier:            "test",
+			Description:          "Curse proposal for fast curse test",
 		},
 	}
 	curseReg := fastcurse.GetCurseRegistry()
@@ -549,17 +531,8 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			MCMSAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			TimelockAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			Description: "Transfer ownership to timelock for fast curse test",
+			Qualifier:            "test",
+			Description:          "Transfer ownership to timelock for fast curse test",
 		},
 	}
 
@@ -587,17 +560,8 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			MCMSAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			TimelockAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			Description: "Curse proposal for fast curse test",
+			Qualifier:            "test",
+			Description:          "Curse proposal for fast curse test",
 		},
 	}
 	curseReg := fastcurse.GetCurseRegistry()
