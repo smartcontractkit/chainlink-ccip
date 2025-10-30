@@ -219,6 +219,9 @@ func (ca *CurseAdapter) ListConnectedChains(e cldf.Environment, selector uint64)
 	}
 	connectedChains := make([]uint64, 0)
 	for _, offRamp := range offRamps {
+		if offRamp.OffRamp == (common.Address{}) {
+			continue // skip uninitialized off-ramps
+		}
 		connectedChains = append(connectedChains, offRamp.SourceChainSelector)
 	}
 	return connectedChains, nil
