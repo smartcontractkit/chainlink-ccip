@@ -128,8 +128,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // is inherited from the parent contract except for the overwritten destPoolData.
     Pool.LockOrBurnOutV1 memory baseOutput = super.lockOrBurn(lockOrBurnIn);
 
-    // Encode the LOCK_RELEASE_FLAG into the destPoolData
-    baseOutput.destPoolData = abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
+    // Encode the LOCK_RELEASE_FLAG into the destPoolData using encodePacked to save space.
+    baseOutput.destPoolData = abi.encodePacked(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
 
     return baseOutput;
   }
