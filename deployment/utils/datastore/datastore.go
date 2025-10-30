@@ -81,9 +81,14 @@ func GetAddressRef(
 	for _, ref := range input {
 		if ref.ChainSelector == selector &&
 			ref.Type == datastore.ContractType(contractType) &&
-			ref.Version.Equal(contractVersion) &&
-			ref.Qualifier == contractQualifier {
-			return ref
+			ref.Version.Equal(contractVersion) {
+			if contractQualifier != "" {
+				if ref.Qualifier == contractQualifier {
+					return ref
+				}
+			} else {
+				return ref
+			}
 		}
 	}
 	return datastore.AddressRef{}
