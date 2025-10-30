@@ -35,4 +35,14 @@ contract OnRampTestHelper is OnRamp {
   ) external view returns (address[] memory) {
     return _getCCVsForPool(destChainSelector, token, amount, finality, tokenArgs);
   }
+
+  /// @notice Exposes the internal _getExecutionFee function for testing.
+  function getExecutionFee(
+    uint64 destChainSelector,
+    uint256 dataLength,
+    uint256 numberOfTokens,
+    Client.GenericExtraArgsV3 memory extraArgs
+  ) external view returns (Receipt memory) {
+    return _getExecutionFee(destChainSelector, dataLength, numberOfTokens, extraArgs);
+  }
 }
