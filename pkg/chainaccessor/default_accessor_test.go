@@ -395,23 +395,23 @@ func createValidSendRequestedEvent(seqNum cciptypes.SeqNum) *SendRequestedEvent 
 				SequenceNumber:      seqNum,
 				MessageID:           cciptypes.Bytes32{byte(seqNum)},
 			},
-			Sender:          cciptypes.UnknownAddress("sender"),
-			Receiver:        cciptypes.UnknownAddress("receiver"),
-			FeeToken:        cciptypes.UnknownAddress("feeToken"),
-			FeeTokenAmount:  cciptypes.NewBigInt(big.NewInt(100)),
+			Sender:         cciptypes.UnknownAddress("sender"),
+			Receiver:       cciptypes.UnknownAddress("receiver"),
+			FeeToken:       cciptypes.UnknownAddress("feeToken"),
+			FeeTokenAmount: cciptypes.NewBigInt(big.NewInt(100)),
 		},
 	}
 }
 
 func TestMsgsBetweenSeqNums(t *testing.T) {
 	tests := []struct {
-		name                 string
-		seqNumRange          cciptypes.SeqNumRange
-		destChainSelector    cciptypes.ChainSelector
-		sequences            []types.Sequence
-		expectedError        bool
-		expectedMsgCount     int
-		validateTxHash       func(t *testing.T, msgs []cciptypes.Message)
+		name              string
+		seqNumRange       cciptypes.SeqNumRange
+		destChainSelector cciptypes.ChainSelector
+		sequences         []types.Sequence
+		expectedError     bool
+		expectedMsgCount  int
+		validateTxHash    func(t *testing.T, msgs []cciptypes.Message)
 	}{
 		{
 			name:              "TxHash populated from item.TxHash",
@@ -464,7 +464,7 @@ func TestMsgsBetweenSeqNums(t *testing.T) {
 			validateTxHash: func(t *testing.T, msgs []cciptypes.Message) {
 				require.Len(t, msgs, 3)
 				assert.Equal(t, "0x112233", msgs[0].Header.TxHash) // From item.TxHash
-				assert.Equal(t, "", msgs[1].Header.TxHash)          // Empty - no TxHash provided
+				assert.Equal(t, "", msgs[1].Header.TxHash)         // Empty - no TxHash provided
 				assert.Equal(t, "0x445566", msgs[2].Header.TxHash) // From item.TxHash
 			},
 		},
