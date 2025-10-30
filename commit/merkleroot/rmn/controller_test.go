@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -1053,9 +1054,7 @@ func (m *mockPeerClient) getReceivedRequests() map[rmntypes.NodeID][]*rmnpb.Requ
 	cp := make(map[rmntypes.NodeID][]*rmnpb.Request)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	for k, v := range m.receivedRequests {
-		cp[k] = v
-	}
+	maps.Copy(cp, m.receivedRequests)
 	return cp
 }
 
