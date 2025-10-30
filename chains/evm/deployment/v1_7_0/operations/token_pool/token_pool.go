@@ -78,6 +78,21 @@ type ApplyCustomBlockConfirmationConfigArgs struct {
 	RateLimitConfigArgs  []CustomBlockConfirmationRateLimitConfigArg
 }
 
+type TokenTransferFeeConfigArg struct {
+	DestChainSelector      uint64
+	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
+}
+
+type ApplyTokenTransferFeeConfigUpdatesArgs struct {
+	TokenTransferFeeConfigArgs []TokenTransferFeeConfigArg
+	DestToUseDefaultFeeConfigs []uint64
+}
+
+type GetTokenTransferFeeConfigArgs struct {
+	LocalToken        common.Address
+	DestChainSelector uint64
+}
+
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "token-pool:deploy",
 	Version:          semver.MustParse("1.7.0"),
@@ -288,6 +303,34 @@ var SetCustomBlockConfirmationRateLimitConfig = contract.NewWrite(contract.Write
 	},
 })
 
+var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[ApplyTokenTransferFeeConfigUpdatesArgs, *token_pool.TokenPool]{
+	Name:            "token-pool:apply-token-transfer-fee-config-updates",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Applies token transfer fee overrides or resets defaults for destination chains on a TokenPool",
+	ContractType:    ContractType,
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, ApplyTokenTransferFeeConfigUpdatesArgs],
+	Validate:        func(ApplyTokenTransferFeeConfigUpdatesArgs) error { return nil },
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesArgs) (*types.Transaction, error) {
+		configs := make([]token_pool.TokenPoolTokenTransferFeeConfigArgs, 0, len(args.TokenTransferFeeConfigArgs))
+		for _, cfg := range args.TokenTransferFeeConfigArgs {
+			configs = append(configs, token_pool.TokenPoolTokenTransferFeeConfigArgs{
+				DestChainSelector: cfg.DestChainSelector,
+				TokenTransferFeeConfig: token_pool.IPoolV2TokenTransferFeeConfig{
+					DestGasOverhead:                        cfg.TokenTransferFeeConfig.DestGasOverhead,
+					DestBytesOverhead:                      cfg.TokenTransferFeeConfig.DestBytesOverhead,
+					DefaultBlockConfirmationFeeUSDCents:    cfg.TokenTransferFeeConfig.DefaultBlockConfirmationFeeUSDCents,
+					CustomBlockConfirmationFeeUSDCents:     cfg.TokenTransferFeeConfig.CustomBlockConfirmationFeeUSDCents,
+					DefaultBlockConfirmationTransferFeeBps: cfg.TokenTransferFeeConfig.DefaultBlockConfirmationTransferFeeBps,
+					CustomBlockConfirmationTransferFeeBps:  cfg.TokenTransferFeeConfig.CustomBlockConfirmationTransferFeeBps,
+				},
+			})
+		}
+		return tokenPool.ApplyTokenTransferFeeConfigUpdates(opts, configs, args.DestToUseDefaultFeeConfigs)
+	},
+})
+
 var ApplyAllowListUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowListUpdatesArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:apply-allowlist-updates",
 	Version:         semver.MustParse("1.7.0"),
@@ -391,6 +434,17 @@ var GetCurrentCustomBlockConfirmationRateLimiterState = contract.NewRead(contrac
 	NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint64) (CustomBlockConfirmationRateLimiterStates, error) {
 		return tokenPool.GetCurrentCustomBlockConfirmationRateLimiterState(opts, args)
+	},
+})
+
+var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[GetTokenTransferFeeConfigArgs, token_pool.IPoolV2TokenTransferFeeConfig, *token_pool.TokenPool]{
+	Name:         "token-pool:get-token-transfer-fee-config",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Gets the token transfer fee configuration for a destination chain on a TokenPool",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args GetTokenTransferFeeConfigArgs) (token_pool.IPoolV2TokenTransferFeeConfig, error) {
+		return tokenPool.GetTokenTransferFeeConfig(opts, args.LocalToken, args.DestChainSelector, token_pool.ClientEVM2AnyMessage{}, 0, nil)
 	},
 })
 
