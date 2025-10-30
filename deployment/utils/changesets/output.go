@@ -178,16 +178,10 @@ func (b *OutputBuilder) getTimelockAddresses(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get timelock ref for chain with selector %d: %w", op.ChainSelector, err)
 		}
-		fullTimelockRef, err := datastore_utils.FindAndFormatRef(
-			b.environment.DataStore,
-			timelockRef,
-			uint64(op.ChainSelector),
-			datastore_utils.FullRef,
-		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve timelock ref on chain with selector %d: %w", op.ChainSelector, err)
 		}
-		timelocks[op.ChainSelector] = fullTimelockRef.Address
+		timelocks[op.ChainSelector] = timelockRef.Address
 	}
 
 	return timelocks, nil
