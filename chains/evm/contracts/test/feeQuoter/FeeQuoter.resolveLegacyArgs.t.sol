@@ -7,12 +7,6 @@ import {Internal} from "../../libraries/Internal.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 
 contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
-  uint64 internal constant TEST_DEST_CHAIN_SELECTOR = 123456789;
-  uint32 internal constant TEST_GAS_LIMIT = 200_000;
-
-  /// @notice Helper function to setup a destination chain with a specific chain family selector
-  /// @param chainFamilySelector The chain family selector to use
-  /// @return config The destination chain config that was applied
   function _setupDestChain(
     bytes4 chainFamilySelector
   ) internal returns (FeeQuoter.DestChainConfig memory config) {
@@ -21,35 +15,33 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigs = new FeeQuoter.DestChainConfigArgs[](1);
     destChainConfigs[0] =
-      FeeQuoter.DestChainConfigArgs({destChainSelector: TEST_DEST_CHAIN_SELECTOR, destChainConfig: config});
+      FeeQuoter.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, destChainConfig: config});
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigs);
 
     return config;
   }
 
-  /// @notice Helper function to setup a destination chain with custom config
-  /// @param config The custom destination chain config to apply
   function _setupDestChainWithConfig(
     FeeQuoter.DestChainConfig memory config
   ) internal {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigs = new FeeQuoter.DestChainConfigArgs[](1);
     destChainConfigs[0] =
-      FeeQuoter.DestChainConfigArgs({destChainSelector: TEST_DEST_CHAIN_SELECTOR, destChainConfig: config});
+      FeeQuoter.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, destChainConfig: config});
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigs);
   }
 
   function test_resolveLegacyArgs_EVM() public {
     _setupDestChain(Internal.CHAIN_FAMILY_SELECTOR_EVM);
 
-    Client.EVMExtraArgsV1 memory evmArgs = Client.EVMExtraArgsV1({gasLimit: TEST_GAS_LIMIT});
+    Client.EVMExtraArgsV1 memory evmArgs = Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT});
     bytes memory extraArgs = Client._argsToBytes(evmArgs);
 
     (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) =
-      s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+      s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
 
-    // For EVM, tokenReceiver and executorArgs should be empty
+    // For EVM, tokenReceiver and executorArgs should be empty.
     assertEq("", tokenReceiver);
-    assertEq(TEST_GAS_LIMIT, gasLimit);
+    assertEq(GAS_LIMIT, gasLimit);
     assertEq("", executorArgs);
   }
 
@@ -61,11 +53,11 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes memory extraArgs = new bytes(0);
 
     (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) =
-      s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+      s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
 
-    // Should use default gas limit
+    // Should use default gas limit.
     assertEq("", tokenReceiver);
-    assertEq(100_000, gasLimit);
+    assertEq(config.defaultTxGasLimit, gasLimit);
     assertEq("", executorArgs);
   }
 
@@ -73,15 +65,15 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     _setupDestChain(Internal.CHAIN_FAMILY_SELECTOR_APTOS);
 
     Client.GenericExtraArgsV2 memory genericArgs =
-      Client.GenericExtraArgsV2({gasLimit: TEST_GAS_LIMIT, allowOutOfOrderExecution: false});
+      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
     bytes memory extraArgs = Client._argsToBytes(genericArgs);
 
     (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) =
-      s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+      s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
 
-    // For Aptos, tokenReceiver and executorArgs should be empty
+    // For Aptos, tokenReceiver and executorArgs should be empty.
     assertEq("", tokenReceiver);
-    assertEq(TEST_GAS_LIMIT, gasLimit);
+    assertEq(GAS_LIMIT, gasLimit);
     assertEq("", executorArgs);
   }
 
@@ -89,15 +81,15 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     _setupDestChain(Internal.CHAIN_FAMILY_SELECTOR_TVM);
 
     Client.GenericExtraArgsV2 memory genericArgs =
-      Client.GenericExtraArgsV2({gasLimit: TEST_GAS_LIMIT, allowOutOfOrderExecution: true});
+      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: true});
     bytes memory extraArgs = Client._argsToBytes(genericArgs);
 
     (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) =
-      s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+      s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
 
-    // For TVM, tokenReceiver and executorArgs should be empty
+    // For TVM, tokenReceiver and executorArgs should be empty.
     assertEq("", tokenReceiver);
-    assertEq(TEST_GAS_LIMIT, gasLimit);
+    assertEq(GAS_LIMIT, gasLimit);
     assertEq("", executorArgs);
   }
 
@@ -110,7 +102,7 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     accounts[1] = bytes32(uint256(2));
 
     Client.SVMExtraArgsV1 memory svmArgs = Client.SVMExtraArgsV1({
-      computeUnits: TEST_GAS_LIMIT,
+      computeUnits: GAS_LIMIT,
       accountIsWritableBitmap: 3,
       allowOutOfOrderExecution: true,
       tokenReceiver: testTokenReceiver,
@@ -119,12 +111,12 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes memory extraArgs = Client._svmArgsToBytes(svmArgs);
 
     (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) =
-      s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+      s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
 
-    // For SVM, tokenReceiver should be encoded, executorArgs should be constructed
+    // For SVM, tokenReceiver should be encoded, executorArgs should be constructed.
     assertEq(abi.encode(testTokenReceiver), tokenReceiver);
-    assertEq(TEST_GAS_LIMIT, gasLimit);
-    // executorArgs should be 8 + 2 + (accounts.length * 32) = 74 bytes
+    assertEq(GAS_LIMIT, gasLimit);
+    // executorArgs should be 8 + 2 + (accounts.length * 32) = 74 bytes.
     assertEq(2 + 8 + 32 * accounts.length, executorArgs.length);
   }
 
@@ -134,7 +126,7 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes32 testTokenReceiver = bytes32(uint256(0x123));
 
     Client.SVMExtraArgsV1 memory svmArgs = Client.SVMExtraArgsV1({
-      computeUnits: TEST_GAS_LIMIT,
+      computeUnits: GAS_LIMIT,
       accountIsWritableBitmap: 0,
       allowOutOfOrderExecution: false,
       tokenReceiver: testTokenReceiver,
@@ -143,12 +135,12 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes memory extraArgs = Client._svmArgsToBytes(svmArgs);
 
     (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) =
-      s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+      s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
 
-    // For SVM, tokenReceiver should be encoded
+    // For SVM, tokenReceiver should be encoded.
     assertEq(abi.encode(testTokenReceiver), tokenReceiver);
-    assertEq(TEST_GAS_LIMIT, gasLimit);
-    // executorArgs should be 8 + 2 + 0 = 10 bytes
+    assertEq(GAS_LIMIT, gasLimit);
+    // executorArgs should be 8 + 2 + 0 = 10 bytes.
     assertEq(10, executorArgs.length);
   }
 
@@ -162,7 +154,7 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     objectIds[2] = bytes32(uint256(300));
 
     Client.SuiExtraArgsV1 memory suiArgs = Client.SuiExtraArgsV1({
-      gasLimit: TEST_GAS_LIMIT,
+      gasLimit: GAS_LIMIT,
       allowOutOfOrderExecution: false,
       tokenReceiver: testTokenReceiver,
       receiverObjectIds: objectIds
@@ -170,12 +162,12 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes memory extraArgs = Client._suiArgsToBytes(suiArgs);
 
     (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) =
-      s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+      s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
 
-    // For SUI, tokenReceiver should be encoded, executorArgs should be constructed
+    // For SUI, tokenReceiver should be encoded, executorArgs should be constructed.
     assertEq(abi.encode(testTokenReceiver), tokenReceiver);
-    assertEq(TEST_GAS_LIMIT, gasLimit);
-    // executorArgs should be 2 + (receiverObjectIds.length * 32) = 98 bytes
+    assertEq(GAS_LIMIT, gasLimit);
+    // executorArgs should be 2 + (receiverObjectIds.length * 32) = 98 bytes.
     assertEq(2 + 32 * objectIds.length, executorArgs.length);
   }
 
@@ -185,7 +177,7 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes32 testTokenReceiver = bytes32(uint256(0x456));
 
     Client.SuiExtraArgsV1 memory suiArgs = Client.SuiExtraArgsV1({
-      gasLimit: TEST_GAS_LIMIT,
+      gasLimit: GAS_LIMIT,
       allowOutOfOrderExecution: true,
       tokenReceiver: testTokenReceiver,
       receiverObjectIds: new bytes32[](0)
@@ -193,12 +185,12 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes memory extraArgs = Client._suiArgsToBytes(suiArgs);
 
     (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) =
-      s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+      s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
 
-    // For SUI, tokenReceiver should be encoded
+    // For SUI, tokenReceiver should be encoded.
     assertEq(abi.encode(testTokenReceiver), tokenReceiver);
-    assertEq(TEST_GAS_LIMIT, gasLimit);
-    // executorArgs should be 2 + 0 = 2 bytes
+    assertEq(GAS_LIMIT, gasLimit);
+    // executorArgs should be 2 + 0 = 2 bytes.
     assertEq(2, executorArgs.length);
   }
 
@@ -211,9 +203,9 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes memory extraArgs = Client._argsToBytes(evmArgs);
 
     (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) =
-      s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+      s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
 
-    // Should accept maxPerMsgGasLimit
+    // Should accept maxPerMsgGasLimit.
     assertEq("", tokenReceiver);
     assertEq(type(uint32).max, gasLimit);
     assertEq("", executorArgs);
@@ -230,7 +222,7 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes memory extraArgs = Client._argsToBytes(evmArgs);
 
     vm.expectRevert(FeeQuoter.MessageGasLimitTooHigh.selector);
-    s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+    s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
   }
 
   function test_resolveLegacyArgs_RevertWhen_InvalidExtraArgsData_SUI_EmptyExtraArgs() public {
@@ -239,7 +231,7 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes memory extraArgs = new bytes(0);
 
     vm.expectRevert(FeeQuoter.InvalidExtraArgsData.selector);
-    s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+    s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
   }
 
   function test_resolveLegacyArgs_RevertWhen_MessageGasLimitTooHigh_SUI() public {
@@ -248,7 +240,7 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     _setupDestChainWithConfig(config);
 
     Client.SuiExtraArgsV1 memory suiArgs = Client.SuiExtraArgsV1({
-      gasLimit: 1_000_001,
+      gasLimit: config.maxPerMsgGasLimit + 1,
       allowOutOfOrderExecution: false,
       tokenReceiver: bytes32(uint256(1)),
       receiverObjectIds: new bytes32[](0)
@@ -256,7 +248,7 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes memory extraArgs = Client._suiArgsToBytes(suiArgs);
 
     vm.expectRevert(FeeQuoter.MessageGasLimitTooHigh.selector);
-    s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+    s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
   }
 
   function test_resolveLegacyArgs_RevertWhen_InvalidExtraArgsTag() public {
@@ -265,6 +257,6 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     bytes memory extraArgs = abi.encodeWithSelector(bytes4(0x12345678));
 
     vm.expectRevert(FeeQuoter.InvalidExtraArgsTag.selector);
-    s_feeQuoter.resolveLegacyArgs(TEST_DEST_CHAIN_SELECTOR, extraArgs);
+    s_feeQuoter.resolveLegacyArgs(DEST_CHAIN_SELECTOR, extraArgs);
   }
 }
