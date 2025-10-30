@@ -47,7 +47,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     // Assert: Verify the result
     assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount);
 
-    // destPoolData is the local token decimals abi-encoded to 32 bytes
+
     assertEq(result.destPoolData.length, 4);
     vm.stopPrank();
   }
