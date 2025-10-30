@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -19,9 +20,8 @@ import (
 )
 
 const (
-	apiVersionV2                     = "v2"
-	messagesPath                     = "messages"
-	attestationStatusComplete string = "complete"
+	apiVersionV2 = "v2"
+	messagesPath = "messages"
 )
 
 type CCTPv2HTTPClient interface {
@@ -87,6 +87,14 @@ func (c *CCTPv2HTTPClientImpl) GetMessages(
 		latency := time.Since(startTime)
 		c.metricsReporter.TrackAttestationAPILatency(sourceChain, sourceDomainID, metricStatus, latency)
 	}()
+
+	// Validate transaction hash
+	if transactionHash == "" {
+		return CCTPv2Messages{}, fmt.Errorf("transaction hash cannot be empty")
+	}
+	if !strings.HasPrefix(transactionHash, "0x") || len(transactionHash) != 66 {
+		return CCTPv2Messages{}, fmt.Errorf("invalid transaction hash format: %s", transactionHash)
+	}
 
 	path := fmt.Sprintf("%s/%s/%d?transactionHash=%s",
 		apiVersionV2, messagesPath, sourceDomainID, url.QueryEscape(transactionHash))
