@@ -12,6 +12,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
@@ -57,10 +58,9 @@ func (r *MCMSReaderRegistry) RegisterMCMSReader(chainFamily string, reader MCMSR
 	if r.m == nil {
 		r.m = make(map[string]MCMSReader)
 	}
-	if _, exists := r.m[chainFamily]; exists {
-		panic(fmt.Sprintf("MCMS reader already registered for chain family: %s", chainFamily))
+	if _, exists := r.m[chainFamily]; !exists {
+		r.m[chainFamily] = reader
 	}
-	r.m[chainFamily] = reader
 }
 
 // GetMCMSReader retrieves an MCMSReader for a specific chain family.

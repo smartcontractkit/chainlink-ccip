@@ -37,11 +37,19 @@ type CurseAdapter interface {
 	Curse() *cldf_ops.Sequence[CurseInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	// Uncurse returns the sequence to lift the curse on subjects on a chain
 	Uncurse() *cldf_ops.Sequence[CurseInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	// ListConnectedChains returns a slice of connected chain selectors
+	// It is used to determine which chains needs to curse subjects derived from given selector
+	// This is needed to put global curse on a given chain with selector `selector`,
+	// so that all chains connected to it can curse the subject derived from `selector`
+	ListConnectedChains(e cldf.Environment, selector uint64) ([]uint64, error)
 }
 
 type CurseSubjectAdapter interface {
 	// SelectorToSubject converts a chain selector to a Subject
 	SelectorToSubject(selector uint64) Subject
+	// DeriveCurseAdapterVersion derives the curse adapter version to be used to curse the subject on a chain
+	// For example, for EVM chains, this could derive the RMN version deployed on the chain with selector `selector`
+	DeriveCurseAdapterVersion(e cldf.Environment, selector uint64) (*semver.Version, error)
 }
 
 type CurseRegistryInput struct {
