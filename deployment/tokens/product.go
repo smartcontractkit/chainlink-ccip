@@ -38,6 +38,16 @@ type RateLimiterConfig struct {
 	Rate *big.Int
 }
 
+// TokenTransferFeeConfig captures per-destination fee overrides that a token pool can apply.
+type TokenTransferFeeConfig struct {
+	DestGasOverhead                        uint32
+	DestBytesOverhead                      uint32
+	DefaultBlockConfirmationFeeUSDCents    uint32
+	CustomBlockConfirmationFeeUSDCents     uint32
+	DefaultBlockConfirmationTransferFeeBps uint16
+	CustomBlockConfirmationTransferFeeBps  uint16
+}
+
 // CustomBlockConfirmationRateLimiterConfig encapsulates rate limiter settings applied to
 // custom block confirmation transfers.
 type CustomBlockConfirmationRateLimiterConfig struct {
@@ -68,6 +78,8 @@ type RemoteChainConfig[R any, CCV any] struct {
 	// CustomBlockConfirmationConfig optionally overrides the rate limiter behaviour for
 	// transfers that request a custom block confirmation depth.
 	CustomBlockConfirmationConfig *CustomBlockConfirmationRateLimiterConfig
+	// TokenTransferFeeConfig optionally overrides token transfer fees for the remote chain.
+	TokenTransferFeeConfig *TokenTransferFeeConfig
 }
 
 // ConfigureTokenForTransfersInput is the input for the ConfigureTokenForTransfers sequence.
