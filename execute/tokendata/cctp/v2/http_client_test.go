@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -462,5 +464,191 @@ func TestGetMessages_MetricsTracking(t *testing.T) {
 		mockHTTPClient.AssertExpectations(t)
 		mockMetrics.AssertExpectations(t)
 		mockMetrics.AssertNumberOfCalls(t, "TrackAttestationAPILatency", 1)
+	})
+}
+
+func TestParseResponseBody(t *testing.T) {
+	t.Run("Valid: Empty messages array", func(t *testing.T) {
+		jsonData := `{"messages": []}`
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		require.NoError(t, err)
+		assert.Empty(t, result.Messages)
+	})
+
+	t.Run("Valid: Single complete message", func(t *testing.T) {
+		jsonData := `{
+			"messages": [{
+				"message": "0xabcdef1234567890",
+				"eventNonce": "12345",
+				"attestation": "0x9876543210fedcba",
+				"cctpVersion": 2,
+				"status": "complete",
+				"decodedMessage": {
+					"sourceDomain": "0",
+					"destinationDomain": "1",
+					"nonce": "100",
+					"sender": "0x1111111111111111111111111111111111111111",
+					"recipient": "0x2222222222222222222222222222222222222222",
+					"destinationCaller": "0x3333333333333333333333333333333333333333",
+					"messageBody": "0xdeadbeef",
+					"decodedMessageBody": {
+						"burnToken": "0x4444444444444444444444444444444444444444",
+						"mintRecipient": "0x5555555555555555555555555555555555555555",
+						"amount": "1000000",
+						"messageSender": "0x6666666666666666666666666666666666666666"
+					}
+				}
+			}]
+		}`
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		require.NoError(t, err)
+		require.Len(t, result.Messages, 1)
+
+		msg := result.Messages[0]
+		assert.Equal(t, "0xabcdef1234567890", msg.Message)
+		assert.Equal(t, "12345", msg.EventNonce)
+		assert.Equal(t, "0x9876543210fedcba", msg.Attestation)
+		assert.Equal(t, 2, msg.CCTPVersion)
+		assert.Equal(t, "complete", msg.Status)
+		assert.Equal(t, "0", msg.DecodedMessage.SourceDomain)
+		assert.Equal(t, "1000000", msg.DecodedMessage.DecodedMessageBody.Amount)
+	})
+
+	t.Run("Valid: Message with optional fields", func(t *testing.T) {
+		jsonData := `{
+			"messages": [{
+				"message": "0xtest",
+				"eventNonce": "100",
+				"attestation": "0xabc",
+				"status": "complete",
+				"cctpVersion": 2,
+				"decodedMessage": {
+					"sourceDomain": "0",
+					"destinationDomain": "1",
+					"nonce": "50",
+					"sender": "0x1111111111111111111111111111111111111111",
+					"recipient": "0x2222222222222222222222222222222222222222",
+					"destinationCaller": "0x3333333333333333333333333333333333333333",
+					"messageBody": "0xbody",
+					"minFinalityThreshold": "65",
+					"finalityThresholdExecuted": "128",
+					"decodedMessageBody": {
+						"burnToken": "0x4444444444444444444444444444444444444444",
+						"mintRecipient": "0x5555555555555555555555555555555555555555",
+						"amount": "2000000",
+						"messageSender": "0x6666666666666666666666666666666666666666",
+						"maxFee": "10000",
+						"feeExecuted": "5000",
+						"expirationBlock": "1000000",
+						"hookData": "0xhookdata123"
+					}
+				}
+			}]
+		}`
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		require.NoError(t, err)
+		require.Len(t, result.Messages, 1)
+
+		body := result.Messages[0].DecodedMessage.DecodedMessageBody
+		assert.Equal(t, "10000", body.MaxFee)
+		assert.Equal(t, "5000", body.FeeExecuted)
+		assert.Equal(t, "1000000", body.ExpirationBlock)
+		assert.Equal(t, "0xhookdata123", body.HookData)
+	})
+
+	t.Run("Edge: Empty strings for fields", func(t *testing.T) {
+		jsonData := `{
+			"messages": [{
+				"message": "",
+				"eventNonce": "",
+				"attestation": "",
+				"status": "",
+				"cctpVersion": 0
+			}]
+		}`
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		require.NoError(t, err)
+		require.Len(t, result.Messages, 1)
+
+		msg := result.Messages[0]
+		assert.Equal(t, "", msg.Message)
+		assert.Equal(t, "", msg.EventNonce)
+		assert.Equal(t, "", msg.Attestation)
+		assert.Equal(t, "", msg.Status)
+	})
+
+	t.Run("Edge: Very long hex string", func(t *testing.T) {
+		// Create a 10KB+ hex string
+		longHex := "0x" + strings.Repeat("ab", 5000)
+		jsonData := fmt.Sprintf(`{
+			"messages": [{
+				"message": "%s",
+				"eventNonce": "1",
+				"attestation": "0xshort",
+				"status": "complete",
+				"cctpVersion": 2
+			}]
+		}`, longHex)
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		require.NoError(t, err)
+		require.Len(t, result.Messages, 1)
+		assert.Equal(t, longHex, result.Messages[0].Message)
+		assert.Len(t, result.Messages[0].Message, 10002) // "0x" + 10000 chars
+	})
+
+	t.Run("Edge: Extra unknown fields ignored", func(t *testing.T) {
+		jsonData := `{
+			"messages": [{
+				"message": "0xtest",
+				"eventNonce": "1",
+				"attestation": "0xabc",
+				"status": "complete",
+				"cctpVersion": 2,
+				"unknownField1": "should be ignored",
+				"futureFeature": 999
+			}],
+			"extraTopLevel": "also ignored"
+		}`
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		require.NoError(t, err)
+		require.Len(t, result.Messages, 1)
+		assert.Equal(t, "0xtest", result.Messages[0].Message)
+	})
+
+	t.Run("Invalid: Empty JSON object", func(t *testing.T) {
+		jsonData := `{}`
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		require.NoError(t, err)
+		assert.Nil(t, result.Messages) // Messages field not populated, so nil slice
+	})
+
+	t.Run("Invalid: Null messages field", func(t *testing.T) {
+		jsonData := `{"messages": null}`
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		require.NoError(t, err)
+		assert.Nil(t, result.Messages)
+	})
+
+	t.Run("Invalid: Wrong type for messages (string)", func(t *testing.T) {
+		jsonData := `{"messages": "not an array"}`
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode json")
+		assert.Empty(t, result.Messages)
+	})
+
+	t.Run("Invalid: Unclosed JSON", func(t *testing.T) {
+		jsonData := `{"messages": [`
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode json")
+		assert.Empty(t, result.Messages)
+	})
+
+	t.Run("Invalid: Missing messages field", func(t *testing.T) {
+		jsonData := `{"other": [], "data": "test"}`
+		result, err := parseResponseBody(cciptypes.Bytes(jsonData))
+		require.NoError(t, err)
+		assert.Nil(t, result.Messages) // Field not present, so nil
 	})
 }
