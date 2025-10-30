@@ -344,9 +344,9 @@ func TestFastCurse(t *testing.T) {
 }
 
 func TestFastCurseGlobalCurseOnChain(t *testing.T) {
-	chain1 := chainsel.TEST_90000001.Selector
-	chain2 := chainsel.TEST_90000002.Selector
-	chain3 := chainsel.TEST_90000003.Selector
+	chain1 := chainsel.TEST_90000004.Selector
+	chain2 := chainsel.TEST_90000005.Selector
+	chain3 := chainsel.TEST_90000006.Selector
 	env, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chain1, chain2, chain3}),
 	)
