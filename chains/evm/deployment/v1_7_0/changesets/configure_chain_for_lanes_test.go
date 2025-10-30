@@ -88,6 +88,7 @@ func TestConfigureChainForLanes_Apply(t *testing.T) {
 							},
 							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
 							AddressBytesLength:       20,
+							BaseExecutionGasCost:     80_000,
 						},
 					},
 				},

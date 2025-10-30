@@ -61,6 +61,8 @@ type RemoteChainConfig struct {
 	ExecutorDestChainConfig executor.RemoteChainConfig
 	// The length in bytes of addresses on the remote chain
 	AddressBytesLength uint8
+	// The base gas cost to execute a message on the remote chain
+	BaseExecutionGasCost uint32
 }
 
 type ConfigureChainForLanesInput struct {
@@ -108,13 +110,14 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				LaneMandatedCCVs:    remoteConfig.LaneMandatedInboundCCVs,
 			})
 			onRampArgs = append(onRampArgs, onramp.DestChainConfigArgs{
-				Router:             input.Router,
-				AddressBytesLength: remoteConfig.AddressBytesLength,
-				DestChainSelector:  remoteSelector,
-				DefaultCCVs:        remoteConfig.DefaultOutboundCCVs,
-				LaneMandatedCCVs:   remoteConfig.LaneMandatedOutboundCCVs,
-				DefaultExecutor:    remoteConfig.DefaultExecutor,
-				OffRamp:            remoteConfig.CCIPMessageDest,
+				Router:               input.Router,
+				AddressBytesLength:   remoteConfig.AddressBytesLength,
+				BaseExecutionGasCost: remoteConfig.BaseExecutionGasCost,
+				DestChainSelector:    remoteSelector,
+				DefaultCCVs:          remoteConfig.DefaultOutboundCCVs,
+				LaneMandatedCCVs:     remoteConfig.LaneMandatedOutboundCCVs,
+				DefaultExecutor:      remoteConfig.DefaultExecutor,
+				OffRamp:              remoteConfig.CCIPMessageDest,
 			})
 			committeeVerifierDestConfigArgs = append(committeeVerifierDestConfigArgs, committee_verifier.DestChainConfigArgs{
 				Router:             input.Router,

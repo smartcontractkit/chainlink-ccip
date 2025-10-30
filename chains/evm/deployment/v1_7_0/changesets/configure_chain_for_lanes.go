@@ -33,6 +33,7 @@ type RemoteChainConfig struct {
 	CommitteeVerifierDestChainConfig sequences.CommitteeVerifierDestChainConfig
 	FeeQuoterDestChainConfig         fee_quoter.DestChainConfig
 	AddressBytesLength               uint8
+	BaseExecutionGasCost             uint32
 }
 
 type ConfigureChainForLanesCfg struct {
@@ -159,6 +160,7 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 				CommitteeVerifierDestChainConfig: remoteConfig.CommitteeVerifierDestChainConfig,
 				FeeQuoterDestChainConfig:         remoteConfig.FeeQuoterDestChainConfig,
 				AddressBytesLength:               remoteConfig.AddressBytesLength,
+				BaseExecutionGasCost:             remoteConfig.BaseExecutionGasCost,
 			}
 		}
 

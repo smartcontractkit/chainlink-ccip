@@ -108,6 +108,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
 							ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
 							AddressBytesLength:       20,
+							BaseExecutionGasCost:     80_000,
 						},
 					},
 				},
@@ -181,8 +182,6 @@ func TestConfigureChainForLanes(t *testing.T) {
 			gotExecConfig := ExecutorDestChains.Output[0].Config
 			require.Equal(t, remoteChainSelector, ExecutorDestChains.Output[0].DestChainSelector, "Dest chain selector on Executor should match remote chain selector")
 			require.Equal(t, expectedExecConfig.UsdCentsFee, gotExecConfig.UsdCentsFee, "UsdCentsFee in Executor dest chain config should match")
-			require.Equal(t, expectedExecConfig.BaseExecGas, gotExecConfig.BaseExecGas, "BaseExecGas in Executor dest chain config should match")
-			require.Equal(t, expectedExecConfig.DestAddressLengthBytes, gotExecConfig.DestAddressLengthBytes, "DestAddressLengthBytes in Executor dest chain config should match")
 			require.True(t, gotExecConfig.Enabled, "Dest chain selector on Executor should be enabled")
 
 			/////////////////////////////////////////
