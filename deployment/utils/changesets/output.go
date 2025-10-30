@@ -12,7 +12,6 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
