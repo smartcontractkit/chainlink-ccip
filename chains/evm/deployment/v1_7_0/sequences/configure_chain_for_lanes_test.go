@@ -196,7 +196,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 
 			extraArgs, err := msgHasher.EncodeGenericExtraArgsV3(
 				&bind.CallOpts{Context: t.Context()},
-				message_hasher.ClientEVMExtraArgsV3{
+				message_hasher.ClientGenericExtraArgsV3{
 					Ccvs: []message_hasher.ClientCCV{
 						{
 							CcvAddress: committeeVerifier,
