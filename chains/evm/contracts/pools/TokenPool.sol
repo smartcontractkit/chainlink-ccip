@@ -107,6 +107,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     uint64 indexed remoteChainSelector, address token, uint256 amount
   );
   event CustomBlockConfirmationUpdated(uint16 minBlockConfirmation);
+  event FeeTokenWithdrawn(address indexed recipient, address indexed feeToken, uint256 amount);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector.
@@ -1149,17 +1150,33 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     );
   }
 
-  /// @notice Withdraws all accumulated pool fees to the specified recipient.
-  /// @dev For burn/mint pools, this transfers the entire token balance of the pool contract.
-  /// lock/release pools should override this function with their own accounting mechanism.
-  /// @param recipient The address to receive the withdrawn fees.
-  function withdrawFees(
-    address recipient
-  ) external virtual onlyOwner {
-    uint256 amount = getAccumulatedFees();
-    if (amount > 0) {
-      getToken().safeTransfer(recipient, amount);
-      emit PoolFeeWithdrawn(recipient, amount);
+  /// @notice Withdraws accrued pool token fees and outstanding balances of the provided fee tokens.
+  /// @dev Restricted to the owner to align with operational controls around fee management. For burn/mint pools, the
+  /// accumulated pool token fees correspond to this contract's balance and are sent to the supplied `recipient`.
+  /// lock/release pools should override this function with custom accounting for pool token fees.
+  /// All non-pool fee token balances are forwarded to the same `recipient`.
+  /// @param feeTokens The list of fee token addresses to withdraw, including the pool token if applicable.
+  /// @param recipient The address that should receive withdrawn fees.
+  function withdrawFee(address[] calldata feeTokens, address recipient) external onlyOwner {
+    IERC20 poolToken = getToken();
+    for (uint256 i = 0; i < feeTokens.length; ++i) {
+      if (feeTokens[i] == address(poolToken)) {
+        uint256 accumulatedFees = getAccumulatedFees();
+        if (accumulatedFees > 0) {
+          i_token.safeTransfer(recipient, accumulatedFees);
+
+          emit PoolFeeWithdrawn(recipient, accumulatedFees);
+        }
+        continue;
+      }
+      IERC20 feeToken = IERC20(feeTokens[i]);
+      uint256 feeTokenBalance = feeToken.balanceOf(address(this));
+
+      if (feeTokenBalance > 0) {
+        feeToken.safeTransfer(recipient, feeTokenBalance);
+
+        emit FeeTokenWithdrawn(recipient, address(feeToken), feeTokenBalance);
+      }
     }
   }
 
