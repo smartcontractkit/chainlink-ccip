@@ -23,9 +23,13 @@ func main() {
 	if len(os.Args) >= 5 {
 		outDirSuffix = os.Args[4]
 	}
+	var outDirPath string
+	if len(os.Args) >= 6 {
+		outDirPath = os.Args[5]
+	}
 
 	if os.Getenv("ZKSYNC") == "true" {
-		outDir := getOutDir(outDirSuffix, pkgName)
+		outDir := getOutDir(outDirSuffix, pkgName, outDirPath)
 		zksyncBytecodePath := filepath.Join("..", "zkout", className+".sol", className+".json")
 		zksyncBytecode := zksyncwrapper.ReadBytecodeFromForgeJSON(zksyncBytecodePath)
 		outPath := filepath.Join(outDir, pkgName+"_zksync.go")
@@ -36,7 +40,7 @@ func main() {
 		binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
 		buildInfoPath := rootDir + project + "/" + className + "/build/build.json"
 
-		GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgName, outDirSuffix)
+		GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgName, outDirSuffix, outDirPath)
 	}
 }
 
@@ -56,10 +60,10 @@ func main() {
 // <project>/generated/<pkgName>/<pkgName>.go. The suffix will take place after
 // the <project>/generated, so the overridden location would be
 // <project>/generated/<outDirSuffixInput>/<pkgName>/<pkgName>.go.
-func GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgName, outDirSuffixInput string) {
+func GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgName, outDirSuffixInput, outDirPath string) {
 	fmt.Println("Generating", pkgName, "contract wrapper")
 
-	outDir := getOutDir(outDirSuffixInput, pkgName)
+	outDir := getOutDir(outDirSuffixInput, pkgName, outDirPath)
 	outPath := filepath.Join(outDir, pkgName+".go")
 	metadataOutPath := filepath.Join(outDir, pkgName+"_metadata.go")
 
@@ -90,12 +94,17 @@ func GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgNam
 	}
 }
 
-func getOutDir(outDirSuffixInput, pkgName string) string {
+func getOutDir(outDirSuffixInput, pkgName, outDirPath string) string {
 	cwd, err := os.Getwd() // gethwrappers directory
 	if err != nil {
 		gethwrappers.Exit("could not get working directory", err)
 	}
-	outDir := filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
+	var outDir string
+	if outDirPath == "" {
+		outDir = filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
+	} else {
+		outDir = filepath.Join(outDirPath, "generated", outDirSuffixInput, pkgName)
+	}
 	if mkdErr := os.MkdirAll(outDir, 0700); err != nil {
 		gethwrappers.Exit(
 			fmt.Sprintf("failed to create wrapper dir, outDirSuffixInput: %s (could be empty)", outDirSuffixInput),
