@@ -21,6 +21,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+const (
+	testTxHash = "0x1234567890123456789012345678901234567890123456789012345678901234"
+)
+
 // MockHTTPClient is a mock implementation of httputil.HTTPClient
 type MockHTTPClient struct {
 	mock.Mock
@@ -31,7 +35,9 @@ func (m *MockHTTPClient) Get(ctx context.Context, path string) (cciptypes.Bytes,
 	return args.Get(0).(cciptypes.Bytes), args.Get(1).(httputil.HTTPStatus), args.Error(2)
 }
 
-func (m *MockHTTPClient) Post(ctx context.Context, path string, requestData cciptypes.Bytes) (cciptypes.Bytes, httputil.HTTPStatus, error) {
+func (m *MockHTTPClient) Post(
+	ctx context.Context, path string, requestData cciptypes.Bytes,
+) (cciptypes.Bytes, httputil.HTTPStatus, error) {
 	args := m.Called(ctx, path, requestData)
 	return args.Get(0).(cciptypes.Bytes), args.Get(1).(httputil.HTTPStatus), args.Error(2)
 }
@@ -100,7 +106,7 @@ func TestGetMessages_Success(t *testing.T) {
 	ctx := context.Background()
 	sourceChain := cciptypes.ChainSelector(1)
 	sourceDomainID := uint32(0)
-	txHash := "0x1234567890123456789012345678901234567890123456789012345678901234"
+	txHash := testTxHash
 
 	// Create response
 	responseData := CCTPv2Messages{
@@ -212,7 +218,7 @@ func TestGetMessages_HTTPError(t *testing.T) {
 	ctx := context.Background()
 	sourceChain := cciptypes.ChainSelector(1)
 	sourceDomainID := uint32(0)
-	txHash := "0x1234567890123456789012345678901234567890123456789012345678901234"
+	txHash := testTxHash
 
 	// Setup mocks
 	httpErr := errors.New("connection timeout")
@@ -251,7 +257,7 @@ func TestGetMessages_NonOKStatus(t *testing.T) {
 	ctx := context.Background()
 	sourceChain := cciptypes.ChainSelector(1)
 	sourceDomainID := uint32(0)
-	txHash := "0x1234567890123456789012345678901234567890123456789012345678901234"
+	txHash := testTxHash
 
 	testCases := []struct {
 		name       string
@@ -302,7 +308,7 @@ func TestGetMessages_ParseError(t *testing.T) {
 	ctx := context.Background()
 	sourceChain := cciptypes.ChainSelector(1)
 	sourceDomainID := uint32(0)
-	txHash := "0x1234567890123456789012345678901234567890123456789012345678901234"
+	txHash := testTxHash
 
 	// Setup mocks with invalid JSON
 	invalidJSON := cciptypes.Bytes(`{invalid json}`)
@@ -340,7 +346,7 @@ func TestGetMessages_URLEncoding(t *testing.T) {
 	ctx := context.Background()
 	sourceChain := cciptypes.ChainSelector(1)
 	sourceDomainID := uint32(0)
-	txHash := "0x1234567890123456789012345678901234567890123456789012345678901234"
+	txHash := testTxHash
 
 	responseData := CCTPv2Messages{Messages: []CCTPv2Message{}}
 	responseJSON, _ := json.Marshal(responseData)
@@ -376,7 +382,7 @@ func TestGetMessages_MetricsTracking(t *testing.T) {
 	ctx := context.Background()
 	sourceChain := cciptypes.ChainSelector(1)
 	sourceDomainID := uint32(0)
-	txHash := "0x1234567890123456789012345678901234567890123456789012345678901234"
+	txHash := testTxHash
 
 	t.Run("Success path tracks success metrics", func(t *testing.T) {
 		mockHTTPClient := &MockHTTPClient{}
