@@ -13,13 +13,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	rmnsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -73,13 +73,13 @@ func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint
 	if !ok {
 		return false, fmt.Errorf("no EVM chain found for selector %d", selector)
 	}
-
-	isCursedRep, err := cldf_ops.ExecuteOperation(e.OperationsBundle, ops.IsCursed, chain, contract.FunctionInput[api.Subject]{
-		ChainSelector: chain.Selector,
-		Address:       rmnAddr,
-		Args:          subject,
-	})
-	return isCursedRep.Output, err
+	rmnC, err := rmn_remote.NewRMNRemote(rmnAddr, chain.Client)
+	if err != nil {
+		return false, fmt.Errorf("failed to instantiate RMNRemote contract at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
+	}
+	return rmnC.IsCursed(&bind.CallOpts{
+		Context: e.GetContext(),
+	}, subject)
 }
 
 func (ca *CurseAdapter) IsChainConnectedToTargetChain(e cldf.Environment, selector uint64, targetSel uint64) (bool, error) {
@@ -92,12 +92,13 @@ func (ca *CurseAdapter) IsChainConnectedToTargetChain(e cldf.Environment, select
 	if !ok {
 		return false, fmt.Errorf("no EVM chain found for selector %d", selector)
 	}
-	isChainSupportedRep, err := cldf_ops.ExecuteOperation(e.OperationsBundle, routerops.IsChainSupported, chain, contract.FunctionInput[uint64]{
-		ChainSelector: chain.Selector,
-		Address:       routerAddr,
-		Args:          targetSel,
-	})
-	return isChainSupportedRep.Output, err
+	routerC, err := router.NewRouter(routerAddr, chain.Client)
+	if err != nil {
+		return false, fmt.Errorf("failed to instantiate router contract at %s on chain %d: %w", routerAddr.String(), chain.Selector, err)
+	}
+	return routerC.IsChainSupported(&bind.CallOpts{
+		Context: e.GetContext(),
+	}, targetSel)
 }
 
 func (ca *CurseAdapter) IsCurseEnabledForChain(e cldf.Environment, selector uint64) (bool, error) {

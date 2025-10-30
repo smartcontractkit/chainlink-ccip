@@ -47,6 +47,8 @@ type CurseAdapter interface {
 type CurseSubjectAdapter interface {
 	// SelectorToSubject converts a chain selector to a Subject
 	SelectorToSubject(selector uint64) Subject
+	// DeriveCurseAdapterVersion derives the curse adapter version to be used to curse the subject on a chain
+	// For example, for EVM chains, this could derive the RMN version deployed on the chain with selector `selector`
 	DeriveCurseAdapterVersion(e cldf.Environment, selector uint64) (*semver.Version, error)
 }
 
