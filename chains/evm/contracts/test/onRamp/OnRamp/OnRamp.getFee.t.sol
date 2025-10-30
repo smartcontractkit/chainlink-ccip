@@ -49,7 +49,7 @@ contract OnRamp_getFee is OnRampSetup {
     // When no CCVs are provided in V3 extra args, default CCVs should be used.
 
     Client.CCV[] memory ccvs = new Client.CCV[](0);
-    Client.EVMExtraArgsV3 memory extraArgsV3 = _createV3ExtraArgs(ccvs);
+    Client.GenericExtraArgsV3 memory extraArgsV3 = _createV3ExtraArgs(ccvs);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgsV3));
@@ -120,7 +120,7 @@ contract OnRamp_getFee is OnRampSetup {
     Client.CCV[] memory ccvs = new Client.CCV[](1);
     ccvs[0] = Client.CCV({ccvAddress: verifier, args: ""});
 
-    Client.EVMExtraArgsV3 memory extraArgsV3 = Client.EVMExtraArgsV3({
+    Client.GenericExtraArgsV3 memory extraArgsV3 = Client.GenericExtraArgsV3({
       ccvs: ccvs,
       finalityConfig: 12,
       gasLimit: GAS_LIMIT,

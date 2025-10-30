@@ -13,7 +13,7 @@ contract OnRampTestHelper is OnRamp {
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) external view returns (Client.EVMExtraArgsV3 memory) {
+  ) external view returns (Client.GenericExtraArgsV3 memory) {
     return _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, extraArgs);
   }
 

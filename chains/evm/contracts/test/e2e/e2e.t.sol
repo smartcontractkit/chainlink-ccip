@@ -90,7 +90,7 @@ contract e2e is OnRampSetup {
       tokenAmounts: new Client.EVMTokenAmount[](1),
       feeToken: s_sourceFeeToken,
       extraArgs: Client._argsToBytes(
-        Client.EVMExtraArgsV3({
+        Client.GenericExtraArgsV3({
           ccvs: userCCVs,
           finalityConfig: 0,
           gasLimit: GAS_LIMIT,

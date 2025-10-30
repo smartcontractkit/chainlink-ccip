@@ -131,7 +131,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage calldata message,
     address[] calldata defaultCCVs
   ) external view returns (OnRamp.Receipt[] memory verifierReceipts, uint32 gasLimit) {
-    Client.EVMExtraArgsV3 memory extraArgsV3 = abi.decode(message.extraArgs[4:], (Client.EVMExtraArgsV3));
+    Client.GenericExtraArgsV3 memory extraArgsV3 = abi.decode(message.extraArgs[4:], (Client.GenericExtraArgsV3));
     uint256 userDefinedCCVCount = extraArgsV3.ccvs.length;
 
     // Leave space for a token (if present) and the executor receipt.
@@ -226,8 +226,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   // Helper function to create EVMExtraArgsV3 struct
   function _createV3ExtraArgs(
     Client.CCV[] memory ccvs
-  ) internal pure returns (Client.EVMExtraArgsV3 memory) {
-    return Client.EVMExtraArgsV3({
+  ) internal pure returns (Client.GenericExtraArgsV3 memory) {
+    return Client.GenericExtraArgsV3({
       ccvs: ccvs,
       finalityConfig: 12,
       gasLimit: GAS_LIMIT,

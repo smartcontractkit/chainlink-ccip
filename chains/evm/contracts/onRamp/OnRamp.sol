@@ -64,6 +64,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     bytes[] verifierBlobs
   );
 
+  /// @dev A helper struct that holds data for the CCIPMessageSent event to avoid stack too deep errors.
   struct CCIPMessageSentEventData {
     bytes encodedMessage;
     Receipt[] receipts;
@@ -121,7 +122,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destGasLimit; //       │ The gas limit for the actions taken on the destination chain for this entity.
     uint32 destBytesOverhead; // ─╯ The byte overhead for the actions taken on the destination chain for this entity.
     uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
-    bytes extraArgs; // Extra args that have been passed in on the source chain.
+    bytes extraArgs; // Extra args that have been passed in on the source chain. May be empty.
   }
 
   // STATIC CONFIG
@@ -190,7 +191,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 1. parse extraArgs.
 
-    Client.EVMExtraArgsV3 memory resolvedExtraArgs =
+    Client.GenericExtraArgsV3 memory resolvedExtraArgs =
       _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
 
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
@@ -380,9 +381,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) internal view returns (Client.EVMExtraArgsV3 memory resolvedArgs) {
+  ) internal view returns (Client.GenericExtraArgsV3 memory resolvedArgs) {
     if (extraArgs.length >= 4 && bytes4(extraArgs[0:4]) == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
-      resolvedArgs = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV3));
+      resolvedArgs = abi.decode(extraArgs[4:], (Client.GenericExtraArgsV3));
 
       // We need to ensure no duplicate CCVs are present in the ccv list.
       uint256 length = resolvedArgs.ccvs.length;
@@ -657,7 +658,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       revert DestinationChainNotSupported(destChainSelector);
     }
 
-    Client.EVMExtraArgsV3 memory resolvedExtraArgs =
+    Client.GenericExtraArgsV3 memory resolvedExtraArgs =
       _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
     // Update the CCVs list to include lane mandated and pool required CCVs.
     address[] memory poolRequiredCCVs = new address[](0);
@@ -694,7 +695,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function _getReceipts(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
-    Client.EVMExtraArgsV3 memory extraArgs
+    Client.GenericExtraArgsV3 memory extraArgs
   ) internal view returns (Receipt[] memory verifierReceipts) {
     // Already ensure there's room for the token transfer and executor receipts.
     verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
