@@ -41,6 +41,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
       router: s_sourceRouter,
       sequenceNumber: 0,
       addressBytesLength: EVM_ADDRESS_LENGTH,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultExecutor: s_defaultExecutor,
       laneMandatedCCVs: s_laneMandatedCCVs,
       defaultCCVs: s_defaultCCVs,

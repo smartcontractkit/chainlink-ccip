@@ -94,6 +94,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
     uint64 sequenceNumber; //      │
     uint8 addressBytesLength; // ──╯ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+    uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address defaultExecutor; // Default executor to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
@@ -107,6 +108,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector; // Destination chain selector.
     IRouter router; // ────────────╮ Source router address  that is allowed to send messages to the destination chain.
     uint8 addressBytesLength; // ──╯ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+    uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address defaultExecutor;
@@ -475,7 +477,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
       if (
         destChainSelector == 0 || destChainSelector == i_localChainSelector
-          || destChainConfigArg.addressBytesLength == 0
+          || destChainConfigArg.addressBytesLength == 0 || destChainConfigArg.baseExecutionGasCost == 0
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }
@@ -489,6 +491,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // The router can be zero to pause the destination chain.
       destChainConfig.router = destChainConfigArg.router;
       destChainConfig.addressBytesLength = destChainConfigArg.addressBytesLength;
+      destChainConfig.baseExecutionGasCost = destChainConfigArg.baseExecutionGasCost;
       destChainConfig.defaultCCVs = destChainConfigArg.defaultCCVs;
       destChainConfig.laneMandatedCCVs = destChainConfigArg.laneMandatedCCVs;
       // Require a default executor so messages that rely on older/defaulted args still resolve to a concrete
@@ -716,21 +719,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       });
     }
 
-    (uint16 usdCentsFee, uint64 execGasCost, uint32 execBytes) = IExecutor(extraArgs.executor).getFee(
-      destChainSelector,
-      extraArgs.finalityConfig,
-      uint32(message.data.length),
-      uint8(message.tokenAmounts.length),
-      extraArgs.ccvs,
-      extraArgs.executorArgs
-    );
-    verifierReceipts[verifierReceipts.length - 1] = Receipt({
-      issuer: extraArgs.executor,
-      destGasLimit: execGasCost + extraArgs.gasLimit,
-      destBytesOverhead: execBytes,
-      feeTokenAmount: usdCentsFee,
-      extraArgs: extraArgs.executorArgs
-    });
+    verifierReceipts[verifierReceipts.length - 1] =
+      _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
 
     if (message.tokenAmounts.length > 0) {
       // TODO pool fees
@@ -744,6 +734,43 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     return verifierReceipts;
+  }
+
+  /// @notice Gets the execution fee receipt. Takes into account specifying the NO_EXECUTION_ADDRESS.
+  /// @param destChainSelector The destination chain selector.
+  /// @param dataLength The length of the message data.
+  /// @param numberOfTokens The number of tokens being transferred.
+  /// @param extraArgs The extra arguments for the message.
+  /// @return receipt The execution fee receipt.
+  function _getExecutionFee(
+    uint64 destChainSelector,
+    uint256 dataLength,
+    uint256 numberOfTokens,
+    Client.GenericExtraArgsV3 memory extraArgs
+  ) internal view returns (Receipt memory) {
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    uint8 remoteChainAddressLengthBytes = destChainConfig.addressBytesLength;
+
+    // Even if no automated execution is requested, we still need to fill out the receipt for proper accounting.
+    // The gas limit and byte overhead are still relevant for estimating total message cost.
+    return Receipt({
+      issuer: extraArgs.executor,
+      destGasLimit: destChainConfig.baseExecutionGasCost + extraArgs.gasLimit,
+      // Since the message payload is the same on source and destination chains with the V1 codec, we can use the
+      // same calculation for execBytes on destination.
+      destBytesOverhead: uint32(
+        MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + extraArgs.executorArgs.length
+          + (MessageV1Codec.MESSAGE_V1_REMOTE_CHAIN_ADDRESSES * remoteChainAddressLengthBytes)
+          + (numberOfTokens * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + remoteChainAddressLengthBytes))
+      ),
+      // Only bill a flat fee when automated execution is enabled.
+      feeTokenAmount: extraArgs.executor == Client.NO_EXECUTION_ADDRESS
+        ? 0
+        : IExecutor(extraArgs.executor).getFee(
+          destChainSelector, extraArgs.finalityConfig, extraArgs.ccvs, extraArgs.executorArgs
+        ),
+      extraArgs: extraArgs.executorArgs
+    });
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.

@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IExecutor} from "../interfaces/IExecutor.sol";
 
 import {Client} from "../libraries/Client.sol";
-import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -33,10 +32,8 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   event ConfigSet(DynamicConfig dynamicConfig);
 
   struct RemoteChainConfig {
-    uint16 usdCentsFee; // ──────────╮ The fee charged by the executor for processing messages to this chain, USD cents.
-    uint32 baseExecGas; //           │ The base gas cost to execute messages, excluding pool/CCV/receiver gas.
-    uint8 destAddressLengthBytes; // │ The length of addresses on the destination chain, in bytes.
-    bool enabled; // ────────────────╯ Whether or not this destination chain is enabled.
+    uint16 usdCentsFee; // ─╮ The fee charged by the executor for processing messages to this chain, USD cents.
+    bool enabled; // ───────╯ Whether or not this destination chain is enabled.
   }
 
   struct RemoteChainConfigArgs {
@@ -62,7 +59,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   /// @notice The set of destination chains that the executor supports.
   EnumerableSet.UintSet internal s_allowedDestChains;
   /// @notice The remote chain configurations for supported destination chains.
-  mapping(uint64 => RemoteChainConfig) internal s_remoteChainConfigs;
+  mapping(uint64 remoteChainSelector => RemoteChainConfig) internal s_remoteChainConfigs;
 
   constructor(uint8 maxCCVsPerMsg, DynamicConfig memory dynamicConfig) {
     if (maxCCVsPerMsg == 0) {
@@ -198,20 +195,14 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   /// @notice Validates whether or not the executor can process the message and returns the fee required to do so.
   /// @param destChainSelector The destination chain selector.
   /// @param requestedBlockDepth The requested block depth for the message. `0` indicates waiting for finality.
-  /// @param dataLength The length of the message data in bytes.
-  /// @param numberOfTokens The number of tokens being transferred in the message.
   /// @param ccvs The CCVs that are requested on source.
   /// @return usdCentsFee The USD denominated fee for the executor.
-  /// @return execGasCost The gas required to execute the message on destination, excluding pool/CCV/receiver gas.
-  /// @return execBytes The byte overhead required to execute the message on destination, excluding pool/CCV bytes.
   function getFee(
     uint64 destChainSelector,
     uint16 requestedBlockDepth,
-    uint32 dataLength,
-    uint8 numberOfTokens,
     Client.CCV[] calldata ccvs,
-    bytes calldata extraArgs
-  ) external view virtual returns (uint16 usdCentsFee, uint32 execGasCost, uint32 execBytes) {
+    bytes calldata // extraArgs
+  ) external view virtual returns (uint16 usdCentsFee) {
     RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[destChainSelector];
     if (!remoteChainConfig.enabled) {
       revert InvalidDestChain(destChainSelector);
@@ -233,20 +224,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
       revert ExceedsMaxCCVs(ccvs.length, i_maxCCVsPerMsg);
     }
 
-    // Since the message payload is the same on source and destination chains with the V1 codec, we can use the
-    // same calculation for execBytes on destination.
-    execBytes = uint32(
-      MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + extraArgs.length
-        + (MessageV1Codec.MESSAGE_V1_REMOTE_CHAIN_ADDRESSES * remoteChainConfig.destAddressLengthBytes)
-        + (
-          numberOfTokens
-            * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + remoteChainConfig.destAddressLengthBytes)
-        )
-    );
-
-    execGasCost += remoteChainConfig.baseExecGas;
-
-    return (remoteChainConfig.usdCentsFee, execGasCost, execBytes);
+    return remoteChainConfig.usdCentsFee;
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.

@@ -25,6 +25,11 @@ library Client {
     bytes extraArgs; // Populate this with _argsToBytes(EVMExtraArgsV3).
   }
 
+  /// @notice Tag to indicate no execution on the destination chain. Execution will need to be done manually.
+  /// @dev Preimage for this tag is: keccak256("NO_EXECUTION_TAG")[:4]
+  bytes4 public constant NO_EXECUTION_TAG = 0xeba517d2;
+  address public constant NO_EXECUTION_ADDRESS = address(bytes20(NO_EXECUTION_TAG));
+
   bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
 
   /// @notice The GenericExtraArgsV3 struct is used to pass extra arguments for all destination chain families. There

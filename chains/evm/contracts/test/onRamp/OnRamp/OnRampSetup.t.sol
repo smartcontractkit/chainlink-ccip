@@ -48,6 +48,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
       defaultExecutor: s_defaultExecutor,
@@ -112,8 +113,10 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     receipts[receipts.length - 1] = OnRamp.Receipt({
       issuer: destChainConfig.defaultExecutor,
       feeTokenAmount: 0, // Matches current OnRamp event behavior
-      destGasLimit: GAS_LIMIT,
-      destBytesOverhead: 0,
+      destGasLimit: destChainConfig.baseExecutionGasCost + GAS_LIMIT,
+      destBytesOverhead: _calculateDestBytesOverhead(
+        uint32(message.data.length), destChainConfig.addressBytesLength, uint32(message.tokenAmounts.length), 0
+      ),
       // TODO when v3 extra args are passed in
       extraArgs: bytes("")
     });
@@ -123,6 +126,19 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       MessageV1Codec._encodeMessageV1(messageV1),
       receipts,
       new bytes[](receipts.length - message.tokenAmounts.length - 1)
+    );
+  }
+
+  function _calculateDestBytesOverhead(
+    uint32 dataLength,
+    uint32 remoteChainAddressLengthBytes,
+    uint32 numberOfTokens,
+    uint256 executorArgsLength
+  ) internal pure returns (uint32) {
+    return uint32(
+      MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + executorArgsLength
+        + (MessageV1Codec.MESSAGE_V1_REMOTE_CHAIN_ADDRESSES * remoteChainAddressLengthBytes)
+        + (numberOfTokens * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + remoteChainAddressLengthBytes))
     );
   }
 
