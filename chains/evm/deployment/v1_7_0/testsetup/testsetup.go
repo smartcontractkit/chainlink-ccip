@@ -7,15 +7,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 // CreateBasicFeeQuoterDestChainConfig creates a basic fee quoter dest chain config with reasonable defaults for testing
-func CreateBasicFeeQuoterDestChainConfig() fee_quoter.DestChainConfig {
-	return fee_quoter.DestChainConfig{
+func CreateBasicFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfig {
+	return adapters.FeeQuoterDestChainConfig{
 		IsEnabled:                   true,
 		MaxDataBytes:                30_000,
 		MaxPerMsgGasLimit:           3_000_000,
@@ -29,9 +29,9 @@ func CreateBasicFeeQuoterDestChainConfig() fee_quoter.DestChainConfig {
 	}
 }
 
-func CreateBasicExecutorDestChainConfig() executor.RemoteChainConfig {
-	return executor.RemoteChainConfig{
-		UsdCentsFee:            50,
+func CreateBasicExecutorDestChainConfig() adapters.ExecutorDestChainConfig {
+	return adapters.ExecutorDestChainConfig{
+		USDCentsFee:            50,
 		BaseExecGas:            100_000,
 		DestAddressLengthBytes: 20,
 		Enabled:                true,
