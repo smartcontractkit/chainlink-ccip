@@ -104,6 +104,14 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 							Rate:      big.NewInt(70),
 						},
 					},
+					TokenTransferFeeConfig: &tokens_core.TokenTransferFeeConfig{
+						DestGasOverhead:                        321,
+						DestBytesOverhead:                      654,
+						DefaultBlockConfirmationFeeUSDCents:    777,
+						CustomBlockConfirmationFeeUSDCents:     888,
+						DefaultBlockConfirmationTransferFeeBps: 123,
+						CustomBlockConfirmationTransferFeeBps:  234,
+					},
 				},
 				remoteChainSel2: {
 					RemoteToken: common.LeftPadBytes(common.FromHex("0x321"), 32),
@@ -164,9 +172,23 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		// Verify configuration for first remote chain
 		checkRemoteChainConfiguration(t, tp, remoteChainSel1, input.RemoteChains[remoteChainSel1])
+		assertTokenTransferFeeConfig(
+			t,
+			tp,
+			common.HexToAddress(tokenAddress),
+			remoteChainSel1,
+			input.RemoteChains[remoteChainSel1].TokenTransferFeeConfig,
+		)
 
 		// Verify configuration for second remote chain
 		checkRemoteChainConfiguration(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2])
+		assertTokenTransferFeeConfig(
+			t,
+			tp,
+			common.HexToAddress(tokenAddress),
+			remoteChainSel2,
+			input.RemoteChains[remoteChainSel2].TokenTransferFeeConfig,
+		)
 
 		minBlockConfirmation, err := tp.GetMinBlockConfirmation(nil)
 		require.NoError(t, err, "Failed to get configured min block confirmation")
@@ -301,6 +323,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		require.Equal(t, uint16(0), minBlockConfirmation, "Min block confirmation should remain default")
 		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel, input.RemoteChains[remoteChainSel].CustomBlockConfirmationConfig)
 	})
+
 }
 
 // checkRemoteChainConfiguration verifies the configuration for a remote chain on the token pool
@@ -343,6 +366,32 @@ func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remo
 	for _, ccv := range config.OutboundCCVs {
 		require.Contains(t, outboundCCVs, common.HexToAddress(ccv), "Outbound CCV should be in the list of required outbound CCVs")
 	}
+}
+
+func assertTokenTransferFeeConfig(
+	t *testing.T,
+	tp *tp_bindings.TokenPool,
+	localToken common.Address,
+	destChainSelector uint64,
+	expected *tokens_core.TokenTransferFeeConfig,
+) {
+	config, err := tp.GetTokenTransferFeeConfig(nil, localToken, destChainSelector, tp_bindings.ClientEVM2AnyMessage{}, 0, nil)
+	require.NoError(t, err, "Failed to get token transfer fee config")
+	if expected == nil {
+		require.Zero(t, config.DestGasOverhead, "Dest gas overhead should be zero when no override is configured")
+		require.Zero(t, config.DestBytesOverhead, "Dest bytes overhead should be zero when no override is configured")
+		require.Zero(t, config.DefaultBlockConfirmationFeeUSDCents, "Default fee cents should be zero when no override is configured")
+		require.Zero(t, config.CustomBlockConfirmationFeeUSDCents, "Custom fee cents should be zero when no override is configured")
+		require.Zero(t, config.DefaultBlockConfirmationTransferFeeBps, "Default transfer fee bps should be zero when no override is configured")
+		require.Zero(t, config.CustomBlockConfirmationTransferFeeBps, "Custom transfer fee bps should be zero when no override is configured")
+		return
+	}
+	require.Equal(t, expected.DestGasOverhead, config.DestGasOverhead, "Dest gas overhead mismatch")
+	require.Equal(t, expected.DestBytesOverhead, config.DestBytesOverhead, "Dest bytes overhead mismatch")
+	require.Equal(t, expected.DefaultBlockConfirmationFeeUSDCents, config.DefaultBlockConfirmationFeeUSDCents, "Default fee cents mismatch")
+	require.Equal(t, expected.CustomBlockConfirmationFeeUSDCents, config.CustomBlockConfirmationFeeUSDCents, "Custom fee cents mismatch")
+	require.Equal(t, expected.DefaultBlockConfirmationTransferFeeBps, config.DefaultBlockConfirmationTransferFeeBps, "Default transfer fee bps mismatch")
+	require.Equal(t, expected.CustomBlockConfirmationTransferFeeBps, config.CustomBlockConfirmationTransferFeeBps, "Custom transfer fee bps mismatch")
 }
 
 func assertCustomBlockConfirmationBucket(
