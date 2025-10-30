@@ -60,7 +60,16 @@ func main() {
 // <project>/generated/<pkgName>/<pkgName>.go. The suffix will take place after
 // the <project>/generated, so the overridden location would be
 // <project>/generated/<outDirSuffixInput>/<pkgName>/<pkgName>.go.
-func GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgName, outDirSuffixInput, outDirPath string) {
+func GenWrapper(
+	abiPath,
+	binPath,
+	buildInfoPath,
+	metadataPath,
+	className,
+	pkgName,
+	outDirSuffixInput,
+	outDirPath string,
+) {
 	fmt.Println("Generating", pkgName, "contract wrapper")
 
 	outDir := getOutDir(outDirSuffixInput, pkgName, outDirPath)
