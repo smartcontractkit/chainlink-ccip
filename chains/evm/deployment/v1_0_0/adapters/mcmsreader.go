@@ -49,6 +49,7 @@ func (r *EVMMCMSReader) GetChainMetadata(e deployment.Environment, chainSelector
 func (r *EVMMCMSReader) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error) {
 	timelockRef := datastore_utils.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		utils.RBACTimelock,
 		Version,
 		input.Qualifier,
@@ -72,6 +73,7 @@ func (r *EVMMCMSReader) GetMCMSRef(e deployment.Environment, chainSelector uint6
 	}
 	mcmAddress := datastore_utils.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		deployment.ContractType(addrType),
 		Version,
 		input.Qualifier,

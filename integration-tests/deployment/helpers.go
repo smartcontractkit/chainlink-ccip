@@ -64,13 +64,16 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 	chain := e.BlockChains.SolanaChains()[selector]
 	timelockSigner := utils.GetTimelockSignerPDA(
 		e.DataStore.Addresses().Filter(),
+		chain.Selector,
 		common_utils.CLLQualifier)
 	mcmSigner := utils.GetMCMSignerPDA(
 		e.DataStore.Addresses().Filter(),
+		chain.Selector,
 		common_utils.CLLQualifier,
 	)
 	timelockCompositeAddress := utils.GetTimelockCompositeAddress(
 		e.DataStore.Addresses().Filter(),
+		chain.Selector,
 		common_utils.CLLQualifier)
 	err := utils.FundSolanaAccounts(
 		context.Background(),
@@ -153,6 +156,7 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 	// router verify
 	program := datastore_utils.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chain.Selector,
 		routerops.ContractType,
 		common_utils.Version_1_6_0,
 		"",
@@ -161,6 +165,7 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 	// offramp verify
 	program = datastore_utils.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chain.Selector,
 		offrampops.ContractType,
 		common_utils.Version_1_6_0,
 		"",
@@ -169,6 +174,7 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 	// fee quoter verify
 	program = datastore_utils.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chain.Selector,
 		fqops.ContractType,
 		common_utils.Version_1_6_0,
 		"",
@@ -177,6 +183,7 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 	// rmn remote verify
 	program = datastore_utils.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chain.Selector,
 		rmnremoteops.ContractType,
 		common_utils.Version_1_6_0,
 		"",

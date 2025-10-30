@@ -33,12 +33,14 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	}
 	mcmAddress := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		utils.McmProgramType,
 		common_utils.Version_1_6_0,
 		"",
 	)
 	proposerSeed := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		common_utils.ProposerManyChainMultisig,
 		common_utils.Version_1_6_0,
 		input.Qualifier,
@@ -58,6 +60,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	case mcms_types.TimelockActionSchedule:
 		ref := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
+			chainSelector,
 			common_utils.ProposerManyChainMultisig,
 			common_utils.Version_1_6_0,
 			input.Qualifier,
@@ -66,6 +69,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	case mcms_types.TimelockActionCancel:
 		ref := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
+			chainSelector,
 			common_utils.CancellerManyChainMultisig,
 			common_utils.Version_1_6_0,
 			input.Qualifier,
@@ -74,6 +78,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	case mcms_types.TimelockActionBypass:
 		ref := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
+			chainSelector,
 			common_utils.BypasserManyChainMultisig,
 			common_utils.Version_1_6_0,
 			input.Qualifier,
@@ -84,18 +89,21 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	}
 	proposerAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		mcmsops.ProposerAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		input.Qualifier,
 	)
 	cancellerAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		mcmsops.CancellerAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		input.Qualifier,
 	)
 	bypasserAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		mcmsops.BypasserAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		input.Qualifier,
@@ -116,6 +124,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 func (a *SolanaAdapter) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (cldf_datastore.AddressRef, error) {
 	timelockRef := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		utils.TimelockCompositeAddress,
 		common_utils.Version_1_6_0,
 		input.Qualifier,
@@ -126,6 +135,7 @@ func (a *SolanaAdapter) GetTimelockRef(e deployment.Environment, chainSelector u
 func (a *SolanaAdapter) GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (cldf_datastore.AddressRef, error) {
 	mcmAddress := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		utils.McmProgramType,
 		common_utils.Version_1_6_0,
 		input.Qualifier,

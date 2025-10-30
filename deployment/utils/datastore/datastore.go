@@ -74,19 +74,16 @@ func FullRef(ref datastore.AddressRef) (datastore.AddressRef, error) {
 
 func GetAddressRef(
 	input []datastore.AddressRef,
+	selector uint64,
 	contractType cldf.ContractType,
 	contractVersion *semver.Version,
 	contractQualifier string) datastore.AddressRef {
 	for _, ref := range input {
-		if ref.Type == datastore.ContractType(contractType) &&
-			ref.Version.Equal(contractVersion) {
-			if contractQualifier != "" {
-				if ref.Qualifier == contractQualifier {
-					return ref
-				}
-			} else {
-				return ref
-			}
+		if ref.ChainSelector == selector &&
+			ref.Type == datastore.ContractType(contractType) &&
+			ref.Version.Equal(contractVersion) &&
+			ref.Qualifier == contractQualifier {
+			return ref
 		}
 	}
 	return datastore.AddressRef{}

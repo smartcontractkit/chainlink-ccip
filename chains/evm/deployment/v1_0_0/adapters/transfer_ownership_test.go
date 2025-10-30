@@ -135,16 +135,18 @@ func TestTransferOwnership(t *testing.T) {
 	newTimelockAddrs := make(map[uint64]string)
 	for _, sel := range []uint64{selector1, selector2} {
 		timelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-			Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-			Qualifier: "test",
-			Version:   semver.MustParse("1.0.0"),
+			ChainSelector: sel,
+			Type:          datastore.ContractType(deploymentutils.RBACTimelock),
+			Qualifier:     "test",
+			Version:       semver.MustParse("1.0.0"),
 		}, sel, datastore_utils.FullRef)
 		require.NoError(t, err)
 		timelockAddrs[sel] = timelockRef.Address
 		newTimelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-			Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-			Qualifier: "test1",
-			Version:   semver.MustParse("1.0.0"),
+			ChainSelector: sel,
+			Type:          datastore.ContractType(deploymentutils.RBACTimelock),
+			Qualifier:     "test1",
+			Version:       semver.MustParse("1.0.0"),
 		}, sel, datastore_utils.FullRef)
 		require.NoError(t, err)
 		newTimelockAddrs[sel] = newTimelockRef.Address
