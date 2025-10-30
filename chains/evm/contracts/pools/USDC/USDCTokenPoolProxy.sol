@@ -146,7 +146,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1, ITypeAndVersion {
   function supportsInterface(
     bytes4 interfaceId
   ) public pure override returns (bool) {
-    return interfaceId == type(IPoolV1).interfaceId || interfaceId == type(IERC165).interfaceId;
+    return interfaceId == type(IPoolV1).interfaceId || interfaceId == Pool.CCIP_POOL_V1
+      || interfaceId == type(IERC165).interfaceId;
   }
 
   /// @inheritdoc IPoolV1
