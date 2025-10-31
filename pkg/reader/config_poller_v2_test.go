@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"errors"
+	"maps"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -314,9 +315,7 @@ func TestConfigPollerV2_BatchRefreshChainAndSourceConfigs_Error(t *testing.T) {
 	cache.sourceChainMu.RLock()
 	initialSourceRefreshTime := cache.sourceChainRefresh
 	initialSourceConfigData := make(map[cciptypes.ChainSelector]StaticSourceChainConfig)
-	for k, v := range cache.staticSourceChainConfigs {
-		initialSourceConfigData[k] = v
-	}
+	maps.Copy(initialSourceConfigData, cache.staticSourceChainConfigs)
 	cache.sourceChainMu.RUnlock()
 
 	// Verify cache was populated
