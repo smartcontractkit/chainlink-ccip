@@ -29,12 +29,25 @@ func CreateBasicFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfig {
 	}
 }
 
+// CreateBasicExecutorDestChainConfig creates a basic executor dest chain config with reasonable defaults for testing
 func CreateBasicExecutorDestChainConfig() adapters.ExecutorDestChainConfig {
 	return adapters.ExecutorDestChainConfig{
 		USDCentsFee:            50,
 		BaseExecGas:            100_000,
 		DestAddressLengthBytes: 20,
 		Enabled:                true,
+	}
+}
+
+// CreateBasicCommitteeVerifierDestChainConfig creates a basic committee verifier dest chain config with reasonable defaults for testing
+func CreateBasicCommitteeVerifierDestChainConfig() adapters.CommitteeVerifierDestChainConfig {
+	return adapters.CommitteeVerifierDestChainConfig{
+		AllowlistEnabled:          false,
+		AddedAllowlistedSenders:   nil,
+		RemovedAllowlistedSenders: nil,
+		FeeUSDCents:               50,
+		GasForVerification:        50_000,
+		PayloadSizeBytes:          6*64 + 2*32,
 	}
 }
 

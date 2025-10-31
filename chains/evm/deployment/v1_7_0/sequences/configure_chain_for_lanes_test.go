@@ -81,7 +81,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			_, err = operations.ExecuteSequence(
 				e.OperationsBundle,
 				sequences.ConfigureChainForLanes,
-				evmChain,
+				e.BlockChains,
 				adapters.ConfigureChainForLanesInput{
 					ChainSelector:      chainSelector,
 					Router:             routerAddress,
@@ -91,23 +91,15 @@ func TestConfigureChainForLanes(t *testing.T) {
 					OffRamp:            offRamp,
 					RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
 						remoteChainSelector: {
-							AllowTrafficFrom:    true,
-							OnRamp:              ccipMessageSource,
-							OffRamp:             ccipMessageDest,
-							DefaultInboundCCVs:  []string{committeeVerifier},
-							DefaultOutboundCCVs: []string{committeeVerifier},
-							DefaultExecutor:     executorAddress,
-							CommitteeVerifierDestChainConfig: adapters.CommitteeVerifierDestChainConfig{
-								AllowlistEnabled:          false,
-								AddedAllowlistedSenders:   nil,
-								RemovedAllowlistedSenders: nil,
-								FeeUSDCents:               50,
-								GasForVerification:        50_000,
-								PayloadSizeBytes:          6*64 + 2*32,
-							},
-							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
-							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
-							ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+							AllowTrafficFrom:                 true,
+							OnRamp:                           ccipMessageSource,
+							OffRamp:                          ccipMessageDest,
+							DefaultInboundCCVs:               []string{committeeVerifier},
+							DefaultOutboundCCVs:              []string{committeeVerifier},
+							DefaultExecutor:                  executorAddress,
+							CommitteeVerifierDestChainConfig: testsetup.CreateBasicCommitteeVerifierDestChainConfig(),
+							FeeQuoterDestChainConfig:         testsetup.CreateBasicFeeQuoterDestChainConfig(),
+							ExecutorDestChainConfig:          testsetup.CreateBasicExecutorDestChainConfig(),
 						},
 					},
 				},
