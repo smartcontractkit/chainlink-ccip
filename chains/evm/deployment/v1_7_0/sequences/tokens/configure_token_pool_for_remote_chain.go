@@ -155,7 +155,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						Address:       input.TokenPoolAddress,
 						Args: token_pool.RemotePoolArgs{
 							RemoteChainSelector: input.RemoteChainSelector,
-							RemotePoolAddress:   input.RemoteChainConfig.RemotePool,
+							RemotePoolAddress:   common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
 						},
 					})
 					if err != nil {
@@ -184,9 +184,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					{
 						RemoteChainSelector: input.RemoteChainSelector,
 						RemotePoolAddresses: [][]byte{
-							input.RemoteChainConfig.RemotePool,
+							common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
 						},
-						RemoteTokenAddress:        input.RemoteChainConfig.RemoteToken,
+						RemoteTokenAddress:        common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
 						OutboundRateLimiterConfig: input.RemoteChainConfig.OutboundRateLimiterConfig,
 						InboundRateLimiterConfig:  input.RemoteChainConfig.InboundRateLimiterConfig,
 					},

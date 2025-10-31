@@ -24,12 +24,12 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *operations.Sequence
 	return evm_tokens.ConfigureTokenForTransfers
 }
 
-// AddressRefToBytes returns an EVM address reference as an EVM address padded to 32 bytes.
+// AddressRefToBytes returns an EVM address reference as an EVM address.
 func (t *TokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	return common.LeftPadBytes(common.HexToAddress(ref.Address).Bytes(), 32), nil
+	return common.HexToAddress(ref.Address).Bytes(), nil
 }
 
-// DeriveTokenAddress derives the token address from a token pool reference, returning it as an EVM address padded to 32 bytes.
+// DeriveTokenAddress derives the token address from a token pool reference, returning it as an EVM address.
 func (t *TokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
