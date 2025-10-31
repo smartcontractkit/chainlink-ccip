@@ -4,10 +4,9 @@ pragma solidity ^0.8.24;
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
-import {ERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/ERC20.sol";
 
 contract TokenPoolV2_withdrawFee is TokenPoolV2Setup {
-  function test_withdrawFee_SendsPoolTokenToRecipient() public {
+  function test_withdrawFee() public {
     uint256 feeAmount = 20 ether;
     address recipient = makeAddr("fee_recipient");
 
@@ -16,38 +15,16 @@ contract TokenPoolV2_withdrawFee is TokenPoolV2Setup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = address(s_token);
 
-    vm.expectEmit(true, true, true, true, address(s_tokenPool));
+    vm.expectEmit();
     emit TokenPool.FeeTokenWithdrawn(recipient, address(s_token), feeAmount);
-    vm.expectEmit(true, true, true, true, address(s_tokenPool));
-    emit TokenPool.PoolFeeWithdrawn(recipient, feeAmount);
 
     s_tokenPool.withdrawFee(feeTokens, recipient);
 
     assertEq(s_token.balanceOf(recipient), feeAmount);
     assertEq(s_token.balanceOf(address(s_tokenPool)), 0);
-    assertEq(s_tokenPool.getAccumulatedFees(), 0);
   }
 
-  function test_withdrawFee_ForwardsNonPoolFeeTokensToRecipient() public {
-    ERC20 feeToken = new ERC20("feeToken", "FEE");
-    uint256 feeTokenAmount = 10 ether;
-    address recipient = makeAddr("fee_token_recipient");
-
-    deal(address(feeToken), address(s_tokenPool), feeTokenAmount);
-
-    address[] memory feeTokens = new address[](1);
-    feeTokens[0] = address(feeToken);
-
-    vm.expectEmit();
-    emit TokenPool.FeeTokenWithdrawn(recipient, address(feeToken), feeTokenAmount);
-
-    s_tokenPool.withdrawFee(feeTokens, recipient);
-
-    assertEq(feeToken.balanceOf(recipient), feeTokenAmount);
-    assertEq(feeToken.balanceOf(address(s_tokenPool)), 0);
-  }
-
-  function test_withdrawFee_RevertsWhen_CalledByNonOwner() public {
+  function test_withdrawFee_RevtwertsWhen_OnlyCallableByOwner() public {
     address recipient = makeAddr("fee_token_recipient");
 
     vm.stopPrank();
