@@ -1147,8 +1147,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @notice Withdraws accrued fee token balances to the provided `recipient`.
-  /// @dev burn/mint pools accrue fees directly on this contract, so the pool token address should be included in
-  /// feeTokens. lock/release pools send bridge liquidity to their ERC20 lockbox during the lock flow, which means any
+  /// @dev Pools accrue fees directly on this contract, so the pool token address should be included in
+  /// feeTokens. Lock/release pools send bridge liquidity to their ERC20 lockbox during the lock flow, which means any
   /// balance left on this contract represents fees that have accrued to the pool. Because user liquidity never
   /// resides on `address(this)` for lock/release pools, transferring the full contract balance is safe and clears
   /// only accrued fees.
