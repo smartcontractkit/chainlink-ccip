@@ -162,9 +162,9 @@ func convertRemoteChainConfig(
 	}
 	outCfg.OffRamp = offRamp
 
-	executor, err := datastore_utils.FindAndFormatRef(e.DataStore, inCfg.DefaultExecutor, remoteChainSelector, datastore_utils.FullRef)
+	executor, err := datastore_utils.FindAndFormatRef(e.DataStore, inCfg.DefaultExecutor, chainSelector, datastore_utils.FullRef)
 	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor ref on remote chain with selector %d: %w", remoteChainSelector, err)
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor ref on chain with selector %d: %w", remoteChainSelector, err)
 	}
 	outCfg.DefaultExecutor = executor.Address
 
