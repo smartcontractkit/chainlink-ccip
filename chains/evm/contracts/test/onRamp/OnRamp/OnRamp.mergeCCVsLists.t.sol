@@ -19,6 +19,8 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: laneMandatedCCVs,
       defaultCCVs: defaultCCVs,
       defaultExecutor: makeAddr("defaultExecutor"),

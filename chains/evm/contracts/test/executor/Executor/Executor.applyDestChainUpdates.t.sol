@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {Executor} from "../../../executor/Executor.sol";
 import {ExecutorSetup} from "./ExecutorSetup.t.sol";
-
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract Executor_applyDestChainUpdates is ExecutorSetup {
@@ -12,12 +11,7 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
   ) internal pure returns (Executor.RemoteChainConfigArgs memory) {
     return Executor.RemoteChainConfigArgs({
       destChainSelector: destChainSelector,
-      config: Executor.RemoteChainConfig({
-        usdCentsFee: DEFAULT_EXEC_FEE_USD_CENTS,
-        baseExecGas: DEFAULT_EXEC_GAS,
-        destAddressLengthBytes: EVM_ADDRESS_LENGTH,
-        enabled: true
-      })
+      config: Executor.RemoteChainConfig({usdCentsFee: DEFAULT_EXEC_FEE_USD_CENTS, enabled: true})
     });
   }
 
@@ -38,8 +32,6 @@ contract Executor_applyDestChainUpdates is ExecutorSetup {
       if (currentDestChains[i].destChainSelector == newChainSelector) {
         assertEq(newRemote[0].destChainSelector, currentDestChains[i].destChainSelector);
         assertEq(newRemote[0].config.usdCentsFee, currentDestChains[i].config.usdCentsFee);
-        assertEq(newRemote[0].config.baseExecGas, currentDestChains[i].config.baseExecGas);
-        assertEq(newRemote[0].config.destAddressLengthBytes, currentDestChains[i].config.destAddressLengthBytes);
         assertEq(newRemote[0].config.enabled, currentDestChains[i].config.enabled);
         found = true;
         break;

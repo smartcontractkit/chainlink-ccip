@@ -23,7 +23,7 @@ contract MessageHasher {
   }
 
   function encodeGenericExtraArgsV3(
-    Client.EVMExtraArgsV3 memory extraArgs
+    Client.GenericExtraArgsV3 memory extraArgs
   ) public pure returns (bytes memory) {
     return Client._argsToBytes(extraArgs);
   }

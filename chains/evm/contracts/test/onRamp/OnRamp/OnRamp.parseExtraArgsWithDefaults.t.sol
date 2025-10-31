@@ -40,6 +40,8 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     s_destChainConfig = OnRamp.DestChainConfig({
       router: s_sourceRouter,
       sequenceNumber: 0,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultExecutor: s_defaultExecutor,
       laneMandatedCCVs: s_laneMandatedCCVs,
       defaultCCVs: s_defaultCCVs,
@@ -51,17 +53,20 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     Client.CCV[] memory userRequiredCCVs = new Client.CCV[](1);
     userRequiredCCVs[0] = Client.CCV({ccvAddress: makeAddr("userCCV1"), args: "userArgs"});
 
-    Client.EVMExtraArgsV3 memory inputArgs = Client.EVMExtraArgsV3({
+    Client.GenericExtraArgsV3 memory inputArgs = Client.GenericExtraArgsV3({
       ccvs: userRequiredCCVs,
       finalityConfig: 0,
+      gasLimit: GAS_LIMIT,
       executor: makeAddr("userExecutor"),
       executorArgs: "execArgs",
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       tokenArgs: "tokenArgs"
     });
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    Client.EVMExtraArgsV3 memory result = s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    Client.GenericExtraArgsV3 memory result =
+      s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
 
     // User-provided CCVs should be used (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(userRequiredCCVs.length, result.ccvs.length);
@@ -71,11 +76,12 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
   }
 
   function test_parseExtraArgsWithDefaults_V3WithEmptyRequiredCCVs() public view {
-    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0));
+    Client.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0));
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
-    Client.EVMExtraArgsV3 memory result = s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    Client.GenericExtraArgsV3 memory result =
+      s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
 
     // Default CCVs should be applied (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(s_defaultCCVs.length, result.ccvs.length);
@@ -88,6 +94,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertEq(s_defaultExecutor, result.executor);
   }
 
+  // TODO Sui/SVM
   function test_parseExtraArgsWithDefaults_OldExtraArgs() public view {
     // Use GenericExtraArgsV2 format.
     uint256 gasLimit = 300_000;
@@ -96,8 +103,8 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
     bytes memory legacyExtraArgs = Client._argsToBytes(v2Args);
 
-    Client.EVMExtraArgsV3 memory result =
-      s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, legacyExtraArgs);
+    Client.GenericExtraArgsV3 memory result =
+      s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, legacyExtraArgs);
 
     assertEq(s_defaultCCVs.length, result.ccvs.length);
     assertEq(result.ccvs[0].ccvAddress, s_defaultCCVs[0]);
@@ -105,9 +112,8 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertEq(result.ccvs[1].ccvAddress, s_defaultCCVs[1]);
     assertEq(result.ccvs[1].args, "", "ccv args 1");
 
-    // V2 args should be set as executor args.
-    assertEq(legacyExtraArgs, result.executorArgs);
-    assertEq(s_defaultExecutor, result.executor);
+    assertEq(result.executorArgs, "");
+    assertEq(result.executor, s_defaultExecutor);
   }
 
   // Additional test for defaults when no user CCVs provided
@@ -116,10 +122,11 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertTrue(s_destChainConfig.defaultCCVs.length > 0, "defaultCCVs must not be empty");
 
     // Test with empty user input
-    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0));
+    Client.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0));
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
-    Client.EVMExtraArgsV3 memory result = s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    Client.GenericExtraArgsV3 memory result =
+      s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
 
     // Should have default CCVs
     assertEq(s_defaultCCVs.length, result.ccvs.length);
@@ -134,12 +141,12 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     userRequiredCCVs[0] = Client.CCV({ccvAddress: duplicateCCV, args: "args1"});
     userRequiredCCVs[1] = Client.CCV({ccvAddress: duplicateCCV, args: "args2"}); // Duplicate
 
-    Client.EVMExtraArgsV3 memory inputArgs = _createV3ExtraArgs(userRequiredCCVs);
+    Client.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(userRequiredCCVs);
 
     bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
 
     // Should revert due to duplicate CCVs
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, duplicateCCV));
-    s_onRampTestHelper.parseExtraArgsWithDefaults(s_destChainConfig, extraArgs);
+    s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
   }
 }

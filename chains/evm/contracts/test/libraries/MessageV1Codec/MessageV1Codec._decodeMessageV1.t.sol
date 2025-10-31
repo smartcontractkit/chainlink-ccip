@@ -13,6 +13,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       onRampAddress: abi.encodePacked(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
       finality: 1000,
+      gasLimit: 300000,
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "destination blob data",
@@ -32,6 +33,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
       sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: "token extra data"
     });
 
@@ -42,6 +44,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       onRampAddress: abi.encodePacked(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
       finality: 2000,
+      gasLimit: 400000,
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "complex destination blob",
@@ -74,6 +77,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       sourcePoolAddress: maxLengthBytes,
       sourceTokenAddress: maxLengthBytes,
       destTokenAddress: maxLengthBytes,
+      tokenReceiver: maxLengthBytes,
       extraData: maxLengthData
     });
 
@@ -84,6 +88,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       onRampAddress: maxLengthBytes,
       offRampAddress: maxLengthBytes,
       finality: type(uint16).max,
+      gasLimit: type(uint32).max,
       sender: maxLengthBytes,
       receiver: maxLengthBytes,
       destBlob: maxLengthData,
@@ -105,6 +110,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       onRampAddress: "",
       offRampAddress: "",
       finality: 0,
+      gasLimit: 0,
       sender: "",
       receiver: "",
       destBlob: "",
@@ -143,6 +149,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
       sourceTokenAddress: abi.encodePacked(makeAddr("token")),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: ""
     });
 
@@ -244,7 +251,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     bytes memory encoded = s_helper.encodeMessageV1(message);
 
     // Truncate right before sender length byte
-    uint256 truncatePoint = 1 + 8 + 8 + 8 + 1 + 20 + 1 + 20 + 2; // Up to finality
+    uint256 truncatePoint = 1 + 8 + 8 + 8 + 1 + 20 + 1 + 20 + 2 + 4; // Up to gasLimit
     bytes memory truncated = new bytes(truncatePoint); // Missing sender length
     for (uint256 i = 0; i < truncated.length; i++) {
       truncated[i] = encoded[i];
@@ -303,6 +310,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
       sourceTokenAddress: abi.encodePacked(makeAddr("token")),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: "test"
     });
 
@@ -333,6 +341,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
       sourceTokenAddress: abi.encodePacked(makeAddr("token")),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: ""
     });
 
@@ -396,7 +405,8 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     uint256 offset = 1 + 8 + 8 + 8; // version + source + dest + sequence
     offset += 1 + message.onRampAddress.length; // onRamp length + content
     offset += 1 + message.offRampAddress.length; // offRamp length + content
-    offset += 8; // finality
+    offset += 2; // finality
+    offset += 4; // gasLimit
     offset += 1 + message.sender.length; // sender length + content
     // Truncate the encoded data to include length but only partial content
     bytes memory truncated = new bytes(offset + 1 + 10); // Include length + only 10 bytes (less than full 20 bytes)
@@ -427,7 +437,8 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     uint256 offset = 1 + 8 + 8 + 8; // version + source + dest + sequence
     offset += 1 + message.onRampAddress.length; // onRamp length + content
     offset += 1 + message.offRampAddress.length; // offRamp length + content
-    offset += 8; // finality
+    offset += 2; // finality
+    offset += 4; // gasLimit
     offset += 1 + message.sender.length; // sender length + content
     offset += 1 + message.receiver.length; // receiver length + content
     // Truncate the encoded data to include length but only partial content
@@ -463,6 +474,9 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
 
     // Skip finality
     offset += 2;
+
+    // Skip gasLimit
+    offset += 4;
 
     // Skip sender
     uint8 senderLength = uint8(encoded[offset++]);
