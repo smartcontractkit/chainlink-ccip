@@ -5,6 +5,7 @@
 /chains/evm @smartcontractkit/ccip-onchain
 .github/workflows/**solidity** @smartcontractkit/ccip-onchain
 /integration-tests @smartcontractkit/ccip-onchain
+/ccv/chains/evm @smartcontractkit/ccip-onchain
 
 # solana development ownership
 /chains/solana @smartcontractkit/ccip-onchain-solana
