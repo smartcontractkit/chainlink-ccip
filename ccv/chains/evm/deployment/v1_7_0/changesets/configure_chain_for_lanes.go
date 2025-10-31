@@ -32,6 +32,8 @@ type RemoteChainConfig struct {
 	DefaultExecutor                  datastore.AddressRef
 	CommitteeVerifierDestChainConfig sequences.CommitteeVerifierDestChainConfig
 	FeeQuoterDestChainConfig         fee_quoter.DestChainConfig
+	AddressBytesLength               uint8
+	BaseExecutionGasCost             uint32
 }
 
 type ConfigureChainForLanesCfg struct {
@@ -157,6 +159,8 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 				CCIPMessageDest:                  ccipMessageDestAddr,
 				CommitteeVerifierDestChainConfig: remoteConfig.CommitteeVerifierDestChainConfig,
 				FeeQuoterDestChainConfig:         remoteConfig.FeeQuoterDestChainConfig,
+				AddressBytesLength:               remoteConfig.AddressBytesLength,
+				BaseExecutionGasCost:             remoteConfig.BaseExecutionGasCost,
 			}
 		}
 

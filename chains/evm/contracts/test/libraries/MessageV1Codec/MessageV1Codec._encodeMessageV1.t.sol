@@ -13,6 +13,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       onRampAddress: abi.encodePacked(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
       finality: 1000,
+      gasLimit: 300000,
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "destination blob data",
@@ -33,6 +34,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
       sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: "token extra data"
     });
 
@@ -43,6 +45,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       onRampAddress: abi.encodePacked(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
       finality: 2000,
+      gasLimit: 400000,
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "complex destination blob",
@@ -76,6 +79,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       sourcePoolAddress: maxLengthBytes,
       sourceTokenAddress: maxLengthBytes,
       destTokenAddress: maxLengthBytes,
+      tokenReceiver: maxLengthBytes,
       extraData: maxLengthData
     });
 
@@ -86,6 +90,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       onRampAddress: maxLengthBytes,
       offRampAddress: maxLengthBytes,
       finality: type(uint16).max,
+      gasLimit: type(uint32).max,
       sender: maxLengthBytes,
       receiver: maxLengthBytes,
       destBlob: maxLengthData,
@@ -107,6 +112,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       onRampAddress: "",
       offRampAddress: "",
       finality: 0,
+      gasLimit: 0,
       sender: "",
       receiver: "",
       destBlob: "",
@@ -129,6 +135,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       onRampAddress: abi.encodePacked(address(0)),
       offRampAddress: "",
       finality: 0,
+      gasLimit: 0,
       sender: abi.encodePacked(address(0)),
       receiver: "",
       destBlob: "",

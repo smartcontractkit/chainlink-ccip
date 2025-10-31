@@ -11,6 +11,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: hex"1234567890abcdef",
       sourceTokenAddress: hex"abcdef1234567890",
       destTokenAddress: hex"fedcba0987654321",
+      tokenReceiver: hex"aabbccdd",
       extraData: hex"0c117e57da7a"
     });
 
@@ -19,10 +20,10 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     // Verify the encoding structure:
     // version (1 byte) + amount (32 bytes) + sourcePoolAddressLength (1 byte) + sourcePoolAddress +
     // sourceTokenAddressLength (1 byte) + sourceTokenAddress + destTokenAddressLength (1 byte) + destTokenAddress +
-    // extraDataLength (2 bytes) + extraData
+    // tokenReceiverLength (1 byte) + tokenReceiver + extraDataLength (2 bytes) + extraData
     uint256 expectedLength = 1 + 32 + 1 + tokenTransfer.sourcePoolAddress.length + 1
-      + tokenTransfer.sourceTokenAddress.length + 1 + tokenTransfer.destTokenAddress.length + 2
-      + tokenTransfer.extraData.length;
+      + tokenTransfer.sourceTokenAddress.length + 1 + tokenTransfer.destTokenAddress.length + 1
+      + tokenTransfer.tokenReceiver.length + 2 + tokenTransfer.extraData.length;
     assertEq(expectedLength, encoded.length);
 
     // Check version
@@ -62,8 +63,17 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     }
     assertEq(keccak256(tokenTransfer.destTokenAddress), keccak256(destTokenAddress));
 
+    // Check tokenReceiver length and content
+    uint256 tokenReceiverOffset = destTokenOffset + 1 + tokenTransfer.destTokenAddress.length;
+    assertEq(tokenTransfer.tokenReceiver.length, uint8(encoded[tokenReceiverOffset]));
+    bytes memory tokenReceiver = new bytes(tokenTransfer.tokenReceiver.length);
+    for (uint256 i = 0; i < tokenTransfer.tokenReceiver.length; i++) {
+      tokenReceiver[i] = encoded[tokenReceiverOffset + 1 + i];
+    }
+    assertEq(keccak256(tokenTransfer.tokenReceiver), keccak256(tokenReceiver));
+
     // Check extraData length and content
-    uint256 extraDataLengthOffset = destTokenOffset + 1 + tokenTransfer.destTokenAddress.length;
+    uint256 extraDataLengthOffset = tokenReceiverOffset + 1 + tokenTransfer.tokenReceiver.length;
     assertEq(
       tokenTransfer.extraData.length,
       uint16(uint8(encoded[extraDataLengthOffset])) << 8 | uint16(uint8(encoded[extraDataLengthOffset + 1]))
@@ -81,13 +91,14 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: "",
       sourceTokenAddress: "",
       destTokenAddress: "",
+      tokenReceiver: "",
       extraData: ""
     });
 
     bytes memory encoded = MessageV1Codec._encodeTokenTransferV1(tokenTransfer);
 
-    // Minimum encoding: version (1) + amount (32) + 3 address lengths (3) + extraData length (2)
-    assertEq(1 + 32 + 1 + 1 + 1 + 2, encoded.length);
+    // Minimum encoding: version (1) + amount (32) + 4 address lengths (4) + extraData length (2)
+    assertEq(1 + 32 + 1 + 1 + 1 + 1 + 2, encoded.length);
 
     // Decode and verify the result matches the original.
     MessageV1Codec.TokenTransferV1 memory decoded = s_helper.decodeTokenTransferV1(encoded);
@@ -106,13 +117,14 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: abi.encode(address(0x1234567890123456789012345678901234567890)),
       sourceTokenAddress: abi.encode(address(0xABcdEFABcdEFabcdEfAbCdefabcdeFABcDEFabCD)),
       destTokenAddress: abi.encode(address(0xfEdcBA9876543210FedCBa9876543210fEdCBa98)),
+      tokenReceiver: abi.encode(address(0x1111222233334444555566667777888899990000)),
       extraData: hex"00112233445566778899aabbccddeeff"
     });
 
     bytes memory encoded = MessageV1Codec._encodeTokenTransferV1(tokenTransfer);
 
-    // 1 + 32 + 1 + 32 + 1 + 32 + 1 + 32 + 2 + 16 = 150 bytes
-    assertEq(150, encoded.length);
+    // 1 + 32 + 1 + 32 + 1 + 32 + 1 + 32 + 1 + 32 + 2 + 16 = 183 bytes
+    assertEq(183, encoded.length);
 
     // Decode and verify the result matches the original.
     MessageV1Codec.TokenTransferV1 memory decoded = s_helper.decodeTokenTransferV1(encoded);
@@ -136,13 +148,14 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: maxLengthAddress,
       sourceTokenAddress: maxLengthAddress,
       destTokenAddress: maxLengthAddress,
+      tokenReceiver: maxLengthAddress,
       extraData: hex""
     });
 
     bytes memory encoded = MessageV1Codec._encodeTokenTransferV1(tokenTransfer);
 
-    // 1 + 32 + 1 + 1 + 1 + 1 + 1 + 1 + 2 = 38 static length
-    assertEq(38 + 3 * maxLengthAddress.length, encoded.length);
+    // 1 + 32 + 1 + 1 + 1 + 1 + 1 + 2 = 39 static length
+    assertEq(39 + 4 * maxLengthAddress.length, encoded.length);
 
     // Decode and verify the result matches the original.
     MessageV1Codec.TokenTransferV1 memory decoded = s_helper.decodeTokenTransferV1(encoded);
@@ -166,13 +179,14 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: hex"",
       sourceTokenAddress: hex"",
       destTokenAddress: hex"",
+      tokenReceiver: hex"",
       extraData: maxLengthExtraData
     });
 
     bytes memory encoded = MessageV1Codec._encodeTokenTransferV1(tokenTransfer);
 
-    // 1 + 32 + 1 + 1 + 1 + 1 + 1 + 1 + 2 = 38 static length
-    assertEq(38 + maxLengthExtraData.length, encoded.length);
+    // 1 + 32 + 1 + 1 + 1 + 1 + 1 + 2 = 39 static length
+    assertEq(39 + maxLengthExtraData.length, encoded.length);
 
     // Decode and verify the result matches the original.
     MessageV1Codec.TokenTransferV1 memory decoded = s_helper.decodeTokenTransferV1(encoded);
@@ -189,12 +203,14 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     bytes memory sourcePoolAddress,
     bytes memory sourceTokenAddress,
     bytes memory destTokenAddress,
+    bytes memory tokenReceiver,
     bytes memory extraData
   ) public view {
     // Bound inputs to valid ranges
     vm.assume(sourcePoolAddress.length <= type(uint8).max);
     vm.assume(sourceTokenAddress.length <= type(uint8).max);
     vm.assume(destTokenAddress.length <= type(uint8).max);
+    vm.assume(tokenReceiver.length <= type(uint8).max);
     vm.assume(extraData.length <= type(uint16).max);
 
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = MessageV1Codec.TokenTransferV1({
@@ -202,6 +218,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: sourcePoolAddress,
       sourceTokenAddress: sourceTokenAddress,
       destTokenAddress: destTokenAddress,
+      tokenReceiver: tokenReceiver,
       extraData: extraData
     });
 
@@ -209,7 +226,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
 
     // Verify encoding structure
     uint256 expectedLength = 1 + 32 + 1 + sourcePoolAddress.length + 1 + sourceTokenAddress.length + 1
-      + destTokenAddress.length + 2 + extraData.length;
+      + destTokenAddress.length + 1 + tokenReceiver.length + 2 + extraData.length;
     assertEq(expectedLength, encoded.length);
 
     // Decode and verify the result matches the original.
@@ -219,6 +236,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     assertEq(keccak256(sourcePoolAddress), keccak256(decoded.sourcePoolAddress));
     assertEq(keccak256(sourceTokenAddress), keccak256(decoded.sourceTokenAddress));
     assertEq(keccak256(destTokenAddress), keccak256(decoded.destTokenAddress));
+    assertEq(keccak256(tokenReceiver), keccak256(decoded.tokenReceiver));
     assertEq(keccak256(extraData), keccak256(decoded.extraData));
   }
 
@@ -233,6 +251,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: tooLongAddress,
       sourceTokenAddress: hex"abcd",
       destTokenAddress: hex"1234",
+      tokenReceiver: hex"5678",
       extraData: hex""
     });
 
@@ -253,6 +272,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: hex"abcd",
       sourceTokenAddress: tooLongAddress,
       destTokenAddress: hex"1234",
+      tokenReceiver: hex"5678",
       extraData: hex""
     });
 
@@ -273,12 +293,35 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: hex"abcd",
       sourceTokenAddress: hex"1234",
       destTokenAddress: tooLongAddress,
+      tokenReceiver: hex"5678",
       extraData: hex""
     });
 
     vm.expectRevert(
       abi.encodeWithSelector(
         MessageV1Codec.InvalidDataLength.selector, MessageV1Codec.EncodingErrorLocation.ENCODE_TOKEN_DEST_TOKEN_LENGTH
+      )
+    );
+    MessageV1Codec._encodeTokenTransferV1(tokenTransfer);
+  }
+
+  /// forge-config: default.allow_internal_expect_revert = true
+  function test__encodeTokenTransferV1_RevertWhen_TokenReceiverTooLong() public {
+    bytes memory tooLongAddress = new bytes(256);
+
+    MessageV1Codec.TokenTransferV1 memory tokenTransfer = MessageV1Codec.TokenTransferV1({
+      amount: 100,
+      sourcePoolAddress: hex"abcd",
+      sourceTokenAddress: hex"1234",
+      destTokenAddress: hex"5678",
+      tokenReceiver: tooLongAddress,
+      extraData: hex""
+    });
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MessageV1Codec.InvalidDataLength.selector,
+        MessageV1Codec.EncodingErrorLocation.ENCODE_TOKEN_TOKEN_RECEIVER_LENGTH
       )
     );
     MessageV1Codec._encodeTokenTransferV1(tokenTransfer);
@@ -293,6 +336,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       sourcePoolAddress: hex"abcd",
       sourceTokenAddress: hex"1234",
       destTokenAddress: hex"5678",
+      tokenReceiver: hex"9012",
       extraData: tooLongExtraData
     });
 

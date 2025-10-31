@@ -13,9 +13,7 @@ interface IExecutor {
   function getFee(
     uint64 destChainSelector,
     uint16 requestedBlockDepth,
-    uint32 dataLength,
-    uint8 numberOfTokens,
     Client.CCV[] memory ccvs,
     bytes memory extraArgs
-  ) external view returns (uint16 usdCents, uint32 gasLimit, uint32 destBytesOverhead);
+  ) external view returns (uint16 usdCents);
 }

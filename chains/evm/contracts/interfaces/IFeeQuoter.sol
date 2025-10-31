@@ -115,12 +115,15 @@ interface IFeeQuoter {
   /// @return feeTokens The tokens set as fee tokens.
   function getFeeTokens() external view returns (address[] memory);
 
-  function resolveTokenReceiver(
-    bytes calldata extraArgs
-  ) external view returns (bytes memory tokenReceiver);
-
-  function validateEncodedAddressAndEncodePacked(
+  /// @notice Resolves legacy extra args for backward compatibility. Only has to support EVM, SVM, Aptos and SUI chain
+  /// families as all future families have to use the new extraArgs format.
+  /// @param destChainSelector The destination chain selector.
+  /// @param extraArgs The extra args bytes.
+  /// @return tokenReceiver The token receiver address encoded as bytes. Always length 32 or 0.
+  /// @return gasLimit The gas limit to use for the message.
+  /// @return executorArgs The executor args encoded as bytes. These are transformed into the new format.
+  function resolveLegacyArgs(
     uint64 destChainSelector,
-    bytes calldata addr
-  ) external view returns (bytes memory);
+    bytes calldata extraArgs
+  ) external view returns (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs);
 }

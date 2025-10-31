@@ -40,8 +40,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       sequenceNumber: 1,
       onRampAddress: abi.encodePacked(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
-      //
       finality: 0,
+      gasLimit: 200_000,
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "",
@@ -83,6 +83,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     address sourceToken = makeAddr("sourceToken");
     address token = makeAddr("token");
     address pool = makeAddr("pool");
+    address tokenReceiver = makeAddr("tokenReceiver");
     uint256 tokenAmount = 100;
 
     MessageV1Codec.MessageV1 memory message = _getMessage();
@@ -94,6 +95,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       sourcePoolAddress: abi.encodePacked(pool),
       sourceTokenAddress: abi.encodePacked(sourceToken),
       destTokenAddress: abi.encodePacked(token),
+      tokenReceiver: abi.encodePacked(tokenReceiver),
       extraData: ""
     });
     message.tokenTransfer = tokenAmounts;
@@ -207,6 +209,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       sourcePoolAddress: abi.encodePacked(makeAddr("pool1")),
       sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken1")),
       destTokenAddress: abi.encodePacked(makeAddr("token1")),
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: ""
     });
     message.tokenTransfer = tokenAmounts;
@@ -238,6 +241,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
       sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
       destTokenAddress: hex"1234", // Invalid length (not 20 bytes).
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: ""
     });
     message.tokenTransfer = tokenAmounts;

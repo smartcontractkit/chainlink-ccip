@@ -107,6 +107,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 							// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
 							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
 							ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+							AddressBytesLength:       20,
+							BaseExecutionGasCost:     80_000,
 						},
 					},
 				},
@@ -180,8 +182,6 @@ func TestConfigureChainForLanes(t *testing.T) {
 			gotExecConfig := ExecutorDestChains.Output[0].Config
 			require.Equal(t, remoteChainSelector, ExecutorDestChains.Output[0].DestChainSelector, "Dest chain selector on Executor should match remote chain selector")
 			require.Equal(t, expectedExecConfig.UsdCentsFee, gotExecConfig.UsdCentsFee, "UsdCentsFee in Executor dest chain config should match")
-			require.Equal(t, expectedExecConfig.BaseExecGas, gotExecConfig.BaseExecGas, "BaseExecGas in Executor dest chain config should match")
-			require.Equal(t, expectedExecConfig.DestAddressLengthBytes, gotExecConfig.DestAddressLengthBytes, "DestAddressLengthBytes in Executor dest chain config should match")
 			require.True(t, gotExecConfig.Enabled, "Dest chain selector on Executor should be enabled")
 
 			/////////////////////////////////////////
@@ -195,7 +195,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 
 			extraArgs, err := msgHasher.EncodeGenericExtraArgsV3(
 				&bind.CallOpts{Context: t.Context()},
-				message_hasher.ClientEVMExtraArgsV3{
+				message_hasher.ClientGenericExtraArgsV3{
 					Ccvs: []message_hasher.ClientCCV{
 						{
 							CcvAddress: committeeVerifier,
