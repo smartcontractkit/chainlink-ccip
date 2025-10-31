@@ -1150,25 +1150,14 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     );
   }
 
-  /// @notice Withdraws accrued pool token fees and outstanding balances of the provided fee tokens.
-  /// @dev Restricted to the owner to align with operational controls around fee management. For burn/mint pools, the
-  /// accumulated pool token fees correspond to this contract's balance and are sent to the supplied `recipient`.
-  /// lock/release pools should override this function with custom accounting for pool token fees.
-  /// All non-pool fee token balances are forwarded to the same `recipient`.
-  /// @param feeTokens The list of fee token addresses to withdraw, including the pool token if applicable.
-  /// @param recipient The address that should receive withdrawn fees.
+  /// @notice Withdraws accrued fee token balances to the provided `recipient`.
+  /// @dev Burn/mint pools accumulate fees on this contract, so the pool token address should be included in `feeTokens`.
+  /// Lock/release pools that rely on lockboxes should override this function to withdraw fees via their lockbox
+  /// accounting, leaving this contract's balance at zero.
+  /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
+  /// @param recipient The address that should receive the withdrawn balances.
   function withdrawFee(address[] calldata feeTokens, address recipient) external onlyOwner {
-    IERC20 poolToken = getToken();
     for (uint256 i = 0; i < feeTokens.length; ++i) {
-      if (feeTokens[i] == address(poolToken)) {
-        uint256 accumulatedFees = getAccumulatedFees();
-        if (accumulatedFees > 0) {
-          i_token.safeTransfer(recipient, accumulatedFees);
-
-          emit PoolFeeWithdrawn(recipient, accumulatedFees);
-        }
-        continue;
-      }
       IERC20 feeToken = IERC20(feeTokens[i]);
       uint256 feeTokenBalance = feeToken.balanceOf(address(this));
 
@@ -1176,16 +1165,17 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
         feeToken.safeTransfer(recipient, feeTokenBalance);
 
         emit FeeTokenWithdrawn(recipient, address(feeToken), feeTokenBalance);
+        if (feeToken == i_token) {
+          emit PoolFeeWithdrawn(recipient, feeTokenBalance);
+        }
       }
     }
   }
 
   /// @notice Gets the accumulated pool fees that can be withdrawn.
-  /// @dev burn/mint pools should return the contract's token balance since pool fees
-  /// are minted directly to the pool contract (e.g., `return getToken().balanceOf(address(this))`).
-  /// lock/release pools should implement their own accounting mechanism for pool fees
-  /// by adding a storage variable (e.g., `s_accumulatedPoolFees`) since they cannot mint
-  /// additional tokens for pool fee rewards.
+  /// @dev Burn/mint pools can rely on the default implementation which returns this contract's token balance.
+  /// Lock/release pools that use lockboxes should override this to surface any fees recorded within their lockbox
+  /// rather than relying on the pool contract's balance (which should remain zero).
   /// Note: Fee accounting can be obscured by sending tokens directly to the pool.
   /// This does not introduce security issues but will need to be handled operationally.
   /// @return The amount of accumulated pool fees available for withdrawal.
