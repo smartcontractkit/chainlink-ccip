@@ -8,7 +8,6 @@ import (
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -119,7 +118,11 @@ func TestRegisterToken(t *testing.T) {
 
 			// Checks
 			tokenConfigReport, err := operations.ExecuteOperation(
-				testsetup.BundleWithFreshReporter(e.OperationsBundle),
+				operations.NewBundle(
+					e.OperationsBundle.GetContext,
+					e.OperationsBundle.Logger,
+					operations.NewMemoryReporter(),
+				),
 				token_admin_registry.GetTokenConfig,
 				e.BlockChains.EVMChains()[chainSel],
 				evm_contract.FunctionInput[common.Address]{
