@@ -50,21 +50,26 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to read gobindings directory: %w", err)
 	}
+	preCCVLen := len(entries)
 	ccvEntries, err := os.ReadDir(ccvGobindingsDir)
 	if err != nil {
 		return fmt.Errorf("failed to read ccv gobindings directory: %w", err)
 	}
 	entries = append(entries, ccvEntries...)
 
-	for _, entry := range entries {
+	for i, entry := range entries {
 		if !entry.IsDir() || entry.Name() == "latest" {
 			continue
 		}
+		bindingsDir := gobindingsDir
+		if i >= preCCVLen {
+			bindingsDir = ccvGobindingsDir
+		}
 
-		versionDir := filepath.Join(gobindingsDir, entry.Name())
+		versionDir := filepath.Join(bindingsDir, entry.Name())
 		fmt.Printf("Processing version: %s\n", entry.Name())
 
-		if err := processVersionDir(versionDir, gobindingsDir, bytecodeDir, abiDir); err != nil {
+		if err := processVersionDir(versionDir, bindingsDir, bytecodeDir, abiDir); err != nil {
 			return fmt.Errorf("failed to process version %s: %w", entry.Name(), err)
 		}
 	}
