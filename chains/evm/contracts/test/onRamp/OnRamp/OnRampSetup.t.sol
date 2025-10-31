@@ -47,6 +47,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
       defaultExecutor: s_defaultExecutor,
@@ -79,6 +81,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       onRampAddress: abi.encodePacked(address(s_onRamp)),
       offRampAddress: abi.encodePacked(address(s_offRampOnRemoteChain)),
       finality: 0,
+      gasLimit: GAS_LIMIT,
       sender: abi.encodePacked(originalSender),
       receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
       destBlob: "",
@@ -93,6 +96,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         sourcePoolAddress: abi.encodePacked(s_sourcePoolByToken[token]),
         sourceTokenAddress: abi.encodePacked(token),
         destTokenAddress: abi.encodePacked(s_destTokenBySourceToken[token]),
+        tokenReceiver: abi.encodePacked(abi.decode(message.receiver, (address))),
         extraData: abi.encode(IERC20Metadata(token).decimals())
       });
     }
@@ -104,17 +108,18 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     if (isLegacyExtraArgs) {
       receipts = _computeVerifierReceiptsLegacyArgs(message, destChainConfig.defaultCCVs);
     } else {
-      receipts = this.computeVerifierReceiptsArgsV3(message, destChainConfig.defaultCCVs);
+      (receipts, messageV1.gasLimit) = this.computeVerifierReceiptsArgsV3(message, destChainConfig.defaultCCVs);
     }
     receipts[receipts.length - 1] = OnRamp.Receipt({
       issuer: destChainConfig.defaultExecutor,
       feeTokenAmount: 0, // Matches current OnRamp event behavior
-      destGasLimit: 0,
-      destBytesOverhead: 0,
+      destGasLimit: destChainConfig.baseExecutionGasCost + GAS_LIMIT,
+      destBytesOverhead: _calculateDestBytesOverhead(
+        uint32(message.data.length), destChainConfig.addressBytesLength, uint32(message.tokenAmounts.length), 0
+      ),
       // TODO when v3 extra args are passed in
-      extraArgs: isLegacyExtraArgs ? message.extraArgs : bytes("")
+      extraArgs: bytes("")
     });
-    messageV1.destBlob = receipts[receipts.length - 1].extraArgs;
 
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
@@ -124,12 +129,25 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     );
   }
 
+  function _calculateDestBytesOverhead(
+    uint32 dataLength,
+    uint32 remoteChainAddressLengthBytes,
+    uint32 numberOfTokens,
+    uint256 executorArgsLength
+  ) internal pure returns (uint32) {
+    return uint32(
+      MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + executorArgsLength
+        + (MessageV1Codec.MESSAGE_V1_REMOTE_CHAIN_ADDRESSES * remoteChainAddressLengthBytes)
+        + (numberOfTokens * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + remoteChainAddressLengthBytes))
+    );
+  }
+
   // This function is external so we can make the extraArgs calldata to allow for indexing.
   function computeVerifierReceiptsArgsV3(
     Client.EVM2AnyMessage calldata message,
     address[] calldata defaultCCVs
-  ) external view returns (OnRamp.Receipt[] memory verifierReceipts) {
-    Client.EVMExtraArgsV3 memory extraArgsV3 = abi.decode(message.extraArgs[4:], (Client.EVMExtraArgsV3));
+  ) external view returns (OnRamp.Receipt[] memory verifierReceipts, uint32 gasLimit) {
+    Client.GenericExtraArgsV3 memory extraArgsV3 = abi.decode(message.extraArgs[4:], (Client.GenericExtraArgsV3));
     uint256 userDefinedCCVCount = extraArgsV3.ccvs.length;
 
     // Leave space for a token (if present) and the executor receipt.
@@ -186,7 +204,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       });
     }
 
-    return verifierReceipts;
+    return (verifierReceipts, extraArgsV3.gasLimit);
   }
 
   function _computeVerifierReceiptsLegacyArgs(
@@ -224,12 +242,14 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   // Helper function to create EVMExtraArgsV3 struct
   function _createV3ExtraArgs(
     Client.CCV[] memory ccvs
-  ) internal pure returns (Client.EVMExtraArgsV3 memory) {
-    return Client.EVMExtraArgsV3({
+  ) internal pure returns (Client.GenericExtraArgsV3 memory) {
+    return Client.GenericExtraArgsV3({
       ccvs: ccvs,
       finalityConfig: 12,
+      gasLimit: GAS_LIMIT,
       executor: address(0), // No executor specified.
       executorArgs: "",
+      tokenReceiver: TOKEN_RECEIVER,
       tokenArgs: ""
     });
   }

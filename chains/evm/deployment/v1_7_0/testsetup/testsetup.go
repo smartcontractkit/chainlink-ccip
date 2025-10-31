@@ -31,10 +31,8 @@ func CreateBasicFeeQuoterDestChainConfig() fee_quoter.DestChainConfig {
 
 func CreateBasicExecutorDestChainConfig() executor.RemoteChainConfig {
 	return executor.RemoteChainConfig{
-		UsdCentsFee:            50,
-		BaseExecGas:            100_000,
-		DestAddressLengthBytes: 20,
-		Enabled:                true,
+		UsdCentsFee: 50,
+		Enabled:     true,
 	}
 }
 

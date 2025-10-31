@@ -77,6 +77,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
       sourcePoolAddress: abi.encodePacked(s_destTokenPool),
       sourceTokenAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
       destTokenAddress: abi.encodePacked(s_destToken),
+      tokenReceiver: abi.encodePacked(address(21321)),
       extraData: ""
     });
     return tokenTransfers;
