@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -57,6 +58,8 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			}
 			ops = append(ops, configureTokenPoolForRemoteChainReport.Output.BatchOps...)
 
+			supportsTokenPoolFeeConfig := true
+			var currentFeeConfig tp_bindings.IPoolV2TokenTransferFeeConfig
 			currentFeeConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
 				ChainSelector: input.ChainSelector,
 				Address:       tokenPoolAddress,
@@ -66,22 +69,30 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 				},
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token transfer fee config for token pool %s on %s for remote chain %d: %w", input.TokenPoolAddress, chain, destChainSelector, err)
+				if strings.Contains(err.Error(), "execution reverted") {
+					supportsTokenPoolFeeConfig = false
+				} else {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token transfer fee config for token pool %s on %s for remote chain %d: %w", input.TokenPoolAddress, chain, destChainSelector, err)
+				}
+			} else {
+				currentFeeConfig = currentFeeConfigReport.Output
 			}
-			currentFeeConfig := currentFeeConfigReport.Output
-			if remoteChainConfig.TokenTransferFeeConfig == nil {
-				if !tokenTransferFeeConfigIsZero(currentFeeConfig) {
-					destToUseDefaultFeeConfigs = append(destToUseDefaultFeeConfigs, destChainSelector)
+
+			if supportsTokenPoolFeeConfig {
+				if remoteChainConfig.TokenTransferFeeConfig == nil {
+					if !tokenTransferFeeConfigIsZero(currentFeeConfig) {
+						destToUseDefaultFeeConfigs = append(destToUseDefaultFeeConfigs, destChainSelector)
+						tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, token_pool.TokenTransferFeeConfigArg{
+							DestChainSelector:      destChainSelector,
+							TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{},
+						})
+					}
+				} else if !tokenTransferFeeConfigsEqual(currentFeeConfig, *remoteChainConfig.TokenTransferFeeConfig) {
 					tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, token_pool.TokenTransferFeeConfigArg{
 						DestChainSelector:      destChainSelector,
-						TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{},
+						TokenTransferFeeConfig: *remoteChainConfig.TokenTransferFeeConfig,
 					})
 				}
-			} else if !tokenTransferFeeConfigsEqual(currentFeeConfig, *remoteChainConfig.TokenTransferFeeConfig) {
-				tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, token_pool.TokenTransferFeeConfigArg{
-					DestChainSelector:      destChainSelector,
-					TokenTransferFeeConfig: *remoteChainConfig.TokenTransferFeeConfig,
-				})
 			}
 
 			if remoteChainConfig.CustomBlockConfirmationConfig != nil {
