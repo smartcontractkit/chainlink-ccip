@@ -43,10 +43,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
   using SafeERC20 for IERC20;
 
-  error InvalidDestBytesOverhead(uint32 destBytesOverhead);
   error InvalidMinBlockConfirmation(uint16 requested, uint16 minBlockConfirmation);
   error InvalidTransferFeeBps(uint256 bps);
-  error InvalidMinBlockConfirmationConfig();
   error CallerIsNotARampOnRouter(address caller);
   error ZeroAddressInvalid();
   error SenderNotAllowed(address sender);
@@ -1149,9 +1147,14 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @notice Withdraws accrued fee token balances to the provided `recipient`.
+  /// @dev burn/mint pools accrue fees directly on this contract, so the pool token address should be included in
+  /// feeTokens. lock/release pools send bridge liquidity to their ERC20 lockbox during the lock flow, which means any
+  /// balance left on this contract represents fees that have accrued to the pool. Because user liquidity never
+  /// resides on `address(this)` for lock/release pools, transferring the full contract balance is safe and clears
+  /// only accrued fees.
   /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
   /// @param recipient The address that should receive the withdrawn balances.
-  function withdrawFee(address[] calldata feeTokens, address recipient) external onlyOwner {
+  function withdrawFeeTokens(address[] calldata feeTokens, address recipient) external onlyOwner {
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       uint256 feeTokenBalance = IERC20(feeTokens[i]).balanceOf(address(this));
       if (feeTokenBalance > 0) {
