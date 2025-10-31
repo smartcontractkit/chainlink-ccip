@@ -431,15 +431,6 @@ func TestTokenPool(t *testing.T) {
 								errStr string
 							}{
 								{
-									name: "enabled-zero-rate",
-									c: test_token_pool.RateLimitConfig{
-										Enabled:  true,
-										Capacity: 10,
-										Rate:     0,
-									},
-									errStr: "invalid rate limit rate",
-								},
-								{
 									name: "enabled-rate-larger-than-capacity",
 									c: test_token_pool.RateLimitConfig{
 										Enabled:  true,
@@ -490,15 +481,14 @@ func TestTokenPool(t *testing.T) {
 							).ValidateAndBuild()
 							require.NoError(t, err)
 
-							// test new rate limit admin
 							ixRatesValid, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint,
 								test_token_pool.RateLimitConfig{
 									Enabled:  true,
 									Capacity: amount,
 									Rate:     1,
 								}, test_token_pool.RateLimitConfig{
-									Enabled:  false,
-									Capacity: 0,
+									Enabled:  true,
+									Capacity: 10,
 									Rate:     0,
 								}, poolConfig, p.Chain[config.EvmChainSelector], user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 							require.NoError(t, err)

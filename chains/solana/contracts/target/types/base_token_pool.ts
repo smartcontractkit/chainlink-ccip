@@ -1,5 +1,5 @@
 export type BaseTokenPool = {
-  "version": "0.1.1",
+  "version": "1.6.0-candidate",
   "name": "base_token_pool",
   "instructions": [],
   "types": [
@@ -869,7 +869,7 @@ export type BaseTokenPool = {
 };
 
 export const IDL: BaseTokenPool = {
-  "version": "0.1.1",
+  "version": "1.6.0-candidate",
   "name": "base_token_pool",
   "instructions": [],
   "types": [
