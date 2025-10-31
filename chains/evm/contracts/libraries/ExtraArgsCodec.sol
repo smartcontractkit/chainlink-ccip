@@ -1,0 +1,383 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
+
+import {Client} from "./Client.sol";
+
+/// @notice Library for CCIP Extra Arguments encoding/decoding operations.
+/// @dev This library handles the GenericExtraArgsV3 format and related structures including:
+/// - GenericExtraArgsV3, SVMExecutorArgsV1, and SuiExecutorArgsV1 struct definitions
+/// - Encoding/decoding functions with comprehensive error handling
+/// - Detailed error location tracking for debugging
+/// - Uses Client.CCV for cross-chain verifier structs
+library ExtraArgsCodec {
+  error InvalidDataLength(EncodingErrorLocation location);
+  error InvalidEncodingVersion(uint8 version);
+
+  bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
+  bytes4 public constant SVM_EXECUTOR_ARGS_V1_TAG = 0x1a2b3c4d; // TODO: Define actual tag
+  bytes4 public constant SUI_EXECUTOR_ARGS_V1_TAG = 0x5e6f7a8b; // TODO: Define actual tag
+
+  uint256 public constant MAX_CCVS = 16;
+  uint256 public constant MAX_SVM_EXECUTOR_ACCOUNTS = 64;
+  uint256 public constant MAX_SUI_RECEIVER_OBJECT_IDS = 64;
+
+  // Base size of GenericExtraArgsV3 without variable length fields.
+  // 2 (ccvsLength) + 2 (finalityConfig) + 4 (gasLimit) + 20 (executor) +
+  // 2 (executorArgsLength) + 2 (tokenReceiverLength) + 2 (tokenArgsLength)
+  uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 2 + 2 + 4 + 20 + 2 + 2 + 2;
+
+  // Base size of a CCV without variable length args field.
+  // 20 (ccvAddress) + 2 (argsLength)
+  uint256 public constant CCV_BASE_SIZE = 20 + 2;
+
+  // Base size of SVMExecutorArgsV1 without variable length accounts field.
+  // 1 (useATA) + 8 (accountIsWritableBitmap) + 2 (accountsLength)
+  uint256 public constant SVM_EXECUTOR_ARGS_V1_BASE_SIZE = 1 + 8 + 2;
+
+  // Base size of SuiExecutorArgsV1 without variable length receiverObjectIds field.
+  // 2 (receiverObjectIdsLength)
+  uint256 public constant SUI_EXECUTOR_ARGS_V1_BASE_SIZE = 2;
+
+  enum EncodingErrorLocation {
+    // GenericExtraArgsV3 components.
+    EXTRA_ARGS_CCVS_LENGTH,
+    EXTRA_ARGS_CCV_ADDRESS,
+    EXTRA_ARGS_CCV_ARGS_LENGTH,
+    EXTRA_ARGS_CCV_ARGS_CONTENT,
+    EXTRA_ARGS_FINALITY_CONFIG,
+    EXTRA_ARGS_GAS_LIMIT,
+    EXTRA_ARGS_EXECUTOR,
+    EXTRA_ARGS_EXECUTOR_ARGS_LENGTH,
+    EXTRA_ARGS_EXECUTOR_ARGS_CONTENT,
+    EXTRA_ARGS_TOKEN_RECEIVER_LENGTH,
+    EXTRA_ARGS_TOKEN_RECEIVER_CONTENT,
+    EXTRA_ARGS_TOKEN_ARGS_LENGTH,
+    EXTRA_ARGS_TOKEN_ARGS_CONTENT,
+    EXTRA_ARGS_FINAL_OFFSET,
+    // SVMExecutorArgsV1 components.
+    SVM_EXECUTOR_USE_ATA,
+    SVM_EXECUTOR_ACCOUNT_BITMAP,
+    SVM_EXECUTOR_ACCOUNTS_LENGTH,
+    SVM_EXECUTOR_ACCOUNTS_CONTENT,
+    SVM_EXECUTOR_FINAL_OFFSET,
+    // SuiExecutorArgsV1 components.
+    SUI_EXECUTOR_OBJECT_IDS_LENGTH,
+    SUI_EXECUTOR_OBJECT_IDS_CONTENT,
+    SUI_EXECUTOR_FINAL_OFFSET,
+    // Encoding validation components.
+    ENCODE_CCVS_ARRAY_LENGTH,
+    ENCODE_CCV_ARGS_LENGTH,
+    ENCODE_EXECUTOR_ARGS_LENGTH,
+    ENCODE_TOKEN_RECEIVER_LENGTH,
+    ENCODE_TOKEN_ARGS_LENGTH,
+    ENCODE_SVM_ACCOUNTS_LENGTH,
+    ENCODE_SUI_OBJECT_IDS_LENGTH
+  }
+
+  /// @notice The GenericExtraArgsV3 struct is used to pass extra arguments for all destination chain families.
+  /// @dev Uses Client.CCV for cross-chain verifier structs to maintain compatibility with the rest of the codebase.
+  struct GenericExtraArgsV3 {
+    /// @notice An array of CCV structs representing the cross-chain verifiers to be used for the message.
+    Client.CCV[] ccvs;
+    /// @notice The finality config, 0 means the default finality that the CCV considers final.
+    uint16 finalityConfig;
+    /// @notice Gas limit for the callback on the destination chain.
+    uint32 gasLimit;
+    /// @notice Address of the executor contract on the source chain.
+    address executor;
+    /// @notice Destination chain family specific arguments for the executor.
+    bytes executorArgs;
+    /// @notice Address of the token receiver on the destination chain, in bytes format.
+    bytes tokenReceiver;
+    /// @notice Additional arguments for token transfers.
+    bytes tokenArgs;
+  }
+
+  struct SVMExecutorArgsV1 {
+    bool useATA;
+    uint64 accountIsWritableBitmap;
+    bytes32[] accounts;
+  }
+
+  struct SuiExecutorArgsV1 {
+    bytes32[] receiverObjectIds;
+  }
+
+  /// @notice Encodes a Client.CCV struct into bytes.
+  /// @param ccv The Client.CCV struct to encode.
+  /// @return encoded The encoded CCV as bytes.
+  function _encodeCCV(
+    Client.CCV memory ccv
+  ) internal pure returns (bytes memory) {
+    if (ccv.args.length > type(uint16).max) {
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCV_ARGS_LENGTH);
+    }
+
+    return abi.encodePacked(ccv.ccvAddress, uint16(ccv.args.length), ccv.args);
+  }
+
+  /// @notice Decodes bytes into a Client.CCV struct.
+  /// @param encoded The encoded bytes to decode.
+  /// @param offset The starting offset in the encoded bytes.
+  /// @return ccv The decoded Client.CCV struct.
+  /// @return newOffset The new offset after decoding.
+  function _decodeCCV(
+    bytes calldata encoded,
+    uint256 offset
+  ) internal pure returns (Client.CCV memory ccv, uint256 newOffset) {
+    // ccvAddress (20 bytes).
+    if (offset + 20 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS);
+    ccv.ccvAddress = address(bytes20(encoded[offset:offset + 20]));
+    offset += 20;
+
+    // argsLength (2 bytes).
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_LENGTH);
+    uint16 argsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    offset += 2;
+
+    // args content.
+    if (offset + argsLength > encoded.length) {
+      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_CONTENT);
+    }
+    ccv.args = encoded[offset:offset + argsLength];
+    offset += argsLength;
+
+    return (ccv, offset);
+  }
+
+  /// @notice Encodes a GenericExtraArgsV3 struct into bytes.
+  /// @param extraArgs The GenericExtraArgsV3 struct to encode.
+  /// @return encoded The encoded extra args as bytes.
+  function _encodeGenericExtraArgsV3(
+    GenericExtraArgsV3 memory extraArgs
+  ) internal pure returns (bytes memory) {
+    // Validate field lengths fit in their respective size limits.
+    if (extraArgs.ccvs.length > MAX_CCVS) {
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCVS_ARRAY_LENGTH);
+    }
+    if (extraArgs.executorArgs.length > type(uint16).max) {
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_EXECUTOR_ARGS_LENGTH);
+    }
+    if (extraArgs.tokenReceiver.length > type(uint16).max) {
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_RECEIVER_LENGTH);
+    }
+    if (extraArgs.tokenArgs.length > type(uint16).max) {
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_ARGS_LENGTH);
+    }
+
+    // Encode CCVs.
+    bytes memory encodedCCVs;
+    for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
+      encodedCCVs = bytes.concat(encodedCCVs, _encodeCCV(extraArgs.ccvs[i]));
+    }
+
+    // Split encoding to avoid stack too deep.
+    bytes memory part1 = abi.encodePacked(
+      GENERIC_EXTRA_ARGS_V3_TAG,
+      uint16(extraArgs.ccvs.length),
+      encodedCCVs,
+      extraArgs.finalityConfig,
+      extraArgs.gasLimit,
+      extraArgs.executor
+    );
+
+    bytes memory part2 = abi.encodePacked(
+      uint16(extraArgs.executorArgs.length),
+      extraArgs.executorArgs,
+      uint16(extraArgs.tokenReceiver.length),
+      extraArgs.tokenReceiver,
+      uint16(extraArgs.tokenArgs.length),
+      extraArgs.tokenArgs
+    );
+
+    return bytes.concat(part1, part2);
+  }
+
+  /// @notice Decodes bytes into a GenericExtraArgsV3 struct.
+  /// @param encoded The encoded bytes to decode.
+  /// @return extraArgs The decoded GenericExtraArgsV3 struct.
+  function _decodeGenericExtraArgsV3(
+    bytes calldata encoded
+  ) internal pure returns (GenericExtraArgsV3 memory extraArgs) {
+    uint256 offset = 0;
+
+    // Tag (4 bytes) - already validated by caller typically, but we skip it here.
+    offset += 4;
+
+    // ccvs length (2 bytes).
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCVS_LENGTH);
+    uint16 ccvsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    offset += 2;
+
+    // Decode CCVs.
+    extraArgs.ccvs = new Client.CCV[](ccvsLength);
+    for (uint256 i = 0; i < ccvsLength; ++i) {
+      (extraArgs.ccvs[i], offset) = _decodeCCV(encoded, offset);
+    }
+
+    // finalityConfig (2 bytes).
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINALITY_CONFIG);
+    extraArgs.finalityConfig = uint16(bytes2(encoded[offset:offset + 2]));
+    offset += 2;
+
+    // gasLimit (4 bytes).
+    if (offset + 4 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_GAS_LIMIT);
+    extraArgs.gasLimit = uint32(bytes4(encoded[offset:offset + 4]));
+    offset += 4;
+
+    // executor (20 bytes).
+    if (offset + 20 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR);
+    extraArgs.executor = address(bytes20(encoded[offset:offset + 20]));
+    offset += 20;
+
+    // executorArgsLength (2 bytes).
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_LENGTH);
+    uint16 executorArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    offset += 2;
+
+    // executorArgs content.
+    if (offset + executorArgsLength > encoded.length) {
+      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_CONTENT);
+    }
+    extraArgs.executorArgs = encoded[offset:offset + executorArgsLength];
+    offset += executorArgsLength;
+
+    // tokenReceiverLength (2 bytes).
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_LENGTH);
+    uint16 tokenReceiverLength = uint16(bytes2(encoded[offset:offset + 2]));
+    offset += 2;
+
+    // tokenReceiver content.
+    if (offset + tokenReceiverLength > encoded.length) {
+      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_CONTENT);
+    }
+    extraArgs.tokenReceiver = encoded[offset:offset + tokenReceiverLength];
+    offset += tokenReceiverLength;
+
+    // tokenArgsLength (2 bytes).
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_LENGTH);
+    uint16 tokenArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    offset += 2;
+
+    // tokenArgs content.
+    if (offset + tokenArgsLength > encoded.length) {
+      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_CONTENT);
+    }
+    extraArgs.tokenArgs = encoded[offset:offset + tokenArgsLength];
+    offset += tokenArgsLength;
+
+    // Ensure we've consumed all bytes.
+    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET);
+
+    return extraArgs;
+  }
+
+  /// @notice Encodes a SVMExecutorArgsV1 struct into bytes.
+  /// @param executorArgs The SVMExecutorArgsV1 struct to encode.
+  /// @return encoded The encoded executor args as bytes.
+  function _encodeSVMExecutorArgsV1(
+    SVMExecutorArgsV1 memory executorArgs
+  ) internal pure returns (bytes memory) {
+    if (executorArgs.accounts.length > MAX_SVM_EXECUTOR_ACCOUNTS) {
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_SVM_ACCOUNTS_LENGTH);
+    }
+
+    return abi.encodePacked(
+      SVM_EXECUTOR_ARGS_V1_TAG,
+      executorArgs.useATA,
+      executorArgs.accountIsWritableBitmap,
+      uint16(executorArgs.accounts.length),
+      abi.encodePacked(executorArgs.accounts)
+    );
+  }
+
+  /// @notice Decodes bytes into a SVMExecutorArgsV1 struct.
+  /// @param encoded The encoded bytes to decode.
+  /// @return executorArgs The decoded SVMExecutorArgsV1 struct.
+  function _decodeSVMExecutorArgsV1(
+    bytes calldata encoded
+  ) internal pure returns (SVMExecutorArgsV1 memory executorArgs) {
+    uint256 offset = 0;
+
+    // Tag (4 bytes) - skip.
+    offset += 4;
+
+    // useATA (1 byte).
+    if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_USE_ATA);
+    executorArgs.useATA = encoded[offset++] != 0;
+
+    // accountIsWritableBitmap (8 bytes).
+    if (offset + 8 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNT_BITMAP);
+    executorArgs.accountIsWritableBitmap = uint64(bytes8(encoded[offset:offset + 8]));
+    offset += 8;
+
+    // accounts length (2 bytes).
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_LENGTH);
+    uint16 accountsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    offset += 2;
+
+    // accounts content (32 bytes each).
+    if (offset + accountsLength * 32 > encoded.length) {
+      revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_CONTENT);
+    }
+    executorArgs.accounts = new bytes32[](accountsLength);
+    for (uint256 i = 0; i < accountsLength; ++i) {
+      executorArgs.accounts[i] = bytes32(encoded[offset:offset + 32]);
+      offset += 32;
+    }
+
+    // Ensure we've consumed all bytes.
+    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET);
+
+    return executorArgs;
+  }
+
+  /// @notice Encodes a SuiExecutorArgsV1 struct into bytes.
+  /// @param executorArgs The SuiExecutorArgsV1 struct to encode.
+  /// @return encoded The encoded executor args as bytes.
+  function _encodeSuiExecutorArgsV1(
+    SuiExecutorArgsV1 memory executorArgs
+  ) internal pure returns (bytes memory) {
+    if (executorArgs.receiverObjectIds.length > MAX_SUI_RECEIVER_OBJECT_IDS) {
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_SUI_OBJECT_IDS_LENGTH);
+    }
+
+    return abi.encodePacked(
+      SUI_EXECUTOR_ARGS_V1_TAG,
+      uint16(executorArgs.receiverObjectIds.length),
+      abi.encodePacked(executorArgs.receiverObjectIds)
+    );
+  }
+
+  /// @notice Decodes bytes into a SuiExecutorArgsV1 struct.
+  /// @param encoded The encoded bytes to decode.
+  /// @return executorArgs The decoded SuiExecutorArgsV1 struct.
+  function _decodeSuiExecutorArgsV1(
+    bytes calldata encoded
+  ) internal pure returns (SuiExecutorArgsV1 memory executorArgs) {
+    uint256 offset = 0;
+
+    // Tag (4 bytes) - skip.
+    offset += 4;
+
+    // receiverObjectIds length (2 bytes).
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_LENGTH);
+    uint16 objectIdsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    offset += 2;
+
+    // receiverObjectIds content (32 bytes each).
+    if (offset + objectIdsLength * 32 > encoded.length) {
+      revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_CONTENT);
+    }
+    executorArgs.receiverObjectIds = new bytes32[](objectIdsLength);
+    for (uint256 i = 0; i < objectIdsLength; ++i) {
+      executorArgs.receiverObjectIds[i] = bytes32(encoded[offset:offset + 32]);
+      offset += 32;
+    }
+
+    // Ensure we've consumed all bytes.
+    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET);
+
+    return executorArgs;
+  }
+}

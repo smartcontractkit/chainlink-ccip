@@ -5,6 +5,7 @@ import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.s
 import {IExecutor} from "../../../interfaces/IExecutor.sol";
 
 import {Client} from "../../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
@@ -49,10 +50,10 @@ contract OnRamp_getFee is OnRampSetup {
     // When no CCVs are provided in V3 extra args, default CCVs should be used.
 
     Client.CCV[] memory ccvs = new Client.CCV[](0);
-    Client.GenericExtraArgsV3 memory extraArgsV3 = _createV3ExtraArgs(ccvs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgsV3 = _createV3ExtraArgs(ccvs);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgsV3));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgsV3);
 
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
@@ -69,7 +70,7 @@ contract OnRamp_getFee is OnRampSetup {
     ccvs[0] = Client.CCV({ccvAddress: newVerifier, args: ""});
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(_createV3ExtraArgs(ccvs)));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(_createV3ExtraArgs(ccvs));
 
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
@@ -121,7 +122,7 @@ contract OnRamp_getFee is OnRampSetup {
     Client.CCV[] memory ccvs = new Client.CCV[](1);
     ccvs[0] = Client.CCV({ccvAddress: verifier, args: ""});
 
-    Client.GenericExtraArgsV3 memory extraArgsV3 = Client.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgsV3 = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       finalityConfig: 12,
       gasLimit: GAS_LIMIT,
@@ -132,7 +133,7 @@ contract OnRamp_getFee is OnRampSetup {
     });
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgsV3));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgsV3);
 
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 

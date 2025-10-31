@@ -2,6 +2,7 @@
 pragma solidity ^0.8.4;
 
 import {Client} from "../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 
 contract MessageHasher {
   function encodeEVMExtraArgsV1(
@@ -23,9 +24,9 @@ contract MessageHasher {
   }
 
   function encodeGenericExtraArgsV3(
-    Client.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) public pure returns (bytes memory) {
-    return Client._argsToBytes(extraArgs);
+    return ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
   }
 
   function decodeEVMExtraArgsV1(

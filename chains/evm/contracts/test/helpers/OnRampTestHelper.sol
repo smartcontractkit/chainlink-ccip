@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 
 /// @notice Test wrapper for OnRamp to expose internal functions for testing.
@@ -13,7 +14,7 @@ contract OnRampTestHelper is OnRamp {
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) external view returns (Client.GenericExtraArgsV3 memory) {
+  ) external view returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
     return _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, extraArgs);
   }
 
@@ -41,7 +42,7 @@ contract OnRampTestHelper is OnRamp {
     uint64 destChainSelector,
     uint256 dataLength,
     uint256 numberOfTokens,
-    Client.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) external view returns (Receipt memory) {
     return _getExecutionFee(destChainSelector, dataLength, numberOfTokens, extraArgs);
   }

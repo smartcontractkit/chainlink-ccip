@@ -5,6 +5,7 @@ import {Router} from "../../Router.sol";
 import {CommitteeVerifier} from "../../ccvs/CommitteeVerifier.sol";
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
@@ -89,8 +90,8 @@ contract e2e is OnRampSetup {
       data: "e2e test data",
       tokenAmounts: new Client.EVMTokenAmount[](1),
       feeToken: s_sourceFeeToken,
-      extraArgs: Client._argsToBytes(
-        Client.GenericExtraArgsV3({
+      extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(
+        ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: userCCVs,
           finalityConfig: 0,
           gasLimit: GAS_LIMIT,

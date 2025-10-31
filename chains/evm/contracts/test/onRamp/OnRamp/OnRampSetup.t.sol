@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 
 import {Client} from "../../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
@@ -147,7 +148,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage calldata message,
     address[] calldata defaultCCVs
   ) external view returns (OnRamp.Receipt[] memory verifierReceipts, uint32 gasLimit) {
-    Client.GenericExtraArgsV3 memory extraArgsV3 = abi.decode(message.extraArgs[4:], (Client.GenericExtraArgsV3));
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgsV3 = ExtraArgsCodec._decodeGenericExtraArgsV3(message.extraArgs);
     uint256 userDefinedCCVCount = extraArgsV3.ccvs.length;
 
     // Leave space for a token (if present) and the executor receipt.
@@ -242,14 +243,14 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   // Helper function to create EVMExtraArgsV3 struct
   function _createV3ExtraArgs(
     Client.CCV[] memory ccvs
-  ) internal pure returns (Client.GenericExtraArgsV3 memory) {
-    return Client.GenericExtraArgsV3({
+  ) internal pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
+    return ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       finalityConfig: 12,
       gasLimit: GAS_LIMIT,
       executor: address(0), // No executor specified.
       executorArgs: "",
-      tokenReceiver: TOKEN_RECEIVER,
+      tokenReceiver: "",
       tokenArgs: ""
     });
   }
@@ -261,7 +262,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     assembly {
       selector := mload(add(extraArgs, 32))
     }
-    return selector != Client.GENERIC_EXTRA_ARGS_V3_TAG;
+    return selector != ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG;
   }
 
   // Helper function to assert that two CCV arrays are equal

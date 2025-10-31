@@ -14,6 +14,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
+import {ExtraArgsCodec} from "../libraries/ExtraArgsCodec.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
@@ -193,7 +194,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 1. parse extraArgs.
 
-    Client.GenericExtraArgsV3 memory resolvedExtraArgs =
+    ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs =
       _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
 
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
@@ -383,9 +384,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) internal view returns (Client.GenericExtraArgsV3 memory resolvedArgs) {
-    if (extraArgs.length >= 4 && bytes4(extraArgs[0:4]) == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
-      resolvedArgs = abi.decode(extraArgs[4:], (Client.GenericExtraArgsV3));
+  ) internal view returns (ExtraArgsCodec.GenericExtraArgsV3 memory resolvedArgs) {
+    if (extraArgs.length >= 4 && bytes4(extraArgs[0:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
+      resolvedArgs = ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
 
       if (resolvedArgs.tokenReceiver.length != 0) {
         this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
@@ -665,7 +666,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       revert DestinationChainNotSupported(destChainSelector);
     }
 
-    Client.GenericExtraArgsV3 memory resolvedExtraArgs =
+    ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs =
       _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
     // Update the CCVs list to include lane mandated and pool required CCVs.
     address[] memory poolRequiredCCVs = new address[](0);
@@ -702,7 +703,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function _getReceipts(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
-    Client.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) internal view returns (Receipt[] memory verifierReceipts) {
     // Already ensure there's room for the token transfer and executor receipts.
     verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
@@ -750,7 +751,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     uint256 dataLength,
     uint256 numberOfTokens,
-    Client.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) internal view returns (Receipt memory) {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
     uint8 remoteChainAddressLengthBytes = destChainConfig.addressBytesLength;

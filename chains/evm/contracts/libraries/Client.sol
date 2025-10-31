@@ -3,6 +3,16 @@ pragma solidity ^0.8.0;
 
 // End consumer library.
 library Client {
+  /// @notice The CCV struct is used to represent a cross-chain verifier.
+  /// @dev This is defined in both Client and ExtraArgsCodec for backwards compatibility.
+  struct CCV {
+    /// @param ccvAddress The address of the verifier contract on the source chain
+    address ccvAddress;
+    /// @param args The arguments that the verifier contract expects. They are opaque to CCIP and are only
+    /// used in the CCV.
+    bytes args;
+  }
+
   struct EVMTokenAmount {
     address token; // token address on the local chain.
     uint256 amount; // Amount of tokens.
@@ -29,68 +39,6 @@ library Client {
   /// @dev Preimage for this tag is: keccak256("NO_EXECUTION_TAG")[:4]
   bytes4 public constant NO_EXECUTION_TAG = 0xeba517d2;
   address public constant NO_EXECUTION_ADDRESS = address(bytes20(NO_EXECUTION_TAG));
-
-  bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
-
-  /// @notice The GenericExtraArgsV3 struct is used to pass extra arguments for all destination chain families. There
-  /// are bytes fields inside that could contain encoded structs specific to each chain family. The primary field that
-  /// contains chain family specific data is the executorArgs field. This field gets passed to the destination chain
-  /// unmodified and is expected to be encoded in a way that the destination chain can understand.
-  struct GenericExtraArgsV3 {
-    /// @notice An array of CCV structs representing the cross-chain verifiers to be used for the message, and optional
-    /// arguments that are passed into the CCV without modification or inspection. CCIP itself does not interpret these
-    /// arguments: they are in the format of the CCV contracts being used.
-    CCV[] ccvs;
-    /// @notice The finality config, 0 means the default finality that the CCV considers final. Any non-zero value means
-    /// a block depth. CCVs, Pools and the executor may all reject this value by reverting the transaction on the source
-    /// chain if they do now want to take on the risk of the block depth specified.
-    uint16 finalityConfig;
-    /// @notice Gas limit for the callback on the destination chain. If the gas limit is zero, no callback will be
-    /// performed, even if a receiver is specified. A gas limit of zero is useful when only token transfers are desired,
-    /// or when the receiver is an EOA account instead of a contract. Besides this gasLimit check, there are other
-    /// checks on the destination chain that may prevent the callback from being executed, depending on the destination
-    /// chain family.
-    /// @dev The sender is billed for the gas specified, not the gas actually used. Any unspent gas is not refunded.
-    /// There are various ways to estimate the gas required for a callback on the destination chain, depending on the
-    /// chain family. Please refer to the documentation for each chain family for more details.
-    uint32 gasLimit;
-    /// @notice Address of the executor contract on the source chain. The executor is responsible for executing the
-    /// message on the destination chains once a quorum of CCVs have verified the message.
-    address executor;
-    /// @notice Destination chain family specific arguments for the executor. This field is passed to the destination
-    /// chain as part of the message itself and these args are therefore fully protected through the message ID. The
-    /// format of this field is specific to each chain family and is not interpreted by CCIP itself, only by the
-    /// executor. Things that may be included here are Solana accounts or Sui object IDs, which must be secured through
-    /// the message ID as passing in incorrect values can lead to loss of funds.
-    bytes executorArgs;
-    /// @notice Address of the token receiver on the destination chain, in bytes format. If an empty bytes array is
-    /// provided, the receiver address from the message itself is used for token transfers. This field allows for
-    /// scenarios where the token receiver is different from the message receiver.
-    bytes tokenReceiver;
-    /// @notice Additional arguments for token transfers. This field is passed into the token pool on the source chain
-    /// and is not inspected by CCIP itself. The format of this field is therefore specific to the token pool being used
-    /// and may vary between different pools.
-    bytes tokenArgs;
-  }
-
-  function _argsToBytes(
-    GenericExtraArgsV3 memory extraArgs
-  ) internal pure returns (bytes memory bts) {
-    return abi.encodeWithSelector(GENERIC_EXTRA_ARGS_V3_TAG, extraArgs);
-  }
-
-  struct SVMExecutorArgsV1 {
-    // TODO Use ATA or raw account flag
-    bool useATA;
-    uint64 accountIsWritableBitmap;
-    // Additional accounts needed for execution of CCIP receiver. Must be empty if message.receiver is zero.
-    // Token transfer related accounts are specified in the token pool lookup table on SVM.
-    bytes32[] accounts;
-  }
-
-  struct SuiExecutorArgsV1 {
-    bytes32[] receiverObjectIds;
-  }
 
   // ================================================================
   // │                           Legacy                             │
@@ -206,14 +154,5 @@ library Client {
     SuiExtraArgsV1 memory extraArgs
   ) internal pure returns (bytes memory bts) {
     return abi.encodeWithSelector(SUI_EXTRA_ARGS_V1_TAG, extraArgs);
-  }
-
-  /// @notice The CCV struct is used to represent a cross-chain verifier.
-  struct CCV {
-    /// @param The ccvAddress is the address of the verifier contract on the source chain
-    address ccvAddress;
-    /// @param args The args are the arguments that the verifier contract expects. They are opaque to CCIP and are only
-    /// used in the CCV.
-    bytes args;
   }
 }

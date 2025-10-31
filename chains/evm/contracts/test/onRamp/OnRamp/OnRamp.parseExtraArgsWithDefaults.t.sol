@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
 import {Client} from "../../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
@@ -53,7 +54,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     Client.CCV[] memory userRequiredCCVs = new Client.CCV[](1);
     userRequiredCCVs[0] = Client.CCV({ccvAddress: makeAddr("userCCV1"), args: "userArgs"});
 
-    Client.GenericExtraArgsV3 memory inputArgs = Client.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: userRequiredCCVs,
       finalityConfig: 0,
       gasLimit: GAS_LIMIT,
@@ -63,9 +64,9 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
       tokenArgs: "tokenArgs"
     });
 
-    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
 
-    Client.GenericExtraArgsV3 memory result =
+    ExtraArgsCodec.GenericExtraArgsV3 memory result =
       s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
 
     // User-provided CCVs should be used (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
@@ -76,11 +77,11 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
   }
 
   function test_parseExtraArgsWithDefaults_V3WithEmptyRequiredCCVs() public view {
-    Client.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0));
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0));
 
-    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
 
-    Client.GenericExtraArgsV3 memory result =
+    ExtraArgsCodec.GenericExtraArgsV3 memory result =
       s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
 
     // Default CCVs should be applied (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
@@ -103,7 +104,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
     bytes memory legacyExtraArgs = Client._argsToBytes(v2Args);
 
-    Client.GenericExtraArgsV3 memory result =
+    ExtraArgsCodec.GenericExtraArgsV3 memory result =
       s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, legacyExtraArgs);
 
     assertEq(s_defaultCCVs.length, result.ccvs.length);
@@ -122,10 +123,10 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertTrue(s_destChainConfig.defaultCCVs.length > 0, "defaultCCVs must not be empty");
 
     // Test with empty user input
-    Client.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0));
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0));
 
-    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
-    Client.GenericExtraArgsV3 memory result =
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory result =
       s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
 
     // Should have default CCVs
@@ -141,9 +142,9 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     userRequiredCCVs[0] = Client.CCV({ccvAddress: duplicateCCV, args: "args1"});
     userRequiredCCVs[1] = Client.CCV({ccvAddress: duplicateCCV, args: "args2"}); // Duplicate
 
-    Client.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(userRequiredCCVs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(userRequiredCCVs);
 
-    bytes memory extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(inputArgs));
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
 
     // Should revert due to duplicate CCVs
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, duplicateCCV));
