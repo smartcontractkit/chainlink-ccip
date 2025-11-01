@@ -8,10 +8,10 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.16.5
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251029160438-93e0a575186e
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20251030162727-690c3fee46e0
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20251030162727-690c3fee46e0
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20251029160438-93e0a575186e
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251101231156-7a3126b96a81
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20251101231156-7a3126b96a81
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20251101231156-7a3126b96a81
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20251101231156-7a3126b96a81
 	github.com/smartcontractkit/chainlink-deployments-framework v0.56.0
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3
 	github.com/smartcontractkit/mcms v0.25.0
