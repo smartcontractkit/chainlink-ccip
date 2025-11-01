@@ -27,7 +27,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   // STATIC CONFIG
   string public constant override typeAndVersion = "CommitteeVerifier 1.7.0-dev";
   /// @dev The preimage is bytes4(keccak256("CommitteeVerifier 1.7.0"))
-  bytes4 internal constant VERSION_TAG = 0x49ff34ed;
+  bytes4 internal constant VERSION_TAG_V1_7_0 = 0x49ff34ed;
   /// @dev The number of bytes allocated to encoding the signature length within the ccvData.
   uint256 internal constant SIGNATURE_LENGTH_BYTES = 2;
 
@@ -51,7 +51,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
     // TODO: Process msg & return verifier data
-    return abi.encodePacked(VERSION_TAG);
+    return abi.encodePacked(VERSION_TAG_V1_7_0);
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -138,7 +138,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   /// @notice Exposes the version tag.
   function versionTag() public pure returns (bytes4) {
-    return VERSION_TAG;
+    return VERSION_TAG_V1_7_0;
   }
 
   // ================================================================

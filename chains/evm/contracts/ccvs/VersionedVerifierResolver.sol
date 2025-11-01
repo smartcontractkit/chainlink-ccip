@@ -55,22 +55,15 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
     return s_versionToInboundImplementation[bytes4(ccvData[:4])];
   }
 
-  /// @notice Returns the verifier contract for a given version.
-  /// @param version The version of the verifier contract.
-  /// @return verifierAddress The address of the verifier contract.
-  function getInboundImplementationForVersion(
-    bytes4 version
-  ) external view returns (address) {
-    return s_versionToInboundImplementation[version];
-  }
-
-  /// @notice Returns all supported verifier versions.
-  function getSupportedVerifierVersions() external view returns (bytes4[] memory) {
-    bytes4[] memory versions = new bytes4[](s_supportedVerifierVersions.length());
-    for (uint256 i = 0; i < s_supportedVerifierVersions.length(); ++i) {
-      versions[i] = bytes4(s_supportedVerifierVersions.at(i));
+  /// @notice Returns all inbound implementations.
+  function getAllInboundImplementations() external view returns (InboundImplementationArgs[] memory) {
+    uint256 len = s_supportedVerifierVersions.length();
+    InboundImplementationArgs[] memory inboundImpls = new InboundImplementationArgs[](len);
+    for (uint256 i = 0; i < len; ++i) {
+      inboundImpls[i].version = bytes4(s_supportedVerifierVersions.at(i));
+      inboundImpls[i].verifier = s_versionToInboundImplementation[inboundImpls[i].version];
     }
-    return versions;
+    return inboundImpls;
   }
 
   /// @inheritdoc ICrossChainVerifierResolver
@@ -81,13 +74,15 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
     return s_destChainToOutboundImplementation[destChainSelector];
   }
 
-  /// @notice Returns all supported destination chains.
-  function getSupportedDestChains() external view returns (uint64[] memory) {
-    uint64[] memory destChains = new uint64[](s_supportedDestChains.length());
-    for (uint256 i = 0; i < s_supportedDestChains.length(); ++i) {
-      destChains[i] = uint64(s_supportedDestChains.at(i));
+  /// @notice Returns all outbound implementations.
+  function getAllOutboundImplementations() external view returns (OutboundImplementationArgs[] memory) {
+    uint256 len = s_supportedDestChains.length();
+    OutboundImplementationArgs[] memory outboundImpls = new OutboundImplementationArgs[](len);
+    for (uint256 i = 0; i < len; ++i) {
+      outboundImpls[i].destChainSelector = uint64(s_supportedDestChains.at(i));
+      outboundImpls[i].verifier = s_destChainToOutboundImplementation[outboundImpls[i].destChainSelector];
     }
-    return destChains;
+    return outboundImpls;
   }
 
   /// @notice Updates inbound implementations.

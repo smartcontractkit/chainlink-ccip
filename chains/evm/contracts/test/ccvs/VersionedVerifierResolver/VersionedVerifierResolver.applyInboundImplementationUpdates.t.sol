@@ -27,17 +27,15 @@ contract VersionedVerifierResolver_applyInboundImplementationUpdates is Versione
 
     s_versionedVerifierResolver.applyInboundImplementationUpdates(impls);
 
-    assertEq(s_versionedVerifierResolver.getInboundImplementationForVersion(newVersion), addedVerifier);
     assertEq(s_versionedVerifierResolver.getInboundImplementation(abi.encodePacked(newVersion)), addedVerifier);
-    assertEq(s_versionedVerifierResolver.getInboundImplementationForVersion(INITIAL_VERSION_1), updatedVerifier);
     assertEq(s_versionedVerifierResolver.getInboundImplementation(abi.encodePacked(INITIAL_VERSION_1)), updatedVerifier);
-    assertEq(s_versionedVerifierResolver.getInboundImplementationForVersion(INITIAL_VERSION_2), address(0));
     assertEq(s_versionedVerifierResolver.getInboundImplementation(abi.encodePacked(INITIAL_VERSION_2)), address(0));
 
-    bytes4[] memory supportedVersions = s_versionedVerifierResolver.getSupportedVerifierVersions();
-    assertEq(supportedVersions.length, 2);
-    for (uint256 i = 0; i < supportedVersions.length; ++i) {
-      if (supportedVersions[i] != newVersion && supportedVersions[i] != INITIAL_VERSION_1) {
+    VersionedVerifierResolver.InboundImplementationArgs[] memory inboundImpls =
+      s_versionedVerifierResolver.getAllInboundImplementations();
+    assertEq(inboundImpls.length, 2);
+    for (uint256 i = 0; i < inboundImpls.length; ++i) {
+      if (inboundImpls[i].version != newVersion && inboundImpls[i].version != INITIAL_VERSION_1) {
         revert("Unexpected supported version");
       }
     }
