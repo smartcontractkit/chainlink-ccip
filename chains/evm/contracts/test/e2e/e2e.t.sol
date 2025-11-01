@@ -104,7 +104,15 @@ contract e2e is OnRampSetup {
       tokenAmounts: new Client.EVMTokenAmount[](1),
       feeToken: s_sourceFeeToken,
       extraArgs: Client._argsToBytes(
-        Client.EVMExtraArgsV3({ccvs: userCCVs, finalityConfig: 0, executor: address(0), executorArgs: "", tokenArgs: ""})
+        Client.GenericExtraArgsV3({
+          ccvs: userCCVs,
+          finalityConfig: 0,
+          gasLimit: GAS_LIMIT,
+          executor: address(0),
+          executorArgs: "",
+          tokenReceiver: "",
+          tokenArgs: ""
+        })
       )
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 1e18});

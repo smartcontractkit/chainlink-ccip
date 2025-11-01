@@ -86,9 +86,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// can be passed in the constructor and the applySourceChainConfigUpdates function.
   // solhint-disable-next-line gas-struct-packing
   struct SourceChainConfigArgs {
-    IRouter router; // ────────────╮  Local router to use for messages coming from this source chain.
-    uint64 sourceChainSelector; // │  Source chain selector of the config to update.
-    bool isEnabled; // ────────────╯  Flag whether the source chain is enabled or not.
+    IRouter router; // ────────────╮ Local router to use for messages coming from this source chain.
+    uint64 sourceChainSelector; // │ Source chain selector of the config to update.
+    bool isEnabled; // ────────────╯ Flag whether the source chain is enabled or not.
     bytes onRamp; // OnRamp address on the source chain.
     address[] defaultCCV; // Default CCV to use for messages from this source chain.
     address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
@@ -110,7 +110,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   uint16 internal immutable i_gasForCallExactCheck;
 
   // DYNAMIC CONFIG
-  bool private s_reentrancyGuardEntered;
 
   /// @notice Set of source chain selectors.
   EnumerableSet.UintSet internal s_sourceChainSelectors;
@@ -119,6 +118,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
 
   // STATE
+
+  bool private s_reentrancyGuardEntered;
 
   /// Message state is tracked to ensure message can only be executed successfully once.
   mapping(bytes32 execStateKey => Internal.MessageExecutionState state) internal s_executionStates;
@@ -300,11 +301,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
     for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
       destTokenAmounts[i] =
-        _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, receiver, message.sourceChainSelector);
+        _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, message.sourceChainSelector);
     }
-
-    // TODO gaslimit
-    uint256 gasLimit = 200000;
 
     // There are three cases in which we skip calling the receiver:
     // 1. If the message data is empty AND the gas limit is 0.
@@ -319,11 +317,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
     // which checks for sufficient gas before making the external call.
     if (
-      (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
+      (message.data.length == 0 && message.gasLimit == 0) || receiver.code.length == 0
         || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
-    uint256 g = gasleft();
     (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
       Client.Any2EVMMessage({
         messageId: messageId,
@@ -333,10 +330,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         destTokenAmounts: destTokenAmounts
       }),
       i_gasForCallExactCheck,
-      // We subtract the gas required to check whether or not gasLimit is within bound,
-      // the proportion of gas discluded by EIP-150 (2x because there are 2 calls: this-->router and router-->receiver),
-      // and an additional buffer for routeMessage logic prior to the receiver call.
-      g - 2 * (g / 64) - i_gasForCallExactCheck - 10000,
+      message.gasLimit,
       receiver
     );
 
@@ -629,15 +623,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// the token on this chain, and re-trying the msg.
   /// @param sourceTokenAmount Amount and source data of the token to be released/minted.
   /// @param originalSender The message sender on the source chain.
-  /// @param receiver The address that will receive the tokens.
   /// @param sourceChainSelector The remote source chain selector
   /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
-    address receiver,
     uint64 sourceChainSelector
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
+    address receiver = address(bytes20(sourceTokenAmount.tokenReceiver));
+
     address localToken = address(bytes20(sourceTokenAmount.destTokenAddress));
     // We check with the token admin registry if the token has a pool on this chain.
     address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);

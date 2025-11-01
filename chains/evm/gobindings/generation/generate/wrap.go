@@ -12,6 +12,7 @@ import (
 
 var (
 	rootDir = "../solc/"
+	outDir  = "../../../ccv/chains/evm/gobindings"
 )
 
 func main() {
@@ -56,7 +57,15 @@ func main() {
 // <project>/generated/<pkgName>/<pkgName>.go. The suffix will take place after
 // the <project>/generated, so the overridden location would be
 // <project>/generated/<outDirSuffixInput>/<pkgName>/<pkgName>.go.
-func GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgName, outDirSuffixInput string) {
+func GenWrapper(
+	abiPath,
+	binPath,
+	buildInfoPath,
+	metadataPath,
+	className,
+	pkgName,
+	outDirSuffixInput string,
+) {
 	fmt.Println("Generating", pkgName, "contract wrapper")
 
 	outDir := getOutDir(outDirSuffixInput, pkgName)
@@ -91,15 +100,11 @@ func GenWrapper(abiPath, binPath, buildInfoPath, metadataPath, className, pkgNam
 }
 
 func getOutDir(outDirSuffixInput, pkgName string) string {
-	cwd, err := os.Getwd() // gethwrappers directory
-	if err != nil {
-		gethwrappers.Exit("could not get working directory", err)
-	}
-	outDir := filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
-	if mkdErr := os.MkdirAll(outDir, 0700); err != nil {
+	outDir := filepath.Join(outDir, "generated", outDirSuffixInput, pkgName)
+	if err := os.MkdirAll(outDir, 0700); err != nil {
 		gethwrappers.Exit(
 			fmt.Sprintf("failed to create wrapper dir, outDirSuffixInput: %s (could be empty)", outDirSuffixInput),
-			mkdErr)
+			err)
 	}
 
 	return outDir

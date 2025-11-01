@@ -23,6 +23,9 @@ contract BaseTest is Test {
   uint64 internal constant SOURCE_CHAIN_SELECTOR = 1;
   uint64 internal constant DEST_CHAIN_SELECTOR = 2;
   uint32 internal constant GAS_LIMIT = 200_000;
+  uint32 internal constant BASE_EXEC_GAS_COST = 80_000;
+
+  bytes internal constant TOKEN_RECEIVER = "token receiver";
 
   uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 90_000;
   uint8 internal constant DEFAULT_TOKEN_DECIMALS = 18;

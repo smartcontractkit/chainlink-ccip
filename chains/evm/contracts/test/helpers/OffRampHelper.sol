@@ -47,10 +47,9 @@ contract OffRampHelper is OffRamp {
   function releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
-    address receiver,
     uint64 sourceChainSelector
   ) external returns (Client.EVMTokenAmount memory) {
-    return _releaseOrMintSingleToken(sourceTokenAmount, originalSender, receiver, sourceChainSelector);
+    return _releaseOrMintSingleToken(sourceTokenAmount, originalSender, sourceChainSelector);
   }
 
   function getBalanceOfReceiver(address receiver, address token) external view returns (uint256) {

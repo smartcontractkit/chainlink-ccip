@@ -845,33 +845,52 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     return destExecDataPerToken;
   }
 
-  function resolveTokenReceiver(
-    bytes calldata extraArgs
-  ) external pure returns (bytes memory tokenReceiver) {
-    if (extraArgs.length < 4 || bytes4(extraArgs[:4]) != Client.SVM_EXTRA_ARGS_V1_TAG) {
-      return (bytes(""));
-    }
-
-    return abi.encode(abi.decode(extraArgs[4:], (Client.SVMExtraArgsV1)).tokenReceiver);
-  }
-
-  function validateEncodedAddressAndEncodePacked(
+  /// @notice Resolves legacy extra args for backward compatibility. Only has to support EVM, SVM, Aptos and SUI chain
+  /// families as all future families have to use the new extraArgs format.
+  /// @param destChainSelector The destination chain selector.
+  /// @param extraArgs The extra args bytes.
+  /// @return tokenReceiver The token receiver address encoded as bytes. Always length 32 or 0.
+  /// @return gasLimit The gas limit to use for the message.
+  /// @return executorArgs The executor args encoded as bytes. These are transformed into the new format.
+  // solhint-disable-next-line chainlink-solidity/explicit-returns
+  function resolveLegacyArgs(
     uint64 destChainSelector,
-    bytes calldata addr
-  ) external view returns (bytes memory) {
-    bytes4 chainFamilySelector = s_destChainConfigs[destChainSelector].chainFamilySelector;
-    if (chainFamilySelector == 0) {
-      revert DestinationChainNotEnabled(destChainSelector);
+    bytes calldata extraArgs
+  ) external view returns (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) {
+    DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
+    if (
+      destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
+    ) {
+      return (
+        "",
+        uint32(
+          _parseGenericExtraArgsFromBytes(
+            extraArgs, destChainConfig.defaultTxGasLimit, destChainConfig.maxPerMsgGasLimit
+          ).gasLimit
+        ),
+        ""
+      );
     }
-    _validateDestFamilyAddress(chainFamilySelector, addr, 0);
+    if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
+      Client.SVMExtraArgsV1 memory svmArgs = abi.decode(extraArgs[4:], (Client.SVMExtraArgsV1));
+      // 8 bytes bitmap + 2 bytes length + 32 bytes per account
+      bytes memory execArgs = new bytes(8 + 2 + svmArgs.accounts.length * 32);
+      // TODO fill SVM args
 
-    // We need to decode the ABI-encoded address into raw bytes. This is safe since we have validated the address
-    // format above.
-    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
-      return abi.encodePacked(abi.decode(addr, (address)));
+      return (abi.encode(svmArgs.tokenReceiver), svmArgs.computeUnits, execArgs);
+    }
+    if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
+      Client.SuiExtraArgsV1 memory suiArgs = _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit);
+      // 2 bytes length + 32 bytes per receiver object id
+      bytes memory execArgs = new bytes(2 + suiArgs.receiverObjectIds.length * 32);
+      // TODO fill Sui args
+
+      return (abi.encode(suiArgs.tokenReceiver), uint32(suiArgs.gasLimit), execArgs);
     }
 
-    return addr;
+    revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
   }
 
   // ================================================================

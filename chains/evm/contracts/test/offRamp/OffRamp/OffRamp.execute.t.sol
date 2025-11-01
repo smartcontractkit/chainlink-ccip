@@ -78,6 +78,7 @@ contract OffRamp_execute is OffRampSetup {
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
       //
       finality: 0,
+      gasLimit: 200_000,
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "",
@@ -159,7 +160,7 @@ contract OffRamp_execute is OffRampSetup {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
 
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, 85_000);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, 90000);
 
     // Verify final state is FAILURE.
     assertEq(

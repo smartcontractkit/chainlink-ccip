@@ -173,6 +173,7 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
       sourcePoolAddress: abi.encodePacked(pool),
       sourceTokenAddress: abi.encodePacked(sourceToken),
       destTokenAddress: abi.encodePacked(token),
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: ""
     });
 

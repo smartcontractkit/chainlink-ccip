@@ -10,10 +10,11 @@ contract OnRampTestHelper is OnRamp {
 
   /// @notice Exposes the internal _parseExtraArgsWithDefaults function for testing.
   function parseExtraArgsWithDefaults(
+    uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) external pure returns (Client.EVMExtraArgsV3 memory) {
-    return _parseExtraArgsWithDefaults(destChainConfig, extraArgs);
+  ) external view returns (Client.GenericExtraArgsV3 memory) {
+    return _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, extraArgs);
   }
 
   /// @notice Exposes the internal _mergeCCVLists function for testing.
@@ -33,5 +34,15 @@ contract OnRampTestHelper is OnRamp {
     bytes memory tokenArgs
   ) external view returns (address[] memory) {
     return _getCCVsForPool(destChainSelector, token, amount, finality, tokenArgs);
+  }
+
+  /// @notice Exposes the internal _getExecutionFee function for testing.
+  function getExecutionFee(
+    uint64 destChainSelector,
+    uint256 dataLength,
+    uint256 numberOfTokens,
+    Client.GenericExtraArgsV3 memory extraArgs
+  ) external view returns (Receipt memory) {
+    return _getExecutionFee(destChainSelector, dataLength, numberOfTokens, extraArgs);
   }
 }

@@ -26,8 +26,10 @@ contract FeeQuoterSetup is TokenSetup {
   uint8 internal constant DEST_GAS_PER_PAYLOAD_BYTE_BASE = 16;
 
   uint16 internal constant DEFAULT_TOKEN_FEE_USD_CENTS = 50;
+  uint8 internal constant EVM_ADDRESS_LENGTH = 20;
+  uint8 internal constant NON_EVM_ADDRESS_LENGTH = 32;
 
-  // CommitteeVerifier
+  // Verifier
   uint16 internal constant DEFAULT_CCV_FEE_USD_CENTS = 45;
   uint32 internal constant DEFAULT_CCV_GAS_LIMIT = 7_500 * 6 + 5_000; // 6 sigs + buffer
   uint32 internal constant DEFAULT_CCV_PAYLOAD_SIZE = 6 * 64 + 2 * 32; // 6 sigs + two slots for length
