@@ -192,7 +192,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				Address:       committeeVerifier,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			inboundImpl, err := boundResolver.GetInboundImplementationForVersion(&bind.CallOpts{Context: t.Context()}, versionTagReport.Output)
+			inboundImpl, err := boundResolver.GetInboundImplementation(&bind.CallOpts{Context: t.Context()}, versionTagReport.Output[:])
 			require.NoError(t, err, "GetInboundImplementationForVersion should not error")
 			require.Equal(t, committeeVerifier.Hex(), inboundImpl.Hex(), "Inbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
 
