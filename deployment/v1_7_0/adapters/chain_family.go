@@ -30,16 +30,8 @@ type CommitteeVerifierDestChainConfig struct {
 type ExecutorDestChainConfig struct {
 	// The fee charged by the executor to process messages to this chain.
 	USDCentsFee uint16
-	// The base gas cost for executing a message on this chain, excluding pool/CCV/receiver gas.
-	BaseExecGas uint32
-	// The length of addresses on the destination chain, in bytes.
-	DestAddressLengthBytes uint8
 	// Whether or not this destination chain is enabled.
 	Enabled bool
-	// Length of addresses on the destination chain, in bytes.
-	AddressBytesLength uint8
-	// Execution gas cost, excluding pool/CCV/receiver gas.
-	BaseExecutionGasCost uint32
 }
 
 // FeeQuoterDestChainConfig configures the FeeQuoter for a remote chain.
@@ -90,6 +82,10 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
 	// ExecutorDestChainConfig configures the Executor for this remote chain
 	ExecutorDestChainConfig ExecutorDestChainConfig
+	// Length of addresses on the destination chain, in bytes.
+	AddressBytesLength uint8
+	// Execution gas cost, excluding pool/CCV/receiver gas.
+	BaseExecutionGasCost uint32
 }
 
 // ConfigureChainForLanesInput is the input for the ConfigureChainForLanes sequence.
