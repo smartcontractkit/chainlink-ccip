@@ -36,6 +36,10 @@ type ExecutorDestChainConfig struct {
 	DestAddressLengthBytes uint8
 	// Whether or not this destination chain is enabled.
 	Enabled bool
+	// Length of addresses on the destination chain, in bytes.
+	AddressBytesLength uint8
+	// Execution gas cost, excluding pool/CCV/receiver gas.
+	BaseExecutionGasCost uint32
 }
 
 // FeeQuoterDestChainConfig configures the FeeQuoter for a remote chain.
