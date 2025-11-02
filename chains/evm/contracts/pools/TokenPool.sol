@@ -43,10 +43,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
   using SafeERC20 for IERC20;
 
-  error InvalidDestBytesOverhead(uint32 destBytesOverhead);
   error InvalidMinBlockConfirmation(uint16 requested, uint16 minBlockConfirmation);
   error InvalidTransferFeeBps(uint256 bps);
-  error InvalidMinBlockConfirmationConfig();
   error CallerIsNotARampOnRouter(address caller);
   error ZeroAddressInvalid();
   error SenderNotAllowed(address sender);
@@ -98,8 +96,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   );
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
   event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector);
-  /// @notice Emitted when pool fees are withdrawn.
-  event PoolFeeWithdrawn(address indexed recipient, uint256 amount);
   event CustomBlockConfirmationOutboundRateLimitConsumed(
     uint64 indexed remoteChainSelector, address token, uint256 amount
   );
@@ -107,6 +103,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     uint64 indexed remoteChainSelector, address token, uint256 amount
   );
   event CustomBlockConfirmationUpdated(uint16 minBlockConfirmation);
+  event FeeTokenWithdrawn(address indexed recipient, address indexed feeToken, uint256 amount);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector.
@@ -1149,32 +1146,23 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     );
   }
 
-  /// @notice Withdraws all accumulated pool fees to the specified recipient.
-  /// @dev For burn/mint pools, this transfers the entire token balance of the pool contract.
-  /// lock/release pools should override this function with their own accounting mechanism.
-  /// @param recipient The address to receive the withdrawn fees.
-  function withdrawFees(
-    address recipient
-  ) external virtual onlyOwner {
-    uint256 amount = getAccumulatedFees();
-    if (amount > 0) {
-      getToken().safeTransfer(recipient, amount);
-      emit PoolFeeWithdrawn(recipient, amount);
+  /// @notice Withdraws accrued fee token balances to the provided `recipient`.
+  /// @dev Pools accrue fees directly on this contract. Lock/release pools send bridge liquidity to their ERC20 lockbox
+  /// during the lock flow, which means any balance left on this contract represents fees that have accrued to the pool.
+  /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract balance is safe
+  /// and clears only accrued fees.
+  /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
+  /// @param recipient The address that should receive the withdrawn balances.
+  function withdrawFeeTokens(address[] calldata feeTokens, address recipient) external onlyOwner {
+    for (uint256 i = 0; i < feeTokens.length; ++i) {
+      uint256 feeTokenBalance = IERC20(feeTokens[i]).balanceOf(address(this));
+      if (feeTokenBalance > 0) {
+        IERC20(feeTokens[i]).safeTransfer(recipient, feeTokenBalance);
+        emit FeeTokenWithdrawn(recipient, address(feeTokens[i]), feeTokenBalance);
+      }
     }
   }
 
-  /// @notice Gets the accumulated pool fees that can be withdrawn.
-  /// @dev burn/mint pools should return the contract's token balance since pool fees
-  /// are minted directly to the pool contract (e.g., `return getToken().balanceOf(address(this))`).
-  /// lock/release pools should implement their own accounting mechanism for pool fees
-  /// by adding a storage variable (e.g., `s_accumulatedPoolFees`) since they cannot mint
-  /// additional tokens for pool fee rewards.
-  /// Note: Fee accounting can be obscured by sending tokens directly to the pool.
-  /// This does not introduce security issues but will need to be handled operationally.
-  /// @return The amount of accumulated pool fees available for withdrawal.
-  function getAccumulatedFees() public view virtual returns (uint256) {
-    return getToken().balanceOf(address(this));
-  }
   /// @dev Deducts the fee from the transferred amount based on the configured basis points (not added on top).
   /// @param lockOrBurnIn The original lock or burn request.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.

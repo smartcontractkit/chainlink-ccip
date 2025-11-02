@@ -13,9 +13,11 @@ import (
 )
 
 const (
-	gobindingsSubdir = "gobindings/generated"
-	bytecodeSubdir   = "bytecode"
-	abiSubdir        = "abi"
+	// Directories are relative to the EVM root (i.e. chains/evm)
+	gobindingsSubdir    = "gobindings/generated"
+	ccvGobindingsSubdir = "../../ccv/chains/evm/gobindings/generated"
+	bytecodeSubdir      = "bytecode"
+	abiSubdir           = "abi"
 )
 
 // Metadata holds the extracted bytecode and ABI from a contract binding
@@ -33,12 +35,13 @@ func main() {
 
 func run() error {
 	// Determine the correct paths based on the current working directory
-	gobindingsDir, bytecodeDir, abiDir, err := findProjectDirs()
+	gobindingsDir, ccvGobindingsDir, bytecodeDir, abiDir, err := findProjectDirs()
 	if err != nil {
 		return fmt.Errorf("failed to find project directories: %w", err)
 	}
 
 	fmt.Printf("Using gobindings dir: %s\n", gobindingsDir)
+	fmt.Printf("Using ccv gobindings dir: %s\n", ccvGobindingsDir)
 	fmt.Printf("Using bytecode dir: %s\n", bytecodeDir)
 	fmt.Printf("Using ABI dir: %s\n", abiDir)
 
@@ -47,16 +50,26 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to read gobindings directory: %w", err)
 	}
+	preCCVLen := len(entries)
+	ccvEntries, err := os.ReadDir(ccvGobindingsDir)
+	if err != nil {
+		return fmt.Errorf("failed to read ccv gobindings directory: %w", err)
+	}
+	entries = append(entries, ccvEntries...)
 
-	for _, entry := range entries {
+	for i, entry := range entries {
 		if !entry.IsDir() || entry.Name() == "latest" {
 			continue
 		}
+		bindingsDir := gobindingsDir
+		if i >= preCCVLen {
+			bindingsDir = ccvGobindingsDir
+		}
 
-		versionDir := filepath.Join(gobindingsDir, entry.Name())
+		versionDir := filepath.Join(bindingsDir, entry.Name())
 		fmt.Printf("Processing version: %s\n", entry.Name())
 
-		if err := processVersionDir(versionDir, gobindingsDir, bytecodeDir, abiDir); err != nil {
+		if err := processVersionDir(versionDir, bindingsDir, bytecodeDir, abiDir); err != nil {
 			return fmt.Errorf("failed to process version %s: %w", entry.Name(), err)
 		}
 	}
@@ -64,19 +77,20 @@ func run() error {
 	return nil
 }
 
-func findProjectDirs() (gobindingsDir, bytecodeDir, abiDir string, err error) {
+func findProjectDirs() (gobindingsDir, ccvGobindingsDir, bytecodeDir, abiDir string, err error) {
 	// Find the chains/evm root directory
 	evmRoot, err := findEvmRoot()
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 
 	// Build all paths from the root using constants
 	gobindingsDir = filepath.Join(evmRoot, gobindingsSubdir)
+	ccvGobindingsDir = filepath.Join(evmRoot, ccvGobindingsSubdir)
 	bytecodeDir = filepath.Join(evmRoot, bytecodeSubdir)
 	abiDir = filepath.Join(evmRoot, abiSubdir)
 
-	return gobindingsDir, bytecodeDir, abiDir, nil
+	return gobindingsDir, ccvGobindingsDir, bytecodeDir, abiDir, nil
 }
 
 // findEvmRoot finds the chains/evm directory by walking up from the current directory

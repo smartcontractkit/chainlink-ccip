@@ -42,6 +42,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error ReentrancyGuardReentrantCall();
   error InvalidOptionalCCVThreshold();
   error DestinationChainNotSupported(uint64 destChainSelector);
+  error InvalidDestChainAddress(bytes destChainAddress);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -63,6 +64,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     bytes[] verifierBlobs
   );
 
+  /// @dev A helper struct that holds data for the CCIPMessageSent event to avoid stack too deep errors.
   struct CCIPMessageSentEventData {
     bytes encodedMessage;
     Receipt[] receipts;
@@ -87,10 +89,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   /// @dev Struct to hold the configs for a single destination chain.
   struct DestChainConfig {
-    IRouter router; // ─────────╮ Local router address  that is allowed to send messages to the destination chain.
+    IRouter router; // ────────────╮ Local router address  that is allowed to send messages to the destination chain.
     // The last used sequence number. This is zero in the case where no messages have yet been sent.
     // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
-    uint64 sequenceNumber; // ──╯
+    uint64 sequenceNumber; //      │
+    uint8 addressBytesLength; // ──╯ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+    uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address defaultExecutor; // Default executor to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
@@ -102,7 +106,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   // solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector.
-    IRouter router; // Source router address  that is allowed to send messages to the destination chain.
+    IRouter router; // ────────────╮ Source router address  that is allowed to send messages to the destination chain.
+    uint8 addressBytesLength; // ──╯ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+    uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address defaultExecutor;
@@ -111,11 +117,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
   struct Receipt {
-    address issuer; // ───────────╮ The address of the entity that issued the receipt.
+    // The address of the entity that issued the receipt. For token receipts this is the token address, not the pool.
+    // for verifiers and executors, this is the user specified value, even if the call is ultimately handled by some
+    // underlying contract.
+    address issuer; // ───────────╮
     uint64 destGasLimit; //       │ The gas limit for the actions taken on the destination chain for this entity.
     uint32 destBytesOverhead; // ─╯ The byte overhead for the actions taken on the destination chain for this entity.
     uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
-    bytes extraArgs; // Extra args that have been passed in on the source chain.
+    bytes extraArgs; // Extra args that have been passed in on the source chain. May be empty.
   }
 
   // STATIC CONFIG
@@ -184,7 +193,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 1. parse extraArgs.
 
-    Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
+    Client.GenericExtraArgsV3 memory resolvedExtraArgs =
+      _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
+
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
@@ -192,11 +203,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       onRampAddress: abi.encodePacked(address(this)),
       offRampAddress: destChainConfig.offRamp,
       finality: resolvedExtraArgs.finalityConfig,
+      gasLimit: resolvedExtraArgs.gasLimit,
       sender: abi.encodePacked(originalSender),
-      // The user encodes the receiver with abi.encode when creating EVM2AnyMessage
-      // whereas MessageV1 expects just the raw bytes, so we strip the first 12 bytes.
-      // TODO handle non-EVM chain families, maybe through fee quoter
-      receiver: message.receiver[12:],
+      receiver: validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
       // Executor args hold security critical execution args, like Solana accounts or Sui object IDs. Because of this,
       // they have to part of the message that is signed off on by the verifiers.
       destBlob: resolvedExtraArgs.executorArgs,
@@ -231,14 +240,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     if (message.tokenAmounts.length != 0) {
       if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
-      // TODO where does the TokenReceiver go? Exec args feels strange but don't have a better place.
-      bytes memory tokenReceiver =
-        IFeeQuoter(s_dynamicConfig.feeQuoter).resolveTokenReceiver(resolvedExtraArgs.executorArgs);
-      if (tokenReceiver.length == 0) {
-        tokenReceiver = abi.encode(message.receiver);
-      }
       newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
-        message.tokenAmounts[0], destChainSelector, tokenReceiver, originalSender, resolvedExtraArgs.tokenArgs
+        message.tokenAmounts[0],
+        destChainSelector,
+        resolvedExtraArgs.tokenReceiver.length > 0 ? resolvedExtraArgs.tokenReceiver : newMessage.receiver,
+        originalSender,
+        resolvedExtraArgs.tokenArgs
       );
     }
 
@@ -250,12 +257,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
-    {
-      for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-        eventData.verifierBlobs[i] = ICrossChainVerifierV1(resolvedExtraArgs.ccvs[i].ccvAddress).forwardToVerifier(
-          newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
-        );
-      }
+    for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
+      eventData.verifierBlobs[i] = ICrossChainVerifierV1(resolvedExtraArgs.ccvs[i].ccvAddress).forwardToVerifier(
+        newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
+      );
     }
 
     // 7. emit event
@@ -333,6 +338,41 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     return ccvs;
   }
 
+  /// @notice This function takes in a raw dest chain address and validates the address is valid for the destination
+  /// chain. User supplied addresses on EVM are always abi.encoded. This function strips the abi encoding to have a
+  /// chain agnostic address.
+  /// @param rawAddress The raw dest chain address provided by the user.
+  /// @param addressBytesLength The expected length of the address on the destination chain.
+  /// @return validatedAddress The validated dest chain address, stripped of any abi encoding.
+  function validateDestChainAddress(
+    bytes calldata rawAddress,
+    uint8 addressBytesLength
+  ) public pure returns (bytes memory validatedAddress) {
+    if (addressBytesLength < 32) {
+      // We have to account for padding as traditionally EVM addresses have been provided abi encoded.
+      if (rawAddress.length > 32) {
+        // If the expected length is smaller than 32 but the provided address is larger than 32, not even abi encoding
+        // can explain the difference. The address is invalid for this chain.
+        revert InvalidDestChainAddress(rawAddress);
+      }
+      if (rawAddress.length == 32) {
+        // abi encoding can explain this, now we need to check if the first (32 - addressBytesLength) bytes are zero. If
+        // so, we strip them and return the unencoded address.
+        if (bytes32(rawAddress[0:(32 - addressBytesLength)]) != bytes32(0)) {
+          revert InvalidDestChainAddress(rawAddress);
+        }
+        return rawAddress[(32 - addressBytesLength):];
+      }
+      // If the rawAddress is smaller than 32 bytes we assume there's no padding involved and we fall back to the
+      // general check below that ensures the length must match exactly.
+    }
+
+    if (rawAddress.length != addressBytesLength) {
+      revert InvalidDestChainAddress(rawAddress);
+    }
+    return rawAddress;
+  }
+
   /// @notice Parses and validates extra arguments, applying defaults from destination chain configuration.
   /// The function ensures all messages have the required CCVs and executor needed for processing,
   /// even when users don't explicitly specify them.
@@ -340,11 +380,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param extraArgs User-provided extra arguments in either V3 or legacy format.
   /// @return resolvedArgs Complete EVMExtraArgsV3 struct with all defaults applied.
   function _parseExtraArgsWithDefaults(
+    uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) internal pure returns (Client.EVMExtraArgsV3 memory resolvedArgs) {
+  ) internal view returns (Client.GenericExtraArgsV3 memory resolvedArgs) {
     if (extraArgs.length >= 4 && bytes4(extraArgs[0:4]) == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
-      resolvedArgs = abi.decode(extraArgs[4:], (Client.EVMExtraArgsV3));
+      resolvedArgs = abi.decode(extraArgs[4:], (Client.GenericExtraArgsV3));
 
       // We need to ensure no duplicate CCVs are present in the ccv list.
       uint256 length = resolvedArgs.ccvs.length;
@@ -364,13 +405,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         }
       }
     } else {
-      // If old extraArgs are supplied, they are assumed to be for the default CCV and the default executor.
-      // This means any default CCV/executor has to be able to process all prior extraArgs.
-      resolvedArgs.executorArgs = extraArgs;
       resolvedArgs.ccvs = new Client.CCV[](destChainConfig.defaultCCVs.length);
       for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
         resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
       }
+
+      // Populate the fields that could be present in legacy extraArgs.
+      (resolvedArgs.tokenReceiver, resolvedArgs.gasLimit, resolvedArgs.executorArgs) =
+        IFeeQuoter(s_dynamicConfig.feeQuoter).resolveLegacyArgs(destChainSelector, extraArgs);
     }
 
     // When users don't specify an executor, default executor is chosen.
@@ -433,7 +475,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       DestChainConfigArgs calldata destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArg.destChainSelector;
 
-      if (destChainSelector == 0 || destChainSelector == i_localChainSelector) {
+      if (
+        destChainSelector == 0 || destChainSelector == i_localChainSelector
+          || destChainConfigArg.addressBytesLength == 0 || destChainConfigArg.baseExecutionGasCost == 0
+      ) {
         revert InvalidDestChainConfig(destChainSelector);
       }
 
@@ -445,6 +490,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       // The router can be zero to pause the destination chain.
       destChainConfig.router = destChainConfigArg.router;
+      destChainConfig.addressBytesLength = destChainConfigArg.addressBytesLength;
+      destChainConfig.baseExecutionGasCost = destChainConfigArg.baseExecutionGasCost;
       destChainConfig.defaultCCVs = destChainConfigArg.defaultCCVs;
       destChainConfig.laneMandatedCCVs = destChainConfigArg.laneMandatedCCVs;
       // Require a default executor so messages that rely on older/defaulted args still resolve to a concrete
@@ -530,9 +577,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       amount: tokenAndAmount.amount,
       sourcePoolAddress: abi.encodePacked(address(sourcePool)),
       sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
-      destTokenAddress: IFeeQuoter(s_dynamicConfig.feeQuoter).validateEncodedAddressAndEncodePacked(
-        destChainSelector, poolReturnData.destTokenAddress
+      destTokenAddress: this.validateDestChainAddress(
+        poolReturnData.destTokenAddress, s_destChainConfigs[destChainSelector].addressBytesLength
       ),
+      tokenReceiver: receiver,
       extraData: poolReturnData.destPoolData
     });
   }
@@ -613,7 +661,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       revert DestinationChainNotSupported(destChainSelector);
     }
 
-    Client.EVMExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(destChainConfig, message.extraArgs);
+    Client.GenericExtraArgsV3 memory resolvedExtraArgs =
+      _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
     // Update the CCVs list to include lane mandated and pool required CCVs.
     address[] memory poolRequiredCCVs = new address[](0);
     if (message.tokenAmounts.length != 0) {
@@ -649,7 +698,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function _getReceipts(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
-    Client.EVMExtraArgsV3 memory extraArgs
+    Client.GenericExtraArgsV3 memory extraArgs
   ) internal view returns (Receipt[] memory verifierReceipts) {
     // Already ensure there's room for the token transfer and executor receipts.
     verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
@@ -670,21 +719,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       });
     }
 
-    (uint16 usdCentsFee, uint64 execGasCost, uint32 execBytes) = IExecutor(extraArgs.executor).getFee(
-      destChainSelector,
-      extraArgs.finalityConfig,
-      uint32(message.data.length),
-      uint8(message.tokenAmounts.length),
-      extraArgs.ccvs,
-      extraArgs.executorArgs
-    );
-    verifierReceipts[verifierReceipts.length - 1] = Receipt({
-      issuer: extraArgs.executor,
-      destGasLimit: execGasCost, // TODO add user gas limit
-      destBytesOverhead: execBytes,
-      feeTokenAmount: usdCentsFee,
-      extraArgs: extraArgs.executorArgs
-    });
+    verifierReceipts[verifierReceipts.length - 1] =
+      _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
 
     if (message.tokenAmounts.length > 0) {
       // TODO pool fees
@@ -698,6 +734,43 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     return verifierReceipts;
+  }
+
+  /// @notice Gets the execution fee receipt. Takes into account specifying the NO_EXECUTION_ADDRESS.
+  /// @param destChainSelector The destination chain selector.
+  /// @param dataLength The length of the message data.
+  /// @param numberOfTokens The number of tokens being transferred.
+  /// @param extraArgs The extra arguments for the message.
+  /// @return receipt The execution fee receipt.
+  function _getExecutionFee(
+    uint64 destChainSelector,
+    uint256 dataLength,
+    uint256 numberOfTokens,
+    Client.GenericExtraArgsV3 memory extraArgs
+  ) internal view returns (Receipt memory) {
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    uint8 remoteChainAddressLengthBytes = destChainConfig.addressBytesLength;
+
+    // Even if no automated execution is requested, we still need to fill out the receipt for proper accounting.
+    // The gas limit and byte overhead are still relevant for estimating total message cost.
+    return Receipt({
+      issuer: extraArgs.executor,
+      destGasLimit: destChainConfig.baseExecutionGasCost + extraArgs.gasLimit,
+      // Since the message payload is the same on source and destination chains with the V1 codec, we can use the
+      // same calculation for execBytes on destination.
+      destBytesOverhead: uint32(
+        MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + extraArgs.executorArgs.length
+          + (MessageV1Codec.MESSAGE_V1_REMOTE_CHAIN_ADDRESSES * remoteChainAddressLengthBytes)
+          + (numberOfTokens * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + remoteChainAddressLengthBytes))
+      ),
+      // Only bill a flat fee when automated execution is enabled.
+      feeTokenAmount: extraArgs.executor == Client.NO_EXECUTION_ADDRESS
+        ? 0
+        : IExecutor(extraArgs.executor).getFee(
+          destChainSelector, extraArgs.finalityConfig, extraArgs.ccvs, extraArgs.executorArgs
+        ),
+      extraArgs: extraArgs.executorArgs
+    });
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
