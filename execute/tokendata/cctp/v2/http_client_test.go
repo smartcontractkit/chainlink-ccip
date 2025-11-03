@@ -50,10 +50,11 @@ type MockMetricsReporter struct {
 func (m *MockMetricsReporter) TrackAttestationAPILatency(
 	sourceChain cciptypes.ChainSelector,
 	sourceDomain uint32,
-	status string,
+	success bool,
+	httpStatus string,
 	latency time.Duration,
 ) {
-	m.Called(sourceChain, sourceDomain, status, latency)
+	m.Called(sourceChain, sourceDomain, success, httpStatus, latency)
 }
 
 func TestNewCCTPv2Client(t *testing.T) {
@@ -128,7 +129,7 @@ func TestGetMessages_Success(t *testing.T) {
 		nil,
 	)
 	mockMetrics.On("TrackAttestationAPILatency",
-		sourceChain, sourceDomainID, "success", mock.AnythingOfType("time.Duration")).Return()
+		sourceChain, sourceDomainID, true, "200", mock.AnythingOfType("time.Duration")).Return()
 
 	// Execute
 	result, err := client.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
@@ -187,9 +188,9 @@ func TestGetMessages_InvalidTransactionHash(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Setup mock to expect error status tracking
+			// Setup mock to expect error status tracking (validation errors have empty httpStatus)
 			mockMetrics.On("TrackAttestationAPILatency",
-				sourceChain, sourceDomainID, "error", mock.AnythingOfType("time.Duration")).Return().Once()
+				sourceChain, sourceDomainID, false, "", mock.AnythingOfType("time.Duration")).Return().Once()
 
 			// Execute
 			result, err := client.GetMessages(ctx, sourceChain, sourceDomainID, tc.txHash)
@@ -228,7 +229,7 @@ func TestGetMessages_HTTPError(t *testing.T) {
 		httpErr,
 	)
 	mockMetrics.On("TrackAttestationAPILatency",
-		sourceChain, sourceDomainID, "error", mock.AnythingOfType("time.Duration")).Return()
+		sourceChain, sourceDomainID, false, "0", mock.AnythingOfType("time.Duration")).Return()
 
 	// Execute
 	result, err := client.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
@@ -277,8 +278,9 @@ func TestGetMessages_NonOKStatus(t *testing.T) {
 				tc.statusCode,
 				nil,
 			).Once()
+			expectedStatus := fmt.Sprintf("%d", tc.statusCode)
 			mockMetrics.On("TrackAttestationAPILatency",
-				sourceChain, sourceDomainID, "error", mock.AnythingOfType("time.Duration")).Return().Once()
+				sourceChain, sourceDomainID, false, expectedStatus, mock.AnythingOfType("time.Duration")).Return().Once()
 
 			// Execute
 			result, err := client.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
@@ -318,7 +320,7 @@ func TestGetMessages_ParseError(t *testing.T) {
 		nil,
 	)
 	mockMetrics.On("TrackAttestationAPILatency",
-		sourceChain, sourceDomainID, "error", mock.AnythingOfType("time.Duration")).Return()
+		sourceChain, sourceDomainID, false, "200", mock.AnythingOfType("time.Duration")).Return()
 
 	// Execute
 	result, err := client.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
@@ -362,7 +364,7 @@ func TestGetMessages_URLEncoding(t *testing.T) {
 		nil,
 	)
 	mockMetrics.On("TrackAttestationAPILatency",
-		sourceChain, sourceDomainID, "success", mock.AnythingOfType("time.Duration")).Return()
+		sourceChain, sourceDomainID, true, "200", mock.AnythingOfType("time.Duration")).Return()
 
 	// Execute
 	_, err := client.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
@@ -403,9 +405,9 @@ func TestGetMessages_MetricsTracking(t *testing.T) {
 			nil,
 		).Once()
 
-		// Verify metrics called with "success"
+		// Verify metrics called with success
 		mockMetrics.On("TrackAttestationAPILatency",
-			sourceChain, sourceDomainID, "success", mock.AnythingOfType("time.Duration")).Return().Once()
+			sourceChain, sourceDomainID, true, "200", mock.AnythingOfType("time.Duration")).Return().Once()
 
 		_, err := client.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
 		require.NoError(t, err)
@@ -430,9 +432,9 @@ func TestGetMessages_MetricsTracking(t *testing.T) {
 			errors.New("http error"),
 		).Once()
 
-		// Verify metrics called with "error"
+		// Verify metrics called with error
 		mockMetrics.On("TrackAttestationAPILatency",
-			sourceChain, sourceDomainID, "error", mock.AnythingOfType("time.Duration")).Return().Once()
+			sourceChain, sourceDomainID, false, "0", mock.AnythingOfType("time.Duration")).Return().Once()
 
 		_, err := client.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
 		assert.Error(t, err)
@@ -462,7 +464,7 @@ func TestGetMessages_MetricsTracking(t *testing.T) {
 
 		// Should be called exactly once
 		mockMetrics.On("TrackAttestationAPILatency",
-			sourceChain, sourceDomainID, "success", mock.AnythingOfType("time.Duration")).Return().Once()
+			sourceChain, sourceDomainID, true, "200", mock.AnythingOfType("time.Duration")).Return().Once()
 
 		_, err := client.GetMessages(ctx, sourceChain, sourceDomainID, txHash)
 		require.NoError(t, err)
