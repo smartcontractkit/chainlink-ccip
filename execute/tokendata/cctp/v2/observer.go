@@ -199,6 +199,8 @@ func (o *CCTPv2TokenDataObserver) extractTokenData(
 }
 
 // attestationToTokenData converts attestation status to TokenData.
+//
+//nolint:unused,unparam
 func (o *CCTPv2TokenDataObserver) attestationToTokenData(
 	ctx context.Context,
 	seqNum cciptypes.SeqNum,
