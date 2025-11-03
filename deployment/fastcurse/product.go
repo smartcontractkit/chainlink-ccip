@@ -121,10 +121,14 @@ func (cr *CurseRegistry) groupRMNSubjectBySelector(e cldf.Environment, rmnSubjec
 		if err != nil {
 			return nil, err
 		}
-		adapter, ok := cr.GetCurseAdapter(family, s.Version)
+		v, err := semver.NewVersion(s.Version)
+		if err != nil {
+			return nil, fmt.Errorf("invalid curse adapter version '%s': %w", s.Version, err)
+		}
+		adapter, ok := cr.GetCurseAdapter(family, v)
 		if !ok {
 			return nil, fmt.Errorf("no curse adapter registered for chain family '%s' and RMN version '%s'",
-				family, s.Version.String())
+				family, s.Version)
 		}
 		// Skip self-curse
 		if s.SubjectChainSelector == s.ChainSelector {

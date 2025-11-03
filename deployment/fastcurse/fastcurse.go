@@ -14,7 +14,7 @@ import (
 )
 
 type GlobalCurseOnNetworkInput struct {
-	ChainSelectors map[uint64]*semver.Version
+	ChainSelectors map[uint64]string
 	MCMS           mcms.Input
 }
 
@@ -32,7 +32,7 @@ type CurseActionInput struct {
 	IsGlobalCurse        bool
 	ChainSelector        uint64
 	SubjectChainSelector uint64
-	Version              *semver.Version
+	Version              string
 }
 
 type curseActionDetails struct {
@@ -80,10 +80,14 @@ func formCurseConfigForGlobalCurse(e cldf.Environment, cr *CurseRegistry, cfg Gl
 		if err != nil {
 			return curseCfg, err
 		}
-		adapter, ok := cr.GetCurseAdapter(family, version)
+		semverVersion, err := semver.NewVersion(version)
+		if err != nil {
+			return curseCfg, fmt.Errorf("invalid semver version '%s' for chain selector %d: %w", version, chainSelector, err)
+		}
+		adapter, ok := cr.GetCurseAdapter(family, semverVersion)
 		if !ok {
 			return curseCfg, fmt.Errorf("no curse adapter registered for chain family '%s' and RMN version '%s'",
-				family, version.String())
+				family, semverVersion)
 		}
 		err = adapter.Initialize(e, chainSelector)
 		if err != nil {
@@ -109,7 +113,7 @@ func formCurseConfigForGlobalCurse(e cldf.Environment, cr *CurseRegistry, cfg Gl
 			}
 			curseCfg.CurseActions = append(curseCfg.CurseActions, CurseActionInput{
 				ChainSelector:        connectedChainSelector,
-				Version:              connectedVersion,
+				Version:              connectedVersion.String(),
 				SubjectChainSelector: chainSelector,
 			})
 		}

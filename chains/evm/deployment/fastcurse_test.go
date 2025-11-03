@@ -245,13 +245,13 @@ func TestFastCurse(t *testing.T) {
 				IsGlobalCurse:        false,
 				ChainSelector:        chain1,
 				SubjectChainSelector: chain2,
-				Version:              semver.MustParse("1.5.0"),
+				Version:              "1.5.0",
 			},
 			{
 				IsGlobalCurse:        false,
 				ChainSelector:        chain2,
 				SubjectChainSelector: chain1,
-				Version:              semver.MustParse("1.6.0"),
+				Version:              "1.6.0",
 			},
 		},
 		Force: false,
@@ -552,8 +552,8 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	t.Logf("Transferred ownership of RMN and RMNRemote to respective MCMS")
 	// now generate a global curse on chain 3
 	curseCfg := fastcurse.GlobalCurseOnNetworkInput{
-		ChainSelectors: map[uint64]*semver.Version{
-			chain3: semver.MustParse("1.6.0"),
+		ChainSelectors: map[uint64]string{
+			chain3: "1.6.0",
 		},
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
