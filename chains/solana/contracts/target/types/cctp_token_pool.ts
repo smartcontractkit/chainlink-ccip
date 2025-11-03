@@ -1,5 +1,5 @@
 export type CctpTokenPool = {
-  "version": "1.6.0-candidate",
+  "version": "1.6.0",
   "name": "cctp_token_pool",
   "instructions": [
     {
@@ -1388,7 +1388,7 @@ export type CctpTokenPool = {
 };
 
 export const IDL: CctpTokenPool = {
-  "version": "1.6.0-candidate",
+  "version": "1.6.0",
   "name": "cctp_token_pool",
   "instructions": [
     {

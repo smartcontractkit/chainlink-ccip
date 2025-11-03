@@ -1,6 +1,6 @@
 [package]
 name = "cctp-token-pool"
-version = "1.6.0-candidate"
+version = "1.6.0"
 description = "USDC Token Pool for CCIP utilizing CCTP"
 edition = "2021"
 
@@ -18,7 +18,7 @@ default = []
 [dependencies]
 anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
 anchor-spl = "0.29.0"
-base-token-pool = { version = "1.6.0-candidate", path = "../base-token-pool/", features = ["no-entrypoint"] }
+base-token-pool = { version = "1.6.0", path = "../base-token-pool/", features = ["no-entrypoint"] }
 ccip_common = {path = "../ccip-common"}
 solana-program = "1.17.25"
 
