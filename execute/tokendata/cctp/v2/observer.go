@@ -217,12 +217,18 @@ func (o *CCTPv2TokenDataObserver) attestationToTokenData(
 	tokenIndex int,
 	attestations map[reader.MessageTokenID]tokendata.AttestationStatus,
 ) exectypes.TokenData {
-	// TODO: Implement attestation to token data conversion
-	// - Look up attestation for MessageTokenID(seqNum, tokenIndex)
-	// - If missing: tokendata.NewErrorTokenData(tokendata.ErrNotReady)
-	// - If error: tokendata.NewErrorTokenData(status.Error)
-	// - If success: Encode using o.attestationEncoder and return tokendata.NewSuccessTokenData(encoded)
-	return exectypes.NotSupportedTokenData()
+	status, ok := attestations[reader.NewMessageTokenID(seqNum, tokenIndex)]
+	if !ok {
+		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
+	}
+	if status.Error != nil {
+		return exectypes.NewErrorTokenData(status.Error)
+	}
+	tokenData, err := o.attestationEncoder(ctx, status.MessageBody, status.Attestation)
+	if err != nil {
+		return exectypes.NewErrorTokenData(fmt.Errorf("unable to encode attestation: %w", err))
+	}
+	return exectypes.NewSuccessTokenData(tokenData)
 }
 
 // TxKey represents a unique identifier for grouping messages by transaction.

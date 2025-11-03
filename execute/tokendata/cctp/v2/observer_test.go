@@ -1,13 +1,18 @@
 package v2
 
 import (
+	"context"
 	"encoding/binary"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 func TestDecodeSourceTokenDataPayloadV2(t *testing.T) {
@@ -216,4 +221,206 @@ func TestDecodeSourceTokenDataPayloadV2(t *testing.T) {
 		assert.Equal(t, result1.SourceDomain, result2.SourceDomain)
 		assert.Equal(t, result1.DepositHash, result2.DepositHash)
 	})
+}
+
+// Mock encoders for testing
+func successEncoder(ctx context.Context, msgBody, attestation cciptypes.Bytes) (cciptypes.Bytes, error) {
+	// Simple pass-through encoder that returns the attestation
+	return attestation, nil
+}
+
+func errorEncoder(ctx context.Context, msgBody, attestation cciptypes.Bytes) (cciptypes.Bytes, error) {
+	return nil, errors.New("encoding failed")
+}
+
+func transformEncoder(ctx context.Context, msgBody, attestation cciptypes.Bytes) (cciptypes.Bytes, error) {
+	// Combines message body and attestation for verification
+	result := make(cciptypes.Bytes, 0, len(msgBody)+len(attestation))
+	result = append(result, msgBody...)
+	result = append(result, attestation...)
+	return result, nil
+}
+
+func Test_attestationToTokenData(t *testing.T) {
+	tests := []struct {
+		name           string
+		seqNum         cciptypes.SeqNum
+		tokenIndex     int
+		attestations   map[reader.MessageTokenID]tokendata.AttestationStatus
+		encoder        AttestationEncoder
+		expectedReady  bool
+		expectedError  error
+		expectedData   cciptypes.Bytes
+	}{
+		{
+			name:       "Success - valid attestation",
+			seqNum:     100,
+			tokenIndex: 0,
+			attestations: map[reader.MessageTokenID]tokendata.AttestationStatus{
+				reader.NewMessageTokenID(100, 0): {
+					MessageBody: []byte{0x01, 0x02},
+					Attestation: []byte{0xAB, 0xCD},
+					Error:       nil,
+				},
+			},
+			encoder:       successEncoder,
+			expectedReady: true,
+			expectedError: nil,
+			expectedData:  []byte{0xAB, 0xCD},
+		},
+		{
+			name:       "Success - transform encoder combines data",
+			seqNum:     200,
+			tokenIndex: 1,
+			attestations: map[reader.MessageTokenID]tokendata.AttestationStatus{
+				reader.NewMessageTokenID(200, 1): {
+					MessageBody: []byte{0x11, 0x22},
+					Attestation: []byte{0x33, 0x44},
+					Error:       nil,
+				},
+			},
+			encoder:       transformEncoder,
+			expectedReady: true,
+			expectedError: nil,
+			expectedData:  []byte{0x11, 0x22, 0x33, 0x44},
+		},
+		{
+			name:         "Error - missing attestation",
+			seqNum:       100,
+			tokenIndex:   0,
+			attestations: map[reader.MessageTokenID]tokendata.AttestationStatus{},
+			encoder:      successEncoder,
+			expectedReady: false,
+			expectedError: tokendata.ErrDataMissing,
+			expectedData:  nil,
+		},
+		{
+			name:       "Error - attestation has ErrNotReady",
+			seqNum:     100,
+			tokenIndex: 0,
+			attestations: map[reader.MessageTokenID]tokendata.AttestationStatus{
+				reader.NewMessageTokenID(100, 0): {
+					MessageBody: []byte{0x01, 0x02},
+					Attestation: []byte{0xAB, 0xCD},
+					Error:       tokendata.ErrNotReady,
+				},
+			},
+			encoder:       successEncoder,
+			expectedReady: false,
+			expectedError: tokendata.ErrNotReady,
+			expectedData:  nil,
+		},
+		{
+			name:       "Error - attestation has custom error",
+			seqNum:     100,
+			tokenIndex: 0,
+			attestations: map[reader.MessageTokenID]tokendata.AttestationStatus{
+				reader.NewMessageTokenID(100, 0): {
+					MessageBody: []byte{0x01, 0x02},
+					Attestation: []byte{0xAB, 0xCD},
+					Error:       errors.New("custom API error"),
+				},
+			},
+			encoder:       successEncoder,
+			expectedReady: false,
+			expectedError: errors.New("custom API error"),
+			expectedData:  nil,
+		},
+		{
+			name:       "Error - encoder failure",
+			seqNum:     100,
+			tokenIndex: 0,
+			attestations: map[reader.MessageTokenID]tokendata.AttestationStatus{
+				reader.NewMessageTokenID(100, 0): {
+					MessageBody: []byte{0x01, 0x02},
+					Attestation: []byte{0xAB, 0xCD},
+					Error:       nil,
+				},
+			},
+			encoder:       errorEncoder,
+			expectedReady: false,
+			expectedError: errors.New("unable to encode attestation: encoding failed"),
+			expectedData:  nil,
+		},
+		{
+			name:       "Edge case - empty data with success encoder",
+			seqNum:     100,
+			tokenIndex: 0,
+			attestations: map[reader.MessageTokenID]tokendata.AttestationStatus{
+				reader.NewMessageTokenID(100, 0): {
+					MessageBody: []byte{},
+					Attestation: []byte{},
+					Error:       nil,
+				},
+			},
+			encoder:       successEncoder,
+			expectedReady: true,
+			expectedError: nil,
+			expectedData:  []byte{},
+		},
+		{
+			name:       "Edge case - different seqNum/tokenIndex combination",
+			seqNum:     999,
+			tokenIndex: 5,
+			attestations: map[reader.MessageTokenID]tokendata.AttestationStatus{
+				reader.NewMessageTokenID(999, 5): {
+					MessageBody: []byte{0xFF},
+					Attestation: []byte{0xEE},
+					Error:       nil,
+				},
+			},
+			encoder:       successEncoder,
+			expectedReady: true,
+			expectedError: nil,
+			expectedData:  []byte{0xEE},
+		},
+		{
+			name:       "Error - wrong MessageTokenID in map",
+			seqNum:     100,
+			tokenIndex: 0,
+			attestations: map[reader.MessageTokenID]tokendata.AttestationStatus{
+				reader.NewMessageTokenID(100, 1): { // Different tokenIndex
+					MessageBody: []byte{0x01, 0x02},
+					Attestation: []byte{0xAB, 0xCD},
+					Error:       nil,
+				},
+			},
+			encoder:       successEncoder,
+			expectedReady: false,
+			expectedError: tokendata.ErrDataMissing,
+			expectedData:  nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			observer := &CCTPv2TokenDataObserver{
+				attestationEncoder: tc.encoder,
+			}
+
+			result := observer.attestationToTokenData(
+				context.Background(),
+				tc.seqNum,
+				tc.tokenIndex,
+				tc.attestations,
+			)
+
+			// Verify Ready flag
+			assert.Equal(t, tc.expectedReady, result.Ready, "Ready flag mismatch")
+
+			// Verify Supported flag (should always be true for this function)
+			assert.True(t, result.Supported, "Supported should always be true")
+
+			// Verify Data
+			assert.Equal(t, tc.expectedData, result.Data, "Data mismatch")
+
+			// Verify Error
+			if tc.expectedError != nil {
+				require.Error(t, result.Error, "Expected error but got nil")
+				assert.Equal(t, tc.expectedError.Error(), result.Error.Error(), "Error message mismatch")
+			} else {
+				assert.NoError(t, result.Error, "Expected no error but got one")
+			}
+		})
+	}
 }
