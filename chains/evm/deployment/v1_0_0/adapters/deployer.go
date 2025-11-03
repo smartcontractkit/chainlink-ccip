@@ -18,6 +18,8 @@ import (
 	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 )
 
+var Version = semver.MustParse("1.0.0")
+
 type EVMDeployer struct{}
 
 func (a *EVMDeployer) DeployChainContracts() *cldf_ops.Sequence[ccipapi.ContractDeploymentConfigPerChainWithAddress, sequtil.OnChainOutput, cldf_chain.BlockChains] {

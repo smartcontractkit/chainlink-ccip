@@ -19,6 +19,7 @@ import (
 	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_solana "github.com/smartcontractkit/mcms/sdk/solana"
@@ -32,15 +33,17 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	}
 	mcmAddress := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		utils.McmProgramType,
 		common_utils.Version_1_6_0,
 		"",
 	)
 	proposerSeed := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		common_utils.ProposerManyChainMultisig,
 		common_utils.Version_1_6_0,
-		input.MCMSAddressRef.Qualifier,
+		input.Qualifier,
 	)
 	proposer := mcms_solana.ContractAddress(
 		solana.MustPublicKeyFromBase58(mcmAddress.Address),
@@ -57,25 +60,28 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	case mcms_types.TimelockActionSchedule:
 		ref := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
+			chainSelector,
 			common_utils.ProposerManyChainMultisig,
 			common_utils.Version_1_6_0,
-			input.MCMSAddressRef.Qualifier,
+			input.Qualifier,
 		)
 		instanceSeed = mcms_solana.PDASeed([]byte(ref.Address))
 	case mcms_types.TimelockActionCancel:
 		ref := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
+			chainSelector,
 			common_utils.CancellerManyChainMultisig,
 			common_utils.Version_1_6_0,
-			input.MCMSAddressRef.Qualifier,
+			input.Qualifier,
 		)
 		instanceSeed = mcms_solana.PDASeed([]byte(ref.Address))
 	case mcms_types.TimelockActionBypass:
 		ref := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
+			chainSelector,
 			common_utils.BypasserManyChainMultisig,
 			common_utils.Version_1_6_0,
-			input.MCMSAddressRef.Qualifier,
+			input.Qualifier,
 		)
 		instanceSeed = mcms_solana.PDASeed([]byte(ref.Address))
 	default:
@@ -83,21 +89,24 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	}
 	proposerAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		mcmsops.ProposerAccessControllerAccount,
 		common_utils.Version_1_6_0,
-		input.MCMSAddressRef.Qualifier,
+		input.Qualifier,
 	)
 	cancellerAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		mcmsops.CancellerAccessControllerAccount,
 		common_utils.Version_1_6_0,
-		input.MCMSAddressRef.Qualifier,
+		input.Qualifier,
 	)
 	bypasserAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
+		chainSelector,
 		mcmsops.BypasserAccessControllerAccount,
 		common_utils.Version_1_6_0,
-		input.MCMSAddressRef.Qualifier,
+		input.Qualifier,
 	)
 	metadata, err := mcms_solana.NewChainMetadata(
 		opcount,
@@ -110,6 +119,28 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to create Solana MCMS chain metadata for chain %d: %w", chainSelector, err)
 	}
 	return metadata, nil
+}
+
+func (a *SolanaAdapter) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (cldf_datastore.AddressRef, error) {
+	timelockRef := datastore.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chainSelector,
+		utils.TimelockCompositeAddress,
+		common_utils.Version_1_6_0,
+		input.Qualifier,
+	)
+	return timelockRef, nil
+}
+
+func (a *SolanaAdapter) GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (cldf_datastore.AddressRef, error) {
+	mcmAddress := datastore.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chainSelector,
+		utils.McmProgramType,
+		common_utils.Version_1_6_0,
+		input.Qualifier,
+	)
+	return mcmAddress, nil
 }
 
 func (a *SolanaAdapter) InitializeTimelockAddress(e deployment.Environment, input mcms.Input) error {

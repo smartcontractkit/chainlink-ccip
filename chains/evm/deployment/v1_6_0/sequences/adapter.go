@@ -23,6 +23,7 @@ func init() {
 	}
 	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, &EVMAdapter{})
+	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 }
 
 type EVMAdapter struct{}
@@ -32,7 +33,7 @@ func (a *EVMAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onramp.ContractType),
 		Version:       onramp.Version,
-	}, chainSelector, evm_datastore_utils.ToPaddedEVMAddress)
+	}, chainSelector, evm_datastore_utils.ToByteArray)
 	if err != nil {
 		return nil, err
 	}

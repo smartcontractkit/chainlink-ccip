@@ -100,6 +100,18 @@ var AddPriceUpdater = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add price updater instruction: %w", err)
 		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{instruction},
+				input.FeeQuoter.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
 		err = chain.Confirm([]solana.Instruction{instruction})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
@@ -152,6 +164,18 @@ var ConnectChains = operations.NewOperation(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
 			}
+		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.FeeQuoter.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
 		}
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {

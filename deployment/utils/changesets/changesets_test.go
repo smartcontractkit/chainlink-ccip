@@ -24,8 +24,25 @@ const OP_COUNT = 42
 
 func (m *MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
 	return mcms_types.ChainMetadata{
-		MCMAddress:      input.MCMSAddressRef.Address,
 		StartingOpCount: OP_COUNT,
+	}, nil
+}
+
+func (m *MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0x01",
+		Type:          datastore.ContractType("Timelock"),
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+func (m *MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0x02",
+		Type:          datastore.ContractType("MCM"),
+		Version:       semver.MustParse("1.0.0"),
 	}, nil
 }
 
@@ -167,15 +184,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 					ValidUntil:           4126214326,
 					TimelockDelay:        mcms_types.MustParseDuration("1h"),
 					TimelockAction:       mcms_types.TimelockActionSchedule,
-					MCMSAddressRef: datastore.AddressRef{
-						Type:    "MCM",
-						Version: semver.MustParse("1.0.0"),
-					},
-					TimelockAddressRef: datastore.AddressRef{
-						Type:    "Timelock",
-						Version: semver.MustParse("1.0.0"),
-					},
-					Description: "Test Proposal",
+					Description:          "Test Proposal",
 				},
 			})
 			require.NoError(t, err)

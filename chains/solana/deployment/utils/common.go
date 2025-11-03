@@ -69,9 +69,11 @@ func BuildMCMSBatchOperation(
 
 func GetTimelockSignerPDA(
 	existingAddresses []cldf_datastore.AddressRef,
+	chainSelector uint64,
 	qualifier string) solana.PublicKey {
 	timelockProgram := datastore.GetAddressRef(
 		existingAddresses,
+		chainSelector,
 		TimelockProgramType,
 		common_utils.Version_1_6_0,
 		"",
@@ -80,6 +82,7 @@ func GetTimelockSignerPDA(
 	// qualifier will identify the correct timelock instance
 	timelockSeed := datastore.GetAddressRef(
 		existingAddresses,
+		chainSelector,
 		common_utils.RBACTimelock,
 		common_utils.Version_1_6_0,
 		qualifier,
@@ -92,9 +95,11 @@ func GetTimelockSignerPDA(
 
 func GetMCMSignerPDA(
 	existingAddresses []cldf_datastore.AddressRef,
+	chainSelector uint64,
 	qualifier string) solana.PublicKey {
 	mcmProgram := datastore.GetAddressRef(
 		existingAddresses,
+		chainSelector,
 		McmProgramType,
 		common_utils.Version_1_6_0,
 		"",
@@ -103,6 +108,7 @@ func GetMCMSignerPDA(
 	// qualifier will identify the correct mcm instance
 	mcmSeed := datastore.GetAddressRef(
 		existingAddresses,
+		chainSelector,
 		common_utils.ProposerManyChainMultisig,
 		common_utils.Version_1_6_0,
 		qualifier,
@@ -115,9 +121,11 @@ func GetMCMSignerPDA(
 
 func GetTimelockCompositeAddress(
 	existingAddresses []cldf_datastore.AddressRef,
+	chainSelector uint64,
 	qualifier string) string {
 	timelockProgram := datastore.GetAddressRef(
 		existingAddresses,
+		chainSelector,
 		TimelockProgramType,
 		common_utils.Version_1_6_0,
 		"",
@@ -126,6 +134,7 @@ func GetTimelockCompositeAddress(
 	// qualifier will identify the correct timelock instance
 	timelockSeed := datastore.GetAddressRef(
 		existingAddresses,
+		chainSelector,
 		common_utils.RBACTimelock,
 		common_utils.Version_1_6_0,
 		qualifier,

@@ -162,6 +162,7 @@ func initAccessController(b operations.Bundle, deps Deps, in InitAccessControlle
 	// Should be one of the AccessControllerAccount types
 	ref := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		in.ChainSel,
 		in.ContractType,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
@@ -252,6 +253,7 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.Ad
 	// ProposerManyChainMultisig
 	ref := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		in.ChainSel,
 		in.ContractType,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
@@ -349,6 +351,7 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) ([]cldf_
 	// RBACTimelock
 	ref := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		in.ChainSel,
 		in.ContractType,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
@@ -429,30 +432,35 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 
 	accessControllerProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		AccessControllerProgramType,
 		common_utils.Version_1_6_0,
 		"",
 	)
 	proposerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		ProposerAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	executorAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		ExecutorAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	cancellerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		CancellerAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	bypasserAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		BypasserAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
@@ -487,12 +495,14 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastore.AddressRef, error) {
 	accessControllerProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		AccessControllerProgramType,
 		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
 	timelockProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		utils.TimelockProgramType,
 		common_utils.Version_1_6_0,
 		in.Qualifier,
@@ -501,6 +511,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 	// qualifier will identify the correct timelock instance
 	timelockSeed := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		common_utils.RBACTimelock,
 		common_utils.Version_1_6_0,
 		in.Qualifier,
@@ -524,6 +535,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 	}
 	roleAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		roleAccessController,
 		common_utils.Version_1_6_0,
 		in.Qualifier,
