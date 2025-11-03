@@ -194,23 +194,52 @@ func (o *CCTPv2TokenDataObserver) matchAttestationsToMessages(
 	return make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus)
 }
 
-// extractTokenData builds final TokenDataObservations structure.
+// extractTokenData builds final TokenDataObservations by iterating through all messages and their tokens.
+// For CCTPv2 USDC tokens, it fetches attestation data in attestationToTokenData.
+// For unsupported tokens, it returns NotSupportedTokenData. Handles nil attestations when no V2 messages exist.
 func (o *CCTPv2TokenDataObserver) extractTokenData(
 	ctx context.Context,
 	lggr logger.Logger,
 	messages exectypes.MessageObservations,
 	attestations map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus,
 ) (exectypes.TokenDataObservations, error) {
-	// TODO: Implement token data extraction
-	// - Iterate through all original messages
-	// - For each token in each message:
-	//   - If not supported: exectypes.NotSupportedTokenData()
-	//   - If supported: Call o.attestationToTokenData()
-	// - Return: exectypes.TokenDataObservations
-	return make(exectypes.TokenDataObservations), nil
+	tokenObservations := make(exectypes.TokenDataObservations)
+
+	for chainSelector, chainMessages := range messages {
+		tokenObservations[chainSelector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+
+		for seqNum, message := range chainMessages {
+			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
+
+			for i, tokenAmount := range message.TokenAmounts {
+				if !o.IsTokenSupported(chainSelector, tokenAmount) {
+					lggr.Debugw(
+						"Ignoring unsupported token",
+						"seqNum", seqNum,
+						"sourceChainSelector", chainSelector,
+						"sourcePoolAddress", tokenAmount.SourcePoolAddress.String(),
+						"destTokenAddress", tokenAmount.DestTokenAddress.String(),
+					)
+					tokenData[i] = exectypes.NotSupportedTokenData()
+				} else {
+					var chainAttestations map[reader.MessageTokenID]tokendata.AttestationStatus
+					if attestations != nil {
+						chainAttestations = attestations[chainSelector]
+					}
+					tokenData[i] = o.attestationToTokenData(ctx, seqNum, i, chainAttestations)
+				}
+			}
+
+			tokenObservations[chainSelector][seqNum] = exectypes.NewMessageTokenData(tokenData...)
+		}
+	}
+
+	return tokenObservations, nil
 }
 
-// attestationToTokenData converts attestation status to TokenData.
+// attestationToTokenData looks up and encodes attestation for a specific token in a message.
+// Returns ErrorTokenData if attestation is missing, has errors, or encoding fails.
+// On success, uses attestationEncoder to format data for the USDC token pool.
 func (o *CCTPv2TokenDataObserver) attestationToTokenData(
 	ctx context.Context,
 	seqNum cciptypes.SeqNum,
