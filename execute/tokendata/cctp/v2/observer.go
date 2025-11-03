@@ -18,7 +18,7 @@ package v2
 
 import (
 	"context"
-	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -30,27 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
-
-// AttestationEncoder encodes CCTP message and attestation into format expected by USDC token pool.
-type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
-
-// CCTP version tags for identifying V2 messages.
-const (
-	// CCTP_VERSION_2_TAG identifies standard CCTP V2 transfers (slow transfers).
-	// Preimage: keccak256("CCTP_V2")
-	CCTP_VERSION_2_TAG = 0xb148ea5f
-
-	// CCTP_VERSION_2_CCV_TAG identifies CCTP V2 transfers with CCIP v1.7 fast transfer support.
-	// CCV = Cross-Chain Verification. Enables fast transfers with verification infrastructure.
-	// Preimage: keccak256("CCTP_V2_CCV")
-	CCTP_VERSION_2_CCV_TAG = 0x3047587c
-)
-
-// SourceTokenDataPayloadV2 represents the CCTPv2 source pool data embedded in message token data.
-type SourceTokenDataPayloadV2 struct {
-	SourceDomain uint32
-	DepositHash  [32]byte
-}
 
 // CCTPv2TokenDataObserver observes CCTPv2 USDC messages and fetches attestations from Circle's v2 API.
 type CCTPv2TokenDataObserver struct {
@@ -103,14 +82,15 @@ func (o *CCTPv2TokenDataObserver) Observe(
 
 	// Step 4: Fetch CCTPv2 messages and attestations from Circle API
 	// Calls GET /v2/messages/{sourceDomain}?transactionHash={hash}
-	cctpMessages, err := o.fetchCCTPv2Attestations(ctx, txGroups)
+	// Matches messages to MessageTokenIDs using depositHash
+	cctpMessages, err := o.fetchCCTPv2Attestations(ctx, txGroups, v2Messages)
 	if err != nil {
 		return nil, fmt.Errorf("fetch CCTPv2 attestations: %w", err)
 	}
 
-	// Step 5: Match Circle API responses to CCIP messages using depositHash
-	// Validates that attestation matches the expected message parameters
-	attestations := o.matchAttestationsToMessages(cctpMessages, v2Messages)
+	// Step 5: Build AttestationStatus objects from matched CCTP messages
+	// Decodes hex-encoded message and attestation bytes into AttestationStatus structures
+	attestations := o.buildAttestationStatuses(cctpMessages, v2Messages)
 
 	// Step 6: Build final TokenDataObservations
 	// Encodes attestations and creates TokenData for each message token
@@ -130,18 +110,70 @@ func (o *CCTPv2TokenDataObserver) Close() error {
 	return nil
 }
 
+// processSingleToken attempts to process a single token and returns its payload if valid.
+// Returns nil, nil for unsupported tokens (not an error case).
+// Returns nil, error for tokens that fail to decode.
+func (o *CCTPv2TokenDataObserver) processSingleToken(
+	chainSelector cciptypes.ChainSelector,
+	seqNum cciptypes.SeqNum,
+	tokenIndex int,
+	tokenAmount cciptypes.RampTokenAmount,
+	lggr logger.Logger,
+) (*SourceTokenDataPayloadV2, error) {
+	// Check if token is from a supported pool
+	if !o.IsTokenSupported(chainSelector, tokenAmount) {
+		return nil, nil // Not an error, just not supported
+	}
+
+	// Try to decode CCTPv2 payload from ExtraData
+	payload, err := DecodeSourceTokenDataPayloadV2(tokenAmount.ExtraData)
+	if err != nil {
+		lggr.Warnw(
+			"Failed to decode CCTPv2 source token data",
+			"chainSelector", chainSelector,
+			"seqNum", seqNum,
+			"tokenIndex", tokenIndex,
+			"error", err,
+		)
+		return nil, err
+	}
+
+	return payload, nil
+}
+
 // pickOnlyCCTPv2Messages filters messages containing CCTPv2 USDC tokens and decodes their payloads.
 func (o *CCTPv2TokenDataObserver) pickOnlyCCTPv2Messages(
 	lggr logger.Logger,
 	messages exectypes.MessageObservations,
 ) map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2 {
-	// TODO: Implement filtering and decoding logic
-	// - Iterate through all messages and their TokenAmounts
-	// - Check if token is supported via o.IsTokenSupported()
-	// - Verify ExtraData starts with CCTP_VERSION_2_TAG
-	// - Decode SourceTokenDataPayloadV2 from ExtraData
-	// - Return: chainSelector -> MessageTokenID -> SourceTokenDataPayloadV2
-	return make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2)
+	result := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2)
+
+	// Iterate through each chain
+	for chainSelector, chainMessages := range messages {
+		// Iterate through each message
+		for seqNum, message := range chainMessages {
+			// Process each token in the message
+			for i, tokenAmount := range message.TokenAmounts {
+				// Attempt to process this token
+				payload, err := o.processSingleToken(chainSelector, seqNum, i, tokenAmount, lggr)
+				if err != nil || payload == nil {
+					// Skip unsupported tokens or tokens that failed to decode
+					continue
+				}
+
+				// Lazy initialize chain map if needed
+				if result[chainSelector] == nil {
+					result[chainSelector] = make(map[reader.MessageTokenID]*SourceTokenDataPayloadV2)
+				}
+
+				// Store the successfully decoded payload
+				msgTokenID := reader.NewMessageTokenID(seqNum, i)
+				result[chainSelector][msgTokenID] = payload
+			}
+		}
+	}
+
+	return result
 }
 
 // extractTransactionHashes gets transaction hash for each V2 message token.
@@ -149,10 +181,40 @@ func (o *CCTPv2TokenDataObserver) extractTransactionHashes(
 	messages exectypes.MessageObservations,
 	v2Messages map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2,
 ) map[cciptypes.ChainSelector]map[reader.MessageTokenID]string {
-	// TODO: Implement transaction hash extraction
-	// - Extract message.Header.TxHash for each message
-	// - Return: chainSelector -> MessageTokenID -> txHash (string)
-	return make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]string)
+	result := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]string)
+
+	// Iterate through each chain's V2 messages
+	for chainSelector, chainV2Messages := range v2Messages {
+		// Initialize map for this chain
+		result[chainSelector] = make(map[reader.MessageTokenID]string)
+
+		// For each V2 message token, extract its transaction hash
+		for msgTokenID := range chainV2Messages {
+			// Extract sequence number from MessageTokenID
+			seqNum := msgTokenID.SeqNr
+
+			// Look up the full message using chainSelector and seqNum
+			message, ok := messages[chainSelector][seqNum]
+			if !ok {
+				// Message not found - this shouldn't happen but be defensive
+				o.lggr.Warnw(
+					"Message not found for V2 token",
+					"chainSelector", chainSelector,
+					"seqNum", seqNum,
+					"messageTokenID", msgTokenID,
+				)
+				continue
+			}
+
+			// Extract TxHash from message header
+			txHash := message.Header.TxHash
+
+			// Store the mapping
+			result[chainSelector][msgTokenID] = txHash
+		}
+	}
+
+	return result
 }
 
 // groupMessagesByTransaction groups messages by (sourceDomain, txHash) for batch API calls.
@@ -160,38 +222,356 @@ func (o *CCTPv2TokenDataObserver) groupMessagesByTransaction(
 	txHashes map[cciptypes.ChainSelector]map[reader.MessageTokenID]string,
 	v2Messages map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2,
 ) map[cciptypes.ChainSelector]map[TxKey][]reader.MessageTokenID {
-	// TODO: Implement grouping logic
-	// - Group messages by (sourceDomain, txHash) tuple
-	// - Extract sourceDomain from SourceTokenDataPayloadV2 (NO mapping needed!)
-	// - Return: chainSelector -> TxKey -> []MessageTokenID
-	return make(map[cciptypes.ChainSelector]map[TxKey][]reader.MessageTokenID)
+	result := make(map[cciptypes.ChainSelector]map[TxKey][]reader.MessageTokenID)
+
+	// Iterate through each chain
+	for chainSelector, chainV2Messages := range v2Messages {
+		// Initialize map for this chain
+		if result[chainSelector] == nil {
+			result[chainSelector] = make(map[TxKey][]reader.MessageTokenID)
+		}
+
+		// Group messages by (sourceDomain, txHash)
+		for msgTokenID, v2Msg := range chainV2Messages {
+			// Get transaction hash for this message token
+			txHash, ok := txHashes[chainSelector][msgTokenID]
+			if !ok {
+				// This shouldn't happen if extractTransactionHashes is implemented correctly,
+				// but we skip messages without transaction hashes to be defensive
+				o.lggr.Warnw(
+					"Transaction hash not found for MessageTokenID",
+					"chainSelector", chainSelector,
+					"messageTokenID", msgTokenID,
+				)
+				continue
+			}
+
+			// Create composite key from sourceDomain (from v2Msg) and txHash
+			txKey := TxKey{
+				SourceDomain: v2Msg.SourceDomain,
+				TxHash:       txHash,
+			}
+
+			// Append MessageTokenID to the group for this transaction
+			result[chainSelector][txKey] = append(result[chainSelector][txKey], msgTokenID)
+		}
+	}
+
+	return result
 }
 
-// fetchCCTPv2Attestations queries Circle API for attestations.
+// calculateDepositHashes calculates deposit hashes for all Circle messages
+func (o *CCTPv2TokenDataObserver) calculateDepositHashes(
+	cctpMessages []CCTPv2Message,
+	chainSelector cciptypes.ChainSelector,
+	txHash string,
+) map[int]depositHashResult {
+	calculatedHashes := make(map[int]depositHashResult)
+
+	for i, cctpMsg := range cctpMessages {
+		hash, err := CalculateDepositHash(cctpMsg.DecodedMessage)
+		if err != nil {
+			o.lggr.Warnw(
+				"Failed to calculate depositHash for Circle message",
+				"chainSelector", chainSelector,
+				"txHash", txHash,
+				"messageIndex", i,
+				"eventNonce", cctpMsg.EventNonce,
+				"sourceDomain", cctpMsg.DecodedMessage.SourceDomain,
+				"destinationDomain", cctpMsg.DecodedMessage.DestinationDomain,
+				"amount", cctpMsg.DecodedMessage.DecodedMessageBody.Amount,
+				"error", err,
+			)
+		}
+		calculatedHashes[i] = depositHashResult{hash: hash, err: err}
+	}
+
+	return calculatedHashes
+}
+
+// fetchMessagesForTransaction calls Circle API for a single transaction.
+func (o *CCTPv2TokenDataObserver) fetchMessagesForTransaction(
+	ctx context.Context,
+	chainSelector cciptypes.ChainSelector,
+	txKey TxKey,
+) (CCTPv2Messages, error) {
+	cctpMessages, err := o.httpClient.GetMessages(
+		ctx,
+		chainSelector,
+		txKey.SourceDomain,
+		txKey.TxHash,
+	)
+
+	if err != nil {
+		o.lggr.Warnw(
+			"Failed to fetch CCTP messages from Circle API",
+			"chainSelector", chainSelector,
+			"sourceDomain", txKey.SourceDomain,
+			"txHash", txKey.TxHash,
+			"error", err,
+		)
+		return CCTPv2Messages{}, err
+	}
+
+	o.lggr.Debugw(
+		"Fetched CCTP messages from Circle API",
+		"chainSelector", chainSelector,
+		"sourceDomain", txKey.SourceDomain,
+		"txHash", txKey.TxHash,
+		"numMessages", len(cctpMessages.Messages),
+	)
+
+	return cctpMessages, nil
+}
+
+// matchMessageToCircleMessages finds a Circle message matching the expected depositHash.
+// Returns true and the message index if found, false otherwise.
+func (o *CCTPv2TokenDataObserver) matchMessageToCircleMessages(
+	expectedHash [32]byte,
+	cctpMessages []CCTPv2Message,
+	calculatedHashes map[int]depositHashResult,
+	usedMessageIndices map[int]bool,
+) (matched bool, messageIndex int) {
+	for i := range cctpMessages {
+		// Skip already-assigned messages
+		if usedMessageIndices[i] {
+			continue
+		}
+
+		// Get pre-calculated depositHash
+		hashResult := calculatedHashes[i]
+		if hashResult.err != nil {
+			continue
+		}
+
+		// Check if hashes match
+		if hashResult.hash == expectedHash {
+			return true, i
+		}
+	}
+
+	// No match found
+	return false, -1
+}
+
+// matchSingleTokenMessage attempts to match a single MessageTokenID to a Circle message.
+// Returns the matched Circle message and index if found, or (-1, false) if no match.
+func (o *CCTPv2TokenDataObserver) matchSingleTokenMessage(
+	msgTokenID reader.MessageTokenID,
+	v2Msg *SourceTokenDataPayloadV2,
+	cctpMessages []CCTPv2Message,
+	calculatedHashes map[int]depositHashResult,
+	usedMessageIndices map[int]bool,
+	chainSelector cciptypes.ChainSelector,
+	txKey TxKey,
+) (CCTPv2Message, int, bool) {
+	var emptyMessage CCTPv2Message
+
+	// Find matching Circle message
+	matched, msgIndex := o.matchMessageToCircleMessages(
+		v2Msg.DepositHash,
+		cctpMessages,
+		calculatedHashes,
+		usedMessageIndices,
+	)
+
+	if matched {
+		o.lggr.Debugw(
+			"Matched Circle message to MessageTokenID by depositHash",
+			"chainSelector", chainSelector,
+			"messageTokenID", msgTokenID,
+			"messageIndex", msgIndex,
+			"depositHash", fmt.Sprintf("%x", v2Msg.DepositHash),
+		)
+		return cctpMessages[msgIndex], msgIndex, true
+	}
+
+	// No match found - log detailed debugging information
+	availableHashes := o.collectAvailableHashes(calculatedHashes, usedMessageIndices)
+	o.lggr.Warnw(
+		"No matching Circle message found for MessageTokenID - depositHash mismatch",
+		"chainSelector", chainSelector,
+		"sourceDomain", txKey.SourceDomain,
+		"txHash", txKey.TxHash,
+		"messageTokenID", msgTokenID,
+		"expectedDepositHash", fmt.Sprintf("%x", v2Msg.DepositHash),
+		"numCircleMessages", len(cctpMessages),
+		"availableDepositHashes", availableHashes,
+	)
+
+	return emptyMessage, -1, false
+}
+
+// collectAvailableHashes formats all available depositHashes for debugging output.
+func (o *CCTPv2TokenDataObserver) collectAvailableHashes(
+	calculatedHashes map[int]depositHashResult,
+	usedMessageIndices map[int]bool,
+) []string {
+	availableHashes := make([]string, 0, len(calculatedHashes))
+	for idx, hashResult := range calculatedHashes {
+		if hashResult.err != nil {
+			availableHashes = append(availableHashes, fmt.Sprintf("[%d]:error", idx))
+		} else if usedMessageIndices[idx] {
+			availableHashes = append(availableHashes, fmt.Sprintf("[%d]:%x(used)", idx, hashResult.hash))
+		} else {
+			availableHashes = append(availableHashes, fmt.Sprintf("[%d]:%x", idx, hashResult.hash))
+		}
+	}
+	return availableHashes
+}
+
+// processTransactionMessages fetches and matches all messages for a single transaction.
+// This function orchestrates the entire matching process for a transaction:
+// 1. Fetches Circle messages from the API
+// 2. Pre-calculates depositHashes for all messages
+// 3. Matches each MessageTokenID to a Circle message using depositHash
+func (o *CCTPv2TokenDataObserver) processTransactionMessages(
+	ctx context.Context,
+	chainSelector cciptypes.ChainSelector,
+	txKey TxKey,
+	msgTokenIDs []reader.MessageTokenID,
+	v2MessagesForChain map[reader.MessageTokenID]*SourceTokenDataPayloadV2,
+) map[reader.MessageTokenID]CCTPv2Message {
+	result := make(map[reader.MessageTokenID]CCTPv2Message)
+
+	// Fetch Circle messages for this transaction
+	cctpMessages, err := o.fetchMessagesForTransaction(ctx, chainSelector, txKey)
+	if err != nil {
+		return result
+	}
+
+	// Pre-calculate deposit hashes for all Circle messages
+	calculatedHashes := o.calculateDepositHashes(cctpMessages.Messages, chainSelector, txKey.TxHash)
+
+	// Track which Circle messages have been assigned
+	usedMessageIndices := make(map[int]bool)
+
+	// Match each MessageTokenID to a Circle message
+	for _, msgTokenID := range msgTokenIDs {
+		// Get expected depositHash
+		v2Msg, ok := v2MessagesForChain[msgTokenID]
+		if !ok {
+			o.lggr.Warnw(
+				"v2Message not found for MessageTokenID",
+				"chainSelector", chainSelector,
+				"messageTokenID", msgTokenID,
+			)
+			continue
+		}
+
+		// Attempt to match this token message
+		matchedMessage, msgIndex, found := o.matchSingleTokenMessage(
+			msgTokenID,
+			v2Msg,
+			cctpMessages.Messages,
+			calculatedHashes,
+			usedMessageIndices,
+			chainSelector,
+			txKey,
+		)
+
+		if found {
+			result[msgTokenID] = matchedMessage
+			usedMessageIndices[msgIndex] = true
+		}
+	}
+
+	return result
+}
+
+// fetchCCTPv2Attestations queries Circle API for attestations and matches them to MessageTokenIDs using depositHash.
 func (o *CCTPv2TokenDataObserver) fetchCCTPv2Attestations(
 	ctx context.Context,
 	txGroups map[cciptypes.ChainSelector]map[TxKey][]reader.MessageTokenID,
+	v2Messages map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2,
 ) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]CCTPv2Message, error) {
-	// TODO: Implement Circle API calls
-	// - For each chain and txHash, call o.httpClient.GetMessages(ctx, chainSel, sourceDomain, txHash)
-	// - Un-group results back to individual MessageTokenID
-	// - Return: chainSelector -> MessageTokenID -> CCTPv2Message
-	return make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]CCTPv2Message), nil
+	result := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]CCTPv2Message)
+
+	// Iterate through each chain
+	for chainSelector, txKeyToMsgIDs := range txGroups {
+		result[chainSelector] = make(map[reader.MessageTokenID]CCTPv2Message)
+
+		// Process each transaction
+		for txKey, msgTokenIDs := range txKeyToMsgIDs {
+			txMessages := o.processTransactionMessages(
+				ctx,
+				chainSelector,
+				txKey,
+				msgTokenIDs,
+				v2Messages[chainSelector],
+			)
+
+			// Merge transaction results into overall result
+			for msgTokenID, cctpMsg := range txMessages {
+				result[chainSelector][msgTokenID] = cctpMsg
+			}
+		}
+	}
+
+	return result, nil
 }
 
-// matchAttestationsToMessages validates attestations match expected messages using depositHash.
-func (o *CCTPv2TokenDataObserver) matchAttestationsToMessages(
+// buildAttestationStatuses transforms matched CCTP messages into AttestationStatus objects.
+// It assumes that cctpMessages have already been validated and matched by depositHash in fetchCCTPv2Attestations.
+func (o *CCTPv2TokenDataObserver) buildAttestationStatuses(
 	cctpMessages map[cciptypes.ChainSelector]map[reader.MessageTokenID]CCTPv2Message,
 	v2Messages map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2,
 ) map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus {
-	// TODO: Implement depositHash validation
-	// - For each CCIP message, compare:
-	//   Expected: v2Messages[chain][msgTokenID].depositHash
-	//   Actual: Calculate depositHash from cctpMessages[chain][msgTokenID].DecodedMessage fields
-	// - If match: Create successful AttestationStatus
-	// - If mismatch or missing: Create error AttestationStatus
-	// - Return: chainSelector -> MessageTokenID -> AttestationStatus
-	return make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus)
+	result := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus)
+
+	// Iterate through all v2Messages to transform each one
+	for chainSelector, chainMessages := range v2Messages {
+		if result[chainSelector] == nil {
+			result[chainSelector] = make(map[reader.MessageTokenID]tokendata.AttestationStatus)
+		}
+
+		for msgTokenID, v2Msg := range chainMessages {
+			// Look up the corresponding CCTP message from Circle API
+			cctpMsg, found := cctpMessages[chainSelector][msgTokenID]
+			if !found {
+				// CCTP message not found in API response (no match was found in fetchCCTPv2Attestations)
+				result[chainSelector][msgTokenID] = tokendata.ErrorAttestationStatus(tokendata.ErrDataMissing)
+				continue
+			}
+
+			// Validate that the attestation status is complete
+			if cctpMsg.Status != "complete" {
+				result[chainSelector][msgTokenID] = tokendata.ErrorAttestationStatus(
+					fmt.Errorf("attestation status is not complete: %s", cctpMsg.Status))
+				continue
+			}
+
+			// Decode message and attestation from hex strings
+			messageBytes, err := hexDecode(cctpMsg.Message)
+			if err != nil {
+				result[chainSelector][msgTokenID] = tokendata.ErrorAttestationStatus(
+					fmt.Errorf("decode message hex: %w", err))
+				continue
+			}
+
+			attestationBytes, err := hexDecode(cctpMsg.Attestation)
+			if err != nil {
+				result[chainSelector][msgTokenID] = tokendata.ErrorAttestationStatus(
+					fmt.Errorf("decode attestation hex: %w", err))
+				continue
+			}
+
+			// Success - create successful AttestationStatus with the expected depositHash
+			result[chainSelector][msgTokenID] = tokendata.SuccessAttestationStatus(
+				v2Msg.DepositHash[:],
+				messageBytes,
+				attestationBytes,
+			)
+		}
+	}
+
+	return result
+}
+
+// hexDecode decodes a hex string (with or without 0x prefix) to bytes.
+func hexDecode(hexStr string) ([]byte, error) {
+	hexStr = strings.TrimPrefix(hexStr, "0x")
+	return hex.DecodeString(hexStr)
 }
 
 // extractTokenData builds final TokenDataObservations by iterating through all messages and their tokens.
@@ -258,39 +638,4 @@ func (o *CCTPv2TokenDataObserver) attestationToTokenData(
 		return exectypes.NewErrorTokenData(fmt.Errorf("unable to encode attestation: %w", err))
 	}
 	return exectypes.NewSuccessTokenData(tokenData)
-}
-
-// TxKey represents a unique identifier for grouping messages by transaction.
-type TxKey struct {
-	SourceDomain uint32
-	TxHash       string
-}
-
-// DecodeSourceTokenDataPayloadV2 decodes SourceTokenDataPayloadV2 from ExtraData bytes.
-// The payload is encoded as: bytes4(versionTag) + uint32(sourceDomain) + bytes32(depositHash)
-// Total length: 40 bytes (4 + 4 + 32)
-func DecodeSourceTokenDataPayloadV2(extraData cciptypes.Bytes) (*SourceTokenDataPayloadV2, error) {
-	// Validate length
-	if len(extraData) != 40 {
-		return nil, fmt.Errorf("invalid V2 source pool data length: expected 40 bytes, got %d", len(extraData))
-	}
-
-	// Extract and validate version tag (bytes 0-3)
-	versionTag := binary.BigEndian.Uint32(extraData[0:4])
-	if versionTag != CCTP_VERSION_2_TAG && versionTag != CCTP_VERSION_2_CCV_TAG {
-		return nil, fmt.Errorf("invalid CCTPv2 version tag: expected 0x%x or 0x%x, got 0x%x",
-			CCTP_VERSION_2_TAG, CCTP_VERSION_2_CCV_TAG, versionTag)
-	}
-
-	// Extract sourceDomain (bytes 4-7, big-endian uint32)
-	sourceDomain := binary.BigEndian.Uint32(extraData[4:8])
-
-	// Extract depositHash (bytes 8-39)
-	var depositHash [32]byte
-	copy(depositHash[:], extraData[8:40])
-
-	return &SourceTokenDataPayloadV2{
-		SourceDomain: sourceDomain,
-		DepositHash:  depositHash,
-	}, nil
 }
