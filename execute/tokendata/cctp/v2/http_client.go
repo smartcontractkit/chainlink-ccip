@@ -1,6 +1,8 @@
 // Package v2 provides an HTTP client wrapper for Circle's CCTP v2 attestation API.
 // This package handles the HTTP communication layer for fetching CCTP v2 messages
 // and attestations from Circle's API endpoints.
+// The CCTPv2 "get messages" API is documented here:
+// https://developers.circle.com/api-reference/cctp/all/get-messages-v-2
 package v2
 
 import (
@@ -140,6 +142,8 @@ func parseResponseBody(body cciptypes.Bytes) (CCTPv2Messages, error) {
 
 // CCTPv2Messages represents the response structure from Circle's attestation API,
 // containing a list of CCTP v2 messages with their attestations.
+// This API response type is documented here:
+// https://developers.circle.com/api-reference/cctp/all/get-messages-v-2
 type CCTPv2Messages struct {
 	Messages []CCTPv2Message `json:"messages"`
 }
