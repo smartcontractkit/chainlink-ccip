@@ -30,7 +30,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     MockReceiverV2 receiver = new MockReceiverV2(userRequired, userOptional, optionalThresholdRequested);
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThreshold) =
-      s_agg.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
 
     assertEq(requiredFromReceiver.length, userRequired.length);
     assertEq(requiredFromReceiver[0], userRequired[0]);
@@ -47,7 +47,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     MockReceiverV2 receiver = new MockReceiverV2(emptyRequired, emptyOptional, 0);
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
-      s_agg.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], s_defaultCCV);
@@ -59,7 +59,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     address eoa = makeAddr("eoa");
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
-      s_agg.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, eoa);
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, eoa);
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], s_defaultCCV);
@@ -72,7 +72,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     vm.etch(contractAddress, "some source code");
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
-      s_agg.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress);
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress);
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], s_defaultCCV);
