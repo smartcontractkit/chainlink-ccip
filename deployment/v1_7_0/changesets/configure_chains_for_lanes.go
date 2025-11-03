@@ -27,7 +27,7 @@ type ChainConfig struct {
 	OnRamp datastore.AddressRef
 	// The CommitteeVerifiers on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []datastore.AddressRef
+	CommitteeVerifiers []adapters.CommitteeVerifier[datastore.AddressRef]
 	// The FeeQuoter on the chain being configured.
 	FeeQuoter datastore.AddressRef
 	// The OffRamp on the chain being configured
@@ -70,13 +70,20 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve onRamp ref on chain with selector %d: %w", chain.ChainSelector, err)
 			}
-			committeeVerifiers := make([]string, 0, len(chain.CommitteeVerifiers))
-			for _, ref := range chain.CommitteeVerifiers {
-				committeeVerifier, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chain.ChainSelector, datastore_utils.FullRef)
+			committeeVerifiers := make([]adapters.CommitteeVerifier[string], 0, len(chain.CommitteeVerifiers))
+			for _, verifier := range chain.CommitteeVerifiers {
+				committeeVerifier, err := datastore_utils.FindAndFormatRef(e.DataStore, verifier.Implementation, chain.ChainSelector, datastore_utils.FullRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve committeeVerifier ref on chain with selector %d: %w", chain.ChainSelector, err)
 				}
-				committeeVerifiers = append(committeeVerifiers, committeeVerifier.Address)
+				committeeVerifierResolver, err := datastore_utils.FindAndFormatRef(e.DataStore, verifier.Resolver, chain.ChainSelector, datastore_utils.FullRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve committeeVerifier resolver ref on chain with selector %d: %w", chain.ChainSelector, err)
+				}
+				committeeVerifiers = append(committeeVerifiers, adapters.CommitteeVerifier[string]{
+					Implementation: committeeVerifier.Address,
+					Resolver:       committeeVerifierResolver.Address,
+				})
 			}
 			feeQuoter, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.FeeQuoter, chain.ChainSelector, datastore_utils.FullRef)
 			if err != nil {

@@ -169,6 +169,14 @@ func makeBaseChainDataStore(t *testing.T, chains []uint64) *datastore.MemoryData
 		})
 		require.NoError(t, err)
 
+		// CommitteeVerifierResolver
+		err = ds.Addresses().Add(datastore.AddressRef{
+			ChainSelector: chain,
+			Address:       fmt.Sprintf("%d-committee-verifier-resolver", chain),
+			Type:          datastore.ContractType("CommitteeVerifierResolver"),
+			Version:       semver.MustParse("1.0.0"),
+		})
+
 		// Executor
 		err = ds.Addresses().Add(datastore.AddressRef{
 			ChainSelector: chain,
@@ -226,11 +234,18 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						CommitteeVerifiers: []datastore.AddressRef{
+						CommitteeVerifiers: []adapters.CommitteeVerifier[datastore.AddressRef]{
 							{
-								Type:          "CommitteeVerifier",
-								Version:       semver.MustParse("1.0.0"),
-								ChainSelector: 5009297550715157269,
+								Implementation: datastore.AddressRef{
+									Type:          "CommitteeVerifier",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								Resolver: datastore.AddressRef{
+									Type:          "CommitteeVerifierResolver",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
 							},
 						},
 						FeeQuoter: datastore.AddressRef{
@@ -299,10 +314,20 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				// Update the first committee verifier to have a qualifier
 				err := ds.Addresses().Delete(datastore.NewAddressRefKey(5009297550715157269, "CommitteeVerifier", semver.MustParse("1.0.0"), ""))
 				require.NoError(t, err)
+				err = ds.Addresses().Delete(datastore.NewAddressRefKey(5009297550715157269, "CommitteeVerifierResolver", semver.MustParse("1.0.0"), ""))
+				require.NoError(t, err)
 				err = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: 5009297550715157269,
 					Address:       fmt.Sprintf("%d-committee-verifier", 5009297550715157269),
 					Type:          datastore.ContractType("CommitteeVerifier"),
+					Version:       semver.MustParse("1.0.0"),
+					Qualifier:     "primary",
+				})
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: 5009297550715157269,
+					Address:       fmt.Sprintf("%d-committee-verifier-resolver", 5009297550715157269),
+					Type:          datastore.ContractType("CommitteeVerifierResolver"),
 					Version:       semver.MustParse("1.0.0"),
 					Qualifier:     "primary",
 				})
@@ -312,6 +337,14 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 					ChainSelector: 5009297550715157269,
 					Address:       fmt.Sprintf("%d-committee-verifier-2", 5009297550715157269),
 					Type:          datastore.ContractType("CommitteeVerifier"),
+					Version:       semver.MustParse("1.0.0"),
+					Qualifier:     "secondary",
+				})
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: 5009297550715157269,
+					Address:       fmt.Sprintf("%d-committee-verifier-resolver-2", 5009297550715157269),
+					Type:          datastore.ContractType("CommitteeVerifierResolver"),
 					Version:       semver.MustParse("1.0.0"),
 					Qualifier:     "secondary",
 				})
@@ -332,18 +365,35 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						CommitteeVerifiers: []datastore.AddressRef{
+
+						CommitteeVerifiers: []adapters.CommitteeVerifier[datastore.AddressRef]{
 							{
-								Type:          "CommitteeVerifier",
-								Version:       semver.MustParse("1.0.0"),
-								ChainSelector: 5009297550715157269,
-								Qualifier:     "primary",
+								Implementation: datastore.AddressRef{
+									Type:          "CommitteeVerifier",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+									Qualifier:     "primary",
+								},
+								Resolver: datastore.AddressRef{
+									Type:          "CommitteeVerifierResolver",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+									Qualifier:     "primary",
+								},
 							},
 							{
-								Type:          "CommitteeVerifier",
-								Version:       semver.MustParse("1.0.0"),
-								ChainSelector: 5009297550715157269,
-								Qualifier:     "secondary",
+								Implementation: datastore.AddressRef{
+									Type:          "CommitteeVerifier",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+									Qualifier:     "secondary",
+								},
+								Resolver: datastore.AddressRef{
+									Type:          "CommitteeVerifierResolver",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+									Qualifier:     "secondary",
+								},
 							},
 						},
 						FeeQuoter: datastore.AddressRef{
@@ -575,11 +625,18 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						CommitteeVerifiers: []datastore.AddressRef{
+						CommitteeVerifiers: []adapters.CommitteeVerifier[datastore.AddressRef]{
 							{
-								Type:          "CommitteeVerifier",
-								Version:       semver.MustParse("1.0.0"),
-								ChainSelector: 5009297550715157269,
+								Implementation: datastore.AddressRef{
+									Type:          "CommitteeVerifier",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								Resolver: datastore.AddressRef{
+									Type:          "CommitteeVerifierResolver",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
 							},
 						},
 						FeeQuoter: datastore.AddressRef{

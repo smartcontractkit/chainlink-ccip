@@ -88,6 +88,13 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	BaseExecutionGasCost uint32
 }
 
+type CommitteeVerifier[Contract any] struct {
+	// Resolver is the contract responsible for directing traffic to the correct CommitteeVerifier implementation.
+	Resolver Contract
+	// Implementation is the actual CommitteeVerifier contract.
+	Implementation Contract
+}
+
 // ConfigureChainForLanesInput is the input for the ConfigureChainForLanes sequence.
 type ConfigureChainForLanesInput struct {
 	// The selector of the chain being configured.
@@ -100,7 +107,7 @@ type ConfigureChainForLanesInput struct {
 	OnRamp string
 	// The CommitteeVerifier addresses on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []string
+	CommitteeVerifiers []CommitteeVerifier[string]
 	// The FeeQuoter address on the chain being configured.
 	FeeQuoter string
 	// The OffRamp address on the chain being configured
