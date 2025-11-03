@@ -8,9 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -114,9 +114,10 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			UpdatesByChain: map[uint64][]offramp.OffRampSourceChainConfigArgs{
 				input.Dest.Selector: {
 					{
-						Router:                    common.BytesToAddress(input.Dest.Router),
-						SourceChainSelector:       input.Source.Selector,
-						OnRamp:                    input.Source.OnRamp,
+						Router:              common.BytesToAddress(input.Dest.Router),
+						SourceChainSelector: input.Source.Selector,
+						// https://github.com/smartcontractkit/chainlink/blob/f7ca3d51db51258bb3b8ae22a8e1593d03bc040b/deployment/ccip/changeset/v1_6/cs_chain_contracts.go#L1148
+						OnRamp:                    common.LeftPadBytes(input.Source.OnRamp, 32),
 						IsEnabled:                 !input.IsDisabled,
 						IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 					},
