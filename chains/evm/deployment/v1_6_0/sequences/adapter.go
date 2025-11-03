@@ -11,8 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 )
 
@@ -22,12 +22,14 @@ func init() {
 		panic(err)
 	}
 	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
+	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, &EVMAdapter{})
+	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 }
 
 type EVMAdapter struct{}
 
-func (a *EVMAdapter) GetOnRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+func (a *EVMAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onramp.ContractType),
 		Version:       onramp.Version,
@@ -38,8 +40,8 @@ func (a *EVMAdapter) GetOnRampAddress(e *cldf.Environment, chainSelector uint64)
 	return addr, nil
 }
 
-func (a *EVMAdapter) GetOffRampAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+func (a *EVMAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(offramp.ContractType),
 		Version:       offramp.Version,
@@ -50,8 +52,8 @@ func (a *EVMAdapter) GetOffRampAddress(e *cldf.Environment, chainSelector uint64
 	return addr, nil
 }
 
-func (a *EVMAdapter) GetFQAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+func (a *EVMAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(fee_quoter.ContractType),
 		Version:       fee_quoter.Version,
@@ -62,8 +64,8 @@ func (a *EVMAdapter) GetFQAddress(e *cldf.Environment, chainSelector uint64) ([]
 	return addr, nil
 }
 
-func (a *EVMAdapter) GetRouterAddress(e *cldf.Environment, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),
 		Version:       router.Version,

@@ -17,14 +17,14 @@ import (
 )
 
 func TestWithDatastore(t *testing.T) {
-	b := changesets.NewOutputBuilder(deployment.Environment{}, changesets.NewMCMSReaderRegistry())
+	b := changesets.NewOutputBuilder(deployment.Environment{}, changesets.GetRegistry())
 	out, err := b.WithDataStore(datastore.NewMemoryDataStore()).Build(mcms.Input{})
 	require.NoError(t, err, "Build should not error")
 	require.NotNil(t, out.DataStore, "DataStore should be set in ChangesetOutput")
 }
 
 func TestWithReports(t *testing.T) {
-	b := changesets.NewOutputBuilder(deployment.Environment{}, changesets.NewMCMSReaderRegistry())
+	b := changesets.NewOutputBuilder(deployment.Environment{}, changesets.GetRegistry())
 	reports := []operations.Report[any, any]{
 		{},
 	}
@@ -50,8 +50,7 @@ func TestWithBatchOps(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	registry := changesets.NewMCMSReaderRegistry()
-	registry.RegisterMCMSReader("evm", &MockReader{})
+	registry := changesets.GetRegistry()
 	b := changesets.NewOutputBuilder(deployment.Environment{
 		DataStore: ds.Seal(),
 	}, registry)
@@ -73,14 +72,6 @@ func TestWithBatchOps(t *testing.T) {
 		TimelockDelay:        mcms_types.NewDuration(3 * time.Hour),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
 		Description:          "Proposal",
-		MCMSAddressRef: datastore.AddressRef{
-			Type:    "MCM",
-			Version: semver.MustParse("1.0.0"),
-		},
-		TimelockAddressRef: datastore.AddressRef{
-			Type:    "Timelock",
-			Version: semver.MustParse("1.0.0"),
-		},
 	})
 	require.NoError(t, err, "Build should not error")
 	require.Len(t, out.MCMSTimelockProposals, 1, "Proposal should exist")

@@ -27,6 +27,9 @@ type ChainDefinition struct {
 	// AllowListEnabled is true if we want an allowlist to dictate who can send messages TO this chain.
 	// This is provided by the user
 	AllowListEnabled bool
+	// AllowList is the list of addresses that are allowed to send messages TO this chain.
+	// This is provided by the user
+	AllowList []string
 	// OnRamp is the address of the OnRamp contract on this chain.
 	// This is populated programmatically
 	OnRamp []byte
@@ -68,8 +71,8 @@ type ConnectChainsConfig struct {
 	MCMS  mcms.Input
 }
 type LaneConfig struct {
-	Source       ChainDefinition
-	Dest         ChainDefinition
+	ChainA       ChainDefinition
+	ChainB       ChainDefinition
 	Version      *semver.Version
 	IsDisabled   bool
 	TestRouter   bool

@@ -10,6 +10,11 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 )
 
+// WithChainSelector is implemented by configs that specify a target chain selector.
+type WithChainSelector interface {
+	ChainSelector() uint64
+}
+
 // OnChainOutput is a standard output type for sequences that deploy contracts on-chain and perform write operations.
 type OnChainOutput struct {
 	// Addresses are the contract addresses that the sequence deployed.
