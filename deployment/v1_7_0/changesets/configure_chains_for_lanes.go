@@ -155,6 +155,8 @@ func convertRemoteChainConfig(
 		CommitteeVerifierDestChainConfig: inCfg.CommitteeVerifierDestChainConfig,
 		FeeQuoterDestChainConfig:         inCfg.FeeQuoterDestChainConfig,
 		ExecutorDestChainConfig:          inCfg.ExecutorDestChainConfig,
+		AddressBytesLength:               inCfg.AddressBytesLength,
+		BaseExecutionGasCost:             inCfg.BaseExecutionGasCost,
 	}
 
 	onRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, inCfg.OnRamp, remoteChainSelector, remoteChainAdapter.AddressRefToBytes)
