@@ -1,6 +1,8 @@
 // Package v2 provides an HTTP client wrapper for Circle's CCTP v2 attestation API.
 // This package handles the HTTP communication layer for fetching CCTP v2 messages
 // and attestations from Circle's API endpoints.
+// The CCTPv2 "get messages" API is documented here:
+// https://developers.circle.com/api-reference/cctp/all/get-messages-v-2
 package v2
 
 import (
@@ -9,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,7 +36,7 @@ type CCTPv2HTTPClient interface {
 // MetricsReporter provides metrics reporting for attestation API calls
 type MetricsReporter interface {
 	TrackAttestationAPILatency(
-		sourceChain cciptypes.ChainSelector, sourceDomain uint32, status string, latency time.Duration)
+		sourceChain cciptypes.ChainSelector, sourceDomain uint32, success bool, httpStatus string, latency time.Duration)
 }
 
 // CCTPv2HTTPClientImpl implements CCTPv2AttestationClient using HTTP calls to Circle's attestation API
@@ -81,11 +84,12 @@ func (c *CCTPv2HTTPClientImpl) GetMessages(
 	transactionHash string,
 ) (CCTPv2Messages, error) {
 	startTime := time.Now()
-	metricStatus := "error" // default to error
+	success := false
+	httpStatus := ""
 
 	defer func() {
 		latency := time.Since(startTime)
-		c.metricsReporter.TrackAttestationAPILatency(sourceChain, sourceDomainID, metricStatus, latency)
+		c.metricsReporter.TrackAttestationAPILatency(sourceChain, sourceDomainID, success, httpStatus, latency)
 	}()
 
 	// Validate transaction hash
@@ -99,6 +103,7 @@ func (c *CCTPv2HTTPClientImpl) GetMessages(
 	path := fmt.Sprintf("%s/%s/%d?transactionHash=%s",
 		apiVersionV2, messagesPath, sourceDomainID, url.QueryEscape(transactionHash))
 	body, status, err := c.client.Get(ctx, path)
+	httpStatus = strconv.Itoa(int(status))
 
 	if err != nil {
 		return CCTPv2Messages{},
@@ -124,7 +129,7 @@ func (c *CCTPv2HTTPClientImpl) GetMessages(
 		return CCTPv2Messages{}, err
 	}
 
-	metricStatus = "success"
+	success = true
 	return result, nil
 }
 
@@ -140,6 +145,8 @@ func parseResponseBody(body cciptypes.Bytes) (CCTPv2Messages, error) {
 
 // CCTPv2Messages represents the response structure from Circle's attestation API,
 // containing a list of CCTP v2 messages with their attestations.
+// This API response type is documented here:
+// https://developers.circle.com/api-reference/cctp/all/get-messages-v-2
 type CCTPv2Messages struct {
 	Messages []CCTPv2Message `json:"messages"`
 }
