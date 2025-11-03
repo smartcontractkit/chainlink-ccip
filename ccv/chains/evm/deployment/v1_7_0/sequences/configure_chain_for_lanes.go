@@ -14,90 +14,23 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-type CommitteeVerifierDestChainConfig struct {
-	// Whether to allow traffic TO the remote chain
-	AllowlistEnabled bool
-	// Addresses that are allowed to send messages TO the remote chain
-	AddedAllowlistedSenders []common.Address
-	// Addresses that are no longer allowed to send messages TO the remote chain
-	RemovedAllowlistedSenders []common.Address
-	// The fee in USD cents charged for verification on the remote chain
-	FeeUSDCents uint16
-	// The gas required to execute the verification call on the destination chain. Used in billing.
-	GasForVerification uint32
-	// The size of the CCV specific payload in bytes. Used in billing.
-	PayloadSizeBytes uint32
-}
-
-type CommitteeVerifier struct {
-	// Implementation is the address of the CommitteeVerifier contract
-	Implementation common.Address
-	// Resolver is the address of the CommitteeVerifierResolver contract
-	Resolver common.Address
-}
-
-type RemoteChainConfig struct {
-	// Whether to allow traffic FROM this remote chain
-	AllowTrafficFrom bool
-	// The address on the remote chain from which the message is emitted
-	// For example, on EVM chains, this is the OnRamp
-	CCIPMessageSource []byte
-	// The address on the remote chain against which the message gets executed
-	CCIPMessageDest []byte
-	// The default CCVs that will be applied to messages FROM this remote chain if no receiver is specified
-	DefaultInboundCCVs []common.Address
-	// Any CCVs that must always be used for messages FROM this remote chain
-	LaneMandatedInboundCCVs []common.Address
-	// The CCVs that will be used for messages TO this remote chain if none are specified
-	DefaultOutboundCCVs []common.Address
-	// The CCVs that will always be applied to messages TO this remote chain
-	LaneMandatedOutboundCCVs []common.Address
-	// The executor that will be used for messages TO this remote chain if none is specified
-	// The address corresponds to the Executor contract
-	DefaultExecutor common.Address
-	// CommitteeVerifierDestChainConfig configures the CommitteeVerifier for this remote chain
-	CommitteeVerifierDestChainConfig CommitteeVerifierDestChainConfig
-	// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
-	FeeQuoterDestChainConfig fee_quoter.DestChainConfig
-	// ExecutorDestChainConfig configures the Executor for this remote chain
-	ExecutorDestChainConfig executor.RemoteChainConfig
-	// The length in bytes of addresses on the remote chain
-	AddressBytesLength uint8
-	// The base gas cost to execute a message on the remote chain
-	BaseExecutionGasCost uint32
-}
-
-type ConfigureChainForLanesInput struct {
-	// The selector of the EVM chain being configured
-	ChainSelector uint64
-	// The router on the EVM chain being configured
-	// We assume that all connections will use the same router, either test or production
-	Router common.Address
-	// The OnRamp on the EVM chain being configured
-	// Similarly, we assume that all connections will use the same OnRamp
-	OnRamp common.Address
-	// The CommitteeVerifiers on the EVM chain being configured
-	CommitteeVerifiers []CommitteeVerifier
-	// The FeeQuoter on the EVM chain being configured
-	FeeQuoter common.Address
-	// The OffRamp on the EVM chain being configured
-	OffRamp common.Address
-	// The configuration of each remote chain to configure
-	RemoteChains map[uint64]RemoteChainConfig
-}
-
 var ConfigureChainForLanes = cldf_ops.NewSequence(
 	"configure-chain-for-lanes",
 	semver.MustParse("1.7.0"),
 	"Configures an EVM chain as a source & destination for multiple remote chains",
-	func(b operations.Bundle, chain evm.Chain, input ConfigureChainForLanesInput) (output sequences.OnChainOutput, err error) {
+	func(b operations.Bundle, chains cldf_chain.BlockChains, input adapters.ConfigureChainForLanesInput) (output sequences.OnChainOutput, err error) {
 		writes := make([]contract.WriteOutput, 0)
+		chain, ok := chains.EVMChains()[input.ChainSelector]
+		if !ok {
+			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
+		}
 
 		// Create inputs for each operation
 		offRampArgs := make([]offramp.SourceChainConfigArgs, 0, len(input.RemoteChains))
@@ -109,36 +42,60 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
 		destChainSelectorsPerExecutor := make(map[common.Address][]executor.RemoteChainConfigArgs)
 		for remoteSelector, remoteConfig := range input.RemoteChains {
+			defaultInboundCCVs := make([]common.Address, 0, len(remoteConfig.DefaultInboundCCVs))
+			for _, ccv := range remoteConfig.DefaultInboundCCVs {
+				defaultInboundCCVs = append(defaultInboundCCVs, common.HexToAddress(ccv))
+			}
+			laneMandatedInboundCCVs := make([]common.Address, 0, len(remoteConfig.LaneMandatedInboundCCVs))
+			for _, ccv := range remoteConfig.LaneMandatedInboundCCVs {
+				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, common.HexToAddress(ccv))
+			}
 			offRampArgs = append(offRampArgs, offramp.SourceChainConfigArgs{
-				Router:              input.Router,
+				Router:              common.HexToAddress(input.Router),
 				SourceChainSelector: remoteSelector,
 				IsEnabled:           remoteConfig.AllowTrafficFrom,
-				OnRamp:              remoteConfig.CCIPMessageSource,
-				DefaultCCV:          remoteConfig.DefaultInboundCCVs,
-				LaneMandatedCCVs:    remoteConfig.LaneMandatedInboundCCVs,
+				OnRamp:              remoteConfig.OnRamp,
+				DefaultCCV:          defaultInboundCCVs,
+				LaneMandatedCCVs:    laneMandatedInboundCCVs,
 			})
+			defaultOutboundCCVs := make([]common.Address, 0, len(remoteConfig.DefaultOutboundCCVs))
+			for _, ccv := range remoteConfig.DefaultOutboundCCVs {
+				defaultOutboundCCVs = append(defaultOutboundCCVs, common.HexToAddress(ccv))
+			}
+			laneMandatedOutboundCCVs := make([]common.Address, 0, len(remoteConfig.LaneMandatedOutboundCCVs))
+			for _, ccv := range remoteConfig.LaneMandatedOutboundCCVs {
+				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, common.HexToAddress(ccv))
+			}
 			onRampArgs = append(onRampArgs, onramp.DestChainConfigArgs{
-				Router:               input.Router,
+				Router:               common.HexToAddress(input.Router),
+				DestChainSelector:    remoteSelector,
 				AddressBytesLength:   remoteConfig.AddressBytesLength,
 				BaseExecutionGasCost: remoteConfig.BaseExecutionGasCost,
-				DestChainSelector:    remoteSelector,
-				DefaultCCVs:          remoteConfig.DefaultOutboundCCVs,
-				LaneMandatedCCVs:     remoteConfig.LaneMandatedOutboundCCVs,
-				DefaultExecutor:      remoteConfig.DefaultExecutor,
-				OffRamp:              remoteConfig.CCIPMessageDest,
+				DefaultCCVs:          defaultOutboundCCVs,
+				LaneMandatedCCVs:     laneMandatedOutboundCCVs,
+				DefaultExecutor:      common.HexToAddress(remoteConfig.DefaultExecutor),
+				OffRamp:              remoteConfig.OffRamp,
 			})
 			committeeVerifierDestConfigArgs = append(committeeVerifierDestConfigArgs, committee_verifier.DestChainConfigArgs{
-				Router:             input.Router,
+				Router:             common.HexToAddress(input.Router),
 				DestChainSelector:  remoteSelector,
 				AllowlistEnabled:   remoteConfig.CommitteeVerifierDestChainConfig.AllowlistEnabled,
 				FeeUSDCents:        remoteConfig.CommitteeVerifierDestChainConfig.FeeUSDCents,
 				GasForVerification: remoteConfig.CommitteeVerifierDestChainConfig.GasForVerification,
 				PayloadSizeBytes:   remoteConfig.CommitteeVerifierDestChainConfig.PayloadSizeBytes,
 			})
+			addedAllowlistedSenders := make([]common.Address, 0, len(remoteConfig.CommitteeVerifierDestChainConfig.AddedAllowlistedSenders))
+			for _, sender := range remoteConfig.CommitteeVerifierDestChainConfig.AddedAllowlistedSenders {
+				addedAllowlistedSenders = append(addedAllowlistedSenders, common.HexToAddress(sender))
+			}
+			removedAllowlistedSenders := make([]common.Address, 0, len(remoteConfig.CommitteeVerifierDestChainConfig.RemovedAllowlistedSenders))
+			for _, sender := range remoteConfig.CommitteeVerifierDestChainConfig.RemovedAllowlistedSenders {
+				removedAllowlistedSenders = append(removedAllowlistedSenders, common.HexToAddress(sender))
+			}
 			committeeVerifierAllowlistArgs = append(committeeVerifierAllowlistArgs, committee_verifier.AllowlistConfigArgs{
 				AllowlistEnabled:          remoteConfig.CommitteeVerifierDestChainConfig.AllowlistEnabled,
-				AddedAllowlistedSenders:   remoteConfig.CommitteeVerifierDestChainConfig.AddedAllowlistedSenders,
-				RemovedAllowlistedSenders: remoteConfig.CommitteeVerifierDestChainConfig.RemovedAllowlistedSenders,
+				AddedAllowlistedSenders:   addedAllowlistedSenders,
+				RemovedAllowlistedSenders: removedAllowlistedSenders,
 				DestChainSelector:         remoteSelector,
 			})
 			feeQuoterArgs = append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
@@ -147,16 +104,17 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			})
 			onRampAdds = append(onRampAdds, router.OnRamp{
 				DestChainSelector: remoteSelector,
-				OnRamp:            input.OnRamp,
+				OnRamp:            common.HexToAddress(input.OnRamp),
 			})
 			offRampAdds = append(offRampAdds, router.OffRamp{
 				SourceChainSelector: remoteSelector,
-				OffRamp:             input.OffRamp,
+				OffRamp:             common.HexToAddress(input.OffRamp),
 			})
-			if destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] == nil {
-				destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] = []executor.RemoteChainConfigArgs{}
+			defaultExecutor := common.HexToAddress(remoteConfig.DefaultExecutor)
+			if destChainSelectorsPerExecutor[defaultExecutor] == nil {
+				destChainSelectorsPerExecutor[defaultExecutor] = []executor.RemoteChainConfigArgs{}
 			}
-			destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor] = append(destChainSelectorsPerExecutor[remoteConfig.DefaultExecutor], executor.RemoteChainConfigArgs{
+			destChainSelectorsPerExecutor[defaultExecutor] = append(destChainSelectorsPerExecutor[defaultExecutor], executor.RemoteChainConfigArgs{
 				DestChainSelector: remoteSelector,
 				Config:            remoteConfig.ExecutorDestChainConfig,
 			})
@@ -165,7 +123,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// ApplySourceChainConfigUpdates on OffRamp
 		offRampReport, err := cldf_ops.ExecuteOperation(b, offramp.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offramp.SourceChainConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       input.OffRamp,
+			Address:       common.HexToAddress(input.OffRamp),
 			Args:          offRampArgs,
 		})
 		if err != nil {
@@ -176,7 +134,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// ApplyDestChainConfigUpdates on OnRamp
 		onRampReport, err := cldf_ops.ExecuteOperation(b, onramp.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onramp.DestChainConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       input.OnRamp,
+			Address:       common.HexToAddress(input.OnRamp),
 			Args:          onRampArgs,
 		})
 		if err != nil {
@@ -188,7 +146,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// ApplyDestChainConfigUpdates on each CommitteeVerifier
 			committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.DestChainConfigArgs]{
 				ChainSelector: chain.Selector,
-				Address:       committeeVerifier.Implementation,
+				Address:       common.HexToAddress(committeeVerifier.Implementation),
 				Args:          committeeVerifierDestConfigArgs,
 			})
 			if err != nil {
@@ -199,7 +157,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// ApplyInboundImplementationUpdates on each CommitteeVerifierResolver, first fetching the version tag
 			versionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetVersionTag, chain, contract.FunctionInput[any]{
 				ChainSelector: chain.Selector,
-				Address:       committeeVerifier.Implementation,
+				Address:       common.HexToAddress(committeeVerifier.Implementation),
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get version tag from CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
@@ -207,12 +165,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			inboundImplementationArgs := []versioned_verifier_resolver.InboundImplementationArgs{
 				{
 					Version:  versionTagReport.Output,
-					Verifier: committeeVerifier.Implementation,
+					Verifier: common.HexToAddress(committeeVerifier.Implementation),
 				},
 			}
 			applyInboundUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
 				ChainSelector: chain.Selector,
-				Address:       committeeVerifier.Resolver,
+				Address:       common.HexToAddress(committeeVerifier.Resolver),
 				Args:          inboundImplementationArgs,
 			})
 			if err != nil {
@@ -225,12 +183,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			for remoteChainSelector := range input.RemoteChains {
 				outboundImplementationArgs = append(outboundImplementationArgs, versioned_verifier_resolver.OutboundImplementationArgs{
 					DestChainSelector: remoteChainSelector,
-					Verifier:          committeeVerifier.Implementation,
+					Verifier:          common.HexToAddress(committeeVerifier.Implementation),
 				})
 			}
 			applyOutboundUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
 				ChainSelector: chain.Selector,
-				Address:       committeeVerifier.Resolver,
+				Address:       common.HexToAddress(committeeVerifier.Resolver),
 				Args:          outboundImplementationArgs,
 			})
 			if err != nil {
@@ -258,7 +216,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		for _, committeeVerifier := range input.CommitteeVerifiers {
 			committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
 				ChainSelector: chain.Selector,
-				Address:       committeeVerifier.Implementation,
+				Address:       common.HexToAddress(committeeVerifier.Implementation),
 				Args:          committeeVerifierAllowlistArgs,
 			})
 			if err != nil {
@@ -270,7 +228,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// ApplyDestChainConfigUpdates on FeeQuoter
 		feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.DestChainConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       input.FeeQuoter,
+			Address:       common.HexToAddress(input.FeeQuoter),
 			Args:          feeQuoterArgs,
 		})
 		if err != nil {
@@ -281,7 +239,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// ApplyRampUpdates on Router
 		routerReport, err := cldf_ops.ExecuteOperation(b, router.ApplyRampUpdates, chain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
 			ChainSelector: chain.Selector,
-			Address:       input.Router,
+			Address:       common.HexToAddress(input.Router),
 			Args: router.ApplyRampsUpdatesArgs{
 				OnRampUpdates:  onRampAdds,
 				OffRampRemoves: []router.OffRamp{}, // removals should be processed by a separate sequence responsible for disconnecting lanes

@@ -7,15 +7,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 // CreateBasicFeeQuoterDestChainConfig creates a basic fee quoter dest chain config with reasonable defaults for testing
-func CreateBasicFeeQuoterDestChainConfig() fee_quoter.DestChainConfig {
-	return fee_quoter.DestChainConfig{
+func CreateBasicFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfig {
+	return adapters.FeeQuoterDestChainConfig{
 		IsEnabled:                   true,
 		MaxDataBytes:                30_000,
 		MaxPerMsgGasLimit:           3_000_000,
@@ -29,10 +29,23 @@ func CreateBasicFeeQuoterDestChainConfig() fee_quoter.DestChainConfig {
 	}
 }
 
-func CreateBasicExecutorDestChainConfig() executor.RemoteChainConfig {
-	return executor.RemoteChainConfig{
-		UsdCentsFee: 50,
+// CreateBasicExecutorDestChainConfig creates a basic executor dest chain config with reasonable defaults for testing
+func CreateBasicExecutorDestChainConfig() adapters.ExecutorDestChainConfig {
+	return adapters.ExecutorDestChainConfig{
+		USDCentsFee: 50,
 		Enabled:     true,
+	}
+}
+
+// CreateBasicCommitteeVerifierDestChainConfig creates a basic committee verifier dest chain config with reasonable defaults for testing
+func CreateBasicCommitteeVerifierDestChainConfig() adapters.CommitteeVerifierDestChainConfig {
+	return adapters.CommitteeVerifierDestChainConfig{
+		AllowlistEnabled:          false,
+		AddedAllowlistedSenders:   nil,
+		RemovedAllowlistedSenders: nil,
+		FeeUSDCents:               50,
+		GasForVerification:        50_000,
+		PayloadSizeBytes:          6*64 + 2*32,
 	}
 }
 
