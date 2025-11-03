@@ -2,11 +2,13 @@ package ccip_evm
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/uuid"
@@ -22,7 +24,12 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 var ccipMessageSentTopic = onramp.OnRampCCIPMessageSent{}.Topic()
@@ -166,12 +173,30 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 	if !ok {
 		return nil, fmt.Errorf("evm chain not found for selector %d", selector)
 	}
-
-	mcmsReaderRegistry := changesetscore.NewMCMSReaderRegistry() // TODO: Integrate actual registry if MCMS support is required.
-
-	_, _ = chain, mcmsReaderRegistry
-
-	// deploy contracts
+	dReg := deployops.GetRegistry()
+	version := semver.MustParse("1.6.0")
+	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
+		MCMS: mcms.Input{},
+		Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+			chain.Selector: {
+				Version: version,
+				// FEE QUOTER CONFIG
+				MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+				TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
+				LinkPremiumMultiplier:        9e17, // 0.9 ETH
+				NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
+				// OFFRAMP CONFIG
+				PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
+				GasForCallExactCheck:                    uint16(5000),
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy contracts: %w", err)
+	}
+	out.DataStore.Merge(env.DataStore)
+	env.DataStore = out.DataStore.Seal()
+	runningDS.Merge(env.DataStore)
 
 	return runningDS.Seal(), nil
 }
@@ -186,7 +211,38 @@ func (m *CCIP16EVM) ConnectContractsWithSelectors(ctx context.Context, e *deploy
 	)
 	e.OperationsBundle = bundle
 
-	// connect chains
+	// we're assuming all dest chains are EVM for this implementation
+	evmEncoded, err := hex.DecodeString(cciputils.EVMFamilySelector)
+	if err != nil {
+		return fmt.Errorf("encoding EVM family selector: %w", err)
+	}
+	mcmsRegistry := changesetscore.GetRegistry()
+	version := semver.MustParse("1.6.0")
+	chainA := lanesapi.ChainDefinition{
+		Selector:                 selector,
+		GasPrice:                 big.NewInt(1e9),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
+	}
+	for _, destSelector := range remoteSelectors {
+		chainB := lanesapi.ChainDefinition{
+			Selector:                 destSelector,
+			GasPrice:                 big.NewInt(1e9),
+			FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
+		}
+		l.Info().Uint64("ChainASelector", chainA.Selector).Uint64("ChainBSelector", chainB.Selector).Msg("Connecting chain pairs")
+		_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+			Lanes: []lanesapi.LaneConfig{
+				{
+					Version: version,
+					ChainA:  chainA,
+					ChainB:  chainB,
+				},
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("connecting chains %d and %d: %w", chainA.Selector, chainB.Selector, err)
+		}
+	}
 
 	return nil
 }
