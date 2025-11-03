@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../interfaces/ICrossChainVerifierV1.sol";
 
 import {Client} from "../../libraries/Client.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 
-contract ReentrantCCV is ICrossChainVerifierV1 {
+contract ReentrantCCV is ICrossChainVerifierV1, ICrossChainVerifierResolver {
   OffRamp internal immutable i_offRamp;
 
   constructor(
@@ -58,5 +59,18 @@ contract ReentrantCCV is ICrossChainVerifierV1 {
 
   function getStorageLocation() external pure override returns (string memory) {
     return "reentrant://ccv";
+  }
+
+  function getInboundImplementation(
+    bytes calldata // ccvData
+  ) external view returns (address) {
+    return address(this);
+  }
+
+  function getOutboundImplementation(
+    uint64, // destChainSelector
+    bytes memory // extraArgs
+  ) external view returns (address) {
+    return address(this);
   }
 }

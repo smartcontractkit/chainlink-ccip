@@ -36,11 +36,16 @@ type RemoteChainConfig struct {
 	BaseExecutionGasCost             uint32
 }
 
+type CommitteeVerifier struct {
+	Implementation datastore.AddressRef
+	Resolver       datastore.AddressRef
+}
+
 type ConfigureChainForLanesCfg struct {
 	ChainSel     uint64
 	RemoteChains map[uint64]RemoteChainConfig
 	// CommitteeVerifiers are the committee verifiers that will be configured by the CS.
-	CommitteeVerifiers []datastore.AddressRef
+	CommitteeVerifiers []CommitteeVerifier
 	MCMSArgs           *mcms.Input
 }
 
@@ -72,13 +77,20 @@ var ConfigureChainForLanes = changesets.NewFromOnChainSequence(changesets.NewFro
 			return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve onRamp ref: %w", err)
 		}
 
-		var committeeVerifiers []common.Address
+		var committeeVerifiers []sequences.CommitteeVerifier
 		for _, cvRef := range cfg.CommitteeVerifiers {
-			committeeVerifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, cvRef, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+			committeeVerifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, cvRef.Implementation, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve committee verifier ref: %w", err)
 			}
-			committeeVerifiers = append(committeeVerifiers, committeeVerifierAddr)
+			resolverAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, cvRef.Resolver, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return sequences.ConfigureChainForLanesInput{}, fmt.Errorf("failed to resolve committee verifier resolver ref: %w", err)
+			}
+			committeeVerifiers = append(committeeVerifiers, sequences.CommitteeVerifier{
+				Implementation: committeeVerifierAddr,
+				Resolver:       resolverAddr,
+			})
 		}
 
 		feeQuoterAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{

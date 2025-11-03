@@ -75,19 +75,31 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		writes = append(writes, setSignatureConfigReport.Output)
 
-		// Deploy CommitteeVerifierProxy
-		committeeVerifierProxyRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.DeployProxy, chain, contract.DeployInput[committee_verifier.ProxyConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ProxyType, *semver.MustParse("1.7.0")),
+		// Deploy CommitteeVerifierResolver
+		committeeVerifierResolverRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.DeployResolver, chain, contract.DeployInput[committee_verifier.ResolverConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ResolverType, *semver.MustParse("1.7.0")),
 			ChainSelector:  chain.Selector,
-			Args: committee_verifier.ProxyConstructorArgs{
-				RampAddress: common.HexToAddress(committeeVerifierRef.Address),
+			Args:           committee_verifier.ResolverConstructorArgs{},
+			Qualifier:      qualifierPtr,
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierResolver: %w", err)
+		}
+		addresses = append(addresses, committeeVerifierResolverRef)
+
+		// Deploy CommitteeVerifierResolverProxy
+		committeeVerifierResolverProxyRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.DeployResolverProxy, chain, contract.DeployInput[committee_verifier.ResolverProxyConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ResolverProxyType, *semver.MustParse("1.7.0")),
+			ChainSelector:  chain.Selector,
+			Args: committee_verifier.ResolverProxyConstructorArgs{
+				ResolverAddress: common.HexToAddress(committeeVerifierResolverRef.Address),
 			},
 			Qualifier: qualifierPtr,
 		}, input.ExistingAddresses)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierProxy: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierResolverProxy: %w", err)
 		}
-		addresses = append(addresses, committeeVerifierProxyRef)
+		addresses = append(addresses, committeeVerifierResolverProxyRef)
 
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {

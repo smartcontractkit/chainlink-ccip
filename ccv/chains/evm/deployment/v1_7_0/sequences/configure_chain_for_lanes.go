@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -32,6 +33,13 @@ type CommitteeVerifierDestChainConfig struct {
 	GasForVerification uint32
 	// The size of the CCV specific payload in bytes. Used in billing.
 	PayloadSizeBytes uint32
+}
+
+type CommitteeVerifier struct {
+	// Implementation is the address of the CommitteeVerifier contract
+	Implementation common.Address
+	// Resolver is the address of the CommitteeVerifierResolver contract
+	Resolver common.Address
 }
 
 type RemoteChainConfig struct {
@@ -75,7 +83,7 @@ type ConfigureChainForLanesInput struct {
 	// Similarly, we assume that all connections will use the same OnRamp
 	OnRamp common.Address
 	// The CommitteeVerifiers on the EVM chain being configured
-	CommitteeVerifiers []common.Address
+	CommitteeVerifiers []CommitteeVerifier
 	// The FeeQuoter on the EVM chain being configured
 	FeeQuoter common.Address
 	// The OffRamp on the EVM chain being configured
@@ -176,17 +184,59 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 		writes = append(writes, onRampReport.Output)
 
-		// ApplyDestChainConfigUpdates on CommitteeVerifier
 		for _, committeeVerifier := range input.CommitteeVerifiers {
+			// ApplyDestChainConfigUpdates on each CommitteeVerifier
 			committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.DestChainConfigArgs]{
 				ChainSelector: chain.Selector,
-				Address:       committeeVerifier,
+				Address:       committeeVerifier.Implementation,
 				Args:          committeeVerifierDestConfigArgs,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
 			}
 			writes = append(writes, committeeVerifierReport.Output)
+
+			// ApplyInboundImplementationUpdates on each CommitteeVerifierResolver, first fetching the version tag
+			versionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetVersionTag, chain, contract.FunctionInput[any]{
+				ChainSelector: chain.Selector,
+				Address:       committeeVerifier.Implementation,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get version tag from CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
+			}
+			inboundImplementationArgs := []versioned_verifier_resolver.InboundImplementationArgs{
+				{
+					Version:  versionTagReport.Output,
+					Verifier: committeeVerifier.Implementation,
+				},
+			}
+			applyInboundUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
+				ChainSelector: chain.Selector,
+				Address:       committeeVerifier.Resolver,
+				Args:          inboundImplementationArgs,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply inbound implementation updates to CommitteeVerifierResolver(%s) on chain %s: %w", committeeVerifier.Resolver, chain, err)
+			}
+			writes = append(writes, applyInboundUpdatesReport.Output)
+
+			// ApplyOutboundImplementationUpdates on each CommitteeVerifierResolver
+			outboundImplementationArgs := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
+			for remoteChainSelector := range input.RemoteChains {
+				outboundImplementationArgs = append(outboundImplementationArgs, versioned_verifier_resolver.OutboundImplementationArgs{
+					DestChainSelector: remoteChainSelector,
+					Verifier:          committeeVerifier.Implementation,
+				})
+			}
+			applyOutboundUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
+				ChainSelector: chain.Selector,
+				Address:       committeeVerifier.Resolver,
+				Args:          outboundImplementationArgs,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply outbound implementation updates to CommitteeVerifierResolver(%s) on chain %s: %w", committeeVerifier.Resolver, chain, err)
+			}
+			writes = append(writes, applyOutboundUpdatesReport.Output)
 		}
 
 		// ApplyDestChainUpdates on each Executor
@@ -208,7 +258,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		for _, committeeVerifier := range input.CommitteeVerifiers {
 			committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
 				ChainSelector: chain.Selector,
-				Address:       committeeVerifier,
+				Address:       committeeVerifier.Implementation,
 				Args:          committeeVerifierAllowlistArgs,
 			})
 			if err != nil {

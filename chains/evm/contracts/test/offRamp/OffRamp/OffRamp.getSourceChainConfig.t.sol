@@ -6,7 +6,7 @@ import {OffRampSetup} from "./OffRampSetup.t.sol";
 
 contract OffRamp_getSourceChainConfig is OffRampSetup {
   function test_getSourceChainConfig_ReturnsCorrectConfig() public view {
-    OffRamp.SourceChainConfig memory config = s_agg.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
+    OffRamp.SourceChainConfig memory config = s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
 
     assertEq(address(config.router), address(s_sourceRouter));
     assertEq(config.isEnabled, true);
