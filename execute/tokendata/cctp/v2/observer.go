@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -32,6 +33,18 @@ import (
 
 // AttestationEncoder encodes CCTP message and attestation into format expected by USDC token pool.
 type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
+
+// CCTP version tags for identifying V2 messages.
+const (
+	// CCTP_VERSION_2_TAG identifies standard CCTP V2 transfers (slow transfers).
+	// Preimage: keccak256("CCTP_V2")
+	CCTP_VERSION_2_TAG = 0xb148ea5f
+
+	// CCTP_VERSION_2_CCV_TAG identifies CCTP V2 transfers with CCIP v1.7 fast transfer support.
+	// CCV = Cross-Chain Verification. Enables fast transfers with verification infrastructure.
+	// Preimage: keccak256("CCTP_V2_CCV")
+	CCTP_VERSION_2_CCV_TAG = 0x3047587c
+)
 
 // SourceTokenDataPayloadV2 represents the CCTPv2 source pool data embedded in message token data.
 type SourceTokenDataPayloadV2 struct {
@@ -81,7 +94,7 @@ func (o *CCTPv2TokenDataObserver) Observe(
 	}
 
 	// Step 2: Extract transaction hashes from message headers
-	// We need txHash to query Circle's v2/messages/{domain}?transactionHash={hash} API
+	// We need txHash to query Circle's CCTPv2 API
 	txHashes := o.extractTransactionHashes(messages, v2Messages)
 
 	// Step 3: Group messages by (sourceDomain, txHash) for efficient API calls
@@ -219,13 +232,30 @@ type TxKey struct {
 }
 
 // DecodeSourceTokenDataPayloadV2 decodes SourceTokenDataPayloadV2 from ExtraData bytes.
+// The payload is encoded as: bytes4(versionTag) + uint32(sourceDomain) + bytes32(depositHash)
+// Total length: 40 bytes (4 + 4 + 32)
 func DecodeSourceTokenDataPayloadV2(extraData cciptypes.Bytes) (*SourceTokenDataPayloadV2, error) {
-	// TODO: Implement decoding logic
-	// - Check length: 40 bytes (4 tag + 4 domain + 32 hash)
-	// - Extract version tag (bytes 0-3)
-	// - Verify tag matches CCTP_VERSION_2_TAG (0xb148ea5f) or CCTP_VERSION_2_CCV_TAG (0x3047587c)
-	// - Extract sourceDomain (bytes 4-7, big-endian uint32)
-	// - Extract depositHash (bytes 8-39)
-	// - Return decoded struct
-	return nil, fmt.Errorf("not yet implemented")
+	// Validate length
+	if len(extraData) != 40 {
+		return nil, fmt.Errorf("invalid V2 source pool data length: expected 40 bytes, got %d", len(extraData))
+	}
+
+	// Extract and validate version tag (bytes 0-3)
+	versionTag := binary.BigEndian.Uint32(extraData[0:4])
+	if versionTag != CCTP_VERSION_2_TAG && versionTag != CCTP_VERSION_2_CCV_TAG {
+		return nil, fmt.Errorf("invalid CCTPv2 version tag: expected 0x%x or 0x%x, got 0x%x",
+			CCTP_VERSION_2_TAG, CCTP_VERSION_2_CCV_TAG, versionTag)
+	}
+
+	// Extract sourceDomain (bytes 4-7, big-endian uint32)
+	sourceDomain := binary.BigEndian.Uint32(extraData[4:8])
+
+	// Extract depositHash (bytes 8-39)
+	var depositHash [32]byte
+	copy(depositHash[:], extraData[8:40])
+
+	return &SourceTokenDataPayloadV2{
+		SourceDomain: sourceDomain,
+		DepositHash:  depositHash,
+	}, nil
 }
