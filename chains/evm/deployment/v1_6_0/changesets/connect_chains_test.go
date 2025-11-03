@@ -94,7 +94,7 @@ func checkBidirectionalLaneConnectivity(
 		require.NoError(t, err, "must get src chain config from offRamp")
 		require.Equal(t, !disable, srcChainConfig.IsEnabled, "isEnabled must be expected")
 		require.Equal(t, !lane.Source.RMNVerificationEnabled, srcChainConfig.IsRMNVerificationDisabled, "rmnVerificationDisabled must equal expected")
-		require.Equal(t, onRampSrcAddr, srcChainConfig.OnRamp, "remote onRamp must be set on offRamp")
+		require.Equal(t, common.LeftPadBytes(onRampSrcAddr, 32), srcChainConfig.OnRamp, "remote onRamp must be set on offRamp")
 		require.Equal(t, routerOnDest.Address().Hex(), srcChainConfig.Router.Hex(), "router must equal expected")
 
 		isOffRamp, err := routerOnSrc.IsOffRamp(nil, lane.Dest.Selector, common.Address(offRampSrcAddr))
@@ -105,7 +105,7 @@ func checkBidirectionalLaneConnectivity(
 		if disable {
 			onRampSrcAddr = common.HexToAddress("0x0").Bytes()
 		}
-		require.Equal(t, onRampSrcAddr, common.LeftPadBytes(onRampOnRouter.Bytes(), 32), "onRamp must equal expected")
+		require.Equal(t, onRampSrcAddr, onRampOnRouter.Bytes(), "onRamp must equal expected")
 
 		isOffRamp, err = routerOnDest.IsOffRamp(nil, lane.Source.Selector, common.Address(offRampDestAddr))
 		require.NoError(t, err, "must check if router has offRamp")
@@ -115,7 +115,7 @@ func checkBidirectionalLaneConnectivity(
 		if disable {
 			onRampDestAddr = common.HexToAddress("0x0").Bytes()
 		}
-		require.Equal(t, onRampDestAddr, common.LeftPadBytes(onRampOnRouter.Bytes(), 32), "onRamp must equal expected")
+		require.Equal(t, onRampDestAddr, onRampOnRouter.Bytes(), "onRamp must equal expected")
 
 		feeQuoterDestConfig, err := feeQuoterOnSrc.GetDestChainConfig(nil, lane.Dest.Selector)
 		require.NoError(t, err, "must get dest chain config from feeQuoter")
