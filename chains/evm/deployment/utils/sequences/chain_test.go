@@ -3,6 +3,7 @@ package sequences_test
 import (
 	"testing"
 
+	sequencescommon "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -23,7 +24,7 @@ func TestResolveEVMChainDep(t *testing.T) {
 		desc        string
 		expectedErr string
 		chains      []chain.BlockChain
-		cfg         sequences.WithChainSelector
+		cfg         sequencescommon.WithChainSelector
 	}{
 		{
 			desc: "happy path",

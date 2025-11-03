@@ -6,6 +6,14 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
@@ -16,39 +24,29 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-type RMNRemoteParams struct {
-	LegacyRMN common.Address
+func (a *EVMAdapter) DeployChainContracts() *cldf_ops.Sequence[deployops.ContractDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return DeployChainContracts
 }
 
-type ContractParams struct {
-	RMNRemote RMNRemoteParams
-	FeeQuoter fqops.FeeQuoterParams
-	OffRamp   offrampops.OffRampParams
-}
-
-type DeployChainContractsInput struct {
-	ChainSelector     uint64 // Only exists to differentiate sequence runs on different chains
-	ExistingAddresses []datastore.AddressRef
-	ContractParams    ContractParams
+// just a wrapper around the v1.0.0 deployer for now
+func (a *EVMAdapter) DeployMCMS() *cldf_ops.Sequence[deployops.MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	evmDeployer := &evm1_0_0.EVMDeployer{}
+	return evmDeployer.DeployMCMS()
 }
 
 var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
 	semver.MustParse("1.6.0"),
 	"Deploys all required contracts for CCIP 1.6.0 to an EVM chain",
-	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
+	func(b operations.Bundle, chains cldf_chain.BlockChains, input deployops.ContractDeploymentConfigPerChainWithAddress) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract.WriteOutput, 0)
+		chain := chains.EVMChains()[input.ChainSelector]
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
 
@@ -78,7 +76,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
-				LegacyRMN:          input.ContractParams.RMNRemote.LegacyRMN,
+				LegacyRMN:          common.HexToAddress(input.LegacyRMN),
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -169,9 +167,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: fqops.ConstructorArgs{
 				StaticConfig: fee_quoter.FeeQuoterStaticConfig{
-					MaxFeeJuelsPerMsg:            input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
+					MaxFeeJuelsPerMsg:            input.MaxFeeJuelsPerMsg,
 					LinkToken:                    common.HexToAddress(linkRef.Address),
-					TokenPriceStalenessThreshold: input.ContractParams.FeeQuoter.TokenPriceStalenessThreshold,
+					TokenPriceStalenessThreshold: input.TokenPriceStalenessThreshold,
 				},
 				PriceUpdaters: []common.Address{
 					// TODO: Add Timelock here when MCMS support is needed.
@@ -181,19 +179,19 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					common.HexToAddress(linkRef.Address),
 					common.HexToAddress(wethRef.Address),
 				},
-				TokenPriceFeedUpdates:      input.ContractParams.FeeQuoter.TokenPriceFeedUpdates,
-				TokenTransferFeeConfigArgs: input.ContractParams.FeeQuoter.TokenTransferFeeConfigArgs,
-				MorePremiumMultiplierWeiPerEth: append([]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
+				TokenPriceFeedUpdates:      []fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
+				TokenTransferFeeConfigArgs: []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
+				MorePremiumMultiplierWeiPerEth: []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
 					{
-						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoter.LinkPremiumMultiplierWeiPerEth,
+						PremiumMultiplierWeiPerEth: input.LinkPremiumMultiplier,
 						Token:                      common.HexToAddress(linkRef.Address),
 					},
 					{
-						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoter.WethPremiumMultiplierWeiPerEth,
+						PremiumMultiplierWeiPerEth: input.NativeTokenPremiumMultiplier,
 						Token:                      common.HexToAddress(wethRef.Address),
 					},
-				}, input.ContractParams.FeeQuoter.MorePremiumMultiplierWeiPerEth...),
-				DestChainConfigArgs: input.ContractParams.FeeQuoter.DestChainConfigArgs,
+				},
+				DestChainConfigArgs: []fee_quoter.FeeQuoterDestChainConfigArgs{},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -208,15 +206,15 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			Args: offrampops.ConstructorArgs{
 				StaticConfig: offrampops.StaticConfig{
 					ChainSelector:        chain.Selector,
-					GasForCallExactCheck: input.ContractParams.OffRamp.GasForCallExactCheck,
+					GasForCallExactCheck: input.GasForCallExactCheck,
 					RmnRemote:            common.HexToAddress(rmnProxyRef.Address),
 					NonceManager:         common.HexToAddress(nonceManagerRef.Address),
 					TokenAdminRegistry:   common.HexToAddress(tokenAdminRegistryRef.Address),
 				},
 				DynamicConfig: offrampops.DynamicConfig{
 					FeeQuoter:                               common.HexToAddress(feeQuoterRef.Address),
-					PermissionLessExecutionThresholdSeconds: input.ContractParams.OffRamp.PermissionLessExecutionThresholdSeconds,
-					MessageInterceptor:                      input.ContractParams.OffRamp.MessageInterceptor,
+					PermissionLessExecutionThresholdSeconds: input.PermissionLessExecutionThresholdSeconds,
+					MessageInterceptor:                      common.HexToAddress(input.MessageInterceptor),
 				},
 			},
 		}, input.ExistingAddresses)

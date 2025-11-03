@@ -2,14 +2,13 @@ package sequences
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -24,7 +23,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 	"Configures lane leg as source on CCIP 1.6.0",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
-		fmt.Println("Configuring lane leg as source:", input)
+		b.Logger.Info("EVM Configuring lane leg as source:", input)
 
 		result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.FeeQuoter),
@@ -68,7 +67,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 					{
 						Router:            common.BytesToAddress(input.Source.Router),
 						DestChainSelector: input.Dest.Selector,
-						AllowlistEnabled:  input.Source.AllowListEnabled,
+						AllowlistEnabled:  input.Dest.AllowListEnabled,
 					},
 				},
 			},
@@ -83,7 +82,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			OnRamp:            common.BytesToAddress(input.Source.OnRamp),
 		}
 		if input.IsDisabled {
-			onrampUpdate.OnRamp = common.Address{}
+			onrampUpdate.OnRamp = common.HexToAddress("0x0")
 		}
 		result, err = sequences.RunAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
 			Address: common.BytesToAddress(input.Source.Router),
@@ -108,18 +107,18 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 	"Configures lane leg as destination on CCIP 1.6.0",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
-		fmt.Println("Configuring lane leg as destination:", input)
+		b.Logger.Info("EVM Configuring lane leg as destination:", input)
 
 		result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
-			Address: common.BytesToAddress(input.Source.OffRamp),
+			Address: common.BytesToAddress(input.Dest.OffRamp),
 			UpdatesByChain: map[uint64][]offramp.OffRampSourceChainConfigArgs{
-				input.Source.Selector: {
+				input.Dest.Selector: {
 					{
-						Router:                    common.BytesToAddress(input.Source.Router),
-						SourceChainSelector:       input.Dest.Selector,
-						OnRamp:                    input.Dest.OnRamp,
+						Router:                    common.BytesToAddress(input.Dest.Router),
+						SourceChainSelector:       input.Source.Selector,
+						OnRamp:                    input.Source.OnRamp,
 						IsEnabled:                 !input.IsDisabled,
-						IsRMNVerificationDisabled: !input.Dest.RMNVerificationEnabled,
+						IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 					},
 				},
 			},
@@ -130,7 +129,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		b.Logger.Info("Destination configs updated on OffRamps")
 
 		offrampUpdate := router.OffRamp{
-			SourceChainSelector: input.Dest.Selector,
+			SourceChainSelector: input.Source.Selector,
 			OffRamp:             common.BytesToAddress(input.Dest.OffRamp),
 		}
 		var offRampAdds []router.OffRamp
@@ -141,9 +140,9 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			offRampAdds = []router.OffRamp{offrampUpdate}
 		}
 		result, err = sequences.RunAndMergeSequence(b, chains, RouterApplyRampUpdatesSequence, RouterApplyRampUpdatesSequenceInput{
-			Address: common.BytesToAddress(input.Source.Router),
+			Address: common.BytesToAddress(input.Dest.Router),
 			UpdatesByChain: map[uint64]router.ApplyRampsUpdatesArgs{
-				input.Source.Selector: {
+				input.Dest.Selector: {
 					OffRampAdds:    offRampAdds,
 					OffRampRemoves: offRampRemoves,
 				},

@@ -28,8 +28,25 @@ const OP_COUNT = 42
 
 func (m *MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
 	return mcms_types.ChainMetadata{
-		MCMAddress:      input.MCMSAddressRef.Address,
 		StartingOpCount: OP_COUNT,
+	}, nil
+}
+
+func (m *MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0x01",
+		Type:          datastore.ContractType("Timelock"),
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+func (m *MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0x02",
+		Type:          datastore.ContractType("MCM"),
+		Version:       semver.MustParse("1.0.0"),
 	}, nil
 }
 
@@ -111,14 +128,6 @@ var basicMCMSInput = mcms.Input{
 	ValidUntil:           3759765795,
 	TimelockDelay:        mcms_types.MustParseDuration("1h"),
 	TimelockAction:       mcms_types.TimelockActionSchedule,
-	MCMSAddressRef: datastore.AddressRef{
-		Type:    "MCM",
-		Version: semver.MustParse("1.0.0"),
-	},
-	TimelockAddressRef: datastore.AddressRef{
-		Type:    "Timelock",
-		Version: semver.MustParse("1.0.0"),
-	},
 }
 
 func makeBaseDataStore(t *testing.T, chains []uint64) *datastore.MemoryDataStore {
@@ -526,14 +535,13 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 			expectedSequenceErrorMsg: "sequence execution failed",
 		},
 	}
+	// Register MCMS reader
+	mcmsRegistry := changesets.GetRegistry()
+	mcmsRegistry.RegisterMCMSReader("evm", &MockReader{})
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
-			// Register MCMS reader
-			mcmsRegistry := changesets.NewMCMSReaderRegistry()
-			mcmsRegistry.RegisterMCMSReader("evm", &MockReader{})
-
 			// Register token adapter with appropriate error condition
 			tokenAdapterRegistry := tokens.NewTokenAdapterRegistry()
 			mockAdapter := &transfersTest_MockTokenAdapter{}
