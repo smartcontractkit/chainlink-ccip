@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -89,7 +90,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 					ChainSelector: chainSelector,
 					Router:        routerAddress,
 					OnRamp:        onRamp,
-					CommitteeVerifiers: []sequences.CommitteeVerifier{
+					CommitteeVerifiers: []adapters.CommitteeVerifier[string]{
 						{
 							Implementation: committeeVerifier,
 							Resolver:       committeeVerifierResolver,
@@ -172,21 +173,21 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.False(t, committeeVerifierDestChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier dest chain config should be false")
 
 			// Check outbound implementation on CommitteeVerifierResolver
-			boundResolver, err := versioned_verifier_resolver.NewVersionedVerifierResolver(committeeVerifierResolver, evmChain.Client)
+			boundResolver, err := versioned_verifier_resolver.NewVersionedVerifierResolver(common.HexToAddress(committeeVerifierResolver), evmChain.Client)
 			require.NoError(t, err, "Failed to instantiate VersionedVerifierResolver")
 			outboundImpl, err := boundResolver.GetOutboundImplementation(&bind.CallOpts{Context: t.Context()}, remoteChainSelector, []byte{})
 			require.NoError(t, err, "GetOutboundImplementation should not error")
-			require.Equal(t, committeeVerifier.Hex(), outboundImpl.Hex(), "Outbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
+			require.Equal(t, committeeVerifier, outboundImpl.Hex(), "Outbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
 
 			// Check inbound implementation on CommitteeVerifierResolver
 			versionTagReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetVersionTag, evmChain, contract.FunctionInput[any]{
 				ChainSelector: evmChain.Selector,
-				Address:       committeeVerifier,
+				Address:       common.HexToAddress(committeeVerifier),
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 			inboundImpl, err := boundResolver.GetInboundImplementation(&bind.CallOpts{Context: t.Context()}, versionTagReport.Output[:])
 			require.NoError(t, err, "GetInboundImplementationForVersion should not error")
-			require.Equal(t, committeeVerifier.Hex(), inboundImpl.Hex(), "Inbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
+			require.Equal(t, committeeVerifier, inboundImpl.Hex(), "Inbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
 
 			// Check dest chains on Executor
 			ExecutorDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor.GetDestChains, evmChain, contract.FunctionInput[any]{

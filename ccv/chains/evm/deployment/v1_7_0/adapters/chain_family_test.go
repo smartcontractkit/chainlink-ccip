@@ -4,15 +4,15 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	evm_adapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/adapters"
-	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
@@ -32,10 +32,16 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 			Type:    datastore.ContractType(onramp.ContractType),
 			Version: semver.MustParse("1.7.0"),
 		},
-		CommitteeVerifiers: []datastore.AddressRef{
+		CommitteeVerifiers: []adapters.CommitteeVerifier[datastore.AddressRef]{
 			{
-				Type:    datastore.ContractType(committee_verifier.ContractType),
-				Version: semver.MustParse("1.7.0"),
+				Implementation: datastore.AddressRef{
+					Type:    datastore.ContractType(committee_verifier.ContractType),
+					Version: semver.MustParse("1.7.0"),
+				},
+				Resolver: datastore.AddressRef{
+					Type:    datastore.ContractType(committee_verifier.ResolverType),
+					Version: semver.MustParse("1.7.0"),
+				},
 			},
 		},
 		FeeQuoter: datastore.AddressRef{
@@ -76,6 +82,8 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 				CommitteeVerifierDestChainConfig: testsetup.CreateBasicCommitteeVerifierDestChainConfig(),
 				FeeQuoterDestChainConfig:         testsetup.CreateBasicFeeQuoterDestChainConfig(),
 				ExecutorDestChainConfig:          testsetup.CreateBasicExecutorDestChainConfig(),
+				AddressBytesLength:               20,
+				BaseExecutionGasCost:             80_000,
 			},
 		},
 	}

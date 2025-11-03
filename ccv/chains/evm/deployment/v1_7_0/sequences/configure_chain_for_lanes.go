@@ -146,7 +146,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// ApplyDestChainConfigUpdates on each CommitteeVerifier
 			committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.DestChainConfigArgs]{
 				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
+				Address:       common.HexToAddress(committeeVerifier.Implementation),
 				Args:          committeeVerifierDestConfigArgs,
 			})
 			if err != nil {
@@ -157,7 +157,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// ApplyInboundImplementationUpdates on each CommitteeVerifierResolver, first fetching the version tag
 			versionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetVersionTag, chain, contract.FunctionInput[any]{
 				ChainSelector: chain.Selector,
-				Address:       committeeVerifier.Implementation,
+				Address:       common.HexToAddress(committeeVerifier.Implementation),
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get version tag from CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
@@ -165,12 +165,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			inboundImplementationArgs := []versioned_verifier_resolver.InboundImplementationArgs{
 				{
 					Version:  versionTagReport.Output,
-					Verifier: committeeVerifier.Implementation,
+					Verifier: common.HexToAddress(committeeVerifier.Implementation),
 				},
 			}
 			applyInboundUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
 				ChainSelector: chain.Selector,
-				Address:       committeeVerifier.Resolver,
+				Address:       common.HexToAddress(committeeVerifier.Resolver),
 				Args:          inboundImplementationArgs,
 			})
 			if err != nil {
@@ -183,12 +183,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			for remoteChainSelector := range input.RemoteChains {
 				outboundImplementationArgs = append(outboundImplementationArgs, versioned_verifier_resolver.OutboundImplementationArgs{
 					DestChainSelector: remoteChainSelector,
-					Verifier:          committeeVerifier.Implementation,
+					Verifier:          common.HexToAddress(committeeVerifier.Implementation),
 				})
 			}
 			applyOutboundUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
 				ChainSelector: chain.Selector,
-				Address:       committeeVerifier.Resolver,
+				Address:       common.HexToAddress(committeeVerifier.Resolver),
 				Args:          outboundImplementationArgs,
 			})
 			if err != nil {
@@ -216,7 +216,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		for _, committeeVerifier := range input.CommitteeVerifiers {
 			committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
 				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier),
+				Address:       common.HexToAddress(committeeVerifier.Implementation),
 				Args:          committeeVerifierAllowlistArgs,
 			})
 			if err != nil {

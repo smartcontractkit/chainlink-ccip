@@ -84,10 +84,8 @@ var ApplyDestChainUpdates = contract.NewWrite(contract.WriteParams[ApplyDestChai
 			destChainSelectorsToAdd = append(destChainSelectorsToAdd, executor.ExecutorRemoteChainConfigArgs{
 				DestChainSelector: destChainSelectorToAdd.DestChainSelector,
 				Config: executor.ExecutorRemoteChainConfig{
-					UsdCentsFee:            destChainSelectorToAdd.Config.USDCentsFee,
-					BaseExecGas:            destChainSelectorToAdd.Config.BaseExecGas,
-					DestAddressLengthBytes: destChainSelectorToAdd.Config.DestAddressLengthBytes,
-					Enabled:                destChainSelectorToAdd.Config.Enabled,
+					UsdCentsFee: destChainSelectorToAdd.Config.USDCentsFee,
+					Enabled:     destChainSelectorToAdd.Config.Enabled,
 				},
 			})
 		}
@@ -98,7 +96,7 @@ var ApplyDestChainUpdates = contract.NewWrite(contract.WriteParams[ApplyDestChai
 var ApplyAllowedCCVUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowedCCVUpdatesArgs, *executor.Executor]{
 	Name:            "executor:apply-allowed-ccv-updates",
 	Version:         semver.MustParse("1.7.0"),
-	Description:     "Applies updates to the CCV allowlist on the Executor",
+	Description:     "Applies updates to the CCV allowlist oån the Executor",
 	ContractType:    ContractType,
 	ContractABI:     executor.ExecutorABI,
 	NewContract:     executor.NewExecutor,
