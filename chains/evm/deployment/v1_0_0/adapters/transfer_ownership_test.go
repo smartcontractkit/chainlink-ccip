@@ -51,7 +51,7 @@ func TestTransferOwnership(t *testing.T) {
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
 	deployMCMS := deploy.DeployMCMS(dReg)
 	output, err := deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
-		Version: semver.MustParse("1.0.0"),
+		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -77,7 +77,7 @@ func TestTransferOwnership(t *testing.T) {
 
 	// deploy another timelock so that later we can transfer ownership to it from first timelock
 	output, err = deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
-		Version: semver.MustParse("1.0.0"),
+		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
@@ -135,16 +135,18 @@ func TestTransferOwnership(t *testing.T) {
 	newTimelockAddrs := make(map[uint64]string)
 	for _, sel := range []uint64{selector1, selector2} {
 		timelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-			Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-			Qualifier: "test",
-			Version:   semver.MustParse("1.0.0"),
+			ChainSelector: sel,
+			Type:          datastore.ContractType(deploymentutils.RBACTimelock),
+			Qualifier:     "test",
+			Version:       semver.MustParse("1.0.0"),
 		}, sel, datastore_utils.FullRef)
 		require.NoError(t, err)
 		timelockAddrs[sel] = timelockRef.Address
 		newTimelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-			Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-			Qualifier: "test1",
-			Version:   semver.MustParse("1.0.0"),
+			ChainSelector: sel,
+			Type:          datastore.ContractType(deploymentutils.RBACTimelock),
+			Qualifier:     "test1",
+			Version:       semver.MustParse("1.0.0"),
 		}, sel, datastore_utils.FullRef)
 		require.NoError(t, err)
 		newTimelockAddrs[sel] = newTimelockRef.Address
@@ -178,24 +180,15 @@ func TestTransferOwnership(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			MCMSAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			TimelockAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			Description: "Transfer ownership test",
+			Qualifier:            "test",
+			Description:          "Transfer ownership test",
 		},
 	}
 	// register chain adapter
 	cr := deploy.GetTransferOwnershipRegistry()
 	evmAdapter := &adapters.EVMTransferOwnershipAdapter{}
 	cr.RegisterAdapter(chainsel.FamilyEVM, transferOwnershipInput.AdapterVersion, evmAdapter)
-	mcmsRegistry := changesets.NewMCMSReaderRegistry()
+	mcmsRegistry := changesets.GetRegistry()
 	evmMCMSReader := &adapters.EVMMCMSReader{}
 	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, evmMCMSReader)
 	transferOwnershipChangeset := deploy.TransferOwnershipChangeset(cr, mcmsRegistry)
@@ -249,17 +242,8 @@ func TestTransferOwnership(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
-			MCMSAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			TimelockAddressRef: datastore.AddressRef{
-				Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-				Qualifier: "test",
-				Version:   semver.MustParse("1.0.0"),
-			},
-			Description: "Transfer ownership test",
+			Qualifier:            "test",
+			Description:          "Transfer ownership test",
 		},
 	}
 	transferOwnershipChangeset = deploy.TransferOwnershipChangeset(cr, mcmsRegistry)
@@ -276,17 +260,8 @@ func TestTransferOwnership(t *testing.T) {
 		ValidUntil:           3759765795,
 		TimelockDelay:        mcms_types.MustParseDuration("0s"),
 		TimelockAction:       mcms_types.TimelockActionSchedule,
-		MCMSAddressRef: datastore.AddressRef{
-			Type:      datastore.ContractType(deploymentutils.ProposerManyChainMultisig),
-			Qualifier: "test1", // new mcms qualifier
-			Version:   semver.MustParse("1.0.0"),
-		},
-		TimelockAddressRef: datastore.AddressRef{
-			Type:      datastore.ContractType(deploymentutils.RBACTimelock),
-			Qualifier: "test1", // new timelock qualifier
-			Version:   semver.MustParse("1.0.0"),
-		},
-		Description: "Transfer ownership test",
+		Qualifier:            "test1",
+		Description:          "Transfer ownership test",
 	}
 	acceptOwnershipChangeset := deploy.AcceptOwnershipChangeset(cr, mcmsRegistry)
 	output, err = acceptOwnershipChangeset.Apply(*env, transferOwnershipInput)

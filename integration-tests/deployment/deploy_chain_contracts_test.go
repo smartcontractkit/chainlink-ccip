@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -24,8 +23,6 @@ import (
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -65,22 +62,8 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
 
-	cs := mcmsapi.DeployMCMS(dReg)
-	output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
-		Version: version,
-		Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
-			chain_selectors.SOLANA_MAINNET.Selector: {
-				Canceller:        testhelpers.SingleGroupMCMS(),
-				Bypasser:         testhelpers.SingleGroupMCMS(),
-				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(common_utils.CLLQualifier),
-			},
-		},
-	})
-	require.NoError(t, err)
-	require.Greater(t, len(output.Reports), 0)
-	e.DataStore = output.DataStore.Seal()
+	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 }
 
 var solanaProgramIDs = map[string]string{
@@ -104,8 +87,8 @@ var solanaContracts = map[string]datastore.ContractType{
 	"fee_quoter":        datastore.ContractType(fqops.ContractType),
 	"ccip_offramp":      datastore.ContractType(offrampops.ContractType),
 	"rmn_remote":        datastore.ContractType(rmnremoteops.ContractType),
-	"mcm":               datastore.ContractType(mcmsops.McmProgramType),
-	"timelock":          datastore.ContractType(mcmsops.TimelockProgramType),
+	"mcm":               datastore.ContractType(utils.McmProgramType),
+	"timelock":          datastore.ContractType(utils.TimelockProgramType),
 	"access_controller": datastore.ContractType(mcmsops.AccessControllerProgramType),
 }
 

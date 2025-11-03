@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IPoolV1} from "../../../../interfaces/IPool.sol";
 
+import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
@@ -33,7 +34,9 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     assertEq(pools.cctpV2Pool, s_cctpV2Pool);
 
     assertTrue(proxy.supportsInterface(type(IPoolV1).interfaceId));
+    assertTrue(proxy.supportsInterface(Pool.CCIP_POOL_V1));
     assertTrue(proxy.supportsInterface(type(IERC165).interfaceId));
+
     assertTrue(proxy.isSupportedToken(address(s_USDCToken)));
   }
 

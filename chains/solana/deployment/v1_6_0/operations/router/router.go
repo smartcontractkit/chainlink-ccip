@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/mcms/types"
 )
 
 var ContractType cldf_deployment.ContractType = "Router"
@@ -52,10 +53,12 @@ var Initialize = operations.NewOperation(
 	Version,
 	"Initializes the Router 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
+		ccip_router.SetProgramID(input.Router)
 		programData, err := utils.GetSolProgramData(chain, input.Router)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
+		authority := GetAuthority(chain, input.Router)
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		instruction, err := ccip_router.NewInitializeInstruction(
 			chain.Selector,
@@ -64,7 +67,7 @@ var Initialize = operations.NewOperation(
 			input.LinkToken,
 			input.RMNRemote,
 			routerConfigPDA,
-			chain.DeployerKey.PublicKey(),
+			authority,
 			solana.SystemProgramID,
 			input.Router,
 			programData.Address,
@@ -85,6 +88,7 @@ var ConnectChains = operations.NewOperation(
 	Version,
 	"Connects the Router 1.6.0 contract to other chains",
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
+		ccip_router.SetProgramID(input.Router)
 		isUpdate := false
 		authority := GetAuthority(chain, input.Router)
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
@@ -100,6 +104,7 @@ var ConnectChains = operations.NewOperation(
 			AllowListEnabled: input.AllowlistEnabled,
 		}
 		var ixn solana.Instruction
+		batches := make([]types.BatchOperation, 0)
 		if isUpdate {
 			ixn, err = ccip_router.NewUpdateDestChainConfigInstruction(
 				input.RemoteChainSelector,
@@ -129,17 +134,31 @@ var ConnectChains = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
 			}
 		}
-		err = chain.Confirm([]solana.Instruction{ixn})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
-		}
 		sourceRef := datastore.AddressRef{
 			Address:       routerDestChainPDA.String(),
 			ChainSelector: chain.Selector,
 			Type:          datastore.ContractType(DestChainType),
 			Version:       Version,
 		}
+		if authority != chain.DeployerKey.PublicKey() {
+			b, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Router.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			batches = append(batches, b)
+		} else {
+			err = chain.Confirm([]solana.Instruction{ixn})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			}
+		}
 		return sequences.OnChainOutput{
+			BatchOps:  batches,
 			Addresses: []datastore.AddressRef{sourceRef},
 		}, nil
 	},
@@ -150,6 +169,7 @@ var AddOffRamp = operations.NewOperation(
 	Version,
 	"Adds an OffRamp to the Router 1.6.0 contract for a given chain",
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
+		ccip_router.SetProgramID(input.Router)
 		authority := GetAuthority(chain, input.Router)
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		allowedOffRampRemotePDA, _ := state.FindAllowedOfframpPDA(input.RemoteChainSelector, input.OffRamp, input.Router)
@@ -164,6 +184,94 @@ var AddOffRamp = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
 		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Router.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
+var TransferOwnership = operations.NewOperation(
+	"router:transfer-ownership",
+	Version,
+	"Transfers ownership of the Router 1.6.0 contract to a new authority",
+	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
+		ccip_router.SetProgramID(input.Program)
+		authority := GetAuthority(chain, input.Program)
+		if authority != input.CurrentOwner {
+			return sequences.OnChainOutput{}, fmt.Errorf("current owner %s does not match on-chain authority %s", input.CurrentOwner.String(), authority.String())
+		}
+		configPDA, _, _ := state.FindConfigPDA(input.Program)
+		ixn, err := ccip_router.NewTransferOwnershipInstruction(
+			input.NewOwner,
+			configPDA,
+			authority,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
+		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Program.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
+var AcceptOwnership = operations.NewOperation(
+	"router:accept-ownership",
+	Version,
+	"Accepts ownership of the Router 1.6.0 contract",
+	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
+		ccip_router.SetProgramID(input.Program)
+		configPDA, _, _ := state.FindConfigPDA(input.Program)
+		ixn, err := ccip_router.NewAcceptOwnershipInstruction(
+			configPDA,
+			input.NewOwner,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
+		}
+		if input.NewOwner != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Program.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
@@ -173,7 +281,13 @@ var AddOffRamp = operations.NewOperation(
 )
 
 func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
-	return chain.DeployerKey.PublicKey()
+	programData := ccip_router.Config{}
+	routerConfigPDA, _, _ := state.FindConfigPDA(program)
+	err := chain.GetAccountDataBorshInto(context.Background(), routerConfigPDA, &programData)
+	if err != nil {
+		return chain.DeployerKey.PublicKey()
+	}
+	return programData.Owner
 }
 
 type Params struct {

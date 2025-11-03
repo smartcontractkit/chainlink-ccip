@@ -11,22 +11,25 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
-	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -47,11 +50,11 @@ func checkBidirectionalLaneConnectivity(
 	var offRampEvmSourceChainPDA solana.PublicKey
 	var evmDestChainStatePDA solana.PublicKey
 	var fqEvmDestChainPDA solana.PublicKey
-	feeQuoterOnSrcAddr, err := solanaAdapter.GetFQAddress(e, solanaChain.Selector)
+	feeQuoterOnSrcAddr, err := solanaAdapter.GetFQAddress(e.DataStore, solanaChain.Selector)
 	require.NoError(t, err, "must get feeQuoter from srcAdapter")
-	routerOnSrcAddr, err := solanaAdapter.GetRouterAddress(e, solanaChain.Selector)
+	routerOnSrcAddr, err := solanaAdapter.GetRouterAddress(e.DataStore, solanaChain.Selector)
 	require.NoError(t, err, "must get router from srcAdapter")
-	offRampOnSrcAddr, err := solanaAdapter.GetOffRampAddress(e, solanaChain.Selector)
+	offRampOnSrcAddr, err := solanaAdapter.GetOffRampAddress(e.DataStore, solanaChain.Selector)
 	require.NoError(t, err, "must get offRamp from srcAdapter")
 
 	offRampEvmSourceChainPDA, _, _ = state.FindOfframpSourceChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(offRampOnSrcAddr))
@@ -70,25 +73,25 @@ func checkBidirectionalLaneConnectivity(
 	require.Equal(t, !disable, destChainFqAccount.Config.IsEnabled)
 
 	// EVM Validation
-	feeQuoterOnDestAddr, err := evmAdapter.GetFQAddress(e, evmChain.Selector)
+	feeQuoterOnDestAddr, err := evmAdapter.GetFQAddress(e.DataStore, evmChain.Selector)
 	require.NoError(t, err, "must get feeQuoter from srcAdapter")
 	feeQuoterOnDest, err := evmfq.NewFeeQuoter(common.BytesToAddress(feeQuoterOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
 	require.NoError(t, err, "must instantiate feeQuoter")
 
-	onRampDestAddr, err := evmAdapter.GetOnRampAddress(e, evmChain.Selector)
+	onRampDestAddr, err := evmAdapter.GetOnRampAddress(e.DataStore, evmChain.Selector)
 	require.NoError(t, err, "must get onRamp from destAdapter")
 	onRampDest, err := onramp.NewOnRamp(common.BytesToAddress(onRampDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
 	require.NoError(t, err, "must instantiate onRamp")
 
-	offRampDestAddr, err := evmAdapter.GetOffRampAddress(e, evmChain.Selector)
+	offRampDestAddr, err := evmAdapter.GetOffRampAddress(e.DataStore, evmChain.Selector)
 	require.NoError(t, err, "must get offRamp from destAdapter")
 	offRampDest, err := offramp.NewOffRamp(common.BytesToAddress(offRampDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
 	require.NoError(t, err, "must instantiate offRamp")
 
-	routerOnDestAddr, err := evmAdapter.GetRouterAddress(e, evmChain.Selector)
+	routerOnDestAddr, err := evmAdapter.GetRouterAddress(e.DataStore, evmChain.Selector)
 	require.NoError(t, err, "must get router from destAdapter")
-	// routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
-	// require.NoError(t, err, "must instantiate router")
+	routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
+	require.NoError(t, err, "must instantiate router")
 
 	destChainConfig, err := onRampDest.GetDestChainConfig(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get dest chain config from onRamp")
@@ -106,9 +109,9 @@ func checkBidirectionalLaneConnectivity(
 	require.Equal(t, routerOnSrcAddr, srcChainConfig.OnRamp, "remote onRamp must be set on offRamp")
 	// require.Equal(t, routerOnSrcAddr, srcChainConfig.Router.Bytes(), "router must equal expected")
 
-	// isOffRamp, err := routerOnDest.IsOffRamp(nil, solanaChain.Selector, common.Address(offRampOnSrcAddr))
-	// require.NoError(t, err, "must check if router has offRamp")
-	// require.Equal(t, !disable, isOffRamp, "isOffRamp result must equal expected")
+	isOffRamp, err := routerOnDest.IsOffRamp(nil, solanaChain.Selector, common.Address(offRampDestAddr))
+	require.NoError(t, err, "must check if router has offRamp")
+	require.Equal(t, !disable, isOffRamp, "isOffRamp result must equal expected")
 	// onRampOnRouter, err := routerOnDest.GetOnRamp(nil, solanaChain.Selector)
 	// require.NoError(t, err, "must get onRamp from router")
 	// onRampAddr := routerOnSrcAddr
@@ -147,7 +150,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	require.NotNil(t, e, "Environment should be created")
 	e.DataStore = ds.Seal() // Add preloaded contracts to env datastore
 
-	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+	mcmsRegistry := cs_core.GetRegistry()
 	dReg := deployops.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	for _, chainSel := range allChains {
@@ -177,9 +180,14 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		out.DataStore.Merge(e.DataStore)
 		e.DataStore = out.DataStore.Seal()
 	}
-	evmEncoded, err := hex.DecodeString(ccipapi.EVMFamilySelector)
+	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	// TODO: EVM doesn't work with a non-zero timelock delay
+	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
+	// EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
+	evmEncoded, err := hex.DecodeString(cciputils.EVMFamilySelector)
 	require.NoError(t, err, "Failed to decode EVM family selector")
-	svmEncoded, err := hex.DecodeString(ccipapi.SVMFamilySelector)
+	svmEncoded, err := hex.DecodeString(cciputils.SVMFamilySelector)
 	require.NoError(t, err, "Failed to decode SVM family selector")
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.SOLANA_MAINNET.Selector,
@@ -192,7 +200,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
 	}
 
-	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,
@@ -200,8 +208,16 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 				ChainB:  chain2,
 			},
 		},
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Description:          "Connect Chains",
+		},
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
+	testhelpers.ProcessTimelockProposals(t, *e, connectOut.MCMSTimelockProposals, false)
 	laneRegistry := lanesapi.GetLaneAdapterRegistry()
 	srcFamily, err := chain_selectors.GetSelectorFamily(chain1.Selector)
 	require.NoError(t, err, "must get selector family for src")
