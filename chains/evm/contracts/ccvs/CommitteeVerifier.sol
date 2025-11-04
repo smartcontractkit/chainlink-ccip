@@ -28,6 +28,8 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   string public constant override typeAndVersion = "CommitteeVerifier 1.7.0-dev";
   /// @dev The preimage is bytes4(keccak256("CommitteeVerifier 1.7.0"))
   bytes4 internal constant VERSION_TAG_V1_7_0 = 0x49ff34ed;
+  /// @dev The number of bytes allocated to encoding the verifier version
+  uint256 internal constant VERIFIER_VERSION_BYTES = 4;
   /// @dev The number of bytes allocated to encoding the signature length within the ccvData.
   uint256 internal constant SIGNATURE_LENGTH_BYTES = 2;
 
@@ -60,18 +62,30 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     bytes32 messageHash,
     bytes calldata ccvData
   ) external view {
-    if (ccvData.length < SIGNATURE_LENGTH_BYTES) {
+    if (ccvData.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES) {
       revert InvalidCCVData();
     }
 
-    uint256 signatureLength = uint16(bytes2(ccvData[:SIGNATURE_LENGTH_BYTES]));
-    if (ccvData.length < SIGNATURE_LENGTH_BYTES + signatureLength) {
+    uint256 signatureLength =
+      uint16(bytes2(ccvData[VERIFIER_VERSION_BYTES:VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES]));
+    if (ccvData.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength) {
       revert InvalidCCVData();
     }
+
+    // Verifiers sign a concatenation of the verifier version and the message hash.
+    // The version is included so that a resolver can return the correct verifier implementation on destination.
+    // The version must be signed, otherwise any version could be inserted post-signatures.
+    bytes32 signedHash = keccak256(abi.encodePacked(ccvData[0:VERIFIER_VERSION_BYTES], messageHash));
 
     // Even though the current version of this contract only expects signatures to be included in the ccvData, bounding
     // it to the given length allows potential forward compatibility with future formats that supply more data.
-    _validateSignatures(messageHash, ccvData[SIGNATURE_LENGTH_BYTES:SIGNATURE_LENGTH_BYTES + signatureLength]);
+    _validateSignatures(
+      signedHash,
+      ccvData[
+        VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES:
+          VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength
+      ]
+    );
   }
 
   // ================================================================

@@ -13,6 +13,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
   uint256 internal constant PRIVATE_KEY_0 = 0x60b919c82f0b4791a5b7c6a7275970ace1748759ebdaa8a5c3a4b2f5a8b1e8d1;
   address internal constant MOCK_SENDER = 0x3333333333333333333333333333333333333333;
   address internal constant MOCK_RECEIVER = 0x4444444444444444444444444444444444444444;
+  bytes4 internal constant VERSION_TAG = 0x01010101;
 
   function setUp() public virtual override {
     super.setUp();
