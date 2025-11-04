@@ -293,8 +293,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
     for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
-      destTokenAmounts[i] =
-        _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, message.sourceChainSelector);
+      destTokenAmounts[i] = _releaseOrMintSingleToken(
+        message.tokenTransfer[i], message.sender, message.sourceChainSelector, message.finality
+      );
     }
 
     // There are three cases in which we skip calling the receiver:
@@ -617,11 +618,13 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param sourceTokenAmount Amount and source data of the token to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param sourceChainSelector The remote source chain selector
+  /// @param finality The finality configuration from the message.
   /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
-    uint64 sourceChainSelector
+    uint64 sourceChainSelector,
+    uint16 finality
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
     address receiver = address(bytes20(sourceTokenAmount.tokenReceiver));
 
@@ -636,19 +639,48 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert NotACompatiblePool(localPoolAddress);
     }
 
-    // Check V2 first, as it is the most recent version of the pool interface.
+    // We retrieve the local token balance of the receiver before the pool call.
+    uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
+    Pool.ReleaseOrMintOutV1 memory returnData;
+
     if (localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V2)) {
-      // TODO write IPoolV2
+      try IPoolV2(localPoolAddress).releaseOrMint(
+        Pool.ReleaseOrMintInV1({
+          originalSender: originalSender,
+          receiver: receiver,
+          sourceDenominatedAmount: sourceTokenAmount.amount,
+          localToken: localToken,
+          remoteChainSelector: sourceChainSelector,
+          // This re-encodes the address as bytes, but now with the zero prefix to make it 32 bytes long.
+          // We have to cast it to an address to ensure the bytes are padded on the left with zeros, bytes objects get
+          // padded on the right.
+          sourcePoolAddress: abi.encode(address(bytes20(sourceTokenAmount.sourcePoolAddress))),
+          sourcePoolData: sourceTokenAmount.extraData,
+          // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
+          offchainTokenData: ""
+        }),
+        finality
+      ) returns (Pool.ReleaseOrMintOutV1 memory result) {
+        returnData = result;
+      } catch (bytes memory err) {
+        revert TokenHandlingError(localToken, err);
+      }
+
+      uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);
+
+      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error.
+      if (balancePost < balancePre || balancePost - balancePre != returnData.destinationAmount) {
+        revert ReleaseOrMintBalanceMismatch(returnData.destinationAmount, balancePre, balancePost);
+      }
+
+      return Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount});
     }
 
     if (!localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V1)) {
       // If the pool does not support the v1 interface, we revert.
       revert NotACompatiblePool(localPoolAddress);
     }
-    // We retrieve the local token balance of the receiver before the pool call.
-    uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
 
-    Pool.ReleaseOrMintOutV1 memory returnData;
     try IPoolV1(localPoolAddress).releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: originalSender,
