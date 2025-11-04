@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
 
-import {OwnableDeployer} from "../../OwnableDeployer.sol";
 import {OwnableDeployerSetup} from "./OwnableDeployerSetup.t.sol";
 
 import {Create2} from "@openzeppelin/contracts@5.0.2/utils/Create2.sol";
