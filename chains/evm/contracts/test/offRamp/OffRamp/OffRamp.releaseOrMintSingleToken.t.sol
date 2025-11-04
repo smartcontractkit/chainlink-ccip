@@ -100,7 +100,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
       abi.encodeCall(ITokenAdminRegistry.getPool, (address(s_token))),
       abi.encode(address(0))
     );
+
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
+
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(0)));
     s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0);
   }
@@ -108,7 +110,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   function test_releaseOrMintSingleToken_RevertWhen_NotACompatiblePool_UnsupportedInterface() public {
     vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V1)), abi.encode(false));
     vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V2)), abi.encode(false));
+
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
+
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(s_pool)));
     s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0);
   }
