@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -17,11 +18,9 @@ var ContractType cldf_deployment.ContractType = "FeeQuoter"
 
 type StaticConfig = fee_quoter.FeeQuoterStaticConfig
 
-type DestChainConfig = fee_quoter.FeeQuoterDestChainConfig
-
 type DestChainConfigArgs struct {
 	DestChainSelector uint64
-	DestChainConfig   DestChainConfig
+	DestChainConfig   adapters.FeeQuoterDestChainConfig
 }
 
 type FeeTokenArgs = fee_quoter.FeeQuoterFeeTokenArgs
@@ -155,7 +154,18 @@ func transformDestChainConfigArgs(args []DestChainConfigArgs) []fee_quoter.FeeQu
 	for _, arg := range args {
 		argsTransformed = append(argsTransformed, fee_quoter.FeeQuoterDestChainConfigArgs{
 			DestChainSelector: arg.DestChainSelector,
-			DestChainConfig:   arg.DestChainConfig,
+			DestChainConfig: fee_quoter.FeeQuoterDestChainConfig{
+				IsEnabled:                   arg.DestChainConfig.IsEnabled,
+				MaxDataBytes:                arg.DestChainConfig.MaxDataBytes,
+				MaxPerMsgGasLimit:           arg.DestChainConfig.MaxPerMsgGasLimit,
+				DestGasOverhead:             arg.DestChainConfig.DestGasOverhead,
+				DestGasPerPayloadByteBase:   arg.DestChainConfig.DestGasPerPayloadByteBase,
+				ChainFamilySelector:         arg.DestChainConfig.ChainFamilySelector,
+				DefaultTokenFeeUSDCents:     arg.DestChainConfig.DefaultTokenFeeUSDCents,
+				DefaultTokenDestGasOverhead: arg.DestChainConfig.DefaultTokenDestGasOverhead,
+				DefaultTxGasLimit:           arg.DestChainConfig.DefaultTxGasLimit,
+				NetworkFeeUSDCents:          arg.DestChainConfig.NetworkFeeUSDCents,
+			},
 		})
 	}
 

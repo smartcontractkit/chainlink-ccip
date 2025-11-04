@@ -21,7 +21,7 @@ contract OffRamp_getCCVsFromPool is OffRampSetup {
       pool, abi.encodeWithSignature("supportsInterface(bytes4)", type(IPoolV2).interfaceId), abi.encode(false)
     );
 
-    address[] memory result = s_agg.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
+    address[] memory result = s_offRamp.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
     assertEq(result.length, 1);
     assertEq(result[0], s_defaultCCV);
   }
@@ -33,7 +33,7 @@ contract OffRamp_getCCVsFromPool is OffRampSetup {
 
     _deployPoolV2(expectedCCVs);
 
-    address[] memory result = s_agg.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
+    address[] memory result = s_offRamp.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
     assertEq(result.length, expectedCCVs.length);
     assertEq(result[0], expectedCCVs[0]);
     assertEq(result[1], expectedCCVs[1]);
@@ -43,7 +43,7 @@ contract OffRamp_getCCVsFromPool is OffRampSetup {
     address[] memory emptyCCVs = new address[](0);
     _deployPoolV2(emptyCCVs);
 
-    address[] memory result = s_agg.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
+    address[] memory result = s_offRamp.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
     assertEq(result.length, 1);
     assertEq(result[0], s_defaultCCV);
   }

@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -25,13 +26,14 @@ type ProxyConstructorArgs struct {
 }
 
 type ApplyDestChainUpdatesArgs struct {
-	DestChainSelectorsToAdd    []executor.ExecutorRemoteChainConfigArgs
+	DestChainSelectorsToAdd    []RemoteChainConfigArgs
 	DestChainSelectorsToRemove []uint64
 }
 
-type RemoteChainConfigArgs = executor.ExecutorRemoteChainConfigArgs
-
-type RemoteChainConfig = executor.ExecutorRemoteChainConfig
+type RemoteChainConfigArgs struct {
+	DestChainSelector uint64
+	Config            adapters.ExecutorDestChainConfig
+}
 
 type ApplyAllowedCCVUpdatesArgs struct {
 	CCVsToAdd        []common.Address
@@ -77,7 +79,17 @@ var ApplyDestChainUpdates = contract.NewWrite(contract.WriteParams[ApplyDestChai
 	IsAllowedCaller: contract.OnlyOwner[*executor.Executor, ApplyDestChainUpdatesArgs],
 	Validate:        func(ApplyDestChainUpdatesArgs) error { return nil },
 	CallContract: func(Executor *executor.Executor, opts *bind.TransactOpts, args ApplyDestChainUpdatesArgs) (*types.Transaction, error) {
-		return Executor.ApplyDestChainUpdates(opts, args.DestChainSelectorsToRemove, args.DestChainSelectorsToAdd)
+		destChainSelectorsToAdd := make([]executor.ExecutorRemoteChainConfigArgs, 0, len(args.DestChainSelectorsToAdd))
+		for _, destChainSelectorToAdd := range args.DestChainSelectorsToAdd {
+			destChainSelectorsToAdd = append(destChainSelectorsToAdd, executor.ExecutorRemoteChainConfigArgs{
+				DestChainSelector: destChainSelectorToAdd.DestChainSelector,
+				Config: executor.ExecutorRemoteChainConfig{
+					UsdCentsFee: destChainSelectorToAdd.Config.USDCentsFee,
+					Enabled:     destChainSelectorToAdd.Config.Enabled,
+				},
+			})
+		}
+		return Executor.ApplyDestChainUpdates(opts, args.DestChainSelectorsToRemove, destChainSelectorsToAdd)
 	},
 })
 
