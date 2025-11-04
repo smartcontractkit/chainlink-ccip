@@ -9,19 +9,15 @@ import {Client} from "../../../libraries/Client.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
-
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 import {TokenPoolSetup} from "../../pools/TokenPool/TokenPoolSetup.t.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
-
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   BurnMintTokenPool internal s_pool;
   OffRampHelper internal s_offRamp;
   address internal s_tokenAdminRegistry = makeAddr("tokenAdminRegistry");
-  address internal receiver = makeAddr("receiver");
+  address internal s_receiver = makeAddr("receiver");
 
   function setUp() public override {
     super.setUp();
@@ -54,30 +50,6 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     );
   }
 
-  function _buildReleaseInput() internal returns (Pool.ReleaseOrMintInV1 memory) {
-    return Pool.ReleaseOrMintInV1({
-      originalSender: abi.encodePacked(makeAddr("originalSender")),
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      receiver: receiver,
-      sourceDenominatedAmount: 1 ether,
-      localToken: address(s_token),
-      sourcePoolAddress: abi.encode(s_initialRemotePool),
-      sourcePoolData: abi.encode(18),
-      offchainTokenData: ""
-    });
-  }
-
-  function _buildTokenTransfer() internal view returns (MessageV1Codec.TokenTransferV1 memory) {
-    return MessageV1Codec.TokenTransferV1({
-      amount: 1 ether,
-      sourcePoolAddress: abi.encodePacked(s_initialRemotePool),
-      sourceTokenAddress: abi.encodePacked(s_initialRemoteToken),
-      destTokenAddress: abi.encodePacked(address(s_token)),
-      tokenReceiver: abi.encodePacked(receiver),
-      extraData: abi.encode(18)
-    });
-  }
-
   function test_releaseOrMintSingleToken_CallsV2Function() public {
     vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V2)), abi.encode(true));
 
@@ -93,22 +65,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
 
     assertEq(dest.token, address(s_token));
     assertEq(dest.amount, tokenTransfer.amount);
-    assertEq(s_token.balanceOf(receiver), dest.amount);
-  }
-
-  function test_releaseOrMintSingleToken_PropagatesPoolError() public {
-    vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V2)), abi.encode(true));
-
-    Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
-    MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
-
-    bytes memory callData = abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, expectedInput, uint16(2));
-    vm.expectCall(address(s_pool), callData);
-    bytes memory poolRevertData = abi.encode("pool-error");
-    vm.mockCallRevert(address(s_pool), callData, poolRevertData);
-
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, address(s_token), poolRevertData));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 2);
+    assertEq(s_token.balanceOf(s_receiver), dest.amount);
   }
 
   function test_releaseOrMintSingleToken_CallsV1FunctionWhenNoV2Support() public {
@@ -125,7 +82,22 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
 
     assertEq(dest.token, address(s_token));
     assertEq(dest.amount, tokenTransfer.amount);
-    assertEq(s_token.balanceOf(receiver), dest.amount);
+    assertEq(s_token.balanceOf(s_receiver), dest.amount);
+  }
+
+  function test_releaseOrMintSingleToken_PropagatesPoolError() public {
+    vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V2)), abi.encode(true));
+
+    Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
+    MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
+
+    bytes memory callData = abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, expectedInput, uint16(2));
+    vm.expectCall(address(s_pool), callData);
+    bytes memory poolRevertData = abi.encode("pool-error");
+    vm.mockCallRevert(address(s_pool), callData, poolRevertData);
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, address(s_token), poolRevertData));
+    s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 2);
   }
 
   function test_releaseOrMintSingleToken_RevertWhen_NotACompatiblePool_PoolAddressZero() public {
@@ -147,7 +119,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0);
   }
 
-  function test_releaseOrMintSingleToken_RevertsWhen_BalanceMismatch() public {
+  function test_releaseOrMintSingleToken_RevertsWhen_ReleaseOrMintBalanceMismatch() public {
     vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V2)), abi.encode(false));
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
@@ -158,5 +130,29 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.ReleaseOrMintBalanceMismatch.selector, tokenTransfer.amount, 0, 0));
     s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 1);
+  }
+
+  function _buildReleaseInput() internal returns (Pool.ReleaseOrMintInV1 memory) {
+    return Pool.ReleaseOrMintInV1({
+      originalSender: abi.encodePacked(makeAddr("originalSender")),
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      receiver: s_receiver,
+      sourceDenominatedAmount: 1 ether,
+      localToken: address(s_token),
+      sourcePoolAddress: abi.encode(s_initialRemotePool),
+      sourcePoolData: abi.encode(18),
+      offchainTokenData: ""
+    });
+  }
+
+  function _buildTokenTransfer() internal view returns (MessageV1Codec.TokenTransferV1 memory) {
+    return MessageV1Codec.TokenTransferV1({
+      amount: 1 ether,
+      sourcePoolAddress: abi.encodePacked(s_initialRemotePool),
+      sourceTokenAddress: abi.encodePacked(s_initialRemoteToken),
+      destTokenAddress: abi.encodePacked(address(s_token)),
+      tokenReceiver: abi.encodePacked(s_receiver),
+      extraData: abi.encode(18)
+    });
   }
 }
