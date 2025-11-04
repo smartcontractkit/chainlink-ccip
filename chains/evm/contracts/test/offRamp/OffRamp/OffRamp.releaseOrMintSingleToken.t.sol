@@ -51,14 +51,11 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   }
 
   function test_releaseOrMintSingleToken_CallsV2Function() public {
-    vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V2)), abi.encode(true));
-
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
     uint16 finality = 2;
 
-    bytes memory callData = abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, expectedInput, finality);
-    vm.expectCall(address(s_pool), callData);
+    vm.expectCall(address(s_pool), abi.encodeCall(IPoolV2.releaseOrMint, (expectedInput, finality)));
 
     Client.EVMTokenAmount memory dest =
       s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, finality);
@@ -74,8 +71,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
-    bytes memory callData = abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, expectedInput);
-    vm.expectCall(address(s_pool), callData);
+    vm.expectCall(address(s_pool), abi.encodeCall(IPoolV1.releaseOrMint, (expectedInput)));
 
     Client.EVMTokenAmount memory dest =
       s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 0);
@@ -86,8 +82,6 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   }
 
   function test_releaseOrMintSingleToken_PropagatesPoolError() public {
-    vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V2)), abi.encode(true));
-
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
@@ -124,8 +118,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
-    bytes memory callData = abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, expectedInput);
-    vm.expectCall(address(s_pool), callData);
+    vm.expectCall(address(s_pool), abi.encodeCall(IPoolV1.releaseOrMint, (expectedInput)));
     vm.mockCall(address(s_token), abi.encodeCall(s_token.balanceOf, (expectedInput.receiver)), abi.encode(0));
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.ReleaseOrMintBalanceMismatch.selector, tokenTransfer.amount, 0, 0));

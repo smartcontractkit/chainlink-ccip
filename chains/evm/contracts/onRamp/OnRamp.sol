@@ -553,7 +553,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param destChainSelector Target destination chain selector of the message.
   /// @param receiver Message receiver.
   /// @param originalSender Message sender.
-  /// @param finality The finality configuration from the message.
+  /// @param blockConfirmationRequested Requested block confirmation.
   /// @param tokenArgs Additional token arguments from the message.
   /// @return TokenTransferV1 token transfer encoding for MessageV1.
   function _lockOrBurnSingleToken(
@@ -561,7 +561,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     bytes memory receiver,
     address originalSender,
-    uint16 finality,
+    uint16 blockConfirmationRequested,
     bytes memory tokenArgs
   ) internal returns (MessageV1Codec.TokenTransferV1 memory) {
     if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
@@ -577,49 +577,39 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     Pool.LockOrBurnOutV1 memory poolReturnData;
     uint256 destTokenAmount;
 
+    Pool.LockOrBurnInV1 memory lockOrBurnInput = Pool.LockOrBurnInV1({
+      receiver: receiver,
+      remoteChainSelector: destChainSelector,
+      originalSender: originalSender,
+      amount: tokenAndAmount.amount,
+      localToken: tokenAndAmount.token
+    });
+
     // If the pool declares support for IPoolV2, it can handle `finality` and `tokenArgs`.
     // Use the V2 overload which returns a potentially adjusted destination amount.
     if (IERC165(address(sourcePool)).supportsInterface(type(IPoolV2).interfaceId)) {
-      (poolReturnData, destTokenAmount) = IPoolV2(address(sourcePool)).lockOrBurn(
-        Pool.LockOrBurnInV1({
-          receiver: receiver,
-          remoteChainSelector: destChainSelector,
-          originalSender: originalSender,
-          amount: tokenAndAmount.amount,
-          localToken: tokenAndAmount.token
-        }),
-        finality,
-        tokenArgs
-      );
+      (poolReturnData, destTokenAmount) =
+        IPoolV2(address(sourcePool)).lockOrBurn(lockOrBurnInput, blockConfirmationRequested, tokenArgs);
     } else {
-      // V1 pools don't understand `finality`/`tokenArgs`.
-      // We enforce default finality and no token args to avoid silent mis-interpretation.
-      if (finality != 0) {
+      // V1 pools don't understand `blockConfirmationRequested`/`tokenArgs`.
+      // We enforce default for `blockConfirmationRequested` and no `tokenArgs` to avoid silent mis-interpretation.
+      if (blockConfirmationRequested != 0) {
         revert CustomBlockConfirmationNotSupportedOnPoolV1();
       }
       if (tokenArgs.length != 0) {
         revert TokenArgsNotSupportedOnPoolV1();
       }
-      poolReturnData = sourcePool.lockOrBurn(
-        Pool.LockOrBurnInV1({
-          receiver: receiver,
-          remoteChainSelector: destChainSelector,
-          originalSender: originalSender,
-          amount: tokenAndAmount.amount,
-          localToken: tokenAndAmount.token
-        })
-      );
+      poolReturnData = sourcePool.lockOrBurn(lockOrBurnInput);
       // V1 returns only LockOrBurnOutV1, the destination amount is 1:1 with the source amount.
       destTokenAmount = tokenAndAmount.amount;
     }
 
-    // NOTE: pool data validations are outsourced to the FeeQuoter to handle family-specific logic handling.
     return MessageV1Codec.TokenTransferV1({
       amount: destTokenAmount,
       sourcePoolAddress: abi.encodePacked(address(sourcePool)),
       sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
       destTokenAddress: this.validateDestChainAddress(
-        poolReturnData.destTokenAddress, s_destChainConfigs[destChainSelector].addressBytesLength
+        poolReturnData.destTokenAddress, s_destChainConfigs[lockOrBurnInput.remoteChainSelector].addressBytesLength
       ),
       tokenReceiver: receiver,
       extraData: poolReturnData.destPoolData
