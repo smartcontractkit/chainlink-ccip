@@ -43,6 +43,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InvalidOptionalCCVThreshold();
   error DestinationChainNotSupported(uint64 destChainSelector);
   error InvalidDestChainAddress(bytes destChainAddress);
+  error CustomBlockConfirmationNotSupportedOnPoolV1();
+  error TokenArgsNotSupportedOnPoolV1();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -245,6 +247,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         destChainSelector,
         resolvedExtraArgs.tokenReceiver.length > 0 ? resolvedExtraArgs.tokenReceiver : newMessage.receiver,
         originalSender,
+        resolvedExtraArgs.finalityConfig,
         resolvedExtraArgs.tokenArgs
       );
     }
@@ -542,13 +545,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param destChainSelector Target destination chain selector of the message.
   /// @param receiver Message receiver.
   /// @param originalSender Message sender.
+  /// @param finality The finality configuration from the message.
+  /// @param tokenArgs Additional token arguments from the message.
   /// @return TokenTransferV1 token transfer encoding for MessageV1.
   function _lockOrBurnSingleToken(
     Client.EVMTokenAmount memory tokenAndAmount,
     uint64 destChainSelector,
     bytes memory receiver,
     address originalSender,
-    bytes memory // extraArgs
+    uint16 finality,
+    bytes memory tokenArgs
   ) internal returns (MessageV1Codec.TokenTransferV1 memory) {
     if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
 
@@ -560,21 +566,48 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       revert UnsupportedToken(tokenAndAmount.token);
     }
 
-    // TODO support CCIP_POOL_V2
+    Pool.LockOrBurnOutV1 memory poolReturnData;
+    uint256 destTokenAmount;
 
-    Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
-      Pool.LockOrBurnInV1({
-        receiver: receiver,
-        remoteChainSelector: destChainSelector,
-        originalSender: originalSender,
-        amount: tokenAndAmount.amount,
-        localToken: tokenAndAmount.token
-      })
-    );
+    // If the pool declares support for IPoolV2, it can handle `finality` and `tokenArgs`.
+    // Use the V2 overload which returns a potentially adjusted destination amount.
+    if (IERC165(address(sourcePool)).supportsInterface(type(IPoolV2).interfaceId)) {
+      (poolReturnData, destTokenAmount) = IPoolV2(address(sourcePool)).lockOrBurn(
+        Pool.LockOrBurnInV1({
+          receiver: receiver,
+          remoteChainSelector: destChainSelector,
+          originalSender: originalSender,
+          amount: tokenAndAmount.amount,
+          localToken: tokenAndAmount.token
+        }),
+        finality,
+        tokenArgs
+      );
+    } else {
+      // V1 pools don't understand `finality`/`tokenArgs`.
+      // We enforce default finality and no token args to avoid silent mis-interpretation.
+      if (finality != 0) {
+        revert CustomBlockConfirmationNotSupportedOnPoolV1();
+      }
+      if (tokenArgs.length != 0) {
+        revert TokenArgsNotSupportedOnPoolV1();
+      }
+      poolReturnData = sourcePool.lockOrBurn(
+        Pool.LockOrBurnInV1({
+          receiver: receiver,
+          remoteChainSelector: destChainSelector,
+          originalSender: originalSender,
+          amount: tokenAndAmount.amount,
+          localToken: tokenAndAmount.token
+        })
+      );
+      // V1 returns only LockOrBurnOutV1, the destination amount is 1:1 with the source amount.
+      destTokenAmount = tokenAndAmount.amount;
+    }
 
     // NOTE: pool data validations are outsourced to the FeeQuoter to handle family-specific logic handling.
     return MessageV1Codec.TokenTransferV1({
-      amount: tokenAndAmount.amount,
+      amount: destTokenAmount,
       sourcePoolAddress: abi.encodePacked(address(sourcePool)),
       sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
       destTokenAddress: this.validateDestChainAddress(
