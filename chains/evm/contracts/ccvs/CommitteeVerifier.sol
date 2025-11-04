@@ -77,8 +77,8 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     // The version must be signed, otherwise any version could be inserted post-signatures.
     bytes32 signedHash = keccak256(abi.encodePacked(ccvData[0:VERIFIER_VERSION_BYTES], messageHash));
 
-    // Even though the current version of this contract only expects signatures to be included in the ccvData, bounding
-    // it to the given length allows potential forward compatibility with future formats that supply more data.
+    // Even though the current version of this contract only expects verifier version and signatures to be included in the ccvData,
+    // bounding it to the given length allows potential forward compatibility with future formats that supply more data.
     _validateSignatures(
       signedHash,
       ccvData[
