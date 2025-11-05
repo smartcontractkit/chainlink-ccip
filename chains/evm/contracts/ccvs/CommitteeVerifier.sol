@@ -27,9 +27,9 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "CommitteeVerifier 1.7.0-dev";
-  /// @dev The preimage is bytes4(keccak256("CommitteeVerifier 1.7.0"))
+  /// @dev The preimage is bytes4(keccak256("CommitteeVerifier 1.7.0")).
   bytes4 internal constant VERSION_TAG_V1_7_0 = 0x49ff34ed;
-  /// @dev The number of bytes allocated to encoding the verifier version
+  /// @dev The number of bytes allocated to encoding the verifier version.
   uint256 internal constant VERIFIER_VERSION_BYTES = 4;
   /// @dev The number of bytes allocated to encoding the signature length within the ccvData.
   uint256 internal constant SIGNATURE_LENGTH_BYTES = 2;
