@@ -23,11 +23,15 @@ contract ReentrantMaliciousTokenPool is TokenPool {
 
   /// @dev Calls into Facade to reenter Router exactly 1 time
   function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public override returns (Pool.LockOrBurnOutV1 memory) {
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16, // finality
+    bytes memory // tokenArgs
+  ) public override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
     if (s_attacked) {
-      return
-        Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+      return (
+        Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""}),
+        lockOrBurnIn.amount
+      );
     }
 
     s_attacked = true;
@@ -40,11 +44,15 @@ contract ReentrantMaliciousTokenPool is TokenPool {
       sender: msg.sender,
       amount: lockOrBurnIn.amount
     });
-    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return (
+      Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""}),
+      lockOrBurnIn.amount
+    );
   }
 
   function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 // finalty
   ) public pure override returns (Pool.ReleaseOrMintOutV1 memory) {
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }

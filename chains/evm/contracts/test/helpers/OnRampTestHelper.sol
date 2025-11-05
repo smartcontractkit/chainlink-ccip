@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
+import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 
 /// @notice Test wrapper for OnRamp to expose internal functions for testing.
@@ -44,5 +45,16 @@ contract OnRampTestHelper is OnRamp {
     Client.GenericExtraArgsV3 memory extraArgs
   ) external view returns (Receipt memory) {
     return _getExecutionFee(destChainSelector, dataLength, numberOfTokens, extraArgs);
+  }
+
+  function lockOrBurnSingleToken(
+    Client.EVMTokenAmount memory tokenAndAmount,
+    uint64 destChainSelector,
+    bytes memory receiver,
+    address originalSender,
+    uint16 finality,
+    bytes memory tokenArgs
+  ) external returns (MessageV1Codec.TokenTransferV1 memory) {
+    return _lockOrBurnSingleToken(tokenAndAmount, destChainSelector, receiver, originalSender, finality, tokenArgs);
   }
 }
