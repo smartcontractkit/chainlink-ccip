@@ -25,3 +25,17 @@ var SetTarget = contract.NewWrite(contract.WriteParams[common.Address, *proxy.Pr
 		return proxy.SetTarget(opts, args)
 	},
 })
+
+var AcceptOwnership = contract.NewWrite(contract.WriteParams[any, *proxy.Proxy]{
+	Name:            "proxy:accept-ownership",
+	Version:         semver.MustParse("1.7.0"),
+	Description:     "Accept ownership of the proxy",
+	ContractType:    ContractType,
+	ContractABI:     proxy.ProxyABI,
+	NewContract:     proxy.NewProxy,
+	IsAllowedCaller: contract.AllCallersAllowed[*proxy.Proxy, any],
+	Validate:        func(any) error { return nil },
+	CallContract: func(proxy *proxy.Proxy, opts *bind.TransactOpts, _ any) (*types.Transaction, error) {
+		return proxy.AcceptOwnership(opts)
+	},
+})

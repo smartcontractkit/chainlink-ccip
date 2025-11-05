@@ -12,6 +12,7 @@ import (
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/ownable_deployer"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	mock_recv_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_receiver_v2"
@@ -98,6 +99,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				token_admin_registry.ContractType:    false,
 				mock_receiver.ContractType:           false,
 				executor.ProxyType:                   false,
+				ownable_deployer.ContractType:        false,
 			}
 			for _, addr := range report.Output.Addresses {
 				exists[deployment.ContractType(addr.Type)] = true
