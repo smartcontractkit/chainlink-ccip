@@ -57,7 +57,7 @@ type Chains interface {
 type OnChainConfigurable interface {
 	// DeployContractsForSelector configures contracts for chain X
 	// returns all the contract addresses and metadata as datastore.DataStore
-	DeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64) (datastore.DataStore, error)
+	DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*nodeset.Input, selector uint64) (datastore.DataStore, error)
 	// ConnectContractsWithSelectors connects this chain onRamp to one or multiple offRamps for remote selectors (other chains)
 	ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error
 }

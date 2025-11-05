@@ -15,22 +15,29 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
+
+MockLinkPrice = deployment.E18Mult(500)
+	MockWethPrice = big.NewInt(9e8)
 
 var ccipMessageSentTopic = onramp.OnRampCCIPMessageSent{}.Topic()
 
@@ -155,7 +162,7 @@ func (m *CCIP16EVM) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (s
 	), nil
 }
 
-func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64) (datastore.DataStore, error) {
+func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64) (datastore.DataStore, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Configuring contracts for selector")
 	l.Info().Any("Selector", selector).Msg("Deploying for chain selectors")
@@ -194,7 +201,56 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy contracts: %w", err)
 	}
-	out.DataStore.Merge(env.DataStore)
+	// TODO: config option for what chain is home chain
+	if selector == chain_selectors.GETH_TESTNET.Selector {
+		nodeClients, err := clclient.New(cls[0].Out.CLNodes)
+		if err != nil {
+			return nil, fmt.Errorf("connecting to CL nodes: %w", err)
+		}
+		// bootstrap is 0
+		workerNodes := nodeClients[1:]
+		var nodeOperators []capabilities_registry.CapabilitiesRegistryNodeOperator
+		var nodeP2PIDsPerNodeOpAdmin = make(map[string][][32]byte)
+		for _, node := range workerNodes {
+			nodeP2PIds, err := node.MustReadP2PKeys()
+			if err != nil {
+				return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
+			}
+			nodeTransmitterAddress, err := node.PrimaryEthAddress()
+			if err != nil {
+				return nil, fmt.Errorf("reading worker node transmitter address: %w", err)
+			}
+			nodeP2PIDsPerNodeOpAdmin[node.Config.URL] = make([][32]byte, 0)
+			for _, id := range nodeP2PIds.Data {
+				nodeOperators = append(nodeOperators, capabilities_registry.CapabilitiesRegistryNodeOperator{
+					Admin: common.HexToAddress(nodeTransmitterAddress),
+					Name:  string(node.Config.URL),
+				})
+				var peerID [32]byte
+				copy(peerID[:], []byte(id.Attributes.PeerID))
+				nodeP2PIDsPerNodeOpAdmin[node.Config.URL] = append(
+					nodeP2PIDsPerNodeOpAdmin[node.Config.URL], peerID,
+				)
+			}
+		}
+		ccipHomeOut, err := changesets.DeployHomeChain.Apply(*env, sequences.DeployHomeChainConfig{
+			HomeChainSel: selector,
+			RMNStaticConfig: rmn_home.RMNHomeStaticConfig{
+				Nodes:          []rmn_home.RMNHomeNode{},
+				OffchainConfig: []byte("static config"),
+			},
+			RMNDynamicConfig: rmn_home.RMNHomeDynamicConfig{
+				SourceChains:   []rmn_home.RMNHomeSourceChain{},
+				OffchainConfig: []byte("dynamic config"),
+			},
+			NodeOperators:            nodeOperators,
+			NodeP2PIDsPerNodeOpAdmin: nodeP2PIDsPerNodeOpAdmin,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to deploy home chain contracts: %w", err)
+		}
+		out.DataStore.Merge(ccipHomeOut.DataStore.Seal())
+	}
 	env.DataStore = out.DataStore.Seal()
 	runningDS.Merge(env.DataStore)
 

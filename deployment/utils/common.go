@@ -20,6 +20,7 @@ const (
 	CallProxy                  cldf.ContractType = "CallProxy"
 	CapabilitiesRegistry       cldf.ContractType = "CapabilitiesRegistry"
 	CCIPHome                   cldf.ContractType = "CCIPHome"
+	RMNHome                    cldf.ContractType = "RMNHome"
 	// CLL Identifiers
 	CLLQualifier = "CLLCCIP"
 

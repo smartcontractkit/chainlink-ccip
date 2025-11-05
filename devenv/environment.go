@@ -159,7 +159,7 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, err
 		}
 		L.Info().Uint64("Selector", networkInfo.ChainSelector).Msg("Deployed chain selector")
-		dsi, err := impl.DeployContractsForSelector(ctx, e, networkInfo.ChainSelector)
+		dsi, err := impl.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector)
 		if err != nil {
 			return nil, err
 		}
