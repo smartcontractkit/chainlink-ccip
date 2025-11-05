@@ -22,7 +22,8 @@ contract ExtraArgsCodec_Test is Test {
 
   function test_encodeDecodeExecutorZeroAddress() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
       finalityConfig: 12,
       gasLimit: 200_000,
       executor: address(0),
@@ -42,7 +43,8 @@ contract ExtraArgsCodec_Test is Test {
   function test_encodeDecodeExecutorNonZeroAddress() public view {
     address executor = address(0x1234567890123456789012345678901234567890);
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
       finalityConfig: 12,
       gasLimit: 200_000,
       executor: executor,
@@ -61,7 +63,8 @@ contract ExtraArgsCodec_Test is Test {
 
   function test_encodeExecutorZeroAddress_ChecksLength() public pure {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
       finalityConfig: 12,
       gasLimit: 200_000,
       executor: address(0),
@@ -82,7 +85,8 @@ contract ExtraArgsCodec_Test is Test {
   function test_encodeExecutorNonZeroAddress_ChecksLength() public pure {
     address executor = address(0x1234567890123456789012345678901234567890);
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
       finalityConfig: 12,
       gasLimit: 200_000,
       executor: executor,
@@ -138,12 +142,16 @@ contract ExtraArgsCodec_Test is Test {
 
   function test_encodeDecodeWithCCVs() public view {
     address executor = address(0x1234567890123456789012345678901234567890);
-    Client.CCV[] memory ccvs = new Client.CCV[](2);
-    ccvs[0] = Client.CCV({ccvAddress: address(0x1111), args: "args1"});
-    ccvs[1] = Client.CCV({ccvAddress: address(0x2222), args: "args2"});
+    address[] memory ccvAddresses = new address[](2);
+    ccvAddresses[0] = address(0x1111);
+    ccvAddresses[1] = address(0x2222);
+    bytes[] memory ccvArgs = new bytes[](2);
+    ccvArgs[0] = "args1";
+    ccvArgs[1] = "args2";
 
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: ccvs,
+      ccvs: ccvAddresses,
+      ccvArgs: ccvArgs,
       finalityConfig: 12,
       gasLimit: 200_000,
       executor: executor,
@@ -157,10 +165,10 @@ contract ExtraArgsCodec_Test is Test {
 
     assertEq(decoded.executor, executor, "Executor should match");
     assertEq(decoded.ccvs.length, 2, "CCVs length should match");
-    assertEq(decoded.ccvs[0].ccvAddress, address(0x1111), "CCV 0 address should match");
-    assertEq(decoded.ccvs[0].args, "args1", "CCV 0 args should match");
-    assertEq(decoded.ccvs[1].ccvAddress, address(0x2222), "CCV 1 address should match");
-    assertEq(decoded.ccvs[1].args, "args2", "CCV 1 args should match");
+    assertEq(decoded.ccvs[0], address(0x1111), "CCV 0 address should match");
+    assertEq(decoded.ccvArgs[0], "args1", "CCV 0 args should match");
+    assertEq(decoded.ccvs[1], address(0x2222), "CCV 1 address should match");
+    assertEq(decoded.ccvArgs[1], "args2", "CCV 1 args should match");
     assertEq(decoded.executorArgs, "execArgs", "ExecutorArgs should match");
     assertEq(decoded.tokenReceiver, abi.encodePacked(address(0x3333)), "TokenReceiver should match");
     assertEq(decoded.tokenArgs, "tokenArgs", "TokenArgs should match");

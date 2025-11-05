@@ -7,10 +7,10 @@ import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 
 contract Executor_getFee is ExecutorSetup {
   function test_getFee_EmptyMessage() public view {
-    Client.CCV[] memory ccvs = new Client.CCV[](1);
-    ccvs[0] = Client.CCV({ccvAddress: INITIAL_CCV, args: ""});
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = INITIAL_CCV;
 
-    uint16 fee = s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvs, "");
+    uint16 fee = s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "");
 
     assertEq(DEFAULT_EXEC_FEE_USD_CENTS, fee);
   }
@@ -23,32 +23,32 @@ contract Executor_getFee is ExecutorSetup {
         Executor.Executor__RequestedBlockDepthTooLow.selector, requestedBlockDepth, MIN_BLOCK_CONFIRMATIONS
       )
     );
-    s_executor.getFee(DEST_CHAIN_SELECTOR, requestedBlockDepth, new Client.CCV[](1), "");
+    s_executor.getFee(DEST_CHAIN_SELECTOR, requestedBlockDepth, new address[](1), "");
   }
 
   function test_getFee_RevertWhen_InvalidDestChain() public {
-    Client.CCV[] memory ccvs = new Client.CCV[](1);
-    ccvs[0] = Client.CCV({ccvAddress: INITIAL_CCV, args: ""});
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = INITIAL_CCV;
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidDestChain.selector, DEST_CHAIN_SELECTOR + 1));
-    s_executor.getFee(DEST_CHAIN_SELECTOR + 1, 0, ccvs, "");
+    s_executor.getFee(DEST_CHAIN_SELECTOR + 1, 0, ccvAddresses, "");
   }
 
   function test_getFee_RevertWhen_UnsupportedRequiredCCV() public {
     address unsupportedCCV = makeAddr("unsupportedCCV");
-    Client.CCV[] memory ccvs = new Client.CCV[](1);
-    ccvs[0] = Client.CCV({ccvAddress: unsupportedCCV, args: ""});
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = unsupportedCCV;
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidCCV.selector, unsupportedCCV));
-    s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvs, "");
+    s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "");
   }
 
   function test_getFee_RevertWhen_ExceedsMaxCCVs() public {
-    Client.CCV[] memory ccvs = new Client.CCV[](2);
-    ccvs[0] = Client.CCV({ccvAddress: INITIAL_CCV, args: ""});
-    ccvs[1] = Client.CCV({ccvAddress: INITIAL_CCV, args: ""});
+    address[] memory ccvAddresses = new address[](2);
+    ccvAddresses[0] = INITIAL_CCV;
+    ccvAddresses[1] = INITIAL_CCV;
 
-    vm.expectRevert(abi.encodeWithSelector(Executor.ExceedsMaxCCVs.selector, ccvs.length, INITIAL_MAX_CCVS));
-    s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvs, "");
+    vm.expectRevert(abi.encodeWithSelector(Executor.ExceedsMaxCCVs.selector, ccvAddresses.length, INITIAL_MAX_CCVS));
+    s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "");
   }
 }

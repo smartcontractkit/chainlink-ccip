@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {Client} from "./Client.sol";
-
 /// @notice Library for CCIP Extra Arguments encoding/decoding operations.
 /// @dev This library handles the GenericExtraArgsV3 format and related structures including:
 /// - GenericExtraArgsV3, SVMExecutorArgsV1, and SuiExecutorArgsV1 struct definitions
 /// - Encoding/decoding functions with comprehensive error handling
 /// - Detailed error location tracking for debugging
-/// - Uses Client.CCV for cross-chain verifier structs
+/// - Variable-length encoding for addresses and arguments for efficient payload size
 library ExtraArgsCodec {
   error InvalidDataLength(EncodingErrorLocation location);
   error InvalidEncodingVersion(uint8 version);
   error InvalidExecutorLength(uint256 length);
+  error InvalidCCVAddressLength(uint256 length);
+  error CCVArrayLengthMismatch(uint256 ccvsLength, uint256 ccvArgsLength);
 
   bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
   bytes4 public constant SVM_EXECUTOR_ARGS_V1_TAG = 0x1a2b3c4d; // TODO: Define actual tag
@@ -25,9 +25,9 @@ library ExtraArgsCodec {
   // 2 (executorArgsLength) + 2 (tokenReceiverLength) + 2 (tokenArgsLength)
   uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 1 + 2 + 4 + 1 + 2 + 2 + 2;
 
-  // Base size of a CCV without variable length args field.
-  // 20 (ccvAddress) + 2 (argsLength)
-  uint256 public constant CCV_BASE_SIZE = 20 + 2;
+  // Base size of a CCV without variable length fields.
+  // 1 (ccvAddressLength) + 2 (argsLength)
+  uint256 public constant CCV_BASE_SIZE = 1 + 2;
 
   // Base size of SVMExecutorArgsV1 without variable length accounts field.
   // 1 (useATA) + 8 (accountIsWritableBitmap) + 2 (accountsLength)
@@ -40,7 +40,8 @@ library ExtraArgsCodec {
   enum EncodingErrorLocation {
     // GenericExtraArgsV3 components.
     EXTRA_ARGS_CCVS_LENGTH,
-    EXTRA_ARGS_CCV_ADDRESS,
+    EXTRA_ARGS_CCV_ADDRESS_LENGTH,
+    EXTRA_ARGS_CCV_ADDRESS_CONTENT,
     EXTRA_ARGS_CCV_ARGS_LENGTH,
     EXTRA_ARGS_CCV_ARGS_CONTENT,
     EXTRA_ARGS_FINALITY_CONFIG,
@@ -66,6 +67,8 @@ library ExtraArgsCodec {
     SUI_EXECUTOR_FINAL_OFFSET,
     // Encoding validation components.
     ENCODE_CCVS_ARRAY_LENGTH,
+    ENCODE_CCV_ARGS_ARRAY_LENGTH,
+    ENCODE_CCV_ADDRESS_LENGTH,
     ENCODE_CCV_ARGS_LENGTH,
     ENCODE_EXECUTOR_LENGTH,
     ENCODE_EXECUTOR_ARGS_LENGTH,
@@ -76,10 +79,12 @@ library ExtraArgsCodec {
   }
 
   /// @notice The GenericExtraArgsV3 struct is used to pass extra arguments for all destination chain families.
-  /// @dev Uses Client.CCV for cross-chain verifier structs to maintain compatibility with the rest of the codebase.
+  /// @dev CCVs are split into separate address and args arrays for more efficient encoding.
   struct GenericExtraArgsV3 {
-    /// @notice An array of CCV structs representing the cross-chain verifiers to be used for the message.
-    Client.CCV[] ccvs;
+    /// @notice An array of CCV addresses to be used for the message.
+    address[] ccvs;
+    /// @notice An array of CCV-specific arguments, parallel to the ccvs array.
+    bytes[] ccvArgs;
     /// @notice The finality config, 0 means the default finality that the CCV considers final.
     uint16 finalityConfig;
     /// @notice Gas limit for the callback on the destination chain.
@@ -104,54 +109,17 @@ library ExtraArgsCodec {
     bytes32[] receiverObjectIds;
   }
 
-  /// @notice Encodes a Client.CCV struct into bytes.
-  /// @param ccv The Client.CCV struct to encode.
-  /// @return encoded The encoded CCV as bytes.
-  function _encodeCCV(
-    Client.CCV memory ccv
-  ) internal pure returns (bytes memory) {
-    if (ccv.args.length > type(uint16).max) {
-      revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCV_ARGS_LENGTH);
-    }
-
-    return abi.encodePacked(ccv.ccvAddress, uint16(ccv.args.length), ccv.args);
-  }
-
-  /// @notice Decodes bytes into a Client.CCV struct.
-  /// @param encoded The encoded bytes to decode.
-  /// @param offset The starting offset in the encoded bytes.
-  /// @return ccv The decoded Client.CCV struct.
-  /// @return newOffset The new offset after decoding.
-  function _decodeCCV(
-    bytes calldata encoded,
-    uint256 offset
-  ) internal pure returns (Client.CCV memory ccv, uint256 newOffset) {
-    // ccvAddress (20 bytes).
-    if (offset + 20 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS);
-    ccv.ccvAddress = address(bytes20(encoded[offset:offset + 20]));
-    offset += 20;
-
-    // argsLength (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_LENGTH);
-    uint256 argsLength = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
-
-    // args content.
-    if (offset + argsLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_CONTENT);
-    }
-    ccv.args = encoded[offset:offset + argsLength];
-    offset += argsLength;
-
-    return (ccv, offset);
-  }
-
   /// @notice Encodes a GenericExtraArgsV3 struct into bytes.
   /// @param extraArgs The GenericExtraArgsV3 struct to encode.
   /// @return encoded The encoded extra args as bytes.
   function _encodeGenericExtraArgsV3(
     GenericExtraArgsV3 memory extraArgs
   ) internal pure returns (bytes memory) {
+    // Validate ccvs and ccvArgs arrays have the same length
+    if (extraArgs.ccvs.length != extraArgs.ccvArgs.length) {
+      revert CCVArrayLengthMismatch(extraArgs.ccvs.length, extraArgs.ccvArgs.length);
+    }
+
     // Validate field lengths fit in their respective size limits.
     if (extraArgs.ccvs.length > type(uint8).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCVS_ARRAY_LENGTH);
@@ -175,7 +143,21 @@ library ExtraArgsCodec {
     // Encode CCVs.
     bytes memory encodedCCVs;
     for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
-      encodedCCVs = bytes.concat(encodedCCVs, _encodeCCV(extraArgs.ccvs[i]));
+      // Encode CCV address as variable length (0 for address(0), 20 for non-zero addresses)
+      bytes memory encodedCCVAddress = extraArgs.ccvs[i] == address(0) ? bytes("") : abi.encodePacked(extraArgs.ccvs[i]);
+      if (encodedCCVAddress.length > type(uint8).max) {
+        revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCV_ADDRESS_LENGTH);
+      }
+      if (extraArgs.ccvArgs[i].length > type(uint16).max) {
+        revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCV_ARGS_LENGTH);
+      }
+
+      encodedCCVs = bytes.concat(
+        encodedCCVs,
+        abi.encodePacked(
+          uint8(encodedCCVAddress.length), encodedCCVAddress, uint16(extraArgs.ccvArgs[i].length), extraArgs.ccvArgs[i]
+        )
+      );
     }
 
     // Split encoding to avoid stack too deep.
@@ -218,9 +200,40 @@ library ExtraArgsCodec {
     offset += 1;
 
     // Decode CCVs.
-    extraArgs.ccvs = new Client.CCV[](ccvsLength);
+    extraArgs.ccvs = new address[](ccvsLength);
+    extraArgs.ccvArgs = new bytes[](ccvsLength);
     for (uint256 i = 0; i < ccvsLength; ++i) {
-      (extraArgs.ccvs[i], offset) = _decodeCCV(encoded, offset);
+      // CCV address length (1 byte).
+      if (offset + 1 > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS_LENGTH);
+      }
+      uint256 ccvAddressLength = uint8(bytes1(encoded[offset:offset + 1]));
+      offset += 1;
+
+      // CCV address content - must be 0 or 20 bytes for EVM
+      if (ccvAddressLength != 0 && ccvAddressLength != 20) {
+        revert InvalidCCVAddressLength(ccvAddressLength);
+      }
+      if (offset + ccvAddressLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS_CONTENT);
+      }
+      extraArgs.ccvs[i] =
+        ccvAddressLength == 0 ? address(0) : address(bytes20(encoded[offset:offset + ccvAddressLength]));
+      offset += ccvAddressLength;
+
+      // CCV argsLength (2 bytes).
+      if (offset + 2 > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_LENGTH);
+      }
+      uint256 ccvArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
+      offset += 2;
+
+      // CCV args content.
+      if (offset + ccvArgsLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_CONTENT);
+      }
+      extraArgs.ccvArgs[i] = encoded[offset:offset + ccvArgsLength];
+      offset += ccvArgsLength;
     }
 
     // finalityConfig (2 bytes).

@@ -58,7 +58,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
 
   function test_getExecutionFee_WithExecutor() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
       finalityConfig: 12,
       gasLimit: GAS_LIMIT,
       executor: s_customExecutor,
@@ -77,7 +78,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
 
   function test_getExecutionFee_NoExecutor() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
       finalityConfig: 12,
       gasLimit: GAS_LIMIT,
       executor: Client.NO_EXECUTION_ADDRESS,
@@ -98,7 +100,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
     uint256 dataLength = 500;
     uint256 numberOfTokens = 1;
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
       finalityConfig: 12,
       gasLimit: GAS_LIMIT,
       executor: s_customExecutor,
@@ -123,7 +126,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
     uint256 dataLength = 500;
     bytes memory executorArgs = new bytes(200);
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
       finalityConfig: 12,
       gasLimit: GAS_LIMIT,
       executor: s_customExecutor,
@@ -144,7 +148,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
 
   function test_getExecutionFee_ZeroGasLimit() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
       finalityConfig: 12,
       gasLimit: 0,
       executor: s_customExecutor,

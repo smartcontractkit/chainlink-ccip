@@ -51,11 +51,14 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
   }
 
   function test_parseExtraArgsWithDefaults_V3WithUserProvidedCCVs() public {
-    Client.CCV[] memory userRequiredCCVs = new Client.CCV[](1);
-    userRequiredCCVs[0] = Client.CCV({ccvAddress: makeAddr("userCCV1"), args: "userArgs"});
+    address[] memory userCCVAddresses = new address[](1);
+    userCCVAddresses[0] = makeAddr("userCCV1");
+    bytes[] memory userCCVArgs = new bytes[](1);
+    userCCVArgs[0] = "userArgs";
 
     ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: userRequiredCCVs,
+      ccvs: userCCVAddresses,
+      ccvArgs: userCCVArgs,
       finalityConfig: 0,
       gasLimit: GAS_LIMIT,
       executor: makeAddr("userExecutor"),
@@ -70,14 +73,14 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
       s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
 
     // User-provided CCVs should be used (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
-    assertEq(userRequiredCCVs.length, result.ccvs.length);
-    assertEq(userRequiredCCVs[0].ccvAddress, result.ccvs[0].ccvAddress);
-    assertEq(userRequiredCCVs[0].args, result.ccvs[0].args);
+    assertEq(userCCVAddresses.length, result.ccvs.length);
+    assertEq(userCCVAddresses[0], result.ccvs[0]);
+    assertEq(userCCVArgs[0], result.ccvArgs[0]);
     assertEq(inputArgs.executor, result.executor);
   }
 
   function test_parseExtraArgsWithDefaults_V3WithEmptyRequiredCCVs() public view {
-    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0));
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
 
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
 
@@ -86,10 +89,10 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
     // Default CCVs should be applied (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(s_defaultCCVs.length, result.ccvs.length);
-    assertEq(s_defaultCCVs[0], result.ccvs[0].ccvAddress);
-    assertEq("", result.ccvs[0].args); // Default CCVs have empty args.
-    assertEq(s_defaultCCVs[1], result.ccvs[1].ccvAddress);
-    assertEq("", result.ccvs[1].args); // Default CCVs have empty args.
+    assertEq(s_defaultCCVs[0], result.ccvs[0]);
+    assertEq("", result.ccvArgs[0]); // Default CCVs have empty args.
+    assertEq(s_defaultCCVs[1], result.ccvs[1]);
+    assertEq("", result.ccvArgs[1]); // Default CCVs have empty args.
 
     // Default executor should be applied.
     assertEq(s_defaultExecutor, result.executor);
@@ -108,10 +111,10 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
       s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, legacyExtraArgs);
 
     assertEq(s_defaultCCVs.length, result.ccvs.length);
-    assertEq(result.ccvs[0].ccvAddress, s_defaultCCVs[0]);
-    assertEq(result.ccvs[0].args, "", "ccv args 0");
-    assertEq(result.ccvs[1].ccvAddress, s_defaultCCVs[1]);
-    assertEq(result.ccvs[1].args, "", "ccv args 1");
+    assertEq(result.ccvs[0], s_defaultCCVs[0]);
+    assertEq(result.ccvArgs[0], "", "ccv args 0");
+    assertEq(result.ccvs[1], s_defaultCCVs[1]);
+    assertEq(result.ccvArgs[1], "", "ccv args 1");
 
     assertEq(result.executorArgs, "");
     assertEq(result.executor, s_defaultExecutor);
@@ -123,7 +126,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertTrue(s_destChainConfig.defaultCCVs.length > 0, "defaultCCVs must not be empty");
 
     // Test with empty user input
-    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new Client.CCV[](0));
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
 
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
     ExtraArgsCodec.GenericExtraArgsV3 memory result =
@@ -138,11 +141,14 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
   function test_parseExtraArgsWithDefaults_RevertWhen_NoDuplicatesAllowed_WithinRequiredCCVs() public {
     // Create user-provided CCVs with duplicates in required list
     address duplicateCCV = makeAddr("duplicateCCV");
-    Client.CCV[] memory userRequiredCCVs = new Client.CCV[](2);
-    userRequiredCCVs[0] = Client.CCV({ccvAddress: duplicateCCV, args: "args1"});
-    userRequiredCCVs[1] = Client.CCV({ccvAddress: duplicateCCV, args: "args2"}); // Duplicate
+    address[] memory userCCVAddresses = new address[](2);
+    userCCVAddresses[0] = duplicateCCV;
+    userCCVAddresses[1] = duplicateCCV; // Duplicate
+    bytes[] memory userCCVArgs = new bytes[](2);
+    userCCVArgs[0] = "args1";
+    userCCVArgs[1] = "args2";
 
-    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(userRequiredCCVs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(userCCVAddresses, userCCVArgs);
 
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
 

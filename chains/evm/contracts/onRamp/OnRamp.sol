@@ -227,8 +227,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
           resolvedExtraArgs.tokenArgs
         );
       }
-      resolvedExtraArgs.ccvs =
-        _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
+      (resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs) = _mergeCCVLists(
+        resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs
+      );
     }
 
     // 3. getFee on all verifiers, pool and executor.
@@ -259,8 +260,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 6. call each verifier.
     for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-      eventData.verifierBlobs[i] = ICrossChainVerifierV1(resolvedExtraArgs.ccvs[i].ccvAddress).forwardToVerifier(
-        newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
+      eventData.verifierBlobs[i] = ICrossChainVerifierV1(resolvedExtraArgs.ccvs[i]).forwardToVerifier(
+        newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvArgs[i]
       );
     }
 
@@ -283,37 +284,44 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev This function assumes there are no duplicates in the userRequestedOrDefaultCCVs list.
   /// @dev There is no protocol-level requirement on the ordering of CCVs in the final list, but for determinism we
   /// process user requested first, then lane-mandated second, pool-required last.
-  /// @param userRequestedOrDefaultCCVs User-provided required CCVs. Can not be empty, as defaults are applied earlier
-  /// if needed. This list does not only contain addresses, but also arguments
+  /// @param userRequestedOrDefaultCCVs User-provided required CCV addresses. Can not be empty, as defaults are applied earlier if needed.
+  /// @param userRequestedOrDefaultCCVArgs User-provided CCV arguments, parallel to userRequestedOrDefaultCCVs.
   /// @param laneMandatedCCVs Lane mandated CCVs are always added, regardless of what a user/pool chooses. Can be empty.
   /// @param poolRequiredCCVs Pool-specific required CCVs.
-  /// @return ccvs Updated list of CCVs.
+  /// @return ccvs Updated list of CCV addresses.
+  /// @return ccvArgs Updated list of CCV arguments, parallel to ccvs.
   function _mergeCCVLists(
-    Client.CCV[] memory userRequestedOrDefaultCCVs,
+    address[] memory userRequestedOrDefaultCCVs,
+    bytes[] memory userRequestedOrDefaultCCVArgs,
     address[] memory laneMandatedCCVs,
     address[] memory poolRequiredCCVs
-  ) internal pure returns (Client.CCV[] memory ccvs) {
+  ) internal pure returns (address[] memory ccvs, bytes[] memory ccvArgs) {
     // Maximum possible CCVs: user + lane + pool.
     uint256 totalCCVs = userRequestedOrDefaultCCVs.length + laneMandatedCCVs.length + poolRequiredCCVs.length;
-    ccvs = new Client.CCV[](totalCCVs);
+    ccvs = new address[](totalCCVs);
+    ccvArgs = new bytes[](totalCCVs);
     uint256 toBeAddedIndex = 0;
 
     // First add all user requested CCVs.
     for (uint256 i = 0; i < userRequestedOrDefaultCCVs.length; ++i) {
-      ccvs[toBeAddedIndex++] = userRequestedOrDefaultCCVs[i];
+      ccvs[toBeAddedIndex] = userRequestedOrDefaultCCVs[i];
+      ccvArgs[toBeAddedIndex] = userRequestedOrDefaultCCVArgs[i];
+      toBeAddedIndex++;
     }
     // Add lane mandated CCVs, skipping duplicates.
     for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
       address laneMandatedCCV = laneMandatedCCVs[i];
       bool found = false;
       for (uint256 j = 0; j < toBeAddedIndex; ++j) {
-        if (ccvs[j].ccvAddress == laneMandatedCCV) {
+        if (ccvs[j] == laneMandatedCCV) {
           found = true;
           break;
         }
       }
       if (!found) {
-        ccvs[toBeAddedIndex++] = Client.CCV({ccvAddress: laneMandatedCCV, args: ""});
+        ccvs[toBeAddedIndex] = laneMandatedCCV;
+        ccvArgs[toBeAddedIndex] = "";
+        toBeAddedIndex++;
       }
     }
     // Add pool required CCVs, skipping duplicates.
@@ -321,22 +329,25 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       address poolRequiredCCV = poolRequiredCCVs[i];
       bool found = false;
       for (uint256 j = 0; j < toBeAddedIndex; ++j) {
-        if (ccvs[j].ccvAddress == poolRequiredCCV) {
+        if (ccvs[j] == poolRequiredCCV) {
           found = true;
           break;
         }
       }
       if (!found) {
-        ccvs[toBeAddedIndex++] = Client.CCV({ccvAddress: poolRequiredCCV, args: ""});
+        ccvs[toBeAddedIndex] = poolRequiredCCV;
+        ccvArgs[toBeAddedIndex] = "";
+        toBeAddedIndex++;
       }
     }
 
-    // Resize the array to the actual number of CCVs added.
+    // Resize both arrays to the actual number of CCVs added.
     assembly {
       mstore(ccvs, toBeAddedIndex)
+      mstore(ccvArgs, toBeAddedIndex)
     }
 
-    return ccvs;
+    return (ccvs, ccvArgs);
   }
 
   /// @notice This function takes in a raw dest chain address and validates the address is valid for the destination
@@ -396,23 +407,27 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       uint256 length = resolvedArgs.ccvs.length;
       for (uint256 i = 0; i < length; ++i) {
         for (uint256 j = i + 1; j < length; ++j) {
-          if (resolvedArgs.ccvs[i].ccvAddress == resolvedArgs.ccvs[j].ccvAddress) {
-            revert CCVConfigValidation.DuplicateCCVNotAllowed(resolvedArgs.ccvs[i].ccvAddress);
+          if (resolvedArgs.ccvs[i] == resolvedArgs.ccvs[j]) {
+            revert CCVConfigValidation.DuplicateCCVNotAllowed(resolvedArgs.ccvs[i]);
           }
         }
       }
 
       // When users don't specify any CCVs, default CCVs are chosen.
       if (resolvedArgs.ccvs.length == 0) {
-        resolvedArgs.ccvs = new Client.CCV[](destChainConfig.defaultCCVs.length);
+        resolvedArgs.ccvs = new address[](destChainConfig.defaultCCVs.length);
+        resolvedArgs.ccvArgs = new bytes[](destChainConfig.defaultCCVs.length);
         for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-          resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
+          resolvedArgs.ccvs[i] = destChainConfig.defaultCCVs[i];
+          resolvedArgs.ccvArgs[i] = "";
         }
       }
     } else {
-      resolvedArgs.ccvs = new Client.CCV[](destChainConfig.defaultCCVs.length);
+      resolvedArgs.ccvs = new address[](destChainConfig.defaultCCVs.length);
+      resolvedArgs.ccvArgs = new bytes[](destChainConfig.defaultCCVs.length);
       for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-        resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
+        resolvedArgs.ccvs[i] = destChainConfig.defaultCCVs[i];
+        resolvedArgs.ccvArgs[i] = "";
       }
 
       // Populate the fields that could be present in legacy extraArgs.
@@ -679,7 +694,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         resolvedExtraArgs.tokenArgs
       );
     }
-    resolvedExtraArgs.ccvs = _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
+    (resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs) = _mergeCCVLists(
+      resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs
+    );
 
     // We sum the fees for the verifier, executor and the pool (if any).
     Receipt[] memory receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
@@ -709,18 +726,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
 
     for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
-      Client.CCV memory verifier = extraArgs.ccvs[i];
-
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
-        verifier.ccvAddress
-      ).getFee(destChainSelector, message, verifier.args, extraArgs.finalityConfig);
+        extraArgs.ccvs[i]
+      ).getFee(destChainSelector, message, extraArgs.ccvArgs[i], extraArgs.finalityConfig);
 
       verifierReceipts[i] = Receipt({
-        issuer: verifier.ccvAddress,
+        issuer: extraArgs.ccvs[i],
         destGasLimit: gasForVerification,
         destBytesOverhead: payloadSizeBytes,
         feeTokenAmount: feeUSDCents,
-        extraArgs: verifier.args
+        extraArgs: extraArgs.ccvArgs[i]
       });
     }
 

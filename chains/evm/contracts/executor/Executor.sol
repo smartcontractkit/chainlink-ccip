@@ -200,7 +200,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   function getFee(
     uint64 destChainSelector,
     uint16 requestedBlockDepth,
-    Client.CCV[] calldata ccvs,
+    address[] calldata ccvs,
     bytes calldata // extraArgs
   ) external view virtual returns (uint16 usdCentsFee) {
     RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[destChainSelector];
@@ -213,9 +213,8 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
 
     if (s_dynamicConfig.ccvAllowlistEnabled) {
       for (uint256 i = 0; i < ccvs.length; ++i) {
-        address ccvAddress = ccvs[i].ccvAddress;
-        if (!s_allowedCCVs.contains(ccvAddress)) {
-          revert InvalidCCV(ccvAddress);
+        if (!s_allowedCCVs.contains(ccvs[i])) {
+          revert InvalidCCV(ccvs[i]);
         }
       }
     }

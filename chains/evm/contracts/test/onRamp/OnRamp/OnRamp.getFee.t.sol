@@ -19,7 +19,8 @@ contract GasTest is OnRampSetup {
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       abi.encode(
         ExtraArgsCodec.GenericExtraArgsV3({
-          ccvs: new Client.CCV[](2),
+          ccvs: new address[](2),
+          ccvArgs: new bytes[](2),
           finalityConfig: 34,
           gasLimit: 59499,
           executor: address(0x1234567890123456789012345678901234567890),
@@ -38,7 +39,8 @@ contract GasTest is OnRampSetup {
   function test_gas_abi_packed() public {
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(
       ExtraArgsCodec.GenericExtraArgsV3({
-        ccvs: new Client.CCV[](2),
+        ccvs: new address[](2),
+        ccvArgs: new bytes[](2),
         finalityConfig: 34,
         gasLimit: 59499,
         executor: address(0x1234567890123456789012345678901234567890),
@@ -59,7 +61,8 @@ contract GasTest is OnRampSetup {
 
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(
       ExtraArgsCodec.GenericExtraArgsV3({
-        ccvs: new Client.CCV[](2),
+        ccvs: new address[](2),
+        ccvArgs: new bytes[](2),
         finalityConfig: 34,
         gasLimit: 59499,
         executor: address(0x1234567890123456789012345678901234567890),
@@ -82,7 +85,8 @@ contract GasTest is OnRampSetup {
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       abi.encode(
         ExtraArgsCodec.GenericExtraArgsV3({
-          ccvs: new Client.CCV[](2),
+          ccvs: new address[](2),
+          ccvArgs: new bytes[](2),
           finalityConfig: 34,
           gasLimit: 59499,
           executor: address(0x1234567890123456789012345678901234567890),
@@ -106,7 +110,8 @@ contract GasTest is OnRampSetup {
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       abi.encode(
         ExtraArgsCodec.GenericExtraArgsV3({
-          ccvs: new Client.CCV[](0),
+          ccvs: new address[](0),
+          ccvArgs: new bytes[](0),
           finalityConfig: 34,
           gasLimit: 59499,
           executor: address(0),
@@ -128,7 +133,8 @@ contract GasTest is OnRampSetup {
     EncodeDecoder encoderDecoder = new EncodeDecoder();
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(
       ExtraArgsCodec.GenericExtraArgsV3({
-        ccvs: new Client.CCV[](0),
+        ccvs: new address[](0),
+        ccvArgs: new bytes[](0),
         finalityConfig: 34,
         gasLimit: 59499,
         executor: address(0),
@@ -200,11 +206,13 @@ contract OnRamp_getFee is OnRampSetup {
     uint16 differentFee = 123_45;
     _mockVerifierFee(newVerifier, differentFee, DEFAULT_CCV_GAS_LIMIT, DEFAULT_CCV_PAYLOAD_SIZE);
 
-    Client.CCV[] memory ccvs = new Client.CCV[](1);
-    ccvs[0] = Client.CCV({ccvAddress: newVerifier, args: ""});
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = newVerifier;
+    bytes[] memory ccvArgs = new bytes[](1);
+    ccvArgs[0] = "";
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(_createV3ExtraArgs(ccvs));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(_createV3ExtraArgs(ccvAddresses, ccvArgs));
 
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
@@ -253,11 +261,14 @@ contract OnRamp_getFee is OnRampSetup {
     _mockExecutorFee(customExecutor, differentExecutorFee, 0, 0);
     _mockVerifierFee(verifier, differentVerifierFee, 0, 0);
 
-    Client.CCV[] memory ccvs = new Client.CCV[](1);
-    ccvs[0] = Client.CCV({ccvAddress: verifier, args: ""});
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = verifier;
+    bytes[] memory ccvArgs = new bytes[](1);
+    ccvArgs[0] = "";
 
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgsV3 = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: ccvs,
+      ccvs: ccvAddresses,
+      ccvArgs: ccvArgs,
       finalityConfig: 12,
       gasLimit: GAS_LIMIT,
       executor: customExecutor,

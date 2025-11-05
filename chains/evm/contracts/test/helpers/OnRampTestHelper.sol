@@ -20,11 +20,12 @@ contract OnRampTestHelper is OnRamp {
 
   /// @notice Exposes the internal _mergeCCVLists function for testing.
   function mergeCCVLists(
-    Client.CCV[] memory userRequestedOrDefaultCCVs,
+    address[] memory userRequestedOrDefaultCCVs,
+    bytes[] memory userRequestedOrDefaultCCVArgs,
     address[] memory laneMandatedCCVs,
     address[] memory poolRequiredCCVs
-  ) external pure returns (Client.CCV[] memory ccvs) {
-    return _mergeCCVLists(userRequestedOrDefaultCCVs, laneMandatedCCVs, poolRequiredCCVs);
+  ) external pure returns (address[] memory ccvs, bytes[] memory ccvArgs) {
+    return _mergeCCVLists(userRequestedOrDefaultCCVs, userRequestedOrDefaultCCVArgs, laneMandatedCCVs, poolRequiredCCVs);
   }
 
   function getCCVsForPool(
