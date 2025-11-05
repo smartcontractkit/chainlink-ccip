@@ -42,7 +42,6 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
       abi.encodeCall(s_sourceRouter.isOffRamp, (DEST_CHAIN_SELECTOR, address(s_offRamp))),
       abi.encode(true)
     );
-    vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V1)), abi.encode(true));
     vm.mockCall(
       address(s_tokenAdminRegistry),
       abi.encodeCall(ITokenAdminRegistry.getPool, address(s_token)),
