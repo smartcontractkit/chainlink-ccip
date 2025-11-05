@@ -12,19 +12,18 @@ import {Client} from "./Client.sol";
 library ExtraArgsCodec {
   error InvalidDataLength(EncodingErrorLocation location);
   error InvalidEncodingVersion(uint8 version);
+  error InvalidExecutorLength(uint256 length);
 
   bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
   bytes4 public constant SVM_EXECUTOR_ARGS_V1_TAG = 0x1a2b3c4d; // TODO: Define actual tag
   bytes4 public constant SUI_EXECUTOR_ARGS_V1_TAG = 0x5e6f7a8b; // TODO: Define actual tag
 
   uint256 public constant MAX_CCVS = 16;
-  uint256 public constant MAX_SVM_EXECUTOR_ACCOUNTS = 64;
-  uint256 public constant MAX_SUI_RECEIVER_OBJECT_IDS = 64;
 
   // Base size of GenericExtraArgsV3 without variable length fields.
-  // 2 (ccvsLength) + 2 (finalityConfig) + 4 (gasLimit) + 20 (executor) +
+  // 1 (ccvsLength) + 2 (finalityConfig) + 4 (gasLimit) + 1 (executorLength) +
   // 2 (executorArgsLength) + 2 (tokenReceiverLength) + 2 (tokenArgsLength)
-  uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 2 + 2 + 4 + 20 + 2 + 2 + 2;
+  uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 1 + 2 + 4 + 1 + 2 + 2 + 2;
 
   // Base size of a CCV without variable length args field.
   // 20 (ccvAddress) + 2 (argsLength)
@@ -46,7 +45,8 @@ library ExtraArgsCodec {
     EXTRA_ARGS_CCV_ARGS_CONTENT,
     EXTRA_ARGS_FINALITY_CONFIG,
     EXTRA_ARGS_GAS_LIMIT,
-    EXTRA_ARGS_EXECUTOR,
+    EXTRA_ARGS_EXECUTOR_LENGTH,
+    EXTRA_ARGS_EXECUTOR_CONTENT,
     EXTRA_ARGS_EXECUTOR_ARGS_LENGTH,
     EXTRA_ARGS_EXECUTOR_ARGS_CONTENT,
     EXTRA_ARGS_TOKEN_RECEIVER_LENGTH,
@@ -67,6 +67,7 @@ library ExtraArgsCodec {
     // Encoding validation components.
     ENCODE_CCVS_ARRAY_LENGTH,
     ENCODE_CCV_ARGS_LENGTH,
+    ENCODE_EXECUTOR_LENGTH,
     ENCODE_EXECUTOR_ARGS_LENGTH,
     ENCODE_TOKEN_RECEIVER_LENGTH,
     ENCODE_TOKEN_ARGS_LENGTH,
@@ -132,7 +133,7 @@ library ExtraArgsCodec {
 
     // argsLength (2 bytes).
     if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_LENGTH);
-    uint16 argsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    uint256 argsLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
 
     // args content.
@@ -152,7 +153,7 @@ library ExtraArgsCodec {
     GenericExtraArgsV3 memory extraArgs
   ) internal pure returns (bytes memory) {
     // Validate field lengths fit in their respective size limits.
-    if (extraArgs.ccvs.length > MAX_CCVS) {
+    if (extraArgs.ccvs.length > type(uint8).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCVS_ARRAY_LENGTH);
     }
     if (extraArgs.executorArgs.length > type(uint16).max) {
@@ -165,6 +166,12 @@ library ExtraArgsCodec {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_ARGS_LENGTH);
     }
 
+    // Encode executor as variable length (0 for address(0), 20 for non-zero addresses)
+    bytes memory encodedExecutor = extraArgs.executor == address(0) ? bytes("") : abi.encodePacked(extraArgs.executor);
+    if (encodedExecutor.length > type(uint8).max) {
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_EXECUTOR_LENGTH);
+    }
+
     // Encode CCVs.
     bytes memory encodedCCVs;
     for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
@@ -174,11 +181,12 @@ library ExtraArgsCodec {
     // Split encoding to avoid stack too deep.
     bytes memory part1 = abi.encodePacked(
       GENERIC_EXTRA_ARGS_V3_TAG,
-      uint16(extraArgs.ccvs.length),
+      uint8(extraArgs.ccvs.length),
       encodedCCVs,
       extraArgs.finalityConfig,
       extraArgs.gasLimit,
-      extraArgs.executor
+      uint8(encodedExecutor.length),
+      encodedExecutor
     );
 
     bytes memory part2 = abi.encodePacked(
@@ -204,10 +212,10 @@ library ExtraArgsCodec {
     // Tag (4 bytes) - already validated by caller typically, but we skip it here.
     offset += 4;
 
-    // ccvs length (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCVS_LENGTH);
-    uint16 ccvsLength = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
+    // ccvs length (1 byte).
+    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCVS_LENGTH);
+    uint256 ccvsLength = uint8(bytes1(encoded[offset:offset + 1]));
+    offset += 1;
 
     // Decode CCVs.
     extraArgs.ccvs = new Client.CCV[](ccvsLength);
@@ -225,14 +233,24 @@ library ExtraArgsCodec {
     extraArgs.gasLimit = uint32(bytes4(encoded[offset:offset + 4]));
     offset += 4;
 
-    // executor (20 bytes).
-    if (offset + 20 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR);
-    extraArgs.executor = address(bytes20(encoded[offset:offset + 20]));
-    offset += 20;
+    // executorLength (1 byte).
+    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_LENGTH);
+    uint256 executorLength = uint8(bytes1(encoded[offset:offset + 1]));
+    offset += 1;
+
+    // executor content - must be 0 or 20 bytes for EVM
+    if (executorLength != 0 && executorLength != 20) {
+      revert InvalidExecutorLength(executorLength);
+    }
+    if (offset + executorLength > encoded.length) {
+      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_CONTENT);
+    }
+    extraArgs.executor = executorLength == 0 ? address(0) : address(bytes20(encoded[offset:offset + executorLength]));
+    offset += executorLength;
 
     // executorArgsLength (2 bytes).
     if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_LENGTH);
-    uint16 executorArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    uint256 executorArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
 
     // executorArgs content.
@@ -244,7 +262,7 @@ library ExtraArgsCodec {
 
     // tokenReceiverLength (2 bytes).
     if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_LENGTH);
-    uint16 tokenReceiverLength = uint16(bytes2(encoded[offset:offset + 2]));
+    uint256 tokenReceiverLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
 
     // tokenReceiver content.
@@ -256,7 +274,7 @@ library ExtraArgsCodec {
 
     // tokenArgsLength (2 bytes).
     if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_LENGTH);
-    uint16 tokenArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    uint256 tokenArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
 
     // tokenArgs content.
@@ -278,7 +296,7 @@ library ExtraArgsCodec {
   function _encodeSVMExecutorArgsV1(
     SVMExecutorArgsV1 memory executorArgs
   ) internal pure returns (bytes memory) {
-    if (executorArgs.accounts.length > MAX_SVM_EXECUTOR_ACCOUNTS) {
+    if (executorArgs.accounts.length > type(uint8).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_SVM_ACCOUNTS_LENGTH);
     }
 
@@ -286,7 +304,7 @@ library ExtraArgsCodec {
       SVM_EXECUTOR_ARGS_V1_TAG,
       executorArgs.useATA,
       executorArgs.accountIsWritableBitmap,
-      uint16(executorArgs.accounts.length),
+      uint8(executorArgs.accounts.length),
       abi.encodePacked(executorArgs.accounts)
     );
   }
@@ -311,10 +329,10 @@ library ExtraArgsCodec {
     executorArgs.accountIsWritableBitmap = uint64(bytes8(encoded[offset:offset + 8]));
     offset += 8;
 
-    // accounts length (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_LENGTH);
-    uint16 accountsLength = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
+    // accounts length (1 byte).
+    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_LENGTH);
+    uint256 accountsLength = uint8(bytes1(encoded[offset:offset + 1]));
+    offset += 1;
 
     // accounts content (32 bytes each).
     if (offset + accountsLength * 32 > encoded.length) {
@@ -338,13 +356,13 @@ library ExtraArgsCodec {
   function _encodeSuiExecutorArgsV1(
     SuiExecutorArgsV1 memory executorArgs
   ) internal pure returns (bytes memory) {
-    if (executorArgs.receiverObjectIds.length > MAX_SUI_RECEIVER_OBJECT_IDS) {
+    if (executorArgs.receiverObjectIds.length > type(uint8).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_SUI_OBJECT_IDS_LENGTH);
     }
 
     return abi.encodePacked(
       SUI_EXECUTOR_ARGS_V1_TAG,
-      uint16(executorArgs.receiverObjectIds.length),
+      uint8(executorArgs.receiverObjectIds.length),
       abi.encodePacked(executorArgs.receiverObjectIds)
     );
   }
@@ -360,10 +378,10 @@ library ExtraArgsCodec {
     // Tag (4 bytes) - skip.
     offset += 4;
 
-    // receiverObjectIds length (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_LENGTH);
-    uint16 objectIdsLength = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
+    // receiverObjectIds length (1 byte).
+    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_LENGTH);
+    uint256 objectIdsLength = uint16(bytes2(encoded[offset:offset + 1]));
+    offset += 1;
 
     // receiverObjectIds content (32 bytes each).
     if (offset + objectIdsLength * 32 > encoded.length) {
