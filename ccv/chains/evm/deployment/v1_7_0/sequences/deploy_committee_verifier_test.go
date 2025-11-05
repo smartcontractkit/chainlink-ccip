@@ -19,12 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func basicParams(ownableDeployer common.Address) sequences.CommitteeVerifierParams {
+func basicParams() sequences.CommitteeVerifierParams {
 	return sequences.CommitteeVerifierParams{
 		Version:         semver.MustParse("1.7.0"),
 		FeeAggregator:   common.HexToAddress("0x02"),
 		AllowlistAdmin:  common.HexToAddress("0x03"),
-		OwnableDeployer: ownableDeployer,
 		StorageLocation: "https://test.chain.link.fake",
 		SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
 			Threshold: 1,
@@ -65,7 +64,7 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 			}, nil)
 			require.NoError(t, err, "Failed to deploy OwnableDeployer")
 
-			params := basicParams(common.HexToAddress(ownableDeployerRef.Address))
+			params := basicParams()
 			params.Qualifier = "alpha"
 
 			report, err := operations.ExecuteSequence(
@@ -73,6 +72,7 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 				sequences.DeployCommitteeVerifier,
 				e.BlockChains.EVMChains()[chainSelector],
 				sequences.DeployCommitteeVerifierInput{
+					OwnableDeployer:   common.HexToAddress(ownableDeployerRef.Address),
 					ChainSelector:     chainSelector,
 					ExistingAddresses: test.existingAddresses,
 					Params:            params,
@@ -126,7 +126,7 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 	}, nil)
 	require.NoError(t, err, "Failed to deploy OwnableDeployer")
 
-	params := basicParams(common.HexToAddress(ownableDeployerRef.Address))
+	params := basicParams()
 	params.Qualifier = "alpha"
 
 	// Pre-deploy a real CommitteeVerifier with qualifier "alpha"
@@ -156,6 +156,7 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSelector],
 		sequences.DeployCommitteeVerifierInput{
+			OwnableDeployer:   common.HexToAddress(ownableDeployerRef.Address),
 			ChainSelector:     chainSelector,
 			ExistingAddresses: []datastore.AddressRef{deployReport.Output},
 			Params:            params,
@@ -210,9 +211,10 @@ func TestDeployCommitteeVerifier_MultipleDeployments(t *testing.T) {
 			}, nil)
 			require.NoError(t, err, "Failed to deploy OwnableDeployer")
 
-			params := basicParams(common.HexToAddress(ownableDeployerRef.Address))
+			params := basicParams()
 			params.Qualifier = "alpha"
 			input := sequences.DeployCommitteeVerifierInput{
+				OwnableDeployer:   common.HexToAddress(ownableDeployerRef.Address),
 				ChainSelector:     evmChain.Selector,
 				ExistingAddresses: nil,
 				Params:            params,
@@ -260,9 +262,10 @@ func TestDeployCommitteeVerifier_MultipleDeployments(t *testing.T) {
 				}, nil)
 				require.NoError(t, err, "Failed to deploy OwnableDeployer")
 
-				params := basicParams(common.HexToAddress(ownableDeployerRef.Address))
+				params := basicParams()
 				params.Qualifier = "alpha"
 				input := sequences.DeployCommitteeVerifierInput{
+					OwnableDeployer:   common.HexToAddress(ownableDeployerRef.Address),
 					ChainSelector:     chainSel,
 					ExistingAddresses: nil,
 					Params:            params,
@@ -305,13 +308,14 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 	}, nil)
 	require.NoError(t, err, "Failed to deploy OwnableDeployer")
 
-	paramsAlpha := basicParams(common.HexToAddress(ownableDeployerRef.Address))
+	paramsAlpha := basicParams()
 	paramsAlpha.Qualifier = "alpha"
 	report1, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployCommitteeVerifierInput{
+			OwnableDeployer:   common.HexToAddress(ownableDeployerRef.Address),
 			ChainSelector:     chainSel,
 			ExistingAddresses: nil,
 			Params:            paramsAlpha,
@@ -337,13 +341,14 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 	require.True(t, ok)
 
 	// Second run with qualifier "beta", passing previous addresses as existing
-	paramsBeta := basicParams(common.HexToAddress(ownableDeployerRef.Address))
+	paramsBeta := basicParams()
 	paramsBeta.Qualifier = "beta"
 	report2, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployCommitteeVerifierInput{
+			OwnableDeployer:   common.HexToAddress(ownableDeployerRef.Address),
 			ChainSelector:     chainSel,
 			ExistingAddresses: addrs1,
 			Params:            paramsBeta,
@@ -369,6 +374,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployCommitteeVerifierInput{
+			OwnableDeployer:   common.HexToAddress(ownableDeployerRef.Address),
 			ChainSelector:     chainSel,
 			ExistingAddresses: append(addrs1, addrs2...),
 			Params:            paramsAlpha,

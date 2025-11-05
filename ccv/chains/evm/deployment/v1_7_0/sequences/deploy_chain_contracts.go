@@ -304,9 +304,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		var committeeVerifierRefs []datastore.AddressRef
 		var committeeVerifierBatchOps []mcms_types.BatchOperation
 		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifier {
-			committeeVerifierParams.OwnableDeployer = common.HexToAddress(ownableDeployerRef.Address)
 			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
+				OwnableDeployer:   common.HexToAddress(ownableDeployerRef.Address),
 				ExistingAddresses: input.ExistingAddresses,
 				Params:            committeeVerifierParams,
 			})

@@ -8,10 +8,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/ownable_deployer"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 )
@@ -43,6 +47,13 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 	ds := datastore.NewMemoryDataStore()
 	e.DataStore = ds.Seal()
 
+	ownableDeployer := datastore.AddressRef{
+		ChainSelector: 5009297550715157269,
+		Type:          datastore.ContractType(ownable_deployer.ContractType),
+		Version:       semver.MustParse("1.7.0"),
+		Address:       common.HexToAddress("0x01").Hex(),
+	}
+
 	tests := []struct {
 		desc        string
 		input       cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]
@@ -53,8 +64,9 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 			input: cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployCommitteeVerifierCfg{
-					ChainSel: 5009297550715157269,
-					Params:   basicDeployCommitteeVerifierParams(),
+					ChainSel:        5009297550715157269,
+					OwnableDeployer: ownableDeployer,
+					Params:          basicDeployCommitteeVerifierParams(),
 				},
 			},
 		},
@@ -62,6 +74,9 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
+			ds := datastore.NewMemoryDataStore()
+			require.NoError(t, ds.Addresses().Add(ownableDeployer))
+			e.DataStore = ds.Seal()
 			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
 			err := changesets.DeployCommitteeVerifier(mcmsRegistry).VerifyPreconditions(*e, test.input)
 			if test.expectedErr != "" {
@@ -85,10 +100,17 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 		Version:       semver.MustParse("1.7.0"),
 		Address:       common.HexToAddress("0x01").Hex(),
 	}
+	ownableDeployerRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, ownable_deployer.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract.DeployInput[ownable_deployer.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(ownable_deployer.ContractType, *semver.MustParse("1.7.0")),
+		ChainSelector:  5009297550715157269,
+		Args:           ownable_deployer.ConstructorArgs{},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy OwnableDeployer")
 
 	// Ensure environment has an initial (empty) datastore
 	ds := datastore.NewMemoryDataStore()
 	require.NoError(t, ds.Addresses().Add(fqAddressRef))
+	require.NoError(t, ds.Addresses().Add(ownableDeployerRef))
 
 	e.DataStore = ds.Seal()
 
@@ -100,8 +122,9 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	out1, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
-			ChainSel: 5009297550715157269,
-			Params:   paramsAlpha,
+			ChainSel:        5009297550715157269,
+			OwnableDeployer: ownableDeployerRef,
+			Params:          paramsAlpha,
 		},
 	})
 	require.NoError(t, err, "First apply failed")
@@ -131,6 +154,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 		require.NoError(t, dsSeed.Addresses().Add(r))
 	}
 	require.NoError(t, dsSeed.Addresses().Add(fqAddressRef))
+	require.NoError(t, dsSeed.Addresses().Add(ownableDeployerRef))
 	e.DataStore = dsSeed.Seal()
 
 	paramsBeta := basicDeployCommitteeVerifierParams()
@@ -138,8 +162,9 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	out2, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
-			ChainSel: 5009297550715157269,
-			Params:   paramsBeta,
+			ChainSel:        5009297550715157269,
+			OwnableDeployer: ownableDeployerRef,
+			Params:          paramsBeta,
 		},
 	})
 	require.NoError(t, err, "Second apply failed")
@@ -167,13 +192,15 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 		require.NoError(t, dsUnion.Addresses().Add(r))
 	}
 	require.NoError(t, dsUnion.Addresses().Add(fqAddressRef))
+	require.NoError(t, dsUnion.Addresses().Add(ownableDeployerRef))
 	e.DataStore = dsUnion.Seal()
 
 	out3, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
-			ChainSel: 5009297550715157269,
-			Params:   paramsAlpha, // same qualifier as first run
+			ChainSel:        5009297550715157269,
+			OwnableDeployer: ownableDeployerRef,
+			Params:          paramsAlpha, // same qualifier as first run
 		},
 	})
 	require.NoError(t, err, "Third apply (repeat qualifier) failed")

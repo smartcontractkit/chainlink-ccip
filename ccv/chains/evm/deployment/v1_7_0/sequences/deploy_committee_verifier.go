@@ -25,7 +25,6 @@ type CommitteeVerifierParams struct {
 	Version             *semver.Version
 	AllowlistAdmin      common.Address
 	FeeAggregator       common.Address
-	OwnableDeployer     common.Address
 	SignatureConfigArgs committee_verifier.SetSignatureConfigArgs
 	StorageLocation     string
 	// Qualifier distinguishes between multiple deployments of the committee verifier and proxy
@@ -36,6 +35,7 @@ type CommitteeVerifierParams struct {
 type DeployCommitteeVerifierInput struct {
 	ChainSelector     uint64
 	ExistingAddresses []datastore.AddressRef
+	OwnableDeployer   common.Address
 	Params            CommitteeVerifierParams
 }
 
@@ -94,15 +94,30 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 
 		// Deploy CommitteeVerifierResolverProxy via OwnableDeployer to ensure deterministic addresses
 		// We use the qualifier string as a differentiator between multiple committee verifier instances on the same chain.
-		// First, pre-compute the expected address of the CommitteeVerifierResolverProxy using the OwnableDeployer contract.
+		// First, pre-compute the init code and expected address of the CommitteeVerifierResolverProxy using the OwnableDeployer contract.
+		// Parse the ABI to properly encode constructor arguments.
+		parsedABI, err := proxy_latest.ProxyMetaData.GetAbi()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse Proxy ABI: %w", err)
+		}
+		// ABI-encode the constructor arguments (target address).
+		// Combine bytecode with encoded constructor arguments.
+		targetAddress := common.HexToAddress(committeeVerifierResolverRef.Address)
+		constructorArgs, err := parsedABI.Pack("", targetAddress)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to pack constructor arguments: %w", err)
+		}
+		creationCode := append(common.FromHex(proxy_latest.ProxyBin), constructorArgs...)
+		// Generate a salt for the deployment using the qualifier string.
 		hasher := hashutil.NewKeccak()
-		salt := hasher.Hash([]byte(input.Params.Qualifier))
+		salt := hasher.Hash(common.LeftPadBytes([]byte(input.Params.Qualifier), 32))
+		// Fetch and save the expected address of the CommitteeVerifierResolverProxy.
 		expectedAddressReport, err := cldf_ops.ExecuteOperation(b, ownable_deployer.ComputeAddress, chain, contract.FunctionInput[ownable_deployer.ComputeAddressArgs]{
-			Address:       input.Params.OwnableDeployer,
+			Address:       input.OwnableDeployer,
 			ChainSelector: chain.Selector,
 			Args: ownable_deployer.ComputeAddressArgs{
 				Sender:   chain.DeployerKey.From,
-				InitCode: common.FromHex(proxy_latest.ProxyBin),
+				InitCode: creationCode,
 				Salt:     salt,
 			},
 		})
@@ -117,25 +132,9 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			Version:       semver.MustParse("1.7.0"),
 		})
 		// Then, actually deploy and transfer ownership of the CommitteeVerifierResolverProxy
-		// Parse the ABI to properly encode constructor arguments
-		parsedABI, err := proxy_latest.ProxyMetaData.GetAbi()
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse Proxy ABI: %w", err)
-		}
-
-		// ABI-encode the constructor arguments (target address)
-		targetAddress := common.HexToAddress(committeeVerifierResolverRef.Address)
-		constructorArgs, err := parsedABI.Pack("", targetAddress)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to pack constructor arguments: %w", err)
-		}
-
-		// Combine bytecode with encoded constructor arguments
-		creationCode := common.FromHex(proxy_latest.ProxyBin)
-		creationCode = append(creationCode, constructorArgs...)
 		deployAndTransferResolverProxyReport, err := cldf_ops.ExecuteOperation(b, ownable_deployer.DeployAndTransferOwnership, chain, contract.FunctionInput[ownable_deployer.DeployAndTransferOwnershipArgs]{
 			ChainSelector: chain.Selector,
-			Address:       input.Params.OwnableDeployer,
+			Address:       input.OwnableDeployer,
 			Args: ownable_deployer.DeployAndTransferOwnershipArgs{
 				InitCode: creationCode,
 				Salt:     salt,
@@ -146,10 +145,12 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		writes = append(writes, deployAndTransferResolverProxyReport.Output)
 		// Finally, accept ownership of the CommitteeVerifierResolverProxy
-		acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxy.AcceptOwnership, chain, contract.FunctionInput[any]{
+		acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxy.AcceptOwnership, chain, contract.FunctionInput[proxy.AcceptOwnershipArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(expectedAddressReport.Output.Hex()),
-			Args:          nil,
+			Args: proxy.AcceptOwnershipArgs{
+				IsProposedOwner: true,
+			},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to accept ownership of CommitteeVerifierResolverProxy: %w", err)
