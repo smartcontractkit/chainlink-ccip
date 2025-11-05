@@ -12,11 +12,11 @@ import {Create2} from "@openzeppelin/contracts@5.0.2/utils/Create2.sol";
 /// deployed contracts to the caller, ensuring that the caller can accept ownership. It does not accept
 /// a desired owner parameter to reduce opportunity for misconfiguration.
 contract OwnableDeployer is ITypeAndVersion {
-  string public constant typeAndVersion = "DeterministicDeployer 1.7.0";
+  string public constant typeAndVersion = "OwnableDeployer 1.7.0";
 
   /// @notice Deploys and transfers ownership of a contract with the given init code and salt.
   /// @dev The deployed address is deterministic based on the deployer address, salt, and init code.
-  /// This method does not supmport deploying contracts with payable constructors (sets amount to 0).
+  /// This method does not support deploying contracts with payable constructors (sets amount to 0).
   /// This method assumes that the deployer of the contract will be set as its owner upon construction.
   /// @param initCode The init code of the contract to deploy.
   /// @param salt The salt to be used in combination with msg.sender to ensure a unique deployment.
@@ -36,7 +36,7 @@ contract OwnableDeployer is ITypeAndVersion {
   /// @param sender The address that will call deployAndTransferOwnership.
   /// @param initCode The init code of the contract to deploy.
   /// @param salt The salt to be used in combination with sender to ensure a unique deployment.
-  /// @return address The address of the contract that will be deployed.
+  /// @return contractAddress The address of the contract that will be deployed.
   function computeAddress(address sender, bytes memory initCode, bytes32 salt) external view returns (address) {
     salt = keccak256(abi.encodePacked(salt, sender));
     return Create2.computeAddress(salt, keccak256(initCode), address(this));

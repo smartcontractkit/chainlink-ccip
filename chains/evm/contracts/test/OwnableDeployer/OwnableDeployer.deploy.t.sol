@@ -5,8 +5,6 @@ import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable
 
 import {OwnableDeployerSetup} from "./OwnableDeployerSetup.t.sol";
 
-import {Create2} from "@openzeppelin/contracts@5.0.2/utils/Create2.sol";
-
 contract OwnableDeployer_deploy is OwnableDeployerSetup {
   function test_deploy() public {
     address predictedAddress = s_ownableDeployer.computeAddress(OWNER, s_initCode, SALT);

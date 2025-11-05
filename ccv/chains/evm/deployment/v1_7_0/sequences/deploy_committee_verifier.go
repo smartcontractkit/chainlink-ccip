@@ -92,16 +92,12 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, committeeVerifierResolverRef)
 
-		// Deploy CommitteeVerifierResolverProxy via OwnableDeployer to ensure deterministic addresses
-		// We use the qualifier string as a differentiator between multiple committee verifier instances on the same chain.
-		// First, pre-compute the init code and expected address of the CommitteeVerifierResolverProxy using the OwnableDeployer contract.
-		// Parse the ABI to properly encode constructor arguments.
+		// Deploy CommitteeVerifierResolverProxy via OwnableDeployer to ensure deterministic addresses.
+		// First, form the creation code for the CommitteeVerifierResolverProxy by combining the bytecode and constructor args.
 		parsedABI, err := proxy_latest.ProxyMetaData.GetAbi()
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse Proxy ABI: %w", err)
 		}
-		// ABI-encode the constructor arguments (target address).
-		// Combine bytecode with encoded constructor arguments.
 		targetAddress := common.HexToAddress(committeeVerifierResolverRef.Address)
 		constructorArgs, err := parsedABI.Pack("", targetAddress)
 		if err != nil {
@@ -109,6 +105,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		creationCode := append(common.FromHex(proxy_latest.ProxyBin), constructorArgs...)
 		// Generate a salt for the deployment using the qualifier string.
+		// We use the qualifier string as a differentiator between multiple committee verifier instances on the same chain.
 		hasher := hashutil.NewKeccak()
 		salt := hasher.Hash(common.LeftPadBytes([]byte(input.Params.Qualifier), 32))
 		// Fetch and save the expected address of the CommitteeVerifierResolverProxy.

@@ -9,7 +9,7 @@ contract OwnableDeployerSetup is BaseTest {
   OwnableDeployer internal s_ownableDeployer;
   bytes internal s_initCode;
 
-  bytes32 constant SALT = keccak256("SALT");
+  bytes32 internal constant SALT = keccak256("SALT");
 
   function setUp() public virtual override {
     super.setUp();
