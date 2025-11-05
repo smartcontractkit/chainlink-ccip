@@ -574,46 +574,48 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       revert UnsupportedToken(tokenAndAmount.token);
     }
 
-    Pool.LockOrBurnOutV1 memory poolReturnData;
-    uint256 destTokenAmount;
+    {
+      Pool.LockOrBurnInV1 memory lockOrBurnInput = Pool.LockOrBurnInV1({
+        receiver: receiver,
+        remoteChainSelector: destChainSelector,
+        originalSender: originalSender,
+        amount: tokenAndAmount.amount,
+        localToken: tokenAndAmount.token
+      });
 
-    Pool.LockOrBurnInV1 memory lockOrBurnInput = Pool.LockOrBurnInV1({
-      receiver: receiver,
-      remoteChainSelector: destChainSelector,
-      originalSender: originalSender,
-      amount: tokenAndAmount.amount,
-      localToken: tokenAndAmount.token
-    });
+      Pool.LockOrBurnOutV1 memory poolReturnData;
+      // For v1 pools, the destination amount is set equal to the source amount.
+      // For v2 pools, the destination amount may be modified in the following logic.
+      uint256 destTokenAmount = tokenAndAmount.amount;
 
-    // If the pool declares support for IPoolV2, it can handle `finality` and `tokenArgs`.
-    // Use the V2 overload which returns a potentially adjusted destination amount.
-    if (IERC165(address(sourcePool)).supportsInterface(type(IPoolV2).interfaceId)) {
-      (poolReturnData, destTokenAmount) =
-        IPoolV2(address(sourcePool)).lockOrBurn(lockOrBurnInput, blockConfirmationRequested, tokenArgs);
-    } else {
-      // V1 pools don't understand `blockConfirmationRequested`/`tokenArgs`.
-      // We enforce default for `blockConfirmationRequested` and no `tokenArgs` to avoid silent mis-interpretation.
-      if (blockConfirmationRequested != 0) {
-        revert CustomBlockConfirmationNotSupportedOnPoolV1();
+      // If the pool declares support for IPoolV2, it can handle `finality` and `tokenArgs`.
+      // Use the V2 overload which returns a potentially adjusted destination amount.
+      if (IERC165(address(sourcePool)).supportsInterface(type(IPoolV2).interfaceId)) {
+        (poolReturnData, destTokenAmount) =
+          IPoolV2(address(sourcePool)).lockOrBurn(lockOrBurnInput, blockConfirmationRequested, tokenArgs);
+      } else {
+        // V1 pools don't understand `blockConfirmationRequested`/`tokenArgs`.
+        // We enforce default for `blockConfirmationRequested` and no `tokenArgs` to avoid silent mis-interpretation.
+        if (blockConfirmationRequested != 0) {
+          revert CustomBlockConfirmationNotSupportedOnPoolV1();
+        }
+        if (tokenArgs.length != 0) {
+          revert TokenArgsNotSupportedOnPoolV1();
+        }
+        poolReturnData = sourcePool.lockOrBurn(lockOrBurnInput);
       }
-      if (tokenArgs.length != 0) {
-        revert TokenArgsNotSupportedOnPoolV1();
-      }
-      poolReturnData = sourcePool.lockOrBurn(lockOrBurnInput);
-      // V1 returns only LockOrBurnOutV1, the destination amount is 1:1 with the source amount.
-      destTokenAmount = tokenAndAmount.amount;
+
+      uint8 destAddressBytesLength = s_destChainConfigs[destChainSelector].addressBytesLength;
+
+      return MessageV1Codec.TokenTransferV1({
+        amount: destTokenAmount,
+        sourcePoolAddress: abi.encodePacked(address(sourcePool)),
+        sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
+        destTokenAddress: this.validateDestChainAddress(poolReturnData.destTokenAddress, destAddressBytesLength),
+        tokenReceiver: receiver,
+        extraData: poolReturnData.destPoolData
+      });
     }
-
-    return MessageV1Codec.TokenTransferV1({
-      amount: destTokenAmount,
-      sourcePoolAddress: abi.encodePacked(address(sourcePool)),
-      sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
-      destTokenAddress: this.validateDestChainAddress(
-        poolReturnData.destTokenAddress, s_destChainConfigs[lockOrBurnInput.remoteChainSelector].addressBytesLength
-      ),
-      tokenReceiver: receiver,
-      extraData: poolReturnData.destPoolData
-    });
   }
 
   /// @notice Gets the required CCVs from the pool for token transfers.
