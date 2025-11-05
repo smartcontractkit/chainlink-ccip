@@ -29,8 +29,8 @@ var (
 )
 
 var OwnableDeployerMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"deployAndTransferOwnership\",\"inputs\":[{\"name\":\"initCode\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"error\",\"name\":\"Create2EmptyBytecode\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"Create2FailedDeployment\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"Create2InsufficientBalance\",\"inputs\":[{\"name\":\"balance\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"needed\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]",
-	Bin: "0x6080806040523460155761035f908161001b8239f35b600080fdfe6080604052600436101561001257600080fd5b6000803560e01c8063181f5a771461021457638fdc344b1461003357600080fd5b346102115760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126102115760043567ffffffffffffffff811161018c573660238201121561018c57806004013567ffffffffffffffff81116101e4578260207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f84011601926100cb60405194856102e2565b828452602084019236602482840101116101e057806024602093018537840101528151156101b8579073ffffffffffffffffffffffffffffffffffffffff9160243591519084f516801561019057803b1561018c57604051917ff2fde38b000000000000000000000000000000000000000000000000000000008352336004840152808360248183865af192831561017f5760209361016f575b5050604051908152f35b81610179916102e2565b38610165565b50604051903d90823e3d90fd5b5080fd5b6004827f741752c2000000000000000000000000000000000000000000000000000000008152fd5b6004837f4ca249dc000000000000000000000000000000000000000000000000000000008152fd5b8280fd5b6024837f4e487b710000000000000000000000000000000000000000000000000000000081526041600452fd5b80fd5b503461021157807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261021157604080519161025282846102e2565b601b83527f44657465726d696e69737469634465706c6f79657220312e372e3000000000006020840152815192839160208352815191826020850152815b8381106102cb575050828201840152601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0168101030190f35b602082820181015188830188015287955001610290565b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761032357604052565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fdfea164736f6c634300081a000a",
+	ABI: "[{\"type\":\"function\",\"name\":\"computeAddress\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"initCode\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"deployAndTransferOwnership\",\"inputs\":[{\"name\":\"initCode\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"error\",\"name\":\"Create2EmptyBytecode\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"Create2FailedDeployment\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"Create2InsufficientBalance\",\"inputs\":[{\"name\":\"balance\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"needed\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]",
+	Bin: "0x608080604052346015576104bf908161001b8239f35b600080fdfe6080604052600436101561001257600080fd5b6000803560e01c8062d762e0146102c9578063181f5a77146101fb57638fdc344b1461003d57600080fd5b346101f85760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101f85760043567ffffffffffffffff81116101a45761008c903690600401610438565b6040516020810190610101816100d53360243586906034927fffffffffffffffffffffffffffffffffffffffff00000000000000000000000091835260601b1660208201520190565b037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe081018352826103c8565b519020908051156101d057805173ffffffffffffffffffffffffffffffffffffffff929160200184f51680156101a857803b156101a457604051917ff2fde38b000000000000000000000000000000000000000000000000000000008352336004840152808360248183865af192831561019757602093610187575b5050604051908152f35b81610191916103c8565b3861017d565b50604051903d90823e3d90fd5b5080fd5b6004827f741752c2000000000000000000000000000000000000000000000000000000008152fd5b6004837f4ca249dc000000000000000000000000000000000000000000000000000000008152fd5b80fd5b50346101f857807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101f857604080519161023982846103c8565b601b83527f44657465726d696e69737469634465706c6f79657220312e372e3000000000006020840152815192839160208352815191826020850152815b8381106102b2575050828201840152601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0168101030190f35b602082820181015188830188015287955001610277565b50346101f85760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101f8576004359073ffffffffffffffffffffffffffffffffffffffff821682036101f8576024359067ffffffffffffffff82116101f85760206055600b856103413660048801610438565b90604051610389816100d58882019460443586906034927fffffffffffffffffffffffffffffffffffffffff00000000000000000000000091835260601b1660208201520190565b5190209084815191012090604051916040830152848201523081520160ff81532073ffffffffffffffffffffffffffffffffffffffff60405191168152f35b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761040957604052565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b81601f820112156104ad5780359067ffffffffffffffff8211610409576040519261048b601f84017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016602001856103c8565b828452602083830101116104ad57816000926020809301838601378301015290565b600080fdfea164736f6c634300081a000a",
 }
 
 var OwnableDeployerABI = OwnableDeployerMetaData.ABI
@@ -169,6 +169,28 @@ func (_OwnableDeployer *OwnableDeployerTransactorRaw) Transact(opts *bind.Transa
 	return _OwnableDeployer.Contract.contract.Transact(opts, method, params...)
 }
 
+func (_OwnableDeployer *OwnableDeployerCaller) ComputeAddress(opts *bind.CallOpts, sender common.Address, initCode []byte, salt [32]byte) (common.Address, error) {
+	var out []interface{}
+	err := _OwnableDeployer.contract.Call(opts, &out, "computeAddress", sender, initCode, salt)
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_OwnableDeployer *OwnableDeployerSession) ComputeAddress(sender common.Address, initCode []byte, salt [32]byte) (common.Address, error) {
+	return _OwnableDeployer.Contract.ComputeAddress(&_OwnableDeployer.CallOpts, sender, initCode, salt)
+}
+
+func (_OwnableDeployer *OwnableDeployerCallerSession) ComputeAddress(sender common.Address, initCode []byte, salt [32]byte) (common.Address, error) {
+	return _OwnableDeployer.Contract.ComputeAddress(&_OwnableDeployer.CallOpts, sender, initCode, salt)
+}
+
 func (_OwnableDeployer *OwnableDeployerCaller) TypeAndVersion(opts *bind.CallOpts) (string, error) {
 	var out []interface{}
 	err := _OwnableDeployer.contract.Call(opts, &out, "typeAndVersion")
@@ -208,6 +230,8 @@ func (_OwnableDeployer *OwnableDeployer) Address() common.Address {
 }
 
 type OwnableDeployerInterface interface {
+	ComputeAddress(opts *bind.CallOpts, sender common.Address, initCode []byte, salt [32]byte) (common.Address, error)
+
 	TypeAndVersion(opts *bind.CallOpts) (string, error)
 
 	DeployAndTransferOwnership(opts *bind.TransactOpts, initCode []byte, salt [32]byte) (*types.Transaction, error)

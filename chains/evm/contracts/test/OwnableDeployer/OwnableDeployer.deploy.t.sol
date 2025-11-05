@@ -9,7 +9,7 @@ import {Create2} from "@openzeppelin/contracts@5.0.2/utils/Create2.sol";
 
 contract OwnableDeployer_deploy is OwnableDeployerSetup {
   function test_deploy() public {
-    address predictedAddress = Create2.computeAddress(SALT, keccak256(s_initCode), address(s_ownableDeployer));
+    address predictedAddress = s_ownableDeployer.computeAddress(OWNER, s_initCode, SALT);
 
     address deployedAddress = s_ownableDeployer.deployAndTransferOwnership(s_initCode, SALT);
     assertEq(deployedAddress, predictedAddress);

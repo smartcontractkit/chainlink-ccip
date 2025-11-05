@@ -17,12 +17,28 @@ contract OwnableDeployer is ITypeAndVersion {
   /// @notice Deploys and transfers ownership of a contract with the given init code and salt.
   /// @dev The deployed address is deterministic based on the deployer address, salt, and init code.
   /// This method does not supmport deploying contracts with payable constructors (sets amount to 0).
-  /// Thi method assumes that the deployer of the contract will be set as its owner upon construction.
+  /// This method assumes that the deployer of the contract will be set as its owner upon construction.
+  /// @param initCode The init code of the contract to deploy.
+  /// @param salt The salt to be used in combination with msg.sender to ensure a unique deployment.
   /// @return contractAddress The address of the contract deployed.
   function deployAndTransferOwnership(bytes memory initCode, bytes32 salt) external returns (address) {
+    // Ensure a unique deployment between senders, even if the same input parameters are used,
+    // to prevent DOS/front running attacks
+    salt = keccak256(abi.encodePacked(salt, msg.sender));
+
     address contractAddress = Create2.deploy(0, salt, initCode);
     IOwnable(contractAddress).transferOwnership(msg.sender);
 
     return contractAddress;
+  }
+
+  /// @notice Computes the address of a contract that will be deployed with the given init code and salt by the given sender.
+  /// @param sender The address that will call deployAndTransferOwnership.
+  /// @param initCode The init code of the contract to deploy.
+  /// @param salt The salt to be used in combination with sender to ensure a unique deployment.
+  /// @return address The address of the contract that will be deployed.
+  function computeAddress(address sender, bytes memory initCode, bytes32 salt) external view returns (address) {
+    salt = keccak256(abi.encodePacked(salt, sender));
+    return Create2.computeAddress(salt, keccak256(initCode), address(this));
   }
 }

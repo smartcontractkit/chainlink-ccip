@@ -28,7 +28,7 @@ mock_usdc_token_transmitter: ../solc/ccip/MockE2EUSDCTransmitter/MockE2EUSDCTran
 multi_ocr3_helper: ../solc/ccip/MultiOCR3Helper/MultiOCR3Helper.sol/MultiOCR3Helper.abi.json ../solc/ccip/MultiOCR3Helper/MultiOCR3Helper.sol/MultiOCR3Helper.bin 068d4e34ec79766e1875319f1767075a2a43c07d79aff53449ea693db33a5ded
 offramp: ../solc/ccip/OffRamp/OffRamp.sol/OffRamp.abi.json ../solc/ccip/OffRamp/OffRamp.sol/OffRamp.bin dbb601c9be66ece059411cfcaed29f464aa936b7fd9c2c2296dc495156e7697b
 onramp: ../solc/ccip/OnRamp/OnRamp.sol/OnRamp.abi.json ../solc/ccip/OnRamp/OnRamp.sol/OnRamp.bin fda5d54f19ba0325ef6bcb84cf279d8a5a65b49cc4d7a1cb118b3f0c92aa88ae
-ownable_deployer: ../solc/ccip/OwnableDeployer/OwnableDeployer.sol/OwnableDeployer.abi.json ../solc/ccip/OwnableDeployer/OwnableDeployer.sol/OwnableDeployer.bin fcb397663f22609f987d76e822107f408a3c92305fb2909b53663bc5512677da
+ownable_deployer: ../solc/ccip/OwnableDeployer/OwnableDeployer.sol/OwnableDeployer.abi.json ../solc/ccip/OwnableDeployer/OwnableDeployer.sol/OwnableDeployer.bin d54567fc31adb6f44ccb7fac3a3b9016ea5299f69954c794aa14697569c8582a
 ping_pong_demo: ../solc/ccip/PingPongDemo/PingPongDemo.sol/PingPongDemo.abi.json ../solc/ccip/PingPongDemo/PingPongDemo.sol/PingPongDemo.bin db90196d1d48e825d2d9cf9fffcb4d662a9b9ceaf3b61dbac3f60a61e99a4572
 proxy: ../solc/ccip/Proxy/Proxy.sol/Proxy.abi.json ../solc/ccip/Proxy/Proxy.sol/Proxy.bin 5c0a7a89ec7140392a84557dce647f7fea246ff248571246be1ee0d574bd40cd
 registry_module_owner_custom: ../solc/ccip/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.sol/RegistryModuleOwnerCustom.abi.json ../solc/ccip/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.sol/RegistryModuleOwnerCustom.bin ce04722cdea2e96d791e48c6a99f64559125d34cd24e19cfd5281892d2ed8ef0
