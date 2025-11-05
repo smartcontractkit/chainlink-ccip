@@ -14,6 +14,7 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, SignatureQuorumValidator, BaseVerifier {
   error InvalidConfig();
   error InvalidCCVData();
+  error InvalidCCVVersion(bytes4 verifierVersion);
   error OnlyCallableByOwnerOrAllowlistAdmin();
 
   event ConfigSet(DynamicConfig dynamicConfig);
@@ -66,21 +67,25 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
       revert InvalidCCVData();
     }
 
+    // Any ccvData submitted to this verifier should have the expected version.
+    bytes4 verifierVersion = bytes4(ccvData[:VERIFIER_VERSION_BYTES]);
+    if (verifierVersion != VERSION_TAG_V1_7_0) {
+      revert InvalidCCVVersion(verifierVersion);
+    }
+
     uint256 signatureLength =
       uint16(bytes2(ccvData[VERIFIER_VERSION_BYTES:VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES]));
     if (ccvData.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength) {
       revert InvalidCCVData();
     }
 
-    // Verifiers sign a concatenation of the verifier version and the message hash.
-    // The version is included so that a resolver can return the correct verifier implementation on destination.
-    // The version must be signed, otherwise any version could be inserted post-signatures.
-    bytes32 signedHash = keccak256(abi.encodePacked(ccvData[0:VERIFIER_VERSION_BYTES], messageHash));
-
     // Even though the current version of this contract only expects verifier version and signatures to be included in the ccvData,
     // bounding it to the given length allows potential forward compatibility with future formats that supply more data.
     _validateSignatures(
-      signedHash,
+      // Verifiers sign a concatenation of the verifier version and the message hash.
+      // The version is included so that a resolver can return the correct verifier implementation on destination.
+      // The version must be signed, otherwise any version could be inserted post-signatures.
+      keccak256(bytes.concat(verifierVersion, messageHash)),
       ccvData[
         VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES:
           VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength
