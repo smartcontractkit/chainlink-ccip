@@ -2,13 +2,14 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {ExtraArgsCodecUnoptimized} from "../../libraries/ExtraArgsCodecUnoptimized.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract ExtraArgsCodecHelper {
   function decode(
     bytes calldata encoded
-  ) external pure returns (ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory) {
+  ) external pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
     return ExtraArgsCodecUnoptimized._decodeGenericExtraArgsV3(encoded);
   }
 }
@@ -21,7 +22,7 @@ contract ExtraArgsCodec_Test is Test {
   }
 
   function test_encodeDecodeExecutorZeroAddress() public view {
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
@@ -33,7 +34,7 @@ contract ExtraArgsCodec_Test is Test {
     });
 
     bytes memory encoded = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
+    ExtraArgsCodec.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
 
     assertEq(decoded.executor, address(0), "Executor should be address(0)");
     assertEq(decoded.finalityConfig, 12, "FinalityConfig should match");
@@ -42,7 +43,7 @@ contract ExtraArgsCodec_Test is Test {
 
   function test_encodeDecodeExecutorNonZeroAddress() public view {
     address executor = address(0x1234567890123456789012345678901234567890);
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
@@ -54,7 +55,7 @@ contract ExtraArgsCodec_Test is Test {
     });
 
     bytes memory encoded = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
+    ExtraArgsCodec.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
 
     assertEq(decoded.executor, executor, "Executor should match");
     assertEq(decoded.finalityConfig, 12, "FinalityConfig should match");
@@ -62,7 +63,7 @@ contract ExtraArgsCodec_Test is Test {
   }
 
   function test_encodeExecutorZeroAddress_ChecksLength() public pure {
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
@@ -84,7 +85,7 @@ contract ExtraArgsCodec_Test is Test {
 
   function test_encodeExecutorNonZeroAddress_ChecksLength() public pure {
     address executor = address(0x1234567890123456789012345678901234567890);
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
@@ -107,7 +108,7 @@ contract ExtraArgsCodec_Test is Test {
   function test_decodeExecutorInvalidLength_Reverts() public {
     // Manually craft an encoded payload with invalid executor length (10 bytes)
     bytes memory invalidEncoded = abi.encodePacked(
-      ExtraArgsCodecUnoptimized.GENERIC_EXTRA_ARGS_V3_TAG,
+      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       uint8(0), // ccvs length
       uint16(12), // finalityConfig
       uint32(200_000), // gasLimit
@@ -118,14 +119,14 @@ contract ExtraArgsCodec_Test is Test {
       uint16(0) // tokenArgs length
     );
 
-    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodecUnoptimized.InvalidExecutorLength.selector, 10));
+    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.InvalidExecutorLength.selector, 10));
     helper.decode(invalidEncoded);
   }
 
   function test_decodeExecutorLength32_Reverts() public {
     // Manually craft an encoded payload with invalid executor length (32 bytes)
     bytes memory invalidEncoded = abi.encodePacked(
-      ExtraArgsCodecUnoptimized.GENERIC_EXTRA_ARGS_V3_TAG,
+      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       uint8(0), // ccvs length
       uint16(12), // finalityConfig
       uint32(200_000), // gasLimit
@@ -136,7 +137,7 @@ contract ExtraArgsCodec_Test is Test {
       uint16(0) // tokenArgs length
     );
 
-    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodecUnoptimized.InvalidExecutorLength.selector, 32));
+    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.InvalidExecutorLength.selector, 32));
     helper.decode(invalidEncoded);
   }
 
@@ -149,7 +150,7 @@ contract ExtraArgsCodec_Test is Test {
     ccvArgs[0] = "args1";
     ccvArgs[1] = "args2";
 
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvAddresses,
       ccvArgs: ccvArgs,
       finalityConfig: 12,
@@ -161,7 +162,7 @@ contract ExtraArgsCodec_Test is Test {
     });
 
     bytes memory encoded = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
+    ExtraArgsCodec.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
 
     assertEq(decoded.executor, executor, "Executor should match");
     assertEq(decoded.ccvs.length, 2, "CCVs length should match");

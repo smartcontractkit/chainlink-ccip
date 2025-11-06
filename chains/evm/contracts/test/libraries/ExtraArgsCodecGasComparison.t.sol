@@ -5,9 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {ExtraArgsCodecUnoptimized} from "../../libraries/ExtraArgsCodecUnoptimized.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 
-/// @notice Helper contract to decode with original implementation
 contract OriginalDecoder {
-  function decode(bytes calldata data) external pure returns (ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory) {
+  function decode(bytes calldata data) external pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
     return ExtraArgsCodecUnoptimized._decodeGenericExtraArgsV3(data);
   }
 
@@ -16,7 +15,6 @@ contract OriginalDecoder {
   }
 }
 
-/// @notice Helper contract to decode with optimized implementation
 contract OptimizedDecoder {
   function decode(bytes calldata data) external pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
     return ExtraArgsCodec._decodeGenericExtraArgsV3(data);
@@ -30,58 +28,14 @@ contract OptimizedDecoder {
 /// @notice Gas comparison test between original and optimized ExtraArgsCodec implementations.
 /// @dev This test suite compares gas costs for encoding and decoding operations.
 contract ExtraArgsCodecGasComparison is Test {
-  OriginalDecoder originalDecoder;
-  OptimizedDecoder optimizedDecoder;
+  OriginalDecoder internal s_originalDecoder;
+  OptimizedDecoder internal s_optimizedDecoder;
 
   function setUp() public {
-    originalDecoder = new OriginalDecoder();
-    optimizedDecoder = new OptimizedDecoder();
+    s_originalDecoder = new OriginalDecoder();
+    s_optimizedDecoder = new OptimizedDecoder();
   }
-  /// @notice Test encoding with no CCVs - comparing gas costs
-  function test_gas_encode_noCCVs() public {
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
-      ccvs: new address[](0),
-      ccvArgs: new bytes[](0),
-      finalityConfig: 12,
-      gasLimit: 200_000,
-      executor: address(0x1234567890123456789012345678901234567890),
-      executorArgs: "some executor args here",
-      tokenReceiver: abi.encodePacked(address(0x9876543210987654321098765432109876543210)),
-      tokenArgs: "token args data"
-    });
 
-    // Original implementation
-    uint256 gasBefore = gasleft();
-    bytes memory encoded1 = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
-    uint256 gasUsedOriginal = gasBefore - gasleft();
-
-    // Optimized implementation
-    ExtraArgsCodec.GenericExtraArgsV3 memory argsOpt = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: args.ccvs,
-      ccvArgs: args.ccvArgs,
-      finalityConfig: args.finalityConfig,
-      gasLimit: args.gasLimit,
-      executor: args.executor,
-      executorArgs: args.executorArgs,
-      tokenReceiver: args.tokenReceiver,
-      tokenArgs: args.tokenArgs
-    });
-
-    gasBefore = gasleft();
-    bytes memory encoded2 = ExtraArgsCodec._encodeGenericExtraArgsV3(argsOpt);
-    uint256 gasUsedOptimized = gasBefore - gasleft();
-
-    // Verify outputs are identical
-    assertEq(encoded1, encoded2, "Encoded outputs should match");
-
-    // Log gas comparison
-    emit log_named_uint("Original gas (no CCVs)", gasUsedOriginal);
-    emit log_named_uint("Optimized gas (no CCVs)", gasUsedOptimized);
-    emit log_named_uint("Gas saved (no CCVs)", gasUsedOriginal - gasUsedOptimized);
-    emit log_named_decimal_uint(
-      "Gas savings % (no CCVs)", ((gasUsedOriginal - gasUsedOptimized) * 10000) / gasUsedOriginal, 2
-    );
-  }
 
   /// @notice Test encoding with 1 CCV
   function test_gas_encode_1CCV() public {
@@ -90,7 +44,7 @@ contract ExtraArgsCodecGasComparison is Test {
     bytes[] memory ccvArgs = new bytes[](1);
     ccvArgs[0] = "ccv args 1";
 
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
       finalityConfig: 12,
@@ -106,20 +60,8 @@ contract ExtraArgsCodecGasComparison is Test {
     bytes memory encoded1 = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
     uint256 gasUsedOriginal = gasBefore - gasleft();
 
-    // Optimized implementation
-    ExtraArgsCodec.GenericExtraArgsV3 memory argsOpt = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: ccvs,
-      ccvArgs: ccvArgs,
-      finalityConfig: args.finalityConfig,
-      gasLimit: args.gasLimit,
-      executor: args.executor,
-      executorArgs: args.executorArgs,
-      tokenReceiver: args.tokenReceiver,
-      tokenArgs: args.tokenArgs
-    });
-
     gasBefore = gasleft();
-    bytes memory encoded2 = ExtraArgsCodec._encodeGenericExtraArgsV3(argsOpt);
+    bytes memory encoded2 = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
     uint256 gasUsedOptimized = gasBefore - gasleft();
 
     // Verify outputs are identical
@@ -146,7 +88,7 @@ contract ExtraArgsCodecGasComparison is Test {
     ccvArgs[1] = "ccv args 2";
     ccvArgs[2] = "ccv args 3 longer arguments here";
 
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
       finalityConfig: 12,
@@ -162,20 +104,8 @@ contract ExtraArgsCodecGasComparison is Test {
     bytes memory encoded1 = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
     uint256 gasUsedOriginal = gasBefore - gasleft();
 
-    // Optimized implementation
-    ExtraArgsCodec.GenericExtraArgsV3 memory argsOpt = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: ccvs,
-      ccvArgs: ccvArgs,
-      finalityConfig: args.finalityConfig,
-      gasLimit: args.gasLimit,
-      executor: args.executor,
-      executorArgs: args.executorArgs,
-      tokenReceiver: args.tokenReceiver,
-      tokenArgs: args.tokenArgs
-    });
-
     gasBefore = gasleft();
-    bytes memory encoded2 = ExtraArgsCodec._encodeGenericExtraArgsV3(argsOpt);
+    bytes memory encoded2 = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
     uint256 gasUsedOptimized = gasBefore - gasleft();
 
     // Verify outputs are identical
@@ -192,7 +122,7 @@ contract ExtraArgsCodecGasComparison is Test {
 
   /// @notice Test decoding with no CCVs
   function test_gas_decode_noCCVs() public {
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
@@ -207,12 +137,12 @@ contract ExtraArgsCodecGasComparison is Test {
 
     // Original implementation
     uint256 gasBefore = gasleft();
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory decoded1 = originalDecoder.decode(encoded);
+    ExtraArgsCodec.GenericExtraArgsV3 memory decoded1 = s_originalDecoder.decode(encoded);
     uint256 gasUsedOriginal = gasBefore - gasleft();
 
     // Optimized implementation
     gasBefore = gasleft();
-    ExtraArgsCodec.GenericExtraArgsV3 memory decoded2 = optimizedDecoder.decode(encoded);
+    ExtraArgsCodec.GenericExtraArgsV3 memory decoded2 = s_optimizedDecoder.decode(encoded);
     uint256 gasUsedOptimized = gasBefore - gasleft();
 
     // Verify outputs match
@@ -237,7 +167,7 @@ contract ExtraArgsCodecGasComparison is Test {
     bytes[] memory ccvArgs = new bytes[](1);
     ccvArgs[0] = "ccv args 1";
 
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
       finalityConfig: 12,
@@ -252,12 +182,12 @@ contract ExtraArgsCodecGasComparison is Test {
 
     // Original implementation
     uint256 gasBefore = gasleft();
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory decoded1 = originalDecoder.decode(encoded);
+    ExtraArgsCodec.GenericExtraArgsV3 memory decoded1 = s_originalDecoder.decode(encoded);
     uint256 gasUsedOriginal = gasBefore - gasleft();
 
     // Optimized implementation
     gasBefore = gasleft();
-    ExtraArgsCodec.GenericExtraArgsV3 memory decoded2 = optimizedDecoder.decode(encoded);
+    ExtraArgsCodec.GenericExtraArgsV3 memory decoded2 = s_optimizedDecoder.decode(encoded);
     uint256 gasUsedOptimized = gasBefore - gasleft();
 
     // Verify outputs match
@@ -286,7 +216,7 @@ contract ExtraArgsCodecGasComparison is Test {
     ccvArgs[1] = "ccv args 2";
     ccvArgs[2] = "ccv args 3 longer arguments here";
 
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
       finalityConfig: 12,
@@ -301,12 +231,12 @@ contract ExtraArgsCodecGasComparison is Test {
 
     // Original implementation
     uint256 gasBefore = gasleft();
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory decoded1 = originalDecoder.decode(encoded);
+    ExtraArgsCodec.GenericExtraArgsV3 memory decoded1 = s_originalDecoder.decode(encoded);
     uint256 gasUsedOriginal = gasBefore - gasleft();
 
     // Optimized implementation
     gasBefore = gasleft();
-    ExtraArgsCodec.GenericExtraArgsV3 memory decoded2 = optimizedDecoder.decode(encoded);
+    ExtraArgsCodec.GenericExtraArgsV3 memory decoded2 = s_optimizedDecoder.decode(encoded);
     uint256 gasUsedOptimized = gasBefore - gasleft();
 
     // Verify outputs match
@@ -326,7 +256,7 @@ contract ExtraArgsCodecGasComparison is Test {
   }
 
   function test_gas_decode_empty() public {
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
@@ -341,12 +271,12 @@ contract ExtraArgsCodecGasComparison is Test {
 
     // Original implementation
     uint256 gasBefore = gasleft();
-     originalDecoder.decodeNoReturn(encoded);
+     s_originalDecoder.decodeNoReturn(encoded);
     uint256 gasUsedOriginal = gasBefore - gasleft();
 
     // Optimized implementation
     gasBefore = gasleft();
-    optimizedDecoder.decodeNoReturn(encoded);
+    s_optimizedDecoder.decodeNoReturn(encoded);
     uint256 gasUsedOptimized = gasBefore - gasleft();
 
 
@@ -361,7 +291,7 @@ contract ExtraArgsCodecGasComparison is Test {
 
   /// @notice Test encoding with zero executor
   function test_gas_encode_empty() public {
-    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
+    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
