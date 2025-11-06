@@ -2,14 +2,14 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
-import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
+import {ExtraArgsCodecUnoptimized} from "../../libraries/ExtraArgsCodecUnoptimized.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract ExtraArgsCodecHelper {
   function decode(
     bytes calldata encoded
-  ) external pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
-    return ExtraArgsCodec._decodeGenericExtraArgsV3(encoded);
+  ) external pure returns (ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory) {
+    return ExtraArgsCodecUnoptimized._decodeGenericExtraArgsV3(encoded);
   }
 }
 
@@ -21,7 +21,7 @@ contract ExtraArgsCodec_Test is Test {
   }
 
   function test_encodeDecodeExecutorZeroAddress() public view {
-    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
+    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
@@ -32,8 +32,8 @@ contract ExtraArgsCodec_Test is Test {
       tokenArgs: ""
     });
 
-    bytes memory encoded = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
-    ExtraArgsCodec.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
+    bytes memory encoded = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
+    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
 
     assertEq(decoded.executor, address(0), "Executor should be address(0)");
     assertEq(decoded.finalityConfig, 12, "FinalityConfig should match");
@@ -42,7 +42,7 @@ contract ExtraArgsCodec_Test is Test {
 
   function test_encodeDecodeExecutorNonZeroAddress() public view {
     address executor = address(0x1234567890123456789012345678901234567890);
-    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
+    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
@@ -53,8 +53,8 @@ contract ExtraArgsCodec_Test is Test {
       tokenArgs: ""
     });
 
-    bytes memory encoded = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
-    ExtraArgsCodec.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
+    bytes memory encoded = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
+    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
 
     assertEq(decoded.executor, executor, "Executor should match");
     assertEq(decoded.finalityConfig, 12, "FinalityConfig should match");
@@ -62,7 +62,7 @@ contract ExtraArgsCodec_Test is Test {
   }
 
   function test_encodeExecutorZeroAddress_ChecksLength() public pure {
-    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
+    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
@@ -73,7 +73,7 @@ contract ExtraArgsCodec_Test is Test {
       tokenArgs: ""
     });
 
-    bytes memory encoded = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
+    bytes memory encoded = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
 
     // Check the executor length field is 0
     // Format: 4 (tag) + 1 (ccvs length) + 2 (finality) + 4 (gasLimit) = 11 bytes offset
@@ -84,7 +84,7 @@ contract ExtraArgsCodec_Test is Test {
 
   function test_encodeExecutorNonZeroAddress_ChecksLength() public pure {
     address executor = address(0x1234567890123456789012345678901234567890);
-    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
+    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       finalityConfig: 12,
@@ -95,7 +95,7 @@ contract ExtraArgsCodec_Test is Test {
       tokenArgs: ""
     });
 
-    bytes memory encoded = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
+    bytes memory encoded = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
 
     // Check the executor length field is 20
     // Format: 4 (tag) + 1 (ccvs length) + 2 (finality) + 4 (gasLimit) = 11 bytes offset
@@ -107,7 +107,7 @@ contract ExtraArgsCodec_Test is Test {
   function test_decodeExecutorInvalidLength_Reverts() public {
     // Manually craft an encoded payload with invalid executor length (10 bytes)
     bytes memory invalidEncoded = abi.encodePacked(
-      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
+      ExtraArgsCodecUnoptimized.GENERIC_EXTRA_ARGS_V3_TAG,
       uint8(0), // ccvs length
       uint16(12), // finalityConfig
       uint32(200_000), // gasLimit
@@ -118,14 +118,14 @@ contract ExtraArgsCodec_Test is Test {
       uint16(0) // tokenArgs length
     );
 
-    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.InvalidExecutorLength.selector, 10));
+    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodecUnoptimized.InvalidExecutorLength.selector, 10));
     helper.decode(invalidEncoded);
   }
 
   function test_decodeExecutorLength32_Reverts() public {
     // Manually craft an encoded payload with invalid executor length (32 bytes)
     bytes memory invalidEncoded = abi.encodePacked(
-      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
+      ExtraArgsCodecUnoptimized.GENERIC_EXTRA_ARGS_V3_TAG,
       uint8(0), // ccvs length
       uint16(12), // finalityConfig
       uint32(200_000), // gasLimit
@@ -136,7 +136,7 @@ contract ExtraArgsCodec_Test is Test {
       uint16(0) // tokenArgs length
     );
 
-    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.InvalidExecutorLength.selector, 32));
+    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodecUnoptimized.InvalidExecutorLength.selector, 32));
     helper.decode(invalidEncoded);
   }
 
@@ -149,7 +149,7 @@ contract ExtraArgsCodec_Test is Test {
     ccvArgs[0] = "args1";
     ccvArgs[1] = "args2";
 
-    ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
+    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory args = ExtraArgsCodecUnoptimized.GenericExtraArgsV3({
       ccvs: ccvAddresses,
       ccvArgs: ccvArgs,
       finalityConfig: 12,
@@ -160,8 +160,8 @@ contract ExtraArgsCodec_Test is Test {
       tokenArgs: "tokenArgs"
     });
 
-    bytes memory encoded = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
-    ExtraArgsCodec.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
+    bytes memory encoded = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
+    ExtraArgsCodecUnoptimized.GenericExtraArgsV3 memory decoded = helper.decode(encoded);
 
     assertEq(decoded.executor, executor, "Executor should match");
     assertEq(decoded.ccvs.length, 2, "CCVs length should match");

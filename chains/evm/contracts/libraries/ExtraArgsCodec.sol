@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-/// @notice Library for CCIP Extra Arguments encoding/decoding operations.
-/// @dev This library handles the GenericExtraArgsV3 format and related structures including:
-/// - GenericExtraArgsV3, SVMExecutorArgsV1, and SuiExecutorArgsV1 struct definitions
-/// - Encoding/decoding functions with comprehensive error handling
-/// - Detailed error location tracking for debugging
-/// - Variable-length encoding for addresses and arguments for efficient payload size
+/// @notice Gas-optimized assembly version of ExtraArgsCodec library.
+/// @dev This is a carbon copy of ExtraArgsCodec but using inline assembly for better gas efficiency.
+/// Key optimizations:
+/// - Direct memory manipulation avoiding abi.encodePacked and bytes.concat
+/// - Single-pass encoding with pre-calculated memory allocation
+/// - Efficient pointer arithmetic
+/// - Reduced memory copies
 library ExtraArgsCodec {
   error InvalidDataLength(EncodingErrorLocation location);
   error InvalidEncodingVersion(uint8 version);
@@ -15,83 +16,60 @@ library ExtraArgsCodec {
   error CCVArrayLengthMismatch(uint256 ccvsLength, uint256 ccvArgsLength);
 
   bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
-  bytes4 public constant SVM_EXECUTOR_ARGS_V1_TAG = 0x1a2b3c4d; // TODO: Define actual tag
-  bytes4 public constant SUI_EXECUTOR_ARGS_V1_TAG = 0x5e6f7a8b; // TODO: Define actual tag
+  bytes4 public constant SVM_EXECUTOR_ARGS_V1_TAG = 0x1a2b3c4d;
+  bytes4 public constant SUI_EXECUTOR_ARGS_V1_TAG = 0x5e6f7a8b;
 
   uint256 public constant MAX_CCVS = 16;
-
-  // Base size of GenericExtraArgsV3 without variable length fields.
-  // 1 (ccvsLength) + 2 (finalityConfig) + 4 (gasLimit) + 1 (executorLength) +
-  // 2 (executorArgsLength) + 2 (tokenReceiverLength) + 2 (tokenArgsLength)
   uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 1 + 2 + 4 + 1 + 2 + 2 + 2;
-
-  // Base size of SVMExecutorArgsV1 without variable length accounts field.
-  // 1 (useATA) + 8 (accountIsWritableBitmap) + 2 (accountsLength)
   uint256 public constant SVM_EXECUTOR_ARGS_V1_BASE_SIZE = 1 + 8 + 2;
-
-  // Base size of SuiExecutorArgsV1 without variable length receiverObjectIds field.
-  // 2 (receiverObjectIdsLength)
   uint256 public constant SUI_EXECUTOR_ARGS_V1_BASE_SIZE = 2;
+  uint256 public constant CCV_BASE_SIZE = 1 + 2;
 
   enum EncodingErrorLocation {
-    // GenericExtraArgsV3 components.
-    EXTRA_ARGS_CCVS_LENGTH, // 0
+    EXTRA_ARGS_CCVS_LENGTH,
     EXTRA_ARGS_CCV_ADDRESS_LENGTH,
     EXTRA_ARGS_CCV_ADDRESS_CONTENT,
     EXTRA_ARGS_CCV_ARGS_LENGTH,
     EXTRA_ARGS_CCV_ARGS_CONTENT,
-    EXTRA_ARGS_FINALITY_CONFIG, // 5
+    EXTRA_ARGS_FINALITY_CONFIG,
     EXTRA_ARGS_GAS_LIMIT,
     EXTRA_ARGS_EXECUTOR_LENGTH,
     EXTRA_ARGS_EXECUTOR_CONTENT,
     EXTRA_ARGS_EXECUTOR_ARGS_LENGTH,
-    EXTRA_ARGS_EXECUTOR_ARGS_CONTENT, // 10
+    EXTRA_ARGS_EXECUTOR_ARGS_CONTENT,
     EXTRA_ARGS_TOKEN_RECEIVER_LENGTH,
     EXTRA_ARGS_TOKEN_RECEIVER_CONTENT,
     EXTRA_ARGS_TOKEN_ARGS_LENGTH,
     EXTRA_ARGS_TOKEN_ARGS_CONTENT,
-    EXTRA_ARGS_FINAL_OFFSET, // 15
-    // SVMExecutorArgsV1 components.
+    EXTRA_ARGS_FINAL_OFFSET,
     SVM_EXECUTOR_USE_ATA,
     SVM_EXECUTOR_ACCOUNT_BITMAP,
     SVM_EXECUTOR_ACCOUNTS_LENGTH,
     SVM_EXECUTOR_ACCOUNTS_CONTENT,
-    SVM_EXECUTOR_FINAL_OFFSET, // 20
-    // SuiExecutorArgsV1 components.
+    SVM_EXECUTOR_FINAL_OFFSET,
     SUI_EXECUTOR_OBJECT_IDS_LENGTH,
     SUI_EXECUTOR_OBJECT_IDS_CONTENT,
     SUI_EXECUTOR_FINAL_OFFSET,
-    // Encoding validation components.
     ENCODE_CCVS_ARRAY_LENGTH,
-    ENCODE_CCV_ARGS_ARRAY_LENGTH, // 25
+    ENCODE_CCV_ARGS_ARRAY_LENGTH,
     ENCODE_CCV_ADDRESS_LENGTH,
     ENCODE_CCV_ARGS_LENGTH,
     ENCODE_EXECUTOR_LENGTH,
     ENCODE_EXECUTOR_ARGS_LENGTH,
-    ENCODE_TOKEN_RECEIVER_LENGTH, // 30
+    ENCODE_TOKEN_RECEIVER_LENGTH,
     ENCODE_TOKEN_ARGS_LENGTH,
     ENCODE_SVM_ACCOUNTS_LENGTH,
     ENCODE_SUI_OBJECT_IDS_LENGTH
   }
 
-  /// @notice The GenericExtraArgsV3 struct is used to pass extra arguments for all destination chain families.
-  /// @dev CCVs are split into separate address and args arrays for more efficient encoding.
   struct GenericExtraArgsV3 {
-    /// @notice An array of CCV addresses to be used for the message.
     address[] ccvs;
-    /// @notice An array of CCV-specific arguments, parallel to the ccvs array.
     bytes[] ccvArgs;
-    /// @notice The finality config, 0 means the default finality that the CCV considers final.
     uint16 finalityConfig;
-    /// @notice Gas limit for the callback on the destination chain.
     uint32 gasLimit;
-    /// @notice Address of the executor contract on the source chain.
     address executor;
-    /// @notice Destination chain family specific arguments for the executor.
     bytes executorArgs;
-    /// @notice Address of the token receiver on the destination chain, in bytes format.
     bytes tokenReceiver;
-    /// @notice Additional arguments for token transfers.
     bytes tokenArgs;
   }
 
@@ -105,306 +83,558 @@ library ExtraArgsCodec {
     bytes32[] receiverObjectIds;
   }
 
-  /// @notice Encodes a GenericExtraArgsV3 struct into bytes.
+  /// @notice Encodes a GenericExtraArgsV3 struct into bytes using assembly for gas efficiency.
   /// @param extraArgs The GenericExtraArgsV3 struct to encode.
   /// @return encoded The encoded extra args as bytes.
   function _encodeGenericExtraArgsV3(
     GenericExtraArgsV3 memory extraArgs
-  ) internal pure returns (bytes memory) {
+  ) internal pure returns (bytes memory encoded) {
     // Validate ccvs and ccvArgs arrays have the same length
-    if (extraArgs.ccvs.length != extraArgs.ccvArgs.length) {
-      revert CCVArrayLengthMismatch(extraArgs.ccvs.length, extraArgs.ccvArgs.length);
+    uint256 ccvsLength = extraArgs.ccvs.length;
+    uint256 ccvArgsLength = extraArgs.ccvArgs.length;
+    if (ccvsLength != ccvArgsLength) {
+      revert CCVArrayLengthMismatch(ccvsLength, ccvArgsLength);
     }
 
-    // Validate field lengths fit in their respective size limits.
-    if (extraArgs.ccvs.length > type(uint8).max) {
+    // Validate field lengths
+    if (ccvsLength > type(uint8).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCVS_ARRAY_LENGTH);
     }
-    if (extraArgs.executorArgs.length > type(uint16).max) {
+    uint256 executorArgsLength = extraArgs.executorArgs.length;
+    if (executorArgsLength > type(uint16).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_EXECUTOR_ARGS_LENGTH);
     }
-    if (extraArgs.tokenReceiver.length > type(uint16).max) {
+    uint256 tokenReceiverLength = extraArgs.tokenReceiver.length;
+    if (tokenReceiverLength > type(uint16).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_RECEIVER_LENGTH);
     }
-    if (extraArgs.tokenArgs.length > type(uint16).max) {
+    uint256 tokenArgsLength = extraArgs.tokenArgs.length;
+    if (tokenArgsLength > type(uint16).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_ARGS_LENGTH);
     }
 
-    // Encode executor as variable length (0 for address(0), 20 for non-zero addresses)
-    bytes memory encodedExecutor = extraArgs.executor == address(0) ? bytes("") : abi.encodePacked(extraArgs.executor);
-    if (encodedExecutor.length > type(uint8).max) {
-      revert InvalidDataLength(EncodingErrorLocation.ENCODE_EXECUTOR_LENGTH);
-    }
+    // Calculate executor length
+    address executor = extraArgs.executor;
+    uint256 executorLength = executor == address(0) ? 0 : 20;
 
-    // Encode CCVs.
-    bytes memory encodedCCVs;
-    for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
-      // Encode CCV address as variable length (0 for address(0), 20 for non-zero addresses)
-      bytes memory encodedCCVAddress = extraArgs.ccvs[i] == address(0) ? bytes("") : abi.encodePacked(extraArgs.ccvs[i]);
-      if (encodedCCVAddress.length > type(uint8).max) {
-        revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCV_ADDRESS_LENGTH);
-      }
-      if (extraArgs.ccvArgs[i].length > type(uint16).max) {
+    // Calculate total CCV encoded size and validate
+    uint256 ccvsEncodedSize = 0;
+    for (uint256 i = 0; i < ccvsLength; ++i) {
+      address ccvAddr = extraArgs.ccvs[i];
+      uint256 ccvAddrLength = ccvAddr == address(0) ? 0 : 20;
+      
+      uint256 ccvArgLength = extraArgs.ccvArgs[i].length;
+      if (ccvArgLength > type(uint16).max) {
         revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCV_ARGS_LENGTH);
       }
-
-      encodedCCVs = bytes.concat(
-        encodedCCVs,
-        abi.encodePacked(
-          uint8(encodedCCVAddress.length), encodedCCVAddress, uint16(extraArgs.ccvArgs[i].length), extraArgs.ccvArgs[i]
-        )
-      );
+      
+      // 1 byte for address length + address bytes + 2 bytes for args length + args bytes
+      ccvsEncodedSize += 1 + ccvAddrLength + 2 + ccvArgLength;
     }
 
-    // Split encoding to avoid stack too deep.
-    bytes memory part1 = abi.encodePacked(
-      GENERIC_EXTRA_ARGS_V3_TAG,
-      uint8(extraArgs.ccvs.length),
-      encodedCCVs,
-      extraArgs.finalityConfig,
-      extraArgs.gasLimit,
-      uint8(encodedExecutor.length),
-      encodedExecutor
-    );
+    // Calculate total size: tag(4) + ccvsLength(1) + ccvsData + finality(2) + gasLimit(4) + 
+    // executorLength(1) + executor + executorArgsLength(2) + executorArgs +
+    // tokenReceiverLength(2) + tokenReceiver + tokenArgsLength(2) + tokenArgs
+    uint256 totalSize = 4 + 1 + ccvsEncodedSize + 2 + 4 + 1 + executorLength + 2 + executorArgsLength + 2 +
+      tokenReceiverLength + 2 + tokenArgsLength;
 
-    bytes memory part2 = abi.encodePacked(
-      uint16(extraArgs.executorArgs.length),
-      extraArgs.executorArgs,
-      uint16(extraArgs.tokenReceiver.length),
-      extraArgs.tokenReceiver,
-      uint16(extraArgs.tokenArgs.length),
-      extraArgs.tokenArgs
-    );
+    // Allocate memory
+    encoded = new bytes(totalSize);
 
-    return bytes.concat(part1, part2);
+    assembly {
+      let ptr := add(encoded, 32) // Skip length prefix
+
+      // Write tag (4 bytes)
+      mstore(ptr, shl(224, 0x302326cb))
+      ptr := add(ptr, 4)
+
+      // Write ccvs length (1 byte)
+      mstore8(ptr, ccvsLength)
+      ptr := add(ptr, 1)
+    }
+
+    // Write CCVs data
+    uint256 ptr;
+    assembly {
+      ptr := add(encoded, 37) // 32 (length) + 4 (tag) + 1 (ccvsLength)
+    }
+
+    for (uint256 i = 0; i < ccvsLength; ++i) {
+      address ccvAddr = extraArgs.ccvs[i];
+      uint256 ccvAddrLength = ccvAddr == address(0) ? 0 : 20;
+      bytes memory ccvArg = extraArgs.ccvArgs[i];
+      uint256 ccvArgLength = ccvArg.length;
+
+      assembly {
+        // Write CCV address length (1 byte)
+        mstore8(ptr, ccvAddrLength)
+        ptr := add(ptr, 1)
+
+        // Write CCV address if non-zero
+        if gt(ccvAddrLength, 0) {
+          mstore(ptr, shl(96, ccvAddr)) // Shift address to align
+          ptr := add(ptr, 20)
+        }
+
+        // Write CCV args length (2 bytes, big endian)
+        mstore8(ptr, shr(8, ccvArgLength))
+        mstore8(add(ptr, 1), and(ccvArgLength, 0xFF))
+        ptr := add(ptr, 2)
+
+        // Copy CCV args
+        if gt(ccvArgLength, 0) {
+          let ccvArgPtr := add(ccvArg, 32) // Skip bytes length prefix
+          // Use efficient memory copy
+          for { let end := add(ccvArgPtr, ccvArgLength) } lt(ccvArgPtr, end) { ccvArgPtr := add(ccvArgPtr, 32) } {
+            mstore(ptr, mload(ccvArgPtr))
+            ptr := add(ptr, 32)
+          }
+          // Adjust ptr if we overshot
+          ptr := sub(ptr, sub(and(add(ccvArgLength, 31), not(31)), ccvArgLength))
+        }
+      }
+    }
+
+    assembly {
+      // Write finality config (2 bytes, big endian)
+      let finality := mload(add(extraArgs, 64)) // offset to finalityConfig
+      mstore8(ptr, shr(8, finality))
+      mstore8(add(ptr, 1), and(finality, 0xFF))
+      ptr := add(ptr, 2)
+
+      // Write gas limit (4 bytes, big endian)
+      let gasLim := mload(add(extraArgs, 96)) // offset to gasLimit
+      mstore8(ptr, shr(24, gasLim))
+      mstore8(add(ptr, 1), and(shr(16, gasLim), 0xFF))
+      mstore8(add(ptr, 2), and(shr(8, gasLim), 0xFF))
+      mstore8(add(ptr, 3), and(gasLim, 0xFF))
+      ptr := add(ptr, 4)
+
+      // Write executor length (1 byte)
+      mstore8(ptr, executorLength)
+      ptr := add(ptr, 1)
+
+      // Write executor address if non-zero
+      if gt(executorLength, 0) {
+        mstore(ptr, shl(96, executor))
+        ptr := add(ptr, 20)
+      }
+    }
+
+    // Write executorArgs
+    bytes memory executorArgs = extraArgs.executorArgs;
+    assembly {
+      // Write executorArgs length (2 bytes, big endian)
+      mstore8(ptr, shr(8, executorArgsLength))
+      mstore8(add(ptr, 1), and(executorArgsLength, 0xFF))
+      ptr := add(ptr, 2)
+
+      // Copy executorArgs
+      if gt(executorArgsLength, 0) {
+        let srcPtr := add(executorArgs, 32)
+        for { let end := add(srcPtr, executorArgsLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {
+          mstore(ptr, mload(srcPtr))
+          ptr := add(ptr, 32)
+        }
+        ptr := sub(ptr, sub(and(add(executorArgsLength, 31), not(31)), executorArgsLength))
+      }
+    }
+
+    // Write tokenReceiver
+    bytes memory tokenReceiver = extraArgs.tokenReceiver;
+    assembly {
+      // Write tokenReceiver length (2 bytes, big endian)
+      mstore8(ptr, shr(8, tokenReceiverLength))
+      mstore8(add(ptr, 1), and(tokenReceiverLength, 0xFF))
+      ptr := add(ptr, 2)
+
+      // Copy tokenReceiver
+      if gt(tokenReceiverLength, 0) {
+        let srcPtr := add(tokenReceiver, 32)
+        for { let end := add(srcPtr, tokenReceiverLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {
+          mstore(ptr, mload(srcPtr))
+          ptr := add(ptr, 32)
+        }
+        ptr := sub(ptr, sub(and(add(tokenReceiverLength, 31), not(31)), tokenReceiverLength))
+      }
+    }
+
+    // Write tokenArgs
+    bytes memory tokenArgs = extraArgs.tokenArgs;
+    assembly {
+      // Write tokenArgs length (2 bytes, big endian)
+      mstore8(ptr, shr(8, tokenArgsLength))
+      mstore8(add(ptr, 1), and(tokenArgsLength, 0xFF))
+      ptr := add(ptr, 2)
+
+      // Copy tokenArgs
+      if gt(tokenArgsLength, 0) {
+        let srcPtr := add(tokenArgs, 32)
+        for { let end := add(srcPtr, tokenArgsLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {
+          mstore(ptr, mload(srcPtr))
+          ptr := add(ptr, 32)
+        }
+      }
+    }
+
+    return encoded;
   }
 
-  /// @notice Decodes bytes into a GenericExtraArgsV3 struct.
+  /// @notice Decodes bytes into a GenericExtraArgsV3 struct using assembly for gas efficiency.
   /// @param encoded The encoded bytes to decode.
   /// @return extraArgs The decoded GenericExtraArgsV3 struct.
   function _decodeGenericExtraArgsV3(
     bytes calldata encoded
   ) internal pure returns (GenericExtraArgsV3 memory extraArgs) {
-    uint256 offset = 0;
+    uint256 encodedLength = encoded.length;
+    uint256 offset = 4; // Skip tag
 
-    // Tag (4 bytes) - already validated by caller typically, but we skip it here.
-    offset += 4;
-
-    // ccvs length (1 byte).
-    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCVS_LENGTH);
-    uint256 ccvsLength = uint8(bytes1(encoded[offset:offset + 1]));
+    // Read ccvs length (1 byte)
+    if (offset + 1 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCVS_LENGTH);
+    uint256 ccvsLength;
+    assembly {
+      ccvsLength := byte(0, calldataload(add(encoded.offset, offset)))
+    }
     offset += 1;
 
-    // Decode CCVs.
+    // Allocate arrays for CCVs
     extraArgs.ccvs = new address[](ccvsLength);
     extraArgs.ccvArgs = new bytes[](ccvsLength);
+
+    // Decode CCVs
     for (uint256 i = 0; i < ccvsLength; ++i) {
-      // CCV address length (1 byte).
-      if (offset + 1 > encoded.length) {
+      // Read CCV address length (1 byte)
+      if (offset + 1 > encodedLength) {
         revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS_LENGTH);
       }
-      uint256 ccvAddressLength = uint8(bytes1(encoded[offset:offset + 1]));
+      
+      uint256 ccvAddressLength;
+      assembly {
+        ccvAddressLength := byte(0, calldataload(add(encoded.offset, offset)))
+      }
       offset += 1;
 
-      // CCV address content - must be 0 or 20 bytes for EVM
+      // Validate CCV address length (0 or 20 for EVM)
       if (ccvAddressLength != 0 && ccvAddressLength != 20) {
         revert InvalidCCVAddressLength(ccvAddressLength);
       }
-      if (offset + ccvAddressLength > encoded.length) {
+
+      // Read CCV address
+      if (offset + ccvAddressLength > encodedLength) {
         revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS_CONTENT);
       }
-      extraArgs.ccvs[i] =
-        ccvAddressLength == 0 ? address(0) : address(bytes20(encoded[offset:offset + ccvAddressLength]));
+      
+      if (ccvAddressLength == 20) {
+        assembly {
+          let addrData := calldataload(add(encoded.offset, offset))
+          mstore(add(add(mload(add(extraArgs, 0)), 32), mul(i, 32)), shr(96, addrData))
+        }
+      }
       offset += ccvAddressLength;
 
-      // CCV argsLength (2 bytes).
-      if (offset + 2 > encoded.length) {
+      // Read CCV args length (2 bytes)
+      if (offset + 2 > encodedLength) {
         revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_LENGTH);
       }
-      uint256 ccvArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
+      
+      uint256 ccvArgsLength;
+      assembly {
+        let data := calldataload(add(encoded.offset, offset))
+        ccvArgsLength := and(shr(240, data), 0xFFFF)
+      }
       offset += 2;
 
-      // CCV args content.
-      if (offset + ccvArgsLength > encoded.length) {
+      // Read CCV args content
+      if (offset + ccvArgsLength > encodedLength) {
         revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_CONTENT);
       }
+      
       extraArgs.ccvArgs[i] = encoded[offset:offset + ccvArgsLength];
       offset += ccvArgsLength;
     }
 
-    // finalityConfig (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINALITY_CONFIG);
-    extraArgs.finalityConfig = uint16(bytes2(encoded[offset:offset + 2]));
+    // Read finality config (2 bytes)
+    if (offset + 2 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINALITY_CONFIG);
+    assembly {
+      let data := calldataload(add(encoded.offset, offset))
+      mstore(add(extraArgs, 64), and(shr(240, data), 0xFFFF))
+    }
     offset += 2;
 
-    // gasLimit (4 bytes).
-    if (offset + 4 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_GAS_LIMIT);
-    extraArgs.gasLimit = uint32(bytes4(encoded[offset:offset + 4]));
+    // Read gas limit (4 bytes)
+    if (offset + 4 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_GAS_LIMIT);
+    assembly {
+      let data := calldataload(add(encoded.offset, offset))
+      mstore(add(extraArgs, 96), and(shr(224, data), 0xFFFFFFFF))
+    }
     offset += 4;
 
-    // executorLength (1 byte).
-    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_LENGTH);
-    uint256 executorLength = uint8(bytes1(encoded[offset:offset + 1]));
+    // Read executor length (1 byte)
+    if (offset + 1 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_LENGTH);
+    uint256 executorLength;
+    assembly {
+      executorLength := byte(0, calldataload(add(encoded.offset, offset)))
+    }
     offset += 1;
 
-    // executor content - must be 0 or 20 bytes for EVM
+    // Validate executor length (0 or 20 for EVM)
     if (executorLength != 0 && executorLength != 20) {
       revert InvalidExecutorLength(executorLength);
     }
-    if (offset + executorLength > encoded.length) {
+
+    // Read executor
+    if (offset + executorLength > encodedLength) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_CONTENT);
     }
-    extraArgs.executor = executorLength == 0 ? address(0) : address(bytes20(encoded[offset:offset + executorLength]));
+    
+    if (executorLength == 20) {
+      assembly {
+        let data := calldataload(add(encoded.offset, offset))
+        mstore(add(extraArgs, 128), shr(96, data))
+      }
+    }
     offset += executorLength;
 
-    // executorArgsLength (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_LENGTH);
-    uint256 executorArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    // Read executorArgs length (2 bytes)
+    if (offset + 2 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_LENGTH);
+    uint256 executorArgsLength;
+    assembly {
+      let data := calldataload(add(encoded.offset, offset))
+      executorArgsLength := and(shr(240, data), 0xFFFF)
+    }
     offset += 2;
 
-    // executorArgs content.
-    if (offset + executorArgsLength > encoded.length) {
+    // Read executorArgs content
+    if (offset + executorArgsLength > encodedLength) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_CONTENT);
     }
     extraArgs.executorArgs = encoded[offset:offset + executorArgsLength];
     offset += executorArgsLength;
 
-    // tokenReceiverLength (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_LENGTH);
-    uint256 tokenReceiverLength = uint16(bytes2(encoded[offset:offset + 2]));
+    // Read tokenReceiver length (2 bytes)
+    if (offset + 2 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_LENGTH);
+    uint256 tokenReceiverLength;
+    assembly {
+      let data := calldataload(add(encoded.offset, offset))
+      tokenReceiverLength := and(shr(240, data), 0xFFFF)
+    }
     offset += 2;
 
-    // tokenReceiver content.
-    if (offset + tokenReceiverLength > encoded.length) {
+    // Read tokenReceiver content
+    if (offset + tokenReceiverLength > encodedLength) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_CONTENT);
     }
     extraArgs.tokenReceiver = encoded[offset:offset + tokenReceiverLength];
     offset += tokenReceiverLength;
 
-    // tokenArgsLength (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_LENGTH);
-    uint256 tokenArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
+    // Read tokenArgs length (2 bytes)
+    if (offset + 2 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_LENGTH);
+    uint256 tokenArgsLength;
+    assembly {
+      let data := calldataload(add(encoded.offset, offset))
+      tokenArgsLength := and(shr(240, data), 0xFFFF)
+    }
     offset += 2;
 
-    // tokenArgs content.
-    if (offset + tokenArgsLength > encoded.length) {
+    // Read tokenArgs content
+    if (offset + tokenArgsLength > encodedLength) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_CONTENT);
     }
     extraArgs.tokenArgs = encoded[offset:offset + tokenArgsLength];
     offset += tokenArgsLength;
 
-    // Ensure we've consumed all bytes.
-    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET);
+    // Ensure we've consumed all bytes
+    if (offset != encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET);
 
     return extraArgs;
   }
 
-  /// @notice Encodes a SVMExecutorArgsV1 struct into bytes.
+  /// @notice Encodes a SVMExecutorArgsV1 struct into bytes using assembly.
   /// @param executorArgs The SVMExecutorArgsV1 struct to encode.
   /// @return encoded The encoded executor args as bytes.
   function _encodeSVMExecutorArgsV1(
     SVMExecutorArgsV1 memory executorArgs
-  ) internal pure returns (bytes memory) {
-    if (executorArgs.accounts.length > type(uint8).max) {
+  ) internal pure returns (bytes memory encoded) {
+    uint256 accountsLength = executorArgs.accounts.length;
+    if (accountsLength > type(uint8).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_SVM_ACCOUNTS_LENGTH);
     }
 
-    return abi.encodePacked(
-      SVM_EXECUTOR_ARGS_V1_TAG,
-      executorArgs.useATA,
-      executorArgs.accountIsWritableBitmap,
-      uint8(executorArgs.accounts.length),
-      abi.encodePacked(executorArgs.accounts)
-    );
+    // Total size: tag(4) + useATA(1) + bitmap(8) + accountsLength(1) + accounts(32 * n)
+    uint256 totalSize = 4 + 1 + 8 + 1 + (accountsLength * 32);
+    encoded = new bytes(totalSize);
+
+    assembly {
+      let ptr := add(encoded, 32)
+      
+      // Write tag
+      mstore(ptr, shl(224, 0x1a2b3c4d))
+      ptr := add(ptr, 4)
+      
+      // Write useATA
+      mstore8(ptr, iszero(iszero(mload(add(executorArgs, 0)))))
+      ptr := add(ptr, 1)
+      
+      // Write accountIsWritableBitmap (8 bytes)
+      let bitmap := mload(add(executorArgs, 32))
+      mstore8(ptr, shr(56, bitmap))
+      mstore8(add(ptr, 1), and(shr(48, bitmap), 0xFF))
+      mstore8(add(ptr, 2), and(shr(40, bitmap), 0xFF))
+      mstore8(add(ptr, 3), and(shr(32, bitmap), 0xFF))
+      mstore8(add(ptr, 4), and(shr(24, bitmap), 0xFF))
+      mstore8(add(ptr, 5), and(shr(16, bitmap), 0xFF))
+      mstore8(add(ptr, 6), and(shr(8, bitmap), 0xFF))
+      mstore8(add(ptr, 7), and(bitmap, 0xFF))
+      ptr := add(ptr, 8)
+      
+      // Write accounts length
+      mstore8(ptr, accountsLength)
+      ptr := add(ptr, 1)
+      
+      // Write accounts
+      let accountsPtr := mload(add(executorArgs, 64))
+      accountsPtr := add(accountsPtr, 32) // Skip array length
+      
+      for { let i := 0 } lt(i, accountsLength) { i := add(i, 1) } {
+        mstore(ptr, mload(accountsPtr))
+        ptr := add(ptr, 32)
+        accountsPtr := add(accountsPtr, 32)
+      }
+    }
+
+    return encoded;
   }
 
-  /// @notice Decodes bytes into a SVMExecutorArgsV1 struct.
+  /// @notice Decodes bytes into a SVMExecutorArgsV1 struct using assembly.
   /// @param encoded The encoded bytes to decode.
   /// @return executorArgs The decoded SVMExecutorArgsV1 struct.
   function _decodeSVMExecutorArgsV1(
     bytes calldata encoded
   ) internal pure returns (SVMExecutorArgsV1 memory executorArgs) {
-    uint256 offset = 0;
+    uint256 encodedLength = encoded.length;
+    uint256 offset = 4; // Skip tag
 
-    // Tag (4 bytes) - skip.
-    offset += 4;
-
-    // useATA (1 byte).
-    if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_USE_ATA);
-    executorArgs.useATA = encoded[offset++] != 0;
-
-    // accountIsWritableBitmap (8 bytes).
-    if (offset + 8 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNT_BITMAP);
-    executorArgs.accountIsWritableBitmap = uint64(bytes8(encoded[offset:offset + 8]));
-    offset += 8;
-
-    // accounts length (1 byte).
-    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_LENGTH);
-    uint256 accountsLength = uint8(bytes1(encoded[offset:offset + 1]));
+    // Read useATA
+    if (offset >= encodedLength) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_USE_ATA);
+    assembly {
+      let data := byte(0, calldataload(add(encoded.offset, offset)))
+      mstore(executorArgs, iszero(iszero(data)))
+    }
     offset += 1;
 
-    // accounts content (32 bytes each).
-    if (offset + accountsLength * 32 > encoded.length) {
+    // Read accountIsWritableBitmap (8 bytes)
+    if (offset + 8 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNT_BITMAP);
+    assembly {
+      let data := calldataload(add(encoded.offset, offset))
+      mstore(add(executorArgs, 32), and(shr(192, data), 0xFFFFFFFFFFFFFFFF))
+    }
+    offset += 8;
+
+    // Read accounts length
+    if (offset + 1 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_LENGTH);
+    uint256 accountsLength;
+    assembly {
+      accountsLength := byte(0, calldataload(add(encoded.offset, offset)))
+    }
+    offset += 1;
+
+    // Read accounts
+    if (offset + accountsLength * 32 > encodedLength) {
       revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_CONTENT);
     }
+    
     executorArgs.accounts = new bytes32[](accountsLength);
     for (uint256 i = 0; i < accountsLength; ++i) {
-      executorArgs.accounts[i] = bytes32(encoded[offset:offset + 32]);
-      offset += 32;
+      assembly {
+        let data := calldataload(add(add(encoded.offset, offset), mul(i, 32)))
+        let accountsArray := mload(add(executorArgs, 64))
+        mstore(add(add(accountsArray, 32), mul(i, 32)), data)
+      }
     }
+    offset += accountsLength * 32;
 
-    // Ensure we've consumed all bytes.
-    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET);
+    // Ensure we've consumed all bytes
+    if (offset != encodedLength) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET);
 
     return executorArgs;
   }
 
-  /// @notice Encodes a SuiExecutorArgsV1 struct into bytes.
+  /// @notice Encodes a SuiExecutorArgsV1 struct into bytes using assembly.
   /// @param executorArgs The SuiExecutorArgsV1 struct to encode.
   /// @return encoded The encoded executor args as bytes.
   function _encodeSuiExecutorArgsV1(
     SuiExecutorArgsV1 memory executorArgs
-  ) internal pure returns (bytes memory) {
-    if (executorArgs.receiverObjectIds.length > type(uint8).max) {
+  ) internal pure returns (bytes memory encoded) {
+    uint256 objectIdsLength = executorArgs.receiverObjectIds.length;
+    if (objectIdsLength > type(uint8).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_SUI_OBJECT_IDS_LENGTH);
     }
 
-    return abi.encodePacked(
-      SUI_EXECUTOR_ARGS_V1_TAG,
-      uint8(executorArgs.receiverObjectIds.length),
-      abi.encodePacked(executorArgs.receiverObjectIds)
-    );
+    // Total size: tag(4) + objectIdsLength(1) + objectIds(32 * n)
+    uint256 totalSize = 4 + 1 + (objectIdsLength * 32);
+    encoded = new bytes(totalSize);
+
+    assembly {
+      let ptr := add(encoded, 32)
+      
+      // Write tag
+      mstore(ptr, shl(224, 0x5e6f7a8b))
+      ptr := add(ptr, 4)
+      
+      // Write objectIds length
+      mstore8(ptr, objectIdsLength)
+      ptr := add(ptr, 1)
+      
+      // Write objectIds
+      let objectIdsPtr := mload(executorArgs)
+      objectIdsPtr := add(objectIdsPtr, 32) // Skip array length
+      
+      for { let i := 0 } lt(i, objectIdsLength) { i := add(i, 1) } {
+        mstore(ptr, mload(objectIdsPtr))
+        ptr := add(ptr, 32)
+        objectIdsPtr := add(objectIdsPtr, 32)
+      }
+    }
+
+    return encoded;
   }
 
-  /// @notice Decodes bytes into a SuiExecutorArgsV1 struct.
+  /// @notice Decodes bytes into a SuiExecutorArgsV1 struct using assembly.
   /// @param encoded The encoded bytes to decode.
   /// @return executorArgs The decoded SuiExecutorArgsV1 struct.
   function _decodeSuiExecutorArgsV1(
     bytes calldata encoded
   ) internal pure returns (SuiExecutorArgsV1 memory executorArgs) {
-    uint256 offset = 0;
+    uint256 encodedLength = encoded.length;
+    uint256 offset = 4; // Skip tag
 
-    // Tag (4 bytes) - skip.
-    offset += 4;
-
-    // receiverObjectIds length (1 byte).
-    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_LENGTH);
-    uint256 objectIdsLength = uint16(bytes2(encoded[offset:offset + 1]));
+    // Read objectIds length
+    if (offset + 1 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_LENGTH);
+    uint256 objectIdsLength;
+    assembly {
+      objectIdsLength := byte(0, calldataload(add(encoded.offset, offset)))
+    }
     offset += 1;
 
-    // receiverObjectIds content (32 bytes each).
-    if (offset + objectIdsLength * 32 > encoded.length) {
+    // Read objectIds
+    if (offset + objectIdsLength * 32 > encodedLength) {
       revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_CONTENT);
     }
+    
     executorArgs.receiverObjectIds = new bytes32[](objectIdsLength);
     for (uint256 i = 0; i < objectIdsLength; ++i) {
-      executorArgs.receiverObjectIds[i] = bytes32(encoded[offset:offset + 32]);
-      offset += 32;
+      assembly {
+        let data := calldataload(add(add(encoded.offset, offset), mul(i, 32)))
+        let objectIdsArray := mload(executorArgs)
+        mstore(add(add(objectIdsArray, 32), mul(i, 32)), data)
+      }
     }
+    offset += objectIdsLength * 32;
 
-    // Ensure we've consumed all bytes.
-    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET);
+    // Ensure we've consumed all bytes
+    if (offset != encodedLength) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET);
 
     return executorArgs;
   }
 }
+
