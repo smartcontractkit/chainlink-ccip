@@ -9,7 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	lock_release_token_pool_v1_7_0_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	bnm_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -74,6 +76,9 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(burn_mint_token_pool.ContractType, *semver.MustParse("1.7.0")).String(): {
 			EVM: common.FromHex(bnm_bindings.BurnMintTokenPoolBin),
+		},
+		cldf_deployment.NewTypeAndVersion(lock_release_token_pool_v1_7_0_ops.ContractType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(lock_release_token_pool.LockReleaseTokenPoolBin),
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
