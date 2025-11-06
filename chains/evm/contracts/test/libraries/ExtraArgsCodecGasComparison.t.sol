@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
-import {ExtraArgsCodecUnoptimized} from "../../libraries/ExtraArgsCodecUnoptimized.sol";
+import {ExtraArgsCodecUnoptimized} from "../helpers/ExtraArgsCodecUnoptimized.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract OriginalDecoder {

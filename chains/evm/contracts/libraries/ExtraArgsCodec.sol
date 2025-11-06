@@ -66,14 +66,14 @@ library ExtraArgsCodec {
     uint32 gasLimit;
     /// @notice The finality config, 0 means the default finality that the CCV considers final. Any non-zero value means
     /// a block depth. CCVs, Pools and the executor may all reject this value by reverting the transaction on the source
-    /// chain if they do now want to take on the risk of the block depth specified.
+    /// chain if they do not want to take on the risk of the block depth specified.
     /// @dev May be zero to indicate waiting for finality is desired.
     uint16 finalityConfig;
     /// @notice An array of CCV addresses representing the cross-chain verifiers to be used for the message.
     /// @dev May be empty to specify the default verifier(s) should be used.
     address[] ccvs;
-    /// Optional arguments that are passed into the CCV without modification or inspection. CCIP itself does not
-    /// interpret these arguments: they encoded in whatever format the CCV has decided.
+    /// @notice Optional arguments that are passed into the CCV without modification or inspection. CCIP itself does not
+    /// interpret these arguments: they are encoded in whatever format the CCV has decided.
     /// @dev Must be the same length as the `ccvs` array. May have empty bytes as arguments.
     bytes[] ccvArgs;
     /// @notice Address of the executor contract on the source chain. The executor is responsible for executing the
@@ -111,20 +111,20 @@ library ExtraArgsCodec {
   ) internal pure returns (bytes memory encoded) {
     encoded = new bytes(GENERIC_EXTRA_ARGS_V3_BASE_SIZE);
     assembly {
-      let ptr := add(encoded, 32) // Skip length prefix
+      let ptr := add(encoded, 32) // Skip length prefix.
 
-      // Write tag (4 bytes)
+      // Write tag (4 bytes).
       mstore(ptr, GENERIC_EXTRA_ARGS_V3_TAG)
       ptr := add(ptr, 4)
 
-      // Write gas limit (4 bytes, big endian)
+      // Write gas limit (4 bytes, big endian).
       mstore8(ptr, shr(24, gasLimit))
       mstore8(add(ptr, 1), and(shr(16, gasLimit), 0xFF))
       mstore8(add(ptr, 2), and(shr(8, gasLimit), 0xFF))
       mstore8(add(ptr, 3), and(gasLimit, 0xFF))
       ptr := add(ptr, 4)
 
-      // Write finality config (2 bytes, big endian)
+      // Write finality config (2 bytes, big endian).
       mstore8(ptr, shr(8, finalityConfig))
       mstore8(add(ptr, 1), and(finalityConfig, 0xFF))
       ptr := add(ptr, 2)
@@ -150,14 +150,14 @@ library ExtraArgsCodec {
   function _encodeGenericExtraArgsV3(
     GenericExtraArgsV3 memory extraArgs
   ) internal pure returns (bytes memory encoded) {
-    // Validate ccvs and ccvArgs arrays have the same length
+    // Validate ccvs and ccvArgs arrays have the same length.
     uint256 ccvsLength = extraArgs.ccvs.length;
     uint256 ccvArgsLength = extraArgs.ccvArgs.length;
     if (ccvsLength != ccvArgsLength) {
       revert CCVArrayLengthMismatch(ccvsLength, ccvArgsLength);
     }
 
-    // Validate field lengths
+    // Validate field lengths.
     if (ccvsLength > type(uint8).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCVS_ARRAY_LENGTH);
     }
@@ -174,11 +174,11 @@ library ExtraArgsCodec {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_ARGS_LENGTH);
     }
 
-    // Calculate executor length
+    // Calculate executor length.
     address executor = extraArgs.executor;
     uint256 executorLength = executor == address(0) ? 0 : 20;
 
-    // Calculate total CCV encoded size and validate
+    // Calculate total CCV encoded size and validate.
     uint256 ccvsEncodedSize = 0;
     for (uint256 i = 0; i < ccvsLength; ++i) {
       uint256 ccvAddrLength = extraArgs.ccvs[i] == address(0) ? 0 : 20;
@@ -188,14 +188,14 @@ library ExtraArgsCodec {
         revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCV_ARGS_LENGTH);
       }
 
-      // 1 byte for address length + address bytes + 2 bytes for args length + args bytes
+      // 1 byte for address length + address bytes + 2 bytes for args length + args bytes.
       ccvsEncodedSize += 1 + ccvAddrLength + 2 + ccvArgLength;
     }
 
-    // Allocate memory
+    // Allocate memory.
     // Calculate total size: tag(4) + gasLimit(4) + finality(2) + ccvsLength(1) + ccvsData +
     // executorLength(1) + executor + executorArgsLength(2) + executorArgs +
-    // tokenReceiverLength(2) + tokenReceiver + tokenArgsLength(2) + tokenArgs
+    // tokenReceiverLength(2) + tokenReceiver + tokenArgsLength(2) + tokenArgs.
     encoded = new bytes(
       4 + 4 + 2 + 1 + ccvsEncodedSize + 1 + executorLength + 2 + executorArgsLength + 2 + tokenReceiverLength + 2
         + tokenArgsLength
@@ -203,13 +203,13 @@ library ExtraArgsCodec {
 
     uint256 ptr;
     assembly {
-      ptr := add(encoded, 32) // Skip length prefix
+      ptr := add(encoded, 32) // Skip length prefix.
 
-      // Write tag (4 bytes)
+      // Write tag (4 bytes).
       mstore(ptr, GENERIC_EXTRA_ARGS_V3_TAG)
       ptr := add(ptr, 4)
 
-      // Load and write gas limit (4 bytes, big endian)
+      // Load and write gas limit (4 bytes, big endian).
       let gasLimit := mload(extraArgs)
       mstore8(ptr, shr(24, gasLimit))
       mstore8(add(ptr, 1), and(shr(16, gasLimit), 0xFF))
@@ -217,18 +217,18 @@ library ExtraArgsCodec {
       mstore8(add(ptr, 3), and(gasLimit, 0xFF))
       ptr := add(ptr, 4)
 
-      // Load and write finality config (2 bytes, big endian)
+      // Load and write finality config (2 bytes, big endian).
       let finalityConfig := mload(add(extraArgs, 32))
       mstore8(ptr, shr(8, finalityConfig))
       mstore8(add(ptr, 1), and(finalityConfig, 0xFF))
       ptr := add(ptr, 2)
 
-      // Write ccvs length (1 byte)
+      // Write ccvs length (1 byte).
       mstore8(ptr, ccvsLength)
       ptr := add(ptr, 1)
     }
 
-    // Write CCVs data
+    // Write CCVs data.
     for (uint256 i = 0; i < ccvsLength; ++i) {
       address ccvAddr = extraArgs.ccvs[i];
       uint256 ccvAddrLength = ccvAddr == address(0) ? 0 : 20;
@@ -236,55 +236,55 @@ library ExtraArgsCodec {
       uint256 ccvArgLength = ccvArg.length;
 
       assembly {
-        // Write CCV address length (1 byte)
+        // Write CCV address length (1 byte).
         mstore8(ptr, ccvAddrLength)
         ptr := add(ptr, 1)
 
-        // Write CCV address if non-zero
+        // Write CCV address if non-zero.
         if gt(ccvAddrLength, 0) {
-          mstore(ptr, shl(96, ccvAddr)) // Shift address to align
+          mstore(ptr, shl(96, ccvAddr)) // Shift address to align.
           ptr := add(ptr, 20)
         }
 
-        // Write CCV args length (2 bytes, big endian)
+        // Write CCV args length (2 bytes, big endian).
         mstore8(ptr, shr(8, ccvArgLength))
         mstore8(add(ptr, 1), and(ccvArgLength, 0xFF))
         ptr := add(ptr, 2)
 
-        // Copy CCV args
+        // Copy CCV args.
         if gt(ccvArgLength, 0) {
-          let ccvArgPtr := add(ccvArg, 32) // Skip bytes length prefix
+          let ccvArgPtr := add(ccvArg, 32) // Skip bytes length prefix.
           for { let end := add(ccvArgPtr, ccvArgLength) } lt(ccvArgPtr, end) { ccvArgPtr := add(ccvArgPtr, 32) } {
             mstore(ptr, mload(ccvArgPtr))
             ptr := add(ptr, 32)
           }
-          // Adjust ptr if we overshot
+          // Adjust ptr if we overshot.
           ptr := sub(ptr, sub(and(add(ccvArgLength, 31), not(31)), ccvArgLength))
         }
       }
     }
 
     assembly {
-      // Write executor length (1 byte)
+      // Write executor length (1 byte).
       mstore8(ptr, executorLength)
       ptr := add(ptr, 1)
 
-      // Write executor address if non-zero
+      // Write executor address if non-zero.
       if gt(executorLength, 0) {
         mstore(ptr, shl(96, executor))
         ptr := add(ptr, 20)
       }
     }
 
-    // Write executorArgs
+    // Write executorArgs.
     bytes memory executorArgs = extraArgs.executorArgs;
     assembly {
-      // Write executorArgs length (2 bytes, big endian)
+      // Write executorArgs length (2 bytes, big endian).
       mstore8(ptr, shr(8, executorArgsLength))
       mstore8(add(ptr, 1), and(executorArgsLength, 0xFF))
       ptr := add(ptr, 2)
 
-      // Copy executorArgs
+      // Copy executorArgs.
       if gt(executorArgsLength, 0) {
         let srcPtr := add(executorArgs, 32)
         for { let end := add(srcPtr, executorArgsLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {
@@ -295,15 +295,15 @@ library ExtraArgsCodec {
       }
     }
 
-    // Write tokenReceiver
+    // Write tokenReceiver.
     bytes memory tokenReceiver = extraArgs.tokenReceiver;
     assembly {
-      // Write tokenReceiver length (2 bytes, big endian)
+      // Write tokenReceiver length (2 bytes, big endian).
       mstore8(ptr, shr(8, tokenReceiverLength))
       mstore8(add(ptr, 1), and(tokenReceiverLength, 0xFF))
       ptr := add(ptr, 2)
 
-      // Copy tokenReceiver
+      // Copy tokenReceiver.
       if gt(tokenReceiverLength, 0) {
         let srcPtr := add(tokenReceiver, 32)
         for { let end := add(srcPtr, tokenReceiverLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {
@@ -314,15 +314,15 @@ library ExtraArgsCodec {
       }
     }
 
-    // Write tokenArgs
+    // Write tokenArgs.
     bytes memory tokenArgs = extraArgs.tokenArgs;
     assembly {
-      // Write tokenArgs length (2 bytes, big endian)
+      // Write tokenArgs length (2 bytes, big endian).
       mstore8(ptr, shr(8, tokenArgsLength))
       mstore8(add(ptr, 1), and(tokenArgsLength, 0xFF))
       ptr := add(ptr, 2)
 
-      // Copy tokenArgs
+      // Copy tokenArgs.
       if gt(tokenArgsLength, 0) {
         let srcPtr := add(tokenArgs, 32)
         for { let end := add(srcPtr, tokenArgsLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {

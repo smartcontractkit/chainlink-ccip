@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {ExtraArgsCodec} from "./ExtraArgsCodec.sol";
+import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 
 /// @notice Unoptimized version of CCIP Extra Arguments encoding/decoding operations for gas comparison.
 /// @dev This library uses the same structs, constants, errors, and enums as ExtraArgsCodec but with
