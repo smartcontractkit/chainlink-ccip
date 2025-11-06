@@ -273,11 +273,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @dev The _applyFee function deducts the fee from the amount and returns the amount after fee deduction.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 finality,
+    uint16 blockConfirmationRequested,
     bytes memory // tokenArgs
   ) public virtual returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    _validateLockOrBurn(lockOrBurnIn, finality);
-    destTokenAmount = _applyFee(lockOrBurnIn, finality);
+    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested);
+    destTokenAmount = _applyFee(lockOrBurnIn, blockConfirmationRequested);
     _lockOrBurn(destTokenAmount);
 
     emit LockedOrBurned({
@@ -333,13 +333,13 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @dev The _validateReleaseOrMint check is an essential security check.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 finality
+    uint16 blockConfirmationRequested
   ) public virtual override(IPoolV2) returns (Pool.ReleaseOrMintOutV1 memory) {
     uint256 localAmount = _calculateLocalAmount(
       releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
     );
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, finality);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
     _releaseOrMint(releaseOrMintIn.receiver, localAmount);
 
@@ -355,7 +355,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV1
-  /// @dev calls IPoolV2.releaseOrMint with finality 0.
+  /// @dev calls IPoolV2.releaseOrMint with default finality.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
@@ -924,18 +924,18 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   // │              Custom Block Confirmation Config                │
   // ================================================================
 
-  /// @notice Updates the finality configuration for token transfers.
+  /// @notice Updates the custom block confirmation configuration for token transfers.
   function applyCustomBlockConfirmationConfigUpdates(
     uint16 minBlockConfirmation,
     CustomBlockConfirmationRateLimitConfigArgs[] calldata rateLimitConfigArgs
   ) external virtual onlyOwner {
-    CustomBlockConfirmationConfig storage finalityConfig = s_customBlockConfirmationConfig;
-    finalityConfig.minBlockConfirmation = minBlockConfirmation;
+    CustomBlockConfirmationConfig storage config = s_customBlockConfirmationConfig;
+    config.minBlockConfirmation = minBlockConfirmation;
     _setCustomBlockConfirmationRateLimitConfig(rateLimitConfigArgs);
     emit CustomBlockConfirmationUpdated(minBlockConfirmation);
   }
 
-  /// @notice Sets the custom finality based rate limit configurations for specified remote chains.
+  /// @notice Sets the custom block confirmation based rate limit configurations for specified remote chains.
   /// @param rateLimitConfigArgs Array of structs containing remote chain selectors and their rate limiter configs.
   function setCustomBlockConfirmationRateLimitConfig(
     CustomBlockConfirmationRateLimitConfigArgs[] calldata rateLimitConfigArgs
@@ -947,14 +947,15 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function _setCustomBlockConfirmationRateLimitConfig(
     CustomBlockConfirmationRateLimitConfigArgs[] calldata rateLimitConfigArgs
   ) internal {
-    CustomBlockConfirmationConfig storage finalityConfig = s_customBlockConfirmationConfig;
+    CustomBlockConfirmationConfig storage customBlockConfirmationConfig = s_customBlockConfirmationConfig;
     for (uint256 i = 0; i < rateLimitConfigArgs.length; ++i) {
       CustomBlockConfirmationRateLimitConfigArgs calldata configArgs = rateLimitConfigArgs[i];
       uint64 remoteChainSelector = configArgs.remoteChainSelector;
       if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
       RateLimiter._validateTokenBucketConfig(configArgs.outboundRateLimiterConfig);
-      RateLimiter.TokenBucket storage outboundBucket = finalityConfig.outboundRateLimiterConfig[remoteChainSelector];
+      RateLimiter.TokenBucket storage outboundBucket =
+        customBlockConfirmationConfig.outboundRateLimiterConfig[remoteChainSelector];
       bool outboundUninitialized = outboundBucket.lastUpdated == 0 && outboundBucket.capacity == 0
         && outboundBucket.rate == 0 && outboundBucket.tokens == 0 && !outboundBucket.isEnabled;
       if (outboundUninitialized && configArgs.outboundRateLimiterConfig.isEnabled) {
@@ -964,7 +965,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       outboundBucket._setTokenBucketConfig(configArgs.outboundRateLimiterConfig);
 
       RateLimiter._validateTokenBucketConfig(configArgs.inboundRateLimiterConfig);
-      RateLimiter.TokenBucket storage inboundBucket = finalityConfig.inboundRateLimiterConfig[remoteChainSelector];
+      RateLimiter.TokenBucket storage inboundBucket =
+        customBlockConfirmationConfig.inboundRateLimiterConfig[remoteChainSelector];
       bool inboundUninitialized = inboundBucket.lastUpdated == 0 && inboundBucket.capacity == 0
         && inboundBucket.rate == 0 && inboundBucket.tokens == 0 && !inboundBucket.isEnabled;
       if (inboundUninitialized && configArgs.inboundRateLimiterConfig.isEnabled) {
@@ -1028,7 +1030,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     address, // localToken
     uint64 remoteChainSelector,
     uint256 amount,
-    uint16, // finality
+    uint16, // blockConfirmationRequested
     bytes calldata, // extraData
     IPoolV2.MessageDirection direction
   ) external view virtual returns (address[] memory requiredCCVs) {
@@ -1103,7 +1105,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     address, // localToken
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata, // message
-    uint16, // finality
+    uint16, // blockConfirmationRequested
     bytes calldata // tokenArgs
   ) external view virtual returns (TokenTransferFeeConfig memory feeConfig) {
     return s_tokenTransferFeeConfig[destChainSelector];
