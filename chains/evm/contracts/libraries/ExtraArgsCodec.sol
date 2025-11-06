@@ -101,6 +101,37 @@ library ExtraArgsCodec {
     bytes tokenArgs;
   }
 
+  /// @notice Creates a basic encoded GenericExtraArgsV3 with only gasLimit and finalityConfig set.
+  /// @param gasLimit The gas limit for the callback on the destination chain.
+  /// @param finalityConfig The finality configuration.
+  /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
+  function getBasicEncodedExtraArgsV3(
+    uint32 gasLimit,
+    uint16 finalityConfig
+  ) internal pure returns (bytes memory encoded) {
+    encoded = new bytes(GENERIC_EXTRA_ARGS_V3_BASE_SIZE);
+    assembly {
+      let ptr := add(encoded, 32) // Skip length prefix
+
+      // Write tag (4 bytes)
+      mstore(ptr, GENERIC_EXTRA_ARGS_V3_TAG)
+      ptr := add(ptr, 4)
+
+      // Write gas limit (4 bytes, big endian)
+      mstore8(ptr, shr(24, gasLimit))
+      mstore8(add(ptr, 1), and(shr(16, gasLimit), 0xFF))
+      mstore8(add(ptr, 2), and(shr(8, gasLimit), 0xFF))
+      mstore8(add(ptr, 3), and(gasLimit, 0xFF))
+      ptr := add(ptr, 4)
+
+      // Write finality config (2 bytes, big endian)
+      mstore8(ptr, shr(8, finalityConfig))
+      mstore8(add(ptr, 1), and(finalityConfig, 0xFF))
+      ptr := add(ptr, 2)
+    }
+    return encoded;
+  }
+
   struct SVMExecutorArgsV1 {
     bool useATA;
     uint64 accountIsWritableBitmap;
