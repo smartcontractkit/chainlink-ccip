@@ -9,6 +9,7 @@ import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.
 
 contract CommitteeVerifierSetup is BaseVerifierSetup {
   CommitteeVerifier internal s_committeeVerifier;
+  bytes4 internal s_versionTag;
 
   uint256 internal constant PRIVATE_KEY_0 = 0x60b919c82f0b4791a5b7c6a7275970ace1748759ebdaa8a5c3a4b2f5a8b1e8d1;
   address internal constant MOCK_SENDER = 0x3333333333333333333333333333333333333333;
@@ -18,6 +19,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
     super.setUp();
 
     s_committeeVerifier = new CommitteeVerifier(_createBasicDynamicConfigArgs(), "testStorageLocation");
+    s_versionTag = s_committeeVerifier.versionTag();
 
     address[] memory validSigner = new address[](1);
     validSigner[0] = vm.addr(PRIVATE_KEY_0);
