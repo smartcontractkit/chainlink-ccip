@@ -7,12 +7,8 @@ import {ExtraArgsCodec} from "./ExtraArgsCodec.sol";
 /// @dev This library uses the same structs, constants, errors, and enums as ExtraArgsCodec but with
 /// standard Solidity encoding/decoding instead of assembly optimizations. This allows for direct gas
 /// comparison between optimized and unoptimized implementations using identical definitions.
+/// @dev This library is used for differential fuzzing tests to ensure parity with the optimized version.
 library ExtraArgsCodecUnoptimized {
-
-
-  /// @notice Encodes a GenericExtraArgsV3 struct into bytes.
-  /// @param extraArgs The GenericExtraArgsV3 struct to encode.
-  /// @return encoded The encoded extra args as bytes.
   function _encodeGenericExtraArgsV3(
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) internal pure returns (bytes memory) {
@@ -72,14 +68,17 @@ library ExtraArgsCodecUnoptimized {
       encodedExecutor
     );
 
-    return bytes.concat(part1, abi.encodePacked(
-      uint16(extraArgs.executorArgs.length),
-      extraArgs.executorArgs,
-      uint16(extraArgs.tokenReceiver.length),
-      extraArgs.tokenReceiver,
-      uint16(extraArgs.tokenArgs.length),
-      extraArgs.tokenArgs
-    ));
+    return bytes.concat(
+      part1,
+      abi.encodePacked(
+        uint16(extraArgs.executorArgs.length),
+        extraArgs.executorArgs,
+        uint16(extraArgs.tokenReceiver.length),
+        extraArgs.tokenReceiver,
+        uint16(extraArgs.tokenArgs.length),
+        extraArgs.tokenArgs
+      )
+    );
   }
 
   /// @notice Decodes bytes into a GenericExtraArgsV3 struct.
@@ -94,7 +93,9 @@ library ExtraArgsCodecUnoptimized {
     offset += 4;
 
     // ccvs length (1 byte).
-    if (offset + 1 > encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_CCVS_LENGTH);
+    if (offset + 1 > encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_CCVS_LENGTH);
+    }
     uint256 ccvsLength = uint8(bytes1(encoded[offset:offset + 1]));
     offset += 1;
 
@@ -136,17 +137,23 @@ library ExtraArgsCodecUnoptimized {
     }
 
     // finalityConfig (2 bytes).
-    if (offset + 2 > encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_FINALITY_CONFIG);
+    if (offset + 2 > encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_FINALITY_CONFIG);
+    }
     extraArgs.finalityConfig = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
 
     // gasLimit (4 bytes).
-    if (offset + 4 > encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_GAS_LIMIT);
+    if (offset + 4 > encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_GAS_LIMIT);
+    }
     extraArgs.gasLimit = uint32(bytes4(encoded[offset:offset + 4]));
     offset += 4;
 
     // executorLength (1 byte).
-    if (offset + 1 > encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_LENGTH);
+    if (offset + 1 > encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_LENGTH);
+    }
     uint256 executorLength = uint8(bytes1(encoded[offset:offset + 1]));
     offset += 1;
 
@@ -161,7 +168,9 @@ library ExtraArgsCodecUnoptimized {
     offset += executorLength;
 
     // executorArgsLength (2 bytes).
-    if (offset + 2 > encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_LENGTH);
+    if (offset + 2 > encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_LENGTH);
+    }
     uint256 executorArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
 
@@ -173,7 +182,9 @@ library ExtraArgsCodecUnoptimized {
     offset += executorArgsLength;
 
     // tokenReceiverLength (2 bytes).
-    if (offset + 2 > encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_LENGTH);
+    if (offset + 2 > encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_LENGTH);
+    }
     uint256 tokenReceiverLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
 
@@ -185,7 +196,9 @@ library ExtraArgsCodecUnoptimized {
     offset += tokenReceiverLength;
 
     // tokenArgsLength (2 bytes).
-    if (offset + 2 > encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_LENGTH);
+    if (offset + 2 > encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_LENGTH);
+    }
     uint256 tokenArgsLength = uint16(bytes2(encoded[offset:offset + 2]));
     offset += 2;
 
@@ -197,7 +210,9 @@ library ExtraArgsCodecUnoptimized {
     offset += tokenArgsLength;
 
     // Ensure we've consumed all bytes.
-    if (offset != encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET);
+    if (offset != encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET);
+    }
 
     return extraArgs;
   }
@@ -213,7 +228,7 @@ library ExtraArgsCodecUnoptimized {
     }
 
     return abi.encodePacked(
-      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG, // Should be SVM_EXECUTOR_ARGS_V1_TAG
+      ExtraArgsCodec.SVM_EXECUTOR_ARGS_V1_TAG,
       executorArgs.useATA,
       executorArgs.accountIsWritableBitmap,
       uint8(executorArgs.accounts.length),
@@ -233,16 +248,22 @@ library ExtraArgsCodecUnoptimized {
     offset += 4;
 
     // useATA (1 byte).
-    if (offset >= encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_USE_ATA);
+    if (offset >= encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_USE_ATA);
+    }
     executorArgs.useATA = encoded[offset++] != 0;
 
     // accountIsWritableBitmap (8 bytes).
-    if (offset + 8 > encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_ACCOUNT_BITMAP);
+    if (offset + 8 > encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_ACCOUNT_BITMAP);
+    }
     executorArgs.accountIsWritableBitmap = uint64(bytes8(encoded[offset:offset + 8]));
     offset += 8;
 
     // accounts length (1 byte).
-    if (offset + 1 > encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_LENGTH);
+    if (offset + 1 > encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_LENGTH);
+    }
     uint256 accountsLength = uint8(bytes1(encoded[offset:offset + 1]));
     offset += 1;
 
@@ -257,7 +278,9 @@ library ExtraArgsCodecUnoptimized {
     }
 
     // Ensure we've consumed all bytes.
-    if (offset != encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET);
+    if (offset != encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET);
+    }
 
     return executorArgs;
   }
@@ -273,7 +296,7 @@ library ExtraArgsCodecUnoptimized {
     }
 
     return abi.encodePacked(
-      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG, // Should be SUI_EXECUTOR_ARGS_V1_TAG
+      ExtraArgsCodec.SUI_EXECUTOR_ARGS_V1_TAG,
       uint8(executorArgs.receiverObjectIds.length),
       abi.encodePacked(executorArgs.receiverObjectIds)
     );
@@ -291,7 +314,9 @@ library ExtraArgsCodecUnoptimized {
     offset += 4;
 
     // receiverObjectIds length (1 byte).
-    if (offset + 1 > encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_LENGTH);
+    if (offset + 1 > encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_LENGTH);
+    }
     uint256 objectIdsLength = uint16(bytes2(encoded[offset:offset + 1]));
     offset += 1;
 
@@ -306,7 +331,9 @@ library ExtraArgsCodecUnoptimized {
     }
 
     // Ensure we've consumed all bytes.
-    if (offset != encoded.length) revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET);
+    if (offset != encoded.length) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET);
+    }
 
     return executorArgs;
   }

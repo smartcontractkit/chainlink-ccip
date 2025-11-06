@@ -1,26 +1,34 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {ExtraArgsCodecUnoptimized} from "../../libraries/ExtraArgsCodecUnoptimized.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
+import {ExtraArgsCodecUnoptimized} from "../../libraries/ExtraArgsCodecUnoptimized.sol";
+import {Test} from "forge-std/Test.sol";
 
 contract OriginalDecoder {
-  function decode(bytes calldata data) external pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
+  function decode(
+    bytes calldata data
+  ) external pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
     return ExtraArgsCodecUnoptimized._decodeGenericExtraArgsV3(data);
   }
 
-  function decodeNoReturn(bytes calldata data) external pure {
+  function decodeNoReturn(
+    bytes calldata data
+  ) external pure {
     ExtraArgsCodecUnoptimized._decodeGenericExtraArgsV3(data);
   }
 }
 
 contract OptimizedDecoder {
-  function decode(bytes calldata data) external pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
+  function decode(
+    bytes calldata data
+  ) external pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
     return ExtraArgsCodec._decodeGenericExtraArgsV3(data);
   }
 
-  function decodeNoReturn(bytes calldata data) external pure {
+  function decodeNoReturn(
+    bytes calldata data
+  ) external pure {
     ExtraArgsCodec._decodeGenericExtraArgsV3(data);
   }
 }
@@ -35,7 +43,6 @@ contract ExtraArgsCodecGasComparison is Test {
     s_originalDecoder = new OriginalDecoder();
     s_optimizedDecoder = new OptimizedDecoder();
   }
-
 
   /// @notice Test encoding with 1 CCV
   function test_gas_encode_1CCV() public {
@@ -82,7 +89,7 @@ contract ExtraArgsCodecGasComparison is Test {
     ccvs[0] = address(0x1111111111111111111111111111111111111111);
     ccvs[1] = address(0x2222222222222222222222222222222222222222);
     ccvs[2] = address(0x3333333333333333333333333333333333333333);
-    
+
     bytes[] memory ccvArgs = new bytes[](3);
     ccvArgs[0] = "ccv args 1 with more data";
     ccvArgs[1] = "ccv args 2";
@@ -210,7 +217,7 @@ contract ExtraArgsCodecGasComparison is Test {
     ccvs[0] = address(0x1111111111111111111111111111111111111111);
     ccvs[1] = address(0x2222222222222222222222222222222222222222);
     ccvs[2] = address(0x3333333333333333333333333333333333333333);
-    
+
     bytes[] memory ccvArgs = new bytes[](3);
     ccvArgs[0] = "ccv args 1 with more data";
     ccvArgs[1] = "ccv args 2";
@@ -271,14 +278,13 @@ contract ExtraArgsCodecGasComparison is Test {
 
     // Original implementation
     uint256 gasBefore = gasleft();
-     s_originalDecoder.decodeNoReturn(encoded);
+    s_originalDecoder.decodeNoReturn(encoded);
     uint256 gasUsedOriginal = gasBefore - gasleft();
 
     // Optimized implementation
     gasBefore = gasleft();
     s_optimizedDecoder.decodeNoReturn(encoded);
     uint256 gasUsedOptimized = gasBefore - gasleft();
-
 
     // Log gas comparison
     emit log_named_uint("Original gas decode empty", gasUsedOriginal);
@@ -335,4 +341,3 @@ contract ExtraArgsCodecGasComparison is Test {
     );
   }
 }
-
