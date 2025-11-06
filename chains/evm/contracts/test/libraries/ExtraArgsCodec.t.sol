@@ -77,7 +77,7 @@ contract ExtraArgsCodec_Test is Test {
     bytes memory encoded = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
 
     // Check the executor length field is 0
-    // Format: 4 (tag) + 1 (ccvs length) + 2 (finality) + 4 (gasLimit) = 11 bytes offset
+    // Format: 4 (tag) + 4 (gasLimit) + 2 (finality) + 1 (ccvs length) = 11 bytes offset
     // Then 1 byte for executor length
     uint8 executorLength = uint8(encoded[11]);
     assertEq(executorLength, 0, "Executor length should be 0 for address(0)");
@@ -99,7 +99,7 @@ contract ExtraArgsCodec_Test is Test {
     bytes memory encoded = ExtraArgsCodecUnoptimized._encodeGenericExtraArgsV3(args);
 
     // Check the executor length field is 20
-    // Format: 4 (tag) + 1 (ccvs length) + 2 (finality) + 4 (gasLimit) = 11 bytes offset
+    // Format: 4 (tag) + 4 (gasLimit) + 2 (finality) + 1 (ccvs length) = 11 bytes offset
     // Then 1 byte for executor length
     uint8 executorLength = uint8(encoded[11]);
     assertEq(executorLength, 20, "Executor length should be 20 for non-zero address");
@@ -109,9 +109,9 @@ contract ExtraArgsCodec_Test is Test {
     // Manually craft an encoded payload with invalid executor length (10 bytes)
     bytes memory invalidEncoded = abi.encodePacked(
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
-      uint8(0), // ccvs length
-      uint16(12), // finalityConfig
       uint32(200_000), // gasLimit
+      uint16(12), // finalityConfig
+      uint8(0), // ccvs length
       uint8(10), // executor length - INVALID (must be 0 or 20)
       bytes10(0x12345678901234567890), // 10 bytes of executor data
       uint16(0), // executorArgs length
@@ -127,9 +127,9 @@ contract ExtraArgsCodec_Test is Test {
     // Manually craft an encoded payload with invalid executor length (32 bytes)
     bytes memory invalidEncoded = abi.encodePacked(
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
-      uint8(0), // ccvs length
-      uint16(12), // finalityConfig
       uint32(200_000), // gasLimit
+      uint16(12), // finalityConfig
+      uint8(0), // ccvs length
       uint8(32), // executor length - INVALID (must be 0 or 20)
       bytes32(0x1234567890123456789012345678901234567890123456789012345678901234), // 32 bytes
       uint16(0), // executorArgs length

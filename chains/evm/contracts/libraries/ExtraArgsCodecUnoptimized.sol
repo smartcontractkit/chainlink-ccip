@@ -60,10 +60,10 @@ library ExtraArgsCodecUnoptimized {
     // Split encoding to avoid stack too deep.
     bytes memory part1 = abi.encodePacked(
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
+      extraArgs.gasLimit,
+      extraArgs.finalityConfig,
       uint8(extraArgs.ccvs.length),
       encodedCCVs,
-      extraArgs.finalityConfig,
-      extraArgs.gasLimit,
       uint8(encodedExecutor.length),
       encodedExecutor
     );
@@ -87,15 +87,22 @@ library ExtraArgsCodecUnoptimized {
   function _decodeGenericExtraArgsV3(
     bytes calldata encoded
   ) internal pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs) {
-    uint256 offset = 0;
+    if (encoded.length < ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_BASE_SIZE) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS);
+    }
 
     // Tag (4 bytes) - already validated by caller typically, but we skip it here.
+    uint256 offset = 4;
+
+    // gasLimit (4 bytes).
+    extraArgs.gasLimit = uint32(bytes4(encoded[offset:offset + 4]));
     offset += 4;
 
+    // finalityConfig (2 bytes).
+    extraArgs.finalityConfig = uint16(bytes2(encoded[offset:offset + 2]));
+    offset += 2;
+
     // ccvs length (1 byte).
-    if (offset + 1 > encoded.length) {
-      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_CCVS_LENGTH);
-    }
     uint256 ccvsLength = uint8(bytes1(encoded[offset:offset + 1]));
     offset += 1;
 
@@ -135,20 +142,6 @@ library ExtraArgsCodecUnoptimized {
       extraArgs.ccvArgs[i] = encoded[offset:offset + ccvArgsLength];
       offset += ccvArgsLength;
     }
-
-    // finalityConfig (2 bytes).
-    if (offset + 2 > encoded.length) {
-      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_FINALITY_CONFIG);
-    }
-    extraArgs.finalityConfig = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
-
-    // gasLimit (4 bytes).
-    if (offset + 4 > encoded.length) {
-      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_GAS_LIMIT);
-    }
-    extraArgs.gasLimit = uint32(bytes4(encoded[offset:offset + 4]));
-    offset += 4;
 
     // executorLength (1 byte).
     if (offset + 1 > encoded.length) {
@@ -242,28 +235,20 @@ library ExtraArgsCodecUnoptimized {
   function _decodeSVMExecutorArgsV1(
     bytes calldata encoded
   ) internal pure returns (ExtraArgsCodec.SVMExecutorArgsV1 memory executorArgs) {
-    uint256 offset = 0;
-
+    if (encoded.length < ExtraArgsCodec.SVM_EXECUTOR_ARGS_V1_BASE_SIZE) {
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS);
+    }
     // Tag (4 bytes) - skip.
-    offset += 4;
+    uint256 offset = 4;
 
     // useATA (1 byte).
-    if (offset >= encoded.length) {
-      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_USE_ATA);
-    }
     executorArgs.useATA = encoded[offset++] != 0;
 
     // accountIsWritableBitmap (8 bytes).
-    if (offset + 8 > encoded.length) {
-      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_ACCOUNT_BITMAP);
-    }
     executorArgs.accountIsWritableBitmap = uint64(bytes8(encoded[offset:offset + 8]));
     offset += 8;
 
     // accounts length (1 byte).
-    if (offset + 1 > encoded.length) {
-      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_LENGTH);
-    }
     uint256 accountsLength = uint8(bytes1(encoded[offset:offset + 1]));
     offset += 1;
 
@@ -308,14 +293,12 @@ library ExtraArgsCodecUnoptimized {
   function _decodeSuiExecutorArgsV1(
     bytes calldata encoded
   ) internal pure returns (ExtraArgsCodec.SuiExecutorArgsV1 memory executorArgs) {
-    uint256 offset = 0;
-
     // Tag (4 bytes) - skip.
-    offset += 4;
+    uint256 offset = 4;
 
     // receiverObjectIds length (1 byte).
     if (offset + 1 > encoded.length) {
-      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_LENGTH);
+      revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS);
     }
     uint256 objectIdsLength = uint16(bytes2(encoded[offset:offset + 1]));
     offset += 1;
