@@ -8,8 +8,8 @@ on:
         required: true
         type: string
   push:
-    branches:
-      - main
+    tags:
+      - 'solana-v*'
 
 jobs:
   changes:
