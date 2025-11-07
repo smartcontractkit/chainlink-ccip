@@ -107,27 +107,7 @@ library ExtraArgsCodec {
   /// @param finalityConfig The finality configuration.
   /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
   function _getBasicEncodedExtraArgsV3(uint32 gasLimit, uint16 finalityConfig) internal pure returns (bytes memory) {
-    bytes memory encoded = new bytes(GENERIC_EXTRA_ARGS_V3_BASE_SIZE);
-    assembly {
-      let ptr := add(encoded, 32) // Skip length prefix.
-
-      // Write tag (4 bytes).
-      mstore(ptr, GENERIC_EXTRA_ARGS_V3_TAG)
-      ptr := add(ptr, 4)
-
-      // Write gas limit (4 bytes, big endian).
-      mstore8(ptr, shr(24, gasLimit))
-      mstore8(add(ptr, 1), and(shr(16, gasLimit), 0xFF))
-      mstore8(add(ptr, 2), and(shr(8, gasLimit), 0xFF))
-      mstore8(add(ptr, 3), and(gasLimit, 0xFF))
-      ptr := add(ptr, 4)
-
-      // Write finality config (2 bytes, big endian).
-      mstore8(ptr, shr(8, finalityConfig))
-      mstore8(add(ptr, 1), and(finalityConfig, 0xFF))
-      ptr := add(ptr, 2)
-    }
-    return encoded;
+    return abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, gasLimit, finalityConfig, bytes8(0));
   }
 
   enum SVMATAUsage {
@@ -146,6 +126,52 @@ library ExtraArgsCodec {
 
   struct SuiExecutorArgsV1 {
     bytes32[] receiverObjectIds;
+  }
+
+  /// @notice Helper function to write a uint8 length prefix and an address.
+  /// @dev Writes length as 1 byte followed by the address bytes (20 bytes if non-zero).
+  /// @param ptr The memory pointer where to start writing.
+  /// @param addr The address to write.
+  /// @return newPtr The updated memory pointer after writing.
+  function _writeUint8PrefixedAddress(uint256 ptr, address addr) private pure returns (uint256 newPtr) {
+    assembly {
+      let addrLength := mul(iszero(iszero(addr)), 20)
+      // Write address length (1 byte).
+      mstore8(ptr, addrLength)
+      newPtr := add(ptr, 1)
+
+      // Write address if non-zero.
+      if gt(addrLength, 0) {
+        mstore(newPtr, shl(96, addr))
+        newPtr := add(newPtr, 20)
+      }
+    }
+  }
+
+  /// @notice Helper function to write a uint16 length prefix and copy bytes data.
+  /// @dev Writes length as 2 bytes (big endian) followed by the data bytes.
+  /// @param ptr The memory pointer where to start writing.
+  /// @param data The bytes data to write.
+  /// @return newPtr The updated memory pointer after writing.
+  function _writeUint16PrefixedBytes(uint256 ptr, bytes memory data) private pure returns (uint256 newPtr) {
+    uint256 dataLength = data.length;
+    assembly {
+      // Write length (2 bytes, big endian).
+      mstore8(ptr, shr(8, dataLength))
+      mstore8(add(ptr, 1), and(dataLength, 0xFF))
+      newPtr := add(ptr, 2)
+
+      // Copy data.
+      if gt(dataLength, 0) {
+        let srcPtr := add(data, 32)
+        for { let end := add(srcPtr, dataLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {
+          mstore(newPtr, mload(srcPtr))
+          newPtr := add(newPtr, 32)
+        }
+        // Adjust ptr if we overshot.
+        newPtr := sub(newPtr, sub(and(add(dataLength, 31), not(31)), dataLength))
+      }
+    }
   }
 
   /// @notice Encodes a GenericExtraArgsV3 struct into bytes using assembly for gas efficiency.
@@ -197,11 +223,9 @@ library ExtraArgsCodec {
     }
 
     // Allocate memory.
-    // Calculate total size: tag(4) + gasLimit(4) + finality(2) + ccvsLength(1) + ccvsData +
-    // executorLength(1) + executor + executorArgsLength(2) + executorArgs +
-    // tokenReceiverLength(2) + tokenReceiver + tokenArgsLength(2) + tokenArgs.
+    // GENERIC_EXTRA_ARGS_V3_BASE_SIZE + all variable-length fields.
     encoded = new bytes(
-      4 + 4 + 2 + 1 + ccvsEncodedSize + 1 + executorLength + 2 + executorArgsLength + 2 + tokenReceiverLength + 2
+      GENERIC_EXTRA_ARGS_V3_BASE_SIZE + ccvsEncodedSize + executorLength + executorArgsLength + tokenReceiverLength
         + tokenArgsLength
     );
 
@@ -234,107 +258,24 @@ library ExtraArgsCodec {
 
     // Write CCVs data.
     for (uint256 i = 0; i < ccvsLength; ++i) {
-      address ccvAddr = extraArgs.ccvs[i];
-      uint256 ccvAddrLength = ccvAddr == address(0) ? 0 : 20;
-      bytes memory ccvArg = extraArgs.ccvArgs[i];
-      uint256 ccvArgLength = ccvArg.length;
+      // Write CCV address (uint8 length + address bytes).
+      ptr = _writeUint8PrefixedAddress(ptr, extraArgs.ccvs[i]);
 
-      assembly {
-        // Write CCV address length (1 byte).
-        mstore8(ptr, ccvAddrLength)
-        ptr := add(ptr, 1)
-
-        // Write CCV address if non-zero.
-        if gt(ccvAddrLength, 0) {
-          mstore(ptr, shl(96, ccvAddr)) // Shift address to align.
-          ptr := add(ptr, 20)
-        }
-
-        // Write CCV args length (2 bytes, big endian).
-        mstore8(ptr, shr(8, ccvArgLength))
-        mstore8(add(ptr, 1), and(ccvArgLength, 0xFF))
-        ptr := add(ptr, 2)
-
-        // Copy CCV args.
-        if gt(ccvArgLength, 0) {
-          let ccvArgPtr := add(ccvArg, 32) // Skip bytes length prefix.
-          for { let end := add(ccvArgPtr, ccvArgLength) } lt(ccvArgPtr, end) { ccvArgPtr := add(ccvArgPtr, 32) } {
-            mstore(ptr, mload(ccvArgPtr))
-            ptr := add(ptr, 32)
-          }
-          // Adjust ptr if we overshot.
-          ptr := sub(ptr, sub(and(add(ccvArgLength, 31), not(31)), ccvArgLength))
-        }
-      }
+      // Write CCV args (uint16 length + bytes data).
+      ptr = _writeUint16PrefixedBytes(ptr, extraArgs.ccvArgs[i]);
     }
 
-    assembly {
-      // Write executor length (1 byte).
-      mstore8(ptr, executorLength)
-      ptr := add(ptr, 1)
-
-      // Write executor address if non-zero.
-      if gt(executorLength, 0) {
-        mstore(ptr, shl(96, executor))
-        ptr := add(ptr, 20)
-      }
-    }
+    // Write executor (uint8 length + address bytes).
+    ptr = _writeUint8PrefixedAddress(ptr, extraArgs.executor);
 
     // Write executorArgs.
-    bytes memory executorArgs = extraArgs.executorArgs;
-    assembly {
-      // Write executorArgs length (2 bytes, big endian).
-      mstore8(ptr, shr(8, executorArgsLength))
-      mstore8(add(ptr, 1), and(executorArgsLength, 0xFF))
-      ptr := add(ptr, 2)
-
-      // Copy executorArgs.
-      if gt(executorArgsLength, 0) {
-        let srcPtr := add(executorArgs, 32)
-        for { let end := add(srcPtr, executorArgsLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {
-          mstore(ptr, mload(srcPtr))
-          ptr := add(ptr, 32)
-        }
-        ptr := sub(ptr, sub(and(add(executorArgsLength, 31), not(31)), executorArgsLength))
-      }
-    }
+    ptr = _writeUint16PrefixedBytes(ptr, extraArgs.executorArgs);
 
     // Write tokenReceiver.
-    bytes memory tokenReceiver = extraArgs.tokenReceiver;
-    assembly {
-      // Write tokenReceiver length (2 bytes, big endian).
-      mstore8(ptr, shr(8, tokenReceiverLength))
-      mstore8(add(ptr, 1), and(tokenReceiverLength, 0xFF))
-      ptr := add(ptr, 2)
-
-      // Copy tokenReceiver.
-      if gt(tokenReceiverLength, 0) {
-        let srcPtr := add(tokenReceiver, 32)
-        for { let end := add(srcPtr, tokenReceiverLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {
-          mstore(ptr, mload(srcPtr))
-          ptr := add(ptr, 32)
-        }
-        ptr := sub(ptr, sub(and(add(tokenReceiverLength, 31), not(31)), tokenReceiverLength))
-      }
-    }
+    ptr = _writeUint16PrefixedBytes(ptr, extraArgs.tokenReceiver);
 
     // Write tokenArgs.
-    bytes memory tokenArgs = extraArgs.tokenArgs;
-    assembly {
-      // Write tokenArgs length (2 bytes, big endian).
-      mstore8(ptr, shr(8, tokenArgsLength))
-      mstore8(add(ptr, 1), and(tokenArgsLength, 0xFF))
-      ptr := add(ptr, 2)
-
-      // Copy tokenArgs.
-      if gt(tokenArgsLength, 0) {
-        let srcPtr := add(tokenArgs, 32)
-        for { let end := add(srcPtr, tokenArgsLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {
-          mstore(ptr, mload(srcPtr))
-          ptr := add(ptr, 32)
-        }
-      }
-    }
+    ptr = _writeUint16PrefixedBytes(ptr, extraArgs.tokenArgs);
 
     return encoded;
   }
@@ -526,48 +467,13 @@ library ExtraArgsCodec {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_SVM_ACCOUNTS_LENGTH);
     }
 
-    // Total size: tag(4) + useATA(1) + bitmap(8) + accountsLength(1) + accounts(32 * n).
-    uint256 totalSize = 4 + 1 + 8 + 1 + (accountsLength * 32);
-    encoded = new bytes(totalSize);
-
-    assembly {
-      let ptr := add(encoded, 32)
-
-      // Write tag.
-      mstore(ptr, SVM_EXECUTOR_ARGS_V1_TAG)
-      ptr := add(ptr, 4)
-
-      // Write useATA.
-      mstore8(ptr, iszero(iszero(mload(executorArgs))))
-      ptr := add(ptr, 1)
-
-      // Write accountIsWritableBitmap (8 bytes).
-      let bitmap := mload(add(executorArgs, 32))
-      mstore8(ptr, shr(56, bitmap))
-      mstore8(add(ptr, 1), and(shr(48, bitmap), 0xFF))
-      mstore8(add(ptr, 2), and(shr(40, bitmap), 0xFF))
-      mstore8(add(ptr, 3), and(shr(32, bitmap), 0xFF))
-      mstore8(add(ptr, 4), and(shr(24, bitmap), 0xFF))
-      mstore8(add(ptr, 5), and(shr(16, bitmap), 0xFF))
-      mstore8(add(ptr, 6), and(shr(8, bitmap), 0xFF))
-      mstore8(add(ptr, 7), and(bitmap, 0xFF))
-      ptr := add(ptr, 8)
-
-      // Write accounts length.
-      mstore8(ptr, accountsLength)
-      ptr := add(ptr, 1)
-
-      // Write accounts.
-      let accountsPtr := add(mload(add(executorArgs, 64)), 32) // Skip array length.
-
-      for { let i := 0 } lt(i, accountsLength) { i := add(i, 1) } {
-        mstore(ptr, mload(accountsPtr))
-        ptr := add(ptr, 32)
-        accountsPtr := add(accountsPtr, 32)
-      }
-    }
-
-    return encoded;
+    return abi.encodePacked(
+      SVM_EXECUTOR_ARGS_V1_TAG,
+      uint8(executorArgs.useATA),
+      executorArgs.accountIsWritableBitmap,
+      uint8(accountsLength),
+      executorArgs.accounts
+    );
   }
 
   /// @notice Decodes bytes into a SVMExecutorArgsV1 struct using assembly.
@@ -632,33 +538,7 @@ library ExtraArgsCodec {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_SUI_OBJECT_IDS_LENGTH);
     }
 
-    // Total size: tag(4) + objectIdsLength(1) + objectIds(32 * n).
-    uint256 totalSize = 4 + 1 + (objectIdsLength * 32);
-    encoded = new bytes(totalSize);
-
-    assembly {
-      let ptr := add(encoded, 32)
-
-      // Write tag.
-      mstore(ptr, SUI_EXECUTOR_ARGS_V1_TAG)
-      ptr := add(ptr, 4)
-
-      // Write objectIds length.
-      mstore8(ptr, objectIdsLength)
-      ptr := add(ptr, 1)
-
-      // Write objectIds.
-      let objectIdsPtr := mload(executorArgs)
-      objectIdsPtr := add(objectIdsPtr, 32) // Skip array length.
-
-      for { let i := 0 } lt(i, objectIdsLength) { i := add(i, 1) } {
-        mstore(ptr, mload(objectIdsPtr))
-        ptr := add(ptr, 32)
-        objectIdsPtr := add(objectIdsPtr, 32)
-      }
-    }
-
-    return encoded;
+    return abi.encodePacked(SUI_EXECUTOR_ARGS_V1_TAG, uint8(objectIdsLength), executorArgs.receiverObjectIds);
   }
 
   /// @notice Decodes bytes into a SuiExecutorArgsV1 struct using assembly.
