@@ -144,7 +144,8 @@ then `attestation1` can be assigned to **either** `tokenPayloadA` or `tokenPaylo
 remaining `tokenPayload`. 
 
 
-???
+
+??? Random thoughts / WIP below ???``
 Need: collection of `SourceTokenDataPayloadV2` and `CCTPv2Messages`
 - SeqNum maps to SourceTokenDataPayloadV2, but TxHash maps to CCTPv2Messages
 `map[TxHash][]SeqNum`?
@@ -152,6 +153,7 @@ Need: collection of `SourceTokenDataPayloadV2` and `CCTPv2Messages`
 getTxHashes(messages map[cciptypes.SeqNum]cciptypes.Message) map[TxHash][]SeqNum
 func (txHashes []TxHash, sourceDomainID, uint32) map[TxHash]CCTPv2Messages
 map[TxHash]CCTPv2Messages + map[TxHash][]SeqNum + map[cciptypes.SeqNum]map[int]SourceTokenDataPayloadV2
+func 
 
 func assignAttestationsToV2TokenPayloads(
     messages map[cciptypes.SeqNum]Message,
@@ -159,7 +161,7 @@ func assignAttestationsToV2TokenPayloads(
     sourceDomainID uint32, 
     v2TokenPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayloadV2
 ) map[cciptypes.SeqNum]map[int]AttestationStatus {
-    result := map[cciptypes.SeqNum]map[int](MessageBody, Attestation)
+    result := map[cciptypes.SeqNum]map[int]AttestationStatus
     for txHash, seqNums in txHashToSeqNums {
       cctpv2Messages := getCCTPv2Messages(sourceDomainID uint32, txHash string) CCTPv2Messages
       attestations := extractAttestations(cctpv2Messages)
