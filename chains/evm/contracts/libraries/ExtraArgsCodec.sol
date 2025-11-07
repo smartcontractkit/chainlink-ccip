@@ -43,15 +43,15 @@ library ExtraArgsCodec {
     SUI_EXECUTOR_OBJECT_IDS_CONTENT, // 20
     SUI_EXECUTOR_FINAL_OFFSET,
     ENCODE_CCVS_ARRAY_LENGTH,
-    ENCODE_CCV_ARGS_ARRAY_LENGTH,
     ENCODE_CCV_ADDRESS_LENGTH,
-    ENCODE_CCV_ARGS_LENGTH, // 25
-    ENCODE_EXECUTOR_LENGTH,
+    ENCODE_CCV_ARGS_LENGTH,
+    ENCODE_EXECUTOR_LENGTH, // 25
     ENCODE_EXECUTOR_ARGS_LENGTH,
     ENCODE_TOKEN_RECEIVER_LENGTH,
     ENCODE_TOKEN_ARGS_LENGTH,
-    ENCODE_SVM_ACCOUNTS_LENGTH, // 30
-    ENCODE_SUI_OBJECT_IDS_LENGTH
+    ENCODE_SVM_ACCOUNTS_LENGTH,
+    ENCODE_SUI_OBJECT_IDS_LENGTH // 30
+
   }
 
   // solhint-disable-next-line gas-struct-packing
@@ -133,8 +133,14 @@ library ExtraArgsCodec {
     return encoded;
   }
 
+  enum SVMATAUsage {
+    DERIVE_ACCOUNT_AND_CREATE,
+    DERIVE_ACCOUNT_DONT_CREATE,
+    DONT_DERIVE_ACCOUNT
+  }
+
   struct SVMExecutorArgsV1 {
-    bool useATA;
+    SVMATAUsage useATA;
     uint64 accountIsWritableBitmap;
     // Additional accounts needed for execution of CCIP receiver. Must be empty if message.receiver is zero.
     // Token transfer related accounts are specified in the token pool lookup table on SVM.

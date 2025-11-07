@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-/// forge-config: default.allow_internal_expect_revert = true
-
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {ExtraArgsCodecHelper} from "../../helpers/ExtraArgsCodecHelpers.sol";
 
+/// forge-config: default.allow_internal_expect_revert = true
 contract ExtraArgsCodecV3_Test is BaseTest {
   ExtraArgsCodecHelper internal s_helper;
 
