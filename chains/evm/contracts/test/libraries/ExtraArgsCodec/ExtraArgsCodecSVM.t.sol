@@ -16,7 +16,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
 
   function test_DecodeSVMExecutorArgsV1_Empty() public view {
     ExtraArgsCodec.SVMExecutorArgsV1 memory args = ExtraArgsCodec.SVMExecutorArgsV1({
-      useATA: ExtraArgsCodec.SVMATAUsage.DERIVE_ACCOUNT_AND_CREATE,
+      useATA: ExtraArgsCodec.SVMTokenReceiverUsage.DERIVE_ATA_AND_CREATE,
       accountIsWritableBitmap: 0,
       accounts: new bytes32[](0)
     });
@@ -37,7 +37,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
     accounts[1] = bytes32(uint256(2));
 
     ExtraArgsCodec.SVMExecutorArgsV1 memory args = ExtraArgsCodec.SVMExecutorArgsV1({
-      useATA: ExtraArgsCodec.SVMATAUsage.DERIVE_ACCOUNT_DONT_CREATE,
+      useATA: ExtraArgsCodec.SVMTokenReceiverUsage.DERIVE_ATA_DONT_CREATE,
       accountIsWritableBitmap: 0x03,
       accounts: accounts
     });
@@ -53,7 +53,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
 
   function test_DecodeSVMExecutorArgsV1_MaxBitmap() public view {
     ExtraArgsCodec.SVMExecutorArgsV1 memory args = ExtraArgsCodec.SVMExecutorArgsV1({
-      useATA: ExtraArgsCodec.SVMATAUsage.DONT_DERIVE_ACCOUNT,
+      useATA: ExtraArgsCodec.SVMTokenReceiverUsage.USE_AS_IS,
       accountIsWritableBitmap: type(uint64).max,
       accounts: new bytes32[](0)
     });
@@ -75,7 +75,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
 
   function test_DecodeSVMExecutorArgsV1_RevertWhen_SVM_EXECUTOR_FINAL_OFFSET() public {
     ExtraArgsCodec.SVMExecutorArgsV1 memory args = ExtraArgsCodec.SVMExecutorArgsV1({
-      useATA: ExtraArgsCodec.SVMATAUsage.DERIVE_ACCOUNT_AND_CREATE,
+      useATA: ExtraArgsCodec.SVMTokenReceiverUsage.DERIVE_ATA_AND_CREATE,
       accountIsWritableBitmap: 0,
       accounts: new bytes32[](0)
     });
@@ -94,7 +94,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
   function test_DecodeSVMExecutorArgsV1_RevertWhen_SVM_EXECUTOR_ACCOUNTS_CONTENT() public {
     bytes memory invalidData = abi.encodePacked(
       ExtraArgsCodec.SVM_EXECUTOR_ARGS_V1_TAG,
-      uint8(ExtraArgsCodec.SVMATAUsage.DERIVE_ACCOUNT_AND_CREATE),
+      uint8(ExtraArgsCodec.SVMTokenReceiverUsage.DERIVE_ATA_AND_CREATE),
       uint64(0),
       uint8(2) // Claims 2 accounts but doesn't provide them.
     );
@@ -117,7 +117,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
     );
     ExtraArgsCodec._encodeSVMExecutorArgsV1(
       ExtraArgsCodec.SVMExecutorArgsV1({
-        useATA: ExtraArgsCodec.SVMATAUsage.DERIVE_ACCOUNT_AND_CREATE,
+        useATA: ExtraArgsCodec.SVMTokenReceiverUsage.DERIVE_ATA_AND_CREATE,
         accountIsWritableBitmap: 0,
         accounts: accounts
       })

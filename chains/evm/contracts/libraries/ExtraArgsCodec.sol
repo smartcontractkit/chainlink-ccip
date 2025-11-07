@@ -39,19 +39,18 @@ library ExtraArgsCodec {
     EXTRA_ARGS_TOKEN_ARGS_CONTENT,
     EXTRA_ARGS_FINAL_OFFSET,
     SVM_EXECUTOR_ACCOUNTS_CONTENT,
-    SVM_EXECUTOR_FINAL_OFFSET,
-    SUI_EXECUTOR_OBJECT_IDS_CONTENT, // 20
+    SVM_EXECUTOR_FINAL_OFFSET, // 15
+    SUI_EXECUTOR_OBJECT_IDS_CONTENT,
     SUI_EXECUTOR_FINAL_OFFSET,
     ENCODE_CCVS_ARRAY_LENGTH,
     ENCODE_CCV_ADDRESS_LENGTH,
-    ENCODE_CCV_ARGS_LENGTH,
-    ENCODE_EXECUTOR_LENGTH, // 25
+    ENCODE_CCV_ARGS_LENGTH, // 20
+    ENCODE_EXECUTOR_LENGTH,
     ENCODE_EXECUTOR_ARGS_LENGTH,
     ENCODE_TOKEN_RECEIVER_LENGTH,
     ENCODE_TOKEN_ARGS_LENGTH,
-    ENCODE_SVM_ACCOUNTS_LENGTH,
-    ENCODE_SUI_OBJECT_IDS_LENGTH // 30
-
+    ENCODE_SVM_ACCOUNTS_LENGTH, // 25
+    ENCODE_SUI_OBJECT_IDS_LENGTH
   }
 
   // solhint-disable-next-line gas-struct-packing
@@ -110,14 +109,14 @@ library ExtraArgsCodec {
     return abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, gasLimit, finalityConfig, bytes8(0));
   }
 
-  enum SVMATAUsage {
-    DERIVE_ACCOUNT_AND_CREATE,
-    DERIVE_ACCOUNT_DONT_CREATE,
-    DONT_DERIVE_ACCOUNT
+  enum SVMTokenReceiverUsage {
+    DERIVE_ATA_AND_CREATE,
+    DERIVE_ATA_DONT_CREATE,
+    USE_AS_IS
   }
 
   struct SVMExecutorArgsV1 {
-    SVMATAUsage useATA;
+    SVMTokenReceiverUsage useATA;
     uint64 accountIsWritableBitmap;
     // Additional accounts needed for execution of CCIP receiver. Must be empty if message.receiver is zero.
     // Token transfer related accounts are specified in the token pool lookup table on SVM.
@@ -146,6 +145,7 @@ library ExtraArgsCodec {
         newPtr := add(newPtr, 20)
       }
     }
+    return newPtr;
   }
 
   /// @notice Helper function to write a uint16 length prefix and copy bytes data.
@@ -172,6 +172,7 @@ library ExtraArgsCodec {
         newPtr := sub(newPtr, sub(and(add(dataLength, 31), not(31)), dataLength))
       }
     }
+    return newPtr;
   }
 
   /// @notice Encodes a GenericExtraArgsV3 struct into bytes using assembly for gas efficiency.
@@ -258,23 +259,14 @@ library ExtraArgsCodec {
 
     // Write CCVs data.
     for (uint256 i = 0; i < ccvsLength; ++i) {
-      // Write CCV address (uint8 length + address bytes).
       ptr = _writeUint8PrefixedAddress(ptr, extraArgs.ccvs[i]);
-
-      // Write CCV args (uint16 length + bytes data).
       ptr = _writeUint16PrefixedBytes(ptr, extraArgs.ccvArgs[i]);
     }
 
-    // Write executor (uint8 length + address bytes).
+    // Write executor, executorArgs, tokenReceiver, tokenArgs.
     ptr = _writeUint8PrefixedAddress(ptr, extraArgs.executor);
-
-    // Write executorArgs.
     ptr = _writeUint16PrefixedBytes(ptr, extraArgs.executorArgs);
-
-    // Write tokenReceiver.
     ptr = _writeUint16PrefixedBytes(ptr, extraArgs.tokenReceiver);
-
-    // Write tokenArgs.
     ptr = _writeUint16PrefixedBytes(ptr, extraArgs.tokenArgs);
 
     return encoded;
