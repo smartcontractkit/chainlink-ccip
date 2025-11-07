@@ -760,12 +760,37 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
 
     if (message.tokenAmounts.length > 0) {
-      // TODO pool fees
+      IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(message.tokenAmounts[0].token));
+      uint256 feeUSDCents = 0;
+      uint32 destGasOverhead = 0;
+      uint32 destBytesOverhead = 0;
+
+      // Try to call `IPoolV2.getFee` to fetch fee components if the pool supports IPoolV2.
+      if (IERC165(address(pool)).supportsInterface(type(IPoolV2).interfaceId)) {
+        (feeUSDCents, destGasOverhead, destBytesOverhead,) = IPoolV2(address(pool)).getFee(
+          message.tokenAmounts[0].token,
+          destChainSelector,
+          message.tokenAmounts[0].amount,
+          message.feeToken,
+          extraArgs.finalityConfig,
+          extraArgs.tokenArgs
+        );
+      }
+
+      // If the pool doesn't support IPoolV2 or didn't provide fee config, fall back to FeeQuoter.
+      if (feeUSDCents == 0 && destGasOverhead == 0) {
+        (uint32 feeQuoterFeeUSDCents, uint32 feeQuoterGasOverhead, uint32 feeQuoterBytesOverhead) =
+          IFeeQuoter(s_dynamicConfig.feeQuoter).getTokenTransferFee(destChainSelector, message.tokenAmounts[0].token);
+        feeUSDCents = feeQuoterFeeUSDCents;
+        destGasOverhead = feeQuoterGasOverhead;
+        destBytesOverhead = feeQuoterBytesOverhead;
+      }
+
       verifierReceipts[verifierReceipts.length - 2] = Receipt({
         issuer: message.tokenAmounts[0].token,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 0,
+        destGasLimit: destGasOverhead,
+        destBytesOverhead: destBytesOverhead,
+        feeTokenAmount: feeUSDCents,
         extraArgs: extraArgs.tokenArgs
       });
     }
