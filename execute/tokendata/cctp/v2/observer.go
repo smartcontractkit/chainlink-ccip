@@ -70,36 +70,6 @@ func NewCCTPv2TokenDataObserver(
 	}
 }
 
-//// Observe fetches CCTPv2 attestations for USDC messages from Circle's API.
-//func (o *CCTPv2TokenDataObserver) Observe(
-//	ctx context.Context,
-//	messages exectypes.MessageObservations,
-//) (exectypes.TokenDataObservations, error) {
-//	lggr := logutil.WithContextValues(ctx, o.lggr)
-//
-//	// Step 1: Get CCTPv2 token payloads
-//	v2TokenPayloads := o.getCCTPv2TokenPayloads(lggr, messages)
-//	if len(v2TokenPayloads) == 0 {
-//		lggr.Debug("no CCTPv2 messages found, skipping observation")
-//		return o.convertToTokenDataObservations(ctx, lggr, messages, nil), nil
-//	}
-//
-//	// Step 2: Fetch CCTPv2 messages from Circle API (grouped by transaction)
-//	fetchResults, err := o.fetchCCTPv2Messages(ctx, messages, v2TokenPayloads)
-//	if err != nil {
-//		return nil, fmt.Errorf("fetch CCTP messages: %w", err)
-//	}
-//
-//	// Step 3: Assign and validate attestations (transaction-scoped pooling)
-//	attestations, err := o.assignAttestations(lggr, v2TokenPayloads, fetchResults)
-//	if err != nil {
-//		return nil, fmt.Errorf("assign attestations: %w", err)
-//	}
-//
-//	// Step 4: Convert to final output format
-//	return o.convertToTokenDataObservations(ctx, lggr, messages, attestations), nil
-//}
-
 // Observe fetches CCTPv2 attestations for USDC messages from Circle's API.
 func (o *CCTPv2TokenDataObserver) Observe(
 	ctx context.Context,
@@ -116,7 +86,7 @@ func (o *CCTPv2TokenDataObserver) Observe(
 		attestations := assignAttestationsToV2TokenPayloads(
 			seqNumToMessage, txHashes, sourceDomainID, v2TokenPayloads,
 		)
-		tokenData := createTokenData(seqNumToMessage, attestations)
+		tokenData := o.createTokenData(ctx, chainSelector, seqNumToMessage, attestations)
 		result[chainSelector] = tokenData
 	}
 
@@ -143,6 +113,7 @@ func getV2TokenPayloads(
 }
 
 // TODO: impl
+// will need to return an error
 func getSourceDomainID(v2TokenPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayloadV2) uint32 {
 	return 0
 }
@@ -153,10 +124,12 @@ func getTxHashes(messages map[cciptypes.SeqNum]cciptypes.Message) map[string][]c
 }
 
 // TODO: impl
+// Will call CCTPv2HTTPClient.GetMessages
 func getCCTPv2Messages(sourceDomainID uint32, txHash string) CCTPv2Messages {
 	return CCTPv2Messages{}
 }
 
+// TODO: doc
 func assignAttestationsToV2TokenPayloads(
 	messages map[cciptypes.SeqNum]cciptypes.Message,
 	txHashToSeqNums map[string][]cciptypes.SeqNum,
@@ -187,23 +160,63 @@ func assignAttestationsToV2TokenPayloads(
 	return result
 }
 
-func createTokenData(
+// createTokenData converts attestations to final TokenDataObservations format.
+// It iterates through all messages and their tokens, encoding attestations for CCTPv2 USDC tokens
+// and returning NotSupportedTokenData for unsupported tokens.
+func (o *CCTPv2TokenDataObserver) createTokenData(
+	ctx context.Context,
+	chainSelector cciptypes.ChainSelector,
 	messages map[cciptypes.SeqNum]cciptypes.Message,
 	attestations map[cciptypes.SeqNum]map[int]tokendata.AttestationStatus,
 ) map[cciptypes.SeqNum]exectypes.MessageTokenData {
-	return nil
-}
+	result := make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
 
-func attestationToTokenData(
-	ctx context.Context,
-	attestationEncoder AttestationEncoder,
-	status tokendata.AttestationStatus,
-) exectypes.TokenData {
-	tokenData, err := attestationEncoder(ctx, status.MessageBody, status.Attestation)
-	if err != nil {
-		return exectypes.NewErrorTokenData(fmt.Errorf("unable to encode attestation: %w", err))
+	for seqNum, message := range messages {
+		tokenDataSlice := make([]exectypes.TokenData, len(message.TokenAmounts))
+
+		for tokenIndex, tokenAmount := range message.TokenAmounts {
+			// Check if token is supported
+			if !o.IsTokenSupported(chainSelector, tokenAmount) {
+				// Token is not supported
+				tokenDataSlice[tokenIndex] = exectypes.NotSupportedTokenData()
+				continue
+			}
+
+			// Look up attestation for this token
+			attestationsBySeq, hasSeq := attestations[seqNum]
+			if !hasSeq {
+				// No attestations for this message
+				tokenDataSlice[tokenIndex] = exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
+				continue
+			}
+
+			attestation, hasToken := attestationsBySeq[tokenIndex]
+			if !hasToken {
+				// No attestation for this specific token
+				tokenDataSlice[tokenIndex] = exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
+				continue
+			}
+
+			// Check if attestation has an error
+			if attestation.Error != nil {
+				tokenDataSlice[tokenIndex] = exectypes.NewErrorTokenData(attestation.Error)
+				continue
+			}
+
+			// Encode the attestation
+			encodedData, err := o.attestationEncoder(ctx, attestation.MessageBody, attestation.Attestation)
+			if err != nil {
+				tokenDataSlice[tokenIndex] = exectypes.NewErrorTokenData(fmt.Errorf("unable to encode attestation: %w", err))
+			} else {
+				tokenDataSlice[tokenIndex] = exectypes.NewSuccessTokenData(encodedData)
+			}
+		}
+
+		// Create MessageTokenData from the slice
+		result[seqNum] = exectypes.NewMessageTokenData(tokenDataSlice...)
 	}
-	return exectypes.NewSuccessTokenData(tokenData)
+
+	return result
 }
 
 // [32]byte = depositHash
@@ -227,320 +240,3 @@ func assignAttestationForV2TokenPayload(
 	attestations[v2TokenPayload.DepositHash] = attestationStatuses[1:]
 	return attestation
 }
-
-//// processSingleToken attempts to process a single token and returns its payload if valid.
-//// Returns nil, nil for unsupported tokens (not an error case).
-//// Returns nil, error for tokens that fail to decode.
-//func (o *CCTPv2TokenDataObserver) processSingleToken(
-//	chainSelector cciptypes.ChainSelector,
-//	seqNum cciptypes.SeqNum,
-//	tokenIndex int,
-//	tokenAmount cciptypes.RampTokenAmount,
-//	lggr logger.Logger,
-//) (*SourceTokenDataPayloadV2, error) {
-//	// Check if token is from a supported pool
-//	if !o.IsTokenSupported(chainSelector, tokenAmount) {
-//		return nil, nil // Not an error, just not supported
-//	}
-//
-//	// Try to decode CCTPv2 payload from ExtraData
-//	payload, err := DecodeSourceTokenDataPayloadV2(tokenAmount.ExtraData)
-//	if err != nil {
-//		lggr.Warnw(
-//			"Failed to decode CCTPv2 source token data",
-//			"chainSelector", chainSelector,
-//			"seqNum", seqNum,
-//			"tokenIndex", tokenIndex,
-//			"error", err,
-//		)
-//		return nil, err
-//	}
-//
-//	return payload, nil
-//}
-//
-//// getCCTPv2TokenPayloads identifies CCTPv2 USDC transfers within messages.
-//// It filters for supported USDC pool addresses and decodes their CCTPv2 payloads.
-//func (o *CCTPv2TokenDataObserver) getCCTPv2TokenPayloads(
-//	lggr logger.Logger,
-//	messages exectypes.MessageObservations,
-//) map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2 {
-//	result := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2)
-//
-//	// Iterate through each chain
-//	for chainSelector, chainMessages := range messages {
-//		// Iterate through each message
-//		for seqNum, message := range chainMessages {
-//			// Process each token in the message
-//			for i, tokenAmount := range message.TokenAmounts {
-//				// Attempt to process this token
-//				payload, err := o.processSingleToken(chainSelector, seqNum, i, tokenAmount, lggr)
-//				if err != nil || payload == nil {
-//					// Skip unsupported tokens or tokens that failed to decode
-//					continue
-//				}
-//
-//				// Lazy initialize chain map if needed
-//				if result[chainSelector] == nil {
-//					result[chainSelector] = make(map[reader.MessageTokenID]*SourceTokenDataPayloadV2)
-//				}
-//
-//				// Store the successfully decoded payload
-//				msgTokenID := reader.NewMessageTokenID(seqNum, i)
-//				result[chainSelector][msgTokenID] = payload
-//			}
-//		}
-//	}
-//
-//	return result
-//}
-//
-//// fetchCCTPv2Messages fetches CCTPv2 messages from Circle's HTTP API.
-//// It groups transfers by transaction for efficient batch API calls, then fetches processed messages for each transaction.
-//// Returns FetchResults containing transaction context and processed CCTP messages.
-//func (o *CCTPv2TokenDataObserver) fetchCCTPv2Messages(
-//	ctx context.Context,
-//	messages exectypes.MessageObservations,
-//	v2TokenPayloads map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2,
-//) ([]FetchResult, error) {
-//	// Group tokens by transaction
-//	reqArgs := o.getCCTPv2RequestArgs(messages, v2TokenPayloads)
-//
-//	var results []FetchResult
-//	for _, arg := range reqArgs {
-//		processedMessages, err := o.httpClient.GetProcessedMessages(
-//			ctx,
-//			arg.SourceChain,
-//			arg.SourceDomainID,
-//			arg.TransactionHash,
-//		)
-//		if err != nil {
-//			o.lggr.Warnw(
-//				"Failed to fetch CCTP messages from Circle API",
-//				"chainSelector", arg.SourceChain,
-//				"sourceDomain", arg.SourceDomainID,
-//				"txHash", arg.TransactionHash,
-//				"error", err,
-//			)
-//			continue // Continue processing other transactions
-//		}
-//
-//		o.lggr.Debugw(
-//			"Fetched CCTP messages from Circle API",
-//			"chainSelector", arg.SourceChain,
-//			"sourceDomain", arg.SourceDomainID,
-//			"txHash", arg.TransactionHash,
-//			"numMessages", len(processedMessages),
-//		)
-//
-//		results = append(results, FetchResult{
-//			Args:             arg,
-//			ProcessedMessages: processedMessages,
-//		})
-//	}
-//
-//	return results, nil
-//}
-//
-//// getCCTPv2RequestArgs groups tokens by transaction and creates request arguments.
-//func (o *CCTPv2TokenDataObserver) getCCTPv2RequestArgs(
-//	messages exectypes.MessageObservations,
-//	v2TokenPayloads map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2,
-//) []CCTPv2RequestArgs {
-//	// Group by (chainSelector, sourceDomain, txHash)
-//	type txKey struct {
-//		chainSelector cciptypes.ChainSelector
-//		sourceDomain  uint32
-//		txHash        string
-//	}
-//
-//	groupedTokens := make(map[txKey][]reader.MessageTokenID)
-//
-//	for chainSelector, chainPayloads := range v2TokenPayloads {
-//		for msgTokenID, payload := range chainPayloads {
-//			// Get transaction hash from the message
-//			message, ok := messages[chainSelector][msgTokenID.SeqNr]
-//			if !ok {
-//				o.lggr.Warnw(
-//					"Message not found for token payload",
-//					"chainSelector", chainSelector,
-//					"msgTokenID", msgTokenID,
-//				)
-//				continue
-//			}
-//
-//			key := txKey{
-//				chainSelector: chainSelector,
-//				sourceDomain:  payload.SourceDomain,
-//				txHash:        message.Header.TxHash,
-//			}
-//
-//			groupedTokens[key] = append(groupedTokens[key], msgTokenID)
-//		}
-//	}
-//
-//	// Convert map to slice of request args
-//	var reqArgs []CCTPv2RequestArgs
-//	for key, msgTokenIDs := range groupedTokens {
-//		reqArgs = append(reqArgs, CCTPv2RequestArgs{
-//			SourceChain:     key.chainSelector,
-//			SourceDomainID:  key.sourceDomain,
-//			TransactionHash: key.txHash,
-//			MsgTokenIDs:     msgTokenIDs,
-//		})
-//	}
-//
-//	return reqArgs
-//}
-//
-//// assignAttestations assigns attestations using transaction-scoped pooling.
-//// It performs depositHash matching within each transaction using the already-processed messages.
-//// Returns AttestationStatus objects ready for encoding.
-//func (o *CCTPv2TokenDataObserver) assignAttestations(
-//	lggr logger.Logger,
-//	v2TokenPayloads map[cciptypes.ChainSelector]map[reader.MessageTokenID]*SourceTokenDataPayloadV2,
-//	fetchResults []FetchResult,
-//) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus, error) {
-//	result := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus)
-//
-//	// Process each transaction's results
-//	for _, fr := range fetchResults {
-//		// Build depositHash map FOR THIS TRANSACTION ONLY (transaction-scoped pooling)
-//		depositHashToMessages := make(map[[32]byte][]ProcessedCCTPMessage)
-//		for _, msg := range fr.ProcessedMessages {
-//			depositHashToMessages[msg.DepositHash] = append(depositHashToMessages[msg.DepositHash], msg)
-//		}
-//
-//		// Assign attestations to tokens IN THIS TRANSACTION
-//		for _, msgTokenID := range fr.Args.MsgTokenIDs {
-//			payload := v2TokenPayloads[fr.Args.SourceChain][msgTokenID]
-//			if payload == nil {
-//				lggr.Warnw(
-//					"Payload not found for MessageTokenID",
-//					"chainSelector", fr.Args.SourceChain,
-//					"msgTokenID", msgTokenID,
-//				)
-//				continue
-//			}
-//
-//			// Pop attestation from THIS transaction's pool
-//			messages := depositHashToMessages[payload.DepositHash]
-//			if len(messages) == 0 {
-//				lggr.Warnw(
-//					"No matching Circle message found for depositHash",
-//					"chainSelector", fr.Args.SourceChain,
-//					"txHash", fr.Args.TransactionHash,
-//					"depositHash", fmt.Sprintf("%x", payload.DepositHash),
-//				)
-//				if result[fr.Args.SourceChain] == nil {
-//					result[fr.Args.SourceChain] = make(map[reader.MessageTokenID]tokendata.AttestationStatus)
-//				}
-//				result[fr.Args.SourceChain][msgTokenID] = tokendata.ErrorAttestationStatus(tokendata.ErrDataMissing)
-//				continue
-//			}
-//
-//			// Pop the first available message (destructive - modifies the map)
-//			processedMsg := messages[0]
-//			depositHashToMessages[payload.DepositHash] = messages[1:]
-//
-//			lggr.Debugw(
-//				"Matched Circle message to depositHash",
-//				"chainSelector", fr.Args.SourceChain,
-//				"txHash", fr.Args.TransactionHash,
-//				"depositHash", fmt.Sprintf("%x", payload.DepositHash),
-//			)
-//
-//			// Initialize chain map if needed
-//			if result[fr.Args.SourceChain] == nil {
-//				result[fr.Args.SourceChain] = make(map[reader.MessageTokenID]tokendata.AttestationStatus)
-//			}
-//
-//			// Create successful AttestationStatus with the processed message data
-//			result[fr.Args.SourceChain][msgTokenID] = tokendata.SuccessAttestationStatus(
-//				processedMsg.DepositHash[:],
-//				processedMsg.MessageBytes,
-//				processedMsg.AttestationBytes,
-//			)
-//		}
-//	}
-//
-//	// Add error status for any payloads that weren't in any fetch result (API fetch failed)
-//	for chainSelector, chainPayloads := range v2TokenPayloads {
-//		if result[chainSelector] == nil {
-//			result[chainSelector] = make(map[reader.MessageTokenID]tokendata.AttestationStatus)
-//		}
-//		for msgTokenID := range chainPayloads {
-//			if _, exists := result[chainSelector][msgTokenID]; !exists {
-//				result[chainSelector][msgTokenID] = tokendata.ErrorAttestationStatus(tokendata.ErrDataMissing)
-//			}
-//		}
-//	}
-//
-//	return result, nil
-//}
-//
-//// convertToTokenDataObservations converts attestations to final TokenDataObservations format.
-//// It iterates through all messages and their tokens, encoding attestations for CCTPv2 USDC tokens
-//// and returning NotSupportedTokenData for unsupported tokens.
-//func (o *CCTPv2TokenDataObserver) convertToTokenDataObservations(
-//	ctx context.Context,
-//	lggr logger.Logger,
-//	messages exectypes.MessageObservations,
-//	attestations map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus,
-//) exectypes.TokenDataObservations {
-//	tokenObservations := make(exectypes.TokenDataObservations)
-//
-//	for chainSelector, chainMessages := range messages {
-//		tokenObservations[chainSelector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
-//
-//		for seqNum, message := range chainMessages {
-//			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
-//
-//			for i, tokenAmount := range message.TokenAmounts {
-//				if !o.IsTokenSupported(chainSelector, tokenAmount) {
-//					lggr.Debugw(
-//						"Ignoring unsupported token",
-//						"seqNum", seqNum,
-//						"sourceChainSelector", chainSelector,
-//						"sourcePoolAddress", tokenAmount.SourcePoolAddress.String(),
-//						"destTokenAddress", tokenAmount.DestTokenAddress.String(),
-//					)
-//					tokenData[i] = exectypes.NotSupportedTokenData()
-//				} else {
-//					var chainAttestations map[reader.MessageTokenID]tokendata.AttestationStatus
-//					if attestations != nil {
-//						chainAttestations = attestations[chainSelector]
-//					}
-//					tokenData[i] = o.attestationToTokenData(ctx, seqNum, i, chainAttestations)
-//				}
-//			}
-//
-//			tokenObservations[chainSelector][seqNum] = exectypes.NewMessageTokenData(tokenData...)
-//		}
-//	}
-//
-//	return tokenObservations
-//}
-//
-//// attestationToTokenData looks up and encodes attestation for a specific token in a message.
-//// Returns ErrorTokenData if attestation is missing, has errors, or encoding fails.
-//// On success, uses attestationEncoder to format data for the USDC token pool.
-//func (o *CCTPv2TokenDataObserver) attestationToTokenData(
-//	ctx context.Context,
-//	seqNum cciptypes.SeqNum,
-//	tokenIndex int,
-//	attestations map[reader.MessageTokenID]tokendata.AttestationStatus,
-//) exectypes.TokenData {
-//	status, ok := attestations[reader.NewMessageTokenID(seqNum, tokenIndex)]
-//	if !ok {
-//		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
-//	}
-//	if status.Error != nil {
-//		return exectypes.NewErrorTokenData(status.Error)
-//	}
-//	tokenData, err := o.attestationEncoder(ctx, status.MessageBody, status.Attestation)
-//	if err != nil {
-//		return exectypes.NewErrorTokenData(fmt.Errorf("unable to encode attestation: %w", err))
-//	}
-//	return exectypes.NewSuccessTokenData(tokenData)
-//}
