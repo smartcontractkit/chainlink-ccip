@@ -3,6 +3,9 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
+import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
+import {IPoolV1} from "../../../interfaces/IPool.sol";
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
@@ -13,6 +16,7 @@ import {MockExecutor} from "../../mocks/MockExecutor.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract OnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
@@ -198,16 +202,45 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     }
 
     if (message.tokenAmounts.length > 0) {
+      (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead) =
+        _getPoolFee(message.tokenAmounts[0].token, message.feeToken, extraArgsV3.finalityConfig, extraArgsV3.tokenArgs);
+
       verifierReceipts[verifierReceipts.length - 2] = OnRamp.Receipt({
         issuer: message.tokenAmounts[0].token,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 0,
+        destGasLimit: destGasOverhead,
+        destBytesOverhead: destBytesOverhead,
+        feeTokenAmount: feeUSDCents,
         extraArgs: extraArgsV3.tokenArgs
       });
     }
 
     return (verifierReceipts, extraArgsV3.gasLimit);
+  }
+
+  /// @notice Helper to get pool fee for a token, with fallback to FeeQuoter.
+  function _getPoolFee(
+    address token,
+    address feeToken,
+    uint16 finalityConfig,
+    bytes memory tokenArgs
+  ) internal view virtual returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead) {
+    IPoolV1 pool = IPoolV1(address(s_tokenAdminRegistry.getPool(token)));
+
+    // Try to call getFee if the pool supports IPoolV2.
+    if (IERC165(address(pool)).supportsInterface(type(IPoolV2).interfaceId)) {
+      (feeUSDCents, destGasOverhead, destBytesOverhead,) =
+        IPoolV2(address(pool)).getFee(token, DEST_CHAIN_SELECTOR, 0, feeToken, finalityConfig, tokenArgs);
+    }
+
+    // If the pool doesn't support IPoolV2 or didn't provide fee config, fall back to FeeQuoter.
+    if (feeUSDCents == 0 && destGasOverhead == 0) {
+      (uint32 feeQuoterFeeUSDCents, uint32 feeQuoterGasOverhead, uint32 feeQuoterBytesOverhead) =
+        IFeeQuoter(address(s_feeQuoter)).getTokenTransferFee(DEST_CHAIN_SELECTOR, token);
+      feeUSDCents = feeQuoterFeeUSDCents;
+      destGasOverhead = feeQuoterGasOverhead;
+      destBytesOverhead = feeQuoterBytesOverhead;
+    }
+    return (feeUSDCents, destGasOverhead, destBytesOverhead);
   }
 
   function _computeVerifierReceiptsLegacyArgs(
@@ -233,11 +266,14 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     }
 
     if (message.tokenAmounts.length > 0) {
+      (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead) =
+        _getPoolFee(message.tokenAmounts[0].token, message.feeToken, 0, "");
+
       verifierReceipts[verifierReceipts.length - 2] = OnRamp.Receipt({
         issuer: message.tokenAmounts[0].token,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 0,
+        destGasLimit: destGasOverhead,
+        destBytesOverhead: destBytesOverhead,
+        feeTokenAmount: feeUSDCents,
         extraArgs: ""
       });
     }
