@@ -106,11 +106,8 @@ library ExtraArgsCodec {
   /// @param gasLimit The gas limit for the callback on the destination chain.
   /// @param finalityConfig The finality configuration.
   /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
-  function _getBasicEncodedExtraArgsV3(
-    uint32 gasLimit,
-    uint16 finalityConfig
-  ) internal pure returns (bytes memory encoded) {
-    encoded = new bytes(GENERIC_EXTRA_ARGS_V3_BASE_SIZE);
+  function _getBasicEncodedExtraArgsV3(uint32 gasLimit, uint16 finalityConfig) internal pure returns (bytes memory) {
+    bytes memory encoded = new bytes(GENERIC_EXTRA_ARGS_V3_BASE_SIZE);
     assembly {
       let ptr := add(encoded, 32) // Skip length prefix.
 
@@ -348,9 +345,8 @@ library ExtraArgsCodec {
   function _decodeGenericExtraArgsV3(
     bytes calldata encoded
   ) internal pure returns (GenericExtraArgsV3 memory extraArgs) {
-    uint256 encodedLength = encoded.length;
     // Check if encodedLength is at least the minimum size.
-    if (encodedLength < GENERIC_EXTRA_ARGS_V3_BASE_SIZE) {
+    if (encoded.length < GENERIC_EXTRA_ARGS_V3_BASE_SIZE) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS);
     }
 
@@ -378,7 +374,7 @@ library ExtraArgsCodec {
     // Decode CCVs
     for (uint256 i = 0; i < ccvsLength; ++i) {
       // Read CCV address length (1 byte).
-      if (offset + 1 > encodedLength) {
+      if (offset + 1 > encoded.length) {
         revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS_LENGTH);
       }
 
@@ -394,7 +390,7 @@ library ExtraArgsCodec {
       }
 
       // Read CCV address
-      if (offset + ccvAddressLength > encodedLength) {
+      if (offset + ccvAddressLength > encoded.length) {
         revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS_CONTENT);
       }
 
@@ -409,7 +405,7 @@ library ExtraArgsCodec {
       }
 
       // Read CCV args length (2 bytes).
-      if (offset + 2 > encodedLength) {
+      if (offset + 2 > encoded.length) {
         revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_LENGTH);
       }
 
@@ -421,7 +417,7 @@ library ExtraArgsCodec {
       }
 
       // Read CCV args content.
-      if (offset + ccvArgsLength > encodedLength) {
+      if (offset + ccvArgsLength > encoded.length) {
         revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_CONTENT);
       }
 
@@ -432,7 +428,7 @@ library ExtraArgsCodec {
     }
 
     // Read executor length (1 byte).
-    if (offset + 1 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_LENGTH);
+    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_LENGTH);
     uint256 executorLength;
     assembly {
       executorLength := byte(0, calldataload(add(encoded.offset, offset)))
@@ -445,7 +441,7 @@ library ExtraArgsCodec {
     }
 
     // Read executor.
-    if (offset + executorLength > encodedLength) {
+    if (offset + executorLength > encoded.length) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_CONTENT);
     }
 
@@ -460,7 +456,7 @@ library ExtraArgsCodec {
     }
 
     // Read executorArgs length (2 bytes).
-    if (offset + 2 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_LENGTH);
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_LENGTH);
     uint256 executorArgsLength;
     assembly {
       let data := calldataload(add(encoded.offset, offset))
@@ -469,7 +465,7 @@ library ExtraArgsCodec {
     }
 
     // Read executorArgs content.
-    if (offset + executorArgsLength > encodedLength) {
+    if (offset + executorArgsLength > encoded.length) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_CONTENT);
     }
     extraArgs.executorArgs = encoded[offset:offset + executorArgsLength];
@@ -478,7 +474,7 @@ library ExtraArgsCodec {
     }
 
     // Read tokenReceiver length (2 bytes).
-    if (offset + 2 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_LENGTH);
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_LENGTH);
     uint256 tokenReceiverLength;
     assembly {
       let data := calldataload(add(encoded.offset, offset))
@@ -487,7 +483,7 @@ library ExtraArgsCodec {
     }
 
     // Read tokenReceiver content.
-    if (offset + tokenReceiverLength > encodedLength) {
+    if (offset + tokenReceiverLength > encoded.length) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_CONTENT);
     }
     extraArgs.tokenReceiver = encoded[offset:offset + tokenReceiverLength];
@@ -496,7 +492,7 @@ library ExtraArgsCodec {
     }
 
     // Read tokenArgs length (2 bytes).
-    if (offset + 2 > encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_LENGTH);
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_LENGTH);
     uint256 tokenArgsLength;
     assembly {
       let data := calldataload(add(encoded.offset, offset))
@@ -505,7 +501,7 @@ library ExtraArgsCodec {
     }
 
     // Read tokenArgs content.
-    if (offset + tokenArgsLength > encodedLength) {
+    if (offset + tokenArgsLength > encoded.length) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_CONTENT);
     }
     extraArgs.tokenArgs = encoded[offset:offset + tokenArgsLength];
@@ -514,7 +510,7 @@ library ExtraArgsCodec {
     }
 
     // Ensure we've consumed all bytes.
-    if (offset != encodedLength) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET);
+    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET);
 
     return extraArgs;
   }
@@ -580,9 +576,7 @@ library ExtraArgsCodec {
   function _decodeSVMExecutorArgsV1(
     bytes calldata encoded
   ) internal pure returns (SVMExecutorArgsV1 memory executorArgs) {
-    uint256 encodedLength = encoded.length;
-
-    if (encodedLength < SVM_EXECUTOR_ARGS_V1_BASE_SIZE) {
+    if (encoded.length < SVM_EXECUTOR_ARGS_V1_BASE_SIZE) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS);
     }
 
@@ -605,7 +599,7 @@ library ExtraArgsCodec {
     uint256 offset = SVM_EXECUTOR_ARGS_V1_BASE_SIZE;
 
     // Read accounts.
-    if (offset + accountsLength * 32 > encodedLength) {
+    if (offset + accountsLength * 32 > encoded.length) {
       revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_CONTENT);
     }
 
@@ -622,7 +616,7 @@ library ExtraArgsCodec {
     }
 
     // Ensure we've consumed all bytes.
-    if (offset != encodedLength) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET);
+    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET);
 
     return executorArgs;
   }
@@ -673,9 +667,7 @@ library ExtraArgsCodec {
   function _decodeSuiExecutorArgsV1(
     bytes calldata encoded
   ) internal pure returns (SuiExecutorArgsV1 memory executorArgs) {
-    uint256 encodedLength = encoded.length;
-
-    if (encodedLength < SUI_EXECUTOR_ARGS_V1_BASE_SIZE) {
+    if (encoded.length < SUI_EXECUTOR_ARGS_V1_BASE_SIZE) {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS);
     }
     // Read objectIds length
@@ -686,7 +678,7 @@ library ExtraArgsCodec {
 
     uint256 offset = SUI_EXECUTOR_ARGS_V1_BASE_SIZE;
     // Read objectIds
-    if (offset + objectIdsLength * 32 > encodedLength) {
+    if (offset + objectIdsLength * 32 > encoded.length) {
       revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_CONTENT);
     }
 
@@ -701,7 +693,7 @@ library ExtraArgsCodec {
     offset += objectIdsLength * 32;
 
     // Ensure we've consumed all bytes
-    if (offset != encodedLength) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET);
+    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET);
 
     return executorArgs;
   }

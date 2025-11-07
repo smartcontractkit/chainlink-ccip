@@ -64,7 +64,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
     assertEq(decoded.accountIsWritableBitmap, type(uint64).max);
   }
 
-  function test_DecodeSVMExecutorArgsV1_RevertWhen_DataTooShort() public {
+  function test_DecodeSVMExecutorArgsV1_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
     vm.expectRevert(
       abi.encodeWithSelector(
         ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS
@@ -73,7 +73,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
     s_helper._decodeSVMExecutorArgsV1(new bytes(10));
   }
 
-  function test_DecodeSVMExecutorArgsV1_RevertWhen_ExtraBytes() public {
+  function test_DecodeSVMExecutorArgsV1_RevertWhen_SVM_EXECUTOR_FINAL_OFFSET() public {
     ExtraArgsCodec.SVMExecutorArgsV1 memory args = ExtraArgsCodec.SVMExecutorArgsV1({
       useATA: ExtraArgsCodec.SVMATAUsage.DERIVE_ACCOUNT_AND_CREATE,
       accountIsWritableBitmap: 0,
@@ -89,5 +89,38 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
       )
     );
     s_helper._decodeSVMExecutorArgsV1(withExtra);
+  }
+
+  function test_DecodeSVMExecutorArgsV1_RevertWhen_SVM_EXECUTOR_ACCOUNTS_CONTENT() public {
+    bytes memory invalidData = abi.encodePacked(
+      ExtraArgsCodec.SVM_EXECUTOR_ARGS_V1_TAG,
+      uint8(ExtraArgsCodec.SVMATAUsage.DERIVE_ACCOUNT_AND_CREATE),
+      uint64(0),
+      uint8(2) // Claims 2 accounts but doesn't provide them.
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_CONTENT
+      )
+    );
+    s_helper._decodeSVMExecutorArgsV1(invalidData);
+  }
+
+  function test_EncodeSVMExecutorArgsV1_RevertWhen_ENCODE_SVM_ACCOUNTS_LENGTH() public {
+    bytes32[] memory accounts = new bytes32[](257);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_SVM_ACCOUNTS_LENGTH
+      )
+    );
+    ExtraArgsCodec._encodeSVMExecutorArgsV1(
+      ExtraArgsCodec.SVMExecutorArgsV1({
+        useATA: ExtraArgsCodec.SVMATAUsage.DERIVE_ACCOUNT_AND_CREATE,
+        accountIsWritableBitmap: 0,
+        accounts: accounts
+      })
+    );
   }
 }

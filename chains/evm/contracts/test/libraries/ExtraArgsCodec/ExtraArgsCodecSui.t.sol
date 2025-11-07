@@ -40,7 +40,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
     assertEq(decoded.receiverObjectIds[0], keccak256("object1"));
   }
 
-  function test_DecodeSuiExecutorArgsV1_RevertWhen_DataTooShort() public {
+  function test_DecodeSuiExecutorArgsV1_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
     vm.expectRevert(
       abi.encodeWithSelector(
         ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS
@@ -49,7 +49,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
     s_helper._decodeSuiExecutorArgsV1(new bytes(3));
   }
 
-  function test_DecodeSuiExecutorArgsV1_RevertWhen_ExtraBytes() public {
+  function test_DecodeSuiExecutorArgsV1_RevertWhen_SUI_EXECUTOR_FINAL_OFFSET() public {
     ExtraArgsCodec.SuiExecutorArgsV1 memory args =
       ExtraArgsCodec.SuiExecutorArgsV1({receiverObjectIds: new bytes32[](0)});
 
@@ -62,5 +62,30 @@ contract ExtraArgsCodecSui_Test is BaseTest {
       )
     );
     s_helper._decodeSuiExecutorArgsV1(withExtra);
+  }
+
+  function test_DecodeSuiExecutorArgsV1_RevertWhen_SUI_EXECUTOR_OBJECT_IDS_CONTENT() public {
+    bytes memory invalidData = abi.encodePacked(
+      ExtraArgsCodec.SUI_EXECUTOR_ARGS_V1_TAG,
+      uint8(2) // Claims 2 object IDs but doesn't provide them.
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_CONTENT
+      )
+    );
+    s_helper._decodeSuiExecutorArgsV1(invalidData);
+  }
+
+  function test_EncodeSuiExecutorArgsV1_RevertWhen_ENCODE_SUI_OBJECT_IDS_LENGTH() public {
+    bytes32[] memory objectIds = new bytes32[](257);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_SUI_OBJECT_IDS_LENGTH
+      )
+    );
+    ExtraArgsCodec._encodeSuiExecutorArgsV1(ExtraArgsCodec.SuiExecutorArgsV1({receiverObjectIds: objectIds}));
   }
 }
