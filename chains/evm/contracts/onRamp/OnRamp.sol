@@ -316,8 +316,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // First add all user requested CCVs.
     for (uint256 i = 0; i < userRequestedOrDefaultCCVs.length; ++i) {
       ccvs[toBeAddedIndex] = userRequestedOrDefaultCCVs[i];
-      ccvArgs[toBeAddedIndex] = userRequestedOrDefaultCCVArgs[i];
-      toBeAddedIndex++;
+      ccvArgs[toBeAddedIndex++] = userRequestedOrDefaultCCVArgs[i];
     }
     // Add lane mandated CCVs, skipping duplicates.
     for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
@@ -330,9 +329,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         }
       }
       if (!found) {
-        ccvs[toBeAddedIndex] = laneMandatedCCV;
-        ccvArgs[toBeAddedIndex] = "";
-        toBeAddedIndex++;
+        ccvs[toBeAddedIndex++] = laneMandatedCCV;
       }
     }
     // Add pool required CCVs, skipping duplicates.
@@ -346,9 +343,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         }
       }
       if (!found) {
-        ccvs[toBeAddedIndex] = poolRequiredCCV;
-        ccvArgs[toBeAddedIndex] = "";
-        toBeAddedIndex++;
+        ccvs[toBeAddedIndex++] = poolRequiredCCV;
       }
     }
 

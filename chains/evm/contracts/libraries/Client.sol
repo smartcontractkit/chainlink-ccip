@@ -3,16 +3,6 @@ pragma solidity ^0.8.0;
 
 // End consumer library.
 library Client {
-  /// @notice The CCV struct is used to represent a cross-chain verifier.
-  /// @dev This is defined in both Client and ExtraArgsCodec for backwards compatibility.
-  struct CCV {
-    /// @param ccvAddress The address of the verifier contract on the source chain
-    address ccvAddress;
-    /// @param args The arguments that the verifier contract expects. They are opaque to CCIP and are only
-    /// used in the CCV.
-    bytes args;
-  }
-
   struct EVMTokenAmount {
     address token; // token address on the local chain.
     uint256 amount; // Amount of tokens.
