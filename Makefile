@@ -114,3 +114,14 @@ gomodtidy: gomods
 modgraph: gomods
 	go install github.com/jmank88/modgraph@v0.1.1
 	./modgraph > go.md
+
+pin_deployment_dependencies:
+	@cd chains/evm/deployment && \
+	go get github.com/smartcontractkit/chainlink-ccip@$(SHA) && \
+	go get github.com/smartcontractkit/chainlink-ccip/deployment@$(SHA)
+	@cd ccv/chains/evm/deployment && \
+	go get github.com/smartcontractkit/chainlink-ccip@$(SHA) && \
+	go get github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm@$(SHA) && \
+	go get github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment@$(SHA) && \
+	go get github.com/smartcontractkit/chainlink-ccip/deployment@$(SHA)
+	@$(MAKE) gomodtidy

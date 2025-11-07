@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 import {IExecutor} from "../../../interfaces/IExecutor.sol";
 
@@ -183,6 +184,11 @@ contract OnRamp_getFee is OnRampSetup {
   ) internal {
     vm.mockCall(
       verifier,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector, DEST_CHAIN_SELECTOR),
+      abi.encode(verifier)
+    );
+    vm.mockCall(
+      verifier,
       abi.encodeWithSelector(ICrossChainVerifierV1.getFee.selector),
       abi.encode(feeUSDCents, gasForVerification, payloadSizeBytes)
     );
@@ -292,5 +298,28 @@ contract OnRamp_getFee is OnRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.DestinationChainNotSupported.selector, invalidChainSelector));
     s_onRamp.getFee(invalidChainSelector, _generateEmptyMessage());
+  }
+
+  function test_getFee_RevertWhen_DestinationChainNotSupportedByCCV() public {
+    address verifier = makeAddr("verifier_no_support");
+
+    _mockVerifierFee(verifier, 100, 0, 0);
+    // Mock to return address(0) to simulate no support.
+    vm.mockCall(
+      verifier,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector, DEST_CHAIN_SELECTOR),
+      abi.encode(address(0))
+    );
+
+    address[] memory ccvs = new address[](1);
+    ccvs[0] = verifier;
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(_createV3ExtraArgs(ccvs, new bytes[](1)));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(OnRamp.DestinationChainNotSupportedByCCV.selector, verifier, DEST_CHAIN_SELECTOR)
+    );
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
 }

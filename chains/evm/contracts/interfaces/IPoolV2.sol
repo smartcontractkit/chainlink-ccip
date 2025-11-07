@@ -26,30 +26,30 @@ interface IPoolV2 is IPoolV1 {
 
   /// @notice Lock tokens into the pool or burn the tokens.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
-  /// @param finality The finality configuration from the CCIP message.
+  /// @param blockConfirmationRequested Requested block confirmation.
   /// @param tokenArgs Additional token arguments.
   /// @return lockOrBurnOut Encoded data fields for the processing of tokens on the destination chain.
   /// @return destTokenAmount The amount of tokens that will be set in TokenTransferV1.amount to be released/mint on destination.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 finality,
+    uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount);
 
   /// @notice Releases or mints tokens on the destination chain.
   /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
-  /// @param finality The finality configuration from the CCIP message.
+  /// @param blockConfirmationRequested Requested block confirmation.
   /// @return releaseOrMintOut Encoded data fields describing the result of the release or mint.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 finality
+    uint16 blockConfirmationRequested
   ) external returns (Pool.ReleaseOrMintOutV1 memory releaseOrMintOut);
 
   /// @notice Returns the set of required CCVs for transfers in a given direction.
   /// @param localToken The address of the local token.
   /// @param remoteChainSelector The chain selector of the remote chain.
   /// @param amount The amount of tokens to be transferred.
-  /// @param finality The finality configuration from the CCIP message.
+  /// @param blockConfirmationRequested Requested block confirmation.
   /// @param extraData Direction-specific payload forwarded by the caller (e.g. token args or source pool data).
   /// @param direction Whether CCVs are required for outbound (source -> remote) or inbound (remote -> destination) transfers.
   /// @return requiredCCVs A set of addresses representing the required CCVs.
@@ -57,7 +57,7 @@ interface IPoolV2 is IPoolV1 {
     address localToken,
     uint64 remoteChainSelector,
     uint256 amount,
-    uint16 finality,
+    uint16 blockConfirmationRequested,
     bytes calldata extraData,
     MessageDirection direction
   ) external view returns (address[] memory requiredCCVs);
@@ -66,14 +66,14 @@ interface IPoolV2 is IPoolV1 {
   /// @notice localToken The address of the local token.
   /// @param destChainSelector The chain selector of the destination chain.
   /// @param message The message to be sent to the destination chain.
-  /// @param finality The finality configuration from the CCIP message.
+  /// @param blockConfirmationRequested Requested block confirmation.
   /// @param tokenArgs Additional token argument from the CCIP message.
   /// @return feeConfig the fee configuration for transferring the token to the destination chain.
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
-    uint16 finality,
+    uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external view returns (TokenTransferFeeConfig memory feeConfig);
 

@@ -153,7 +153,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.lockOrBurn(lockOrBurnIn);
 
-    assertEq(s_tokenPool.getAccumulatedFees(), 0); // No fees should be accumulated
+    assertEq(IERC20(s_token).balanceOf(address(s_tokenPool)), 0); // No fees should be accumulated
   }
 
   // Should not burn tokens if cursed.

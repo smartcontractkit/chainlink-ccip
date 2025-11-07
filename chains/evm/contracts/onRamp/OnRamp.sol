@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IExecutor} from "../interfaces/IExecutor.sol";
@@ -32,6 +33,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   using USDPriceWith18Decimals for uint224;
 
   error CannotSendZeroTokens();
+  error DestinationChainNotSupportedByCCV(address ccvAddress, uint64 destChainSelector);
   error UnsupportedToken(address token);
   error CanOnlySendOneTokenPerMessage();
   error MustBeCalledByRouter();
@@ -44,6 +46,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InvalidOptionalCCVThreshold();
   error DestinationChainNotSupported(uint64 destChainSelector);
   error InvalidDestChainAddress(bytes destChainAddress);
+  error CustomBlockConfirmationNotSupportedOnPoolV1();
+  error TokenArgsNotSupportedOnPoolV1();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -247,6 +251,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         destChainSelector,
         resolvedExtraArgs.tokenReceiver.length > 0 ? resolvedExtraArgs.tokenReceiver : newMessage.receiver,
         originalSender,
+        resolvedExtraArgs.finalityConfig,
         resolvedExtraArgs.tokenArgs
       );
     }
@@ -260,7 +265,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 6. call each verifier.
     for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-      eventData.verifierBlobs[i] = ICrossChainVerifierV1(resolvedExtraArgs.ccvs[i]).forwardToVerifier(
+      address implAddress = ICrossChainVerifierResolver(resolvedExtraArgs.ccvs[i]).getOutboundImplementation(
+        destChainSelector, resolvedExtraArgs.ccvArgs[i]
+      );
+      if (implAddress == address(0)) {
+        revert DestinationChainNotSupportedByCCV(resolvedExtraArgs.ccvs[i], destChainSelector);
+      }
+      eventData.verifierBlobs[i] = ICrossChainVerifierV1(implAddress).forwardToVerifier(
         newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvArgs[i]
       );
     }
@@ -562,13 +573,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param destChainSelector Target destination chain selector of the message.
   /// @param receiver Message receiver.
   /// @param originalSender Message sender.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Additional token arguments from the message.
   /// @return TokenTransferV1 token transfer encoding for MessageV1.
   function _lockOrBurnSingleToken(
     Client.EVMTokenAmount memory tokenAndAmount,
     uint64 destChainSelector,
     bytes memory receiver,
     address originalSender,
-    bytes memory // extraArgs
+    uint16 blockConfirmationRequested,
+    bytes memory tokenArgs
   ) internal returns (MessageV1Codec.TokenTransferV1 memory) {
     if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
 
@@ -580,21 +594,40 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       revert UnsupportedToken(tokenAndAmount.token);
     }
 
-    // TODO support CCIP_POOL_V2
+    // For v1 pools, the destination amount is set equal to the source amount.
+    // For v2 pools, the destination amount may be modified in the following logic.
+    uint256 destTokenAmount = tokenAndAmount.amount;
+    Pool.LockOrBurnOutV1 memory poolReturnData;
 
-    Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
-      Pool.LockOrBurnInV1({
+    {
+      Pool.LockOrBurnInV1 memory lockOrBurnInput = Pool.LockOrBurnInV1({
         receiver: receiver,
         remoteChainSelector: destChainSelector,
         originalSender: originalSender,
         amount: tokenAndAmount.amount,
         localToken: tokenAndAmount.token
-      })
-    );
+      });
 
-    // NOTE: pool data validations are outsourced to the FeeQuoter to handle family-specific logic handling.
+      // If the pool declares support for IPoolV2, it can handle `finality` and `tokenArgs`.
+      // Use the V2 overload which returns a potentially adjusted destination amount.
+      if (IERC165(address(sourcePool)).supportsInterface(type(IPoolV2).interfaceId)) {
+        (poolReturnData, destTokenAmount) =
+          IPoolV2(address(sourcePool)).lockOrBurn(lockOrBurnInput, blockConfirmationRequested, tokenArgs);
+      } else {
+        // V1 pools don't understand `blockConfirmationRequested`/`tokenArgs`.
+        // We enforce default for `blockConfirmationRequested` and no `tokenArgs` to avoid silent mis-interpretation.
+        if (blockConfirmationRequested != 0) {
+          revert CustomBlockConfirmationNotSupportedOnPoolV1();
+        }
+        if (tokenArgs.length != 0) {
+          revert TokenArgsNotSupportedOnPoolV1();
+        }
+        poolReturnData = sourcePool.lockOrBurn(lockOrBurnInput);
+      }
+    }
+
     return MessageV1Codec.TokenTransferV1({
-      amount: tokenAndAmount.amount,
+      amount: destTokenAmount,
       sourcePoolAddress: abi.encodePacked(address(sourcePool)),
       sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
       destTokenAddress: this.validateDestChainAddress(
@@ -726,9 +759,15 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
 
     for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
-      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
-        extraArgs.ccvs[i]
-      ).getFee(destChainSelector, message, extraArgs.ccvArgs[i], extraArgs.finalityConfig);
+      address implAddress = ICrossChainVerifierResolver(extraArgs.ccvs[i]).getOutboundImplementation(
+        destChainSelector, extraArgs.ccvArgs[i]
+      );
+      if (implAddress == address(0)) {
+        revert DestinationChainNotSupportedByCCV(extraArgs.ccvs[i], destChainSelector);
+      }
+
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(implAddress)
+        .getFee(destChainSelector, message, extraArgs.ccvArgs[i], extraArgs.finalityConfig);
 
       verifierReceipts[i] = Receipt({
         issuer: extraArgs.ccvs[i],

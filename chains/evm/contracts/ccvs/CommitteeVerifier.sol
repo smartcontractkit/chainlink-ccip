@@ -14,6 +14,7 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, SignatureQuorumValidator, BaseVerifier {
   error InvalidConfig();
   error InvalidCCVData();
+  error InvalidCCVVersion(bytes4 verifierVersion);
   error OnlyCallableByOwnerOrAllowlistAdmin();
 
   event ConfigSet(DynamicConfig dynamicConfig);
@@ -26,6 +27,10 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "CommitteeVerifier 1.7.0-dev";
+  /// @dev The preimage is bytes4(keccak256("CommitteeVerifier 1.7.0")).
+  bytes4 internal constant VERSION_TAG_V1_7_0 = 0x49ff34ed;
+  /// @dev The number of bytes allocated to encoding the verifier version.
+  uint256 internal constant VERIFIER_VERSION_BYTES = 4;
   /// @dev The number of bytes allocated to encoding the signature length within the ccvData.
   uint256 internal constant SIGNATURE_LENGTH_BYTES = 2;
 
@@ -49,7 +54,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
     // TODO: Process msg & return verifier data
-    return "";
+    return abi.encodePacked(VERSION_TAG_V1_7_0);
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -58,18 +63,34 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     bytes32 messageHash,
     bytes calldata ccvData
   ) external view {
-    if (ccvData.length < SIGNATURE_LENGTH_BYTES) {
+    if (ccvData.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES) {
       revert InvalidCCVData();
     }
 
-    uint256 signatureLength = uint16(bytes2(ccvData[:SIGNATURE_LENGTH_BYTES]));
-    if (ccvData.length < SIGNATURE_LENGTH_BYTES + signatureLength) {
+    // Any ccvData submitted to this verifier should have the expected version.
+    bytes4 verifierVersion = bytes4(ccvData[:VERIFIER_VERSION_BYTES]);
+    if (verifierVersion != VERSION_TAG_V1_7_0) {
+      revert InvalidCCVVersion(verifierVersion);
+    }
+
+    uint256 signatureLength =
+      uint16(bytes2(ccvData[VERIFIER_VERSION_BYTES:VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES]));
+    if (ccvData.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength) {
       revert InvalidCCVData();
     }
 
-    // Even though the current version of this contract only expects signatures to be included in the ccvData, bounding
-    // it to the given length allows potential forward compatibility with future formats that supply more data.
-    _validateSignatures(messageHash, ccvData[SIGNATURE_LENGTH_BYTES:SIGNATURE_LENGTH_BYTES + signatureLength]);
+    // Even though the current version of this contract only expects verifier version and signatures to be included in the ccvData,
+    // bounding it to the given length allows potential forward compatibility with future formats that supply more data.
+    _validateSignatures(
+      // Verifiers sign a concatenation of the verifier version and the message hash.
+      // The version is included so that a resolver can return the correct verifier implementation on destination.
+      // The version must be signed, otherwise any version could be inserted post-signatures.
+      keccak256(bytes.concat(verifierVersion, messageHash)),
+      ccvData[
+        VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES:
+          VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength
+      ]
+    );
   }
 
   // ================================================================
@@ -132,6 +153,11 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     emit BaseVerifier.StorageLocationUpdated(s_storageLocation, newLocation);
 
     s_storageLocation = newLocation;
+  }
+
+  /// @notice Exposes the version tag.
+  function versionTag() public pure returns (bytes4) {
+    return VERSION_TAG_V1_7_0;
   }
 
   // ================================================================

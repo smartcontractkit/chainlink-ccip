@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMessageReceiverV2} from "../interfaces/IAny2EVMMessageReceiverV2.sol";
+import {ICrossChainVerifierResolver} from "../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
@@ -13,17 +14,17 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
-import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.0.2/token/ERC20/IERC20.sol";
+import {ERC165Checker} from "@openzeppelin/contracts@5.0.2/utils/introspection/ERC165Checker.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
-  using ERC165CheckerReverting for address;
+  using ERC165Checker for address;
   using EnumerableSet for EnumerableSet.UintSet;
 
   error ZeroChainSelectorNotAllowed();
@@ -47,6 +48,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
   error InvalidOnRamp(bytes expected, bytes got);
+  error InboundImplementationNotFound(address ccvAddress, bytes ccvData);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -283,7 +285,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        ICrossChainVerifierV1(ccvsToQuery[i]).verifyMessage({
+        address implAddress =
+          ICrossChainVerifierResolver(ccvsToQuery[i]).getInboundImplementation(ccvData[ccvDataIndex[i]]);
+        if (implAddress == address(0)) {
+          revert InboundImplementationNotFound(ccvsToQuery[i], ccvData[ccvDataIndex[i]]);
+        }
+        ICrossChainVerifierV1(implAddress).verifyMessage({
           message: message,
           messageId: messageId,
           ccvData: ccvData[ccvDataIndex[i]]
@@ -293,8 +300,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
     for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
-      destTokenAmounts[i] =
-        _releaseOrMintSingleToken(message.tokenTransfer[i], message.sender, message.sourceChainSelector);
+      destTokenAmounts[i] = _releaseOrMintSingleToken(
+        message.tokenTransfer[i], message.sender, message.sourceChainSelector, message.finality
+      );
     }
 
     // There are three cases in which we skip calling the receiver:
@@ -311,7 +319,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // which checks for sufficient gas before making the external call.
     if (
       (message.data.length == 0 && message.gasLimit == 0) || receiver.code.length == 0
-        || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
+        || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
     (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
@@ -555,7 +563,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // If the receiver is a contract
     if (receiver.code.length != 0) {
       // And the contract implements the IAny2EVMMessageReceiverV2 interface.
-      if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
+      if (receiver.supportsInterface(type(IAny2EVMMessageReceiverV2).interfaceId)) {
         (requiredCCV, optionalCCVs, optionalThreshold) =
           IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
 
@@ -589,7 +597,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   ) internal view returns (address[] memory requiredCCV) {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
 
-    if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
+    if (pool.supportsInterface(type(IPoolV2).interfaceId)) {
       requiredCCV = IPoolV2(pool).getRequiredCCVs(
         localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.MessageDirection.Inbound
       );
@@ -617,11 +625,13 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param sourceTokenAmount Amount and source data of the token to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param sourceChainSelector The remote source chain selector
+  /// @param blockConfirmationRequested Requested block confirmation.
   /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
-    uint64 sourceChainSelector
+    uint64 sourceChainSelector,
+    uint16 blockConfirmationRequested
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
     address receiver = address(bytes20(sourceTokenAmount.tokenReceiver));
 
@@ -636,38 +646,42 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert NotACompatiblePool(localPoolAddress);
     }
 
-    // Check V2 first, as it is the most recent version of the pool interface.
-    if (localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V2)) {
-      // TODO write IPoolV2
-    }
-
-    if (!localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V1)) {
-      // If the pool does not support the v1 interface, we revert.
-      revert NotACompatiblePool(localPoolAddress);
-    }
     // We retrieve the local token balance of the receiver before the pool call.
     uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
-
     Pool.ReleaseOrMintOutV1 memory returnData;
-    try IPoolV1(localPoolAddress).releaseOrMint(
-      Pool.ReleaseOrMintInV1({
-        originalSender: originalSender,
-        receiver: receiver,
-        sourceDenominatedAmount: sourceTokenAmount.amount,
-        localToken: localToken,
-        remoteChainSelector: sourceChainSelector,
-        // This re-encodes the address as bytes, but now with the zero prefix to make it 32 bytes long.
-        // We have to cast it to an address to ensure the bytes are padded on the left with zeros, bytes objects get
-        // padded on the right.
-        sourcePoolAddress: abi.encode(address(bytes20(sourceTokenAmount.sourcePoolAddress))),
-        sourcePoolData: sourceTokenAmount.extraData,
-        // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
-        offchainTokenData: ""
-      })
-    ) returns (Pool.ReleaseOrMintOutV1 memory result) {
-      returnData = result;
-    } catch (bytes memory err) {
-      revert TokenHandlingError(localToken, err);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintInput = Pool.ReleaseOrMintInV1({
+      originalSender: originalSender,
+      receiver: receiver,
+      sourceDenominatedAmount: sourceTokenAmount.amount,
+      localToken: localToken,
+      remoteChainSelector: sourceChainSelector,
+      // This re-encodes the address as bytes, but now with the zero prefix to make it 32 bytes long.
+      // We have to cast it to an address to ensure the bytes are padded on the left with zeros, bytes objects get
+      // padded on the right.
+      sourcePoolAddress: abi.encode(address(bytes20(sourceTokenAmount.sourcePoolAddress))),
+      sourcePoolData: sourceTokenAmount.extraData,
+      // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
+      offchainTokenData: ""
+    });
+
+    if (localPoolAddress.supportsInterface(Pool.CCIP_POOL_V2)) {
+      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationRequested) returns (
+        Pool.ReleaseOrMintOutV1 memory result
+      ) {
+        returnData = result;
+      } catch (bytes memory err) {
+        revert TokenHandlingError(localToken, err);
+      }
+    } else if (localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
+      try IPoolV1(localPoolAddress).releaseOrMint(releaseOrMintInput) returns (Pool.ReleaseOrMintOutV1 memory result) {
+        returnData = result;
+      } catch (bytes memory err) {
+        revert TokenHandlingError(localToken, err);
+      }
+    } else {
+      // If the pool does not support the v1 interface, we revert.
+      revert NotACompatiblePool(localPoolAddress);
     }
 
     // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
