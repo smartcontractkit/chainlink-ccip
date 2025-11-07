@@ -143,68 +143,22 @@ cctpV2Message2 with attestation2 and DepositHashX
 then `attestation1` can be assigned to **either** `tokenPayloadA` or `tokenPayloadB`, and `attestation2` assigned to the 
 remaining `tokenPayload`. 
 
+### Putting it all together
+With this understanding we can write the high-level design of `Observe()`. For each chain:
+1. Extract data from `messages`: v2TokenPayloads, sourceDomainID, txHashes
+2. Fetch attestations from the CCTPv2 API and assign an attestation to each v2TokenPayload
+3. Convert each attestation to `TokenData`
 
+Step 2 is implemented by `assignAttestationsToV2TokenPayloads` which, for each txHash:
+- fetch `CCTPv2Messages` from the API
+- converts `CCTPv2Messages` to a map from `DepositHash` to `[]AttestationStatus`
+  - Again note that `DepositHash` is not unique and may map to multiple `AttestationStatus`
+  - `AttestationStatus` acts here as a container for `MessageBody` and `Attestation`
+- iterate over each `v2TokenPayload`
+  - look up `v2TokenPayload.DepositHash` in the `DepositHash` to `[]AttestationStatus` map
+  - if the lookup returns a non-empty list, destructively pop() an `AttestationStatus`
+    - **The popped `AttestationStatus` is now assigned to this specific `v2TokenPayload`**
+    - The pop() being destructive ensures the `AttestationStatus` won't be assigned again
+- At the end of this iteration, each `v2TokenPayload` has been assigned a `AttestationStatus` (for this specific TxHash)
 
-??? Random thoughts / WIP below ???``
-Need: collection of `SourceTokenDataPayloadV2` and `CCTPv2Messages`
-- SeqNum maps to SourceTokenDataPayloadV2, but TxHash maps to CCTPv2Messages
-`map[TxHash][]SeqNum`?
-```
-getTxHashes(messages map[cciptypes.SeqNum]cciptypes.Message) map[TxHash][]SeqNum
-func (txHashes []TxHash, sourceDomainID, uint32) map[TxHash]CCTPv2Messages
-map[TxHash]CCTPv2Messages + map[TxHash][]SeqNum + map[cciptypes.SeqNum]map[int]SourceTokenDataPayloadV2
-func 
-
-func assignAttestationsToV2TokenPayloads(
-    messages map[cciptypes.SeqNum]Message,
-    txHashToSeqNums map[TxHash][]SeqNum, 
-    sourceDomainID uint32, 
-    v2TokenPayloads map[cciptypes.SeqNum]map[int]SourceTokenDataPayloadV2
-) map[cciptypes.SeqNum]map[int]AttestationStatus {
-    result := map[cciptypes.SeqNum]map[int]AttestationStatus
-    for txHash, seqNums in txHashToSeqNums {
-      cctpv2Messages := getCCTPv2Messages(sourceDomainID uint32, txHash string) CCTPv2Messages
-      attestations := extractAttestations(cctpv2Messages)
-      assignedAttestations := make(map[int]AttestationStatus)
-      for seqNum, v2TokenPayloads in v2TokenPayloads {
-        for idx, v2TokenPayload in v2TokenPayloads {
-            assignedAttestation := assignAttestationForV2TokenPayload(attestations, v2TokenPayload)
-            assignedAttestation.ID = messages[SeqNum].ID
-            assignedAttestations[idx] = assignedAttestation
-        }
-        result[SeqNum] = assignedAttestations
-      }
-    }
-    return result
-}
-
-// For a single Tx
-// Maybe fill-in messageID later
-func extractAttestations(cctpV2Messages CCTPv2Messages) map[depositHash][]AttestationStatus {
-    // filter out not complete, not v2
-    for cctpV2Message in cctpV2Messages {
-        
-    }
-}
-
-
-// Need to mutate attestations
-func assignAttestationForV2TokenPayload (
-    attestations map[depositHash][]AttestationStatus, 
-    v2TokenPayload SourceTokenDataPayloadV2
-) AttestationStatus {
-    attestationStatuses, ok := attestations.get(v2TokenPayload.DepositHash)
-    if !ok || len(attestationStatuses) == 0 {
-        return ErrorAttestationStatus(tokendata.ErrDataMissing)
-    }
-        
-    attestation := attestationStatuses[0]
-    attestations[v2TokenPayload.DepositHash] = attestationStatuses[1:]
-    return attestation
-}
-```
-You can transform `CCTPv2Messages -> map[depositHash][]AttestationStatus`
-
-Key point: attestations are fungible for the same depositHashes *in the same tx*
-
-Need: `map[cciptypes.SeqNum]map[int](ID, MessageBody, Attestation)`
+Step 3 converts these `AttestationStatus` into `TokenData` and ensures structure is preserved.

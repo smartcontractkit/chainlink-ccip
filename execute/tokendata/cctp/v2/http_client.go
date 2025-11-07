@@ -7,7 +7,6 @@ package v2
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -32,9 +31,6 @@ type CCTPv2HTTPClient interface {
 	GetMessages(
 		ctx context.Context, sourceChain cciptypes.ChainSelector, sourceDomainID uint32, transactionHash string,
 	) (CCTPv2Messages, error)
-	GetProcessedMessages(
-		ctx context.Context, sourceChain cciptypes.ChainSelector, sourceDomainID uint32, transactionHash string,
-	) ([]ProcessedCCTPMessage, error)
 }
 
 // MetricsReporter provides metrics reporting for attestation API calls
@@ -133,8 +129,30 @@ func (c *CCTPv2HTTPClientImpl) GetMessages(
 		return CCTPv2Messages{}, err
 	}
 
+	// Filter messages to only include complete V2 messages
+	filteredMessages := make([]CCTPv2Message, 0, len(result.Messages))
+	for _, msg := range result.Messages {
+		// Only include messages that are:
+		// 1. CCTPv2 (version = 2)
+		// 2. Complete (status = "complete")
+		if msg.CCTPVersion == 2 && strings.EqualFold(msg.Status, "complete") {
+			filteredMessages = append(filteredMessages, msg)
+		}
+	}
+
+	// Log if we filtered out any messages
+	if len(filteredMessages) != len(result.Messages) {
+		c.lggr.Debugw(
+			"Filtered CCTPv2 messages",
+			"originalCount", len(result.Messages),
+			"filteredCount", len(filteredMessages),
+			"transactionHash", transactionHash,
+			"sourceDomainID", sourceDomainID,
+		)
+	}
+
 	success = true
-	return result, nil
+	return CCTPv2Messages{Messages: filteredMessages}, nil
 }
 
 // parseResponseBody parses the JSON response from Circle's attestation API
@@ -193,132 +211,4 @@ type CCTPv2DecodedMessageBody struct {
 	FeeExecuted     string `json:"feeExecuted,omitempty"`
 	ExpirationBlock string `json:"expirationBlock,omitempty"`
 	HookData        string `json:"hookData,omitempty"`
-}
-
-// ProcessedCCTPMessage contains validated and decoded CCTP message data ready for use.
-// This is the result of processing a raw CCTPv2Message from the API by:
-// - Filtering for complete status and CCTP version 2
-// - Calculating the depositHash from the decoded message
-// - Decoding hex-encoded message and attestation bytes
-type ProcessedCCTPMessage struct {
-	DepositHash      [32]byte // Content-addressable hash identifying the transfer
-	MessageBytes     []byte   // Decoded CCTP message bytes
-	AttestationBytes []byte   // Decoded attestation signature bytes
-}
-
-// GetProcessedMessages fetches CCTP messages for a transaction and processes them.
-// Returns only complete, version 2 messages with decoded hex data.
-// This method:
-// 1. Calls GetMessages() to fetch raw messages from Circle API
-// 2. Filters for messages with CCTPVersion == 2 and Status == "complete"
-// 3. Calculates depositHash for each message using CalculateDepositHash()
-// 4. Decodes hex-encoded message and attestation bytes
-// 5. Returns a list of ProcessedCCTPMessage ready for use
-func (c *CCTPv2HTTPClientImpl) GetProcessedMessages(
-	ctx context.Context,
-	sourceChain cciptypes.ChainSelector,
-	sourceDomainID uint32,
-	transactionHash string,
-) ([]ProcessedCCTPMessage, error) {
-	// Fetch raw messages from Circle API
-	rawMessages, err := c.GetMessages(ctx, sourceChain, sourceDomainID, transactionHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get messages: %w", err)
-	}
-
-	var processedMessages []ProcessedCCTPMessage
-
-	for i, msg := range rawMessages.Messages {
-		// Filter: Only process CCTP version 2 messages
-		if msg.CCTPVersion != 2 {
-			c.lggr.Debugw(
-				"Skipping message with non-v2 CCTP version",
-				"sourceChain", sourceChain,
-				"sourceDomainID", sourceDomainID,
-				"transactionHash", transactionHash,
-				"messageIndex", i,
-				"cctpVersion", msg.CCTPVersion,
-			)
-			continue
-		}
-
-		// Filter: Only process complete messages
-		if msg.Status != "complete" {
-			c.lggr.Debugw(
-				"Skipping message with incomplete status",
-				"sourceChain", sourceChain,
-				"sourceDomainID", sourceDomainID,
-				"transactionHash", transactionHash,
-				"messageIndex", i,
-				"status", msg.Status,
-			)
-			continue
-		}
-
-		// Calculate depositHash from decoded message
-		depositHash, err := CalculateDepositHash(msg.DecodedMessage)
-		if err != nil {
-			c.lggr.Warnw(
-				"Failed to calculate depositHash for message",
-				"sourceChain", sourceChain,
-				"sourceDomainID", sourceDomainID,
-				"transactionHash", transactionHash,
-				"messageIndex", i,
-				"error", err,
-			)
-			continue
-		}
-
-		// Decode hex-encoded message bytes
-		messageBytes, err := hexDecode(msg.Message)
-		if err != nil {
-			c.lggr.Warnw(
-				"Failed to decode message hex",
-				"sourceChain", sourceChain,
-				"sourceDomainID", sourceDomainID,
-				"transactionHash", transactionHash,
-				"messageIndex", i,
-				"error", err,
-			)
-			continue
-		}
-
-		// Decode hex-encoded attestation bytes
-		attestationBytes, err := hexDecode(msg.Attestation)
-		if err != nil {
-			c.lggr.Warnw(
-				"Failed to decode attestation hex",
-				"sourceChain", sourceChain,
-				"sourceDomainID", sourceDomainID,
-				"transactionHash", transactionHash,
-				"messageIndex", i,
-				"error", err,
-			)
-			continue
-		}
-
-		// Create processed message
-		processedMessages = append(processedMessages, ProcessedCCTPMessage{
-			DepositHash:      depositHash,
-			MessageBytes:     messageBytes,
-			AttestationBytes: attestationBytes,
-		})
-	}
-
-	c.lggr.Debugw(
-		"Processed CCTP messages",
-		"sourceChain", sourceChain,
-		"sourceDomainID", sourceDomainID,
-		"transactionHash", transactionHash,
-		"totalMessages", len(rawMessages.Messages),
-		"processedMessages", len(processedMessages),
-	)
-
-	return processedMessages, nil
-}
-
-// hexDecode decodes a hex string (with or without 0x prefix) to bytes.
-func hexDecode(hexStr string) ([]byte, error) {
-	hexStr = strings.TrimPrefix(hexStr, "0x")
-	return hex.DecodeString(hexStr)
 }
