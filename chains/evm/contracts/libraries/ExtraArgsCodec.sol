@@ -18,9 +18,9 @@ library ExtraArgsCodec {
   // executorArgsLength(2) + tokenReceiverLength(2) + tokenArgsLength(2) = 19 bytes.
   uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 4 + 4 + 2 + 1 + 1 + 2 + 2 + 2;
   // Base size: tag(4) + useATA(1) + accountIsWritableBitmap(8) + accountsLength(1) = 14 bytes.
-  uint256 public constant SVM_EXECUTOR_ARGS_V1_BASE_SIZE = 4 + 1 + 8 + 2;
-  // Base size: tag(4) + objectIdsLength(2) = 6 bytes.
-  uint256 public constant SUI_EXECUTOR_ARGS_V1_BASE_SIZE = 4 + 2;
+  uint256 public constant SVM_EXECUTOR_ARGS_V1_BASE_SIZE = 4 + 1 + 8 + 1;
+  // Base size: tag(4) + objectIdsLength(1) = 5 bytes.
+  uint256 public constant SUI_EXECUTOR_ARGS_V1_BASE_SIZE = 4 + 1;
 
   // Enum to indicate specific error locations during encoding/decoding.
   enum EncodingErrorLocation {
@@ -54,6 +54,7 @@ library ExtraArgsCodec {
     ENCODE_SUI_OBJECT_IDS_LENGTH
   }
 
+  // solhint-disable-next-line gas-struct-packing
   struct GenericExtraArgsV3 {
     /// @notice Gas limit for the callback on the destination chain. If the gas limit is zero and the message data
     /// length is also zero, no callback will be performed, even if a receiver is specified. A gas limit of zero is
@@ -105,7 +106,7 @@ library ExtraArgsCodec {
   /// @param gasLimit The gas limit for the callback on the destination chain.
   /// @param finalityConfig The finality configuration.
   /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
-  function getBasicEncodedExtraArgsV3(
+  function _getBasicEncodedExtraArgsV3(
     uint32 gasLimit,
     uint16 finalityConfig
   ) internal pure returns (bytes memory encoded) {

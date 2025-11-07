@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Client} from "../../../libraries/Client.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";

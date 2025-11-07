@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Executor} from "../../../executor/Executor.sol";
-import {Client} from "../../../libraries/Client.sol";
 import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 
 contract Executor_getFee is ExecutorSetup {
