@@ -159,9 +159,8 @@ library ExtraArgsCodec {
         addr := shr(96, addrData)
       }
       newOffset += addrLength;
-
-      return (addr, newOffset);
     }
+    return (addr, newOffset);
   }
 
   /// @notice Helper function to read a uint16 length prefix and bytes data from calldata.
@@ -192,9 +191,8 @@ library ExtraArgsCodec {
       // Read content.
       data = encoded[newOffset:newOffset + dataLength];
       newOffset += dataLength;
-
-      return (data, newOffset);
     }
+    return (data, newOffset);
   }
 
   /// @notice Helper function to read a uint8 length prefix and bytes data from calldata.
@@ -224,9 +222,8 @@ library ExtraArgsCodec {
       // Read content.
       data = encoded[newOffset:newOffset + dataLength];
       newOffset += dataLength;
-
-      return (data, newOffset);
     }
+    return (data, newOffset);
   }
 
   /// @notice Helper function to write a uint8 length prefix and an address.
@@ -528,9 +525,8 @@ library ExtraArgsCodec {
 
       // Ensure we've consumed all bytes.
       if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET, offset);
-
-      return executorArgs;
     }
+    return executorArgs;
   }
 
   /// @notice Encodes a SuiExecutorArgsV1 struct into bytes using assembly.
@@ -582,8 +578,7 @@ library ExtraArgsCodec {
 
       // Ensure we've consumed all bytes
       if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET, offset);
-
-      return executorArgs;
     }
+    return executorArgs;
   }
 }
