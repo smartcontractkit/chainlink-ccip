@@ -24,7 +24,7 @@ library ExtraArgsCodecUnoptimized {
     if (extraArgs.executorArgs.length > type(uint16).max) {
       revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.ENCODE_EXECUTOR_ARGS_LENGTH, 0);
     }
-    if (extraArgs.tokenReceiver.length > type(uint16).max) {
+    if (extraArgs.tokenReceiver.length > type(uint8).max) {
       revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.ENCODE_TOKEN_RECEIVER_LENGTH, 0);
     }
     if (extraArgs.tokenArgs.length > type(uint16).max) {
@@ -67,7 +67,7 @@ library ExtraArgsCodecUnoptimized {
       abi.encodePacked(
         uint16(extraArgs.executorArgs.length),
         extraArgs.executorArgs,
-        uint16(extraArgs.tokenReceiver.length),
+        uint8(extraArgs.tokenReceiver.length),
         extraArgs.tokenReceiver,
         uint16(extraArgs.tokenArgs.length),
         extraArgs.tokenArgs
@@ -170,12 +170,12 @@ library ExtraArgsCodecUnoptimized {
     extraArgs.executorArgs = encoded[offset:offset + executorArgsLength];
     offset += executorArgsLength;
 
-    // tokenReceiverLength (2 bytes).
-    if (offset + 2 > encoded.length) {
+    // tokenReceiverLength (1 byte).
+    if (offset + 1 > encoded.length) {
       revert ExtraArgsCodec.InvalidDataLength(ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
     }
-    uint256 tokenReceiverLength = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
+    uint256 tokenReceiverLength = uint8(bytes1(encoded[offset:offset + 1]));
+    offset += 1;
 
     // tokenReceiver content.
     if (offset + tokenReceiverLength > encoded.length) {

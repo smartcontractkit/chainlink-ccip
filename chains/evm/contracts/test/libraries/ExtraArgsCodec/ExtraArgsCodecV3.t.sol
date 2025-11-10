@@ -102,7 +102,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
   function test_DecodeGenericExtraArgsV3_WithTokenArgs() public {
     address tokenReceiver = makeAddr("tokenReceiver");
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
-      gasLimit: GAS_LIMIT / 2,
+      gasLimit: GAS_LIMIT,
       blockConfirmations: 1,
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
@@ -302,7 +302,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
   function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_FINAL_OFFSET() public {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
-      gasLimit: GAS_LIMIT / 2,
+      gasLimit: GAS_LIMIT,
       blockConfirmations: 1,
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
@@ -317,7 +317,9 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET, 18
+        ExtraArgsCodec.InvalidDataLength.selector,
+        ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET,
+        ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_BASE_SIZE
       )
     );
     s_helper._decodeGenericExtraArgsV3(withExtra);
@@ -368,7 +370,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
   }
 
   function test_EncodeGenericExtraArgsV3_RevertWhen_ENCODE_TOKEN_RECEIVER_LENGTH() public {
-    uint256 tooLong = uint256(type(uint16).max) + 1;
+    uint256 tooLong = uint256(type(uint8).max) + 1;
 
     vm.expectRevert(
       abi.encodeWithSelector(

@@ -14,8 +14,8 @@ library ExtraArgsCodec {
   // Base size excludes all variable-length fields (CCV addresses/args, executor address, executorArgs, tokenReceiver,
   // tokenArgs).
   // Encoding order: tag(4) + gasLimit(4) + blockConfirmations(2) + ccvsLength(1) + executorLength(1) +
-  // executorArgsLength(2) + tokenReceiverLength(2) + tokenArgsLength(2) = 19 bytes.
-  uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 4 + 4 + 2 + 1 + 1 + 2 + 2 + 2;
+  // executorArgsLength(2) + tokenReceiverLength(1) + tokenArgsLength(2) = 17 bytes.
+  uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 4 + 4 + 2 + 1 + 1 + 2 + 1 + 2;
   uint256 public constant GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE = 4 + 4 + 2 + 1;
   // Base size: tag(4) + useATA(1) + accountIsWritableBitmap(8) + accountsLength(1) = 14 bytes.
   uint256 public constant SVM_EXECUTOR_ARGS_V1_BASE_SIZE = 4 + 1 + 8 + 1;
@@ -98,7 +98,7 @@ library ExtraArgsCodec {
   /// @param blockConfirmations The user requested number of block confirmations.
   /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
   function _getBasicEncodedExtraArgsV3(uint32 gasLimit, uint16 blockConfirmations) internal pure returns (bytes memory) {
-    return abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, gasLimit, blockConfirmations, bytes8(0));
+    return abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, gasLimit, blockConfirmations, bytes7(0));
   }
 
   enum SVMTokenReceiverUsage {
@@ -197,6 +197,38 @@ library ExtraArgsCodec {
     }
   }
 
+  /// @notice Helper function to read a uint8 length prefix and bytes data from calldata.
+  /// @dev Reads length as 1 byte followed by the data bytes.
+  /// @param encoded The encoded bytes to read from.
+  /// @param offset The current offset in the encoded bytes.
+  /// @return data The bytes data read from calldata.
+  /// @return newOffset The updated offset after reading.
+  function _readUint8PrefixedBytes(
+    bytes calldata encoded,
+    uint256 offset
+  ) private pure returns (bytes calldata data, uint256 newOffset) {
+    // Unchecked is safe as the offset can never approach type(uint256).max.
+    unchecked {
+      // Read length (1 byte).
+      if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
+      uint256 dataLength;
+      assembly {
+        dataLength := byte(0, calldataload(add(encoded.offset, offset)))
+      }
+      newOffset = offset + 1;
+
+      if (newOffset + dataLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, newOffset);
+      }
+
+      // Read content.
+      data = encoded[newOffset:newOffset + dataLength];
+      newOffset += dataLength;
+
+      return (data, newOffset);
+    }
+  }
+
   /// @notice Helper function to write a uint8 length prefix and an address.
   /// @dev Writes length as 1 byte followed by the address bytes (20 bytes if non-zero).
   /// @param ptr The memory pointer where to start writing.
@@ -245,6 +277,32 @@ library ExtraArgsCodec {
     return newPtr;
   }
 
+  /// @notice Helper function to write a uint8 length prefix and copy bytes data.
+  /// @dev Writes length as 1 byte followed by the data bytes.
+  /// @param ptr The memory pointer where to start writing.
+  /// @param data The bytes data to write.
+  /// @return newPtr The updated memory pointer after writing.
+  function _writeUint8PrefixedBytes(uint256 ptr, bytes memory data) private pure returns (uint256 newPtr) {
+    uint256 dataLength = data.length;
+    assembly {
+      // Write length (1 byte).
+      mstore8(ptr, dataLength)
+      newPtr := add(ptr, 1)
+
+      // Copy data.
+      if gt(dataLength, 0) {
+        let srcPtr := add(data, 32)
+        for { let end := add(srcPtr, dataLength) } lt(srcPtr, end) { srcPtr := add(srcPtr, 32) } {
+          mstore(newPtr, mload(srcPtr))
+          newPtr := add(newPtr, 32)
+        }
+        // Adjust ptr if we overshot.
+        newPtr := sub(newPtr, sub(and(add(dataLength, 31), not(31)), dataLength))
+      }
+    }
+    return newPtr;
+  }
+
   /// @notice Encodes a GenericExtraArgsV3 struct into bytes using assembly for gas efficiency.
   /// @param extraArgs The GenericExtraArgsV3 struct to encode.
   /// @return encoded The encoded extra args as bytes.
@@ -267,7 +325,7 @@ library ExtraArgsCodec {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_EXECUTOR_ARGS_LENGTH, 0);
     }
     uint256 tokenReceiverLength = extraArgs.tokenReceiver.length;
-    if (tokenReceiverLength > type(uint16).max) {
+    if (tokenReceiverLength > type(uint8).max) {
       revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_RECEIVER_LENGTH, 0);
     }
     uint256 tokenArgsLength = extraArgs.tokenArgs.length;
@@ -336,8 +394,7 @@ library ExtraArgsCodec {
     // Write executor, executorArgs, tokenReceiver, tokenArgs.
     ptr = _writeUint8PrefixedAddress(ptr, extraArgs.executor);
     ptr = _writeUint16PrefixedBytes(ptr, extraArgs.executorArgs);
-    // should this be 8?
-    ptr = _writeUint16PrefixedBytes(ptr, extraArgs.tokenReceiver);
+    ptr = _writeUint8PrefixedBytes(ptr, extraArgs.tokenReceiver);
     ptr = _writeUint16PrefixedBytes(ptr, extraArgs.tokenArgs);
 
     // We should have exactly filled the allocated bytes.
@@ -390,7 +447,7 @@ library ExtraArgsCodec {
     // Read executor, executorArgs, tokenReceiver, and tokenArgs.
     (extraArgs.executor, offset) = _readUint8PrefixedAddress(encoded, offset);
     (extraArgs.executorArgs, offset) = _readUint16PrefixedBytes(encoded, offset);
-    (extraArgs.tokenReceiver, offset) = _readUint16PrefixedBytes(encoded, offset);
+    (extraArgs.tokenReceiver, offset) = _readUint8PrefixedBytes(encoded, offset);
     (extraArgs.tokenArgs, offset) = _readUint16PrefixedBytes(encoded, offset);
 
     // Ensure we've consumed all bytes.
