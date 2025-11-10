@@ -160,7 +160,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       address implAddress =
         ICrossChainVerifierResolver(extraArgsV3.ccvs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR, "");
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(implAddress)
-        .getFee(DEST_CHAIN_SELECTOR, message, extraArgsV3.ccvArgs[i], extraArgsV3.finalityConfig);
+        .getFee(DEST_CHAIN_SELECTOR, message, extraArgsV3.ccvArgs[i], extraArgsV3.blockConfirmations);
 
       verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
         issuer: extraArgsV3.ccvs[i],
@@ -187,7 +187,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
         ICrossChainVerifierResolver(defaultCCVs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR, "")
-      ).getFee(DEST_CHAIN_SELECTOR, message, "", extraArgsV3.finalityConfig);
+      ).getFee(DEST_CHAIN_SELECTOR, message, "", extraArgsV3.blockConfirmations);
 
       verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
         issuer: defaultCCVs[i],
@@ -253,7 +253,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     return ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvAddresses,
       ccvArgs: ccvArgs,
-      finalityConfig: 12,
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: address(0), // No executor specified.
       executorArgs: "",

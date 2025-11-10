@@ -22,7 +22,7 @@ contract GasTest is OnRampSetup {
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: new address[](2),
           ccvArgs: new bytes[](2),
-          finalityConfig: 34,
+          blockConfirmations: 34,
           gasLimit: 59499,
           executor: address(0x1234567890123456789012345678901234567890),
           executorArgs: "3282389428935872359872395885792839273525",
@@ -42,7 +42,7 @@ contract GasTest is OnRampSetup {
       ExtraArgsCodec.GenericExtraArgsV3({
         ccvs: new address[](2),
         ccvArgs: new bytes[](2),
-        finalityConfig: 34,
+        blockConfirmations: 34,
         gasLimit: 59499,
         executor: address(0x1234567890123456789012345678901234567890),
         executorArgs: "3282389428935872359872395885792839273525",
@@ -64,7 +64,7 @@ contract GasTest is OnRampSetup {
       ExtraArgsCodec.GenericExtraArgsV3({
         ccvs: new address[](2),
         ccvArgs: new bytes[](2),
-        finalityConfig: 34,
+        blockConfirmations: 34,
         gasLimit: 59499,
         executor: address(0x1234567890123456789012345678901234567890),
         executorArgs: "3282389428935872359872395885792839273525",
@@ -88,7 +88,7 @@ contract GasTest is OnRampSetup {
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: new address[](2),
           ccvArgs: new bytes[](2),
-          finalityConfig: 34,
+          blockConfirmations: 34,
           gasLimit: 59499,
           executor: address(0x1234567890123456789012345678901234567890),
           executorArgs: "3282389428935872359872395885792839273525",
@@ -113,7 +113,7 @@ contract GasTest is OnRampSetup {
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: new address[](0),
           ccvArgs: new bytes[](0),
-          finalityConfig: 34,
+          blockConfirmations: 34,
           gasLimit: 59499,
           executor: address(0),
           executorArgs: "",
@@ -136,7 +136,7 @@ contract GasTest is OnRampSetup {
       ExtraArgsCodec.GenericExtraArgsV3({
         ccvs: new address[](0),
         ccvArgs: new bytes[](0),
-        finalityConfig: 34,
+        blockConfirmations: 34,
         gasLimit: 59499,
         executor: address(0),
         executorArgs: "",
@@ -275,7 +275,7 @@ contract OnRamp_getFee is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgsV3 = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvAddresses,
       ccvArgs: ccvArgs,
-      finalityConfig: 12,
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: customExecutor,
       executorArgs: "",

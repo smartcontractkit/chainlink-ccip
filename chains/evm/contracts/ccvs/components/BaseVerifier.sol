@@ -190,7 +190,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint64 destChainSelector,
     Client.EVM2AnyMessage memory, // message
     bytes memory, // extraArgs
-    uint16 // finalityConfig
+    uint16 // blockConfirmations
   ) external view virtual returns (uint16 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) {
     if (s_destChainConfigs[destChainSelector].router == IRouter(address(0))) {
       revert DestinationNotSupported(destChainSelector);

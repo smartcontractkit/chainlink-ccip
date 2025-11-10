@@ -28,7 +28,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      finalityConfig: 12,
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: address(0),
       executorArgs: "",
@@ -47,7 +47,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
-      finalityConfig: 12,
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: executor,
       executorArgs: "",
@@ -90,7 +90,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
       ccvArgs: ccvArgs,
-      finalityConfig: 12,
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: makeAddr("executor"),
       executorArgs: "execArgs",
@@ -107,7 +107,7 @@ contract ExtraArgsCodec_Test is BaseTest {
   /// forge-config: ccip.fuzz.runs = 4096
   function testFuzz_EncodeGenericExtraArgsV3_Differential_Identical(
     uint32 gasLimit,
-    uint16 finalityConfig,
+    uint16 blockConfirmations,
     address[9] memory ccvs,
     bytes[9] memory ccvArgs,
     address executor,
@@ -129,7 +129,7 @@ contract ExtraArgsCodec_Test is BaseTest {
 
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: gasLimit,
-      finalityConfig: finalityConfig,
+      blockConfirmations: blockConfirmations,
       ccvs: ccvsDynamic,
       ccvArgs: ccvArgsDynamic,
       executor: executor,

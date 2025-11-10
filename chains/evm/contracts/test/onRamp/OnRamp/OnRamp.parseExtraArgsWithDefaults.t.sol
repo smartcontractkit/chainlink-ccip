@@ -59,7 +59,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: userCCVAddresses,
       ccvArgs: userCCVArgs,
-      finalityConfig: 0,
+      blockConfirmations: 0,
       gasLimit: GAS_LIMIT,
       executor: makeAddr("userExecutor"),
       executorArgs: "execArgs",

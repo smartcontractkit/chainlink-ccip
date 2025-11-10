@@ -62,6 +62,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
     ExtraArgsCodec.SVMExecutorArgsV1 memory decoded = s_helper._decodeSVMExecutorArgsV1(encoded);
 
     assertEq(decoded.accountIsWritableBitmap, type(uint64).max);
+    assertEq(uint8(decoded.useATA), uint8(args.useATA));
   }
 
   function test_DecodeSVMExecutorArgsV1_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {

@@ -17,7 +17,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
   function _emptyArgs() internal pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
     return ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: GAS_LIMIT,
-      finalityConfig: 1,
+      blockConfirmations: 1,
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       executor: address(0),
@@ -40,14 +40,14 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
   function test_DecodeGenericExtraArgsV3_Basic() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = _emptyArgs();
-    args.finalityConfig = 12;
+    args.blockConfirmations = 12;
     args.gasLimit = GAS_LIMIT;
 
     bytes memory encoded = ExtraArgsCodec._encodeGenericExtraArgsV3(args);
     ExtraArgsCodec.GenericExtraArgsV3 memory decoded = s_helper._decodeGenericExtraArgsV3(encoded);
 
     assertEq(decoded.gasLimit, args.gasLimit);
-    assertEq(decoded.finalityConfig, args.finalityConfig);
+    assertEq(decoded.blockConfirmations, args.blockConfirmations);
     assertEq(decoded.ccvs.length, args.ccvs.length);
     assertEq(decoded.executor, address(0));
   }
@@ -56,7 +56,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     address executor = makeAddr("executor");
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: GAS_LIMIT * 2,
-      finalityConfig: 5,
+      blockConfirmations: 5,
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       executor: executor,
@@ -82,7 +82,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: GAS_LIMIT + 100_000,
-      finalityConfig: 10,
+      blockConfirmations: 10,
       ccvs: ccvs,
       ccvArgs: ccvArgs,
       executor: address(0),
@@ -103,7 +103,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     address tokenReceiver = makeAddr("tokenReceiver");
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: GAS_LIMIT / 2,
-      finalityConfig: 1,
+      blockConfirmations: 1,
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       executor: address(0),
@@ -122,7 +122,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
   function test_DecodeGenericExtraArgsV3_ZeroValues() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: 0,
-      finalityConfig: 0,
+      blockConfirmations: 0,
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       executor: address(0),
@@ -135,13 +135,13 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     ExtraArgsCodec.GenericExtraArgsV3 memory decoded = s_helper._decodeGenericExtraArgsV3(encoded);
 
     assertEq(decoded.gasLimit, 0);
-    assertEq(decoded.finalityConfig, 0);
+    assertEq(decoded.blockConfirmations, 0);
   }
 
   function test_DecodeGenericExtraArgsV3_MaxValues() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: type(uint32).max,
-      finalityConfig: type(uint16).max,
+      blockConfirmations: type(uint16).max,
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       executor: address(0),
@@ -154,7 +154,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     ExtraArgsCodec.GenericExtraArgsV3 memory decoded = s_helper._decodeGenericExtraArgsV3(encoded);
 
     assertEq(decoded.gasLimit, type(uint32).max);
-    assertEq(decoded.finalityConfig, type(uint16).max);
+    assertEq(decoded.blockConfirmations, type(uint16).max);
   }
 
   function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
@@ -303,7 +303,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
   function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_FINAL_OFFSET() public {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: GAS_LIMIT / 2,
-      finalityConfig: 1,
+      blockConfirmations: 1,
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
       executor: address(0),
@@ -334,7 +334,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     ExtraArgsCodec._encodeGenericExtraArgsV3(
       ExtraArgsCodec.GenericExtraArgsV3({
         gasLimit: GAS_LIMIT,
-        finalityConfig: 1,
+        blockConfirmations: 1,
         ccvs: new address[](tooLong),
         ccvArgs: new bytes[](tooLong),
         executor: address(0),
@@ -356,7 +356,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     ExtraArgsCodec._encodeGenericExtraArgsV3(
       ExtraArgsCodec.GenericExtraArgsV3({
         gasLimit: GAS_LIMIT,
-        finalityConfig: 1,
+        blockConfirmations: 1,
         ccvs: new address[](0),
         ccvArgs: new bytes[](0),
         executor: address(0),
@@ -378,7 +378,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     ExtraArgsCodec._encodeGenericExtraArgsV3(
       ExtraArgsCodec.GenericExtraArgsV3({
         gasLimit: GAS_LIMIT,
-        finalityConfig: 1,
+        blockConfirmations: 1,
         ccvs: new address[](0),
         ccvArgs: new bytes[](0),
         executor: address(0),
@@ -400,7 +400,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     ExtraArgsCodec._encodeGenericExtraArgsV3(
       ExtraArgsCodec.GenericExtraArgsV3({
         gasLimit: GAS_LIMIT,
-        finalityConfig: 1,
+        blockConfirmations: 1,
         ccvs: new address[](0),
         ccvArgs: new bytes[](0),
         executor: address(0),

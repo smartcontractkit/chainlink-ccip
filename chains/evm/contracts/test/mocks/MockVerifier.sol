@@ -38,7 +38,7 @@ contract MockVerifier is ICrossChainVerifierResolver, ICrossChainVerifierV1 {
     uint64, // destChainSelector
     Client.EVM2AnyMessage memory, // message
     bytes memory, // extraArgs
-    uint16 // finalityConfig
+    uint16 // blockConfirmations
   ) external pure returns (uint16 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) {
     return (0, 0, 0);
   }

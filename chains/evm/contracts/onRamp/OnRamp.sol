@@ -207,7 +207,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       sequenceNumber: ++destChainConfig.sequenceNumber,
       onRampAddress: abi.encodePacked(address(this)),
       offRampAddress: destChainConfig.offRamp,
-      finality: resolvedExtraArgs.finalityConfig,
+      finality: resolvedExtraArgs.blockConfirmations,
       gasLimit: resolvedExtraArgs.gasLimit,
       sender: abi.encodePacked(originalSender),
       receiver: validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
@@ -227,7 +227,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
           destChainSelector,
           message.tokenAmounts[0].token,
           message.tokenAmounts[0].amount,
-          resolvedExtraArgs.finalityConfig,
+          resolvedExtraArgs.blockConfirmations,
           resolvedExtraArgs.tokenArgs
         );
       }
@@ -251,7 +251,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         destChainSelector,
         resolvedExtraArgs.tokenReceiver.length > 0 ? resolvedExtraArgs.tokenReceiver : newMessage.receiver,
         originalSender,
-        resolvedExtraArgs.finalityConfig,
+        resolvedExtraArgs.blockConfirmations,
         resolvedExtraArgs.tokenArgs
       );
     }
@@ -718,7 +718,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         destChainSelector,
         message.tokenAmounts[0].token,
         message.tokenAmounts[0].amount,
-        resolvedExtraArgs.finalityConfig,
+        resolvedExtraArgs.blockConfirmations,
         resolvedExtraArgs.tokenArgs
       );
     }
@@ -762,7 +762,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
 
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(implAddress)
-        .getFee(destChainSelector, message, extraArgs.ccvArgs[i], extraArgs.finalityConfig);
+        .getFee(destChainSelector, message, extraArgs.ccvArgs[i], extraArgs.blockConfirmations);
 
       verifierReceipts[i] = Receipt({
         issuer: extraArgs.ccvs[i],
@@ -821,7 +821,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       feeTokenAmount: extraArgs.executor == Client.NO_EXECUTION_ADDRESS
         ? 0
         : IExecutor(extraArgs.executor).getFee(
-          destChainSelector, extraArgs.finalityConfig, extraArgs.ccvs, extraArgs.executorArgs
+          destChainSelector, extraArgs.blockConfirmations, extraArgs.ccvs, extraArgs.executorArgs
         ),
       extraArgs: extraArgs.executorArgs
     });

@@ -38,6 +38,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
 
     assertEq(decoded.receiverObjectIds.length, 2);
     assertEq(decoded.receiverObjectIds[0], keccak256("object1"));
+    assertEq(decoded.receiverObjectIds[1], keccak256("object2"));
   }
 
   function test_DecodeSuiExecutorArgsV1_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
