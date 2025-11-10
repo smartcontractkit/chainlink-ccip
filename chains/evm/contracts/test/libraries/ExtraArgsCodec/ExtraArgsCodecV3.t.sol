@@ -412,4 +412,34 @@ contract ExtraArgsCodecV3_Test is BaseTest {
       })
     );
   }
+
+  function test_EncodeGenericExtraArgsV3_RevertWhen_EncodingSizeMismatch() public {
+    bytes memory validExtraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(
+      ExtraArgsCodec.GenericExtraArgsV3({
+        gasLimit: GAS_LIMIT,
+        blockConfirmations: 1,
+        ccvs: new address[](0),
+        ccvArgs: new bytes[](0),
+        executor: address(0),
+        executorArgs: "",
+        tokenReceiver: "",
+        tokenArgs: new bytes(0)
+      })
+    );
+
+    // Set the length to current length + 1 to simulate a size mismatch
+    assembly {
+      mstore(validExtraArgs, add(mload(validExtraArgs), 1))
+    }
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ExtraArgsCodec.InvalidDataLength.selector,
+        ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET,
+        ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_BASE_SIZE
+      )
+    );
+
+    s_helper._decodeGenericExtraArgsV3(validExtraArgs);
+  }
 }

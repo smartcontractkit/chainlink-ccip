@@ -397,11 +397,16 @@ library ExtraArgsCodec {
     ptr = _writeUint8PrefixedBytes(ptr, extraArgs.tokenReceiver);
     ptr = _writeUint16PrefixedBytes(ptr, extraArgs.tokenArgs);
 
-    // We should have exactly filled the allocated bytes.
-    // TODO
-    //    if (ptr != encoded.length + 32) {
-    //      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET);
-    //    }
+    // Verify that we've exactly filled the allocated bytes. We load the data offset of the bytes array to be able to
+    // compare with ptr.
+    uint256 encodedDataOffset;
+    assembly {
+      encodedDataOffset := encoded
+    }
+    // The pointer should be at the end of the allocated data (data offset + length + 32 bytes for length prefix).
+    if (ptr != encodedDataOffset + encoded.length + 32) {
+      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET, ptr - encodedDataOffset);
+    }
 
     return encoded;
   }
