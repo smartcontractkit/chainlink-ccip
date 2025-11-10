@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 /// @notice Gas-optimized assembly version of ExtraArgsCodec library.
 library ExtraArgsCodec {
   error InvalidDataLength(EncodingErrorLocation location, uint256 offset);
+  error InvalidExtraArgsTag(bytes4 expected, bytes4 actual);
   error InvalidAddressLength(uint256 length);
   error CCVArrayLengthMismatch(uint256 ccvsLength, uint256 ccvArgsLength);
 
@@ -419,6 +420,16 @@ library ExtraArgsCodec {
       revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS, encoded.length);
     }
 
+    // Check tag.
+    bytes4 tag;
+    assembly {
+      tag := calldataload(encoded.offset)
+    }
+
+    if (tag != GENERIC_EXTRA_ARGS_V3_TAG) {
+      revert InvalidExtraArgsTag(GENERIC_EXTRA_ARGS_V3_TAG, tag);
+    }
+
     uint256 ccvsLength;
     // Read static-length fields.
     assembly {
@@ -490,6 +501,16 @@ library ExtraArgsCodec {
         revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS, encoded.length);
       }
 
+      // Check tag.
+      bytes4 tag;
+      assembly {
+        tag := calldataload(encoded.offset)
+      }
+
+      if (tag != SVM_EXECUTOR_ARGS_V1_TAG) {
+        revert InvalidExtraArgsTag(SVM_EXECUTOR_ARGS_V1_TAG, tag);
+      }
+
       uint256 accountsLength;
 
       // Read static-length fields.
@@ -554,6 +575,17 @@ library ExtraArgsCodec {
       if (encoded.length < SUI_EXECUTOR_ARGS_V1_BASE_SIZE) {
         revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS, encoded.length);
       }
+
+      // Check tag.
+      bytes4 tag;
+      assembly {
+        tag := calldataload(encoded.offset)
+      }
+
+      if (tag != SUI_EXECUTOR_ARGS_V1_TAG) {
+        revert InvalidExtraArgsTag(SUI_EXECUTOR_ARGS_V1_TAG, tag);
+      }
+
       // Read objectIds length
       uint256 objectIdsLength;
       assembly {

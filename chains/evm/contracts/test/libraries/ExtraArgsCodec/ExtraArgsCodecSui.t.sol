@@ -26,6 +26,16 @@ contract ExtraArgsCodecSui_Test is BaseTest {
     assertEq(decoded.receiverObjectIds.length, 0);
   }
 
+  function test__decodeSuiExecutorArgsV1_RevertWhen_InvalidExtraArgsTag() public {
+    bytes memory invalidData = abi.encodePacked(bytes4(0xdeadbeef), uint8(0));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ExtraArgsCodec.InvalidExtraArgsTag.selector, ExtraArgsCodec.SUI_EXECUTOR_ARGS_V1_TAG, bytes4(0xdeadbeef)
+      )
+    );
+    s_helper._decodeSuiExecutorArgsV1(invalidData);
+  }
+
   function test__decodeSuiExecutorArgsV1_WithObjectIds() public view {
     bytes32[] memory objectIds = new bytes32[](2);
     objectIds[0] = keccak256("object1");

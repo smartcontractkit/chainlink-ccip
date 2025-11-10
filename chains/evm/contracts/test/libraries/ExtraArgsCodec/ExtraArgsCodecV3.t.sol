@@ -52,6 +52,16 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     assertEq(decoded.executor, address(0));
   }
 
+  function test__decodeGenericExtraArgsV3_RevertWhen_InvalidExtraArgsTag() public {
+    bytes memory invalidData = abi.encodePacked(bytes4(0xdeadbeef), uint32(GAS_LIMIT), uint16(1), bytes7(0));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ExtraArgsCodec.InvalidExtraArgsTag.selector, ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG, bytes4(0xdeadbeef)
+      )
+    );
+    s_helper._decodeGenericExtraArgsV3(invalidData);
+  }
+
   function test__decodeGenericExtraArgsV3_WithExecutor() public {
     address executor = makeAddr("executor");
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({

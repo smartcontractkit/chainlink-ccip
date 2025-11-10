@@ -31,6 +31,16 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
     assertEq(decoded.accounts.length, args.accounts.length);
   }
 
+  function test__decodeSVMExecutorArgsV1_RevertWhen_InvalidExtraArgsTag() public {
+    bytes memory invalidData = abi.encodePacked(bytes4(0xdeadbeef), uint8(0), uint64(0), uint8(0));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ExtraArgsCodec.InvalidExtraArgsTag.selector, ExtraArgsCodec.SVM_EXECUTOR_ARGS_V1_TAG, bytes4(0xdeadbeef)
+      )
+    );
+    s_helper._decodeSVMExecutorArgsV1(invalidData);
+  }
+
   function test__decodeSVMExecutorArgsV1_WithAccounts() public view {
     bytes32[] memory accounts = new bytes32[](2);
     accounts[0] = bytes32(uint256(1));
