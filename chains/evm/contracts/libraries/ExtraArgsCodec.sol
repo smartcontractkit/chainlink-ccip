@@ -57,9 +57,10 @@ library ExtraArgsCodec {
     /// There are various ways to estimate the gas required for a callback on the destination chain, depending on the
     /// chain family. Please refer to the documentation for each chain for more details.
     uint32 gasLimit;
-    /// @notice The finality config, 0 means the default finality that the CCV considers final. Any non-zero value means
-    /// a block depth. CCVs, Pools and the executor may all reject this value by reverting the transaction on the source
-    /// chain if they do not want to take on the risk of the block depth specified.
+    /// @notice The number of block confirmations to wait for. 0 means the default finality that the CCV considers
+    /// final. Any non-zero value means a block depth. CCVs, Pools and the executor may all reject this value by
+    /// reverting the transaction on the source chain if they do not want to take on the risk of the block depth
+    /// specified.
     /// @dev May be zero to indicate waiting for finality is desired.
     uint16 blockConfirmations;
     /// @notice An array of CCV addresses representing the cross-chain verifiers to be used for the message.
@@ -372,7 +373,7 @@ library ExtraArgsCodec {
       mstore8(add(ptr, 3), and(gasLimit, 0xFF))
       ptr := add(ptr, 4)
 
-      // Load and write finality config (2 bytes, big endian).
+      // Load and write block confirmations (2 bytes, big endian).
       let blockConfirmations := mload(add(extraArgs, 32))
       mstore8(ptr, shr(8, blockConfirmations))
       mstore8(add(ptr, 1), and(blockConfirmations, 0xFF))
@@ -437,9 +438,9 @@ library ExtraArgsCodec {
       let gasLimit := calldataload(add(encoded.offset, 4))
       mstore(extraArgs, and(shr(224, gasLimit), 0xFFFFFFFF))
 
-      // Read finality config (2 bytes).
-      let blockDepth := calldataload(add(encoded.offset, 8))
-      mstore(add(extraArgs, 32), and(shr(240, blockDepth), 0xFFFF))
+      // Read block confirmations (2 bytes).
+      let blockConfirmations := calldataload(add(encoded.offset, 8))
+      mstore(add(extraArgs, 32), and(shr(240, blockConfirmations), 0xFFFF))
 
       // Read ccvs length (1 byte).
       ccvsLength := byte(0, calldataload(add(encoded.offset, 10)))
@@ -586,14 +587,14 @@ library ExtraArgsCodec {
         revert InvalidExtraArgsTag(SUI_EXECUTOR_ARGS_V1_TAG, tag);
       }
 
-      // Read objectIds length
+      // Read objectIds length.
       uint256 objectIdsLength;
       assembly {
         objectIdsLength := byte(0, calldataload(add(encoded.offset, 4)))
       }
 
       uint256 offset = SUI_EXECUTOR_ARGS_V1_BASE_SIZE;
-      // Read objectIds
+      // Read objectIds.
       if (offset + objectIdsLength * 32 > encoded.length) {
         revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_CONTENT, offset);
       }
@@ -608,7 +609,7 @@ library ExtraArgsCodec {
       }
       offset += objectIdsLength * 32;
 
-      // Ensure we've consumed all bytes
+      // Ensure we've consumed all bytes.
       if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET, offset);
     }
     return executorArgs;
