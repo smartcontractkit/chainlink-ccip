@@ -129,34 +129,39 @@ library ExtraArgsCodec {
     bytes calldata encoded,
     uint256 offset
   ) private pure returns (address addr, uint256 newOffset) {
-    // Read address length (1 byte).
-    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
-    uint256 addrLength;
-    assembly {
-      addrLength := byte(0, calldataload(add(encoded.offset, offset)))
-      newOffset := add(offset, 1)
-    }
+    // Unchecked is safe as the offset can never approach type(uint256).max.
+    unchecked {
+      // Read address length (1 byte).
+      if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
+      uint256 addrLength;
+      assembly {
+        addrLength := byte(0, calldataload(add(encoded.offset, offset)))
+      }
+      newOffset = offset + 1;
 
-    // Validate address length (0 or 20 for EVM).
-    if (addrLength != 0 && addrLength != 20) {
-      revert InvalidAddressLength(addrLength);
-    }
+      // If the address is zero length, we are done and return address(0).
+      if (addrLength == 0) {
+        return (address(0), newOffset);
+      }
 
-    // Read address content.
-    if (newOffset + addrLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, newOffset);
-    }
+      // Validate address length 20 as these extraArgs are for EVM and the only valid address length is 20.
+      if (addrLength != 20) {
+        revert InvalidAddressLength(addrLength);
+      }
 
-    if (addrLength == 20) {
+      // Read address content, unchecked is safe as the offset can never approach type(uint256).max.
+      if (newOffset + addrLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, newOffset);
+      }
+
       assembly {
         let addrData := calldataload(add(encoded.offset, newOffset))
         addr := shr(96, addrData)
       }
-    }
-    unchecked {
       newOffset += addrLength;
+
+      return (addr, newOffset);
     }
-    return (addr, newOffset);
   }
 
   /// @notice Helper function to read a uint16 length prefix and bytes data from calldata.
@@ -169,25 +174,27 @@ library ExtraArgsCodec {
     bytes calldata encoded,
     uint256 offset
   ) private pure returns (bytes calldata data, uint256 newOffset) {
-    // Read length (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
-    uint256 dataLength;
-    assembly {
-      let lengthData := calldataload(add(encoded.offset, offset))
-      dataLength := and(shr(240, lengthData), 0xFFFF)
-      newOffset := add(offset, 2)
-    }
-
-    // Read content.
-    if (newOffset + dataLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, newOffset);
-    }
-    data = encoded[newOffset:newOffset + dataLength];
+    // Unchecked is safe as the offset can never approach type(uint256).max.
     unchecked {
-      newOffset += dataLength;
-    }
+      // Read length (2 bytes).
+      if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
+      uint256 dataLength;
+      assembly {
+        let lengthData := calldataload(add(encoded.offset, offset))
+        dataLength := and(shr(240, lengthData), 0xFFFF)
+      }
+      newOffset = offset + 2;
 
-    return (data, newOffset);
+      if (newOffset + dataLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, newOffset);
+      }
+
+      // Read content.
+      data = encoded[newOffset:newOffset + dataLength];
+      newOffset += dataLength;
+
+      return (data, newOffset);
+    }
   }
 
   /// @notice Helper function to write a uint8 length prefix and an address.
