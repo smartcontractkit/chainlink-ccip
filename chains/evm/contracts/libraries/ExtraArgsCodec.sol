@@ -46,6 +46,28 @@ library ExtraArgsCodec {
 
   }
 
+  /// @notice GenericExtraArgsV3 encoding format used for CCIP messages.
+  /// Static length fields.
+  ///   bytes4 tag;                     Version tag.
+  ///   uint32 gasLimit;                Gas limit for the callback on the destination chain.
+  ///   uint16 blockConfirmations;      Number of block confirmations to wait for (0 = default finality).
+  ///   uint8 ccvsLength;               Number of cross-chain verifiers.
+  ///
+  /// Variable length fields (per CCV, repeated ccvsLength times).
+  ///   uint8 ccvAddressLength;         Length of the CCV address in bytes (0 or 20 for EVM addresses).
+  ///   bytes ccvAddress;               CCV address as unpadded bytes (20 bytes for EVM addresses if non-zero).
+  ///   uint16 ccvArgsLength;           Length of the CCV-specific arguments in bytes.
+  ///   bytes ccvArgs;                  CCV-specific arguments.
+  ///
+  /// Variable length fields (executor and token config).
+  ///   uint8 executorLength;           Length of the executor address in bytes (0 or 20 for EVM addresses).
+  ///   bytes executor;                 Executor address as unpadded bytes (20 bytes for EVM addresses if non-zero).
+  ///   uint16 executorArgsLength;      Length of the executor arguments in bytes.
+  ///   bytes executorArgs;             Destination chain family-specific executor arguments.
+  ///   uint8 tokenReceiverLength;      Length of the token receiver address in bytes (0 or 20 for EVM addresses).
+  ///   bytes tokenReceiver;            Token receiver address as unpadded bytes (20 bytes for EVM addresses if non-zero).
+  ///   uint16 tokenArgsLength;         Length of the token arguments in bytes.
+  ///   bytes tokenArgs;                Token pool-specific arguments.
   // solhint-disable-next-line gas-struct-packing
   struct GenericExtraArgsV3 {
     /// @notice Gas limit for the callback on the destination chain. If the gas limit is zero and the message data

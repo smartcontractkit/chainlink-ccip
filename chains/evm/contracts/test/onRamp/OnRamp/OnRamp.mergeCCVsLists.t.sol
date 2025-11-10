@@ -2,11 +2,11 @@
 pragma solidity ^0.8.24;
 
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
-import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
+import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 contract OnRamp_mergeCCVLists is OnRampSetup {
-  OnRampTestHelper internal s_onRampTestHelper;
+  OnRampHelper internal s_OnRampHelper;
 
   function _setupTestDestChainConfig(
     address[] memory laneMandatedCCVs
@@ -26,12 +26,12 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
       offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
-    s_onRampTestHelper.applyDestChainConfigUpdates(destChainConfigArgs);
+    s_OnRampHelper.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
   function setUp() public override {
     super.setUp();
-    s_onRampTestHelper = new OnRampTestHelper(
+    s_OnRampHelper = new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
@@ -61,7 +61,7 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     bytes[] memory userCCVArgs = new bytes[](0);
 
     (address[] memory newCCVAddresses, bytes[] memory newCCVArgs) =
-      s_onRampTestHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, new address[](0), poolRequiredCCV);
+      s_OnRampHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, new address[](0), poolRequiredCCV);
 
     // Should only add unique pool CCVs.
     address[] memory expectedAddresses = new address[](2);
@@ -85,7 +85,7 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     userCCVArgs[0] = "required1";
 
     (address[] memory newCCVAddresses, bytes[] memory newCCVArgs) =
-      s_onRampTestHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, new address[](0), poolRequiredCCV);
+      s_OnRampHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, new address[](0), poolRequiredCCV);
 
     // Should return original arrays unchanged.
     _assertCCVArraysEqual(newCCVAddresses, newCCVArgs, userCCVAddresses, userCCVArgs);
@@ -106,7 +106,7 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     poolRequiredCCV[1] = defaultCCVs[1];
 
     (address[] memory newCCVAddresses, bytes[] memory newCCVArgs) =
-      s_onRampTestHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, new address[](0), poolRequiredCCV);
+      s_OnRampHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, new address[](0), poolRequiredCCV);
 
     address[] memory expectedAddresses = new address[](3);
     expectedAddresses[0] = userCCVAddresses[0];
@@ -131,7 +131,7 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     laneMandatedCCVs[0] = makeAddr("laneCCV");
 
     (address[] memory newCCVAddresses, bytes[] memory newCCVArgs) =
-      s_onRampTestHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, laneMandatedCCVs, new address[](0));
+      s_OnRampHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, laneMandatedCCVs, new address[](0));
 
     address[] memory expectedAddresses = new address[](2);
     expectedAddresses[0] = userCCVAddresses[0];
@@ -158,7 +158,7 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     userCCVArgs[0] = "required1";
 
     (address[] memory newCCVAddresses, bytes[] memory newCCVArgs) =
-      s_onRampTestHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, laneMandatedCCVs, poolRequiredCCV);
+      s_OnRampHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, laneMandatedCCVs, poolRequiredCCV);
 
     address[] memory expectedAddresses = new address[](3);
     expectedAddresses[0] = requiredCCV1;
@@ -184,7 +184,7 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     userCCVArgs[0] = "required1";
 
     (address[] memory newCCVAddresses, bytes[] memory newCCVArgs) =
-      s_onRampTestHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, new address[](0), poolRequiredCCV);
+      s_OnRampHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, new address[](0), poolRequiredCCV);
 
     // Should result in only one instance of the CCV with user args preserved.
     address[] memory expectedAddresses = new address[](1);
@@ -211,7 +211,7 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
     userCCVArgs[0] = "userArgs";
 
     (address[] memory newCCVAddresses, bytes[] memory newCCVArgs) =
-      s_onRampTestHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, new address[](0), poolRequiredCCV);
+      s_OnRampHelper.mergeCCVLists(userCCVAddresses, userCCVArgs, new address[](0), poolRequiredCCV);
 
     address[] memory expectedAddresses = new address[](4);
     expectedAddresses[0] = defaultCCVs[0];

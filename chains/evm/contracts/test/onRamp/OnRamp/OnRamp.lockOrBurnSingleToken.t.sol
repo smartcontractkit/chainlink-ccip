@@ -8,13 +8,13 @@ import {Client} from "../../../libraries/Client.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
-import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
+import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
-  OnRampTestHelper internal s_onRampHelper;
+  OnRampHelper internal s_onRampHelper;
   address internal s_sourceToken;
   address internal s_destToken;
   address internal s_pool;
@@ -22,7 +22,7 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
   function setUp() public override {
     super.setUp();
 
-    s_onRampHelper = new OnRampTestHelper(
+    s_onRampHelper = new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,

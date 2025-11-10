@@ -10,6 +10,7 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
+import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {MockExecutor} from "../../mocks/MockExecutor.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
@@ -18,7 +19,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensio
 contract OnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
 
-  OnRamp internal s_onRamp;
+  OnRampHelper internal s_onRamp;
   OffRamp internal s_offRampOnRemoteChain = OffRamp(makeAddr("OffRampRemote"));
 
   address internal s_defaultCCV;
@@ -27,7 +28,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_onRamp = new OnRamp(
+    s_onRamp = new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
@@ -76,14 +77,34 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     )
   {
     OnRamp.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs =
+      s_onRamp.parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
+
+    address[] memory poolRequiredCCVs = new address[](0);
+    if (message.tokenAmounts.length != 0) {
+      poolRequiredCCVs = s_onRamp.getCCVsForPool(
+        destChainSelector,
+        message.tokenAmounts[0].token,
+        message.tokenAmounts[0].amount,
+        resolvedExtraArgs.blockConfirmations,
+        resolvedExtraArgs.tokenArgs
+      );
+    }
+    (resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs) = s_onRamp.mergeCCVLists(
+      resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs
+    );
+
     MessageV1Codec.MessageV1 memory messageV1 = MessageV1Codec.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: destChainSelector,
       sequenceNumber: seqNum,
+      executionGasLimit: 0,
+      callbackGasLimit: GAS_LIMIT,
+      finality: 0,
+      ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(resolvedExtraArgs.ccvs, resolvedExtraArgs.executor),
       onRampAddress: abi.encodePacked(address(s_onRamp)),
       offRampAddress: abi.encodePacked(address(s_offRampOnRemoteChain)),
-      finality: 0,
-      gasLimit: GAS_LIMIT,
       sender: abi.encodePacked(originalSender),
       receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
       destBlob: "",
@@ -91,37 +112,11 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       data: message.data
     });
 
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      address token = message.tokenAmounts[i].token;
-      messageV1.tokenTransfer[i] = MessageV1Codec.TokenTransferV1({
-        amount: message.tokenAmounts[i].amount,
-        sourcePoolAddress: abi.encodePacked(s_sourcePoolByToken[token]),
-        sourceTokenAddress: abi.encodePacked(token),
-        destTokenAddress: abi.encodePacked(s_destTokenBySourceToken[token]),
-        tokenReceiver: abi.encodePacked(abi.decode(message.receiver, (address))),
-        extraData: abi.encode(IERC20Metadata(token).decimals())
-      });
-    }
+    // Populate token transfers
+    _populateTokenTransfers(messageV1, message);
 
-    // If legacy extraArgs are supplied, they are passed into the CCVs and Executor.
-    // If V3 extraArgs are supplied, the extraArgs as the user supplied them are used.
-    bool isLegacyExtraArgs = _isLegacyExtraArgs(message.extraArgs);
-
-    if (isLegacyExtraArgs) {
-      receipts = _computeVerifierReceiptsLegacyArgs(message, destChainConfig.defaultCCVs);
-    } else {
-      (receipts, messageV1.gasLimit) = this.computeVerifierReceiptsArgsV3(message, destChainConfig.defaultCCVs);
-    }
-    receipts[receipts.length - 1] = OnRamp.Receipt({
-      issuer: destChainConfig.defaultExecutor,
-      feeTokenAmount: 0, // Matches current OnRamp event behavior
-      destGasLimit: destChainConfig.baseExecutionGasCost + GAS_LIMIT,
-      destBytesOverhead: _calculateDestBytesOverhead(
-        uint32(message.data.length), destChainConfig.addressBytesLength, uint32(message.tokenAmounts.length), 0
-      ),
-      // TODO when v3 extra args are passed in
-      extraArgs: bytes("")
-    });
+    // Compute receipts
+    (receipts, messageV1.executionGasLimit,) = s_onRamp.getReceipts(destChainSelector, message, resolvedExtraArgs);
 
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
@@ -129,120 +124,6 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       receipts,
       new bytes[](receipts.length - message.tokenAmounts.length - 1)
     );
-  }
-
-  function _calculateDestBytesOverhead(
-    uint32 dataLength,
-    uint32 remoteChainAddressLengthBytes,
-    uint32 numberOfTokens,
-    uint256 executorArgsLength
-  ) internal pure returns (uint32) {
-    return uint32(
-      MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + executorArgsLength
-        + (MessageV1Codec.MESSAGE_V1_REMOTE_CHAIN_ADDRESSES * remoteChainAddressLengthBytes)
-        + (numberOfTokens * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + remoteChainAddressLengthBytes))
-    );
-  }
-
-  // This function is external so we can make the extraArgs calldata to allow for indexing.
-  function computeVerifierReceiptsArgsV3(
-    Client.EVM2AnyMessage calldata message,
-    address[] calldata defaultCCVs
-  ) external view returns (OnRamp.Receipt[] memory verifierReceipts, uint32 gasLimit) {
-    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgsV3 = ExtraArgsCodec._decodeGenericExtraArgsV3(message.extraArgs);
-    uint256 userDefinedCCVCount = extraArgsV3.ccvs.length;
-
-    // Leave space for a token (if present) and the executor receipt.
-    verifierReceipts = new OnRamp.Receipt[](userDefinedCCVCount + defaultCCVs.length + message.tokenAmounts.length + 1);
-
-    uint256 currentVerifierIndex = 0;
-    for (uint256 i = 0; i < userDefinedCCVCount; ++i) {
-      address implAddress =
-        ICrossChainVerifierResolver(extraArgsV3.ccvs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR, "");
-      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(implAddress)
-        .getFee(DEST_CHAIN_SELECTOR, message, extraArgsV3.ccvArgs[i], extraArgsV3.blockConfirmations);
-
-      verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
-        issuer: extraArgsV3.ccvs[i],
-        feeTokenAmount: feeUSDCents,
-        destGasLimit: gasForVerification,
-        destBytesOverhead: payloadSizeBytes,
-        extraArgs: extraArgsV3.ccvArgs[i]
-      });
-    }
-
-    for (uint256 i = 0; i < defaultCCVs.length; ++i) {
-      bool found = false;
-      for (uint256 j = 0; j < userDefinedCCVCount; ++j) {
-        // Skip if the default CCV is already included in the user-defined CCVs.
-        if (defaultCCVs[i] == extraArgsV3.ccvs[j]) {
-          found = true;
-          break;
-        }
-      }
-
-      if (found) {
-        continue;
-      }
-
-      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
-        ICrossChainVerifierResolver(defaultCCVs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR, "")
-      ).getFee(DEST_CHAIN_SELECTOR, message, "", extraArgsV3.blockConfirmations);
-
-      verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
-        issuer: defaultCCVs[i],
-        feeTokenAmount: feeUSDCents,
-        destGasLimit: gasForVerification,
-        destBytesOverhead: payloadSizeBytes,
-        extraArgs: ""
-      });
-    }
-
-    if (message.tokenAmounts.length > 0) {
-      verifierReceipts[verifierReceipts.length - 2] = OnRamp.Receipt({
-        issuer: message.tokenAmounts[0].token,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 0,
-        extraArgs: extraArgsV3.tokenArgs
-      });
-    }
-
-    return (verifierReceipts, extraArgsV3.gasLimit);
-  }
-
-  function _computeVerifierReceiptsLegacyArgs(
-    Client.EVM2AnyMessage memory message,
-    address[] memory defaultCCVs
-  ) internal view returns (OnRamp.Receipt[] memory verifierReceipts) {
-    // Leave space for a token (if present) and the executor receipt.
-    verifierReceipts = new OnRamp.Receipt[](defaultCCVs.length + message.tokenAmounts.length + 1);
-
-    for (uint256 i = 0; i < defaultCCVs.length; ++i) {
-      address implAddress =
-        ICrossChainVerifierResolver(defaultCCVs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR, "");
-      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
-        ICrossChainVerifierV1(implAddress).getFee(DEST_CHAIN_SELECTOR, message, "", 0);
-
-      verifierReceipts[i] = OnRamp.Receipt({
-        issuer: defaultCCVs[i],
-        feeTokenAmount: feeUSDCents,
-        destGasLimit: gasForVerification,
-        destBytesOverhead: payloadSizeBytes,
-        extraArgs: ""
-      });
-    }
-
-    if (message.tokenAmounts.length > 0) {
-      verifierReceipts[verifierReceipts.length - 2] = OnRamp.Receipt({
-        issuer: message.tokenAmounts[0].token,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 0,
-        extraArgs: ""
-      });
-    }
-    return verifierReceipts;
   }
 
   // Helper function to create GenericExtraArgsV3 struct
@@ -262,16 +143,6 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     });
   }
 
-  function _isLegacyExtraArgs(
-    bytes memory extraArgs
-  ) internal pure returns (bool) {
-    bytes4 selector;
-    assembly {
-      selector := mload(add(extraArgs, 32))
-    }
-    return selector != ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG;
-  }
-
   // Helper function to assert that two CCV arrays are equal (using parallel address and bytes arrays)
   function _assertCCVArraysEqual(
     address[] memory actualAddresses,
@@ -288,6 +159,24 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         actualAddresses[i], expectedAddresses[i], string.concat("CCV address mismatch at index ", vm.toString(i))
       );
       assertEq(actualArgs[i], expectedArgs[i], string.concat("CCV args mismatch at index ", vm.toString(i)));
+    }
+  }
+
+  // Helper to populate token transfers
+  function _populateTokenTransfers(
+    MessageV1Codec.MessageV1 memory messageV1,
+    Client.EVM2AnyMessage memory message
+  ) internal view {
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      address token = message.tokenAmounts[i].token;
+      messageV1.tokenTransfer[i] = MessageV1Codec.TokenTransferV1({
+        amount: message.tokenAmounts[i].amount,
+        sourcePoolAddress: abi.encodePacked(s_sourcePoolByToken[token]),
+        sourceTokenAddress: abi.encodePacked(token),
+        destTokenAddress: abi.encodePacked(s_destTokenBySourceToken[token]),
+        tokenReceiver: abi.encodePacked(abi.decode(message.receiver, (address))),
+        extraData: abi.encode(IERC20Metadata(token).decimals())
+      });
     }
   }
 }

@@ -318,7 +318,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
     // which checks for sufficient gas before making the external call.
     if (
-      (message.data.length == 0 && message.gasLimit == 0) || receiver.code.length == 0
+      (message.data.length == 0 && message.callbackGasLimit == 0) || receiver.code.length == 0
         || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
@@ -331,7 +331,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         destTokenAmounts: destTokenAmounts
       }),
       i_gasForCallExactCheck,
-      message.gasLimit,
+      message.callbackGasLimit,
       receiver
     );
 
