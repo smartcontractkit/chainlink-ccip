@@ -325,6 +325,22 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     s_helper._decodeGenericExtraArgsV3(withExtra);
   }
 
+  function test__encodeGenericExtraArgsV3_RevertWhen_CCVArrayLengthMismatch() public {
+    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.CCVArrayLengthMismatch.selector, 2, 1));
+    ExtraArgsCodec._encodeGenericExtraArgsV3(
+      ExtraArgsCodec.GenericExtraArgsV3({
+        gasLimit: GAS_LIMIT,
+        blockConfirmations: 1,
+        ccvs: new address[](2),
+        ccvArgs: new bytes[](1),
+        executor: address(0),
+        executorArgs: "",
+        tokenReceiver: "",
+        tokenArgs: ""
+      })
+    );
+  }
+
   function test__encodeGenericExtraArgsV3_RevertWhen_ENCODE_CCVS_ARRAY_LENGTH() public {
     uint256 tooLong = uint256(type(uint8).max) + 1;
 
