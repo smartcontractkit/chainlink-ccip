@@ -1,449 +1,299 @@
 package sequences
 
 import (
-	"bytes"
-	"context"
-	"errors"
 	"fmt"
-	"maps"
-	"math"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	cciphomeops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	libocr_types "github.com/smartcontractkit/libocr/ragep2p/types"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-	"golang.org/x/crypto/sha3"
 )
 
-var Version = *semver.MustParse("1.6.0")
+var CCIPHomeABI *abi.ABI
 
-const (
-	CapabilityLabelledName = "ccip"
-	CapabilityVersion      = "v1.0.0"
-)
-
-var CCIPCapabilityID = Keccak256Fixed(MustABIEncode(`[{"type": "string"}, {"type": "string"}]`, CapabilityLabelledName, CapabilityVersion))
-
-func MustABIEncode(abiString string, args ...any) []byte {
-	encoded, err := ABIEncode(abiString, args...)
+func init() {
+	var err error
+	CCIPHomeABI, err = ccip_home.CCIPHomeMetaData.GetAbi()
 	if err != nil {
 		panic(err)
 	}
-	return encoded
 }
 
-// ABIEncode is the equivalent of abi.encode.
-// See a full set of examples https://github.com/ethereum/go-ethereum/blob/420b78659bef661a83c5c442121b13f13288c09f/accounts/abi/packing_test.go#L31
-func ABIEncode(abiStr string, values ...interface{}) ([]byte, error) {
-	// Create a dummy method with arguments
-	inDef := fmt.Sprintf(`[{ "name" : "method", "type": "function", "inputs": %s}]`, abiStr)
-	inAbi, err := abi.JSON(strings.NewReader(inDef))
-	if err != nil {
-		return nil, err
-	}
-	res, err := inAbi.Pack("method", values...)
-	if err != nil {
-		return nil, err
-	}
-	return res[4:], nil
+type DONSequenceDeps struct {
+	HomeChain cldf_evm.Chain
 }
 
-func Keccak256Fixed(in []byte) [32]byte {
-	hash := sha3.NewLegacyKeccak256()
-	// Note this Keccak256 cannot error https://github.com/golang/crypto/blob/master/sha3/sha3.go#L126
-	// if we start supporting hashing algos which do, we can change this API to include an error.
-	hash.Write(in)
-	var h [32]byte
-	copy(h[:], hash.Sum(nil))
-	return h
+type DONAddition struct {
+	ExpectedID       uint32
+	PluginConfig     ccip_home.CCIPHomeOCR3Config
+	PeerIDs          [][32]byte
+	F                uint8
+	IsPublic         bool
+	AcceptsWorkflows bool
 }
 
-type DeployHomeChainConfig struct {
-	HomeChainSel             uint64
-	RMNStaticConfig          rmn_home.RMNHomeStaticConfig
-	RMNDynamicConfig         rmn_home.RMNHomeDynamicConfig
-	NodeOperators            []capabilities_registry.CapabilitiesRegistryNodeOperator
-	NodeP2PIDsPerNodeOpAdmin map[string][][32]byte
+type AddDONAndSetCandidateSequenceInput struct {
+	CapabilitiesRegistry common.Address
+	NoSend               bool
+	DONs                 []DONAddition
 }
 
-var DeployHomeChain = cldf_ops.NewSequence(
-	"deploy-home-chain",
-	semver.MustParse("1.6.0"),
-	"Deploys CCIP Home and Capabilities Registry contracts to the home chain.",
-	func(b operations.Bundle, chains cldf_chain.BlockChains, input DeployHomeChainConfig) (output sequences.OnChainOutput, err error) {
-		addresses := make([]datastore.AddressRef, 0)
-		chain := chains.EVMChains()[input.HomeChainSel]
-
-		// Deploy Capabilities Registry
-		crAddr, tx, capReg, err := capabilities_registry.DeployCapabilitiesRegistry(
-			chain.DeployerKey,
-			chain.Client,
-		)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		addresses = append(addresses, datastore.AddressRef{
-			ChainSelector: input.HomeChainSel,
-			Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-			Version:       &Version,
-			Address:       crAddr.String(),
-		})
-		_, err = chain.Confirm(tx)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-
-		// Deploy CCIPHome
-		ccAddr, tx, _, err := ccip_home.DeployCCIPHome(
-			chain.DeployerKey,
-			chain.Client,
-			crAddr,
-		)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		addresses = append(addresses, datastore.AddressRef{
-			ChainSelector: input.HomeChainSel,
-			Type:          datastore.ContractType(utils.CCIPHome),
-			Version:       &Version,
-			Address:       ccAddr.String(),
-		})
-		_, err = chain.Confirm(tx)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-
-		// Deploy RMNHome
-		rmnAddr, tx, rmnHome, err := rmn_home.DeployRMNHome(
-			chain.DeployerKey,
-			chain.Client,
-		)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		addresses = append(addresses, datastore.AddressRef{
-			ChainSelector: input.HomeChainSel,
-			Type:          datastore.ContractType(utils.RMNHome),
-			Version:       &Version,
-			Address:       rmnAddr.String(),
-		})
-		_, err = chain.Confirm(tx)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-
-		// considering the RMNHome is recently deployed, there is no digest to overwrite
-		configs, err := rmnHome.GetAllConfigs(nil)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get all configs from RMNHome: %w", err)
-		}
-		setCandidate := false
-		promoteCandidate := false
-
-		// check if the candidate is already set and equal to static and dynamic configs
-		if isRMNDynamicConfigEqual(input.RMNDynamicConfig, configs.CandidateConfig.DynamicConfig) &&
-			isRMNStaticConfigEqual(input.RMNStaticConfig, configs.CandidateConfig.StaticConfig) {
-			b.Logger.Infow("RMNHome candidate is already set and equal to given static and dynamic configs,skip setting candidate")
-		} else {
-			setCandidate = true
-		}
-		// check the active config is equal to the static and dynamic configs
-		if isRMNDynamicConfigEqual(input.RMNDynamicConfig, configs.ActiveConfig.DynamicConfig) &&
-			isRMNStaticConfigEqual(input.RMNStaticConfig, configs.ActiveConfig.StaticConfig) {
-			b.Logger.Infow("RMNHome active is already set and equal to given static and dynamic configs," +
-				"skip setting and promoting candidate")
-			setCandidate = false
-			promoteCandidate = false
-		} else {
-			promoteCandidate = true
-		}
-
-		if setCandidate {
-			tx, err := rmnHome.SetCandidate(
-				chain.DeployerKey, input.RMNStaticConfig, input.RMNDynamicConfig, configs.CandidateConfig.ConfigDigest)
-			if _, err := cldf.ConfirmIfNoErrorWithABI(chain, tx, rmn_home.RMNHomeABI, err); err != nil {
-				b.Logger.Errorw("Failed to set candidate on RMNHome", "err", err)
-				return sequences.OnChainOutput{}, err
-			}
-			b.Logger.Infow("Set candidate on RMNHome", "chain", chain.String())
-		}
-		if promoteCandidate {
-			rmnCandidateDigest, err := rmnHome.GetCandidateDigest(nil)
+var AddDONAndSetCandidateSequence = operations.NewSequence(
+	"AddDONAndSetCandidateSequence",
+	semver.MustParse("1.0.0"),
+	"Adds commit / exec DONs for chains and sets their candidates on CCIPHome",
+	func(b operations.Bundle, deps DONSequenceDeps, input AddDONAndSetCandidateSequenceInput) (sequences.OnChainOutput, error) {
+		for _, don := range input.DONs {
+			encodedSetCandidateCall, err := CCIPHomeABI.Pack(
+				"setCandidate",
+				don.ExpectedID,
+				don.PluginConfig.PluginType,
+				don.PluginConfig,
+				[32]byte{},
+			)
 			if err != nil {
-				b.Logger.Errorw("Failed to get RMNHome candidate digest", "chain", chain.String(), "err", err)
-				return sequences.OnChainOutput{}, err
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to pack set candidate call: %w", err)
 			}
-
-			tx, err := rmnHome.PromoteCandidateAndRevokeActive(chain.DeployerKey, rmnCandidateDigest, [32]byte{})
-			if _, err := cldf.ConfirmIfNoErrorWithABI(chain, tx, rmn_home.RMNHomeABI, err); err != nil {
-				b.Logger.Errorw("Failed to promote candidate and revoke active on RMNHome", "chain", chain.String(), "err", err)
-				return sequences.OnChainOutput{}, err
-			}
-
-			rmnActiveDigest, err := rmnHome.GetActiveDigest(nil)
-			if err != nil {
-				b.Logger.Errorw("Failed to get RMNHome active digest", "chain", chain.String(), "err", err)
-				return sequences.OnChainOutput{}, err
-			}
-			b.Logger.Infow("Got rmn home active digest", "digest", rmnActiveDigest)
-
-			if rmnActiveDigest != rmnCandidateDigest {
-				b.Logger.Errorw("RMNHome active digest does not match previously candidate digest",
-					"active", rmnActiveDigest, "candidate", rmnCandidateDigest)
-				return sequences.OnChainOutput{}, errors.New("RMNHome active digest does not match candidate digest")
-			}
-			b.Logger.Infow("Promoted candidate and revoked active on RMNHome", "chain", chain.String())
-		}
-		// check if ccip capability exists in cap reg
-		capabilities, err := capReg.GetCapabilities(nil)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get capabilities: %w", err)
-		}
-		capabilityToAdd := capabilities_registry.CapabilitiesRegistryCapability{
-			LabelledName:          CapabilityLabelledName,
-			Version:               CapabilityVersion,
-			CapabilityType:        2, // consensus. not used (?)
-			ResponseType:          0, // report. not used (?)
-			ConfigurationContract: ccAddr,
-		}
-		addCapability := true
-		for _, cap := range capabilities {
-			if cap.LabelledName == capabilityToAdd.LabelledName && cap.Version == capabilityToAdd.Version {
-				b.Logger.Infow("Capability already exists, skipping adding capability",
-					"labelledName", cap.LabelledName, "version", cap.Version)
-				addCapability = false
-				break
-			}
-		}
-		// Add the capability to the CapabilitiesRegistry contract only if it does not exist
-		if addCapability {
-			tx, err := capReg.AddCapabilities(
-				chain.DeployerKey, []capabilities_registry.CapabilitiesRegistryCapability{
-					capabilityToAdd,
+			_, err = operations.ExecuteOperation(
+				b,
+				cciphomeops.AddDON,
+				deps.HomeChain,
+				contract.FunctionInput[cciphomeops.AddDONOpInput]{
+					ChainSelector: deps.HomeChain.Selector,
+					Address:       input.CapabilitiesRegistry,
+					Args: cciphomeops.AddDONOpInput{
+						Nodes: don.PeerIDs,
+						CapabilityConfigurations: []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
+							{
+								CapabilityId: CCIPCapabilityID,
+								Config:       encodedSetCandidateCall,
+							},
+						},
+						IsPublic:         don.IsPublic,
+						AcceptsWorkflows: don.AcceptsWorkflows,
+						F:                don.F,
+					},
 				})
-			if _, err := cldf.ConfirmIfNoErrorWithABI(chain, tx, capabilities_registry.CapabilitiesRegistryABI, err); err != nil {
-				b.Logger.Errorw("Failed to add capabilities", "chain", chain.String(), "err", err)
-				return sequences.OnChainOutput{}, err
-			}
-			b.Logger.Infow("Added capability to CapabilitiesRegistry",
-				"labelledName", capabilityToAdd.LabelledName, "version", capabilityToAdd.Version)
-		}
-
-		existingNodeOps, err := capReg.GetNodeOperators(nil)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get existing node operators: %w", err)
-		}
-		nodeOpsMap := make(map[string]capabilities_registry.CapabilitiesRegistryNodeOperator)
-		for _, nop := range input.NodeOperators {
-			nodeOpsMap[nop.Admin.String()] = nop
-		}
-		for _, existingNop := range existingNodeOps {
-			if _, ok := nodeOpsMap[existingNop.Admin.String()]; ok {
-				b.Logger.Infow("Node operator already exists", "admin", existingNop.Admin.String())
-				delete(nodeOpsMap, existingNop.Admin.String())
-			}
-		}
-		nodeOpsToAdd := make([]capabilities_registry.CapabilitiesRegistryNodeOperator, 0, len(nodeOpsMap))
-		for _, nop := range nodeOpsMap {
-			nodeOpsToAdd = append(nodeOpsToAdd, nop)
-		}
-		// Need to fetch nodeoperators ids to be able to add nodes for corresponding node operators
-		p2pIDsByNodeOpID := make(map[uint32][][32]byte)
-		if len(nodeOpsToAdd) > 0 {
-			tx, err := capReg.AddNodeOperators(chain.DeployerKey, input.NodeOperators)
-			txBlockNum, err := cldf.ConfirmIfNoErrorWithABI(chain, tx, capabilities_registry.CapabilitiesRegistryABI, err)
 			if err != nil {
-				b.Logger.Errorw("Failed to add node operators", "chain", chain.String(), "err", err)
-				return sequences.OnChainOutput{}, err
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AddDON for chain with selector %d and plugin type %s: %w", don.PluginConfig.ChainSelector, don.PluginConfig.PluginType, err)
 			}
-			addedEvent, err := capReg.FilterNodeOperatorAdded(&bind.FilterOpts{
-				Start:   txBlockNum,
-				Context: context.Background(),
-			}, nil, nil)
+		}
+
+		return sequences.OnChainOutput{}, nil
+	})
+
+type DONUpdate struct {
+	ID             uint32
+	PluginConfig   ccip_home.CCIPHomeOCR3Config
+	PeerIDs        [][32]byte
+	F              uint8
+	IsPublic       bool
+	ExistingDigest [32]byte
+}
+
+type SetCandidateSequenceInput struct {
+	CapabilitiesRegistry common.Address
+	NoSend               bool
+	DONs                 []DONUpdate
+}
+
+var SetCandidateSequence = operations.NewSequence(
+	"SetCandidateSequence",
+	semver.MustParse("1.0.0"),
+	"Updates candidates for existing commit / exec DONs across multiple chains",
+	func(b operations.Bundle, deps DONSequenceDeps, input SetCandidateSequenceInput) (sequences.OnChainOutput, error) {
+		for _, don := range input.DONs {
+			encodedSetCandidateCall, err := CCIPHomeABI.Pack(
+				"setCandidate",
+				don.ID,
+				don.PluginConfig.PluginType,
+				don.PluginConfig,
+				don.ExistingDigest,
+			)
 			if err != nil {
-				b.Logger.Errorw("Failed to filter NodeOperatorAdded event", "chain", chain.String(), "err", err)
-				return sequences.OnChainOutput{}, err
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to pack set candidate call: %w", err)
 			}
-
-			for addedEvent.Next() {
-				for nopName, p2pID := range input.NodeP2PIDsPerNodeOpAdmin {
-					if addedEvent.Event.Name == nopName {
-						b.Logger.Infow("Added node operator", "admin", addedEvent.Event.Admin, "name", addedEvent.Event.Name)
-						p2pIDsByNodeOpID[addedEvent.Event.NodeOperatorId] = p2pID
-					}
-				}
-			}
-		} else {
-			b.Logger.Infow("No new node operators to add")
-			foundNopID := make(map[uint32]bool)
-			for nopName, p2pID := range input.NodeP2PIDsPerNodeOpAdmin {
-				// this is to find the node operator id for the given node operator name
-				// node operator start from id 1, starting from 1 to len(existingNodeOps)
-				totalNops := len(existingNodeOps)
-				if totalNops >= math.MaxUint32 {
-					return sequences.OnChainOutput{}, errors.New("too many node operators")
-				}
-				for nopID := uint32(1); nopID <= uint32(totalNops); nopID++ {
-					// if we already found the node operator id, skip
-					if foundNopID[nopID] {
-						continue
-					}
-					nodeOp, err := capReg.GetNodeOperator(nil, nopID)
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to get node operator %d: %w", nopID, err)
-					}
-					if nodeOp.Name == nopName {
-						p2pIDsByNodeOpID[nopID] = p2pID
-						foundNopID[nopID] = true
-						break
-					}
-				}
+			_, err = operations.ExecuteOperation(
+				b,
+				cciphomeops.UpdateDON,
+				deps.HomeChain,
+				contract.FunctionInput[cciphomeops.UpdateDONOpInput]{
+					Address:       input.CapabilitiesRegistry,
+					ChainSelector: deps.HomeChain.Selector,
+					Args: cciphomeops.UpdateDONOpInput{
+						ID:    don.ID,
+						Nodes: don.PeerIDs,
+						CapabilityConfigurations: []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
+							{
+								CapabilityId: CCIPCapabilityID,
+								Config:       encodedSetCandidateCall,
+							},
+						},
+						IsPublic: don.IsPublic,
+						F:        don.F,
+					},
+				},
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute UpdateDON for chain with selector %d and plugin type %s: %w", don.PluginConfig.ChainSelector, don.PluginConfig.PluginType, err)
 			}
 		}
-		if len(p2pIDsByNodeOpID) != len(input.NodeP2PIDsPerNodeOpAdmin) {
-			b.Logger.Errorw("Failed to add all node operators", "added", maps.Keys(p2pIDsByNodeOpID), "expected", maps.Keys(input.NodeP2PIDsPerNodeOpAdmin), "chain", chain.String())
-			return sequences.OnChainOutput{}, errors.New("failed to add all node operators")
-		}
-		// Adds initial set of nodes to CR, who all have the CCIP capability
-		if err := addNodes(b.Logger, capReg, chain, p2pIDsByNodeOpID); err != nil {
-			return sequences.OnChainOutput{}, err
-		}
 
-		return sequences.OnChainOutput{
-			Addresses: addresses,
-			BatchOps:  []mcms_types.BatchOperation{},
-		}, nil
-	},
-)
+		return sequences.OnChainOutput{}, nil
+	})
 
-func isRMNStaticConfigEqual(a, b rmn_home.RMNHomeStaticConfig) bool {
-	if len(a.Nodes) != len(b.Nodes) {
-		return false
-	}
-	nodesByPeerID := make(map[libocr_types.PeerID]rmn_home.RMNHomeNode)
-	for i := range a.Nodes {
-		nodesByPeerID[a.Nodes[i].PeerId] = a.Nodes[i]
-	}
-	for i := range b.Nodes {
-		node, exists := nodesByPeerID[b.Nodes[i].PeerId]
-		if !exists {
-			return false
-		}
-		if !bytes.Equal(node.OffchainPublicKey[:], b.Nodes[i].OffchainPublicKey[:]) {
-			return false
-		}
-	}
-
-	return bytes.Equal(a.OffchainConfig, b.OffchainConfig)
+type DONUpdatePromotion struct {
+	ID              uint32
+	PluginType      uint8
+	ChainSelector   uint64
+	PeerIDs         [][32]byte
+	F               uint8
+	IsPublic        bool
+	CandidateDigest [32]byte
+	ActiveDigest    [32]byte
 }
 
-func isRMNDynamicConfigEqual(a, b rmn_home.RMNHomeDynamicConfig) bool {
-	if len(a.SourceChains) != len(b.SourceChains) {
-		return false
-	}
-	sourceChainBySelector := make(map[uint64]rmn_home.RMNHomeSourceChain)
-	for i := range a.SourceChains {
-		sourceChainBySelector[a.SourceChains[i].ChainSelector] = a.SourceChains[i]
-	}
-	for i := range b.SourceChains {
-		sourceChain, exists := sourceChainBySelector[b.SourceChains[i].ChainSelector]
-		if !exists {
-			return false
-		}
-		if sourceChain.FObserve != b.SourceChains[i].FObserve {
-			return false
-		}
-		if sourceChain.ObserverNodesBitmap.Cmp(b.SourceChains[i].ObserverNodesBitmap) != 0 {
-			return false
-		}
-	}
-	return bytes.Equal(a.OffchainConfig, b.OffchainConfig)
+type PromoteCandidateSequenceInput struct {
+	CapabilitiesRegistry common.Address
+	NoSend               bool
+	DONs                 []DONUpdatePromotion
 }
 
-func addNodes(
-	lggr logger.Logger,
-	capReg *capabilities_registry.CapabilitiesRegistry,
-	chain cldf_evm.Chain,
-	p2pIDsByNodeOpId map[uint32][][32]byte,
-) error {
-	var nodeParams []capabilities_registry.CapabilitiesRegistryNodeParams
-	nodes, err := capReg.GetNodes(nil)
-	if err != nil {
-		return err
-	}
-	existingNodeParams := make(map[libocr_types.PeerID]capabilities_registry.CapabilitiesRegistryNodeParams)
-	for _, node := range nodes {
-		existingNodeParams[node.P2pId] = capabilities_registry.CapabilitiesRegistryNodeParams{
-			NodeOperatorId:      node.NodeOperatorId,
-			Signer:              node.Signer,
-			P2pId:               node.P2pId,
-			EncryptionPublicKey: node.EncryptionPublicKey,
-			HashedCapabilityIds: node.HashedCapabilityIds,
-		}
-	}
-	for nopID, p2pIDs := range p2pIDsByNodeOpId {
-		for _, p2pID := range p2pIDs {
-			// if any p2pIDs are empty throw error
-			if p2pID == ([32]byte{}) {
-				return fmt.Errorf("p2pID: %x selector: %d: %w", p2pID, chain.Selector, errors.New("empty p2pID"))
-			}
-			nodeParam := capabilities_registry.CapabilitiesRegistryNodeParams{
-				NodeOperatorId:      nopID,
-				Signer:              p2pID, // Not used in tests
-				P2pId:               p2pID,
-				EncryptionPublicKey: p2pID, // Not used in tests
-				HashedCapabilityIds: [][32]byte{CCIPCapabilityID},
-			}
-			if existing, ok := existingNodeParams[p2pID]; ok {
-				if isEqualCapabilitiesRegistryNodeParams(existing, nodeParam) {
-					lggr.Infow("Node already exists", "p2pID", p2pID)
-					continue
-				}
-			}
+var PromoteCandidateSequence = operations.NewSequence(
+	"PromoteCandidateSequence",
+	semver.MustParse("1.0.0"),
+	"Promote candidates for existing commit / exec DONs across multiple chains",
+	func(b operations.Bundle, deps DONSequenceDeps, input PromoteCandidateSequenceInput) (sequences.OnChainOutput, error) {
 
-			nodeParams = append(nodeParams, nodeParam)
+		for _, don := range input.DONs {
+			encodedPromoteCandidateCall, err := CCIPHomeABI.Pack(
+				"promoteCandidateAndRevokeActive",
+				don.ID,
+				don.PluginType,
+				don.CandidateDigest,
+				don.ActiveDigest,
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to pack promote candidate call: %w", err)
+			}
+			_, err = operations.ExecuteOperation(
+				b,
+				cciphomeops.UpdateDON,
+				deps.HomeChain,
+				contract.FunctionInput[cciphomeops.UpdateDONOpInput]{
+					Address:       input.CapabilitiesRegistry,
+					ChainSelector: deps.HomeChain.Selector,
+					Args: cciphomeops.UpdateDONOpInput{
+						ID:    don.ID,
+						Nodes: don.PeerIDs,
+						CapabilityConfigurations: []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
+							{
+								CapabilityId: CCIPCapabilityID,
+								Config:       encodedPromoteCandidateCall,
+							},
+						},
+						IsPublic: don.IsPublic,
+						F:        don.F,
+					},
+				},
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute UpdateDONOp for chain with selector %d and plugin type %s: %w", don.ChainSelector, don.PluginType, err)
+			}
 		}
-	}
-	if len(nodeParams) == 0 {
-		lggr.Infow("No new nodes to add")
-		return nil
-	}
-	lggr.Infow("Adding nodes", "chain", chain.String(), "nodes", p2pIDsByNodeOpId)
-	tx, err := capReg.AddNodes(chain.DeployerKey, nodeParams)
-	if err != nil {
-		lggr.Errorw("Failed to add nodes", "chain", chain.String(),
-			"err", cldf.DecodedErrFromABIIfDataErr(err, capabilities_registry.CapabilitiesRegistryABI))
-		return err
-	}
-	_, err = chain.Confirm(tx)
-	return err
+
+		return sequences.OnChainOutput{}, nil
+	})
+
+type ApplyChainConfigUpdatesSequenceInput struct {
+	CCIPHome           common.Address
+	NoSend             bool
+	RemoteChainAdds    []ccip_home.CCIPHomeChainConfigArgs
+	RemoteChainRemoves []uint64
+	BatchSize          int
 }
 
-func isEqualCapabilitiesRegistryNodeParams(a, b capabilities_registry.CapabilitiesRegistryNodeParams) bool {
-	if len(a.HashedCapabilityIds) != len(b.HashedCapabilityIds) {
-		return false
-	}
-	for i := range a.HashedCapabilityIds {
-		if !bytes.Equal(a.HashedCapabilityIds[i][:], b.HashedCapabilityIds[i][:]) {
-			return false
+var ApplyChainConfigUpdatesSequence = operations.NewSequence(
+	"ApplyChainConfigUpdatesSequence",
+	semver.MustParse("1.0.0"),
+	"Updates chain configurations on CCIPHome, using multiple ApplyChainConfigUpdates according to a batch size",
+	func(b operations.Bundle, deps DONSequenceDeps, input ApplyChainConfigUpdatesSequenceInput) (sequences.OnChainOutput, error) {
+		batches := make([]cciphomeops.ApplyChainConfigUpdatesOpInput, 0)
+		currentBatch := cciphomeops.ApplyChainConfigUpdatesOpInput{
+			RemoteChainRemoves: make([]uint64, 0),
+			RemoteChainAdds:    make([]ccip_home.CCIPHomeChainConfigArgs, 0),
+		}
+
+		// Track additions for quick lookups. Although we generally process removals first,
+		// if an addition for the same chain exists we must batch it with the removal.
+		// This is to ensure that there isn't any downtime for the chain in question.
+		adds := make(map[uint64]ccip_home.CCIPHomeChainConfigArgs)
+		for _, add := range input.RemoteChainAdds {
+			adds[add.ChainSelector] = add
+		}
+
+		processedAdds := make(map[uint64]struct{})
+		for _, removal := range input.RemoteChainRemoves {
+			currentBatch.RemoteChainRemoves = append(currentBatch.RemoteChainRemoves, removal)
+			// If there's an addition for the same chain, add it to the same batch
+			if add, ok := adds[removal]; ok {
+				currentBatch.RemoteChainAdds = append(currentBatch.RemoteChainAdds, add)
+				processedAdds[removal] = struct{}{}
+			}
+			batches, currentBatch = maybeSaveCurrentBatch(batches, currentBatch, input.BatchSize)
+		}
+
+		// Now, process the remaining additions (those not already processed)
+		for _, add := range input.RemoteChainAdds {
+			if _, ok := processedAdds[add.ChainSelector]; ok {
+				continue
+			}
+			currentBatch.RemoteChainAdds = append(currentBatch.RemoteChainAdds, add)
+			batches, currentBatch = maybeSaveCurrentBatch(batches, currentBatch, input.BatchSize)
+		}
+
+		// If any remaining items in the current batch, save it
+		if len(currentBatch.RemoteChainRemoves) > 0 || len(currentBatch.RemoteChainAdds) > 0 {
+			batches = append(batches, currentBatch)
+		}
+
+		for _, batch := range batches {
+			_, err := operations.ExecuteOperation(
+				b,
+				cciphomeops.ApplyChainConfigUpdates,
+				deps.HomeChain,
+				contract.FunctionInput[cciphomeops.ApplyChainConfigUpdatesOpInput]{
+					Address:       input.CCIPHome,
+					ChainSelector: deps.HomeChain.Selector,
+					Args:          batch,
+				},
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute ApplyChainConfigUpdatesOp on CCIPHome: %w", err)
+			}
+		}
+
+		return sequences.OnChainOutput{}, nil
+	})
+
+func maybeSaveCurrentBatch(
+	batches []cciphomeops.ApplyChainConfigUpdatesOpInput,
+	currentBatch cciphomeops.ApplyChainConfigUpdatesOpInput,
+	batchSize int,
+) ([]cciphomeops.ApplyChainConfigUpdatesOpInput, cciphomeops.ApplyChainConfigUpdatesOpInput) {
+	if len(currentBatch.RemoteChainRemoves)+len(currentBatch.RemoteChainAdds) >= batchSize {
+		batches = append(batches, currentBatch)
+		currentBatch = cciphomeops.ApplyChainConfigUpdatesOpInput{
+			RemoteChainRemoves: make([]uint64, 0),
+			RemoteChainAdds:    make([]ccip_home.CCIPHomeChainConfigArgs, 0),
 		}
 	}
-	return a.NodeOperatorId == b.NodeOperatorId &&
-		bytes.Equal(a.Signer[:], b.Signer[:]) &&
-		bytes.Equal(a.P2pId[:], b.P2pId[:]) &&
-		bytes.Equal(a.EncryptionPublicKey[:], b.EncryptionPublicKey[:])
+	return batches, currentBatch
 }

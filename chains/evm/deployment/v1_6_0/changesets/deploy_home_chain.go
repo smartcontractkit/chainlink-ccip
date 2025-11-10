@@ -7,13 +7,13 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var DeployHomeChain = deployment.CreateChangeSet(apply, validate)
+var DeployHomeChain = deployment.CreateChangeSet(applyDeployHomeChain, validateDeployHomeChain)
 
-func validate(e deployment.Environment, cfg sequences.DeployHomeChainConfig) error {
+func validateDeployHomeChain(e deployment.Environment, cfg sequences.DeployHomeChainConfig) error {
 	return nil
 }
 
-func apply(e deployment.Environment, cfg sequences.DeployHomeChainConfig) (deployment.ChangesetOutput, error) {
+func applyDeployHomeChain(e deployment.Environment, cfg sequences.DeployHomeChainConfig) (deployment.ChangesetOutput, error) {
 	report, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		sequences.DeployHomeChain,

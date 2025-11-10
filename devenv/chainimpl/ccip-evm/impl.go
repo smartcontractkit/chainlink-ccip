@@ -36,9 +36,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
-MockLinkPrice = deployment.E18Mult(500)
-	MockWethPrice = big.NewInt(9e8)
-
+// TODO: config option for what chain is home chain
+var CCIPHomeChain = chain_selectors.GETH_TESTNET.Selector
 var ccipMessageSentTopic = onramp.OnRampCCIPMessageSent{}.Topic()
 
 type CCIP16EVM struct {
@@ -201,14 +200,13 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy contracts: %w", err)
 	}
-	// TODO: config option for what chain is home chain
-	if selector == chain_selectors.GETH_TESTNET.Selector {
-		nodeClients, err := clclient.New(cls[0].Out.CLNodes)
-		if err != nil {
-			return nil, fmt.Errorf("connecting to CL nodes: %w", err)
-		}
-		// bootstrap is 0
-		workerNodes := nodeClients[1:]
+	nodeClients, err := clclient.New(cls[0].Out.CLNodes)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
+	}
+	// bootstrap is 0
+	workerNodes := nodeClients[1:]
+	if selector == CCIPHomeChain {
 		var nodeOperators []capabilities_registry.CapabilitiesRegistryNodeOperator
 		var nodeP2PIDsPerNodeOpAdmin = make(map[string][][32]byte)
 		for _, node := range workerNodes {
@@ -250,6 +248,12 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 			return nil, fmt.Errorf("failed to deploy home chain contracts: %w", err)
 		}
 		out.DataStore.Merge(ccipHomeOut.DataStore.Seal())
+	}
+	_, err = changesets.UpdateChainConfig.Apply(*env, changesets.UpdateChainConfigConfig{
+		HomeChainSelector: CCIPHomeChain,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure chain contracts: %w", err)
 	}
 	env.DataStore = out.DataStore.Seal()
 	runningDS.Merge(env.DataStore)
