@@ -38,7 +38,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     assertEq(tag, ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG);
   }
 
-  function test_DecodeGenericExtraArgsV3_Basic() public view {
+  function test__decodeGenericExtraArgsV3_Basic() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = _emptyArgs();
     args.blockConfirmations = 12;
     args.gasLimit = GAS_LIMIT;
@@ -52,7 +52,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     assertEq(decoded.executor, address(0));
   }
 
-  function test_DecodeGenericExtraArgsV3_WithExecutor() public {
+  function test__decodeGenericExtraArgsV3_WithExecutor() public {
     address executor = makeAddr("executor");
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: GAS_LIMIT * 2,
@@ -72,7 +72,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     assertEq(decoded.executorArgs, "data");
   }
 
-  function test_DecodeGenericExtraArgsV3_WithCCVs() public {
+  function test__decodeGenericExtraArgsV3_WithCCVs() public {
     address[] memory ccvs = new address[](2);
     ccvs[0] = makeAddr("ccv1");
     ccvs[1] = makeAddr("ccv2");
@@ -99,7 +99,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     assertEq(decoded.ccvArgs[0], "args1");
   }
 
-  function test_DecodeGenericExtraArgsV3_WithTokenArgs() public {
+  function test__decodeGenericExtraArgsV3_WithTokenArgs() public {
     address tokenReceiver = makeAddr("tokenReceiver");
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: GAS_LIMIT,
@@ -119,7 +119,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     assertEq(decoded.tokenArgs, "token args");
   }
 
-  function test_DecodeGenericExtraArgsV3_ZeroValues() public view {
+  function test__decodeGenericExtraArgsV3_ZeroValues() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: 0,
       blockConfirmations: 0,
@@ -138,7 +138,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     assertEq(decoded.blockConfirmations, 0);
   }
 
-  function test_DecodeGenericExtraArgsV3_MaxValues() public view {
+  function test__decodeGenericExtraArgsV3_MaxValues() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: type(uint32).max,
       blockConfirmations: type(uint16).max,
@@ -157,7 +157,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     assertEq(decoded.blockConfirmations, type(uint16).max);
   }
 
-  function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
     vm.expectRevert(
       abi.encodeWithSelector(
         ExtraArgsCodec.InvalidDataLength.selector,
@@ -168,7 +168,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     s_helper._decodeGenericExtraArgsV3(new bytes(10));
   }
 
-  function test_DecodeGenericExtraArgsV3_RevertWhen_InvalidExecutorLength() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_InvalidExecutorLength() public {
     bytes memory invalidData = abi.encodePacked(
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       GAS_LIMIT,
@@ -185,7 +185,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     s_helper._decodeGenericExtraArgsV3(invalidData);
   }
 
-  function test_DecodeGenericExtraArgsV3_RevertWhen_InvalidCCVAddressLength() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_InvalidCCVAddressLength() public {
     bytes memory invalidData = abi.encodePacked(
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       GAS_LIMIT,
@@ -204,7 +204,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     s_helper._decodeGenericExtraArgsV3(invalidData);
   }
 
-  function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_CCV_ADDRESS_LENGTH() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_CCV_ADDRESS_LENGTH() public {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = _emptyArgs();
     args.ccvs = new address[](2);
     args.ccvs[0] = makeAddr("ccv");
@@ -224,7 +224,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     s_helper._decodeGenericExtraArgsV3(encoded);
   }
 
-  function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_CCV_ADDRESS_CONTENT() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_CCV_ADDRESS_CONTENT() public {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = _emptyArgs();
     args.ccvs = new address[](2);
     args.ccvs[0] = makeAddr("ccv");
@@ -244,7 +244,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     s_helper._decodeGenericExtraArgsV3(encoded);
   }
 
-  function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_CCV_ARGS_LENGTH() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_CCV_ARGS_LENGTH() public {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = _emptyArgs();
     args.ccvs = new address[](1);
     args.ccvs[0] = makeAddr("ccv");
@@ -263,7 +263,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     s_helper._decodeGenericExtraArgsV3(encoded);
   }
 
-  function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_CCV_ARGS_CONTENT() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_CCV_ARGS_CONTENT() public {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = _emptyArgs();
     args.ccvs = new address[](1);
     args.ccvs[0] = makeAddr("ccv");
@@ -283,7 +283,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     s_helper._decodeGenericExtraArgsV3(encoded);
   }
 
-  function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_EXECUTOR_CONTENT() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_EXECUTOR_CONTENT() public {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = _emptyArgs();
     args.executor = makeAddr("executor");
 
@@ -300,7 +300,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     s_helper._decodeGenericExtraArgsV3(encoded);
   }
 
-  function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_FINAL_OFFSET() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_FINAL_OFFSET() public {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       gasLimit: GAS_LIMIT,
       blockConfirmations: 1,
@@ -325,7 +325,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     s_helper._decodeGenericExtraArgsV3(withExtra);
   }
 
-  function test_EncodeGenericExtraArgsV3_RevertWhen_ENCODE_CCVS_ARRAY_LENGTH() public {
+  function test__encodeGenericExtraArgsV3_RevertWhen_ENCODE_CCVS_ARRAY_LENGTH() public {
     uint256 tooLong = uint256(type(uint8).max) + 1;
 
     vm.expectRevert(
@@ -347,7 +347,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     );
   }
 
-  function test_EncodeGenericExtraArgsV3_RevertWhen_ENCODE_EXECUTOR_ARGS_LENGTH() public {
+  function test__encodeGenericExtraArgsV3_RevertWhen_ENCODE_EXECUTOR_ARGS_LENGTH() public {
     uint256 tooLong = uint256(type(uint16).max) + 1;
 
     vm.expectRevert(
@@ -369,7 +369,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     );
   }
 
-  function test_EncodeGenericExtraArgsV3_RevertWhen_ENCODE_TOKEN_RECEIVER_LENGTH() public {
+  function test__encodeGenericExtraArgsV3_RevertWhen_ENCODE_TOKEN_RECEIVER_LENGTH() public {
     uint256 tooLong = uint256(type(uint8).max) + 1;
 
     vm.expectRevert(
@@ -391,7 +391,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     );
   }
 
-  function test_EncodeGenericExtraArgsV3_RevertWhen_ENCODE_TOKEN_ARGS_LENGTH() public {
+  function test__encodeGenericExtraArgsV3_RevertWhen_ENCODE_TOKEN_ARGS_LENGTH() public {
     uint256 tooLong = uint256(type(uint16).max) + 1;
 
     vm.expectRevert(
@@ -413,7 +413,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
     );
   }
 
-  function test_EncodeGenericExtraArgsV3_RevertWhen_EncodingSizeMismatch() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_EncodingSizeMismatch() public {
     bytes memory validExtraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(
       ExtraArgsCodec.GenericExtraArgsV3({
         gasLimit: GAS_LIMIT,

@@ -24,7 +24,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     s_unoptimizedDecoder = new UnoptimizedDecodeHelper();
   }
 
-  function test_EncodeGenericExtraArgsV3_AllDynamicArgsDefaultValues() public view {
+  function test__encodeGenericExtraArgsV3_AllDynamicArgsDefaultValues() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
       ccvArgs: new bytes[](0),
@@ -42,7 +42,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     _assertSameArgs(args, s_decoder._decodeGenericExtraArgsV3(encoded));
   }
 
-  function test_EncodeGenericExtraArgsV3_ExecutorNonZeroAddress() public {
+  function test__encodeGenericExtraArgsV3_ExecutorNonZeroAddress() public {
     address executor = makeAddr("executor");
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
@@ -62,7 +62,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     _assertSameArgs(args, s_decoder._decodeGenericExtraArgsV3(encoded));
   }
 
-  function test_DecodeGenericExtraArgsV3_RevertWhen_InvalidExecutorLength() public {
+  function test__decodeGenericExtraArgsV3_RevertWhen_InvalidExecutorLength() public {
     bytes memory invalidEncoded = abi.encodePacked(
       ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
       GAS_LIMIT,
@@ -79,7 +79,7 @@ contract ExtraArgsCodec_Test is BaseTest {
     s_decoder._decodeGenericExtraArgsV3(invalidEncoded);
   }
 
-  function test_EncodeGenericExtraArgsV3_WithCCVs() public {
+  function test__encodeGenericExtraArgsV3_WithCCVs() public {
     address[] memory ccvs = new address[](2);
     ccvs[0] = makeAddr("ccv1");
     ccvs[1] = makeAddr("ccv2");
@@ -105,7 +105,7 @@ contract ExtraArgsCodec_Test is BaseTest {
 
   /// forge-config: default.fuzz.runs = 4096
   /// forge-config: ccip.fuzz.runs = 4096
-  function testFuzz_EncodeGenericExtraArgsV3_Differential_Identical(
+  function testFuzz__encodeGenericExtraArgsV3_Differential_Identical(
     uint32 gasLimit,
     uint16 blockConfirmations,
     address[9] memory ccvs,

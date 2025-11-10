@@ -14,7 +14,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
     s_helper = new ExtraArgsCodecHelper();
   }
 
-  function test_DecodeSuiExecutorArgsV1_NoObjectIds() public view {
+  function test__ecodeSuiExecutorArgsV1_NoObjectIds() public view {
     ExtraArgsCodec.SuiExecutorArgsV1 memory args =
       ExtraArgsCodec.SuiExecutorArgsV1({receiverObjectIds: new bytes32[](0)});
 
@@ -26,7 +26,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
     assertEq(decoded.receiverObjectIds.length, 0);
   }
 
-  function test_DecodeSuiExecutorArgsV1_WithObjectIds() public view {
+  function test__decodeSuiExecutorArgsV1_WithObjectIds() public view {
     bytes32[] memory objectIds = new bytes32[](2);
     objectIds[0] = keccak256("object1");
     objectIds[1] = keccak256("object2");
@@ -41,7 +41,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
     assertEq(decoded.receiverObjectIds[1], keccak256("object2"));
   }
 
-  function test_DecodeSuiExecutorArgsV1_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
+  function test__decodeSuiExecutorArgsV1_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
     vm.expectRevert(
       abi.encodeWithSelector(
         ExtraArgsCodec.InvalidDataLength.selector,
@@ -52,7 +52,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
     s_helper._decodeSuiExecutorArgsV1(new bytes(3));
   }
 
-  function test_DecodeSuiExecutorArgsV1_RevertWhen_SUI_EXECUTOR_FINAL_OFFSET() public {
+  function test__decodeSuiExecutorArgsV1_RevertWhen_SUI_EXECUTOR_FINAL_OFFSET() public {
     ExtraArgsCodec.SuiExecutorArgsV1 memory args =
       ExtraArgsCodec.SuiExecutorArgsV1({receiverObjectIds: new bytes32[](0)});
 
@@ -67,7 +67,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
     s_helper._decodeSuiExecutorArgsV1(withExtra);
   }
 
-  function test_DecodeSuiExecutorArgsV1_RevertWhen_SUI_EXECUTOR_OBJECT_IDS_CONTENT() public {
+  function test__decodeSuiExecutorArgsV1_RevertWhen_SUI_EXECUTOR_OBJECT_IDS_CONTENT() public {
     bytes memory invalidData = abi.encodePacked(
       ExtraArgsCodec.SUI_EXECUTOR_ARGS_V1_TAG,
       uint8(2) // Claims 2 object IDs but doesn't provide them.
@@ -83,7 +83,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
     s_helper._decodeSuiExecutorArgsV1(invalidData);
   }
 
-  function test_EncodeSuiExecutorArgsV1_RevertWhen_ENCODE_SUI_OBJECT_IDS_LENGTH() public {
+  function test__encodeSuiExecutorArgsV1_RevertWhen_ENCODE_SUI_OBJECT_IDS_LENGTH() public {
     bytes32[] memory objectIds = new bytes32[](257);
 
     vm.expectRevert(
