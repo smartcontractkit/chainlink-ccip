@@ -3,9 +3,8 @@ pragma solidity ^0.8.4;
 
 /// @notice Gas-optimized assembly version of ExtraArgsCodec library.
 library ExtraArgsCodec {
-  error InvalidDataLength(EncodingErrorLocation location);
-  error InvalidExecutorLength(uint256 length);
-  error InvalidCCVAddressLength(uint256 length);
+  error InvalidDataLength(EncodingErrorLocation location, uint256 offset);
+  error InvalidAddressLength(uint256 length);
   error CCVArrayLengthMismatch(uint256 ccvsLength, uint256 ccvArgsLength);
 
   bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
@@ -17,6 +16,7 @@ library ExtraArgsCodec {
   // Encoding order: tag(4) + gasLimit(4) + finalityConfig(2) + ccvsLength(1) + executorLength(1) +
   // executorArgsLength(2) + tokenReceiverLength(2) + tokenArgsLength(2) = 19 bytes.
   uint256 public constant GENERIC_EXTRA_ARGS_V3_BASE_SIZE = 4 + 4 + 2 + 1 + 1 + 2 + 2 + 2;
+  uint256 public constant GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE = 4 + 4 + 2 + 1;
   // Base size: tag(4) + useATA(1) + accountIsWritableBitmap(8) + accountsLength(1) = 14 bytes.
   uint256 public constant SVM_EXECUTOR_ARGS_V1_BASE_SIZE = 4 + 1 + 8 + 1;
   // Base size: tag(4) + objectIdsLength(1) = 5 bytes.
@@ -24,33 +24,25 @@ library ExtraArgsCodec {
 
   // Enum to indicate specific error locations during encoding/decoding.
   enum EncodingErrorLocation {
-    EXTRA_ARGS_CCV_ADDRESS_LENGTH, // 0
-    EXTRA_ARGS_CCV_ADDRESS_CONTENT,
-    EXTRA_ARGS_CCV_ARGS_LENGTH,
-    EXTRA_ARGS_CCV_ARGS_CONTENT,
-    EXTRA_ARGS_STATIC_LENGTH_FIELDS,
-    EXTRA_ARGS_EXECUTOR_LENGTH, // 5
-    EXTRA_ARGS_EXECUTOR_CONTENT,
-    EXTRA_ARGS_EXECUTOR_ARGS_LENGTH,
-    EXTRA_ARGS_EXECUTOR_ARGS_CONTENT,
-    EXTRA_ARGS_TOKEN_RECEIVER_LENGTH,
-    EXTRA_ARGS_TOKEN_RECEIVER_CONTENT, // 10
-    EXTRA_ARGS_TOKEN_ARGS_LENGTH,
-    EXTRA_ARGS_TOKEN_ARGS_CONTENT,
-    EXTRA_ARGS_FINAL_OFFSET,
-    SVM_EXECUTOR_ACCOUNTS_CONTENT,
-    SVM_EXECUTOR_FINAL_OFFSET, // 15
-    SUI_EXECUTOR_OBJECT_IDS_CONTENT,
-    SUI_EXECUTOR_FINAL_OFFSET,
-    ENCODE_CCVS_ARRAY_LENGTH,
-    ENCODE_CCV_ADDRESS_LENGTH,
-    ENCODE_CCV_ARGS_LENGTH, // 20
-    ENCODE_EXECUTOR_LENGTH,
-    ENCODE_EXECUTOR_ARGS_LENGTH,
-    ENCODE_TOKEN_RECEIVER_LENGTH,
-    ENCODE_TOKEN_ARGS_LENGTH,
-    ENCODE_SVM_ACCOUNTS_LENGTH, // 25
-    ENCODE_SUI_OBJECT_IDS_LENGTH
+    // Generic decoding errors (used in helper functions).
+    DECODE_FIELD_LENGTH, // 0 - Error reading a field's length prefix.
+    DECODE_FIELD_CONTENT, // 1 - Error reading a field's content/payload.
+    // Specific decoding errors (used in main decoding functions).
+    EXTRA_ARGS_STATIC_LENGTH_FIELDS, // 2
+    EXTRA_ARGS_FINAL_OFFSET, // 3
+    SVM_EXECUTOR_ACCOUNTS_CONTENT, // 4
+    SVM_EXECUTOR_FINAL_OFFSET, // 5
+    SUI_EXECUTOR_OBJECT_IDS_CONTENT, // 6
+    SUI_EXECUTOR_FINAL_OFFSET, // 7
+    // Encoding validation errors.
+    ENCODE_CCVS_ARRAY_LENGTH, // 8
+    ENCODE_CCV_ARGS_LENGTH, // 9
+    ENCODE_EXECUTOR_ARGS_LENGTH, // 10
+    ENCODE_TOKEN_RECEIVER_LENGTH, // 11
+    ENCODE_TOKEN_ARGS_LENGTH, // 12
+    ENCODE_SVM_ACCOUNTS_LENGTH, // 13
+    ENCODE_SUI_OBJECT_IDS_LENGTH // 14
+
   }
 
   // solhint-disable-next-line gas-struct-packing
@@ -127,6 +119,77 @@ library ExtraArgsCodec {
     bytes32[] receiverObjectIds;
   }
 
+  /// @notice Helper function to read a uint8 length prefix and an address from calldata.
+  /// @dev Reads length as 1 byte followed by the address bytes (20 bytes if non-zero).
+  /// @param encoded The encoded bytes to read from.
+  /// @param offset The current offset in the encoded bytes.
+  /// @return addr The address read from calldata (address(0) if length was 0).
+  /// @return newOffset The updated offset after reading.
+  function _readUint8PrefixedAddress(
+    bytes calldata encoded,
+    uint256 offset
+  ) private pure returns (address addr, uint256 newOffset) {
+    // Read address length (1 byte).
+    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
+    uint256 addrLength;
+    assembly {
+      addrLength := byte(0, calldataload(add(encoded.offset, offset)))
+      newOffset := add(offset, 1)
+    }
+
+    // Validate address length (0 or 20 for EVM).
+    if (addrLength != 0 && addrLength != 20) {
+      revert InvalidAddressLength(addrLength);
+    }
+
+    // Read address content.
+    if (newOffset + addrLength > encoded.length) {
+      revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, newOffset);
+    }
+
+    if (addrLength == 20) {
+      assembly {
+        let addrData := calldataload(add(encoded.offset, newOffset))
+        addr := shr(96, addrData)
+      }
+    }
+    unchecked {
+      newOffset += addrLength;
+    }
+    return (addr, newOffset);
+  }
+
+  /// @notice Helper function to read a uint16 length prefix and bytes data from calldata.
+  /// @dev Reads length as 2 bytes (big endian) followed by the data bytes.
+  /// @param encoded The encoded bytes to read from.
+  /// @param offset The current offset in the encoded bytes.
+  /// @return data The bytes data read from calldata.
+  /// @return newOffset The updated offset after reading.
+  function _readUint16PrefixedBytes(
+    bytes calldata encoded,
+    uint256 offset
+  ) private pure returns (bytes calldata data, uint256 newOffset) {
+    // Read length (2 bytes).
+    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
+    uint256 dataLength;
+    assembly {
+      let lengthData := calldataload(add(encoded.offset, offset))
+      dataLength := and(shr(240, lengthData), 0xFFFF)
+      newOffset := add(offset, 2)
+    }
+
+    // Read content.
+    if (newOffset + dataLength > encoded.length) {
+      revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, newOffset);
+    }
+    data = encoded[newOffset:newOffset + dataLength];
+    unchecked {
+      newOffset += dataLength;
+    }
+
+    return (data, newOffset);
+  }
+
   /// @notice Helper function to write a uint8 length prefix and an address.
   /// @dev Writes length as 1 byte followed by the address bytes (20 bytes if non-zero).
   /// @param ptr The memory pointer where to start writing.
@@ -190,19 +253,19 @@ library ExtraArgsCodec {
 
     // Validate field lengths.
     if (ccvsLength > type(uint8).max) {
-      revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCVS_ARRAY_LENGTH);
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCVS_ARRAY_LENGTH, 0);
     }
     uint256 executorArgsLength = extraArgs.executorArgs.length;
     if (executorArgsLength > type(uint16).max) {
-      revert InvalidDataLength(EncodingErrorLocation.ENCODE_EXECUTOR_ARGS_LENGTH);
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_EXECUTOR_ARGS_LENGTH, 0);
     }
     uint256 tokenReceiverLength = extraArgs.tokenReceiver.length;
     if (tokenReceiverLength > type(uint16).max) {
-      revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_RECEIVER_LENGTH);
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_RECEIVER_LENGTH, 0);
     }
     uint256 tokenArgsLength = extraArgs.tokenArgs.length;
     if (tokenArgsLength > type(uint16).max) {
-      revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_ARGS_LENGTH);
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_ARGS_LENGTH, 0);
     }
 
     // Calculate executor length.
@@ -216,7 +279,7 @@ library ExtraArgsCodec {
 
       uint256 ccvArgLength = extraArgs.ccvArgs[i].length;
       if (ccvArgLength > type(uint16).max) {
-        revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCV_ARGS_LENGTH);
+        revert InvalidDataLength(EncodingErrorLocation.ENCODE_CCV_ARGS_LENGTH, 0);
       }
 
       // 1 byte for address length + address bytes + 2 bytes for args length + args bytes.
@@ -266,8 +329,15 @@ library ExtraArgsCodec {
     // Write executor, executorArgs, tokenReceiver, tokenArgs.
     ptr = _writeUint8PrefixedAddress(ptr, extraArgs.executor);
     ptr = _writeUint16PrefixedBytes(ptr, extraArgs.executorArgs);
+    // should this be 8?
     ptr = _writeUint16PrefixedBytes(ptr, extraArgs.tokenReceiver);
     ptr = _writeUint16PrefixedBytes(ptr, extraArgs.tokenArgs);
+
+    // We should have exactly filled the allocated bytes.
+    // TODO
+    //    if (ptr != encoded.length + 32) {
+    //      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET);
+    //    }
 
     return encoded;
   }
@@ -280,7 +350,7 @@ library ExtraArgsCodec {
   ) internal pure returns (GenericExtraArgsV3 memory extraArgs) {
     // Check if encodedLength is at least the minimum size.
     if (encoded.length < GENERIC_EXTRA_ARGS_V3_BASE_SIZE) {
-      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS);
+      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS, encoded.length);
     }
 
     uint256 ccvsLength;
@@ -298,152 +368,26 @@ library ExtraArgsCodec {
       ccvsLength := byte(0, calldataload(add(encoded.offset, 10)))
     }
 
-    uint256 offset = 11; // Skip tag, gasLimit, finalityConfig, ccvsLength.
+    uint256 offset = GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE; // Skip tag, gasLimit, finalityConfig, ccvsLength.
 
     // Allocate arrays for CCVs.
     extraArgs.ccvs = new address[](ccvsLength);
     extraArgs.ccvArgs = new bytes[](ccvsLength);
 
-    // Decode CCVs
+    // Decode CCVs and args.
     for (uint256 i = 0; i < ccvsLength; ++i) {
-      // Read CCV address length (1 byte).
-      if (offset + 1 > encoded.length) {
-        revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS_LENGTH);
-      }
-
-      uint256 ccvAddressLength;
-      assembly {
-        ccvAddressLength := byte(0, calldataload(add(encoded.offset, offset)))
-        offset := add(offset, 1)
-      }
-
-      // Validate CCV address length (0 or 20 for EVM).
-      if (ccvAddressLength != 0 && ccvAddressLength != 20) {
-        revert InvalidCCVAddressLength(ccvAddressLength);
-      }
-
-      // Read CCV address
-      if (offset + ccvAddressLength > encoded.length) {
-        revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS_CONTENT);
-      }
-
-      if (ccvAddressLength == 20) {
-        assembly {
-          let addrData := calldataload(add(encoded.offset, offset))
-          mstore(add(add(mload(add(extraArgs, 64)), 32), mul(i, 32)), shr(96, addrData))
-        }
-      }
-      unchecked {
-        offset += ccvAddressLength;
-      }
-
-      // Read CCV args length (2 bytes).
-      if (offset + 2 > encoded.length) {
-        revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_LENGTH);
-      }
-
-      uint256 ccvArgsLength;
-      assembly {
-        let data := calldataload(add(encoded.offset, offset))
-        ccvArgsLength := and(shr(240, data), 0xFFFF)
-        offset := add(offset, 2)
-      }
-
-      // Read CCV args content.
-      if (offset + ccvArgsLength > encoded.length) {
-        revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_CONTENT);
-      }
-
-      extraArgs.ccvArgs[i] = encoded[offset:offset + ccvArgsLength];
-      unchecked {
-        offset += ccvArgsLength;
-      }
+      (extraArgs.ccvs[i], offset) = _readUint8PrefixedAddress(encoded, offset);
+      (extraArgs.ccvArgs[i], offset) = _readUint16PrefixedBytes(encoded, offset);
     }
 
-    // Read executor length (1 byte).
-    if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_LENGTH);
-    uint256 executorLength;
-    assembly {
-      executorLength := byte(0, calldataload(add(encoded.offset, offset)))
-      offset := add(offset, 1)
-    }
-
-    // Validate executor length (0 or 20 for EVM).
-    if (executorLength != 0 && executorLength != 20) {
-      revert InvalidExecutorLength(executorLength);
-    }
-
-    // Read executor.
-    if (offset + executorLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_CONTENT);
-    }
-
-    if (executorLength == 20) {
-      assembly {
-        let data := calldataload(add(encoded.offset, offset))
-        mstore(add(extraArgs, 128), shr(96, data))
-      }
-    }
-    unchecked {
-      offset += executorLength;
-    }
-
-    // Read executorArgs length (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_LENGTH);
-    uint256 executorArgsLength;
-    assembly {
-      let data := calldataload(add(encoded.offset, offset))
-      executorArgsLength := and(shr(240, data), 0xFFFF)
-      offset := add(offset, 2)
-    }
-
-    // Read executorArgs content.
-    if (offset + executorArgsLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_ARGS_CONTENT);
-    }
-    extraArgs.executorArgs = encoded[offset:offset + executorArgsLength];
-    unchecked {
-      offset += executorArgsLength;
-    }
-
-    // Read tokenReceiver length (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_LENGTH);
-    uint256 tokenReceiverLength;
-    assembly {
-      let data := calldataload(add(encoded.offset, offset))
-      tokenReceiverLength := and(shr(240, data), 0xFFFF)
-      offset := add(offset, 2)
-    }
-
-    // Read tokenReceiver content.
-    if (offset + tokenReceiverLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_RECEIVER_CONTENT);
-    }
-    extraArgs.tokenReceiver = encoded[offset:offset + tokenReceiverLength];
-    unchecked {
-      offset += tokenReceiverLength;
-    }
-
-    // Read tokenArgs length (2 bytes).
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_LENGTH);
-    uint256 tokenArgsLength;
-    assembly {
-      let data := calldataload(add(encoded.offset, offset))
-      tokenArgsLength := and(shr(240, data), 0xFFFF)
-      offset := add(offset, 2)
-    }
-
-    // Read tokenArgs content.
-    if (offset + tokenArgsLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_TOKEN_ARGS_CONTENT);
-    }
-    extraArgs.tokenArgs = encoded[offset:offset + tokenArgsLength];
-    unchecked {
-      offset += tokenArgsLength;
-    }
+    // Read executor, executorArgs, tokenReceiver, and tokenArgs.
+    (extraArgs.executor, offset) = _readUint8PrefixedAddress(encoded, offset);
+    (extraArgs.executorArgs, offset) = _readUint16PrefixedBytes(encoded, offset);
+    (extraArgs.tokenReceiver, offset) = _readUint16PrefixedBytes(encoded, offset);
+    (extraArgs.tokenArgs, offset) = _readUint16PrefixedBytes(encoded, offset);
 
     // Ensure we've consumed all bytes.
-    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET);
+    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET, offset);
 
     return extraArgs;
   }
@@ -456,7 +400,7 @@ library ExtraArgsCodec {
   ) internal pure returns (bytes memory encoded) {
     uint256 accountsLength = executorArgs.accounts.length;
     if (accountsLength > type(uint8).max) {
-      revert InvalidDataLength(EncodingErrorLocation.ENCODE_SVM_ACCOUNTS_LENGTH);
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_SVM_ACCOUNTS_LENGTH, 0);
     }
 
     return abi.encodePacked(
@@ -475,16 +419,16 @@ library ExtraArgsCodec {
     bytes calldata encoded
   ) internal pure returns (SVMExecutorArgsV1 memory executorArgs) {
     if (encoded.length < SVM_EXECUTOR_ARGS_V1_BASE_SIZE) {
-      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS);
+      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS, encoded.length);
     }
 
     uint256 accountsLength;
 
     // Read static-length fields.
     assembly {
-      // Read useATA (1 byte).
+      // Read useATA (1 byte) - enum value.
       let useATA := byte(0, calldataload(add(encoded.offset, 4)))
-      mstore(executorArgs, iszero(iszero(useATA)))
+      mstore(executorArgs, useATA)
 
       // Read accountIsWritableBitmap (8 bytes).
       let bitmap := calldataload(add(encoded.offset, 5))
@@ -498,7 +442,7 @@ library ExtraArgsCodec {
 
     // Read accounts.
     if (offset + accountsLength * 32 > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_CONTENT);
+      revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_CONTENT, offset);
     }
 
     executorArgs.accounts = new bytes32[](accountsLength);
@@ -514,7 +458,7 @@ library ExtraArgsCodec {
     }
 
     // Ensure we've consumed all bytes.
-    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET);
+    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET, offset);
 
     return executorArgs;
   }
@@ -527,7 +471,7 @@ library ExtraArgsCodec {
   ) internal pure returns (bytes memory encoded) {
     uint256 objectIdsLength = executorArgs.receiverObjectIds.length;
     if (objectIdsLength > type(uint8).max) {
-      revert InvalidDataLength(EncodingErrorLocation.ENCODE_SUI_OBJECT_IDS_LENGTH);
+      revert InvalidDataLength(EncodingErrorLocation.ENCODE_SUI_OBJECT_IDS_LENGTH, 0);
     }
 
     return abi.encodePacked(SUI_EXECUTOR_ARGS_V1_TAG, uint8(objectIdsLength), executorArgs.receiverObjectIds);
@@ -540,7 +484,7 @@ library ExtraArgsCodec {
     bytes calldata encoded
   ) internal pure returns (SuiExecutorArgsV1 memory executorArgs) {
     if (encoded.length < SUI_EXECUTOR_ARGS_V1_BASE_SIZE) {
-      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS);
+      revert InvalidDataLength(EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS, encoded.length);
     }
     // Read objectIds length
     uint256 objectIdsLength;
@@ -551,7 +495,7 @@ library ExtraArgsCodec {
     uint256 offset = SUI_EXECUTOR_ARGS_V1_BASE_SIZE;
     // Read objectIds
     if (offset + objectIdsLength * 32 > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_CONTENT);
+      revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_CONTENT, offset);
     }
 
     executorArgs.receiverObjectIds = new bytes32[](objectIdsLength);
@@ -565,7 +509,7 @@ library ExtraArgsCodec {
     offset += objectIdsLength * 32;
 
     // Ensure we've consumed all bytes
-    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET);
+    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET, offset);
 
     return executorArgs;
   }

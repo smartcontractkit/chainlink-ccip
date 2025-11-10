@@ -67,7 +67,9 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
   function test_DecodeSVMExecutorArgsV1_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS
+        ExtraArgsCodec.InvalidDataLength.selector,
+        ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS,
+        10
       )
     );
     s_helper._decodeSVMExecutorArgsV1(new bytes(10));
@@ -85,7 +87,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_FINAL_OFFSET, 14
       )
     );
     s_helper._decodeSVMExecutorArgsV1(withExtra);
@@ -101,7 +103,9 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_CONTENT
+        ExtraArgsCodec.InvalidDataLength.selector,
+        ExtraArgsCodec.EncodingErrorLocation.SVM_EXECUTOR_ACCOUNTS_CONTENT,
+        14
       )
     );
     s_helper._decodeSVMExecutorArgsV1(invalidData);
@@ -112,7 +116,7 @@ contract ExtraArgsCodecSVM_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_SVM_ACCOUNTS_LENGTH
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_SVM_ACCOUNTS_LENGTH, 0
       )
     );
     ExtraArgsCodec._encodeSVMExecutorArgsV1(

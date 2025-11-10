@@ -160,7 +160,9 @@ contract ExtraArgsCodecV3_Test is BaseTest {
   function test_DecodeGenericExtraArgsV3_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS
+        ExtraArgsCodec.InvalidDataLength.selector,
+        ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS,
+        10
       )
     );
     s_helper._decodeGenericExtraArgsV3(new bytes(10));
@@ -179,7 +181,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
       uint16(0)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.InvalidExecutorLength.selector, 10));
+    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.InvalidAddressLength.selector, 10));
     s_helper._decodeGenericExtraArgsV3(invalidData);
   }
 
@@ -198,7 +200,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
       uint16(0)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.InvalidCCVAddressLength.selector, 10));
+    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.InvalidAddressLength.selector, 10));
     s_helper._decodeGenericExtraArgsV3(invalidData);
   }
 
@@ -216,7 +218,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS_LENGTH
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_LENGTH, 34
       )
     );
     s_helper._decodeGenericExtraArgsV3(encoded);
@@ -236,7 +238,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_CCV_ADDRESS_CONTENT
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_CONTENT, 35
       )
     );
     s_helper._decodeGenericExtraArgsV3(encoded);
@@ -255,7 +257,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_LENGTH
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_LENGTH, 32
       )
     );
     s_helper._decodeGenericExtraArgsV3(encoded);
@@ -275,7 +277,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_CCV_ARGS_CONTENT
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_CONTENT, 34
       )
     );
     s_helper._decodeGenericExtraArgsV3(encoded);
@@ -292,7 +294,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_EXECUTOR_CONTENT
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.DECODE_FIELD_CONTENT, 12
       )
     );
     s_helper._decodeGenericExtraArgsV3(encoded);
@@ -315,7 +317,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_FINAL_OFFSET, 18
       )
     );
     s_helper._decodeGenericExtraArgsV3(withExtra);
@@ -326,7 +328,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_CCVS_ARRAY_LENGTH
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_CCVS_ARRAY_LENGTH, 0
       )
     );
     ExtraArgsCodec._encodeGenericExtraArgsV3(
@@ -348,7 +350,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_EXECUTOR_ARGS_LENGTH
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_EXECUTOR_ARGS_LENGTH, 0
       )
     );
     ExtraArgsCodec._encodeGenericExtraArgsV3(
@@ -370,7 +372,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_TOKEN_RECEIVER_LENGTH
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_TOKEN_RECEIVER_LENGTH, 0
       )
     );
     ExtraArgsCodec._encodeGenericExtraArgsV3(
@@ -392,7 +394,7 @@ contract ExtraArgsCodecV3_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_TOKEN_ARGS_LENGTH
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_TOKEN_ARGS_LENGTH, 0
       )
     );
     ExtraArgsCodec._encodeGenericExtraArgsV3(

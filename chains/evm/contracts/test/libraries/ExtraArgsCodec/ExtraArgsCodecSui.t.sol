@@ -43,7 +43,9 @@ contract ExtraArgsCodecSui_Test is BaseTest {
   function test_DecodeSuiExecutorArgsV1_RevertWhen_EXTRA_ARGS_STATIC_LENGTH_FIELDS() public {
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS
+        ExtraArgsCodec.InvalidDataLength.selector,
+        ExtraArgsCodec.EncodingErrorLocation.EXTRA_ARGS_STATIC_LENGTH_FIELDS,
+        3
       )
     );
     s_helper._decodeSuiExecutorArgsV1(new bytes(3));
@@ -58,7 +60,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.SUI_EXECUTOR_FINAL_OFFSET, 5
       )
     );
     s_helper._decodeSuiExecutorArgsV1(withExtra);
@@ -72,7 +74,9 @@ contract ExtraArgsCodecSui_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_CONTENT
+        ExtraArgsCodec.InvalidDataLength.selector,
+        ExtraArgsCodec.EncodingErrorLocation.SUI_EXECUTOR_OBJECT_IDS_CONTENT,
+        5
       )
     );
     s_helper._decodeSuiExecutorArgsV1(invalidData);
@@ -83,7 +87,7 @@ contract ExtraArgsCodecSui_Test is BaseTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_SUI_OBJECT_IDS_LENGTH
+        ExtraArgsCodec.InvalidDataLength.selector, ExtraArgsCodec.EncodingErrorLocation.ENCODE_SUI_OBJECT_IDS_LENGTH, 0
       )
     );
     ExtraArgsCodec._encodeSuiExecutorArgsV1(ExtraArgsCodec.SuiExecutorArgsV1({receiverObjectIds: objectIds}));

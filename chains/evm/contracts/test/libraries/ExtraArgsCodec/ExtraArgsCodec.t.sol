@@ -75,7 +75,7 @@ contract ExtraArgsCodec_Test is BaseTest {
       uint16(0)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.InvalidExecutorLength.selector, 10));
+    vm.expectRevert(abi.encodeWithSelector(ExtraArgsCodec.InvalidAddressLength.selector, 10));
     s_decoder._decodeGenericExtraArgsV3(invalidEncoded);
   }
 

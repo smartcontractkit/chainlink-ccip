@@ -402,7 +402,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
   ) internal view returns (ExtraArgsCodec.GenericExtraArgsV3 memory resolvedArgs) {
-    if (extraArgs.length >= 4 && bytes4(extraArgs[0:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
+    if (extraArgs.length >= 4 && bytes4(extraArgs[:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
 
       if (resolvedArgs.tokenReceiver.length != 0) {
