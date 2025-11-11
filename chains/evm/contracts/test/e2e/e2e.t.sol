@@ -7,6 +7,7 @@ import {CommitteeVerifier} from "../../ccvs/CommitteeVerifier.sol";
 import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
@@ -95,18 +96,21 @@ contract e2e is OnRampSetup {
 
     IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
 
-    Client.CCV[] memory userCCVs = new Client.CCV[](1);
-    userCCVs[0] = Client.CCV({ccvAddress: s_userSpecifiedCCV, args: "1"});
+    address[] memory userCCVAddresses = new address[](1);
+    userCCVAddresses[0] = s_userSpecifiedCCV;
+    bytes[] memory userCCVArgs = new bytes[](1);
+    userCCVArgs[0] = "1";
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
       data: "e2e test data",
       tokenAmounts: new Client.EVMTokenAmount[](1),
       feeToken: s_sourceFeeToken,
-      extraArgs: Client._argsToBytes(
-        Client.GenericExtraArgsV3({
-          ccvs: userCCVs,
-          finalityConfig: 0,
+      extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(
+        ExtraArgsCodec.GenericExtraArgsV3({
+          ccvs: userCCVAddresses,
+          ccvArgs: userCCVArgs,
+          blockConfirmations: 0,
           gasLimit: GAS_LIMIT,
           executor: address(0),
           executorArgs: "",

@@ -15,6 +15,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
+import {ExtraArgsCodec} from "../libraries/ExtraArgsCodec.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
@@ -197,7 +198,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 1. parse extraArgs.
 
-    Client.GenericExtraArgsV3 memory resolvedExtraArgs =
+    ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs =
       _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
 
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
@@ -206,7 +207,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       sequenceNumber: ++destChainConfig.sequenceNumber,
       onRampAddress: abi.encodePacked(address(this)),
       offRampAddress: destChainConfig.offRamp,
-      finality: resolvedExtraArgs.finalityConfig,
+      finality: resolvedExtraArgs.blockConfirmations,
       gasLimit: resolvedExtraArgs.gasLimit,
       sender: abi.encodePacked(originalSender),
       receiver: validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
@@ -226,12 +227,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
           destChainSelector,
           message.tokenAmounts[0].token,
           message.tokenAmounts[0].amount,
-          resolvedExtraArgs.finalityConfig,
+          resolvedExtraArgs.blockConfirmations,
           resolvedExtraArgs.tokenArgs
         );
       }
-      resolvedExtraArgs.ccvs =
-        _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
+      (resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs) = _mergeCCVLists(
+        resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs
+      );
     }
 
     // 3. getFee on all verifiers, pool and executor.
@@ -249,7 +251,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         destChainSelector,
         resolvedExtraArgs.tokenReceiver.length > 0 ? resolvedExtraArgs.tokenReceiver : newMessage.receiver,
         originalSender,
-        resolvedExtraArgs.finalityConfig,
+        resolvedExtraArgs.blockConfirmations,
         resolvedExtraArgs.tokenArgs
       );
     }
@@ -263,14 +265,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 6. call each verifier.
     for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-      address implAddress = ICrossChainVerifierResolver(resolvedExtraArgs.ccvs[i].ccvAddress).getOutboundImplementation(
-        destChainSelector, resolvedExtraArgs.ccvs[i].args
+      address implAddress = ICrossChainVerifierResolver(resolvedExtraArgs.ccvs[i]).getOutboundImplementation(
+        destChainSelector, resolvedExtraArgs.ccvArgs[i]
       );
       if (implAddress == address(0)) {
-        revert DestinationChainNotSupportedByCCV(resolvedExtraArgs.ccvs[i].ccvAddress, destChainSelector);
+        revert DestinationChainNotSupportedByCCV(resolvedExtraArgs.ccvs[i], destChainSelector);
       }
       eventData.verifierBlobs[i] = ICrossChainVerifierV1(implAddress).forwardToVerifier(
-        newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvs[i].args
+        newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvArgs[i]
       );
     }
 
@@ -293,37 +295,41 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev This function assumes there are no duplicates in the userRequestedOrDefaultCCVs list.
   /// @dev There is no protocol-level requirement on the ordering of CCVs in the final list, but for determinism we
   /// process user requested first, then lane-mandated second, pool-required last.
-  /// @param userRequestedOrDefaultCCVs User-provided required CCVs. Can not be empty, as defaults are applied earlier
-  /// if needed. This list does not only contain addresses, but also arguments
+  /// @param userRequestedOrDefaultCCVs User-provided required CCV addresses. Can not be empty, as defaults are applied earlier if needed.
+  /// @param userRequestedOrDefaultCCVArgs User-provided CCV arguments, parallel to userRequestedOrDefaultCCVs.
   /// @param laneMandatedCCVs Lane mandated CCVs are always added, regardless of what a user/pool chooses. Can be empty.
   /// @param poolRequiredCCVs Pool-specific required CCVs.
-  /// @return ccvs Updated list of CCVs.
+  /// @return ccvs Updated list of CCV addresses.
+  /// @return ccvArgs Updated list of CCV arguments, parallel to ccvs.
   function _mergeCCVLists(
-    Client.CCV[] memory userRequestedOrDefaultCCVs,
+    address[] memory userRequestedOrDefaultCCVs,
+    bytes[] memory userRequestedOrDefaultCCVArgs,
     address[] memory laneMandatedCCVs,
     address[] memory poolRequiredCCVs
-  ) internal pure returns (Client.CCV[] memory ccvs) {
+  ) internal pure returns (address[] memory ccvs, bytes[] memory ccvArgs) {
     // Maximum possible CCVs: user + lane + pool.
     uint256 totalCCVs = userRequestedOrDefaultCCVs.length + laneMandatedCCVs.length + poolRequiredCCVs.length;
-    ccvs = new Client.CCV[](totalCCVs);
+    ccvs = new address[](totalCCVs);
+    ccvArgs = new bytes[](totalCCVs);
     uint256 toBeAddedIndex = 0;
 
     // First add all user requested CCVs.
     for (uint256 i = 0; i < userRequestedOrDefaultCCVs.length; ++i) {
-      ccvs[toBeAddedIndex++] = userRequestedOrDefaultCCVs[i];
+      ccvs[toBeAddedIndex] = userRequestedOrDefaultCCVs[i];
+      ccvArgs[toBeAddedIndex++] = userRequestedOrDefaultCCVArgs[i];
     }
     // Add lane mandated CCVs, skipping duplicates.
     for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
       address laneMandatedCCV = laneMandatedCCVs[i];
       bool found = false;
       for (uint256 j = 0; j < toBeAddedIndex; ++j) {
-        if (ccvs[j].ccvAddress == laneMandatedCCV) {
+        if (ccvs[j] == laneMandatedCCV) {
           found = true;
           break;
         }
       }
       if (!found) {
-        ccvs[toBeAddedIndex++] = Client.CCV({ccvAddress: laneMandatedCCV, args: ""});
+        ccvs[toBeAddedIndex++] = laneMandatedCCV;
       }
     }
     // Add pool required CCVs, skipping duplicates.
@@ -331,22 +337,23 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       address poolRequiredCCV = poolRequiredCCVs[i];
       bool found = false;
       for (uint256 j = 0; j < toBeAddedIndex; ++j) {
-        if (ccvs[j].ccvAddress == poolRequiredCCV) {
+        if (ccvs[j] == poolRequiredCCV) {
           found = true;
           break;
         }
       }
       if (!found) {
-        ccvs[toBeAddedIndex++] = Client.CCV({ccvAddress: poolRequiredCCV, args: ""});
+        ccvs[toBeAddedIndex++] = poolRequiredCCV;
       }
     }
 
-    // Resize the array to the actual number of CCVs added.
+    // Resize both arrays to the actual number of CCVs added.
     assembly {
       mstore(ccvs, toBeAddedIndex)
+      mstore(ccvArgs, toBeAddedIndex)
     }
 
-    return ccvs;
+    return (ccvs, ccvArgs);
   }
 
   /// @notice This function takes in a raw dest chain address and validates the address is valid for the destination
@@ -394,31 +401,39 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) internal view returns (Client.GenericExtraArgsV3 memory resolvedArgs) {
-    if (extraArgs.length >= 4 && bytes4(extraArgs[0:4]) == Client.GENERIC_EXTRA_ARGS_V3_TAG) {
-      resolvedArgs = abi.decode(extraArgs[4:], (Client.GenericExtraArgsV3));
+  ) internal view returns (ExtraArgsCodec.GenericExtraArgsV3 memory resolvedArgs) {
+    if (extraArgs.length >= 4 && bytes4(extraArgs[:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
+      resolvedArgs = ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
+
+      if (resolvedArgs.tokenReceiver.length != 0) {
+        this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
+      }
 
       // We need to ensure no duplicate CCVs are present in the ccv list.
       uint256 length = resolvedArgs.ccvs.length;
       for (uint256 i = 0; i < length; ++i) {
         for (uint256 j = i + 1; j < length; ++j) {
-          if (resolvedArgs.ccvs[i].ccvAddress == resolvedArgs.ccvs[j].ccvAddress) {
-            revert CCVConfigValidation.DuplicateCCVNotAllowed(resolvedArgs.ccvs[i].ccvAddress);
+          if (resolvedArgs.ccvs[i] == resolvedArgs.ccvs[j]) {
+            revert CCVConfigValidation.DuplicateCCVNotAllowed(resolvedArgs.ccvs[i]);
           }
         }
       }
 
       // When users don't specify any CCVs, default CCVs are chosen.
       if (resolvedArgs.ccvs.length == 0) {
-        resolvedArgs.ccvs = new Client.CCV[](destChainConfig.defaultCCVs.length);
+        resolvedArgs.ccvs = new address[](destChainConfig.defaultCCVs.length);
+        resolvedArgs.ccvArgs = new bytes[](destChainConfig.defaultCCVs.length);
         for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-          resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
+          resolvedArgs.ccvs[i] = destChainConfig.defaultCCVs[i];
+          resolvedArgs.ccvArgs[i] = "";
         }
       }
     } else {
-      resolvedArgs.ccvs = new Client.CCV[](destChainConfig.defaultCCVs.length);
+      resolvedArgs.ccvs = new address[](destChainConfig.defaultCCVs.length);
+      resolvedArgs.ccvArgs = new bytes[](destChainConfig.defaultCCVs.length);
       for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-        resolvedArgs.ccvs[i] = Client.CCV({ccvAddress: destChainConfig.defaultCCVs[i], args: ""});
+        resolvedArgs.ccvs[i] = destChainConfig.defaultCCVs[i];
+        resolvedArgs.ccvArgs[i] = "";
       }
 
       // Populate the fields that could be present in legacy extraArgs.
@@ -694,7 +709,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       revert DestinationChainNotSupported(destChainSelector);
     }
 
-    Client.GenericExtraArgsV3 memory resolvedExtraArgs =
+    ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs =
       _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
     // Update the CCVs list to include lane mandated and pool required CCVs.
     address[] memory poolRequiredCCVs = new address[](0);
@@ -703,11 +718,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         destChainSelector,
         message.tokenAmounts[0].token,
         message.tokenAmounts[0].amount,
-        resolvedExtraArgs.finalityConfig,
+        resolvedExtraArgs.blockConfirmations,
         resolvedExtraArgs.tokenArgs
       );
     }
-    resolvedExtraArgs.ccvs = _mergeCCVLists(resolvedExtraArgs.ccvs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs);
+    (resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs) = _mergeCCVLists(
+      resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs
+    );
 
     // We sum the fees for the verifier, executor and the pool (if any).
     Receipt[] memory receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
@@ -731,28 +748,28 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function _getReceipts(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
-    Client.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) internal view returns (Receipt[] memory verifierReceipts) {
     // Already ensure there's room for the token transfer and executor receipts.
     verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
 
     for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
-      Client.CCV memory verifier = extraArgs.ccvs[i];
-      address implAddress =
-        ICrossChainVerifierResolver(verifier.ccvAddress).getOutboundImplementation(destChainSelector, verifier.args);
+      address implAddress = ICrossChainVerifierResolver(extraArgs.ccvs[i]).getOutboundImplementation(
+        destChainSelector, extraArgs.ccvArgs[i]
+      );
       if (implAddress == address(0)) {
-        revert DestinationChainNotSupportedByCCV(verifier.ccvAddress, destChainSelector);
+        revert DestinationChainNotSupportedByCCV(extraArgs.ccvs[i], destChainSelector);
       }
 
-      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) =
-        ICrossChainVerifierV1(implAddress).getFee(destChainSelector, message, verifier.args, extraArgs.finalityConfig);
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(implAddress)
+        .getFee(destChainSelector, message, extraArgs.ccvArgs[i], extraArgs.blockConfirmations);
 
       verifierReceipts[i] = Receipt({
-        issuer: verifier.ccvAddress,
+        issuer: extraArgs.ccvs[i],
         destGasLimit: gasForVerification,
         destBytesOverhead: payloadSizeBytes,
         feeTokenAmount: feeUSDCents,
-        extraArgs: verifier.args
+        extraArgs: extraArgs.ccvArgs[i]
       });
     }
 
@@ -783,7 +800,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     uint256 dataLength,
     uint256 numberOfTokens,
-    Client.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) internal view returns (Receipt memory) {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
     uint8 remoteChainAddressLengthBytes = destChainConfig.addressBytesLength;
@@ -804,7 +821,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       feeTokenAmount: extraArgs.executor == Client.NO_EXECUTION_ADDRESS
         ? 0
         : IExecutor(extraArgs.executor).getFee(
-          destChainSelector, extraArgs.finalityConfig, extraArgs.ccvs, extraArgs.executorArgs
+          destChainSelector, extraArgs.blockConfirmations, extraArgs.ccvs, extraArgs.executorArgs
         ),
       extraArgs: extraArgs.executorArgs
     });
