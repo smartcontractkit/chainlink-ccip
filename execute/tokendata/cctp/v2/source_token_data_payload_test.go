@@ -2,7 +2,6 @@ package v2
 
 import (
 	"encoding/hex"
-	"strings"
 	"testing"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -185,16 +184,4 @@ func createValidExtraData(versionTag uint32, sourceDomain uint32, depositHashHex
 	copy(data[8:40], hashBytes)
 
 	return cciptypes.Bytes(data)
-}
-
-func mustHexToBytes32(hexStr string) [32]byte {
-	hexStr = strings.TrimPrefix(hexStr, "0x")
-	decoded, err := hex.DecodeString(hexStr)
-	if err != nil {
-		panic(err)
-	}
-
-	var result [32]byte
-	copy(result[32-len(decoded):], decoded)
-	return result
 }
