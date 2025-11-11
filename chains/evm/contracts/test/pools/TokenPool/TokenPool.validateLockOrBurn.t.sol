@@ -48,7 +48,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
 
   function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmation() public {
     uint16 minBlockConfirmation = 5;
-    _applyCustomFinalityConfig(minBlockConfirmation);
+    _applyCustomBlockConfirmations(minBlockConfirmation);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
@@ -61,7 +61,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, minBlockConfirmation - 1);
   }
 
-  function _applyCustomFinalityConfig(
+  function _applyCustomBlockConfirmations(
     uint16 minBlockConfirmation
   ) internal {
     TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory rateLimitArgs =

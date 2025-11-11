@@ -25,7 +25,7 @@ contract BaseTest is Test {
   uint32 internal constant GAS_LIMIT = 200_000;
   uint32 internal constant BASE_EXEC_GAS_COST = 80_000;
 
-  bytes internal constant TOKEN_RECEIVER = "token receiver";
+  bytes internal constant TOKEN_RECEIVER = abi.encodePacked(address(0x0000000000000000000000000000000000000001));
 
   uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 90_000;
   uint8 internal constant DEFAULT_TOKEN_DECIMALS = 18;

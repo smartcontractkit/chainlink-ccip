@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IExecutor} from "../interfaces/IExecutor.sol";
 
-import {Client} from "../libraries/Client.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -200,7 +199,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   function getFee(
     uint64 destChainSelector,
     uint16 requestedBlockDepth,
-    Client.CCV[] calldata ccvs,
+    address[] calldata ccvs,
     bytes calldata // extraArgs
   ) external view virtual returns (uint16 usdCentsFee) {
     RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[destChainSelector];
@@ -213,9 +212,8 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
 
     if (s_dynamicConfig.ccvAllowlistEnabled) {
       for (uint256 i = 0; i < ccvs.length; ++i) {
-        address ccvAddress = ccvs[i].ccvAddress;
-        if (!s_allowedCCVs.contains(ccvAddress)) {
-          revert InvalidCCV(ccvAddress);
+        if (!s_allowedCCVs.contains(ccvs[i])) {
+          revert InvalidCCV(ccvs[i]);
         }
       }
     }
