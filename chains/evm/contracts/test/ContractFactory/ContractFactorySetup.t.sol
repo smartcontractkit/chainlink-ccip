@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
 
 import {ContractFactory} from "../../ContractFactory.sol";
 import {BaseTest} from "../BaseTest.t.sol";

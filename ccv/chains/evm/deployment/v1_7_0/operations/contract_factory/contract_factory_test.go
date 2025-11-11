@@ -1,0 +1,169 @@
+package contract_factory_test
+
+import (
+	"context"
+	"fmt"
+	"math/big"
+	"testing"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/contract_factory"
+	contract_factory_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/contract_factory"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/stretchr/testify/require"
+)
+
+// sendFunds sends a percentage of the sender's balance to the destination address
+// percentageInt is the percentage as an integer (e.g., 50 for 50%)
+func sendFunds(ctx context.Context, chain evm.Chain, to common.Address, percentageInt int64) error {
+	// Get the sender's balance
+	balance, err := chain.Client.BalanceAt(ctx, chain.DeployerKey.From, nil)
+	if err != nil {
+		return err
+	}
+
+	// Calculate the amount to send as a percentage of the balance
+	percentage := big.NewInt(percentageInt)
+	hundred := big.NewInt(100)
+	amount := new(big.Int).Mul(balance, percentage)
+	amount.Div(amount, hundred)
+
+	nonce, err := chain.Client.PendingNonceAt(ctx, chain.DeployerKey.From)
+	if err != nil {
+		return err
+	}
+
+	gasPrice, err := chain.Client.SuggestGasPrice(ctx)
+	if err != nil {
+		return err
+	}
+
+	tx := types.NewTransaction(nonce, to, amount, 21000, gasPrice, nil)
+	signedTx, err := chain.DeployerKey.Signer(chain.DeployerKey.From, tx)
+	if err != nil {
+		return err
+	}
+
+	err = chain.Client.SendTransaction(ctx, signedTx)
+	if err != nil {
+		return err
+	}
+
+	_, err = chain.Confirm(signedTx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func TestContractFactory(t *testing.T) {
+	chain1Sel := uint64(5009297550715157269)
+	chain2Sel := uint64(4949039107694359620)
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chain1Sel, chain2Sel}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	require.NotNil(t, e, "Environment should be created")
+
+	evmChains := e.BlockChains.EVMChains()
+
+	// Deploy ContractFactory on chain1
+	factory1Report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		contract_factory.Deploy,
+		evmChains[chain1Sel],
+		contract.DeployInput[contract_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
+			ChainSelector:  chain1Sel,
+			Args: contract_factory.ConstructorArgs{
+				AllowList: []common.Address{evmChains[chain1Sel].DeployerKey.From},
+			},
+		},
+	)
+	require.NoError(t, err, "Failed to deploy ContractFactory on chain1")
+
+	// Adjust the deployer key on chain2 to be the same as chain1
+	// + fund the key on chain2
+	desiredDeployerKey := evmChains[chain1Sel].DeployerKey
+	err = sendFunds(t.Context(), evmChains[chain2Sel], desiredDeployerKey.From, 50)
+	require.NoError(t, err, "Failed to send funds to chain2")
+	chain2 := evmChains[chain2Sel]
+	chain2.DeployerKey = desiredDeployerKey
+	evmChains[chain2Sel] = chain2
+	// Ensure that the deployer key is funded on chain2
+	balance, err := evmChains[chain2Sel].Client.BalanceAt(t.Context(), desiredDeployerKey.From, nil)
+	fmt.Println("balance", balance)
+	require.NoError(t, err, "Failed to get balance of deployer key on chain2")
+	require.Greater(t, balance.Int64(), int64(0), "Deployer key should be funded on chain2")
+
+	// Deploy ContractFactory on chain2
+	factory2Report, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		contract_factory.Deploy,
+		evmChains[chain2Sel],
+		contract.DeployInput[contract_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
+			ChainSelector:  chain2Sel,
+		},
+	)
+	require.NoError(t, err, "Failed to deploy ContractFactory on chain2")
+
+	// Ensure that the factories addresses are the same on each chain
+	require.Equal(t, factory1Report.Output.Address, factory2Report.Output.Address, "Factory addresses should be the same")
+
+	// Now, increment the nonce of the deployer key on chain2 by sending funds to another address
+	err = sendFunds(t.Context(), chain2, evmChains[chain1Sel].DeployerKey.From, 1)
+	require.NoError(t, err, "Failed to send funds to random address")
+
+	// Ensure that the nonce of the deployer key is different on each chain
+	nonce1, err := evmChains[chain1Sel].Client.PendingNonceAt(t.Context(), evmChains[chain1Sel].DeployerKey.From)
+	require.NoError(t, err, "Failed to get nonce of deployer key on chain1")
+	nonce2, err := evmChains[chain2Sel].Client.PendingNonceAt(t.Context(), evmChains[chain2Sel].DeployerKey.From)
+	require.NoError(t, err, "Failed to get nonce of deployer key on chain2")
+	require.NotEqual(t, nonce1, nonce2, "Nonce should be different")
+
+	// Now, create a contract via the factory on each chain
+	// The resulting addresses should be the same
+	createAndCallReport1, err := cldf_ops.ExecuteOperation(
+		e.OperationsBundle,
+		contract_factory.CreateAndTransferOwnership,
+		evmChains[chain1Sel],
+		contract.FunctionInput[contract_factory.CreateAndTransferOwnershipArgs]{
+			ChainSelector: chain1Sel,
+			Args: contract_factory.CreateAndTransferOwnershipArgs{
+				ComputeAddressArgs: contract_factory.ComputeAddressArgs{
+					ABI:             contract_factory_latest.ContractFactoryMetaData.ABI,
+					Bin:             contract_factory_latest.ContractFactoryBin,
+					ConstructorArgs: []any{},
+					Salt:            "salt",
+				},
+				To: evmChains[chain1Sel].DeployerKey.From,
+			},
+		})
+	require.NoError(t, err, "Failed to create and transfer ownership of contract on chain1")
+	createAndCallReport2, err := cldf_ops.ExecuteOperation(e.OperationsBundle, contract_factory.CreateAndTransferOwnership, evmChains[chain2Sel], contract.FunctionInput[contract_factory.CreateAndTransferOwnershipArgs]{
+		ChainSelector: chain2Sel,
+		Args: contract_factory.CreateAndTransferOwnershipArgs{
+			ComputeAddressArgs: contract_factory.ComputeAddressArgs{
+				ABI:             contract_factory_latest.ContractFactoryMetaData.ABI,
+				Bin:             contract_factory_latest.ContractFactoryBin,
+				ConstructorArgs: []any{},
+				Salt:            "salt",
+			},
+		},
+	})
+	require.NoError(t, err, "Failed to create and transfer ownership of contract on chain2")
+
+	txHash1 := createAndCallReport1.Output.ExecInfo.Hash
+	txHash2 := createAndCallReport2.Output.ExecInfo.Hash
+
+	// Fetch the deployed addresses using each transaction hash
+}

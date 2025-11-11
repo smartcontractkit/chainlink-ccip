@@ -20,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/ownable_deployer"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -92,6 +91,7 @@ type ContractParams struct {
 
 type DeployChainContractsInput struct {
 	ChainSelector     uint64 // Only exists to differentiate sequence runs on different chains
+	ContractFactory   common.Address
 	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
 }
@@ -289,24 +289,13 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, onRampRef)
 
-		// Deploy OwnableDeployer
-		ownableDeployerRef, err := contract_utils.MaybeDeployContract(b, ownable_deployer.Deploy, chain, contract.DeployInput[ownable_deployer.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(ownable_deployer.ContractType, *semver.MustParse("1.7.0")),
-			ChainSelector:  chain.Selector,
-			Args:           ownable_deployer.ConstructorArgs{},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OwnableDeployer: %w", err)
-		}
-		addresses = append(addresses, ownableDeployerRef)
-
 		// TODO: validate prior to deploying that qualifiers are unique?
 		var committeeVerifierRefs []datastore.AddressRef
 		var committeeVerifierBatchOps []mcms_types.BatchOperation
 		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifier {
 			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
-				OwnableDeployer:   common.HexToAddress(ownableDeployerRef.Address),
+				ContractFactory:   input.ContractFactory,
 				ExistingAddresses: input.ExistingAddresses,
 				Params:            committeeVerifierParams,
 			})

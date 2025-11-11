@@ -22,6 +22,7 @@ contract ContractFactory is ITypeAndVersion, Ownable2StepMsgSender {
 
   event CallerAdded(address indexed caller);
   event CallerRemoved(address indexed caller);
+  event ContractDeployed(address indexed contractAddress);
 
   string public constant override typeAndVersion = "ContractFactory 1.7.0";
 
@@ -47,6 +48,7 @@ contract ContractFactory is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     address contractAddress = Create2.deploy(0, salt, creationCode);
+    emit ContractDeployed(contractAddress);
 
     for (uint256 i = 0; i < calls.length; ++i) {
       // solhint-disable-next-line avoid-low-level-calls
