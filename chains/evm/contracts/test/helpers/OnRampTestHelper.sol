@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 
@@ -14,17 +15,18 @@ contract OnRampTestHelper is OnRamp {
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs
-  ) external view returns (Client.GenericExtraArgsV3 memory) {
+  ) external view returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
     return _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, extraArgs);
   }
 
   /// @notice Exposes the internal _mergeCCVLists function for testing.
   function mergeCCVLists(
-    Client.CCV[] memory userRequestedOrDefaultCCVs,
+    address[] memory userRequestedOrDefaultCCVs,
+    bytes[] memory userRequestedOrDefaultCCVArgs,
     address[] memory laneMandatedCCVs,
     address[] memory poolRequiredCCVs
-  ) external pure returns (Client.CCV[] memory ccvs) {
-    return _mergeCCVLists(userRequestedOrDefaultCCVs, laneMandatedCCVs, poolRequiredCCVs);
+  ) external pure returns (address[] memory ccvs, bytes[] memory ccvArgs) {
+    return _mergeCCVLists(userRequestedOrDefaultCCVs, userRequestedOrDefaultCCVArgs, laneMandatedCCVs, poolRequiredCCVs);
   }
 
   function getCCVsForPool(
@@ -42,7 +44,7 @@ contract OnRampTestHelper is OnRamp {
     uint64 destChainSelector,
     uint256 dataLength,
     uint256 numberOfTokens,
-    Client.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) external view returns (Receipt memory) {
     return _getExecutionFee(destChainSelector, dataLength, numberOfTokens, extraArgs);
   }

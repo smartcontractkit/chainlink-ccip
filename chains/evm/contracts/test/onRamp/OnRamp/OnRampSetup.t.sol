@@ -8,6 +8,7 @@ import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Client} from "../../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
@@ -152,7 +153,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage calldata message,
     address[] calldata defaultCCVs
   ) external view returns (OnRamp.Receipt[] memory verifierReceipts, uint32 gasLimit) {
-    Client.GenericExtraArgsV3 memory extraArgsV3 = abi.decode(message.extraArgs[4:], (Client.GenericExtraArgsV3));
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgsV3 = ExtraArgsCodec._decodeGenericExtraArgsV3(message.extraArgs);
     uint256 userDefinedCCVCount = extraArgsV3.ccvs.length;
 
     // Leave space for a token (if present) and the executor receipt.
@@ -161,16 +162,16 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     uint256 currentVerifierIndex = 0;
     for (uint256 i = 0; i < userDefinedCCVCount; ++i) {
       address implAddress =
-        ICrossChainVerifierResolver(extraArgsV3.ccvs[i].ccvAddress).getOutboundImplementation(DEST_CHAIN_SELECTOR, "");
+        ICrossChainVerifierResolver(extraArgsV3.ccvs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR, "");
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(implAddress)
-        .getFee(DEST_CHAIN_SELECTOR, message, extraArgsV3.ccvs[i].args, extraArgsV3.finalityConfig);
+        .getFee(DEST_CHAIN_SELECTOR, message, extraArgsV3.ccvArgs[i], extraArgsV3.blockConfirmations);
 
       verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
-        issuer: extraArgsV3.ccvs[i].ccvAddress,
+        issuer: extraArgsV3.ccvs[i],
         feeTokenAmount: feeUSDCents,
         destGasLimit: gasForVerification,
         destBytesOverhead: payloadSizeBytes,
-        extraArgs: extraArgsV3.ccvs[i].args
+        extraArgs: extraArgsV3.ccvArgs[i]
       });
     }
 
@@ -178,7 +179,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       bool found = false;
       for (uint256 j = 0; j < userDefinedCCVCount; ++j) {
         // Skip if the default CCV is already included in the user-defined CCVs.
-        if (defaultCCVs[i] == extraArgsV3.ccvs[j].ccvAddress) {
+        if (defaultCCVs[i] == extraArgsV3.ccvs[j]) {
           found = true;
           break;
         }
@@ -190,7 +191,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
       (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(
         ICrossChainVerifierResolver(defaultCCVs[i]).getOutboundImplementation(DEST_CHAIN_SELECTOR, "")
-      ).getFee(DEST_CHAIN_SELECTOR, message, "", extraArgsV3.finalityConfig);
+      ).getFee(DEST_CHAIN_SELECTOR, message, "", extraArgsV3.blockConfirmations);
 
       verifierReceipts[currentVerifierIndex++] = OnRamp.Receipt({
         issuer: defaultCCVs[i],
@@ -280,17 +281,19 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     return verifierReceipts;
   }
 
-  // Helper function to create EVMExtraArgsV3 struct
+  // Helper function to create GenericExtraArgsV3 struct
   function _createV3ExtraArgs(
-    Client.CCV[] memory ccvs
-  ) internal pure returns (Client.GenericExtraArgsV3 memory) {
-    return Client.GenericExtraArgsV3({
-      ccvs: ccvs,
-      finalityConfig: 12,
+    address[] memory ccvAddresses,
+    bytes[] memory ccvArgs
+  ) internal pure returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
+    return ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: ccvAddresses,
+      ccvArgs: ccvArgs,
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: address(0), // No executor specified.
       executorArgs: "",
-      tokenReceiver: TOKEN_RECEIVER,
+      tokenReceiver: "",
       tokenArgs: ""
     });
   }
@@ -302,18 +305,25 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     assembly {
       selector := mload(add(extraArgs, 32))
     }
-    return selector != Client.GENERIC_EXTRA_ARGS_V3_TAG;
+    return selector != ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG;
   }
 
-  // Helper function to assert that two CCV arrays are equal
-  function _assertCCVArraysEqual(Client.CCV[] memory actual, Client.CCV[] memory expected) internal pure {
-    assertEq(actual.length, expected.length, "CCV arrays have different lengths");
+  // Helper function to assert that two CCV arrays are equal (using parallel address and bytes arrays)
+  function _assertCCVArraysEqual(
+    address[] memory actualAddresses,
+    bytes[] memory actualArgs,
+    address[] memory expectedAddresses,
+    bytes[] memory expectedArgs
+  ) internal pure {
+    assertEq(actualAddresses.length, expectedAddresses.length, "CCV address arrays have different lengths");
+    assertEq(actualArgs.length, expectedArgs.length, "CCV args arrays have different lengths");
+    assertEq(actualAddresses.length, actualArgs.length, "CCV addresses and args have different lengths");
 
-    for (uint256 i = 0; i < actual.length; i++) {
+    for (uint256 i = 0; i < actualAddresses.length; i++) {
       assertEq(
-        actual[i].ccvAddress, expected[i].ccvAddress, string.concat("CCV address mismatch at index ", vm.toString(i))
+        actualAddresses[i], expectedAddresses[i], string.concat("CCV address mismatch at index ", vm.toString(i))
       );
-      assertEq(actual[i].args, expected[i].args, string.concat("CCV args mismatch at index ", vm.toString(i)));
+      assertEq(actualArgs[i], expectedArgs[i], string.concat("CCV args mismatch at index ", vm.toString(i)));
     }
   }
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
@@ -45,6 +46,38 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
+					TokenPoolVersion: semver.MustParse("1.7.0"),
+					TokenSymbol:      tokenReport.Input.Args.Symbol,
+					RateLimitAdmin:   common.HexToAddress("0x01"),
+					ConstructorArgs: token_pool.ConstructorArgs{
+						Token:              common.HexToAddress(tokenReport.Output.Address),
+						LocalTokenDecimals: 18,
+						Allowlist: []common.Address{
+							common.HexToAddress("0x02"),
+						},
+						RMNProxy: rmnProxyAddress,
+						Router:   routerAddress,
+					},
+				}
+			},
+			expectedErr: "",
+		},
+		{
+			desc: "happy path with lock release token pool",
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+				var rmnProxyAddress common.Address
+				var routerAddress common.Address
+				for _, addr := range chainReport.Output.Addresses {
+					if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
+						rmnProxyAddress = common.HexToAddress(addr.Address)
+					}
+					if addr.Type == datastore.ContractType(router.ContractType) {
+						routerAddress = common.HexToAddress(addr.Address)
+					}
+				}
+				return tokens.DeployTokenPoolInput{
+					ChainSel:         chainReport.Input.ChainSelector,
+					TokenPoolType:    datastore.ContractType(lock_release_token_pool.ContractType),
 					TokenPoolVersion: semver.MustParse("1.7.0"),
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					RateLimitAdmin:   common.HexToAddress("0x01"),

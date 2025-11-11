@@ -6,8 +6,164 @@ import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.s
 import {IExecutor} from "../../../interfaces/IExecutor.sol";
 
 import {Client} from "../../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
+
+contract GasTest is OnRampSetup {
+  function setUp() public virtual override {}
+
+  event LogBytes(bytes data);
+
+  function test_gas_abi_encode() public {
+    bytes memory extraArgs = bytes.concat(
+      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
+      abi.encode(
+        ExtraArgsCodec.GenericExtraArgsV3({
+          ccvs: new address[](2),
+          ccvArgs: new bytes[](2),
+          blockConfirmations: 34,
+          gasLimit: 59499,
+          executor: address(0x1234567890123456789012345678901234567890),
+          executorArgs: "3282389428935872359872395885792839273525",
+          tokenReceiver: "3282389428935872359872329385792837273525",
+          tokenArgs: ""
+        })
+      )
+    );
+
+    vm.pauseGasMetering();
+    emit LogBytes(extraArgs);
+    vm.resumeGasMetering();
+  }
+
+  function test_gas_abi_packed() public {
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(
+      ExtraArgsCodec.GenericExtraArgsV3({
+        ccvs: new address[](2),
+        ccvArgs: new bytes[](2),
+        blockConfirmations: 34,
+        gasLimit: 59499,
+        executor: address(0x1234567890123456789012345678901234567890),
+        executorArgs: "3282389428935872359872395885792839273525",
+        tokenReceiver: "3282389428935872359872329385792837273525",
+        tokenArgs: ""
+      })
+    );
+
+    vm.pauseGasMetering();
+    emit LogBytes(extraArgs);
+    vm.resumeGasMetering();
+  }
+
+  function test_gas_decode_abi_packed() public {
+    vm.pauseGasMetering();
+    EncodeDecoder encoderDecoder = new EncodeDecoder();
+
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(
+      ExtraArgsCodec.GenericExtraArgsV3({
+        ccvs: new address[](2),
+        ccvArgs: new bytes[](2),
+        blockConfirmations: 34,
+        gasLimit: 59499,
+        executor: address(0x1234567890123456789012345678901234567890),
+        executorArgs: "3282389428935872359872395885792839273525",
+        tokenReceiver: "3282389428935872359872329385792837273525",
+        tokenArgs: ""
+      })
+    );
+
+    vm.resumeGasMetering();
+
+    encoderDecoder.decodePacked(extraArgs);
+  }
+
+  function test_gas_decode_abi_encode() public {
+    vm.pauseGasMetering();
+
+    EncodeDecoder encoderDecoder = new EncodeDecoder();
+    bytes memory extraArgs = bytes.concat(
+      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
+      abi.encode(
+        ExtraArgsCodec.GenericExtraArgsV3({
+          ccvs: new address[](2),
+          ccvArgs: new bytes[](2),
+          blockConfirmations: 34,
+          gasLimit: 59499,
+          executor: address(0x1234567890123456789012345678901234567890),
+          executorArgs: "3282389428935872359872395885792839273525",
+          tokenReceiver: "3282389428935872359872329385792837273525",
+          tokenArgs: ""
+        })
+      )
+    );
+
+    vm.resumeGasMetering();
+
+    encoderDecoder.decodeABI(extraArgs);
+  }
+
+  function test_gas_decode_empty_abi_encode() public {
+    vm.pauseGasMetering();
+
+    EncodeDecoder encoderDecoder = new EncodeDecoder();
+    bytes memory extraArgs = bytes.concat(
+      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
+      abi.encode(
+        ExtraArgsCodec.GenericExtraArgsV3({
+          ccvs: new address[](0),
+          ccvArgs: new bytes[](0),
+          blockConfirmations: 34,
+          gasLimit: 59499,
+          executor: address(0),
+          executorArgs: "",
+          tokenReceiver: "",
+          tokenArgs: ""
+        })
+      )
+    );
+
+    vm.resumeGasMetering();
+
+    encoderDecoder.decodeABI(extraArgs);
+  }
+
+  function test_gas_decode_empty_packed() public {
+    vm.pauseGasMetering();
+
+    EncodeDecoder encoderDecoder = new EncodeDecoder();
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(
+      ExtraArgsCodec.GenericExtraArgsV3({
+        ccvs: new address[](0),
+        ccvArgs: new bytes[](0),
+        blockConfirmations: 34,
+        gasLimit: 59499,
+        executor: address(0),
+        executorArgs: "",
+        tokenReceiver: "",
+        tokenArgs: ""
+      })
+    );
+
+    vm.resumeGasMetering();
+
+    encoderDecoder.decodePacked(extraArgs);
+  }
+}
+
+contract EncodeDecoder {
+  function decodePacked(
+    bytes calldata extraArgs
+  ) external pure {
+    ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
+  }
+
+  function decodeABI(
+    bytes calldata extraArgs
+  ) external pure {
+    abi.decode(extraArgs[4:], (ExtraArgsCodec.GenericExtraArgsV3));
+  }
+}
 
 contract OnRamp_getFee is OnRampSetup {
   uint16 internal constant MOCKED_DEFAULT_CCV_FEE_USD_CENTS = 5_00;
@@ -51,31 +207,18 @@ contract OnRamp_getFee is OnRampSetup {
     );
   }
 
-  function test_getFee_WithV3ExtraArgs_EmptyCCVs_UsesDefaults() public view {
-    // When no CCVs are provided in V3 extra args, default CCVs should be used.
-
-    Client.CCV[] memory ccvs = new Client.CCV[](0);
-    Client.GenericExtraArgsV3 memory extraArgsV3 = _createV3ExtraArgs(ccvs);
-
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgsV3));
-
-    uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
-
-    // Should use default CCV + executor.
-    assertEq(MOCKED_DEFAULT_CCV_FEE_USD_CENTS + MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS, feeAmount);
-  }
-
   function test_getFee_WithV3ExtraArgs_CustomCCV_SkipsDefaults() public {
     address newVerifier = makeAddr("custom_verifier");
     uint16 differentFee = 123_45;
     _mockVerifierFee(newVerifier, differentFee, DEFAULT_CCV_GAS_LIMIT, DEFAULT_CCV_PAYLOAD_SIZE);
 
-    Client.CCV[] memory ccvs = new Client.CCV[](1);
-    ccvs[0] = Client.CCV({ccvAddress: newVerifier, args: ""});
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = newVerifier;
+    bytes[] memory ccvArgs = new bytes[](1);
+    ccvArgs[0] = "";
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(_createV3ExtraArgs(ccvs)));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(_createV3ExtraArgs(ccvAddresses, ccvArgs));
 
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
@@ -124,12 +267,15 @@ contract OnRamp_getFee is OnRampSetup {
     _mockExecutorFee(customExecutor, differentExecutorFee, 0, 0);
     _mockVerifierFee(verifier, differentVerifierFee, 0, 0);
 
-    Client.CCV[] memory ccvs = new Client.CCV[](1);
-    ccvs[0] = Client.CCV({ccvAddress: verifier, args: ""});
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = verifier;
+    bytes[] memory ccvArgs = new bytes[](1);
+    ccvArgs[0] = "";
 
-    Client.GenericExtraArgsV3 memory extraArgsV3 = Client.GenericExtraArgsV3({
-      ccvs: ccvs,
-      finalityConfig: 12,
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgsV3 = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: ccvAddresses,
+      ccvArgs: ccvArgs,
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: customExecutor,
       executorArgs: "",
@@ -138,7 +284,7 @@ contract OnRamp_getFee is OnRampSetup {
     });
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(extraArgsV3));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgsV3);
 
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
@@ -165,11 +311,11 @@ contract OnRamp_getFee is OnRampSetup {
       abi.encode(address(0))
     );
 
-    Client.CCV[] memory ccvs = new Client.CCV[](1);
-    ccvs[0] = Client.CCV({ccvAddress: verifier, args: ""});
+    address[] memory ccvs = new address[](1);
+    ccvs[0] = verifier;
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodePacked(Client.GENERIC_EXTRA_ARGS_V3_TAG, abi.encode(_createV3ExtraArgs(ccvs)));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(_createV3ExtraArgs(ccvs, new bytes[](1)));
 
     vm.expectRevert(
       abi.encodeWithSelector(OnRamp.DestinationChainNotSupportedByCCV.selector, verifier, DEST_CHAIN_SELECTOR)

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IExecutor} from "../../../interfaces/IExecutor.sol";
 
 import {Client} from "../../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
@@ -56,9 +57,10 @@ contract OnRamp_getExecutionFee is OnRampSetup {
   }
 
   function test_getExecutionFee_WithExecutor() public view {
-    Client.GenericExtraArgsV3 memory extraArgs = Client.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
-      finalityConfig: 12,
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: s_customExecutor,
       executorArgs: "",
@@ -75,9 +77,10 @@ contract OnRamp_getExecutionFee is OnRampSetup {
   }
 
   function test_getExecutionFee_NoExecutor() public view {
-    Client.GenericExtraArgsV3 memory extraArgs = Client.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
-      finalityConfig: 12,
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: Client.NO_EXECUTION_ADDRESS,
       executorArgs: "",
@@ -96,9 +99,10 @@ contract OnRamp_getExecutionFee is OnRampSetup {
   function test_getExecutionFee_CalculatesDestBytesOverhead_WithTokens() public view {
     uint256 dataLength = 500;
     uint256 numberOfTokens = 1;
-    Client.GenericExtraArgsV3 memory extraArgs = Client.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
-      finalityConfig: 12,
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: s_customExecutor,
       executorArgs: "",
@@ -121,9 +125,10 @@ contract OnRamp_getExecutionFee is OnRampSetup {
   function test_getExecutionFee_CalculatesDestBytesOverhead_WithExecutorArgs() public view {
     uint256 dataLength = 500;
     bytes memory executorArgs = new bytes(200);
-    Client.GenericExtraArgsV3 memory extraArgs = Client.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
-      finalityConfig: 12,
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
+      blockConfirmations: 12,
       gasLimit: GAS_LIMIT,
       executor: s_customExecutor,
       executorArgs: executorArgs,
@@ -142,9 +147,10 @@ contract OnRamp_getExecutionFee is OnRampSetup {
   }
 
   function test_getExecutionFee_ZeroGasLimit() public view {
-    Client.GenericExtraArgsV3 memory extraArgs = Client.GenericExtraArgsV3({
-      ccvs: new Client.CCV[](0),
-      finalityConfig: 12,
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
+      blockConfirmations: 12,
       gasLimit: 0,
       executor: s_customExecutor,
       executorArgs: "",
