@@ -789,7 +789,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
           destChainSelector,
           message.tokenAmounts[0].amount,
           message.feeToken,
-          extraArgs.finalityConfig,
+          extraArgs.blockConfirmations,
           extraArgs.tokenArgs
         );
       }

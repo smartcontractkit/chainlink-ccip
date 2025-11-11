@@ -64,7 +64,7 @@ contract OnRampTestHelper is OnRamp {
   function getReceipts(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
-    Client.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) external view returns (Receipt[] memory) {
     return _getReceipts(destChainSelector, message, extraArgs);
   }

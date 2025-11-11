@@ -203,8 +203,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     }
 
     if (message.tokenAmounts.length > 0) {
-      (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead) =
-        _getPoolFee(message.tokenAmounts[0].token, message.feeToken, extraArgsV3.finalityConfig, extraArgsV3.tokenArgs);
+      (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead) = _getPoolFee(
+        message.tokenAmounts[0].token, message.feeToken, extraArgsV3.blockConfirmations, extraArgsV3.tokenArgs
+      );
 
       verifierReceipts[verifierReceipts.length - 2] = OnRamp.Receipt({
         issuer: message.tokenAmounts[0].token,

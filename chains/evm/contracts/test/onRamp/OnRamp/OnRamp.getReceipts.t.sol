@@ -7,6 +7,7 @@ import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Client} from "../../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
@@ -96,15 +97,17 @@ contract OnRamp_getReceipts is OnRampSetup {
 
   function _createExtraArgs(
     address[] memory ccvAddresses
-  ) internal view returns (Client.GenericExtraArgsV3 memory) {
-    Client.CCV[] memory ccvs = new Client.CCV[](ccvAddresses.length);
+  ) internal view returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
+    address[] memory ccvs = new address[](ccvAddresses.length);
+    bytes[] memory execArgs = new bytes[](ccvAddresses.length);
     for (uint256 i = 0; i < ccvAddresses.length; i++) {
-      ccvs[i] = Client.CCV({ccvAddress: ccvAddresses[i], args: ""});
+      ccvs[i] = ccvAddresses[i];
     }
 
-    return Client.GenericExtraArgsV3({
+    return ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
-      finalityConfig: 0,
+      ccvArgs: execArgs,
+      blockConfirmations: 0,
       gasLimit: GAS_LIMIT,
       executor: s_defaultExecutor,
       executorArgs: "",
@@ -154,7 +157,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     address[] memory ccvs = new address[](2);
     ccvs[0] = s_verifier1;
     ccvs[1] = s_verifier2;
-    Client.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
@@ -200,7 +203,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     Client.EVM2AnyMessage memory message = _createMessage(100 ether);
     address[] memory ccvs = new address[](1);
     ccvs[0] = s_verifier1;
-    Client.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
@@ -236,7 +239,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     Client.EVM2AnyMessage memory message = _createMessage(100 ether);
     address[] memory ccvs = new address[](1);
     ccvs[0] = s_verifier1;
-    Client.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
@@ -260,7 +263,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     address[] memory ccvs = new address[](2);
     ccvs[0] = s_verifier1;
     ccvs[1] = s_verifier2;
-    Client.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
@@ -284,7 +287,7 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     Client.EVM2AnyMessage memory message = _createMessage(100 ether);
     address[] memory ccvs = new address[](0); // No verifiers
-    Client.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
@@ -324,7 +327,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     ccvs[0] = s_verifier1;
     ccvs[1] = s_verifier2;
     ccvs[2] = verifier3;
-    Client.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
@@ -360,7 +363,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     Client.EVM2AnyMessage memory message = _createMessage(100 ether);
     address[] memory ccvs = new address[](1);
     ccvs[0] = s_verifier1;
-    Client.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
     extraArgs.tokenArgs = customTokenArgs;
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
