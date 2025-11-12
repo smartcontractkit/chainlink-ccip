@@ -12,9 +12,11 @@ contract ContractFactory_createAndCall is ContractFactorySetup {
   function test_createAndCall_NoCalls() public {
     address predictedAddress = s_contractFactory.computeAddress(getStorageCreationCode(1), SALT);
     vm.startPrank(s_allowedCaller);
+
     vm.expectEmit();
     emit ContractFactory.ContractDeployed(predictedAddress);
     address deployedAddress = s_contractFactory.createAndCall(getStorageCreationCode(1), SALT, new bytes[](0));
+
     assertEq(deployedAddress, predictedAddress);
   }
 
