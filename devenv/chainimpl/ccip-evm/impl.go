@@ -15,9 +15,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
+	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -36,8 +37,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
-// TODO: config option for what chain is home chain
-var CCIPHomeChain = chain_selectors.GETH_TESTNET.Selector
 var ccipMessageSentTopic = onramp.OnRampCCIPMessageSent{}.Topic()
 
 type CCIP16EVM struct {
@@ -161,7 +160,7 @@ func (m *CCIP16EVM) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (s
 	), nil
 }
 
-func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64) (datastore.DataStore, error) {
+func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64) (datastore.DataStore, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Configuring contracts for selector")
 	l.Info().Any("Selector", selector).Msg("Deploying for chain selectors")
@@ -206,7 +205,7 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 	}
 	// bootstrap is 0
 	workerNodes := nodeClients[1:]
-	if selector == CCIPHomeChain {
+	if selector == ccipHomeSelector {
 		var nodeOperators []capabilities_registry.CapabilitiesRegistryNodeOperator
 		var nodeP2PIDsPerNodeOpAdmin = make(map[string][][32]byte)
 		for _, node := range workerNodes {
@@ -248,12 +247,6 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 			return nil, fmt.Errorf("failed to deploy home chain contracts: %w", err)
 		}
 		out.DataStore.Merge(ccipHomeOut.DataStore.Seal())
-	}
-	_, err = changesets.UpdateChainConfig.Apply(*env, changesets.UpdateChainConfigConfig{
-		HomeChainSelector: CCIPHomeChain,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to configure chain contracts: %w", err)
 	}
 	env.DataStore = out.DataStore.Seal()
 	runningDS.Merge(env.DataStore)
@@ -304,6 +297,124 @@ func (m *CCIP16EVM) ConnectContractsWithSelectors(ctx context.Context, e *deploy
 		}
 	}
 
+	return nil
+}
+
+func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, ccipHomeSelector uint64, remoteSelectors []uint64) error {
+	l := zerolog.Ctx(ctx)
+	l.Info().Uint64("HomeChainSelector", ccipHomeSelector).Msg("Configuring contracts for home chain selector")
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
+
+	// Build the CCIPHome chain configs.
+	chainConfigs := make(map[uint64]changesets.ChainConfig)
+	commitOCRConfigs := make(map[uint64]changesets.CCIPOCRParams)
+	execOCRConfigs := make(map[uint64]changesets.CCIPOCRParams)
+	nodeClients, err := clclient.New(cls[0].Out.CLNodes)
+	if err != nil {
+		return fmt.Errorf("connecting to CL nodes: %w", err)
+	}
+	// bootstrap is 0
+	workerNodes := nodeClients[1:]
+	var readers [][32]byte
+	for _, node := range workerNodes {
+		nodeP2PIds, err := node.MustReadP2PKeys()
+		if err != nil {
+			return fmt.Errorf("reading worker node P2P keys: %w", err)
+		}
+		for _, id := range nodeP2PIds.Data {
+			var peerID [32]byte
+			copy(peerID[:], []byte(id.Attributes.PeerID))
+			readers = append(readers, peerID)
+		}
+	}
+	for _, chain := range remoteSelectors {
+		ocrOverride := func(ocrParams changesets.CCIPOCRParams) changesets.CCIPOCRParams {
+			if ocrParams.CommitOffChainConfig != nil {
+				ocrParams.CommitOffChainConfig.RMNEnabled = false
+			}
+			return ocrParams
+		}
+		commitOCRConfigs[chain] = changesets.DeriveOCRParamsForCommit(changesets.SimulationTest, ccipHomeSelector, nil, ocrOverride)
+		execOCRConfigs[chain] = changesets.DeriveOCRParamsForExec(changesets.SimulationTest, nil, ocrOverride)
+
+		l.Info().Msgf("setting readers for chain %d to %v due to no topology", chain, len(readers))
+		chainConfigs[chain] = changesets.ChainConfig{
+			Readers: readers,
+			FChain: uint8(len(readers) / 3),
+			EncodableChainConfig: chainconfig.ChainConfig{
+				GasPriceDeviationPPB:      ccipocr3common.BigInt{Int: big.NewInt(1000)},
+				DAGasPriceDeviationPPB:    ccipocr3common.BigInt{Int: big.NewInt(1000)},
+				OptimisticConfirmations:   changesets.OptimisticConfirmations,
+				ChainFeeDeviationDisabled: false,
+			},
+		}
+	}
+
+	_, err = changesets.UpdateChainConfig.Apply(*e, changesets.UpdateChainConfigConfig{
+		HomeChainSelector: ccipHomeSelector,
+		RemoteChainAdds:   chainConfigs,
+	})
+	if err != nil {
+		return fmt.Errorf("updating chain config for selector %d: %w", ccipHomeSelector, err)
+	}
+	_, err = changesets.AddDONAndSetCandidate.Apply(*e, changesets.AddDonAndSetCandidateChangesetConfig{
+		HomeChainSelector: ccipHomeSelector,
+		FeedChainSelector: ccipHomeSelector,
+		PluginInfo: changesets.SetCandidatePluginInfo{
+			OCRConfigPerRemoteChainSelector: commitOCRConfigs,
+			PluginType:                      ccipocr3common.PluginTypeCCIPCommit,
+		},
+		NonBootstraps:    workerNodes,
+	})
+	if err != nil {
+		return fmt.Errorf("adding DON and setting candidate for selector %d: %w", ccipHomeSelector, err)
+	}
+	_, err = changesets.SetCandidate.Apply(*e, changesets.SetCandidateChangesetConfig{
+		HomeChainSelector: ccipHomeSelector,
+		FeedChainSelector: ccipHomeSelector,
+		PluginInfo: []changesets.SetCandidatePluginInfo{
+			{
+				OCRConfigPerRemoteChainSelector: execOCRConfigs,
+				PluginType:                      ccipocr3common.PluginTypeCCIPExec,
+			},
+		},
+		NonBootstraps:    workerNodes,
+	})
+	if err != nil {
+		return fmt.Errorf("setting candidate for selector %d: %w", ccipHomeSelector, err)
+	}
+	_, err = changesets.PromoteCandidate.Apply(*e, changesets.PromoteCandidateChangesetConfig{
+		HomeChainSelector: ccipHomeSelector,
+		PluginInfo: []changesets.PromoteCandidatePluginInfo{
+			{
+				PluginType:           ccipocr3common.PluginTypeCCIPCommit,
+				RemoteChainSelectors: remoteSelectors,
+			},
+			{
+				PluginType:           ccipocr3common.PluginTypeCCIPExec,
+				RemoteChainSelectors: remoteSelectors,
+			},
+		},
+		NonBootstraps:    workerNodes,
+	})
+	if err != nil {
+		return fmt.Errorf("promoting candidate for selector %d: %w", ccipHomeSelector, err)
+	}
+	dReg := deployops.GetRegistry()
+	mcmsRegistry := changesetscore.GetRegistry()
+	_, err = deployops.SetOCR3Config(dReg, mcmsRegistry).Apply(*e, deployops.SetOCR3ConfigArgs{
+		HomeChainSel:    ccipHomeSelector,
+		RemoteChainSels: remoteSelectors,
+		ConfigType:      cciputils.ConfigTypeActive,
+	})
+	if err != nil {
+		return fmt.Errorf("setting OCR3 config for selector %d: %w", ccipHomeSelector, err)
+	}
 	return nil
 }
 

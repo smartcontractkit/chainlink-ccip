@@ -23,6 +23,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
@@ -36,6 +37,7 @@ const (
 	DefaultTempoURL   = "http://localhost:4318/v1/traces"
 )
 
+var CCIPHomeChain = chain_selectors.GETH_TESTNET.Selector
 var L = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.InfoLevel)
 
 // Load loads TOML configurations from a list of paths, i.e. env.toml,overrides.toml

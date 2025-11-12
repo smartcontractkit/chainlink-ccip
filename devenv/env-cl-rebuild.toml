@@ -1,6 +1,6 @@
 [[nodesets]]
   name = "don"
-  nodes = 4
+  nodes = 6
   override_mode = "each"
 
   [nodesets.db]
@@ -24,6 +24,18 @@
       docker_ctx = "../../chainlink"
       docker_file = "plugins/chainlink.Dockerfile"
 
+  [[nodesets.node_specs]]
+
+    [nodesets.node_specs.node]
+      docker_ctx = "../../chainlink"
+      docker_file = "plugins/chainlink.Dockerfile"
+  
+  [[nodesets.node_specs]]
+
+    [nodesets.node_specs.node]
+      docker_ctx = "../../chainlink"
+      docker_file = "plugins/chainlink.Dockerfile"
+  
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]

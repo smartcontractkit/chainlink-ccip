@@ -131,7 +131,7 @@ func NewEnvironment() (*Cfg, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create job distributor: %w", err)
 	}
-	
+
 	// connect JD to nodes here
 
 	tr.Record("[changeset] configured nodes network")
@@ -159,7 +159,7 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, err
 		}
 		L.Info().Uint64("Selector", networkInfo.ChainSelector).Msg("Deployed chain selector")
-		dsi, err := impl.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector)
+		dsi, err := impl.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain)
 		if err != nil {
 			return nil, err
 		}
@@ -177,6 +177,11 @@ func NewEnvironment() (*Cfg, error) {
 		}
 	}
 	e.DataStore = ds.Seal()
+
+	err = impls[0].ConfigureContractsForSelectors(ctx, e, in.NodeSets, CCIPHomeChain, selectors)
+	if err != nil {
+		return nil, err
+	}
 
 	// connect all the contracts together (on-ramps, off-ramps)
 	for i, impl := range impls {

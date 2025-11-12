@@ -2,13 +2,13 @@ package changesets
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
 	"strings"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -28,10 +28,12 @@ import (
 	focr "github.com/smartcontractkit/chainlink-deployments-framework/offchain/ocr"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/xssnick/tonutils-go/address"
+	"golang.org/x/sync/errgroup"
 )
 
 type ChainConfig struct {
@@ -49,7 +51,7 @@ type UpdateChainConfigConfig struct {
 var UpdateChainConfig = deployment.CreateChangeSet(applyUpdateChainConfig, validateUpdateChainConfig)
 var AddDONAndSetCandidate = deployment.CreateChangeSet(applyAddDonAndSetCandidateChangesetConfig, validateAddDonAndSetCandidateChangesetConfig)
 var SetCandidate = deployment.CreateChangeSet(applySetCandidateChangesetConfig, validateSetCandidateChangesetConfig)
-var PromoteCandidate = deployment.CreateChangeSet(applyUpdateChainConfig, validateUpdateChainConfig)
+var PromoteCandidate = deployment.CreateChangeSet(applyPromoteCandidateChangesetConfig, validatePromoteCandidateChangesetConfig)
 
 func validateUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfig) error {
 	return nil
@@ -132,30 +134,6 @@ func isChainConfigEqual(a, b ccip_home.CCIPHomeChainConfig) bool {
 		a.FChain == b.FChain
 }
 
-type OCRParameters struct {
-	DeltaProgress                           time.Duration `json:"deltaProgress"`
-	DeltaResend                             time.Duration `json:"deltaResend"`
-	DeltaInitial                            time.Duration `json:"deltaInitial"`
-	DeltaRound                              time.Duration `json:"deltaRound"`
-	DeltaGrace                              time.Duration `json:"deltaGrace"`
-	DeltaCertifiedCommitRequest             time.Duration `json:"deltaCertifiedCommitRequest"`
-	DeltaStage                              time.Duration `json:"deltaStage"`
-	Rmax                                    uint64        `json:"rmax"`
-	MaxDurationQuery                        time.Duration `json:"maxDurationQuery"`
-	MaxDurationObservation                  time.Duration `json:"maxDurationObservation"`
-	MaxDurationShouldAcceptAttestedReport   time.Duration `json:"maxDurationShouldAcceptAttestedReport"`
-	MaxDurationShouldTransmitAcceptedReport time.Duration `json:"maxDurationShouldTransmitAcceptedReport"`
-}
-
-type CCIPOCRParams struct {
-	// OCRParameters contains the parameters for the OCR plugin.
-	OCRParameters OCRParameters `json:"ocrParameters"`
-	// CommitOffChainConfig contains pointers to Arb feeds for prices.
-	CommitOffChainConfig *pluginconfig.CommitOffchainConfig `json:"commitOffChainConfig,omitempty"`
-	// ExecuteOffChainConfig contains USDC config.
-	ExecuteOffChainConfig *pluginconfig.ExecuteOffchainConfig `json:"executeOffChainConfig,omitempty"`
-}
-
 type SetCandidatePluginInfo struct {
 	// OCRConfigPerRemoteChainSelector is the chain selector of the chain where the DON will be added.
 	OCRConfigPerRemoteChainSelector map[uint64]CCIPOCRParams `json:"ocrConfigPerRemoteChainSelector"`
@@ -168,7 +146,8 @@ type AddDonAndSetCandidateChangesetConfig struct {
 
 	// Only set one plugin at a time while you are adding the DON for the first time.
 	// For subsequent SetCandidate call use SetCandidateChangeset as that fetches the already added DONID and sets the candidate.
-	PluginInfo SetCandidatePluginInfo `json:"pluginInfo"`
+	PluginInfo    SetCandidatePluginInfo      `json:"pluginInfo"`
+	NonBootstraps []*clclient.ChainlinkClient `json:"nonBootstraps"`
 }
 
 func validateAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg AddDonAndSetCandidateChangesetConfig) error {
@@ -211,15 +190,23 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
 	}
-	nodes, err := NodeInfo(e.NodeIDs, e.Offchain)
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("get node info: %w", err)
-	}
-	nonBootstraps := nodes.NonBootstraps()
 
 	expectedDonID, err := capReg.GetNextDONId(nil)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("get next don id: %w", err)
+	}
+
+	var readers [][32]byte
+	for _, node := range cfg.NonBootstraps {
+		nodeP2PIds, err := node.MustReadP2PKeys()
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to read p2p keys from node %s: %w", node.URL(), err)
+		}
+		for _, id := range nodeP2PIds.Data {
+			var peerID [32]byte
+			copy(peerID[:], []byte(id.Attributes.PeerID))
+			readers = append(readers, peerID)
+		}
 	}
 
 	dons := make([]sequences.DONAddition, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
@@ -235,7 +222,7 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 			e.OCRSecrets,
 			offRampAddress,
 			chainSelector,
-			nonBootstraps,
+			cfg.NonBootstraps,
 			rmnHome.Address(),
 			params.OCRParameters,
 			params.CommitOffChainConfig,
@@ -254,8 +241,8 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 		dons[i] = sequences.DONAddition{
 			ExpectedID:       expectedDonID,
 			PluginConfig:     pluginOCR3Config,
-			PeerIDs:          nonBootstraps.PeerIDs(),
-			F:                nonBootstraps.DefaultF(),
+			PeerIDs:          readers,
+			F:                uint8(len(cfg.NonBootstraps) / 3),
 			IsPublic:         false,
 			AcceptsWorkflows: false,
 		}
@@ -282,81 +269,90 @@ func BuildOCR3ConfigForCCIPHome(
 	ocrSecrets focr.OCRSecrets,
 	offRampAddress []byte,
 	destSelector uint64,
-	nodes Nodes,
+	nodes []*clclient.ChainlinkClient,
 	rmnHomeAddress common.Address,
 	ocrParams OCRParameters,
 	commitOffchainCfg *pluginconfig.CommitOffchainConfig,
 	execOffchainCfg *pluginconfig.ExecuteOffchainConfig,
 ) (map[ccipocr3.PluginType]ccip_home.CCIPHomeOCR3Config, error) {
 	// check if we have info from this node for another chain in the same destFamily
-	destFamily, err := chain_selectors.GetSelectorFamily(destSelector)
+	// destFamily, err := chain_selectors.GetSelectorFamily(destSelector)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// var p2pIDs [][32]byte
+	schedule, oracles, err := getOracleIdentities(nodes)
 	if err != nil {
 		return nil, err
 	}
+	// for _, node := range nodes {
+	// 	schedule = append(schedule, 1)
 
-	var p2pIDs [][32]byte
-	// Get OCR3 Config from helper
-	var schedule []int
-	var oracles []confighelper.OracleIdentityExtra
-	for _, node := range nodes {
-		schedule = append(schedule, 1)
+	// 	// TODO: not every node supports the destination chain, but nodes must have an OCR identity for the
+	// 	// destination chain, in order to be able to participate in the OCR protocol, sign reports, etc.
+	// 	// However, JD currently only returns the "OCRConfig" for chains that are explicitly supported by the node,
+	// 	// presumably in the TOML config.
+	// 	// JD should instead give us the OCR identity for the destination chain, and, if the node does NOT
+	// 	// actually support the chain (in terms of TOML config), then return an empty transmitter address,
+	// 	// which is what we're supposed to set anyway if that particular node doesn't support the destination chain.
+	// 	// The current workaround is to check if we have the OCR identity for the destination chain based off of
+	// 	// the node's OCR identity for another chain in the same family.
+	// 	// This is a HACK, because it is entirely possible that the destination chain is a unique family,
+	// 	// and no other supported chain by the node has the same family, e.g. Solana.
+	// 	// cfg, exists := node.OCRConfigForChainSelector(destSelector)
+	// 	// if !exists {
+	// 	// 	// check if we have an oracle identity for another chain in the same family as destFamily.
+	// 	// 	allOCRConfigs := node.AllOCRConfigs()
+	// 	// 	for chainDetails, ocrConfig := range allOCRConfigs {
+	// 	// 		chainFamily, err := chain_selectors.GetSelectorFamily(chainDetails.ChainSelector)
+	// 	// 		if err != nil {
+	// 	// 			return nil, err
+	// 	// 		}
 
-		// TODO: not every node supports the destination chain, but nodes must have an OCR identity for the
-		// destination chain, in order to be able to participate in the OCR protocol, sign reports, etc.
-		// However, JD currently only returns the "OCRConfig" for chains that are explicitly supported by the node,
-		// presumably in the TOML config.
-		// JD should instead give us the OCR identity for the destination chain, and, if the node does NOT
-		// actually support the chain (in terms of TOML config), then return an empty transmitter address,
-		// which is what we're supposed to set anyway if that particular node doesn't support the destination chain.
-		// The current workaround is to check if we have the OCR identity for the destination chain based off of
-		// the node's OCR identity for another chain in the same family.
-		// This is a HACK, because it is entirely possible that the destination chain is a unique family,
-		// and no other supported chain by the node has the same family, e.g. Solana.
-		cfg, exists := node.OCRConfigForChainSelector(destSelector)
-		if !exists {
-			// check if we have an oracle identity for another chain in the same family as destFamily.
-			allOCRConfigs := node.AllOCRConfigs()
-			for chainDetails, ocrConfig := range allOCRConfigs {
-				chainFamily, err := chain_selectors.GetSelectorFamily(chainDetails.ChainSelector)
-				if err != nil {
-					return nil, err
-				}
+	// 	// 		if chainFamily == destFamily {
+	// 	// 			cfg = ocrConfig
+	// 	// 			break
+	// 	// 		}
+	// 	// 	}
 
-				if chainFamily == destFamily {
-					cfg = ocrConfig
-					break
-				}
-			}
+	// 	// 	if cfg.OffchainPublicKey == [32]byte{} {
+	// 	// 		return nil, fmt.Errorf(
+	// 	// 			"no OCR config for chain %d (family %s) from node %s (peer id %s) and no other OCR config for another chain in the same family",
+	// 	// 			destSelector, destFamily, node.Name, node.PeerID.String(),
+	// 	// 		)
+	// 	// 	}
+	// 	// }
 
-			if cfg.OffchainPublicKey == [32]byte{} {
-				return nil, fmt.Errorf(
-					"no OCR config for chain %d (family %s) from node %s (peer id %s) and no other OCR config for another chain in the same family",
-					destSelector, destFamily, node.Name, node.PeerID.String(),
-				)
-			}
-		}
+	// 	var transmitAccount ocrtypes.Account
+	// 	if !exists {
+	// 		// empty account means that the node cannot transmit for this chain
+	// 		// we replace this with a canonical address with the oracle ID as the address when doing the ocr config validation below, but it should remain empty
+	// 		// in the CCIPHome OCR config and it should not be included in the destination chain transmitters whitelist.
+	// 		transmitAccount = ocrtypes.Account("")
+	// 	} else {
+	// 		transmitAccount = cfg.TransmitAccount
+	// 	}
+	// 	nodeP2PIds, err := node.MustReadP2PKeys()
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to read p2p keys from node %s: %w", node.URL(), err)
+	// 	}
+	// 	for _, id := range nodeP2PIds.Data {
+	// 		var peerID [32]byte
+	// 		copy(peerID[:], []byte(id.Attributes.PeerID))
+	// 		p2pIDs = append(p2pIDs, peerID)
+	// 	}
 
-		var transmitAccount ocrtypes.Account
-		if !exists {
-			// empty account means that the node cannot transmit for this chain
-			// we replace this with a canonical address with the oracle ID as the address when doing the ocr config validation below, but it should remain empty
-			// in the CCIPHome OCR config and it should not be included in the destination chain transmitters whitelist.
-			transmitAccount = ocrtypes.Account("")
-		} else {
-			transmitAccount = cfg.TransmitAccount
-		}
-
-		p2pIDs = append(p2pIDs, node.PeerID)
-		oracles = append(oracles, confighelper.OracleIdentityExtra{
-			OracleIdentity: confighelper.OracleIdentity{
-				OnchainPublicKey:  cfg.OnchainPublicKey,    // should be the same for all chains within the same family
-				TransmitAccount:   transmitAccount,         // different per chain (!) can be empty if the node does not support the destination chain
-				OffchainPublicKey: cfg.OffchainPublicKey,   // should be the same for all chains within the same family
-				PeerID:            cfg.PeerID.String()[4:], // should be the same for all oracle identities
-			},
-			ConfigEncryptionPublicKey: cfg.ConfigEncryptionPublicKey, // should be the same for all chains within the same family
-		})
-	}
+	// 	oracles = append(oracles, confighelper.OracleIdentityExtra{
+	// 		OracleIdentity: confighelper.OracleIdentity{
+	// 			OnchainPublicKey:  cfg.OnchainPublicKey,    // should be the same for all chains within the same family
+	// 			TransmitAccount:   transmitAccount,         // different per chain (!) can be empty if the node does not support the destination chain
+	// 			OffchainPublicKey: cfg.OffchainPublicKey,   // should be the same for all chains within the same family
+	// 			PeerID:            cfg.PeerID.String()[4:], // should be the same for all oracle identities
+	// 		},
+	// 		ConfigEncryptionPublicKey: cfg.ConfigEncryptionPublicKey, // should be the same for all chains within the same family
+	// 	})
+	// }
 
 	// Add DON on capability registry contract
 	ocr3Configs := make(map[ccipocr3.PluginType]ccip_home.CCIPHomeOCR3Config)
@@ -403,7 +399,7 @@ func BuildOCR3ConfigForCCIPHome(
 			ocrParams.MaxDurationObservation,
 			ocrParams.MaxDurationShouldAcceptAttestedReport,
 			ocrParams.MaxDurationShouldTransmitAcceptedReport,
-			int(nodes.DefaultF()),
+			int(len(nodes)/3),
 			[]byte{}, // empty OnChainConfig
 		)
 		if err2 != nil {
@@ -465,7 +461,7 @@ func BuildOCR3ConfigForCCIPHome(
 			transmittersBytes[i] = parsed
 		}
 
-		_, err = ocr3confighelper.PublicConfigFromContractConfig(false, ocrtypes.ContractConfig{
+		_, err := ocr3confighelper.PublicConfigFromContractConfig(false, ocrtypes.ContractConfig{
 			Signers:               signers,
 			Transmitters:          transmitters,
 			F:                     configF,
@@ -479,8 +475,10 @@ func BuildOCR3ConfigForCCIPHome(
 
 		var ocrNodes []ccip_home.CCIPHomeOCR3Node
 		for i := range nodes {
+			var p2pID [32]byte
+			copy(p2pID[:], []byte(oracles[i].OracleIdentity.PeerID))
 			ocrNodes = append(ocrNodes, ccip_home.CCIPHomeOCR3Node{
-				P2pId:          p2pIDs[i],
+				P2pId:          p2pID,
 				SignerKey:      signersBytes[i],
 				TransmitterKey: transmittersBytes[i],
 			})
@@ -514,6 +512,74 @@ func BuildOCR3ConfigForCCIPHome(
 	return ocr3Configs, nil
 }
 
+func getOracleIdentities(clClients []*clclient.ChainlinkClient) ([]int, []confighelper.OracleIdentityExtra, error) { //nolint:gocritic
+	s := make([]int, len(clClients))
+	oracleIdentities := make([]confighelper.OracleIdentityExtra, len(clClients))
+	sharedSecretEncryptionPublicKeys := make([]ocrtypes.ConfigEncryptionPublicKey, len(clClients))
+	eg := &errgroup.Group{}
+	for i, cl := range clClients {
+		eg.Go(func() error {
+			addresses, err := cl.EthAddresses()
+			if err != nil {
+				return err
+			}
+			ocr2Keys, err := cl.MustReadOCR2Keys()
+			if err != nil {
+				return err
+			}
+			var ocr2Config clclient.OCR2KeyAttributes
+			for _, key := range ocr2Keys.Data {
+				if key.Attributes.ChainType == "evm" {
+					ocr2Config = key.Attributes
+					break
+				}
+			}
+
+			keys, err := cl.MustReadP2PKeys()
+			if err != nil {
+				return err
+			}
+			p2pKeyID := keys.Data[0].Attributes.PeerID
+
+			offchainPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.OffChainPublicKey, "ocr2off_evm_"))
+			if err != nil {
+				return err
+			}
+			offchainPkBytesFixed := [ed25519.PublicKeySize]byte{}
+			n := copy(offchainPkBytesFixed[:], offchainPkBytes)
+			if n != ed25519.PublicKeySize {
+				return fmt.Errorf("wrong number of elements copied")
+			}
+			configPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.ConfigPublicKey, "ocr2cfg_evm_"))
+			if err != nil {
+				return err
+			}
+			configPkBytesFixed := [ed25519.PublicKeySize]byte{}
+			n = copy(configPkBytesFixed[:], configPkBytes)
+			if n != ed25519.PublicKeySize {
+				return fmt.Errorf("wrong number of elements copied")
+			}
+			onchainPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.OnChainPublicKey, "ocr2on_evm_"))
+			if err != nil {
+				return err
+			}
+			sharedSecretEncryptionPublicKeys[i] = configPkBytesFixed
+			oracleIdentities[i] = confighelper.OracleIdentityExtra{
+				OracleIdentity: confighelper.OracleIdentity{
+					OnchainPublicKey:  onchainPkBytes,
+					OffchainPublicKey: offchainPkBytesFixed,
+					PeerID:            p2pKeyID,
+					TransmitAccount:   ocrtypes.Account(addresses[0]),
+				},
+				ConfigEncryptionPublicKey: configPkBytesFixed,
+			}
+			s[i] = 1
+			return nil
+		})
+	}
+	return s, oracleIdentities, eg.Wait()
+}
+
 func (p SetCandidatePluginInfo) String() string {
 	allchains := maps.Keys(p.OCRConfigPerRemoteChainSelector)
 	return fmt.Sprintf("PluginType: %s, Chains: %v", p.PluginType.String(), allchains)
@@ -523,7 +589,8 @@ type SetCandidateChangesetConfig struct {
 	HomeChainSelector uint64 `json:"homeChainSelector"`
 	FeedChainSelector uint64 `json:"feedChainSelector"`
 
-	PluginInfo []SetCandidatePluginInfo `json:"pluginInfo"`
+	PluginInfo    []SetCandidatePluginInfo    `json:"pluginInfo"`
+	NonBootstraps []*clclient.ChainlinkClient `json:"nonBootstraps"`
 }
 
 func validateSetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidateChangesetConfig) error {
@@ -567,12 +634,6 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
 	}
 
-	nodes, err := NodeInfo(e.NodeIDs, e.Offchain)
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("get node info: %w", err)
-	}
-	nonBootstraps := nodes.NonBootstraps()
-
 	pluginInfos := make([]string, 0)
 	dons := make([]sequences.DONUpdate, 0)
 	a := &sequences.EVMAdapter{}
@@ -595,6 +656,19 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 		}
 	}
 
+	var readers [][32]byte
+	for _, node := range cfg.NonBootstraps {
+		nodeP2PIds, err := node.MustReadP2PKeys()
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to read p2p keys from node %s: %w", node.URL(), err)
+		}
+		for _, id := range nodeP2PIds.Data {
+			var peerID [32]byte
+			copy(peerID[:], []byte(id.Attributes.PeerID))
+			readers = append(readers, peerID)
+		}
+	}
+
 	for _, plugin := range cfg.PluginInfo {
 		pluginInfos = append(pluginInfos, plugin.String())
 		for chainSelector, params := range plugin.OCRConfigPerRemoteChainSelector {
@@ -607,7 +681,7 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 				e.OCRSecrets,
 				offRampAddress,
 				chainSelector,
-				nodes.NonBootstraps(),
+				cfg.NonBootstraps,
 				rmnHome.Address(),
 				params.OCRParameters,
 				params.CommitOffChainConfig,
@@ -637,8 +711,8 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 			dons = append(dons, sequences.DONUpdate{
 				ID:             donID,
 				PluginConfig:   config,
-				PeerIDs:        nonBootstraps.PeerIDs(),
-				F:              nonBootstraps.DefaultF(),
+				PeerIDs:        readers,
+				F:              uint8(len(cfg.NonBootstraps) / 3),
 				IsPublic:       false,
 				ExistingDigest: existingDigest,
 			})
@@ -708,7 +782,8 @@ type PromoteCandidatePluginInfo struct {
 type PromoteCandidateChangesetConfig struct {
 	HomeChainSelector uint64 `json:"homeChainSelector"`
 
-	PluginInfo []PromoteCandidatePluginInfo `json:"pluginInfo"`
+	PluginInfo    []PromoteCandidatePluginInfo `json:"pluginInfo"`
+	NonBootstraps []*clclient.ChainlinkClient  `json:"nonBootstraps"`
 }
 
 func validatePromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteCandidateChangesetConfig) error {
@@ -780,13 +855,19 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 		}
 	}
 
-	nodes, err := NodeInfo(e.NodeIDs, e.Offchain)
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("fetch node info: %w", err)
-	}
-	nonBootstraps := nodes.NonBootstraps()
-
 	dons := make([]sequences.DONUpdatePromotion, 0)
+	var readers [][32]byte
+	for _, node := range cfg.NonBootstraps {
+		nodeP2PIds, err := node.MustReadP2PKeys()
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to read p2p keys from node %s: %w", node.URL(), err)
+		}
+		for _, id := range nodeP2PIds.Data {
+			var peerID [32]byte
+			copy(peerID[:], []byte(id.Attributes.PeerID))
+			readers = append(readers, peerID)
+		}
+	}
 	for _, plugin := range cfg.PluginInfo {
 		for _, donID := range donIDs {
 			digest, err := ccipHome.GetCandidateDigest(nil, donID, uint8(plugin.PluginType))
@@ -806,8 +887,8 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 				ID:              donID,
 				PluginType:      uint8(plugin.PluginType),
 				ChainSelector:   allConfigs.CandidateConfig.Config.ChainSelector,
-				PeerIDs:         nonBootstraps.PeerIDs(),
-				F:               nonBootstraps.DefaultF(),
+				PeerIDs:         readers,
+				F:               uint8(len(cfg.NonBootstraps) / 3),
 				IsPublic:        false,
 				CandidateDigest: allConfigs.CandidateConfig.ConfigDigest,
 				ActiveDigest:    allConfigs.ActiveConfig.ConfigDigest,
