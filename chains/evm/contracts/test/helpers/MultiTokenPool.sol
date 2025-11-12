@@ -40,7 +40,7 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
   );
-  event ChainConfigured(
+  event DefaultFinalityRateLimitConfigured(
     uint64 remoteChainSelector,
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
@@ -362,7 +362,7 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
     s_remoteChainConfigs[token][remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
     RateLimiter._validateTokenBucketConfig(inboundConfig);
     s_remoteChainConfigs[token][remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
-    emit ChainConfigured(remoteChainSelector, outboundConfig, inboundConfig);
+    emit DefaultFinalityRateLimitConfigured(remoteChainSelector, outboundConfig, inboundConfig);
   }
 
   // ================================================================

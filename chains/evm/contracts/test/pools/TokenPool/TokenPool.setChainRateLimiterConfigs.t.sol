@@ -58,7 +58,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     vm.expectEmit();
     emit RateLimiter.ConfigChanged(newInboundConfig);
     vm.expectEmit();
-    emit TokenPool.ChainConfigured(DEST_CHAIN_SELECTOR, newOutboundConfig, newInboundConfig);
+    emit TokenPool.DefaultFinalityRateLimitConfigured(DEST_CHAIN_SELECTOR, newOutboundConfig, newInboundConfig);
 
     s_tokenPool.setChainRateLimiterConfigs(chainSelectors, newOutboundConfigs, newInboundConfigs);
 

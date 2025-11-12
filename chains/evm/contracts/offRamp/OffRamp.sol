@@ -665,7 +665,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       offchainTokenData: ""
     });
 
-    if (localPoolAddress.supportsInterface(Pool.CCIP_POOL_V2)) {
+    if (localPoolAddress.supportsInterface(type(IPoolV2).interfaceId)) {
       try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationRequested) returns (
         Pool.ReleaseOrMintOutV1 memory result
       ) {
