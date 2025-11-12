@@ -80,13 +80,13 @@ type ExecutorParams struct {
 }
 
 type ContractParams struct {
-	RMNRemote         RMNRemoteParams
-	OffRamp           OffRampParams
-	CommitteeVerifier []CommitteeVerifierParams
-	OnRamp            OnRampParams
-	FeeQuoter         FeeQuoterParams
-	Executor          ExecutorParams
-	MockReceivers     []MockReceiverParams
+	RMNRemote          RMNRemoteParams
+	OffRamp            OffRampParams
+	CommitteeVerifiers []CommitteeVerifierParams
+	OnRamp             OnRampParams
+	FeeQuoter          FeeQuoterParams
+	Executor           ExecutorParams
+	MockReceivers      []MockReceiverParams
 }
 
 type DeployChainContractsInput struct {
@@ -292,7 +292,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// TODO: validate prior to deploying that qualifiers are unique?
 		var committeeVerifierRefs []datastore.AddressRef
 		var committeeVerifierBatchOps []mcms_types.BatchOperation
-		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifier {
+		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifiers {
 			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
 				ContractFactory:   input.ContractFactory,
