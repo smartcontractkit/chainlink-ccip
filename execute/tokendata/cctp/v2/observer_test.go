@@ -7,6 +7,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 )
 
 // Helper function to create UnknownAddress from hex string
@@ -1010,4 +1012,216 @@ func TestIsTokenSupported(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// Helper function to create a success attestation status
+func createSuccessAttestation(id, body, attestation string) tokendata.AttestationStatus {
+	return tokendata.SuccessAttestationStatus(
+		cciptypes.Bytes(id),
+		cciptypes.Bytes(body),
+		cciptypes.Bytes(attestation),
+	)
+}
+
+func Test_assignAttestationForV2TokenPayload(t *testing.T) {
+	validDepositHash1 := mustHexToBytes32("1234567890123456789012345678901234567890123456789012345678901234")
+	validDepositHash2 := mustHexToBytes32("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
+	validDepositHash3 := mustHexToBytes32("fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210")
+
+	attestation1 := createSuccessAttestation("id1", "body1", "attestation1")
+	attestation2 := createSuccessAttestation("id2", "body2", "attestation2")
+	attestation3 := createSuccessAttestation("id3", "body3", "attestation3")
+	v2TokenPayload1 := SourceTokenDataPayloadV2{
+		SourceDomain: 1,
+		DepositHash:  validDepositHash1,
+	}
+
+	tests := []struct {
+		name                   string
+		attestations           map[[32]byte][]tokendata.AttestationStatus
+		v2TokenPayload         SourceTokenDataPayloadV2
+		expectedAttestation    tokendata.AttestationStatus
+		expectedRemainingCount int
+		checkRemainingInMap    bool
+		expectedError          error
+	}{
+		{
+			name: "single attestation for deposit hash - success",
+			attestations: map[[32]byte][]tokendata.AttestationStatus{
+				validDepositHash1: {attestation1},
+			},
+			v2TokenPayload:         v2TokenPayload1,
+			expectedAttestation:    attestation1,
+			expectedRemainingCount: 0,
+			checkRemainingInMap:    true,
+		},
+		{
+			name: "multiple attestations - returns first and removes it",
+			attestations: map[[32]byte][]tokendata.AttestationStatus{
+				validDepositHash1: {attestation1, attestation2, attestation3},
+			},
+			v2TokenPayload:         v2TokenPayload1,
+			expectedAttestation:    attestation1,
+			expectedRemainingCount: 2,
+			checkRemainingInMap:    true,
+		},
+		{
+			name: "deposit hash not found in map",
+			attestations: map[[32]byte][]tokendata.AttestationStatus{
+				validDepositHash1: {attestation1},
+			},
+			v2TokenPayload: SourceTokenDataPayloadV2{
+				SourceDomain: 2,
+				DepositHash:  validDepositHash2, // Different hash not in map
+			},
+			expectedAttestation: tokendata.ErrorAttestationStatus(tokendata.ErrDataMissing),
+			expectedError:       tokendata.ErrDataMissing,
+		},
+		{
+			name: "empty attestation slice for deposit hash",
+			attestations: map[[32]byte][]tokendata.AttestationStatus{
+				validDepositHash1: {}, // Empty slice
+			},
+			v2TokenPayload:      v2TokenPayload1,
+			expectedAttestation: tokendata.ErrorAttestationStatus(tokendata.ErrDataMissing),
+			expectedError:       tokendata.ErrDataMissing,
+		},
+		{
+			name:                "empty attestations map",
+			attestations:        map[[32]byte][]tokendata.AttestationStatus{},
+			v2TokenPayload:      v2TokenPayload1,
+			expectedAttestation: tokendata.ErrorAttestationStatus(tokendata.ErrDataMissing),
+			expectedError:       tokendata.ErrDataMissing,
+		},
+		{
+			name: "attestation with error status",
+			attestations: map[[32]byte][]tokendata.AttestationStatus{
+				validDepositHash1: {
+					tokendata.ErrorAttestationStatus(tokendata.ErrNotReady),
+				},
+			},
+			v2TokenPayload:      v2TokenPayload1,
+			expectedAttestation: tokendata.ErrorAttestationStatus(tokendata.ErrNotReady),
+			expectedError:       tokendata.ErrNotReady,
+		},
+		{
+			name: "multiple hashes in map - correct one selected",
+			attestations: map[[32]byte][]tokendata.AttestationStatus{
+				validDepositHash1: {attestation1},
+				validDepositHash2: {attestation2},
+				validDepositHash3: {attestation3},
+			},
+			v2TokenPayload: SourceTokenDataPayloadV2{
+				SourceDomain: 2,
+				DepositHash:  validDepositHash2,
+			},
+			expectedAttestation:    attestation2,
+			expectedRemainingCount: 0,
+			checkRemainingInMap:    true,
+		},
+		{
+			name: "two attestations - first call gets first, map updated",
+			attestations: map[[32]byte][]tokendata.AttestationStatus{
+				validDepositHash1: {attestation1, attestation2},
+			},
+			v2TokenPayload:         v2TokenPayload1,
+			expectedAttestation:    attestation1,
+			expectedRemainingCount: 1,
+			checkRemainingInMap:    true,
+		},
+		{
+			name: "attestation with various error types - ErrRateLimit",
+			attestations: map[[32]byte][]tokendata.AttestationStatus{
+				validDepositHash1: {
+					tokendata.ErrorAttestationStatus(tokendata.ErrRateLimit),
+				},
+			},
+			v2TokenPayload:      v2TokenPayload1,
+			expectedAttestation: tokendata.ErrorAttestationStatus(tokendata.ErrRateLimit),
+			expectedError:       tokendata.ErrRateLimit,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make a copy of the attestations map to verify mutation
+			attestationsCopy := make(map[[32]byte][]tokendata.AttestationStatus)
+			for k, v := range tt.attestations {
+				statusesCopy := make([]tokendata.AttestationStatus, len(v))
+				copy(statusesCopy, v)
+				attestationsCopy[k] = statusesCopy
+			}
+
+			// Call the function
+			result := assignAttestationForV2TokenPayload(attestationsCopy, tt.v2TokenPayload)
+
+			// Verify the returned attestation
+			if tt.expectedError != nil {
+				// Check error case
+				require.Error(t, result.Error)
+				assert.ErrorIs(t, result.Error, tt.expectedError)
+				assert.Nil(t, result.ID)
+				assert.Nil(t, result.MessageBody)
+				assert.Nil(t, result.Attestation)
+			} else {
+				// Check success case
+				require.NoError(t, result.Error)
+				assert.Equal(t, tt.expectedAttestation.ID, result.ID)
+				assert.Equal(t, tt.expectedAttestation.MessageBody, result.MessageBody)
+				assert.Equal(t, tt.expectedAttestation.Attestation, result.Attestation)
+			}
+
+			// Verify map mutation if applicable
+			if tt.checkRemainingInMap {
+				remainingStatuses, ok := attestationsCopy[tt.v2TokenPayload.DepositHash]
+				require.True(t, ok, "deposit hash should still exist in map")
+				assert.Equal(
+					t, tt.expectedRemainingCount, len(remainingStatuses),
+					"unexpected number of remaining attestations in map",
+				)
+			}
+		})
+	}
+}
+
+func Test_assignAttestationForV2TokenPayload_Mutation(t *testing.T) {
+	// This test specifically verifies that the function mutates the attestations map
+	// by removing the first element and that subsequent calls work correctly
+	depositHash := mustHexToBytes32("1234567890123456789012345678901234567890123456789012345678901234")
+
+	attestation1 := createSuccessAttestation("id1", "body1", "attestation1")
+	attestation2 := createSuccessAttestation("id2", "body2", "attestation2")
+	attestation3 := createSuccessAttestation("id3", "body3", "attestation3")
+
+	attestations := map[[32]byte][]tokendata.AttestationStatus{
+		depositHash: {attestation1, attestation2, attestation3},
+	}
+
+	payload := SourceTokenDataPayloadV2{
+		SourceDomain: 1,
+		DepositHash:  depositHash,
+	}
+
+	// First call - should get first attestation
+	result1 := assignAttestationForV2TokenPayload(attestations, payload)
+	require.NoError(t, result1.Error)
+	assert.Equal(t, cciptypes.Bytes("id1"), result1.ID)
+	assert.Equal(t, 2, len(attestations[depositHash]), "should have 2 attestations remaining")
+
+	// Second call - should get second attestation (which was originally at index 1)
+	result2 := assignAttestationForV2TokenPayload(attestations, payload)
+	require.NoError(t, result2.Error)
+	assert.Equal(t, cciptypes.Bytes("id2"), result2.ID)
+	assert.Equal(t, 1, len(attestations[depositHash]), "should have 1 attestation remaining")
+
+	// Third call - should get third attestation (which was originally at index 2)
+	result3 := assignAttestationForV2TokenPayload(attestations, payload)
+	require.NoError(t, result3.Error)
+	assert.Equal(t, cciptypes.Bytes("id3"), result3.ID)
+	assert.Equal(t, 0, len(attestations[depositHash]), "should have 0 attestations remaining")
+
+	// Fourth call - should return error since no attestations left
+	result4 := assignAttestationForV2TokenPayload(attestations, payload)
+	require.Error(t, result4.Error)
+	assert.ErrorIs(t, result4.Error, tokendata.ErrDataMissing)
 }
