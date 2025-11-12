@@ -135,17 +135,17 @@ contract OnRamp_getReceipts is OnRampSetup {
   }
 
   function test_getReceipts_WithTokens_PoolV2Fee_Success() public {
-    // Mock pool to support IPoolV2
+    // Mock pool to support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
 
-    // Mock pool's getFee to return custom fees
+    // Mock pool's getFee to return custom fees.
     vm.mockCall(
       s_pool,
       abi.encodeWithSelector(IPoolV2.getFee.selector),
       abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0))
     );
 
-    // Mock verifiers
+    // Mock verifiers.
     address verifier1Impl = makeAddr("verifier1Impl");
     address verifier2Impl = makeAddr("verifier2Impl");
     _mockVerifier(s_verifier1, verifier1Impl);
@@ -161,10 +161,10 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
-    // Should have: 2 verifiers + 1 token + 1 executor = 4 receipts
+    // Should have: 2 verifiers + 1 token + 1 executor = 4 receipts.
     assertEq(receipts.length, 4, "Should have 4 receipts");
 
-    // Check verifier receipts (first 2)
+    // Check verifier receipts (first 2).
     assertEq(receipts[0].issuer, s_verifier1, "First receipt should be from verifier1");
     assertEq(receipts[0].feeTokenAmount, VERIFIER_FEE_USD_CENTS, "Verifier1 fee should match");
     assertEq(receipts[0].destGasLimit, VERIFIER_GAS, "Verifier1 gas should match");
@@ -173,10 +173,10 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[1].issuer, s_verifier2, "Second receipt should be from verifier2");
     assertEq(receipts[1].feeTokenAmount, VERIFIER_FEE_USD_CENTS, "Verifier2 fee should match");
 
-    // Check executor receipt (last)
+    // Check executor receipt (last).
     assertEq(receipts[3].issuer, s_defaultExecutor, "Last receipt should be from executor");
 
-    // Check token pool receipt (second to last)
+    // Check token pool receipt (second to last).
     assertEq(receipts[2].issuer, s_sourceToken, "Second to last receipt should be from token");
     assertEq(receipts[2].feeTokenAmount, POOL_FEE_USD_CENTS, "Pool fee should match");
     assertEq(receipts[2].destGasLimit, POOL_GAS_OVERHEAD, "Pool gas overhead should match");
@@ -185,17 +185,17 @@ contract OnRamp_getReceipts is OnRampSetup {
   }
 
   function test_getReceipts_WithTokens_FeeQuoterFallback_Success() public {
-    // Mock pool to NOT support IPoolV2
+    // Mock pool to NOT support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false));
 
-    // Mock FeeQuoter's getTokenTransferFee
+    // Mock FeeQuoter's getTokenTransferFee.
     vm.mockCall(
       address(s_feeQuoter),
       abi.encodeCall(IFeeQuoter.getTokenTransferFee, (DEST_CHAIN_SELECTOR, s_sourceToken)),
       abi.encode(FEE_QUOTER_FEE_USD_CENTS, FEE_QUOTER_GAS_OVERHEAD, FEE_QUOTER_BYTES_OVERHEAD)
     );
 
-    // Mock verifier
+    // Mock verifier.
     address verifier1Impl = makeAddr("verifier1Impl");
     _mockVerifier(s_verifier1, verifier1Impl);
     _mockVerifierFee(verifier1Impl);
@@ -207,10 +207,10 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
-    // Should have: 1 verifier + 1 token + 1 executor = 3 receipts
+    // Should have: 1 verifier + 1 token + 1 executor = 3 receipts.
     assertEq(receipts.length, 3, "Should have 3 receipts");
 
-    // Check token pool receipt uses FeeQuoter values
+    // Check token pool receipt uses FeeQuoter values.
     assertEq(receipts[1].issuer, s_sourceToken, "Token receipt should be second to last");
     assertEq(receipts[1].feeTokenAmount, FEE_QUOTER_FEE_USD_CENTS, "Should use FeeQuoter fee");
     assertEq(receipts[1].destGasLimit, FEE_QUOTER_GAS_OVERHEAD, "Should use FeeQuoter gas overhead");
@@ -218,20 +218,20 @@ contract OnRamp_getReceipts is OnRampSetup {
   }
 
   function test_getReceipts_WithTokens_PoolV2ReturnsZero_FallsBackToFeeQuoter() public {
-    // Mock pool to support IPoolV2
+    // Mock pool to support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
 
-    // Mock pool's getFee to return zeros (indicating it wants to use FeeQuoter)
+    // Mock pool's getFee to return zeros (indicating it wants to use FeeQuoter).
     vm.mockCall(s_pool, abi.encodeWithSelector(IPoolV2.getFee.selector), abi.encode(0, 0, 0, uint16(0)));
 
-    // Mock FeeQuoter's getTokenTransferFee
+    // Mock FeeQuoter's getTokenTransferFee.
     vm.mockCall(
       address(s_feeQuoter),
       abi.encodeCall(IFeeQuoter.getTokenTransferFee, (DEST_CHAIN_SELECTOR, s_sourceToken)),
       abi.encode(FEE_QUOTER_FEE_USD_CENTS, FEE_QUOTER_GAS_OVERHEAD, FEE_QUOTER_BYTES_OVERHEAD)
     );
 
-    // Mock verifier
+    // Mock verifier.
     address verifier1Impl = makeAddr("verifier1Impl");
     _mockVerifier(s_verifier1, verifier1Impl);
     _mockVerifierFee(verifier1Impl);
@@ -243,7 +243,7 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
-    // Check token receipt falls back to FeeQuoter values
+    // Check token receipt falls back to FeeQuoter values.
     assertEq(receipts[1].issuer, s_sourceToken, "Token receipt should be present");
     assertEq(receipts[1].feeTokenAmount, FEE_QUOTER_FEE_USD_CENTS, "Should fall back to FeeQuoter fee");
     assertEq(receipts[1].destGasLimit, FEE_QUOTER_GAS_OVERHEAD, "Should fall back to FeeQuoter gas");
@@ -251,7 +251,7 @@ contract OnRamp_getReceipts is OnRampSetup {
   }
 
   function test_getReceipts_NoTokens_Success() public {
-    // Mock verifiers
+    // Mock verifiers.
     address verifier1Impl = makeAddr("verifier1Impl");
     address verifier2Impl = makeAddr("verifier2Impl");
     _mockVerifier(s_verifier1, verifier1Impl);
@@ -259,7 +259,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     _mockVerifierFee(verifier1Impl);
     _mockVerifierFee(verifier2Impl);
 
-    Client.EVM2AnyMessage memory message = _createMessage(0); // No tokens
+    Client.EVM2AnyMessage memory message = _createMessage(0); // No tokens.
     address[] memory ccvs = new address[](2);
     ccvs[0] = s_verifier1;
     ccvs[1] = s_verifier2;
@@ -267,7 +267,7 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
-    // Should have: 2 verifiers + 1 executor = 3 receipts (no token receipt)
+    // Should have: 2 verifiers + 1 executor = 3 receipts (no token receipt).
     assertEq(receipts.length, 3, "Should have 3 receipts without tokens");
 
     // Verify all are verifiers and executor
@@ -277,7 +277,7 @@ contract OnRamp_getReceipts is OnRampSetup {
   }
 
   function test_getReceipts_NoVerifiers_WithTokens_Success() public {
-    // Mock pool to support IPoolV2
+    // Mock pool to support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
     vm.mockCall(
       s_pool,
@@ -286,12 +286,12 @@ contract OnRamp_getReceipts is OnRampSetup {
     );
 
     Client.EVM2AnyMessage memory message = _createMessage(100 ether);
-    address[] memory ccvs = new address[](0); // No verifiers
+    address[] memory ccvs = new address[](0); // No verifiers.
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
-    // Should have: 0 verifiers + 1 token + 1 executor = 2 receipts
+    // Should have: 0 verifiers + 1 token + 1 executor = 2 receipts.
     assertEq(receipts.length, 2, "Should have 2 receipts");
 
     // Check receipts order
@@ -301,7 +301,7 @@ contract OnRamp_getReceipts is OnRampSetup {
   }
 
   function test_getReceipts_MultipleVerifiers_WithTokens_OrderIsCorrect() public {
-    // Mock pool
+    // Mock pool.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
     vm.mockCall(
       s_pool,
@@ -331,10 +331,10 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
-    // Should have: 3 verifiers + 1 token + 1 executor = 5 receipts
+    // Should have: 3 verifiers + 1 token + 1 executor = 5 receipts.
     assertEq(receipts.length, 5, "Should have 5 receipts");
 
-    // Verify order: verifiers (0-2), token (3), executor (4)
+    // Verify order: verifiers (0-2), token (3), executor (4).
     assertEq(receipts[0].issuer, s_verifier1, "Receipt 0: verifier1");
     assertEq(receipts[1].issuer, s_verifier2, "Receipt 1: verifier2");
     assertEq(receipts[2].issuer, verifier3, "Receipt 2: verifier3");
@@ -345,17 +345,17 @@ contract OnRamp_getReceipts is OnRampSetup {
   function test_getReceipts_TokenArgsPassedToPool() public {
     bytes memory customTokenArgs = abi.encode("custom token args");
 
-    // Mock pool to support IPoolV2
+    // Mock pool to support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
 
-    // Expect pool's getFee to be called with correct tokenArgs
+    // Expect pool's getFee to be called with correct tokenArgs.
     vm.mockCall(
       s_pool,
       abi.encodeWithSelector(IPoolV2.getFee.selector),
       abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0))
     );
 
-    // Mock verifier
+    // Mock verifier.
     address verifier1Impl = makeAddr("verifier1Impl");
     _mockVerifier(s_verifier1, verifier1Impl);
     _mockVerifierFee(verifier1Impl);
@@ -368,7 +368,7 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
-    // Verify token receipt has correct tokenArgs
+    // Verify token receipt has correct tokenArgs.
     assertEq(receipts[1].extraArgs, customTokenArgs, "Token receipt should have custom token args");
   }
 }
