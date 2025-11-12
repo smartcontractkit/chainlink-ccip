@@ -109,6 +109,7 @@ var ApplyAllowListUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowLis
 	Version:         semver.MustParse("1.7.0"),
 	Description:     "Applies the allow list updates to the ContractFactory contract",
 	ContractType:    ContractType,
+	ContractABI:     contract_factory.ContractFactoryABI,
 	NewContract:     contract_factory.NewContractFactory,
 	IsAllowedCaller: contract.OnlyOwner[*contract_factory.ContractFactory, ApplyAllowListUpdatesArgs],
 	Validate:        func(ApplyAllowListUpdatesArgs) error { return nil },

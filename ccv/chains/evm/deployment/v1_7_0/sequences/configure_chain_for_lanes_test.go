@@ -214,17 +214,15 @@ func TestConfigureChainForLanes(t *testing.T) {
 
 			extraArgs, err := msgHasher.EncodeGenericExtraArgsV3(
 				&bind.CallOpts{Context: t.Context()},
-				message_hasher.ClientGenericExtraArgsV3{
-					Ccvs: []message_hasher.ClientCCV{
-						{
-							CcvAddress: common.HexToAddress(committeeVerifierResolver),
-							Args:       []byte{},
-						},
-					},
-					FinalityConfig: 0,
-					Executor:       common.HexToAddress(executorAddress),
-					ExecutorArgs:   []byte{},
-					TokenArgs:      []byte{},
+				message_hasher.ExtraArgsCodecGenericExtraArgsV3{
+					GasLimit:           80_000,
+					BlockConfirmations: 0,
+					Ccvs:               []common.Address{common.HexToAddress(committeeVerifierResolver)},
+					CcvArgs:            [][]byte{[]byte{}},
+					Executor:           common.HexToAddress(executorAddress),
+					ExecutorArgs:       []byte{},
+					TokenReceiver:      []byte{},
+					TokenArgs:          []byte{},
 				},
 			)
 			require.NoError(t, err, "EncodeGenericExtraArgsV3 should not error")

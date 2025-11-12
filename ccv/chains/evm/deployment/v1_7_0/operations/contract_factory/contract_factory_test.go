@@ -2,7 +2,6 @@ package contract_factory_test
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -100,7 +99,6 @@ func TestContractFactory(t *testing.T) {
 	evmChains[chain2Sel] = chain2
 	// Ensure that the deployer key is funded on chain2
 	balance, err := evmChains[chain2Sel].Client.BalanceAt(t.Context(), desiredDeployerKey.From, nil)
-	fmt.Println("balance", balance)
 	require.NoError(t, err, "Failed to get balance of deployer key on chain2")
 	require.Greater(t, balance.Int64(), int64(0), "Deployer key should be funded on chain2")
 
@@ -112,6 +110,9 @@ func TestContractFactory(t *testing.T) {
 		contract.DeployInput[contract_factory.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
 			ChainSelector:  chain2Sel,
+			Args: contract_factory.ConstructorArgs{
+				AllowList: []common.Address{evmChains[chain2Sel].DeployerKey.From},
+			},
 		},
 	)
 	require.NoError(t, err, "Failed to deploy ContractFactory on chain2")
@@ -132,38 +133,62 @@ func TestContractFactory(t *testing.T) {
 
 	// Now, create a contract via the factory on each chain
 	// The resulting addresses should be the same
-	createAndCallReport1, err := cldf_ops.ExecuteOperation(
+	_, err = cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
 		contract_factory.CreateAndTransferOwnership,
 		evmChains[chain1Sel],
 		contract.FunctionInput[contract_factory.CreateAndTransferOwnershipArgs]{
 			ChainSelector: chain1Sel,
+			Address:       common.HexToAddress(factory1Report.Output.Address),
 			Args: contract_factory.CreateAndTransferOwnershipArgs{
 				ComputeAddressArgs: contract_factory.ComputeAddressArgs{
 					ABI:             contract_factory_latest.ContractFactoryMetaData.ABI,
 					Bin:             contract_factory_latest.ContractFactoryBin,
-					ConstructorArgs: []any{},
+					ConstructorArgs: []any{[]common.Address{}},
 					Salt:            "salt",
 				},
 				To: evmChains[chain1Sel].DeployerKey.From,
 			},
 		})
 	require.NoError(t, err, "Failed to create and transfer ownership of contract on chain1")
-	createAndCallReport2, err := cldf_ops.ExecuteOperation(e.OperationsBundle, contract_factory.CreateAndTransferOwnership, evmChains[chain2Sel], contract.FunctionInput[contract_factory.CreateAndTransferOwnershipArgs]{
+
+	_, err = cldf_ops.ExecuteOperation(e.OperationsBundle, contract_factory.CreateAndTransferOwnership, evmChains[chain2Sel], contract.FunctionInput[contract_factory.CreateAndTransferOwnershipArgs]{
 		ChainSelector: chain2Sel,
+		Address:       common.HexToAddress(factory2Report.Output.Address),
 		Args: contract_factory.CreateAndTransferOwnershipArgs{
 			ComputeAddressArgs: contract_factory.ComputeAddressArgs{
 				ABI:             contract_factory_latest.ContractFactoryMetaData.ABI,
 				Bin:             contract_factory_latest.ContractFactoryBin,
-				ConstructorArgs: []any{},
+				ConstructorArgs: []any{[]common.Address{}},
 				Salt:            "salt",
 			},
 		},
 	})
 	require.NoError(t, err, "Failed to create and transfer ownership of contract on chain2")
 
-	txHash1 := createAndCallReport1.Output.ExecInfo.Hash
-	txHash2 := createAndCallReport2.Output.ExecInfo.Hash
+	// Since factories should be at the same address, we should filter on both chains
+	// using that same factory address
+	boundFactory1, err := contract_factory_latest.NewContractFactory(common.HexToAddress(factory1Report.Output.Address), evmChains[chain1Sel].Client)
+	require.NoError(t, err, "Failed to bind ContractFactory on chain1")
 
-	// Fetch the deployed addresses using each transaction hash
+	iter1, err := boundFactory1.FilterContractDeployed(nil, nil)
+	require.NoError(t, err, "Failed to filter ContractDeployed events on chain1")
+	var contractAddress1 common.Address
+	for iter1.Next() {
+		contractAddress1 = iter1.Event.ContractAddress
+	}
+	iter1.Close()
+
+	boundFactory2, err := contract_factory_latest.NewContractFactory(common.HexToAddress(factory2Report.Output.Address), evmChains[chain2Sel].Client)
+	require.NoError(t, err, "Failed to bind ContractFactory on chain2")
+
+	iter2, err := boundFactory2.FilterContractDeployed(nil, nil)
+	require.NoError(t, err, "Failed to filter ContractDeployed events on chain2")
+	var contractAddress2 common.Address
+	for iter2.Next() {
+		contractAddress2 = iter2.Event.ContractAddress
+	}
+	iter2.Close()
+
+	require.Equal(t, contractAddress1, contractAddress2, "Contract addresses should be the same")
 }

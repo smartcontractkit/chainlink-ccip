@@ -38,6 +38,9 @@ contract ContractFactory is ITypeAndVersion, Ownable2StepMsgSender {
   /// @notice Deploys a contract with the given creation code and salt and optionally calls it.
   /// @dev The deployed address is deterministic based on address(this), salt, and creation code.
   /// This method does not support deploying contracts with payable constructors (sets amount to 0).
+  /// This function is allowlisted to prevent unexpected accounts from claiming important addresses on new chains.
+  /// Concatenating msg.sender with the salt is an alternative way to approach this problem, but prevents the ability
+  /// to rotate keys. Taking that approach, you would need to use the same key for createAndCall on every chain.
   /// @param creationCode The creation code of the contract to deploy.
   /// @param salt The salt used to ensure a unique deployment.
   /// @param calls Any calls to perform post-deployment.

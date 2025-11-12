@@ -1,7 +1,6 @@
 package sequences_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -298,7 +297,6 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	// Assert mock receiver properties
 	ds := datastore.NewMemoryDataStore()
 	for _, addr := range report.Output.Addresses {
-		fmt.Println(addr)
 		require.NoError(t, ds.Addresses().Add(addr))
 	}
 	sealed := ds.Seal()
