@@ -65,7 +65,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   }
 
   function test_releaseOrMintSingleToken_CallsV1FunctionWhenNoV2Support() public {
-    vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V2)), abi.encode(false));
+    vm.mockCall(
+      address(s_pool), abi.encodeCall(s_pool.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false)
+    );
 
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
@@ -108,7 +110,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
 
   function test_releaseOrMintSingleToken_RevertWhen_NotACompatiblePool_UnsupportedInterface() public {
     vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V1)), abi.encode(false));
-    vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V2)), abi.encode(false));
+    vm.mockCall(
+      address(s_pool), abi.encodeCall(s_pool.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false)
+    );
 
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
@@ -117,7 +121,9 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   }
 
   function test_releaseOrMintSingleToken_RevertsWhen_ReleaseOrMintBalanceMismatch() public {
-    vm.mockCall(address(s_pool), abi.encodeCall(s_pool.supportsInterface, (Pool.CCIP_POOL_V2)), abi.encode(false));
+    vm.mockCall(
+      address(s_pool), abi.encodeCall(s_pool.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false)
+    );
     Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 

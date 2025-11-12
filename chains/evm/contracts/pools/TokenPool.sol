@@ -73,7 +73,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
   );
-  event ChainConfigured(
+  event DefaultFinalityRateLimitConfigured(
     uint64 remoteChainSelector,
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
@@ -103,6 +103,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     uint64 indexed remoteChainSelector, address token, uint256 amount
   );
   event CustomBlockConfirmationUpdated(uint16 minBlockConfirmation);
+  event CustomBlockConfirmationRateLimitConfigured(
+    uint64 remoteChainSelector,
+    RateLimiter.Config outboundRateLimiterConfig,
+    RateLimiter.Config inboundRateLimiterConfig
+  );
   event FeeTokenWithdrawn(address indexed recipient, address indexed feeToken, uint256 amount);
 
   struct ChainUpdate {
@@ -259,9 +264,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function supportsInterface(
     bytes4 interfaceId
   ) public pure virtual override returns (bool) {
-    return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == Pool.CCIP_POOL_V1
-      || interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IPoolV1).interfaceId
-      || interfaceId == type(IERC165).interfaceId;
+    return interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IPoolV2).interfaceId
+      || interfaceId == type(IPoolV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================
@@ -833,7 +837,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
     RateLimiter._validateTokenBucketConfig(inboundConfig);
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
-    emit ChainConfigured(remoteChainSelector, outboundConfig, inboundConfig);
+    emit DefaultFinalityRateLimitConfigured(remoteChainSelector, outboundConfig, inboundConfig);
   }
 
   // ================================================================
@@ -974,6 +978,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
         inboundBucket.lastUpdated = uint32(block.timestamp);
       }
       inboundBucket._setTokenBucketConfig(configArgs.inboundRateLimiterConfig);
+
+      emit CustomBlockConfirmationRateLimitConfigured(
+        remoteChainSelector, configArgs.outboundRateLimiterConfig, configArgs.inboundRateLimiterConfig
+      );
     }
   }
 
