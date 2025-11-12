@@ -264,9 +264,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function supportsInterface(
     bytes4 interfaceId
   ) public pure virtual override returns (bool) {
-    return interfaceId == Pool.CCIP_POOL_V2 || interfaceId == Pool.CCIP_POOL_V1
-      || interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IPoolV1).interfaceId
-      || interfaceId == type(IERC165).interfaceId;
+    return interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IPoolV2).interfaceId
+      || interfaceId == type(IPoolV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================
