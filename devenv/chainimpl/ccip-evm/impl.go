@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/uuid"
@@ -17,7 +19,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -43,6 +47,8 @@ type CCIP16EVM struct {
 	e                      *deployment.Environment
 	chainDetailsBySelector map[uint64]chainsel.ChainDetails
 	ethClients             map[uint64]*ethclient.Client
+	sequenceNumber         uint64
+	rawEvent               any
 }
 
 // NewCCIP16EVM creates new smart-contracts wrappers with utility functions for CCIP16EVM implementation.
@@ -58,13 +64,139 @@ func (m *CCIP16EVM) SetCLDF(e *deployment.Environment) {
 }
 
 func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields any, opts any) error {
-	_ = zerolog.Ctx(ctx)
-	return nil
+	l := zerolog.Ctx(ctx)
+	l.Info().Msg("Sending CCIP message")
+	fmt.Println("Sending CCIP message...")
+	a := &sequences.EVMAdapter{}
+	fqAddr, err := a.GetFQAddress(m.e.DataStore, src)
+	if err != nil {
+		return fmt.Errorf("failed to get fee quoter address: %w", err)
+	}
+	fmt.Println("Got fee quoter address:", common.Bytes2Hex(fqAddr))
+	fq, err := fee_quoter.NewFeeQuoter(
+		common.BytesToAddress(fqAddr),
+		m.e.BlockChains.EVMChains()[src].Client)
+	if err != nil {
+		return fmt.Errorf("failed to create fee quoter instance: %w", err)
+	}
+	feeTokens, err := fq.GetFeeTokens(nil)
+	if err != nil {
+		return fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
+	}
+	fmt.Println("Got fee tokens from fee quoter:", feeTokens)
+	msg := router.ClientEVM2AnyMessage{
+		Receiver:     common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32),
+		Data:         []byte("hello eoa"),
+		TokenAmounts: nil,
+		FeeToken:     feeTokens[1],
+		ExtraArgs:    nil,
+	}
+	const errCodeInsufficientFee = "0x07da6ee6"
+	const cannotDecodeErrorReason = "could not decode error reason"
+	const errMsgMissingTrieNode = "missing trie node"
+	sender := m.e.BlockChains.EVMChains()[src].DeployerKey
+	defer func() { sender.Value = nil }()
+	rAddr, err := a.GetRouterAddress(m.e.DataStore, src)
+	if err != nil {
+		return fmt.Errorf("failed to get router address: %w", err)
+	}
+	r, err := router.NewRouter(
+		common.BytesToAddress(rAddr),
+		m.e.BlockChains.EVMChains()[src].Client)
+	if err != nil {
+		return fmt.Errorf("failed to create router instance: %w", err)
+	}
+	onRampAddr, err := r.GetOnRamp(nil, dest)
+	if err != nil {
+		return fmt.Errorf("failed to get onramp address: %w", err)
+	}
+	fmt.Println("Got onramp address:", onRampAddr.Hex())
+	onRamp, err := onramp.NewOnRamp(
+		onRampAddr,
+		m.e.BlockChains.EVMChains()[src].Client)
+	if err != nil {
+		return fmt.Errorf("failed to create onramp instance: %w", err)
+	}
+	l.Info().Msg("Got contract instances, preparing to send CCIP message")
+	fmt.Println("Got contract instances, preparing to send CCIP message")
+	c, err := onRamp.GetDynamicConfig(nil)
+	if err != nil {
+		return fmt.Errorf("failed to get onramp dynamic config: %w", err)
+	}
+	fmt.Println("Got onramp dynamic config:", c.FeeQuoter)
+	fq2, err := fee_quoter.NewFeeQuoter(
+		c.FeeQuoter,
+		m.e.BlockChains.EVMChains()[src].Client)
+	if err != nil {
+		return fmt.Errorf("failed to create fee quoter instance: %w", err)
+	}
+	feeTokens2, err := fq2.GetFeeTokens(nil)
+	if err != nil {
+		return fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
+	}
+	fmt.Println("Got fee tokens from fee quoter:", feeTokens2)
+	
+	var retryCount int
+	for {
+		fee, err := r.GetFee(&bind.CallOpts{Context: ctx}, dest, msg)
+		if err != nil {
+			return fmt.Errorf("failed to get EVM fee: %w", deployment.MaybeDataErr(err))
+		}
+		fmt.Println("Got fee, sending CCIP message...")
+
+		sender.Value = fee
+
+		tx, err := r.CcipSend(sender, dest, msg)
+		if err != nil {
+			return fmt.Errorf("failed to send CCIP message: %w", err)
+		}
+		fmt.Println("Sent CCIP message, waiting for confirmation...")
+
+		blockNum, err := m.e.BlockChains.EVMChains()[src].Confirm(tx)
+		if err != nil {
+			if strings.Contains(err.Error(), errCodeInsufficientFee) {
+				// Don't count insufficient fee as part of the retry count
+				// because this is expected and we need to adjust the fee
+				continue
+			} else if strings.Contains(err.Error(), cannotDecodeErrorReason) ||
+				strings.Contains(err.Error(), errMsgMissingTrieNode) {
+				// If the error reason cannot be decoded, we retry to avoid transient issues. The retry behavior is disabled by default
+				// It is configured in the CCIPSendReqConfig.
+				// This retry was originally added to solve transient failure in end to end tests
+				if retryCount >= 5 {
+					return fmt.Errorf("failed to confirm CCIP message after %d retries: %w", retryCount, deployment.MaybeDataErr(err))
+				}
+				retryCount++
+				continue
+			}
+
+			return fmt.Errorf("failed to confirm CCIP message: %w", deployment.MaybeDataErr(err))
+		}
+		it, err := onRamp.FilterCCIPMessageSent(&bind.FilterOpts{
+			Start:   blockNum,
+			End:     &blockNum,
+			Context: context.Background(),
+		}, []uint64{dest}, []uint64{})
+		if err != nil {
+			return fmt.Errorf("failed to filter CCIPMessageSent events: %w", err)
+		}
+		fmt.Println("Filtered CCIPMessageSent events")
+
+		if !it.Next() {
+			return fmt.Errorf("no CCIP message sent event found")
+		}
+		fmt.Println("Found CCIPMessageSent event")
+
+		m.sequenceNumber = it.Event.SequenceNumber
+		m.rawEvent = it.Event
+
+		return nil
+	}
 }
 
 func (m *CCIP16EVM) GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error) {
 	_ = zerolog.Ctx(ctx)
-	return 0, nil
+	return m.sequenceNumber, nil
 }
 
 // WaitOneSentEventBySeqNo wait and fetch strictly one CCIPMessageSent event by selector and sequence number and selector.
@@ -345,7 +477,7 @@ func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deplo
 		l.Info().Msgf("setting readers for chain %d to %v due to no topology", chain, len(readers))
 		chainConfigs[chain] = changesets.ChainConfig{
 			Readers: readers,
-			FChain: uint8(len(readers) / 3),
+			FChain:  uint8(len(readers) / 3),
 			EncodableChainConfig: chainconfig.ChainConfig{
 				GasPriceDeviationPPB:      ccipocr3common.BigInt{Int: big.NewInt(1000)},
 				DAGasPriceDeviationPPB:    ccipocr3common.BigInt{Int: big.NewInt(1000)},
@@ -369,7 +501,7 @@ func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deplo
 			OCRConfigPerRemoteChainSelector: commitOCRConfigs,
 			PluginType:                      ccipocr3common.PluginTypeCCIPCommit,
 		},
-		NonBootstraps:    workerNodes,
+		NonBootstraps: workerNodes,
 	})
 	if err != nil {
 		return fmt.Errorf("adding DON and setting candidate for selector %d: %w", ccipHomeSelector, err)
@@ -383,7 +515,7 @@ func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deplo
 				PluginType:                      ccipocr3common.PluginTypeCCIPExec,
 			},
 		},
-		NonBootstraps:    workerNodes,
+		NonBootstraps: workerNodes,
 	})
 	if err != nil {
 		return fmt.Errorf("setting candidate for selector %d: %w", ccipHomeSelector, err)
@@ -400,7 +532,7 @@ func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deplo
 				RemoteChainSelectors: remoteSelectors,
 			},
 		},
-		NonBootstraps:    workerNodes,
+		NonBootstraps: workerNodes,
 	})
 	if err != nil {
 		return fmt.Errorf("promoting candidate for selector %d: %w", ccipHomeSelector, err)

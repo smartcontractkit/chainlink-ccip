@@ -64,9 +64,10 @@ func TestE2ESmoke(t *testing.T) {
 		}
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
+				t.Logf("Testing CCIP message from chain %d to chain %d", tc.fromSelector, tc.toSelector)
 				// use impls to initiate andverify message passing betwee two chains
 				// tc.implOne.GetExpectedNextSequenceNumber()
-				// tc.implOne.SendMessage()
+				tc.implOne.SendMessage(t.Context(), tc.fromSelector, tc.toSelector, nil, nil)
 				// tc.implOne.WaitOneExecEventBySeqNo()
 				// tc.implTwo.SendMessage(..)
 			})
