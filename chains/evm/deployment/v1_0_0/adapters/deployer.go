@@ -9,15 +9,9 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-<<<<<<< HEAD
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
-=======
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
->>>>>>> main
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"

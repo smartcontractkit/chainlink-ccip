@@ -9,6 +9,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	evmofframpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
@@ -18,6 +19,7 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
+	solsequences "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -142,12 +144,14 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 		},
 	}
 
-	transferOutput, err := mcmsapi.TransferOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
+	mcmsReg := mcmsreaderapi.NewMCMSReaderRegistry()
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilySolana, &solsequences.SolanaAdapter{})
+	transferOutput, err := mcmsapi.TransferOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsReg).Apply(*e, mcmsInput)
 	require.NoError(t, err)
 	require.Greater(t, len(transferOutput.Reports), 0)
 	require.Equal(t, 0, len(transferOutput.MCMSTimelockProposals))
 
-	acceptOutput, err := mcmsapi.AcceptOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
+	acceptOutput, err := mcmsapi.AcceptOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsReg).Apply(*e, mcmsInput)
 	require.NoError(t, err)
 	require.Greater(t, len(acceptOutput.Reports), 0)
 	require.Equal(t, 1, len(acceptOutput.MCMSTimelockProposals))
@@ -253,7 +257,7 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 		},
 	}
 
-	transferOutput, err := mcmsapi.TransferOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
+	transferOutput, err := mcmsapi.TransferOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.NewMCMSReaderRegistry()).Apply(*e, mcmsInput)
 	require.NoError(t, err)
 	require.Greater(t, len(transferOutput.Reports), 0)
 	require.Equal(t, 1, len(transferOutput.MCMSTimelockProposals))

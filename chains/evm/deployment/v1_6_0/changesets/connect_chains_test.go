@@ -139,7 +139,7 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 	require.NoError(t, err, "Failed to create test environment")
 	require.NotNil(t, e, "Environment should be created")
 
-	mcmsRegistry := cs_core.GetRegistry()
+	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
 	dReg := deployops.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	for _, chainSel := range chains {

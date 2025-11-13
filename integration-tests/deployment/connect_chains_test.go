@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	solsequences "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
@@ -150,7 +151,8 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	require.NotNil(t, e, "Environment should be created")
 	e.DataStore = ds.Seal() // Add preloaded contracts to env datastore
 
-	mcmsRegistry := cs_core.GetRegistry()
+	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilySolana, &solsequences.SolanaAdapter{})
 	dReg := deployops.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	for _, chainSel := range allChains {

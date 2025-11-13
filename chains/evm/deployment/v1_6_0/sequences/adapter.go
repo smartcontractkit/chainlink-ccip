@@ -33,7 +33,7 @@ func (a *EVMAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onramp.ContractType),
 		Version:       onramp.Version,
-	}, chainSelector, evm_datastore_utils.ToByteArray)
+	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
 	if err != nil {
 		return nil, err
 	}
