@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -26,11 +27,41 @@ type lanesTest_MockReader struct{}
 
 const LANES_OP_COUNT = 42
 
-func (m *lanesTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
+func (m *lanesTest_MockReader) GetChainMetadata(e deployment.Environment, chainSel uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
+	mcmsRef, err := m.GetMCMSRef(e, chainSel, input)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to get mcms ref: %w", err)
+	}
 	return mcms_types.ChainMetadata{
-		MCMAddress:      input.MCMSAddressRef.Address,
+		MCMAddress:      mcmsRef.Address,
 		StartingOpCount: LANES_OP_COUNT,
 	}, nil
+}
+
+func (m *lanesTest_MockReader) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms.Input) (datastore.AddressRef, error) {
+	tlRef := datastore.AddressRef{
+		Type:      datastore.ContractType("Timelock"),
+		Version:   semver.MustParse("1.0.0"),
+		Qualifier: input.Qualifier,
+	}
+	fullTlRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tlRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to find timelock address for chain %d: %w", chainSelector, err)
+	}
+	return fullTlRef, nil
+}
+
+func (m *lanesTest_MockReader) GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms.Input) (datastore.AddressRef, error) {
+	mcmRef := datastore.AddressRef{
+		Type:      datastore.ContractType("MCM"),
+		Version:   semver.MustParse("1.0.0"),
+		Qualifier: input.Qualifier,
+	}
+	fullMcmRef, err := datastore_utils.FindAndFormatRef(e.DataStore, mcmRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to find MCMS address for chain %d: %w", chainSelector, err)
+	}
+	return fullMcmRef, nil
 }
 
 type lanesTest_MockChainFamily struct {
@@ -110,14 +141,6 @@ var lanesTest_BasicMCMSInput = mcms.Input{
 	ValidUntil:           3759765795,
 	TimelockDelay:        mcms_types.MustParseDuration("1h"),
 	TimelockAction:       mcms_types.TimelockActionSchedule,
-	MCMSAddressRef: datastore.AddressRef{
-		Type:    "MCM",
-		Version: semver.MustParse("1.0.0"),
-	},
-	TimelockAddressRef: datastore.AddressRef{
-		Type:    "Timelock",
-		Version: semver.MustParse("1.0.0"),
-	},
 }
 
 func makeBaseChainDataStore(t *testing.T, chains []uint64) *datastore.MemoryDataStore {
@@ -176,6 +199,7 @@ func makeBaseChainDataStore(t *testing.T, chains []uint64) *datastore.MemoryData
 			Type:          datastore.ContractType("CommitteeVerifierResolver"),
 			Version:       semver.MustParse("1.0.0"),
 		})
+		require.NoError(t, err)
 
 		// Executor
 		err = ds.Addresses().Add(datastore.AddressRef{

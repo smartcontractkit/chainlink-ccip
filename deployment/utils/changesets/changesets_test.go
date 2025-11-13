@@ -24,9 +24,32 @@ const OP_COUNT = 42
 
 func (m *MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
 	return mcms_types.ChainMetadata{
-		MCMAddress:      input.MCMSAddressRef.Address,
 		StartingOpCount: OP_COUNT,
 	}, nil
+}
+
+func (m *MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0x01",
+		Type:          datastore.ContractType("Timelock"),
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+func (m *MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0x02",
+		Type:          datastore.ContractType("MCM"),
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+// only register once for tests
+func init() {
+	registry := changesets.NewMCMSReaderRegistry()
+	registry.RegisterMCMSReader("evm", &MockReader{})
 }
 
 var mockSequence = operations.NewSequence(
@@ -94,10 +117,13 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			},
 		},
 	}
+	registry := changesets.NewMCMSReaderRegistry()
+	registry.RegisterMCMSReader("evm", &MockReader{})
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			lggr, err := logger.New()
+			require.NoError(t, err)
 			bundle := operations.NewBundle(
 				func() context.Context { return context.Background() },
 				lggr,
@@ -123,8 +149,6 @@ func TestNewFromOnChainSequence(t *testing.T) {
 				DataStore:        ds.Seal(),
 			}
 
-			registry := changesets.NewMCMSReaderRegistry()
-			registry.RegisterMCMSReader("evm", &MockReader{})
 			changeset := changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[sequences.OnChainOutput, int, sequences.OnChainOutput]{
 				Sequence:     mockSequence,
 				ResolveInput: test.resolveInput,
@@ -162,15 +186,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 					ValidUntil:           4126214326,
 					TimelockDelay:        mcms_types.MustParseDuration("1h"),
 					TimelockAction:       mcms_types.TimelockActionSchedule,
-					MCMSAddressRef: datastore.AddressRef{
-						Type:    "MCM",
-						Version: semver.MustParse("1.0.0"),
-					},
-					TimelockAddressRef: datastore.AddressRef{
-						Type:    "Timelock",
-						Version: semver.MustParse("1.0.0"),
-					},
-					Description: "Test Proposal",
+					Description:          "Test Proposal",
 				},
 			})
 			require.NoError(t, err)

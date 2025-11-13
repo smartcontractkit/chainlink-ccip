@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -15,19 +15,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/changesets"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	mcmsops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/mcms"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
-	tokenops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 )
 
 func TestDeployChainContracts_Apply(t *testing.T) {
@@ -45,38 +41,29 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	e.DataStore = ds.Seal() // Add preloaded contracts to env datastore
 	mint, _ := solana.NewRandomPrivateKey()
 
-	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
-	_, err = changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+	dReg := mcmsapi.GetRegistry()
+	version := semver.MustParse("1.6.0")
+	_, err = mcmsapi.DeployContracts(dReg).Apply(*e, mcmsapi.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
-		Cfg: changesets.DeployChainContractsCfg{
-			ChainSel: chain_selectors.SOLANA_MAINNET.Selector,
-			Params: sequences.ContractParams{
-				FeeQuoter: fqops.DefaultParams(),
-				OffRamp:   offrampops.DefaultParams(),
-				LinkToken: tokenops.Params{
-					TokenPrivKey:  mint,
-					TokenDecimals: 9,
-				},
+		Chains: map[uint64]mcmsapi.ContractDeploymentConfigPerChain{
+			chain_selectors.SOLANA_MAINNET.Selector: {
+				Version: version,
+				// LINK TOKEN CONFIG
+				// token private key used to deploy the LINK token. Solana: base58 encoded private key
+				TokenPrivKey: mint.String(),
+				// token decimals used to deploy the LINK token
+				TokenDecimals: 9,
+				// FEE QUOTER CONFIG
+				MaxFeeJuelsPerMsg: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+				// OFFRAMP CONFIG
+				PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
 			},
 		},
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
-	dReg := mcmsapi.GetRegistry()
-	cs := mcmsapi.DeployMCMS(dReg)
-	output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
-		Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
-			chain_selectors.SOLANA_MAINNET.Selector: {
-				Canceller:        testhelpers.SingleGroupMCMS(),
-				Bypasser:         testhelpers.SingleGroupMCMS(),
-				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(common_utils.CLLQualifier),
-			},
-		},
-	})
-	require.NoError(t, err)
-	require.Greater(t, len(output.Reports), 0)
-	e.DataStore = output.DataStore.Seal()
+
+	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 }
 
 var solanaProgramIDs = map[string]string{
@@ -100,8 +87,8 @@ var solanaContracts = map[string]datastore.ContractType{
 	"fee_quoter":        datastore.ContractType(fqops.ContractType),
 	"ccip_offramp":      datastore.ContractType(offrampops.ContractType),
 	"rmn_remote":        datastore.ContractType(rmnremoteops.ContractType),
-	"mcm":               datastore.ContractType(mcmsops.McmProgramType),
-	"timelock":          datastore.ContractType(mcmsops.TimelockProgramType),
+	"mcm":               datastore.ContractType(utils.McmProgramType),
+	"timelock":          datastore.ContractType(utils.TimelockProgramType),
 	"access_controller": datastore.ContractType(mcmsops.AccessControllerProgramType),
 }
 
