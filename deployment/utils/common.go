@@ -21,7 +21,8 @@ const (
 	CapabilitiesRegistry       cldf.ContractType = "CapabilitiesRegistry"
 	CCIPHome                   cldf.ContractType = "CCIPHome"
 	// CLL Identifiers
-	CLLQualifier = "CLLCCIP"
+	CLLQualifier         = "CLLCCIP"
+	RMNTimelockQualifier = "RMNMCMS"
 
 	// https://github.com/smartcontractkit/chainlink/blob/1423e2581e8640d9e5cd06f745c6067bb2893af2/contracts/src/v0.8/ccip/libraries/Internal.sol#L275-L279
 	/*
