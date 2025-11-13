@@ -17,6 +17,9 @@ contract TokenPoolV2_setCustomBlockConfirmationRateLimitConfig is TokenPoolV2Set
       inboundRateLimiterConfig: inboundConfig
     });
 
+    vm.expectEmit();
+    emit TokenPool.CustomBlockConfirmationRateLimitConfigured(DEST_CHAIN_SELECTOR, outboundConfig, inboundConfig);
+
     s_tokenPool.setCustomBlockConfirmationRateLimitConfig(args);
 
     (RateLimiter.TokenBucket memory outboundBucket, RateLimiter.TokenBucket memory inboundBucket) =
