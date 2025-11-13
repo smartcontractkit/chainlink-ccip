@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"math/rand"
 
-	"github.com/Masterminds/semver/v3"
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
@@ -32,15 +31,11 @@ var (
 	AccessControllerProgramName                              = "access_controller"
 	AccessControllerProgramSize                              = 1 * 1024 * 1024
 
-	TimelockProgramType cldf_deployment.ContractType = "RBACTimelockProgram"
-	TimelockProgramName                              = "timelock"
-	TimelockProgramSize                              = 1 * 1024 * 1024
+	TimelockProgramName = "timelock"
+	TimelockProgramSize = 1 * 1024 * 1024
 
-	McmProgramType cldf_deployment.ContractType = "ManyChainMultiSigProgram"
 	McmProgramName                              = "mcm"
 	McmProgramSize                              = 1 * 1024 * 1024
-
-	Version *semver.Version = semver.MustParse("1.6.0")
 
 	ProposerAccessControllerAccount  cldf_deployment.ContractType = "ProposerAccessControllerAccount"
 	ExecutorAccessControllerAccount  cldf_deployment.ContractType = "ExecutorAccessControllerAccount"
@@ -50,7 +45,7 @@ var (
 
 var AccessControllerDeploy = operations.NewOperation(
 	"access-controller:deploy",
-	Version,
+	common_utils.Version_1_6_0,
 	"Deploys the Access Controller program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input []cldf_datastore.AddressRef) (cldf_datastore.AddressRef, error) {
 		return utils.MaybeDeployContract(
@@ -58,7 +53,7 @@ var AccessControllerDeploy = operations.NewOperation(
 			chain,
 			input,
 			AccessControllerProgramType,
-			Version,
+			common_utils.Version_1_6_0,
 			"",
 			AccessControllerProgramName,
 			AccessControllerProgramSize)
@@ -67,15 +62,15 @@ var AccessControllerDeploy = operations.NewOperation(
 
 var TimelockDeploy = operations.NewOperation(
 	"timelock:deploy",
-	Version,
+	common_utils.Version_1_6_0,
 	"Deploys the Timelock program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input []cldf_datastore.AddressRef) (cldf_datastore.AddressRef, error) {
 		return utils.MaybeDeployContract(
 			b,
 			chain,
 			input,
-			TimelockProgramType,
-			Version,
+			utils.TimelockProgramType,
+			common_utils.Version_1_6_0,
 			"",
 			TimelockProgramName,
 			TimelockProgramSize)
@@ -84,15 +79,15 @@ var TimelockDeploy = operations.NewOperation(
 
 var McmDeploy = operations.NewOperation(
 	"mcm:deploy",
-	Version,
+	common_utils.Version_1_6_0,
 	"Deploys the Many Chain Multi Sig program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input []cldf_datastore.AddressRef) (cldf_datastore.AddressRef, error) {
 		return utils.MaybeDeployContract(
 			b,
 			chain,
 			input,
-			McmProgramType,
-			Version,
+			utils.McmProgramType,
+			common_utils.Version_1_6_0,
 			"",
 			McmProgramName,
 			McmProgramSize)
@@ -101,28 +96,28 @@ var McmDeploy = operations.NewOperation(
 
 var InitAccessControllerOp = operations.NewOperation(
 	"init-access-controller",
-	Version,
+	common_utils.Version_1_6_0,
 	"Initializes access controller for solana",
 	initAccessController,
 )
 
 var InitMCMOp = operations.NewOperation(
 	"init-mcm-program",
-	Version,
+	common_utils.Version_1_6_0,
 	"Initializes MCMProgram for solana",
 	initMCM,
 )
 
 var InitTimelockOp = operations.NewOperation(
 	"init-timelock-program",
-	Version,
+	common_utils.Version_1_6_0,
 	"Initializes timelock for solana",
 	initTimelock,
 )
 
 var AddAccessOp = operations.NewOperation(
 	"add-access-op",
-	Version,
+	common_utils.Version_1_6_0,
 	"Adds access to provided role for timelock",
 	addAccess,
 )
@@ -163,11 +158,13 @@ type (
 )
 
 func initAccessController(b operations.Bundle, deps Deps, in InitAccessControllerInput) (cldf_datastore.AddressRef, error) {
+	access_controller.SetProgramID(in.AccessController)
 	// Should be one of the AccessControllerAccount types
 	ref := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		in.ChainSel,
 		in.ContractType,
-		Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 
@@ -203,7 +200,7 @@ func initAccessController(b operations.Bundle, deps Deps, in InitAccessControlle
 		ChainSelector: deps.Chain.Selector,
 		Type:          cldf_datastore.ContractType(in.ContractType),
 		Qualifier:     deps.Qualifier,
-		Version:       Version,
+		Version:       common_utils.Version_1_6_0,
 	}, nil
 }
 
@@ -249,14 +246,16 @@ func initializeAccessController(
 }
 
 func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.AddressRef, error) {
+	mcm.SetProgramID(in.MCM)
 	// Should be one of:
 	// BypasserManyChainMultisig
 	// CancellerManyChainMultisig
 	// ProposerManyChainMultisig
 	ref := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		in.ChainSel,
 		in.ContractType,
-		Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 
@@ -296,7 +295,7 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.Ad
 		ChainSelector: deps.Chain.Selector,
 		Type:          cldf_datastore.ContractType(in.ContractType),
 		Qualifier:     deps.Qualifier,
-		Version:       Version,
+		Version:       common_utils.Version_1_6_0,
 	}, nil
 }
 
@@ -346,13 +345,15 @@ func initializeMCM(b operations.Bundle, deps Deps, mcmProgram solana.PublicKey, 
 	return nil
 }
 
-func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (cldf_datastore.AddressRef, error) {
+func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) ([]cldf_datastore.AddressRef, error) {
+	timelock.SetProgramID(in.Timelock)
 	// Should be one of:
 	// RBACTimelock
 	ref := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		in.ChainSel,
 		in.ContractType,
-		Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 
@@ -364,9 +365,9 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (cldf_da
 		err := deps.Chain.GetAccountDataBorshInto(b.GetContext(), timelockConfigPDA, &timelockConfig)
 		if err == nil {
 			b.Logger.Infow("timelock config already initialized, skipping initialization", "chain", deps.Chain.String())
-			return cldf_datastore.AddressRef{}, nil
+			return []cldf_datastore.AddressRef{}, nil
 		}
-		return cldf_datastore.AddressRef{}, fmt.Errorf("unable to read timelock ConfigPDA account config %s", timelockConfigPDA.String())
+		return []cldf_datastore.AddressRef{}, fmt.Errorf("unable to read timelock ConfigPDA account config %s", timelockConfigPDA.String())
 	}
 
 	b.Logger.Infow("timelock config not initialized, initializing", "chain", deps.Chain.String())
@@ -376,15 +377,27 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (cldf_da
 
 	err := initializeTimelock(b, deps, in.Timelock, seed, in.MinDelay)
 	if err != nil {
-		return cldf_datastore.AddressRef{}, fmt.Errorf("failed to initialize timelock: %w", err)
+		return []cldf_datastore.AddressRef{}, fmt.Errorf("failed to initialize timelock: %w", err)
 	}
 
-	return cldf_datastore.AddressRef{
-		Address:       string(seed[:]),
-		ChainSelector: deps.Chain.Selector,
-		Type:          cldf_datastore.ContractType(in.ContractType),
-		Qualifier:     deps.Qualifier,
-		Version:       Version,
+	return []cldf_datastore.AddressRef{
+		{
+			Address: mcms_solana.ContractAddress(
+				solana.MustPublicKeyFromBase58(in.Timelock.String()),
+				mcms_solana.PDASeed([]byte(seed[:])),
+			),
+			ChainSelector: deps.Chain.Selector,
+			Type:          cldf_datastore.ContractType(utils.TimelockCompositeAddress),
+			Qualifier:     deps.Qualifier,
+			Version:       common_utils.Version_1_6_0,
+		},
+		{
+			Address:       string(seed[:]),
+			ChainSelector: deps.Chain.Selector,
+			Type:          cldf_datastore.ContractType(in.ContractType),
+			Qualifier:     deps.Qualifier,
+			Version:       common_utils.Version_1_6_0,
+		},
 	}, nil
 }
 
@@ -419,32 +432,37 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 
 	accessControllerProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		AccessControllerProgramType,
-		Version,
+		common_utils.Version_1_6_0,
 		"",
 	)
 	proposerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		ProposerAccessControllerAccount,
-		Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	executorAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		ExecutorAccessControllerAccount,
-		Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	cancellerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		CancellerAccessControllerAccount,
-		Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	bypasserAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		BypasserAccessControllerAccount,
-		Version,
+		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 
@@ -477,22 +495,25 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastore.AddressRef, error) {
 	accessControllerProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		AccessControllerProgramType,
-		Version,
+		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
 	timelockProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
-		TimelockProgramType,
-		Version,
+		deps.Chain.Selector,
+		utils.TimelockProgramType,
+		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
 	// timelock seeds stored as a separate program type
 	// qualifier will identify the correct timelock instance
 	timelockSeed := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		common_utils.RBACTimelock,
-		Version,
+		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
 	timelockConfigPDA := state.GetTimelockConfigPDA(
@@ -514,8 +535,9 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 	}
 	roleAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
+		deps.Chain.Selector,
 		roleAccessController,
-		Version,
+		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
 	instructionBuilder := timelock.NewBatchAddAccessInstruction([32]uint8(

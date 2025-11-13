@@ -71,8 +71,8 @@ type ConnectChainsConfig struct {
 	MCMS  mcms.Input
 }
 type LaneConfig struct {
-	Source       ChainDefinition
-	Dest         ChainDefinition
+	ChainA       ChainDefinition
+	ChainB       ChainDefinition
 	Version      *semver.Version
 	IsDisabled   bool
 	TestRouter   bool

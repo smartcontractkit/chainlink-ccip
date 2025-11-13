@@ -124,6 +124,13 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
     return i_transmitter;
   }
 
+  /// @dev This function is only available for CCTP V2
+  function getMinFeeAmount(
+    uint256
+  ) external pure returns (uint256) {
+    return 0;
+  }
+
   /**
    * @notice Sends a BurnMessage through the local message transmitter
    * @dev calls local message transmitter's sendMessage() function if `_destinationCaller` == bytes32(0),

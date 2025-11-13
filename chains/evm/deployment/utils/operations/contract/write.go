@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -130,7 +131,7 @@ func NewWrite[ARGS any, C any](params WriteParams[ARGS, C]) *operations.Operatio
 					},
 					To:               input.Address.Hex(),
 					Data:             tx.Data(),
-					AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					AdditionalFields: json.RawMessage(`{"value": 0}`),
 				},
 			}, nil
 		},

@@ -3,7 +3,6 @@ package mcms
 import (
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
@@ -17,10 +16,8 @@ type Input struct {
 	TimelockDelay mcms_types.Duration
 	// TimelockAction is the action to perform on the timelock contract (schedule, bypass, or cancel).
 	TimelockAction mcms_types.TimelockAction
-	// MCMSAddressRef is a reference to the MCMS contract address in the datastore.
-	MCMSAddressRef datastore.AddressRef
-	// TimelockAddressRef is a reference to the timelock contract address in the datastore.
-	TimelockAddressRef datastore.AddressRef
+	// Qualifier is a string used to qualify the MCMS + Timelock contract addresses.
+	Qualifier string
 	// Description is a human-readable description of the proposal.
 	Description string
 }

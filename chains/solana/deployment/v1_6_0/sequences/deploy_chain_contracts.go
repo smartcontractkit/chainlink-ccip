@@ -2,8 +2,10 @@ package sequences
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
@@ -11,39 +13,32 @@ import (
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-type ContractParams struct {
-	LinkToken tokensops.Params
-	FeeQuoter fqops.Params
-	OffRamp   offrampops.Params
-}
-
-type DeployChainContractsInput struct {
-	ChainSelector     uint64 // Only exists to differentiate sequence runs on different chains
-	ExistingAddresses []datastore.AddressRef
-	ContractParams    ContractParams
+func (a *SolanaAdapter) DeployChainContracts() *cldf_ops.Sequence[deployops.ContractDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return DeployChainContracts
 }
 
 var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
 	semver.MustParse("1.6.0"),
 	"Deploys all required contracts for CCIP 1.6.0 to a Solana chain",
-	func(b operations.Bundle, chain cldf_solana.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
+	func(b operations.Bundle, chains cldf_chain.BlockChains, input deployops.ContractDeploymentConfigPerChainWithAddress) (output sequences.OnChainOutput, err error) {
+		chain := chains.SolanaChains()[input.ChainSelector]
 		addresses := make([]datastore.AddressRef, 0)
 
 		// Deploy LINK
-		linkRef, err := operations.ExecuteOperation(b, tokensops.DeployLINK, chain, input.ContractParams.LinkToken)
+		linkRef, err := operations.ExecuteOperation(b, tokensops.DeployLINK, chain, tokensops.Params{
+			TokenPrivKey:  solana.MustPrivateKeyFromBase58(input.TokenPrivKey),
+			TokenDecimals: input.TokenDecimals,
+		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LINK: %w", err)
 		}
@@ -81,18 +76,19 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		offRampAddress := solana.MustPublicKeyFromBase58(offRampRef.Output.Address)
 		rmnRemoteAddress := solana.MustPublicKeyFromBase58(rmnRemoteRef.Output.Address)
 		ccipRouterProgram := solana.MustPublicKeyFromBase58(routerRef.Output.Address)
-		fee_quoter.SetProgramID(feeQuoterAddress)
-		ccip_offramp.SetProgramID(offRampAddress)
-		ccip_router.SetProgramID(ccipRouterProgram)
-		rmn_remote.SetProgramID(rmnRemoteAddress)
 
 		// Initialize FeeQuoter
+		lowBits, highBits := GetHighLowBits(input.MaxFeeJuelsPerMsg)
 		_, err = operations.ExecuteOperation(b, fqops.Initialize, chain, fqops.Params{
-			MaxFeeJuelsPerMsg: input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
-			FeeQuoter:         feeQuoterAddress,
-			Router:            ccipRouterProgram,
-			OffRamp:           offRampAddress,
-			LinkToken:         linkTokenAddress,
+			MaxFeeJuelsPerMsg: bin.Uint128{
+				Lo:         lowBits,
+				Hi:         highBits,
+				Endianness: nil,
+			},
+			FeeQuoter: feeQuoterAddress,
+			Router:    ccipRouterProgram,
+			OffRamp:   offRampAddress,
+			LinkToken: linkTokenAddress,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize FeeQuoter: %w", err)
@@ -129,7 +125,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		_, err = operations.ExecuteOperation(b, offrampops.InitializeConfig, chain, offrampops.Params{
-			EnableExecutionAfter: input.ContractParams.OffRamp.EnableExecutionAfter,
+			EnableExecutionAfter: int64(input.PermissionLessExecutionThresholdSeconds),
 			OffRamp:              offRampAddress,
 		})
 		if err != nil {
@@ -191,3 +187,15 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+func GetHighLowBits(n *big.Int) (low, high uint64) {
+	mask := big.NewInt(0).SetUint64(0xFFFFFFFFFFFFFFFF) // 64-bit mask
+
+	lowBig := big.NewInt(0).And(n, mask)
+	low = lowBig.Uint64()
+
+	highBig := big.NewInt(0).Rsh(n, 64) // Shift right by 64 bits
+	high = highBig.Uint64()
+
+	return low, high
+}

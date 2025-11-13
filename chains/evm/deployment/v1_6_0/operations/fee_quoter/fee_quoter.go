@@ -11,12 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 var ContractType cldf_deployment.ContractType = "FeeQuoter"
-var Version *semver.Version = semver.MustParse("1.6.0")
+var Version *semver.Version = semver.MustParse("1.6.3")
 
 type ConstructorArgs struct {
 	StaticConfig                   fee_quoter.FeeQuoterStaticConfig
@@ -91,17 +91,4 @@ func (c FeeQuoterParams) Validate() error {
 		return errors.New("TokenPriceStalenessThreshold can't be 0")
 	}
 	return nil
-}
-
-func DefaultFeeQuoterParams() FeeQuoterParams {
-	return FeeQuoterParams{
-		MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-		TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
-		LinkPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
-		WethPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
-		TokenPriceFeedUpdates:          []fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
-		TokenTransferFeeConfigArgs:     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
-		MorePremiumMultiplierWeiPerEth: []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{},
-		DestChainConfigArgs:            []fee_quoter.FeeQuoterDestChainConfigArgs{},
-	}
 }
