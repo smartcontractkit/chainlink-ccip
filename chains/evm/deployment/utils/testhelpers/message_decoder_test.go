@@ -317,7 +317,6 @@ func DecodeTokenTransferV1(encoded []byte, offset int) (*TokenTransferV1, int, e
 // PrettyPrintMessage formats a decoded message for readable output
 func PrettyPrintMessage(msg *MessageV1) string {
 	s := "=== CCIP Message V1 ===\n\n"
-	s += "Protocol Header:\n"
 	s += fmt.Sprintf("  Version:               %d\n", msg.Version)
 	s += fmt.Sprintf("  Source Chain Selector: %d (0x%x)\n", msg.SourceChainSelector, msg.SourceChainSelector)
 	s += fmt.Sprintf("  Dest Chain Selector:   %d (0x%x)\n", msg.DestChainSelector, msg.DestChainSelector)
@@ -329,11 +328,10 @@ func PrettyPrintMessage(msg *MessageV1) string {
 	s += fmt.Sprintf("  OnRamp Address:        %s\n", formatAddress(msg.OnRampAddress))
 	s += fmt.Sprintf("  OffRamp Address:       %s\n", formatAddress(msg.OffRampAddress))
 	s += "\n"
-
-	s += "User Controlled Data:\n"
 	s += fmt.Sprintf("  Sender:                %s\n", formatAddress(msg.Sender))
 	s += fmt.Sprintf("  Receiver:              %s\n", formatAddress(msg.Receiver))
 	s += fmt.Sprintf("  Dest Blob:             %s (%d bytes)\n", formatHex(msg.DestBlob), len(msg.DestBlob))
+	s += fmt.Sprintf("  Data Payload:          %s (%d bytes)\n", formatHex(msg.Data), len(msg.Data))
 	s += "\n"
 
 	s += fmt.Sprintf("Token Transfers: %d\n", len(msg.TokenTransfers))
@@ -347,9 +345,7 @@ func PrettyPrintMessage(msg *MessageV1) string {
 		s += fmt.Sprintf("    Token Receiver:      %s\n", formatAddress(tt.TokenReceiver))
 		s += fmt.Sprintf("    Extra Data:          %s (%d bytes)\n", formatHex(tt.ExtraData), len(tt.ExtraData))
 	}
-	s += "\n"
 
-	s += fmt.Sprintf("Data Payload:          %s (%d bytes)\n", formatHex(msg.Data), len(msg.Data))
 	s += "\n"
 
 	return s

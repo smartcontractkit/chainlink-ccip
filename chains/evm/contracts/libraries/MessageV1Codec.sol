@@ -336,7 +336,8 @@ library MessageV1Codec {
     }
     if (message.data.length > type(uint16).max) revert InvalidDataLength(EncodingErrorLocation.ENCODE_DATA_LENGTH);
 
-    bytes memory partialEncoding = abi.encodePacked(
+    // We need to partially encode it in three parts to avoid stack too deep issues.
+    bytes memory part1 = abi.encodePacked(
       uint8(1), // version.
       message.sourceChainSelector,
       message.destChainSelector,
@@ -344,7 +345,10 @@ library MessageV1Codec {
       message.executionGasLimit,
       message.callbackGasLimit,
       message.finality,
-      message.ccvAndExecutorHash,
+      message.ccvAndExecutorHash
+    );
+
+    bytes memory part2 = abi.encodePacked(
       uint8(message.onRampAddress.length),
       message.onRampAddress,
       uint8(message.offRampAddress.length),
@@ -354,15 +358,15 @@ library MessageV1Codec {
     );
 
     // Encode token the transfer if present. We checked above that there is at most 1 token transfer.
-    // We define it below the partial encoding to avoid "Stack too deep" errors.
+    // We define it below the partial encoding to avoid stack too deep errors.
     bytes memory encodedTokenTransfers;
     if (message.tokenTransfer.length > 0) {
       encodedTokenTransfers = _encodeTokenTransferV1(message.tokenTransfer[0]);
     }
 
-    // Encoding has to be split into groups to avoid "Stack too deep" errors.
-    return bytes.concat(
-      partialEncoding,
+    return abi.encodePacked(
+      part1,
+      part2,
       abi.encodePacked(
         uint8(message.receiver.length),
         message.receiver,
@@ -389,7 +393,6 @@ library MessageV1Codec {
       uint8 version = uint8(encoded[0]);
       if (version != 1) revert InvalidEncodingVersion(version);
 
-      // Protocol Header.
       // sourceChainSelector (8 bytes, big endian).
       message.sourceChainSelector = uint64(bytes8(encoded[1:9]));
 

@@ -383,7 +383,7 @@ library ExtraArgsCodec {
     assembly {
       ptr := add(encoded, 32) // Skip length prefix.
 
-      // Write tag (4 bytes).
+      // Write tag (4 bytes, bytes are left aligned).
       mstore(ptr, GENERIC_EXTRA_ARGS_V3_TAG)
       ptr := add(ptr, 4)
 
