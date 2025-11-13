@@ -27,6 +27,15 @@ func applyDeployCREATE2Factory(e cldf_deployment.Environment, cfg DeployCREATE2F
 		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain with selector %d not found in environment", cfg.ChainSel)
 	}
 
+	// Require that the nonce of the deployer key is 0
+	nonce, err := evmChain.Client.PendingNonceAt(e.GetContext(), evmChain.DeployerKey.From)
+	if err != nil {
+		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to get nonce of deployer key: %w", err)
+	}
+	if nonce != 0 {
+		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("nonce of the deployer key must be 0, got %d", nonce)
+	}
+
 	deployReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		ChainSelector:  cfg.ChainSel,
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),

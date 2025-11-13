@@ -72,20 +72,7 @@ var CreateAndTransferOwnership = contract.NewWrite(contract.WriteParams[CreateAn
 		if err != nil {
 			return nil, fmt.Errorf("failed to make creation code: %w", err)
 		}
-		calls := make([][]byte, 0)
-		// We use the CREATE2Factory ABI to construct the transferOwnership call because we conveniently have access to it here.
-		// Any other contract that implements IOwnable will be compatible with this operation.
-		parsedABI, err := create2_factory.CREATE2FactoryMetaData.GetAbi()
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse ABI: %w", err)
-		}
-		transferOwnershipCall, err := parsedABI.Pack("transferOwnership", input.To)
-		if err != nil {
-			return nil, fmt.Errorf("failed to pack transferOwnership call: %w", err)
-		}
-		calls = append(calls, transferOwnershipCall)
-
-		return contract.CreateAndCall(opts, creationCode, hashSalt(input.Salt), calls)
+		return contract.CreateAndTransferOwnership(opts, creationCode, hashSalt(input.Salt), input.To)
 	},
 })
 

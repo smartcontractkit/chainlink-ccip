@@ -66,7 +66,7 @@ func TestDeployCREATE2Factory_Apply(t *testing.T) {
 	}
 }
 
-func TestDeployCREATE2Factory_Idempotency(t *testing.T) {
+func TestDeployCREATE2Factory_NonceNotZero(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 
 	e, err := environment.New(t.Context(),
@@ -93,19 +93,13 @@ func TestDeployCREATE2Factory_Idempotency(t *testing.T) {
 	// Update environment with the deployed contract
 	e.DataStore = out1.DataStore.Seal()
 
-	// Second deployment (should use existing)
-	out2, err := create2_factory.DeployCREATE2Factory.Apply(*e, create2_factory.DeployCREATE2FactoryCfg{
+	// Second deployment (should fail because nonce is not 0)
+	_, err = create2_factory.DeployCREATE2Factory.Apply(*e, create2_factory.DeployCREATE2FactoryCfg{
 		ChainSel:  chainSel,
 		AllowList: allowList,
 	})
-	require.NoError(t, err, "Failed to apply DeployCREATE2Factory changeset (second time)")
-
-	addrs2, err := out2.DataStore.Addresses().Fetch()
-	require.NoError(t, err, "Failed to fetch addresses from datastore")
-	require.Len(t, addrs2, 1, "Should still have one contract")
-
-	// Verify addresses are the same (idempotency)
-	require.Equal(t, addrs1[0].Address, addrs2[0].Address, "Contract address should be the same on repeated deployment")
+	require.Error(t, err, "Should fail when deploying with nonce not 0")
+	require.ErrorContains(t, err, "nonce of the deployer key must be 0, got 1", "Error should mention nonce is not 0")
 }
 
 func TestDeployCREATE2Factory_InvalidChain(t *testing.T) {

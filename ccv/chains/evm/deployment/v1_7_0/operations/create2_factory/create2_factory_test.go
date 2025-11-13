@@ -95,6 +95,7 @@ func TestCREATE2Factory(t *testing.T) {
 	err = sendFunds(t.Context(), evmChains[chain2Sel], desiredDeployerKey.From, 50)
 	require.NoError(t, err, "Failed to send funds to chain2")
 	chain2 := evmChains[chain2Sel]
+	prevChain2DeployerKey := chain2.DeployerKey
 	chain2.DeployerKey = desiredDeployerKey
 	evmChains[chain2Sel] = chain2
 	// Ensure that the deployer key is funded on chain2
@@ -111,7 +112,7 @@ func TestCREATE2Factory(t *testing.T) {
 			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 			ChainSelector:  chain2Sel,
 			Args: create2_factory.ConstructorArgs{
-				AllowList: []common.Address{evmChains[chain2Sel].DeployerKey.From},
+				AllowList: []common.Address{prevChain2DeployerKey.From},
 			},
 		},
 	)
@@ -119,8 +120,14 @@ func TestCREATE2Factory(t *testing.T) {
 
 	// Ensure that the factories addresses are the same on each chain
 	require.Equal(t, factory1Report.Output.Address, factory2Report.Output.Address, "Factory addresses should be the same")
+	// Once confirmed, switch the deployer key on chain2 back to the original deployer key
+	// This will allow us to confirm that the sender address no longer factors into the address computation
+	chain2.DeployerKey = prevChain2DeployerKey
+	evmChains[chain2Sel] = chain2
+	require.NotEqual(t, evmChains[chain2Sel].DeployerKey.From, evmChains[chain1Sel].DeployerKey.From, "Deployer key on chain2 should be different from chain1")
 
-	// Now, increment the nonce of the deployer key on chain2 by sending funds to another address
+	// Now, increment the nonce of the deployer key on chain2 by sending funds to another address.
+	// This further increases the difference between the signers on chains 1 and 2.
 	err = sendFunds(t.Context(), chain2, evmChains[chain1Sel].DeployerKey.From, 1)
 	require.NoError(t, err, "Failed to send funds to random address")
 
