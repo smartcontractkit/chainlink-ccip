@@ -1,6 +1,7 @@
 package changesets
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -10,8 +11,9 @@ import (
 )
 
 type DeployCommitteeVerifierCfg struct {
-	ChainSel uint64
-	Params   sequences.CommitteeVerifierParams
+	ChainSel        uint64
+	CREATE2Factory common.Address
+	Params          sequences.CommitteeVerifierParams
 }
 
 func (c DeployCommitteeVerifierCfg) ChainSelector() uint64 {
@@ -30,6 +32,7 @@ var DeployCommitteeVerifier = changesets.NewFromOnChainSequence(changesets.NewFr
 			ChainSelector:     cfg.ChainSel,
 			ExistingAddresses: addresses,
 			Params:            cfg.Params,
+			CREATE2Factory:   cfg.CREATE2Factory,
 		}, nil
 	},
 	ResolveDep: evm_sequences.ResolveEVMChainDep[DeployCommitteeVerifierCfg],

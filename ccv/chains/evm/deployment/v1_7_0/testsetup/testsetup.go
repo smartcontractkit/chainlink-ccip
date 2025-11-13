@@ -61,7 +61,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 		OffRamp: sequences.OffRampParams{
 			Version: semver.MustParse("1.7.0"),
 		},
-		CommitteeVerifier: []sequences.CommitteeVerifierParams{
+		CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 			{
 				Version:       semver.MustParse("1.7.0"),
 				FeeAggregator: common.HexToAddress("0x01"),

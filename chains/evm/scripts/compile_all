@@ -65,6 +65,7 @@ function getOptimizations() {
 
 
 compileContract Proxy
+compileContract CREATE2Factory
 compileContract ccvs/CommitteeVerifier
 compileContract ccvs/VersionedVerifierResolver
 compileContract onRamp/OnRamp
