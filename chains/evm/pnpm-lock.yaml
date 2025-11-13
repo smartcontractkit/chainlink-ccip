@@ -12,11 +12,8 @@ importers:
   .:
     dependencies:
       '@chainlink/contracts':
-        specifier: ^1.5.0
+        specifier: 1.5.0
         version: 1.5.0(ethers@5.8.0)
-      '@chainlink/contracts-ccip':
-        specifier: ^1.6.3
-        version: 1.6.3(ethers@5.8.0)
       '@changesets/cli':
         specifier: ^2.29.7
         version: 2.29.7
@@ -56,10 +53,6 @@ packages:
   '@babel/runtime@7.27.0':
     resolution: {integrity: sha512-VtPOkrdPHZsKc/clNqyi9WUA8TINkZ4cGk63UUE3u4pmB2k+ZMQRDuIOagv8UVd6j7k0T3+RRIb7beKTebNbcw==}
     engines: {node: '>=6.9.0'}
-
-  '@chainlink/contracts-ccip@1.6.3':
-    resolution: {integrity: sha512-O5YPQ0u7kR+fqvYNOYMNdRc0ISFyX2a8GH8F21yxCu+xgN4/ukxjfHQSKZfLf5YyE6efUPDcqyXBqF9pkWOCUA==}
-    engines: {node: '>=20', pnpm: '>=10'}
 
   '@chainlink/contracts@1.5.0':
     resolution: {integrity: sha512-1fGJwjvivqAxvVOTqZUEXGR54CATtg0vjcXgSIk4Cfoad2nUhSG/qaWHXjLg1CkNTeOoteoxGQcpP/HiA5HsUA==}
@@ -1203,22 +1196,6 @@ snapshots:
   '@babel/runtime@7.27.0':
     dependencies:
       regenerator-runtime: 0.14.1
-
-  '@chainlink/contracts-ccip@1.6.3(ethers@5.8.0)':
-    dependencies:
-      '@chainlink/contracts': 1.5.0(ethers@5.8.0)
-      '@changesets/cli': 2.29.7
-      '@changesets/get-github-info': 0.6.0
-      '@openzeppelin/contracts-4.8.3': '@openzeppelin/contracts@4.8.3'
-      '@openzeppelin/contracts-5.0.2': '@openzeppelin/contracts@5.0.2'
-      semver: 7.7.2
-    transitivePeerDependencies:
-      - '@types/node'
-      - bufferutil
-      - encoding
-      - ethers
-      - supports-color
-      - utf-8-validate
 
   '@chainlink/contracts@1.5.0(ethers@5.8.0)':
     dependencies:
