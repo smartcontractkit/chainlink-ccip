@@ -53,6 +53,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, env, "Environment should be created")
+	env.DataStore = dstr.Seal() // Add preloaded contracts to env datastore
 	DeployMCMS(t, env, chainsel.SOLANA_MAINNET.Selector)
 	SolanaTransferOwnership(t, env, chainsel.SOLANA_MAINNET.Selector)
 	ds := datastore.NewMemoryDataStore()
