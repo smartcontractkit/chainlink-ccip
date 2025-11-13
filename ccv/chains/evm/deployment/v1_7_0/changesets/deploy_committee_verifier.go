@@ -12,7 +12,7 @@ import (
 
 type DeployCommitteeVerifierCfg struct {
 	ChainSel        uint64
-	ContractFactory common.Address
+	CREATE2Factory common.Address
 	Params          sequences.CommitteeVerifierParams
 }
 
@@ -32,7 +32,7 @@ var DeployCommitteeVerifier = changesets.NewFromOnChainSequence(changesets.NewFr
 			ChainSelector:     cfg.ChainSel,
 			ExistingAddresses: addresses,
 			Params:            cfg.Params,
-			ContractFactory:   cfg.ContractFactory,
+			CREATE2Factory:   cfg.CREATE2Factory,
 		}, nil
 	},
 	ResolveDep: evm_sequences.ResolveEVMChainDep[DeployCommitteeVerifierCfg],

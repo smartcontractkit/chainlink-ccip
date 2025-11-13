@@ -91,7 +91,7 @@ type ContractParams struct {
 
 type DeployChainContractsInput struct {
 	ChainSelector     uint64 // Only exists to differentiate sequence runs on different chains
-	ContractFactory   common.Address
+	CREATE2Factory   common.Address
 	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
 }
@@ -295,7 +295,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifiers {
 			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
-				ContractFactory:   input.ContractFactory,
+				CREATE2Factory:   input.CREATE2Factory,
 				ExistingAddresses: input.ExistingAddresses,
 				Params:            committeeVerifierParams,
 			})

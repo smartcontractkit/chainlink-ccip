@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/contract_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 
@@ -59,7 +59,7 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployCommitteeVerifierCfg{
 					ChainSel:        5009297550715157269,
-					ContractFactory: common.HexToAddress("0x01"),
+					CREATE2Factory: common.HexToAddress("0x01"),
 					Params:          basicDeployCommitteeVerifierParams(),
 				},
 			},
@@ -91,14 +91,14 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 		Version:       semver.MustParse("1.7.0"),
 		Address:       common.HexToAddress("0x01").Hex(),
 	}
-	contractFactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, contract_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract.DeployInput[contract_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 		ChainSelector:  5009297550715157269,
-		Args: contract_factory.ConstructorArgs{
+		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[5009297550715157269].DeployerKey.From},
 		},
 	}, nil)
-	require.NoError(t, err, "Failed to deploy ContractFactory")
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
 	// Ensure environment has an initial (empty) datastore
 	ds := datastore.NewMemoryDataStore()
@@ -115,7 +115,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
 			ChainSel:        5009297550715157269,
-			ContractFactory: common.HexToAddress(contractFactoryRef.Address),
+			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 			Params:          paramsAlpha,
 		},
 	})
@@ -154,7 +154,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
 			ChainSel:        5009297550715157269,
-			ContractFactory: common.HexToAddress(contractFactoryRef.Address),
+			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 			Params:          paramsBeta,
 		},
 	})
@@ -189,7 +189,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
 			ChainSel:        5009297550715157269,
-			ContractFactory: common.HexToAddress(contractFactoryRef.Address),
+			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 			Params:          paramsAlpha, // same qualifier as first run
 		},
 	})

@@ -9,7 +9,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.16.5
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251106173718-055b9debf177
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20251111214836-57e9908d74a9
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20251113013342-3d275dc8b861
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20251106173718-055b9debf177
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20251106173718-055b9debf177
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250929154511-1f5fbda7ae76

@@ -1,17 +1,17 @@
-package contract_factory_test
+package create2_factory_test
 
 import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets/contract_factory"
-	contract_factory_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/contract_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets/create2_factory"
+	create2_factory_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeployContractFactory_Apply(t *testing.T) {
+func TestDeployCREATE2Factory_Apply(t *testing.T) {
 	tests := []struct {
 		desc      string
 		chainSel  uint64
@@ -47,11 +47,11 @@ func TestDeployContractFactory_Apply(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			// Apply the changeset
-			out, err := contract_factory.DeployContractFactory.Apply(*e, contract_factory.DeployContractFactoryCfg{
+			out, err := create2_factory.DeployCREATE2Factory.Apply(*e, create2_factory.DeployCREATE2FactoryCfg{
 				ChainSel:  test.chainSel,
 				AllowList: test.allowList,
 			})
-			require.NoError(t, err, "Failed to apply DeployContractFactory changeset")
+			require.NoError(t, err, "Failed to apply DeployCREATE2Factory changeset")
 			require.NotNil(t, out.DataStore, "DataStore should be returned")
 			require.Len(t, out.Reports, 1, "Should have one report")
 
@@ -59,14 +59,14 @@ func TestDeployContractFactory_Apply(t *testing.T) {
 			addrs, err := out.DataStore.Addresses().Fetch()
 			require.NoError(t, err, "Failed to fetch addresses from datastore")
 			require.Len(t, addrs, 1, "Should have deployed one contract")
-			require.Equal(t, datastore.ContractType(contract_factory_ops.ContractType), addrs[0].Type, "Contract type should match")
+			require.Equal(t, datastore.ContractType(create2_factory_ops.ContractType), addrs[0].Type, "Contract type should match")
 			require.Equal(t, test.chainSel, addrs[0].ChainSelector, "Chain selector should match")
 			require.NotEmpty(t, addrs[0].Address, "Address should not be empty")
 		})
 	}
 }
 
-func TestDeployContractFactory_Idempotency(t *testing.T) {
+func TestDeployCREATE2Factory_Idempotency(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 
 	e, err := environment.New(t.Context(),
@@ -80,11 +80,11 @@ func TestDeployContractFactory_Idempotency(t *testing.T) {
 	}
 
 	// First deployment
-	out1, err := contract_factory.DeployContractFactory.Apply(*e, contract_factory.DeployContractFactoryCfg{
+	out1, err := create2_factory.DeployCREATE2Factory.Apply(*e, create2_factory.DeployCREATE2FactoryCfg{
 		ChainSel:  chainSel,
 		AllowList: allowList,
 	})
-	require.NoError(t, err, "Failed to apply DeployContractFactory changeset (first time)")
+	require.NoError(t, err, "Failed to apply DeployCREATE2Factory changeset (first time)")
 
 	addrs1, err := out1.DataStore.Addresses().Fetch()
 	require.NoError(t, err, "Failed to fetch addresses from datastore")
@@ -94,11 +94,11 @@ func TestDeployContractFactory_Idempotency(t *testing.T) {
 	e.DataStore = out1.DataStore.Seal()
 
 	// Second deployment (should use existing)
-	out2, err := contract_factory.DeployContractFactory.Apply(*e, contract_factory.DeployContractFactoryCfg{
+	out2, err := create2_factory.DeployCREATE2Factory.Apply(*e, create2_factory.DeployCREATE2FactoryCfg{
 		ChainSel:  chainSel,
 		AllowList: allowList,
 	})
-	require.NoError(t, err, "Failed to apply DeployContractFactory changeset (second time)")
+	require.NoError(t, err, "Failed to apply DeployCREATE2Factory changeset (second time)")
 
 	addrs2, err := out2.DataStore.Addresses().Fetch()
 	require.NoError(t, err, "Failed to fetch addresses from datastore")
@@ -108,7 +108,7 @@ func TestDeployContractFactory_Idempotency(t *testing.T) {
 	require.Equal(t, addrs1[0].Address, addrs2[0].Address, "Contract address should be the same on repeated deployment")
 }
 
-func TestDeployContractFactory_InvalidChain(t *testing.T) {
+func TestDeployCREATE2Factory_InvalidChain(t *testing.T) {
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{5009297550715157269}),
 	)
@@ -116,7 +116,7 @@ func TestDeployContractFactory_InvalidChain(t *testing.T) {
 	require.NotNil(t, e, "Environment should be created")
 
 	// Try to deploy on a chain that doesn't exist
-	_, err = contract_factory.DeployContractFactory.Apply(*e, contract_factory.DeployContractFactoryCfg{
+	_, err = create2_factory.DeployCREATE2Factory.Apply(*e, create2_factory.DeployCREATE2FactoryCfg{
 		ChainSel:  99999999,
 		AllowList: []common.Address{},
 	})

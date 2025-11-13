@@ -6,7 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/contract_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -56,14 +56,14 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 			e.DataStore = datastore.NewMemoryDataStore().Seal()
 
-			contractFactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, contract_factory.Deploy, e.BlockChains.EVMChains()[chainSelector], contract.DeployInput[contract_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
+			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSelector], contract.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 				ChainSelector:  chainSelector,
-				Args: contract_factory.ConstructorArgs{
+				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSelector].DeployerKey.From},
 				},
 			}, nil)
-			require.NoError(t, err, "Failed to deploy ContractFactory")
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
 			params := basicParams()
 			params.Qualifier = "alpha"
@@ -73,7 +73,7 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 				sequences.DeployCommitteeVerifier,
 				e.BlockChains.EVMChains()[chainSelector],
 				sequences.DeployCommitteeVerifierInput{
-					ContractFactory:   common.HexToAddress(contractFactoryRef.Address),
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 					ChainSelector:     chainSelector,
 					ExistingAddresses: test.existingAddresses,
 					Params:            params,
@@ -120,14 +120,14 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 	require.NoError(t, err, "Failed to create environment")
 	require.NotNil(t, e, "Environment should be created")
 
-	contractFactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, contract_factory.Deploy, e.BlockChains.EVMChains()[chainSelector], contract.DeployInput[contract_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSelector], contract.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 		ChainSelector:  chainSelector,
-		Args: contract_factory.ConstructorArgs{
+		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSelector].DeployerKey.From},
 		},
 	}, nil)
-	require.NoError(t, err, "Failed to deploy ContractFactory")
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
 	params := basicParams()
 	params.Qualifier = "alpha"
@@ -138,7 +138,7 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSelector],
 		sequences.DeployCommitteeVerifierInput{
-			ContractFactory: common.HexToAddress(contractFactoryRef.Address),
+			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 			ChainSelector:   chainSelector,
 			Params:          params,
 		},
@@ -151,7 +151,7 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSelector],
 		sequences.DeployCommitteeVerifierInput{
-			ContractFactory:   common.HexToAddress(contractFactoryRef.Address),
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			ChainSelector:     chainSelector,
 			ExistingAddresses: deployReport.Output.Addresses,
 			Params:            params,
@@ -203,19 +203,19 @@ func TestDeployCommitteeVerifier_MultipleDeployments(t *testing.T) {
 
 		var allReports []operations.SequenceReport[sequences.DeployCommitteeVerifierInput, seq_core.OnChainOutput]
 		for _, evmChain := range evmChains {
-			contractFactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, contract_factory.Deploy, evmChain, contract.DeployInput[contract_factory.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
+			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 				ChainSelector:  evmChain.Selector,
-				Args: contract_factory.ConstructorArgs{
+				Args: create2_factory.ConstructorArgs{
 					AllowList: []common.Address{evmChain.DeployerKey.From},
 				},
 			}, nil)
-			require.NoError(t, err, "Failed to deploy ContractFactory")
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
 			params := basicParams()
 			params.Qualifier = "alpha"
 			input := sequences.DeployCommitteeVerifierInput{
-				ContractFactory:   common.HexToAddress(contractFactoryRef.Address),
+				CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 				ChainSelector:     evmChain.Selector,
 				ExistingAddresses: nil,
 				Params:            params,
@@ -256,19 +256,19 @@ func TestDeployCommitteeVerifier_MultipleDeployments(t *testing.T) {
 			go func(chainSel uint64) {
 				evmChain := evmChains[chainSel]
 
-				contractFactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, contract_factory.Deploy, evmChain, contract.DeployInput[contract_factory.ConstructorArgs]{
-					TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
+				create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
+					TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 					ChainSelector:  evmChain.Selector,
-					Args: contract_factory.ConstructorArgs{
+					Args: create2_factory.ConstructorArgs{
 						AllowList: []common.Address{evmChain.DeployerKey.From},
 					},
 				}, nil)
-				require.NoError(t, err, "Failed to deploy ContractFactory")
+				require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
 				params := basicParams()
 				params.Qualifier = "alpha"
 				input := sequences.DeployCommitteeVerifierInput{
-					ContractFactory:   common.HexToAddress(contractFactoryRef.Address),
+					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 					ChainSelector:     chainSel,
 					ExistingAddresses: nil,
 					Params:            params,
@@ -304,14 +304,14 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 
 	// First run with qualifier "alpha"
-	contractFactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, contract_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[contract_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 		ChainSelector:  chainSel,
-		Args: contract_factory.ConstructorArgs{
+		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 		},
 	}, nil)
-	require.NoError(t, err, "Failed to deploy ContractFactory")
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
 	paramsAlpha := basicParams()
 	paramsAlpha.Qualifier = "alpha"
@@ -320,7 +320,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployCommitteeVerifierInput{
-			ContractFactory:   common.HexToAddress(contractFactoryRef.Address),
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			ChainSelector:     chainSel,
 			ExistingAddresses: nil,
 			Params:            paramsAlpha,
@@ -353,7 +353,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployCommitteeVerifierInput{
-			ContractFactory:   common.HexToAddress(contractFactoryRef.Address),
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			ChainSelector:     chainSel,
 			ExistingAddresses: addrs1,
 			Params:            paramsBeta,
@@ -379,7 +379,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployCommitteeVerifierInput{
-			ContractFactory:   common.HexToAddress(contractFactoryRef.Address),
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			ChainSelector:     chainSel,
 			ExistingAddresses: append(addrs1, addrs2...),
 			Params:            paramsAlpha,

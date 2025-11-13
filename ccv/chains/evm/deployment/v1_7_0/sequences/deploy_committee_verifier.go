@@ -6,7 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/contract_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
 	proxy_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -34,7 +34,7 @@ type CommitteeVerifierParams struct {
 type DeployCommitteeVerifierInput struct {
 	ChainSelector     uint64
 	ExistingAddresses []datastore.AddressRef
-	ContractFactory   common.Address
+	CREATE2Factory   common.Address
 	Params            CommitteeVerifierParams
 }
 
@@ -91,8 +91,8 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, committeeVerifierResolverRef)
 
-		if input.ContractFactory != (common.Address{}) {
-			// Deployment flow via ContractFactory
+		if input.CREATE2Factory != (common.Address{}) {
+			// Deployment flow via CREATE2Factory
 			// First, check if the CommitteeVerifierResolverProxy already exists.
 			var resolverProxyRef *datastore.AddressRef
 			for _, ref := range input.ExistingAddresses {
@@ -105,12 +105,12 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			if resolverProxyRef != nil {
 				addresses = append(addresses, *resolverProxyRef)
 			} else {
-				// Deploy CommitteeVerifierResolverProxy via ContractFactory to ensure deterministic addresses.
+				// Deploy CommitteeVerifierResolverProxy via CREATE2Factory to ensure deterministic addresses.
 				// Fetch and save the expected address of the CommitteeVerifierResolverProxy.
-				expectedAddressReport, err := cldf_ops.ExecuteOperation(b, contract_factory.ComputeAddress, chain, contract.FunctionInput[contract_factory.ComputeAddressArgs]{
-					Address:       input.ContractFactory,
+				expectedAddressReport, err := cldf_ops.ExecuteOperation(b, create2_factory.ComputeAddress, chain, contract.FunctionInput[create2_factory.ComputeAddressArgs]{
+					Address:       input.CREATE2Factory,
 					ChainSelector: chain.Selector,
-					Args: contract_factory.ComputeAddressArgs{
+					Args: create2_factory.ComputeAddressArgs{
 						ABI:             proxy_latest.ProxyMetaData.ABI,
 						Bin:             proxy_latest.ProxyMetaData.Bin,
 						ConstructorArgs: []any{common.HexToAddress(committeeVerifierResolverRef.Address)},
@@ -128,11 +128,11 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 					Version:       semver.MustParse("1.7.0"),
 				})
 				// Then, actually deploy and transfer ownership of the CommitteeVerifierResolverProxy to the deployer key.
-				deployAndTransferResolverProxyReport, err := cldf_ops.ExecuteOperation(b, contract_factory.CreateAndTransferOwnership, chain, contract.FunctionInput[contract_factory.CreateAndTransferOwnershipArgs]{
+				deployAndTransferResolverProxyReport, err := cldf_ops.ExecuteOperation(b, create2_factory.CreateAndTransferOwnership, chain, contract.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
 					ChainSelector: chain.Selector,
-					Address:       input.ContractFactory,
-					Args: contract_factory.CreateAndTransferOwnershipArgs{
-						ComputeAddressArgs: contract_factory.ComputeAddressArgs{
+					Address:       input.CREATE2Factory,
+					Args: create2_factory.CreateAndTransferOwnershipArgs{
+						ComputeAddressArgs: create2_factory.ComputeAddressArgs{
 							ABI:             proxy_latest.ProxyMetaData.ABI,
 							Bin:             proxy_latest.ProxyMetaData.Bin,
 							ConstructorArgs: []any{common.HexToAddress(committeeVerifierResolverRef.Address)},

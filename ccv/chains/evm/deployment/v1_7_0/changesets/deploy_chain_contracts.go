@@ -12,7 +12,7 @@ import (
 
 type DeployChainContractsCfg struct {
 	ChainSel        uint64
-	ContractFactory common.Address
+	CREATE2Factory common.Address
 	Params          sequences.ContractParams
 }
 
@@ -29,7 +29,7 @@ var DeployChainContracts = changesets.NewFromOnChainSequence(changesets.NewFromO
 	ResolveInput: func(e cldf_deployment.Environment, cfg DeployChainContractsCfg) (sequences.DeployChainContractsInput, error) {
 		addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(cfg.ChainSel))
 		return sequences.DeployChainContractsInput{
-			ContractFactory:   cfg.ContractFactory,
+			CREATE2Factory:   cfg.CREATE2Factory,
 			ChainSelector:     cfg.ChainSel,
 			ExistingAddresses: addresses,
 			ContractParams:    cfg.Params,

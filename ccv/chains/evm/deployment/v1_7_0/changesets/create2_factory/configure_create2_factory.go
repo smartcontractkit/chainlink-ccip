@@ -1,11 +1,11 @@
-package contract_factory
+package create2_factory
 
 import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/contract_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
@@ -20,54 +20,54 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-type ConfigureContractFactoryInput[CONTRACT any] struct {
+type ConfigureCREATE2FactoryInput[CONTRACT any] struct {
 	ChainSel         uint64
-	ContractFactory  CONTRACT
+	CREATE2Factory  CONTRACT
 	AllowListAdds    []common.Address
 	AllowListRemoves []common.Address
 }
 
-func (c ConfigureContractFactoryInput[CONTRACT]) ChainSelector() uint64 {
+func (c ConfigureCREATE2FactoryInput[CONTRACT]) ChainSelector() uint64 {
 	return c.ChainSel
 }
 
-var ConfigureContractFactory = changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[
-	ConfigureContractFactoryInput[common.Address],
+var ConfigureCREATE2Factory = changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[
+	ConfigureCREATE2FactoryInput[common.Address],
 	evm.Chain,
-	ConfigureContractFactoryInput[datastore.AddressRef],
+	ConfigureCREATE2FactoryInput[datastore.AddressRef],
 ]{
-	Sequence: configureContractFactory,
-	ResolveInput: func(e cldf_deployment.Environment, cfg ConfigureContractFactoryInput[datastore.AddressRef]) (ConfigureContractFactoryInput[common.Address], error) {
-		contractFactoryAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, cfg.ContractFactory, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+	Sequence: configureCREATE2Factory,
+	ResolveInput: func(e cldf_deployment.Environment, cfg ConfigureCREATE2FactoryInput[datastore.AddressRef]) (ConfigureCREATE2FactoryInput[common.Address], error) {
+		create2FactoryAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, cfg.CREATE2Factory, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
-			return ConfigureContractFactoryInput[common.Address]{}, fmt.Errorf("failed to find contract factory: %w", err)
+			return ConfigureCREATE2FactoryInput[common.Address]{}, fmt.Errorf("failed to find create2 factory: %w", err)
 		}
-		return ConfigureContractFactoryInput[common.Address]{
+		return ConfigureCREATE2FactoryInput[common.Address]{
 			ChainSel:         cfg.ChainSel,
-			ContractFactory:  contractFactoryAddress,
+			CREATE2Factory:  create2FactoryAddress,
 			AllowListAdds:    cfg.AllowListAdds,
 			AllowListRemoves: cfg.AllowListRemoves,
 		}, nil
 	},
-	ResolveDep: evm_sequences.ResolveEVMChainDep[ConfigureContractFactoryInput[datastore.AddressRef]],
+	ResolveDep: evm_sequences.ResolveEVMChainDep[ConfigureCREATE2FactoryInput[datastore.AddressRef]],
 })
 
-var configureContractFactory = cldf_ops.NewSequence(
-	"configure-contract-factory",
+var configureCREATE2Factory = cldf_ops.NewSequence(
+	"configure-create2-factory",
 	semver.MustParse("1.7.0"),
-	"Configures the ContractFactory contract",
-	func(b operations.Bundle, chain evm.Chain, input ConfigureContractFactoryInput[common.Address]) (output sequences.OnChainOutput, err error) {
+	"Configures the CREATE2Factory contract",
+	func(b operations.Bundle, chain evm.Chain, input ConfigureCREATE2FactoryInput[common.Address]) (output sequences.OnChainOutput, err error) {
 		writes := make([]contract.WriteOutput, 0)
-		configureReport, err := cldf_ops.ExecuteOperation(b, contract_factory.ApplyAllowListUpdates, chain, contract.FunctionInput[contract_factory.ApplyAllowListUpdatesArgs]{
+		configureReport, err := cldf_ops.ExecuteOperation(b, create2_factory.ApplyAllowListUpdates, chain, contract.FunctionInput[create2_factory.ApplyAllowListUpdatesArgs]{
 			ChainSelector: chain.Selector,
-			Address:       input.ContractFactory,
-			Args: contract_factory.ApplyAllowListUpdatesArgs{
+			Address:       input.CREATE2Factory,
+			Args: create2_factory.ApplyAllowListUpdatesArgs{
 				Adds:    input.AllowListAdds,
 				Removes: input.AllowListRemoves,
 			},
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure ContractFactory: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure CREATE2Factory: %w", err)
 		}
 		writes = append(writes, configureReport.Output)
 

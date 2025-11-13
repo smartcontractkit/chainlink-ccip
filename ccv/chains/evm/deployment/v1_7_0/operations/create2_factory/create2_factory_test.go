@@ -1,4 +1,4 @@
-package contract_factory_test
+package create2_factory_test
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/contract_factory"
-	contract_factory_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/contract_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	create2_factory_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -62,7 +62,7 @@ func sendFunds(ctx context.Context, chain evm.Chain, to common.Address, percenta
 	return nil
 }
 
-func TestContractFactory(t *testing.T) {
+func TestCREATE2Factory(t *testing.T) {
 	chain1Sel := uint64(5009297550715157269)
 	chain2Sel := uint64(4949039107694359620)
 
@@ -74,20 +74,20 @@ func TestContractFactory(t *testing.T) {
 
 	evmChains := e.BlockChains.EVMChains()
 
-	// Deploy ContractFactory on chain1
+	// Deploy CREATE2Factory on chain1
 	factory1Report, err := cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
-		contract_factory.Deploy,
+		create2_factory.Deploy,
 		evmChains[chain1Sel],
-		contract.DeployInput[contract_factory.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
+		contract.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 			ChainSelector:  chain1Sel,
-			Args: contract_factory.ConstructorArgs{
+			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{evmChains[chain1Sel].DeployerKey.From},
 			},
 		},
 	)
-	require.NoError(t, err, "Failed to deploy ContractFactory on chain1")
+	require.NoError(t, err, "Failed to deploy CREATE2Factory on chain1")
 
 	// Adjust the deployer key on chain2 to be the same as chain1
 	// + fund the key on chain2
@@ -102,20 +102,20 @@ func TestContractFactory(t *testing.T) {
 	require.NoError(t, err, "Failed to get balance of deployer key on chain2")
 	require.Greater(t, balance.Int64(), int64(0), "Deployer key should be funded on chain2")
 
-	// Deploy ContractFactory on chain2
+	// Deploy CREATE2Factory on chain2
 	factory2Report, err := cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
-		contract_factory.Deploy,
+		create2_factory.Deploy,
 		evmChains[chain2Sel],
-		contract.DeployInput[contract_factory.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
+		contract.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 			ChainSelector:  chain2Sel,
-			Args: contract_factory.ConstructorArgs{
+			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{evmChains[chain2Sel].DeployerKey.From},
 			},
 		},
 	)
-	require.NoError(t, err, "Failed to deploy ContractFactory on chain2")
+	require.NoError(t, err, "Failed to deploy CREATE2Factory on chain2")
 
 	// Ensure that the factories addresses are the same on each chain
 	require.Equal(t, factory1Report.Output.Address, factory2Report.Output.Address, "Factory addresses should be the same")
@@ -135,15 +135,15 @@ func TestContractFactory(t *testing.T) {
 	// The resulting addresses should be the same
 	_, err = cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
-		contract_factory.CreateAndTransferOwnership,
+		create2_factory.CreateAndTransferOwnership,
 		evmChains[chain1Sel],
-		contract.FunctionInput[contract_factory.CreateAndTransferOwnershipArgs]{
+		contract.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
 			ChainSelector: chain1Sel,
 			Address:       common.HexToAddress(factory1Report.Output.Address),
-			Args: contract_factory.CreateAndTransferOwnershipArgs{
-				ComputeAddressArgs: contract_factory.ComputeAddressArgs{
-					ABI:             contract_factory_latest.ContractFactoryMetaData.ABI,
-					Bin:             contract_factory_latest.ContractFactoryBin,
+			Args: create2_factory.CreateAndTransferOwnershipArgs{
+				ComputeAddressArgs: create2_factory.ComputeAddressArgs{
+					ABI:             create2_factory_latest.CREATE2FactoryMetaData.ABI,
+					Bin:             create2_factory_latest.CREATE2FactoryBin,
 					ConstructorArgs: []any{[]common.Address{}},
 					Salt:            "salt",
 				},
@@ -152,13 +152,13 @@ func TestContractFactory(t *testing.T) {
 		})
 	require.NoError(t, err, "Failed to create and transfer ownership of contract on chain1")
 
-	_, err = cldf_ops.ExecuteOperation(e.OperationsBundle, contract_factory.CreateAndTransferOwnership, evmChains[chain2Sel], contract.FunctionInput[contract_factory.CreateAndTransferOwnershipArgs]{
+	_, err = cldf_ops.ExecuteOperation(e.OperationsBundle, create2_factory.CreateAndTransferOwnership, evmChains[chain2Sel], contract.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
 		ChainSelector: chain2Sel,
 		Address:       common.HexToAddress(factory2Report.Output.Address),
-		Args: contract_factory.CreateAndTransferOwnershipArgs{
-			ComputeAddressArgs: contract_factory.ComputeAddressArgs{
-				ABI:             contract_factory_latest.ContractFactoryMetaData.ABI,
-				Bin:             contract_factory_latest.ContractFactoryBin,
+		Args: create2_factory.CreateAndTransferOwnershipArgs{
+			ComputeAddressArgs: create2_factory.ComputeAddressArgs{
+				ABI:             create2_factory_latest.CREATE2FactoryMetaData.ABI,
+				Bin:             create2_factory_latest.CREATE2FactoryBin,
 				ConstructorArgs: []any{[]common.Address{}},
 				Salt:            "salt",
 			},
@@ -168,8 +168,8 @@ func TestContractFactory(t *testing.T) {
 
 	// Since factories should be at the same address, we should filter on both chains
 	// using that same factory address
-	boundFactory1, err := contract_factory_latest.NewContractFactory(common.HexToAddress(factory1Report.Output.Address), evmChains[chain1Sel].Client)
-	require.NoError(t, err, "Failed to bind ContractFactory on chain1")
+	boundFactory1, err := create2_factory_latest.NewCREATE2Factory(common.HexToAddress(factory1Report.Output.Address), evmChains[chain1Sel].Client)
+	require.NoError(t, err, "Failed to bind CREATE2Factory on chain1")
 
 	iter1, err := boundFactory1.FilterContractDeployed(nil, nil)
 	require.NoError(t, err, "Failed to filter ContractDeployed events on chain1")
@@ -179,8 +179,8 @@ func TestContractFactory(t *testing.T) {
 	}
 	iter1.Close()
 
-	boundFactory2, err := contract_factory_latest.NewContractFactory(common.HexToAddress(factory2Report.Output.Address), evmChains[chain2Sel].Client)
-	require.NoError(t, err, "Failed to bind ContractFactory on chain2")
+	boundFactory2, err := create2_factory_latest.NewCREATE2Factory(common.HexToAddress(factory2Report.Output.Address), evmChains[chain2Sel].Client)
+	require.NoError(t, err, "Failed to bind CREATE2Factory on chain2")
 
 	iter2, err := boundFactory2.FilterContractDeployed(nil, nil)
 	require.NoError(t, err, "Failed to filter ContractDeployed events on chain2")

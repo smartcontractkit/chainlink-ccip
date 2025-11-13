@@ -1,11 +1,11 @@
-package contract_factory
+package create2_factory
 
 import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/contract_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -14,33 +14,33 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var DeployContractFactory = cldf_deployment.CreateChangeSet(applyDeployContractFactory, verifyDeployContractFactory)
+var DeployCREATE2Factory = cldf_deployment.CreateChangeSet(applyDeployCREATE2Factory, verifyDeployCREATE2Factory)
 
-type DeployContractFactoryCfg struct {
+type DeployCREATE2FactoryCfg struct {
 	ChainSel  uint64
 	AllowList []common.Address
 }
 
-func applyDeployContractFactory(e cldf_deployment.Environment, cfg DeployContractFactoryCfg) (cldf_deployment.ChangesetOutput, error) {
+func applyDeployCREATE2Factory(e cldf_deployment.Environment, cfg DeployCREATE2FactoryCfg) (cldf_deployment.ChangesetOutput, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[cfg.ChainSel]
 	if !ok {
 		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain with selector %d not found in environment", cfg.ChainSel)
 	}
 
-	deployReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, contract_factory.Deploy, evmChain, contract.DeployInput[contract_factory.ConstructorArgs]{
+	deployReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, create2_factory.Deploy, evmChain, contract.DeployInput[create2_factory.ConstructorArgs]{
 		ChainSelector:  cfg.ChainSel,
-		TypeAndVersion: deployment.NewTypeAndVersion(contract_factory.ContractType, *semver.MustParse("1.7.0")),
-		Args: contract_factory.ConstructorArgs{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		Args: create2_factory.ConstructorArgs{
 			AllowList: cfg.AllowList,
 		},
 	})
 	if err != nil {
-		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy contract factory: %w", err)
+		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy create2 factory: %w", err)
 	}
 
 	ds := datastore.NewMemoryDataStore()
 	if err := ds.Addresses().Add(deployReport.Output); err != nil {
-		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to add contract factory address to datastore: %w", err)
+		return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to add create2 factory address to datastore: %w", err)
 	}
 
 	return cldf_deployment.ChangesetOutput{
@@ -49,6 +49,6 @@ func applyDeployContractFactory(e cldf_deployment.Environment, cfg DeployContrac
 	}, nil
 }
 
-func verifyDeployContractFactory(e cldf_deployment.Environment, cfg DeployContractFactoryCfg) error {
+func verifyDeployCREATE2Factory(e cldf_deployment.Environment, cfg DeployCREATE2FactoryCfg) error {
 	return nil
 }

@@ -1,12 +1,12 @@
-package contract_factory_test
+package create2_factory_test
 
 import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets/contract_factory"
-	contract_factory_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/contract_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets/create2_factory"
+	create2_factory_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfigureContractFactory_Apply(t *testing.T) {
+func TestConfigureCREATE2Factory_Apply(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 
 	e, err := environment.New(t.Context(),
@@ -28,20 +28,20 @@ func TestConfigureContractFactory_Apply(t *testing.T) {
 	chain := e.BlockChains.EVMChains()[chainSel]
 	initialAllowList := []common.Address{chain.DeployerKey.From}
 
-	// Deploy ContractFactory first
+	// Deploy CREATE2Factory first
 	deployReport, err := cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
-		contract_factory_ops.Deploy,
+		create2_factory_ops.Deploy,
 		chain,
-		contract.DeployInput[contract_factory_ops.ConstructorArgs]{
+		contract.DeployInput[create2_factory_ops.ConstructorArgs]{
 			ChainSelector:  chainSel,
-			TypeAndVersion: deployment.NewTypeAndVersion(contract_factory_ops.ContractType, *semver.MustParse("1.7.0")),
-			Args: contract_factory_ops.ConstructorArgs{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory_ops.ContractType, *semver.MustParse("1.7.0")),
+			Args: create2_factory_ops.ConstructorArgs{
 				AllowList: initialAllowList,
 			},
 		},
 	)
-	require.NoError(t, err, "Failed to deploy ContractFactory")
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
 	// Add the deployed contract to datastore
 	ds := datastore.NewMemoryDataStore()
@@ -88,25 +88,25 @@ func TestConfigureContractFactory_Apply(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			mcmsRegistry := changesets.NewMCMSReaderRegistry()
 			// Apply the configuration changeset
-			out, err := contract_factory.ConfigureContractFactory(mcmsRegistry).Apply(*e, changesets.WithMCMS[contract_factory.ConfigureContractFactoryInput[datastore.AddressRef]]{
-				Cfg: contract_factory.ConfigureContractFactoryInput[datastore.AddressRef]{
+			out, err := create2_factory.ConfigureCREATE2Factory(mcmsRegistry).Apply(*e, changesets.WithMCMS[create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]]{
+				Cfg: create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]{
 					ChainSel: chainSel,
-					ContractFactory: datastore.AddressRef{
+					CREATE2Factory: datastore.AddressRef{
 						ChainSelector: chainSel,
-						Type:          datastore.ContractType(contract_factory_ops.ContractType),
+						Type:          datastore.ContractType(create2_factory_ops.ContractType),
 						Version:       semver.MustParse("1.7.0"),
 					},
 					AllowListAdds:    test.allowListAdds,
 					AllowListRemoves: test.allowListRemoves,
 				}})
-			require.NoError(t, err, "Failed to apply ConfigureContractFactory changeset")
+			require.NoError(t, err, "Failed to apply ConfigureCREATE2Factory changeset")
 			require.NotNil(t, out.DataStore, "DataStore should be returned")
 			require.Len(t, out.Reports, 2, "Should have two reports, one for sequence and one for nested op")
 		})
 	}
 }
 
-func TestConfigureContractFactory_ContractNotFound(t *testing.T) {
+func TestConfigureCREATE2Factory_ContractNotFound(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 
 	e, err := environment.New(t.Context(),
@@ -117,12 +117,12 @@ func TestConfigureContractFactory_ContractNotFound(t *testing.T) {
 
 	// Try to configure a contract that doesn't exist
 	mcmsRegistry := changesets.NewMCMSReaderRegistry()
-	_, err = contract_factory.ConfigureContractFactory(mcmsRegistry).Apply(*e, changesets.WithMCMS[contract_factory.ConfigureContractFactoryInput[datastore.AddressRef]]{
-		Cfg: contract_factory.ConfigureContractFactoryInput[datastore.AddressRef]{
+	_, err = create2_factory.ConfigureCREATE2Factory(mcmsRegistry).Apply(*e, changesets.WithMCMS[create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]]{
+		Cfg: create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]{
 			ChainSel: chainSel,
-			ContractFactory: datastore.AddressRef{
+			CREATE2Factory: datastore.AddressRef{
 				ChainSelector: chainSel,
-				Type:          datastore.ContractType(contract_factory_ops.ContractType),
+				Type:          datastore.ContractType(create2_factory_ops.ContractType),
 				Version:       semver.MustParse("1.7.0"),
 			},
 			AllowListAdds: []common.Address{
@@ -132,7 +132,7 @@ func TestConfigureContractFactory_ContractNotFound(t *testing.T) {
 	require.Error(t, err, "Should fail when contract is not in datastore")
 }
 
-func TestConfigureContractFactory_InvalidChain(t *testing.T) {
+func TestConfigureCREATE2Factory_InvalidChain(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 
 	e, err := environment.New(t.Context(),
@@ -143,12 +143,12 @@ func TestConfigureContractFactory_InvalidChain(t *testing.T) {
 
 	// Try to configure on a chain that doesn't exist
 	mcmsRegistry := changesets.NewMCMSReaderRegistry()
-	_, err = contract_factory.ConfigureContractFactory(mcmsRegistry).Apply(*e, changesets.WithMCMS[contract_factory.ConfigureContractFactoryInput[datastore.AddressRef]]{
-		Cfg: contract_factory.ConfigureContractFactoryInput[datastore.AddressRef]{
+	_, err = create2_factory.ConfigureCREATE2Factory(mcmsRegistry).Apply(*e, changesets.WithMCMS[create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]]{
+		Cfg: create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]{
 			ChainSel: 99999999,
-			ContractFactory: datastore.AddressRef{
+			CREATE2Factory: datastore.AddressRef{
 				ChainSelector: 99999999,
-				Type:          datastore.ContractType(contract_factory_ops.ContractType),
+				Type:          datastore.ContractType(create2_factory_ops.ContractType),
 				Version:       semver.MustParse("1.7.0"),
 			},
 			AllowListAdds: []common.Address{
@@ -158,7 +158,7 @@ func TestConfigureContractFactory_InvalidChain(t *testing.T) {
 	require.Error(t, err, "Should fail when configuring on non-existent chain")
 }
 
-func TestConfigureContractFactory_EmptyUpdates(t *testing.T) {
+func TestConfigureCREATE2Factory_EmptyUpdates(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 
 	e, err := environment.New(t.Context(),
@@ -169,20 +169,20 @@ func TestConfigureContractFactory_EmptyUpdates(t *testing.T) {
 
 	chain := e.BlockChains.EVMChains()[chainSel]
 
-	// Deploy ContractFactory first
+	// Deploy CREATE2Factory first
 	deployReport, err := cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
-		contract_factory_ops.Deploy,
+		create2_factory_ops.Deploy,
 		chain,
-		contract.DeployInput[contract_factory_ops.ConstructorArgs]{
+		contract.DeployInput[create2_factory_ops.ConstructorArgs]{
 			ChainSelector:  chainSel,
-			TypeAndVersion: deployment.NewTypeAndVersion(contract_factory_ops.ContractType, *semver.MustParse("1.7.0")),
-			Args: contract_factory_ops.ConstructorArgs{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory_ops.ContractType, *semver.MustParse("1.7.0")),
+			Args: create2_factory_ops.ConstructorArgs{
 				AllowList: []common.Address{chain.DeployerKey.From},
 			},
 		},
 	)
-	require.NoError(t, err, "Failed to deploy ContractFactory")
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
 	// Add the deployed contract to datastore
 	ds := datastore.NewMemoryDataStore()
@@ -192,12 +192,12 @@ func TestConfigureContractFactory_EmptyUpdates(t *testing.T) {
 
 	// Apply configuration with empty adds and removes (should still work)
 	mcmsRegistry := changesets.NewMCMSReaderRegistry()
-	out, err := contract_factory.ConfigureContractFactory(mcmsRegistry).Apply(*e, changesets.WithMCMS[contract_factory.ConfigureContractFactoryInput[datastore.AddressRef]]{
-		Cfg: contract_factory.ConfigureContractFactoryInput[datastore.AddressRef]{
+	out, err := create2_factory.ConfigureCREATE2Factory(mcmsRegistry).Apply(*e, changesets.WithMCMS[create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]]{
+		Cfg: create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]{
 			ChainSel: chainSel,
-			ContractFactory: datastore.AddressRef{
+			CREATE2Factory: datastore.AddressRef{
 				ChainSelector: chainSel,
-				Type:          datastore.ContractType(contract_factory_ops.ContractType),
+				Type:          datastore.ContractType(create2_factory_ops.ContractType),
 				Version:       semver.MustParse("1.7.0"),
 			},
 			AllowListAdds:    []common.Address{},
