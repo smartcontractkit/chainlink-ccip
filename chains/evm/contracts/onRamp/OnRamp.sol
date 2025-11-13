@@ -795,14 +795,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
 
       // If the pool doesn't support IPoolV2 or didn't provide fee config, fall back to FeeQuoter.
-      if (destGasOverhead == 0 && destBytesOverhead == 0) {
-        (uint32 feeQuoterFeeUSDCents, uint32 feeQuoterGasOverhead, uint32 feeQuoterBytesOverhead) =
+      if (destGasOverhead == 0) {
+        (feeUSDCents, destGasOverhead, destBytesOverhead) =
           IFeeQuoter(s_dynamicConfig.feeQuoter).getTokenTransferFee(destChainSelector, message.tokenAmounts[0].token);
-        feeUSDCents = feeQuoterFeeUSDCents;
-        destGasOverhead = feeQuoterGasOverhead;
-        destBytesOverhead = feeQuoterBytesOverhead;
       }
 
+      // issuer is set to the token address, fee distribution logic will resolve token → pool and distribute fees according to the pool version.
       verifierReceipts[verifierReceipts.length - 2] = Receipt({
         issuer: message.tokenAmounts[0].token,
         destGasLimit: destGasOverhead,

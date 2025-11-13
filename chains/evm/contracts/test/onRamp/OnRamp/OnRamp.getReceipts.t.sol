@@ -99,14 +99,14 @@ contract OnRamp_getReceipts is OnRampSetup {
     address[] memory ccvAddresses
   ) internal view returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
     address[] memory ccvs = new address[](ccvAddresses.length);
-    bytes[] memory execArgs = new bytes[](ccvAddresses.length);
+    bytes[] memory ccvArgs = new bytes[](ccvAddresses.length);
     for (uint256 i = 0; i < ccvAddresses.length; i++) {
       ccvs[i] = ccvAddresses[i];
     }
 
     return ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: ccvs,
-      ccvArgs: execArgs,
+      ccvArgs: ccvArgs,
       blockConfirmations: 0,
       gasLimit: GAS_LIMIT,
       executor: s_defaultExecutor,

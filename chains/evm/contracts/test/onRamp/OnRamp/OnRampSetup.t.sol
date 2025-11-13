@@ -204,7 +204,11 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
     if (message.tokenAmounts.length > 0) {
       (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead) = _getPoolFee(
-        message.tokenAmounts[0].token, message.feeToken, extraArgsV3.blockConfirmations, extraArgsV3.tokenArgs
+        message.tokenAmounts[0].token,
+        message.tokenAmounts[0].amount,
+        message.feeToken,
+        extraArgsV3.blockConfirmations,
+        extraArgsV3.tokenArgs
       );
 
       verifierReceipts[verifierReceipts.length - 2] = OnRamp.Receipt({
@@ -222,6 +226,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   /// @notice Helper to get pool fee for a token, with fallback to FeeQuoter.
   function _getPoolFee(
     address token,
+    uint256 amount,
     address feeToken,
     uint16 finalityConfig,
     bytes memory tokenArgs
@@ -231,16 +236,13 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     // Try to call getFee if the pool supports IPoolV2.
     if (IERC165(address(pool)).supportsInterface(type(IPoolV2).interfaceId)) {
       (feeUSDCents, destGasOverhead, destBytesOverhead,) =
-        IPoolV2(address(pool)).getFee(token, DEST_CHAIN_SELECTOR, 0, feeToken, finalityConfig, tokenArgs);
+        IPoolV2(address(pool)).getFee(token, DEST_CHAIN_SELECTOR, amount, feeToken, finalityConfig, tokenArgs);
     }
 
     // If the pool doesn't support IPoolV2 or didn't provide fee config, fall back to FeeQuoter.
-    if (feeUSDCents == 0 && destGasOverhead == 0) {
-      (uint32 feeQuoterFeeUSDCents, uint32 feeQuoterGasOverhead, uint32 feeQuoterBytesOverhead) =
+    if (feeUSDCents == 0) {
+      (feeUSDCents, destGasOverhead, destBytesOverhead) =
         IFeeQuoter(address(s_feeQuoter)).getTokenTransferFee(DEST_CHAIN_SELECTOR, token);
-      feeUSDCents = feeQuoterFeeUSDCents;
-      destGasOverhead = feeQuoterGasOverhead;
-      destBytesOverhead = feeQuoterBytesOverhead;
     }
     return (feeUSDCents, destGasOverhead, destBytesOverhead);
   }
@@ -269,7 +271,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
     if (message.tokenAmounts.length > 0) {
       (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead) =
-        _getPoolFee(message.tokenAmounts[0].token, message.feeToken, 0, "");
+        _getPoolFee(message.tokenAmounts[0].token, message.tokenAmounts[0].amount, message.feeToken, 0, "");
 
       verifierReceipts[verifierReceipts.length - 2] = OnRamp.Receipt({
         issuer: message.tokenAmounts[0].token,
