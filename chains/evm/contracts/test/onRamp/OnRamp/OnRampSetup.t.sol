@@ -99,7 +99,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: destChainSelector,
       sequenceNumber: seqNum,
-      executionGasLimit: 0,
+      executionGasLimit: 0, // populated below.
       callbackGasLimit: GAS_LIMIT,
       finality: 0,
       ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(resolvedExtraArgs.ccvs, resolvedExtraArgs.executor),

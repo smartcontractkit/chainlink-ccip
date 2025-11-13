@@ -777,6 +777,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       feeUSDCentsSum += feeUSDCents;
     }
 
+    // This includes the user callback gas limit.
     verifierReceipts[verifierReceipts.length - 1] =
       _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
 

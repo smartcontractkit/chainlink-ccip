@@ -110,4 +110,14 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     );
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
   }
+
+  function test_forwardFromRouter_RevertWhen_CursedByRMN() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    // Set a curse on the specific destination chain (subject-specific, not global)
+    _setMockRMNChainCurse(DEST_CHAIN_SELECTOR, true);
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.CursedByRMN.selector, DEST_CHAIN_SELECTOR));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+  }
 }
