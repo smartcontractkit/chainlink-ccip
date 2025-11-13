@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
-import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
-
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
