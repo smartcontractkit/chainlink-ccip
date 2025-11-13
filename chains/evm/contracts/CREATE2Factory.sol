@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
@@ -14,7 +15,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 /// one or more initialization calls (i.e. transfer ownership, configure roles) to perform post-deployment.
 /// To achieve deterministic addresses across chains, this contract must be deployed with a reserved key.
 /// This is because the factory address is used in the CREATE2 address computation.
-contract ContractFactory is ITypeAndVersion, Ownable2StepMsgSender {
+contract CREATE2Factory is ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error CallFailed(uint256 index, bytes result);
@@ -24,7 +25,7 @@ contract ContractFactory is ITypeAndVersion, Ownable2StepMsgSender {
   event CallerRemoved(address indexed caller);
   event ContractDeployed(address indexed contractAddress);
 
-  string public constant override typeAndVersion = "ContractFactory 1.7.0";
+  string public constant override typeAndVersion = "CREATE2Factory 1.7.0";
 
   /// @notice Addresses that are allowed to call createAndCall.
   EnumerableSet.AddressSet private s_allowList;
@@ -37,15 +38,26 @@ contract ContractFactory is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Deploys a contract with the given creation code and salt and optionally calls it.
   /// @dev The deployed address is deterministic based on address(this), salt, and creation code.
+  /// Creation code includes constructor arguments, which must be taken into account if address parity is desired.
+  /// Example: For token pools to have the same address across chains, their tokens must also have the same address across chains.
   /// This method does not support deploying contracts with payable constructors (sets amount to 0).
   /// This function is allowlisted to prevent unexpected accounts from claiming important addresses on new chains.
   /// Concatenating msg.sender with the salt is an alternative way to approach this problem, but prevents the ability
-  /// to rotate keys. Taking that approach, you would need to use the same key for createAndCall on every chain.
+  /// to rotate keys. Taking that approach, you would need to use the same key for createAndCall on every chain in perpetuity.
   /// @param creationCode The creation code of the contract to deploy.
   /// @param salt The salt used to ensure a unique deployment.
   /// @param calls Any calls to perform post-deployment.
   /// @return contractAddress The address of the contract deployed.
-  function createAndCall(bytes calldata creationCode, bytes32 salt, bytes[] calldata calls) external returns (address) {
+  function createAndCall(bytes calldata creationCode, bytes32 salt, bytes[] memory calls) external returns (address) {
+    return _createAndCall(creationCode, salt, calls);
+  }
+
+  /// @notice Internal helper for createAndCall.
+  /// @param creationCode The creation code of the contract to deploy.
+  /// @param salt The salt used to ensure a unique deployment.
+  /// @param calls Any calls to perform post-deployment.
+  /// @return contractAddress The address of the contract deployed.
+  function _createAndCall(bytes calldata creationCode, bytes32 salt, bytes[] memory calls) internal returns (address) {
     if (!s_allowList.contains(msg.sender)) {
       revert CallerNotAllowed(msg.sender);
     }
@@ -62,6 +74,17 @@ contract ContractFactory is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     return contractAddress;
+  }
+
+  /// @notice Deploys a contract with the given creation code and salt and transfers ownership to the given address.
+  /// @param creationCode The creation code of the contract to deploy.
+  /// @param salt The salt used to ensure a unique deployment.
+  /// @param to The address to transfer ownership to.
+  /// @return contractAddress The address of the contract deployed.
+  function createAndTransferOwnership(bytes calldata creationCode, bytes32 salt, address to) external returns (address) {
+    bytes[] memory calls = new bytes[](1);
+    calls[0] = abi.encodeWithSelector(IOwnable.transferOwnership.selector, to);
+    return _createAndCall(creationCode, salt, calls);
   }
 
   /// @notice Computes the address of a contract if deployed with the given creation code and salt.

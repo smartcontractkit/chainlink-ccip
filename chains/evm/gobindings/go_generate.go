@@ -3,7 +3,7 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip OnRamp onramp latest
 //go:generate go run generation/generate/wrap.go ccip OffRamp offramp latest
 //go:generate go run generation/generate/wrap.go ccip Proxy proxy latest
-//go:generate go run generation/generate/wrap.go ccip ContractFactory contract_factory latest
+//go:generate go run generation/generate/wrap.go ccip CREATE2Factory create2_factory latest
 //go:generate go run generation/generate/wrap.go ccip CommitteeVerifier committee_verifier latest
 //go:generate go run generation/generate/wrap.go ccip VersionedVerifierResolver versioned_verifier_resolver latest
 //go:generate go run generation/generate/wrap.go ccip Executor executor latest

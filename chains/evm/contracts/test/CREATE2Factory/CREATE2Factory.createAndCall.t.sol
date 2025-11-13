@@ -3,19 +3,19 @@ pragma solidity ^0.8.24;
 
 import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
 
-import {ContractFactory} from "../../ContractFactory.sol";
-import {ContractFactorySetup, Storage} from "./ContractFactorySetup.t.sol";
+import {CREATE2Factory} from "../../CREATE2Factory.sol";
+import {CREATE2FactorySetup, Storage} from "./CREATE2FactorySetup.t.sol";
 
 import {Create2} from "@openzeppelin/contracts@5.0.2/utils/Create2.sol";
 
-contract ContractFactory_createAndCall is ContractFactorySetup {
+contract CREATE2Factory_createAndCall is CREATE2FactorySetup {
   function test_createAndCall_NoCalls() public {
-    address predictedAddress = s_contractFactory.computeAddress(getStorageCreationCode(1), SALT);
-    vm.startPrank(s_allowedCaller);
+    address predictedAddress = s_create2Factory.computeAddress(getStorageCreationCode(1), SALT);
 
+    vm.startPrank(s_allowedCaller);
     vm.expectEmit();
-    emit ContractFactory.ContractDeployed(predictedAddress);
-    address deployedAddress = s_contractFactory.createAndCall(getStorageCreationCode(1), SALT, new bytes[](0));
+    emit CREATE2Factory.ContractDeployed(predictedAddress);
+    address deployedAddress = s_create2Factory.createAndCall(getStorageCreationCode(1), SALT, new bytes[](0));
 
     assertEq(deployedAddress, predictedAddress);
   }
@@ -23,12 +23,14 @@ contract ContractFactory_createAndCall is ContractFactorySetup {
   function test_createAndCall_SingleCall() public {
     bytes[] memory calls = new bytes[](1);
     calls[0] = abi.encodeWithSelector(IOwnable.transferOwnership.selector, OWNER);
+    address predictedAddress = s_create2Factory.computeAddress(getStorageCreationCode(1), SALT);
 
-    address predictedAddress = s_contractFactory.computeAddress(getStorageCreationCode(1), SALT);
     vm.startPrank(s_allowedCaller);
     vm.expectEmit();
-    emit ContractFactory.ContractDeployed(predictedAddress);
-    address deployedAddress = s_contractFactory.createAndCall(getStorageCreationCode(1), SALT, calls);
+    emit CREATE2Factory.ContractDeployed(predictedAddress);
+    vm.expectCall(predictedAddress, 0, abi.encodeWithSelector(IOwnable.transferOwnership.selector, OWNER));
+    address deployedAddress = s_create2Factory.createAndCall(getStorageCreationCode(1), SALT, calls);
+
     assertEq(deployedAddress, predictedAddress);
 
     vm.startPrank(OWNER);
@@ -40,12 +42,15 @@ contract ContractFactory_createAndCall is ContractFactorySetup {
     bytes[] memory calls = new bytes[](2);
     calls[0] = abi.encodeWithSelector(IOwnable.transferOwnership.selector, OWNER);
     calls[1] = abi.encodeWithSelector(Storage.setValue.selector, 2);
+    address predictedAddress = s_create2Factory.computeAddress(getStorageCreationCode(1), SALT);
 
-    address predictedAddress = s_contractFactory.computeAddress(getStorageCreationCode(1), SALT);
     vm.startPrank(s_allowedCaller);
     vm.expectEmit();
-    emit ContractFactory.ContractDeployed(predictedAddress);
-    address deployedAddress = s_contractFactory.createAndCall(getStorageCreationCode(1), SALT, calls);
+    emit CREATE2Factory.ContractDeployed(predictedAddress);
+    vm.expectCall(predictedAddress, 0, abi.encodeWithSelector(IOwnable.transferOwnership.selector, OWNER));
+    vm.expectCall(predictedAddress, 0, abi.encodeWithSelector(Storage.setValue.selector, 2));
+    address deployedAddress = s_create2Factory.createAndCall(getStorageCreationCode(1), SALT, calls);
+
     assertEq(deployedAddress, predictedAddress);
 
     vm.startPrank(OWNER);
@@ -56,14 +61,14 @@ contract ContractFactory_createAndCall is ContractFactorySetup {
 
   function test_createAndCall_RevertWhen_CallerNotAllowed() public {
     vm.startPrank(s_invalidCaller);
-    vm.expectRevert(abi.encodeWithSelector(ContractFactory.CallerNotAllowed.selector, s_invalidCaller));
-    s_contractFactory.createAndCall(getStorageCreationCode(1), SALT, new bytes[](0));
+    vm.expectRevert(abi.encodeWithSelector(CREATE2Factory.CallerNotAllowed.selector, s_invalidCaller));
+    s_create2Factory.createAndCall(getStorageCreationCode(1), SALT, new bytes[](0));
   }
 
   function test_createAndCall_RevertWhen_Create2FailedDeployment() public {
     vm.startPrank(s_allowedCaller);
     vm.expectRevert(abi.encodeWithSelector(Create2.Create2FailedDeployment.selector));
-    s_contractFactory.createAndCall(getStorageCreationCode(0), SALT, new bytes[](0));
+    s_create2Factory.createAndCall(getStorageCreationCode(0), SALT, new bytes[](0));
   }
 
   function test_createAndCall_RevertWhen_CallFailed() public {
@@ -73,9 +78,9 @@ contract ContractFactory_createAndCall is ContractFactorySetup {
     vm.startPrank(s_allowedCaller);
     vm.expectRevert(
       abi.encodeWithSelector(
-        ContractFactory.CallFailed.selector, 0, abi.encodeWithSelector(Storage.InvalidValue.selector)
+        CREATE2Factory.CallFailed.selector, 0, abi.encodeWithSelector(Storage.InvalidValue.selector)
       )
     );
-    s_contractFactory.createAndCall(getStorageCreationCode(1), SALT, calls);
+    s_create2Factory.createAndCall(getStorageCreationCode(1), SALT, calls);
   }
 }

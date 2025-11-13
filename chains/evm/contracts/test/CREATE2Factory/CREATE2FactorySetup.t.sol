@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
-
-import {ContractFactory} from "../../ContractFactory.sol";
+import {CREATE2Factory} from "../../CREATE2Factory.sol";
 import {BaseTest} from "../BaseTest.t.sol";
+import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 // We need to use a real contract because mockCallRevert causes issues with CREATE2.
 // Calling mockCallRevert against a predicted address creates the contract, which breaks the following CREATE2 call.
@@ -39,8 +38,8 @@ contract Storage is Ownable2StepMsgSender {
   }
 }
 
-contract ContractFactorySetup is BaseTest {
-  ContractFactory internal s_contractFactory;
+contract CREATE2FactorySetup is BaseTest {
+  CREATE2Factory internal s_create2Factory;
   bytes32 internal constant SALT = keccak256("SALT");
   address internal s_allowedCaller;
   address internal s_invalidCaller;
@@ -53,7 +52,7 @@ contract ContractFactorySetup is BaseTest {
 
     address[] memory allowList = new address[](1);
     allowList[0] = s_allowedCaller;
-    s_contractFactory = new ContractFactory(allowList);
+    s_create2Factory = new CREATE2Factory(allowList);
   }
 
   function getStorageCreationCode(

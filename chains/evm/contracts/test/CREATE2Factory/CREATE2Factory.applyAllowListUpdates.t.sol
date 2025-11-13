@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ContractFactory} from "../../ContractFactory.sol";
-import {ContractFactorySetup} from "./ContractFactorySetup.t.sol";
+import {CREATE2Factory} from "../../CREATE2Factory.sol";
+import {CREATE2FactorySetup} from "./CREATE2FactorySetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract ContractFactory_applyAllowListUpdates is ContractFactorySetup {
+contract CREATE2Factory_applyAllowListUpdates is CREATE2FactorySetup {
   function test_applyAllowListUpdates() public {
     address[] memory removes = new address[](1);
     removes[0] = s_allowedCaller;
@@ -15,12 +15,12 @@ contract ContractFactory_applyAllowListUpdates is ContractFactorySetup {
     adds[0] = newAllowedCaller;
 
     vm.expectEmit();
-    emit ContractFactory.CallerRemoved(s_allowedCaller);
+    emit CREATE2Factory.CallerRemoved(s_allowedCaller);
     vm.expectEmit();
-    emit ContractFactory.CallerAdded(newAllowedCaller);
-    s_contractFactory.applyAllowListUpdates(removes, adds);
+    emit CREATE2Factory.CallerAdded(newAllowedCaller);
+    s_create2Factory.applyAllowListUpdates(removes, adds);
 
-    address[] memory allowList = s_contractFactory.getAllowList();
+    address[] memory allowList = s_create2Factory.getAllowList();
     assertEq(allowList.length, 1);
     assertEq(allowList[0], newAllowedCaller);
   }
@@ -34,10 +34,10 @@ contract ContractFactory_applyAllowListUpdates is ContractFactorySetup {
     removes[0] = unknownCaller;
 
     vm.recordLogs();
-    s_contractFactory.applyAllowListUpdates(removes, adds);
+    s_create2Factory.applyAllowListUpdates(removes, adds);
     vm.assertEq(vm.getRecordedLogs().length, 0);
 
-    address[] memory allowList = s_contractFactory.getAllowList();
+    address[] memory allowList = s_create2Factory.getAllowList();
     assertEq(allowList.length, 1);
     assertEq(allowList[0], s_allowedCaller);
   }
@@ -45,6 +45,6 @@ contract ContractFactory_applyAllowListUpdates is ContractFactorySetup {
   function test_applyAllowListUpdates_RevertWhen_OnlyCallableByOwner() public {
     vm.startPrank(STRANGER);
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_contractFactory.applyAllowListUpdates(new address[](0), new address[](0));
+    s_create2Factory.applyAllowListUpdates(new address[](0), new address[](0));
   }
 }
