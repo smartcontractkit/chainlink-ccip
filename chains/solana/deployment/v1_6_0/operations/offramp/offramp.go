@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
@@ -23,7 +24,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "OffRamp"
-var SourceChainType cldf_deployment.ContractType = "SourceChain"
+var SourceChainType cldf_deployment.ContractType = "RemoteSource"
 var ProgramName = "off_ramp"
 var ProgramSize = int(1.5 * 1024 * 1024)
 var Version *semver.Version = semver.MustParse("1.6.0")
@@ -229,6 +230,7 @@ var ConnectChains = operations.NewOperation(
 			ChainSelector: chain.Selector,
 			Type:          datastore.ContractType(SourceChainType),
 			Version:       Version,
+			Qualifier:     strconv.FormatUint(input.RemoteChainSelector, 10),
 		}
 		return sequences.OnChainOutput{
 			BatchOps:  batches,
