@@ -626,15 +626,3 @@ func TestDepositHash_SolidityCompatibility(t *testing.T) {
 		})
 	}
 }
-
-func mustHexToBytes32(hexStr string) [32]byte {
-	hexStr = strings.TrimPrefix(hexStr, "0x")
-	decoded, err := hex.DecodeString(hexStr)
-	if err != nil {
-		panic(err)
-	}
-
-	var result [32]byte
-	copy(result[32-len(decoded):], decoded)
-	return result
-}
