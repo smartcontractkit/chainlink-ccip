@@ -97,7 +97,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       destChainSelector: destChainSelector,
       sequenceNumber: seqNum,
       executionGasLimit: 0, // populated below.
-      callbackGasLimit: GAS_LIMIT,
+      ccipReceiveGasLimit: GAS_LIMIT,
       finality: 0,
       ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(resolvedExtraArgs.ccvs, resolvedExtraArgs.executor),
       onRampAddress: abi.encodePacked(address(s_onRamp)),

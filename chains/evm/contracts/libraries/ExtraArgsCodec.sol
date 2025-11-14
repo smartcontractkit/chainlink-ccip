@@ -158,7 +158,7 @@ library ExtraArgsCodec {
       // Read address length (1 byte).
       if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
       uint256 addrLength;
-      assembly {
+      assembly ("memory-safe") {
         addrLength := byte(0, calldataload(add(encoded.offset, offset)))
       }
       newOffset = offset + 1;
@@ -178,7 +178,7 @@ library ExtraArgsCodec {
         revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, newOffset);
       }
 
-      assembly {
+      assembly ("memory-safe") {
         let addrData := calldataload(add(encoded.offset, newOffset))
         addr := shr(96, addrData)
       }
@@ -202,7 +202,7 @@ library ExtraArgsCodec {
       // Read length (2 bytes).
       if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
       uint256 dataLength;
-      assembly {
+      assembly ("memory-safe") {
         let lengthData := calldataload(add(encoded.offset, offset))
         dataLength := and(shr(240, lengthData), 0xFFFF)
       }
@@ -234,7 +234,7 @@ library ExtraArgsCodec {
       // Read length (1 byte).
       if (offset + 1 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_LENGTH, offset);
       uint256 dataLength;
-      assembly {
+      assembly ("memory-safe") {
         dataLength := byte(0, calldataload(add(encoded.offset, offset)))
       }
       newOffset = offset + 1;
@@ -250,7 +250,8 @@ library ExtraArgsCodec {
     return (data, newOffset);
   }
 
-  /// @notice Helper function to write a uint8 length prefix and an address.
+  /// @notice Helper function to write a uint8 length prefix and an address. This function writes 12 bytes of overshoot
+  /// to the pointer location. This must be handled by the caller.
   /// @dev Writes length as 1 byte followed by the address bytes (20 bytes if non-zero).
   /// @param ptr The memory pointer where to start writing.
   /// @param addr The address to write.
@@ -271,7 +272,9 @@ library ExtraArgsCodec {
     return newPtr;
   }
 
-  /// @notice Helper function to write a uint16 length prefix and copy bytes data.
+  /// @notice Helper function to write a uint16 length prefix and copy bytes data. This function can write overshoot
+  /// to the pointer location of at most 31 bytes. This must be handled by the caller. The overshoot depends on the data
+  /// length.
   /// @dev Writes length as 2 bytes (big endian) followed by the data bytes.
   /// @param ptr The memory pointer where to start writing.
   /// @param data The bytes data to write.
@@ -298,7 +301,9 @@ library ExtraArgsCodec {
     return newPtr;
   }
 
-  /// @notice Helper function to write a uint8 length prefix and copy bytes data.
+  /// @notice Helper function to write a uint8 length prefix and copy bytes data. This function can write overshoot
+  /// to the pointer location of at most 31 bytes. This must be handled by the caller. The overshoot depends on the data
+  /// length.
   /// @dev Writes length as 1 byte followed by the data bytes.
   /// @param ptr The memory pointer where to start writing.
   /// @param data The bytes data to write.
@@ -373,14 +378,16 @@ library ExtraArgsCodec {
     }
 
     // Allocate memory.
-    // GENERIC_EXTRA_ARGS_V3_BASE_SIZE + all variable-length fields.
+    // GENERIC_EXTRA_ARGS_V3_BASE_SIZE + all variable-length fields + 32 bytes to account for any potential overshoot
+    // that comes from writing 32-byte blocks of data.
     encoded = new bytes(
       GENERIC_EXTRA_ARGS_V3_BASE_SIZE + ccvsEncodedSize + executorLength + executorArgsLength + tokenReceiverLength
-        + tokenArgsLength
+        + tokenArgsLength + 32
     );
 
     uint256 ptr;
-    assembly {
+    // This block is memory safe because it only writes to the allocated `encoded` bytes.
+    assembly ("memory-safe") {
       ptr := add(encoded, 32) // Skip length prefix.
 
       // Write tag (4 bytes, bytes are left aligned).
@@ -421,7 +428,8 @@ library ExtraArgsCodec {
     // Verify that we've exactly filled the allocated bytes. We load the data offset of the bytes array to be able to
     // compare with ptr.
     uint256 encodedDataOffset;
-    assembly {
+    assembly ("memory-safe") {
+      mstore(encoded, sub(mload(encoded), 32)) // Set correct length as we overprovisioned for overshoot.
       encodedDataOffset := encoded
     }
     // The pointer should be at the end of the allocated data (data offset + length + 32 bytes for length prefix).
@@ -445,7 +453,7 @@ library ExtraArgsCodec {
 
     // Check tag.
     bytes4 tag;
-    assembly {
+    assembly ("memory-safe") {
       tag := calldataload(encoded.offset)
     }
 
@@ -455,7 +463,7 @@ library ExtraArgsCodec {
 
     uint256 ccvsLength;
     // Read static-length fields.
-    assembly {
+    assembly ("memory-safe") {
       // Read gas limit (4 bytes).
       let gasLimit := calldataload(add(encoded.offset, 4))
       mstore(extraArgs, and(shr(224, gasLimit), 0xFFFFFFFF))
@@ -492,7 +500,7 @@ library ExtraArgsCodec {
     return extraArgs;
   }
 
-  /// @notice Encodes a SVMExecutorArgsV1 struct into bytes using assembly.
+  /// @notice Encodes a SVMExecutorArgsV1 struct into bytes.
   /// @param executorArgs The SVMExecutorArgsV1 struct to encode.
   /// @return encoded The encoded executor args as bytes.
   function _encodeSVMExecutorArgsV1(
@@ -526,7 +534,7 @@ library ExtraArgsCodec {
 
       // Check tag.
       bytes4 tag;
-      assembly {
+      assembly ("memory-safe") {
         tag := calldataload(encoded.offset)
       }
 
@@ -537,7 +545,7 @@ library ExtraArgsCodec {
       uint256 accountsLength;
 
       // Read static-length fields.
-      assembly {
+      assembly ("memory-safe") {
         // Read useATA (1 byte) - enum value.
         let useATA := byte(0, calldataload(add(encoded.offset, 4)))
         mstore(executorArgs, useATA)
@@ -559,7 +567,7 @@ library ExtraArgsCodec {
 
       executorArgs.accounts = new bytes32[](accountsLength);
       for (uint256 i = 0; i < accountsLength; ++i) {
-        assembly {
+        assembly ("memory-safe") {
           let data := calldataload(add(add(encoded.offset, offset), mul(i, 32)))
           let accountsArray := mload(add(executorArgs, 64))
           mstore(add(add(accountsArray, 32), mul(i, 32)), data)
@@ -573,7 +581,7 @@ library ExtraArgsCodec {
     return executorArgs;
   }
 
-  /// @notice Encodes a SuiExecutorArgsV1 struct into bytes using assembly.
+  /// @notice Encodes a SuiExecutorArgsV1 struct into bytes.
   /// @param executorArgs The SuiExecutorArgsV1 struct to encode.
   /// @return encoded The encoded executor args as bytes.
   function _encodeSuiExecutorArgsV1(
@@ -601,7 +609,7 @@ library ExtraArgsCodec {
 
       // Check tag.
       bytes4 tag;
-      assembly {
+      assembly ("memory-safe") {
         tag := calldataload(encoded.offset)
       }
 
@@ -611,7 +619,7 @@ library ExtraArgsCodec {
 
       // Read objectIds length.
       uint256 objectIdsLength;
-      assembly {
+      assembly ("memory-safe") {
         objectIdsLength := byte(0, calldataload(add(encoded.offset, 4)))
       }
 
@@ -623,7 +631,7 @@ library ExtraArgsCodec {
 
       executorArgs.receiverObjectIds = new bytes32[](objectIdsLength);
       for (uint256 i = 0; i < objectIdsLength; ++i) {
-        assembly {
+        assembly ("memory-safe") {
           let data := calldataload(add(add(encoded.offset, offset), mul(i, 32)))
           let objectIdsArray := mload(executorArgs)
           mstore(add(add(objectIdsArray, 32), mul(i, 32)), data)

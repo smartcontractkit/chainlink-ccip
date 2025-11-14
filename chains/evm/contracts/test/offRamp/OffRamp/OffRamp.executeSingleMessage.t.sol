@@ -40,7 +40,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: 1,
       executionGasLimit: 200_000,
-      callbackGasLimit: 0,
+      ccipReceiveGasLimit: 0,
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encodePacked(makeAddr("onRamp")),

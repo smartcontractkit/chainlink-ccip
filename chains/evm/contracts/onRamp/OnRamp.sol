@@ -209,7 +209,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       destChainSelector: destChainSelector,
       sequenceNumber: ++destChainConfig.sequenceNumber,
       executionGasLimit: 0, // Populated after getting receipts.
-      callbackGasLimit: resolvedExtraArgs.gasLimit,
+      ccipReceiveGasLimit: resolvedExtraArgs.gasLimit,
       finality: resolvedExtraArgs.blockConfirmations,
       ccvAndExecutorHash: bytes32(0), // Will be set after CCV list is finalized.
       onRampAddress: abi.encodePacked(address(this)),

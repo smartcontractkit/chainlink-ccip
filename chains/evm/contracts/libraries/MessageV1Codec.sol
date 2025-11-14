@@ -13,7 +13,7 @@ library MessageV1Codec {
   uint256 public constant MAX_NUMBER_OF_TOKENS = 1;
   // Base size of a MessageV1 without variable length fields.
   // 1 (version) + 8 (sourceChain) + 8 (destChain) + 8 (seqNum) + 4 (executionGasLimit) +
-  // 4 (callbackGasLimit) + 2 (finality) + 32 (ccvAndExecutorHash) + 1 (onRampLen) + 1 (offRampLen) +
+  // 4 (ccipReceiveGasLimit) + 2 (finality) + 32 (ccvAndExecutorHash) + 1 (onRampLen) + 1 (offRampLen) +
   // 1 (senderLen) + 1 (receiverLen) + 2 (destBlobLen) + 2 (tokenTransferLen) + 2 (dataLen) = 77
   uint256 public constant MESSAGE_V1_BASE_SIZE = 1 + 8 + 8 + 8 + 4 + 4 + 2 + 32 + 1 + 1 + 1 + 1 + 2 + 2 + 2;
   // The base size plus 20 bytes for sender and 20 bytes for onRamp addresses.
@@ -89,7 +89,7 @@ library MessageV1Codec {
   ///   uint64 destChainSelector;   Destination Chain Selector.
   ///   uint64 sequenceNumber;      Auto-incrementing sequence number for the message.
   ///   uint32 executionGasLimit;   Gas limit for message execution on the destination chain.
-  ///   uint32 callbackGasLimit;    Gas limit for the user callback on the destination chain.
+  ///   uint32 ccipReceiveGasLimit;    Gas limit for the user callback on the destination chain.
   ///   uint16 finality;            Configurable per-message finality value.
   ///   bytes32 ccvAndExecutorHash; Hash of the verifiers and executor addresses.
   ///
@@ -128,7 +128,7 @@ library MessageV1Codec {
     // Gas limit for message execution on the destination chain.
     uint32 executionGasLimit;
     // Gas limit for the user callback on the destination chain.
-    uint32 callbackGasLimit;
+    uint32 ccipReceiveGasLimit;
     // Configurable per-message finality value.
     uint16 finality;
     // A hash of the verifiers and executor addresses. This is used by the offchain systems to validate the list of CCVs
@@ -343,18 +343,18 @@ library MessageV1Codec {
     if (message.data.length > type(uint16).max) revert InvalidDataLength(EncodingErrorLocation.ENCODE_DATA_LENGTH);
 
     // We need to partially encode it in three parts to avoid stack too deep issues.
-    bytes memory part1 = abi.encodePacked(
+    bytes memory staticLengthSection = abi.encodePacked(
       uint8(1), // version.
       message.sourceChainSelector,
       message.destChainSelector,
       message.sequenceNumber,
       message.executionGasLimit,
-      message.callbackGasLimit,
+      message.ccipReceiveGasLimit,
       message.finality,
       message.ccvAndExecutorHash
     );
 
-    bytes memory part2 = abi.encodePacked(
+    bytes memory dynamicLengthPart1 = abi.encodePacked(
       uint8(message.onRampAddress.length),
       message.onRampAddress,
       uint8(message.offRampAddress.length),
@@ -371,8 +371,8 @@ library MessageV1Codec {
     }
 
     return abi.encodePacked(
-      part1,
-      part2,
+      staticLengthSection,
+      dynamicLengthPart1,
       abi.encodePacked(
         uint8(message.receiver.length),
         message.receiver,
@@ -411,8 +411,8 @@ library MessageV1Codec {
       // executionGasLimit (4 bytes, big endian).
       message.executionGasLimit = uint32(bytes4(encoded[25:29]));
 
-      // callbackGasLimit (4 bytes, big endian).
-      message.callbackGasLimit = uint32(bytes4(encoded[29:33]));
+      // ccipReceiveGasLimit (4 bytes, big endian).
+      message.ccipReceiveGasLimit = uint32(bytes4(encoded[29:33]));
 
       // finality (2 bytes, big endian).
       message.finality = uint16(bytes2(encoded[33:35]));

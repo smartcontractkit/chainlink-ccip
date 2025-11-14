@@ -11,7 +11,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       destChainSelector: 10,
       sequenceNumber: 200,
       executionGasLimit: 300000,
-      callbackGasLimit: 90_000,
+      ccipReceiveGasLimit: 90_000,
       finality: 1000,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encodePacked(makeAddr("onRamp")),
@@ -44,7 +44,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       destChainSelector: 456,
       sequenceNumber: 789,
       executionGasLimit: 400000,
-      callbackGasLimit: 120_000,
+      ccipReceiveGasLimit: 120_000,
       finality: 2000,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encodePacked(makeAddr("onRamp")),
@@ -90,7 +90,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       destChainSelector: type(uint64).max,
       sequenceNumber: type(uint64).max,
       executionGasLimit: type(uint32).max,
-      callbackGasLimit: type(uint32).max,
+      ccipReceiveGasLimit: type(uint32).max,
       finality: type(uint16).max,
       ccvAndExecutorHash: bytes32(type(uint256).max),
       onRampAddress: maxLengthBytes,
@@ -114,7 +114,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
       destChainSelector: 2,
       sequenceNumber: 3,
       executionGasLimit: 0,
-      callbackGasLimit: 0,
+      ccipReceiveGasLimit: 0,
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: "",
@@ -475,7 +475,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
 
     // Skip fixed header fields
     offset += 8 + 8 + 8; // sourceChainSelector + destChainSelector + sequenceNumber
-    offset += 4 + 4; // executionGasLimit + callbackGasLimit
+    offset += 4 + 4; // executionGasLimit + ccipReceiveGasLimit
     offset += 2; // finality
     offset += 32; // ccvAndExecutorHash
     // Now at offset 67
