@@ -5,11 +5,11 @@ import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
-import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
+import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
-  OnRampTestHelper internal s_onRampTestHelper;
+  OnRampHelper internal s_OnRampHelper;
 
   address[] internal s_defaultCCVs;
   address[] internal s_laneMandatedCCVs;
@@ -17,7 +17,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
   function setUp() public override {
     super.setUp();
-    s_onRampTestHelper = new OnRampTestHelper(
+    s_OnRampHelper = new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
@@ -70,7 +70,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
 
     ExtraArgsCodec.GenericExtraArgsV3 memory result =
-      s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
+      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
 
     // User-provided CCVs should be used (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(userCCVAddresses.length, result.ccvs.length);
@@ -85,7 +85,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
 
     ExtraArgsCodec.GenericExtraArgsV3 memory result =
-      s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
+      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
 
     // Default CCVs should be applied (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(s_defaultCCVs.length, result.ccvs.length);
@@ -108,7 +108,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     bytes memory legacyExtraArgs = Client._argsToBytes(v2Args);
 
     ExtraArgsCodec.GenericExtraArgsV3 memory result =
-      s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, legacyExtraArgs);
+      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, legacyExtraArgs);
 
     assertEq(s_defaultCCVs.length, result.ccvs.length);
     assertEq(result.ccvs[0], s_defaultCCVs[0]);
@@ -130,7 +130,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
     ExtraArgsCodec.GenericExtraArgsV3 memory result =
-      s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
+      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
 
     // Should have default CCVs
     assertEq(s_defaultCCVs.length, result.ccvs.length);
@@ -154,6 +154,6 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
     // Should revert due to duplicate CCVs
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, duplicateCCV));
-    s_onRampTestHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
+    s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
   }
 }

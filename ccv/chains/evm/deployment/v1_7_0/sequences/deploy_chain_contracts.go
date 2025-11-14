@@ -80,17 +80,18 @@ type ExecutorParams struct {
 }
 
 type ContractParams struct {
-	RMNRemote         RMNRemoteParams
-	OffRamp           OffRampParams
-	CommitteeVerifier []CommitteeVerifierParams
-	OnRamp            OnRampParams
-	FeeQuoter         FeeQuoterParams
-	Executor          ExecutorParams
-	MockReceivers     []MockReceiverParams
+	RMNRemote          RMNRemoteParams
+	OffRamp            OffRampParams
+	CommitteeVerifiers []CommitteeVerifierParams
+	OnRamp             OnRampParams
+	FeeQuoter          FeeQuoterParams
+	Executor           ExecutorParams
+	MockReceivers      []MockReceiverParams
 }
 
 type DeployChainContractsInput struct {
 	ChainSelector     uint64 // Only exists to differentiate sequence runs on different chains
+	CREATE2Factory   common.Address
 	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
 }
@@ -291,9 +292,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// TODO: validate prior to deploying that qualifiers are unique?
 		var committeeVerifierRefs []datastore.AddressRef
 		var committeeVerifierBatchOps []mcms_types.BatchOperation
-		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifier {
+		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifiers {
 			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
+				CREATE2Factory:   input.CREATE2Factory,
 				ExistingAddresses: input.ExistingAddresses,
 				Params:            committeeVerifierParams,
 			})
@@ -310,7 +312,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Deploy Executor
-		ExecutorRef, err := contract_utils.MaybeDeployContract(b, executor.Deploy, chain, contract.DeployInput[executor.ConstructorArgs]{
+		executorRef, err := contract_utils.MaybeDeployContract(b, executor.Deploy, chain, contract.DeployInput[executor.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(executor.ContractType, *input.ContractParams.Executor.Version),
 			ChainSelector:  chain.Selector,
 			Args: executor.ConstructorArgs{
@@ -321,14 +323,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Executor: %w", err)
 		}
-		addresses = append(addresses, ExecutorRef)
+		addresses = append(addresses, executorRef)
 
 		// Deploy ExecutorProxy
 		executorProxyRef, err := contract_utils.MaybeDeployContract(b, executor.DeployProxy, chain, contract.DeployInput[executor.ProxyConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(executor.ProxyType, *semver.MustParse("1.7.0")),
 			ChainSelector:  chain.Selector,
 			Args: executor.ProxyConstructorArgs{
-				ExecutorAddress: common.HexToAddress(ExecutorRef.Address),
+				ExecutorAddress: common.HexToAddress(executorRef.Address),
 			},
 		}, input.ExistingAddresses)
 		if err != nil {

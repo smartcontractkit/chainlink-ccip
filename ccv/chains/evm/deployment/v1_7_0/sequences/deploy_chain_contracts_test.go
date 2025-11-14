@@ -214,7 +214,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 
 	// Configure two committee verifiers with different qualifiers and request both for MockReceiver
 	params := testsetup.CreateBasicContractParams()
-	params.CommitteeVerifier = []sequences.CommitteeVerifierParams{
+	params.CommitteeVerifiers = []sequences.CommitteeVerifierParams{
 		{
 			Version:       semver.MustParse("1.7.0"),
 			FeeAggregator: common.HexToAddress("0x01"),

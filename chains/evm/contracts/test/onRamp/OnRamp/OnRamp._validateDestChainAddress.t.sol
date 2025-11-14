@@ -2,15 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
-import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
+import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 contract OnRamp_validateDestChainAddress is OnRampSetup {
-  OnRampTestHelper internal s_onRampTestHelper;
+  OnRampHelper internal s_OnRampHelper;
 
   function setUp() public override {
     super.setUp();
-    s_onRampTestHelper = new OnRampTestHelper(
+    s_OnRampHelper = new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
@@ -28,7 +28,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     bytes memory rawAddress = abi.encodePacked(makeAddr("receiver"));
     uint8 addressBytesLength = 20;
 
-    bytes memory validated = s_onRampTestHelper.validateDestChainAddress(rawAddress, addressBytesLength);
+    bytes memory validated = s_OnRampHelper.validateDestChainAddress(rawAddress, addressBytesLength);
 
     assertEq(rawAddress, validated);
   }
@@ -40,7 +40,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
 
     uint8 addressBytesLength = uint8(rawAddress.length);
 
-    bytes memory validated = s_onRampTestHelper.validateDestChainAddress(rawAddress, addressBytesLength);
+    bytes memory validated = s_OnRampHelper.validateDestChainAddress(rawAddress, addressBytesLength);
 
     assertEq(rawAddress, validated);
   }
@@ -50,7 +50,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     bytes memory abiEncodedAddress = abi.encode(addr);
     uint8 addressBytesLength = 20;
 
-    bytes memory validated = s_onRampTestHelper.validateDestChainAddress(abiEncodedAddress, addressBytesLength);
+    bytes memory validated = s_OnRampHelper.validateDestChainAddress(abiEncodedAddress, addressBytesLength);
 
     assertEq(abi.encodePacked(addr), validated);
     assertEq(20, validated.length);
@@ -72,7 +72,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
       paddedAddress[paddingLength + i] = actualAddress[i];
     }
 
-    bytes memory validated = s_onRampTestHelper.validateDestChainAddress(paddedAddress, addressBytesLength);
+    bytes memory validated = s_OnRampHelper.validateDestChainAddress(paddedAddress, addressBytesLength);
 
     assertEq(actualAddress, validated);
     assertEq(addressBytesLength, validated.length);
@@ -91,7 +91,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     }
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, paddedAddress));
-    s_onRampTestHelper.validateDestChainAddress(paddedAddress, addressBytesLength);
+    s_OnRampHelper.validateDestChainAddress(paddedAddress, addressBytesLength);
   }
 
   function test_validateDestChainAddress_RevertWhen_InvalidDestChainAddress_LengthTooShort() public {
@@ -99,7 +99,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     uint8 addressBytesLength = 32;
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, rawAddress));
-    s_onRampTestHelper.validateDestChainAddress(rawAddress, addressBytesLength);
+    s_OnRampHelper.validateDestChainAddress(rawAddress, addressBytesLength);
   }
 
   function test_validateDestChainAddress_RevertWhen_InvalidDestChainAddress_LengthTooLong() public {
@@ -107,7 +107,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     uint8 addressBytesLength = 32;
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, rawAddress));
-    s_onRampTestHelper.validateDestChainAddress(rawAddress, addressBytesLength);
+    s_OnRampHelper.validateDestChainAddress(rawAddress, addressBytesLength);
   }
 
   function test_validateDestChainAddress_RevertWhen_21BytesFor20ByteAddress() public {
@@ -115,6 +115,6 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     uint8 addressBytesLength = 20;
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, rawAddress));
-    s_onRampTestHelper.validateDestChainAddress(rawAddress, addressBytesLength);
+    s_OnRampHelper.validateDestChainAddress(rawAddress, addressBytesLength);
   }
 }

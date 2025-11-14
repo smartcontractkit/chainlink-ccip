@@ -6,8 +6,7 @@ import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 
-/// @notice Test wrapper for OnRamp to expose internal functions for testing.
-contract OnRampTestHelper is OnRamp {
+contract OnRampHelper is OnRamp {
   constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) OnRamp(staticConfig, dynamicConfig) {}
 
   /// @notice Exposes the internal _parseExtraArgsWithDefaults function for testing.
@@ -60,12 +59,11 @@ contract OnRampTestHelper is OnRamp {
     return _lockOrBurnSingleToken(tokenAndAmount, destChainSelector, receiver, originalSender, finality, tokenArgs);
   }
 
-  /// @notice Exposes the internal _getReceipts function for testing.
   function getReceipts(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
-  ) external view returns (Receipt[] memory) {
+  ) external view returns (Receipt[] memory verifierReceipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) {
     return _getReceipts(destChainSelector, message, extraArgs);
   }
 }

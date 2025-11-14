@@ -126,7 +126,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // for verifiers and executors, this is the user specified value, even if the call is ultimately handled by some
     // underlying contract.
     address issuer; // ───────────╮
-    uint64 destGasLimit; //       │ The gas limit for the actions taken on the destination chain for this entity.
+    uint32 destGasLimit; //       │ The gas limit for the actions taken on the destination chain for this entity.
     uint32 destBytesOverhead; // ─╯ The byte overhead for the actions taken on the destination chain for this entity.
     uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
     bytes extraArgs; // Extra args that have been passed in on the source chain. May be empty.
@@ -183,6 +183,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32 messageId) {
+    if (i_rmnRemote.isCursed(bytes16(uint128(destChainSelector)))) {
+      revert CursedByRMN(destChainSelector);
+    }
     // We rely on a reentrancy guard here due to the untrusted calls performed to the pools. This enables some
     // optimizations by not following the CEI pattern.
     if (s_dynamicConfig.reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
@@ -205,10 +208,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
       sequenceNumber: ++destChainConfig.sequenceNumber,
+      executionGasLimit: 0, // Populated after getting receipts.
+      ccipReceiveGasLimit: resolvedExtraArgs.gasLimit,
+      finality: resolvedExtraArgs.blockConfirmations,
+      ccvAndExecutorHash: bytes32(0), // Will be set after CCV list is finalized.
       onRampAddress: abi.encodePacked(address(this)),
       offRampAddress: destChainConfig.offRamp,
-      finality: resolvedExtraArgs.blockConfirmations,
-      gasLimit: resolvedExtraArgs.gasLimit,
       sender: abi.encodePacked(originalSender),
       receiver: validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
       // Executor args hold security critical execution args, like Solana accounts or Sui object IDs. Because of this,
@@ -236,13 +241,17 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       );
     }
 
+    // Set the ccvAndExecutorHash now that the CCV list is finalized.
+    newMessage.ccvAndExecutorHash =
+      MessageV1Codec._computeCCVAndExecutorHash(resolvedExtraArgs.ccvs, resolvedExtraArgs.executor);
+
     // 3. getFee on all verifiers, pool and executor.
 
     CCIPMessageSentEventData memory eventData;
     // Populate receipts for verifiers, pool and executor in that order.
-    eventData.receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
+    (eventData.receipts, newMessage.executionGasLimit,) = _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
-    // 4. lockOrBurn
+    // 4. lockOrBurn.
 
     if (message.tokenAmounts.length != 0) {
       if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
@@ -276,7 +285,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       );
     }
 
-    // 7. emit event
+    // 7. emit event.
     emit CCIPMessageSent(
       destChainSelector,
       newMessage.sequenceNumber,
@@ -727,31 +736,22 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     );
 
     // We sum the fees for the verifier, executor and the pool (if any).
-    Receipt[] memory receipts = _getReceipts(destChainSelector, message, resolvedExtraArgs);
+    (,, uint256 usdCentsFee) = _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
-    uint256 destGasLimit = 0;
-    uint256 destBytesOverhead = 0;
-
-    // Sum all receipts.
-    for (uint256 i = 0; i < receipts.length; ++i) {
-      feeTokenAmount += receipts[i].feeTokenAmount;
-      destGasLimit += receipts[i].destGasLimit;
-      destBytesOverhead += receipts[i].destBytesOverhead;
-    }
-
-    // TODO: handle destBytes & gas
+    // TODO: handle gas to fee token conversion here.
 
     // TODO: it currently returns dollars, not fee token amount.
-    return feeTokenAmount;
+    return usdCentsFee;
   }
 
   function _getReceipts(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
-  ) internal view returns (Receipt[] memory verifierReceipts) {
+  ) internal view returns (Receipt[] memory verifierReceipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) {
     // Already ensure there's room for the token transfer and executor receipts.
     verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
+    uint32 bytesOverheadSum = 0;
 
     for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
       address implAddress = ICrossChainVerifierResolver(extraArgs.ccvs[i]).getOutboundImplementation(
@@ -771,10 +771,19 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         feeTokenAmount: feeUSDCents,
         extraArgs: extraArgs.ccvArgs[i]
       });
+
+      gasLimitSum += gasForVerification;
+      bytesOverheadSum += payloadSizeBytes;
+      feeUSDCentsSum += feeUSDCents;
     }
 
+    // This includes the user callback gas limit.
     verifierReceipts[verifierReceipts.length - 1] =
       _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
+
+    gasLimitSum += verifierReceipts[verifierReceipts.length - 1].destGasLimit;
+    bytesOverheadSum += verifierReceipts[verifierReceipts.length - 1].destBytesOverhead;
+    feeUSDCentsSum += verifierReceipts[verifierReceipts.length - 1].feeTokenAmount;
 
     if (message.tokenAmounts.length > 0) {
       IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(message.tokenAmounts[0].token));
@@ -812,7 +821,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       verifierReceipts[verifierReceipts.length - 2] = tokenReceipt;
     }
 
-    return verifierReceipts;
+    // TODO include bytes overhead in gasLimit calculation
+
+    return (verifierReceipts, gasLimitSum, feeUSDCentsSum);
   }
 
   /// @notice Gets the execution fee receipt. Takes into account specifying the NO_EXECUTION_ADDRESS.
