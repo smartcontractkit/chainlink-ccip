@@ -13,7 +13,11 @@ import (
 
 func TestDecodeString(t *testing.T) {
 	// Load a hex-encoded CCIP message (v1) from a string
-	hexMessage := "0100000000000000010000000000000002000000000000000114912cf1ee1d4a3a302dfc64d70bd023e6839a5dd814baa5fa2b829e9c90d06cd4824ccb54f550386ebc000000030d401400007e64e1fb0c487f25dd6d3601ff6af8d32e4e1400007e64e1fb0c487f25dd6d3601ff6af8d32e4e000000a3010000000000000000000000000000000000000000000000000de0b6b3a764000014ce4ec7b524851e51d5c55eefbbb8e58e8ce2515f14e55c1374bc6a38cea4e86f3a7e5b1cf17db5418514e2c2bb2f43b91f65b5519708e340310394c72d8f2000000000000000000000000000007e64e1fb0c487f25dd6d3601ff6af8d32e4e00200000000000000000000000000000000000000000000000000000000000000012000d65326520746573742064617461"
+	hexMessage := "0x010000000000000001000000000000000200000000000000010005091000030d400000cbe110ff8af6bb46e2a4e352d0c9026e3902ad3f1369ad49c6a57fc740dee6a114912cf1ee1d4a3a302dfc64d70bd023e6839a5dd814baa5fa2b829e9c90d06cd4824ccb54f550386ebc1400007e64e1fb0c487f25dd6d3601ff6af8d32e4e1400007e64e1fb0c487f25dd6d3601ff6af8d32e4e00000097010000000000000000000000000000000000000000000000000de0b6b3a764000014ce4ec7b524851e51d5c55eefbbb8e58e8ce2515f14e55c1374bc6a38cea4e86f3a7e5b1cf17db5418514e2c2bb2f43b91f65b5519708e340310394c72d8f1400007e64e1fb0c487f25dd6d3601ff6af8d32e4e00200000000000000000000000000000000000000000000000000000000000000012000d65326520746573742064617461"
+	// Remove "0x" prefix if present
+	if len(hexMessage) >= 2 && hexMessage[0:2] == "0x" {
+		hexMessage = hexMessage[2:]
+	}
 	encodedMessage, err := hex.DecodeString(hexMessage)
 	require.NoError(t, err, "Failed to decode hex message")
 
@@ -34,10 +38,12 @@ type MessageV1 struct {
 	SourceChainSelector uint64
 	DestChainSelector   uint64
 	SequenceNumber      uint64
+	ExecutionGasLimit   uint32
+	CallbackGasLimit    uint32
+	Finality            uint16
+	CCVAndExecutorHash  [32]byte
 	OnRampAddress       []byte
 	OffRampAddress      []byte
-	Finality            uint16
-	GasLimit            uint32
 	Sender              []byte
 	Receiver            []byte
 	DestBlob            []byte
@@ -58,8 +64,8 @@ type TokenTransferV1 struct {
 
 // DecodeMessageV1 decodes a byte slice into a MessageV1 struct following the v1 protocol format.
 func DecodeMessageV1(encoded []byte) (*MessageV1, error) {
-	if len(encoded) < 37 {
-		return nil, fmt.Errorf("message too short: %d bytes", len(encoded))
+	if len(encoded) < 77 {
+		return nil, fmt.Errorf("message too short: %d bytes, minimum is 77", len(encoded))
 	}
 
 	msg := &MessageV1{}
@@ -72,7 +78,6 @@ func DecodeMessageV1(encoded []byte) (*MessageV1, error) {
 		return nil, fmt.Errorf("invalid version: %d", msg.Version)
 	}
 
-	// Protocol Header
 	// sourceChainSelector (8 bytes, big endian)
 	msg.SourceChainSelector = binary.BigEndian.Uint64(encoded[offset : offset+8])
 	offset += 8
@@ -85,7 +90,38 @@ func DecodeMessageV1(encoded []byte) (*MessageV1, error) {
 	msg.SequenceNumber = binary.BigEndian.Uint64(encoded[offset : offset+8])
 	offset += 8
 
+	// executionGasLimit (4 bytes, big endian)
+	if offset+4 > len(encoded) {
+		return nil, fmt.Errorf("executionGasLimit out of bounds")
+	}
+	msg.ExecutionGasLimit = binary.BigEndian.Uint32(encoded[offset : offset+4])
+	offset += 4
+
+	// callbackGasLimit (4 bytes, big endian)
+	if offset+4 > len(encoded) {
+		return nil, fmt.Errorf("callbackGasLimit out of bounds")
+	}
+	msg.CallbackGasLimit = binary.BigEndian.Uint32(encoded[offset : offset+4])
+	offset += 4
+
+	// finality (2 bytes, big endian)
+	if offset+2 > len(encoded) {
+		return nil, fmt.Errorf("finality out of bounds")
+	}
+	msg.Finality = binary.BigEndian.Uint16(encoded[offset : offset+2])
+	offset += 2
+
+	// ccvAndExecutorHash (32 bytes)
+	if offset+32 > len(encoded) {
+		return nil, fmt.Errorf("ccvAndExecutorHash out of bounds")
+	}
+	copy(msg.CCVAndExecutorHash[:], encoded[offset:offset+32])
+	offset += 32
+
 	// onRampAddressLength and onRampAddress
+	if offset >= len(encoded) {
+		return nil, fmt.Errorf("onRamp length out of bounds")
+	}
 	onRampLen := int(encoded[offset])
 	offset++
 	if offset+onRampLen > len(encoded) {
@@ -107,21 +143,6 @@ func DecodeMessageV1(encoded []byte) (*MessageV1, error) {
 	msg.OffRampAddress = make([]byte, offRampLen)
 	copy(msg.OffRampAddress, encoded[offset:offset+offRampLen])
 	offset += offRampLen
-
-	// User controlled data
-	// finality (2 bytes, big endian)
-	if offset+2 > len(encoded) {
-		return nil, fmt.Errorf("finality out of bounds")
-	}
-	msg.Finality = binary.BigEndian.Uint16(encoded[offset : offset+2])
-	offset += 2
-
-	// gasLimit (4 bytes, big endian)
-	if offset+4 > len(encoded) {
-		return nil, fmt.Errorf("gasLimit out of bounds")
-	}
-	msg.GasLimit = binary.BigEndian.Uint32(encoded[offset : offset+4])
-	offset += 4
 
 	// senderLength and sender
 	if offset >= len(encoded) {
@@ -296,21 +317,21 @@ func DecodeTokenTransferV1(encoded []byte, offset int) (*TokenTransferV1, int, e
 // PrettyPrintMessage formats a decoded message for readable output
 func PrettyPrintMessage(msg *MessageV1) string {
 	s := "=== CCIP Message V1 ===\n\n"
-	s += "Protocol Header:\n"
 	s += fmt.Sprintf("  Version:               %d\n", msg.Version)
 	s += fmt.Sprintf("  Source Chain Selector: %d (0x%x)\n", msg.SourceChainSelector, msg.SourceChainSelector)
 	s += fmt.Sprintf("  Dest Chain Selector:   %d (0x%x)\n", msg.DestChainSelector, msg.DestChainSelector)
 	s += fmt.Sprintf("  Sequence Number:       %d\n", msg.SequenceNumber)
+	s += fmt.Sprintf("  Execution Gas Limit:   %d\n", msg.ExecutionGasLimit)
+	s += fmt.Sprintf("  Callback Gas Limit:    %d\n", msg.CallbackGasLimit)
+	s += fmt.Sprintf("  Finality:              %d\n", msg.Finality)
+	s += fmt.Sprintf("  CCV & Executor Hash:   0x%x\n", msg.CCVAndExecutorHash)
 	s += fmt.Sprintf("  OnRamp Address:        %s\n", formatAddress(msg.OnRampAddress))
 	s += fmt.Sprintf("  OffRamp Address:       %s\n", formatAddress(msg.OffRampAddress))
 	s += "\n"
-
-	s += "User Controlled Data:\n"
-	s += fmt.Sprintf("  Finality:              %d\n", msg.Finality)
-	s += fmt.Sprintf("  Gas Limit:             %d\n", msg.GasLimit)
 	s += fmt.Sprintf("  Sender:                %s\n", formatAddress(msg.Sender))
 	s += fmt.Sprintf("  Receiver:              %s\n", formatAddress(msg.Receiver))
 	s += fmt.Sprintf("  Dest Blob:             %s (%d bytes)\n", formatHex(msg.DestBlob), len(msg.DestBlob))
+	s += fmt.Sprintf("  Data Payload:          %s (%d bytes)\n", formatHex(msg.Data), len(msg.Data))
 	s += "\n"
 
 	s += fmt.Sprintf("Token Transfers: %d\n", len(msg.TokenTransfers))
@@ -324,9 +345,7 @@ func PrettyPrintMessage(msg *MessageV1) string {
 		s += fmt.Sprintf("    Token Receiver:      %s\n", formatAddress(tt.TokenReceiver))
 		s += fmt.Sprintf("    Extra Data:          %s (%d bytes)\n", formatHex(tt.ExtraData), len(tt.ExtraData))
 	}
-	s += "\n"
 
-	s += fmt.Sprintf("Data Payload:          %s (%d bytes)\n", formatHex(msg.Data), len(msg.Data))
 	s += "\n"
 
 	return s
@@ -379,6 +398,30 @@ func TestMessageDecoding(t *testing.T) {
 	binary.BigEndian.PutUint64(seqNum, 42)
 	encoded = append(encoded, seqNum...)
 
+	// Execution Gas Limit (4 bytes): 330000
+	execGasLimit := make([]byte, 4)
+	binary.BigEndian.PutUint32(execGasLimit, 330000)
+	encoded = append(encoded, execGasLimit...)
+
+	// Callback Gas Limit (4 bytes): 200000
+	callbackGasLimit := make([]byte, 4)
+	binary.BigEndian.PutUint32(callbackGasLimit, 200000)
+	encoded = append(encoded, callbackGasLimit...)
+
+	// Finality (2 bytes): 100 blocks
+	finality := make([]byte, 2)
+	binary.BigEndian.PutUint16(finality, 100)
+	encoded = append(encoded, finality...)
+
+	// CCV and Executor Hash (32 bytes) - example hash
+	ccvAndExecutorHash := [32]byte{
+		0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
+		0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
+		0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
+		0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
+	}
+	encoded = append(encoded, ccvAndExecutorHash[:]...)
+
 	// OnRamp Address (1 byte length + 20 bytes address)
 	onRampAddr := common.HexToAddress("0x1234567890123456789012345678901234567890")
 	encoded = append(encoded, 20) // length
@@ -388,16 +431,6 @@ func TestMessageDecoding(t *testing.T) {
 	offRampAddr := common.HexToAddress("0x0987654321098765432109876543210987654321")
 	encoded = append(encoded, 20) // length
 	encoded = append(encoded, offRampAddr.Bytes()...)
-
-	// Finality (2 bytes): 100 blocks
-	finality := make([]byte, 2)
-	binary.BigEndian.PutUint16(finality, 100)
-	encoded = append(encoded, finality...)
-
-	// Gas Limit (4 bytes): 200000
-	gasLimit := make([]byte, 4)
-	binary.BigEndian.PutUint32(gasLimit, 200000)
-	encoded = append(encoded, gasLimit...)
 
 	// Sender Address (1 byte length + 20 bytes address)
 	senderAddr := common.HexToAddress("0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa")
@@ -478,10 +511,12 @@ func TestMessageDecoding(t *testing.T) {
 		require.Equal(t, uint64(16015286601757825753), msg.SourceChainSelector)
 		require.Equal(t, uint64(3478487238524512106), msg.DestChainSelector)
 		require.Equal(t, uint64(42), msg.SequenceNumber)
+		require.Equal(t, uint32(330000), msg.ExecutionGasLimit)
+		require.Equal(t, uint32(200000), msg.CallbackGasLimit)
+		require.Equal(t, uint16(100), msg.Finality)
+		require.Equal(t, ccvAndExecutorHash, msg.CCVAndExecutorHash)
 		require.Equal(t, onRampAddr.Bytes(), msg.OnRampAddress)
 		require.Equal(t, offRampAddr.Bytes(), msg.OffRampAddress)
-		require.Equal(t, uint16(100), msg.Finality)
-		require.Equal(t, uint32(200000), msg.GasLimit)
 		require.Equal(t, senderAddr.Bytes(), msg.Sender)
 		require.Equal(t, receiverAddr.Bytes(), msg.Receiver)
 		require.Empty(t, msg.DestBlob)
@@ -519,17 +554,25 @@ func TestMessageDecoding(t *testing.T) {
 		minEncoded = append(minEncoded, dstChain...)
 		minEncoded = append(minEncoded, seqNum...)
 
-		// Addresses
-		minEncoded = append(minEncoded, 20)
-		minEncoded = append(minEncoded, onRampAddr.Bytes()...)
-		minEncoded = append(minEncoded, 20)
-		minEncoded = append(minEncoded, offRampAddr.Bytes()...)
+		// Execution Gas Limit
+		minEncoded = append(minEncoded, execGasLimit...)
+
+		// Callback Gas Limit
+		minEncoded = append(minEncoded, callbackGasLimit...)
 
 		// Finality
 		minEncoded = append(minEncoded, finality...)
 
-		// Gas Limit
-		minEncoded = append(minEncoded, gasLimit...)
+		// CCV and Executor Hash
+		minEncoded = append(minEncoded, ccvAndExecutorHash[:]...)
+
+		// OnRamp Address
+		minEncoded = append(minEncoded, 20)
+		minEncoded = append(minEncoded, onRampAddr.Bytes()...)
+
+		// OffRamp Address
+		minEncoded = append(minEncoded, 20)
+		minEncoded = append(minEncoded, offRampAddr.Bytes()...)
 
 		// Sender and receiver
 		minEncoded = append(minEncoded, 20)

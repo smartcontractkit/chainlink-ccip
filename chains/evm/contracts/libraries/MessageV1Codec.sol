@@ -3,35 +3,35 @@ pragma solidity ^0.8.4;
 
 /// @notice Library for CCIP MessageV1 encoding/decoding operations.
 /// @dev This library handles the complete V1 message format protocol including:
-/// - MessageV1 and TokenTransferV1 struct definitions
-/// - Encoding/decoding functions with comprehensive error handling
-/// - Detailed error location tracking for debugging
+/// - MessageV1 and TokenTransferV1 struct definitions.
+/// - Encoding/decoding functions with comprehensive error handling.
+/// - Detailed error location tracking for debugging.
 library MessageV1Codec {
   error InvalidDataLength(EncodingErrorLocation location);
   error InvalidEncodingVersion(uint8 version);
 
   uint256 public constant MAX_NUMBER_OF_TOKENS = 1;
   // Base size of a MessageV1 without variable length fields.
-  // 1 (version) + 8 (sourceChain) + 8 (destChain) + 8 (seqNum) + 1 (onRampLen) + 1 (offRampLen) +
-  // 2 (finality) + 4 (gasLimit) + 1 (senderLen) + 1 (receiverLen) + 2 (destBlobLen) +
-  // 2 (tokenTransferLen) + 2 (dataLen)
-  uint256 public constant MESSAGE_V1_BASE_SIZE = 1 + 8 + 8 + 8 + 1 + 1 + 2 + 4 + 1 + 1 + 2 + 2 + 2;
+  // 1 (version) + 8 (sourceChain) + 8 (destChain) + 8 (seqNum) + 4 (executionGasLimit) +
+  // 4 (ccipReceiveGasLimit) + 2 (finality) + 32 (ccvAndExecutorHash) + 1 (onRampLen) + 1 (offRampLen) +
+  // 1 (senderLen) + 1 (receiverLen) + 2 (destBlobLen) + 2 (tokenTransferLen) + 2 (dataLen) = 77.
+  uint256 public constant MESSAGE_V1_BASE_SIZE = 1 + 8 + 8 + 8 + 4 + 4 + 2 + 32 + 1 + 1 + 1 + 1 + 2 + 2 + 2;
   // The base size plus 20 bytes for sender and 20 bytes for onRamp addresses.
   // To be added:
-  // - receiver, offRamp and destBlob are dest chain specific
-  // - data is user specified
-  // - token transfer is optional and has variable size fields
+  // - receiver, offRamp and destBlob are dest chain specific.
+  // - data is user specified.
+  // - token transfer is optional and has variable size fields.
   uint256 public constant MESSAGE_V1_EVM_SOURCE_BASE_SIZE = MESSAGE_V1_BASE_SIZE + 20 + 20;
   uint256 public constant MESSAGE_V1_REMOTE_CHAIN_ADDRESSES = 2;
 
   // Base size of a TokenTransferV1 without variable length fields.
   // 1 (version) + 32 (amount) + 1 (sourcePoolLen) + 1 (sourceTokenLen) + 1 (destTokenLen) +
-  // 1 (tokenReceiverLen) + 2 (extraDataLen)
+  // 1 (tokenReceiverLen) + 2 (extraDataLen).
   uint256 public constant TOKEN_TRANSFER_V1_BASE_SIZE = 1 + 32 + 1 + 1 + 1 + 1 + 2;
   // The base size plus 20 bytes for sourcePool, 20 bytes for sourceToken.
   // To be added:
-  // - destToken is dest chain specific
-  // - extraData is a variable length field that is billed separately
+  // - destToken is dest chain specific.
+  // - extraData is a variable length field that is billed separately.
   uint256 public constant TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE = TOKEN_TRANSFER_V1_BASE_SIZE + 20 + 20;
 
   enum EncodingErrorLocation {
@@ -41,7 +41,8 @@ library MessageV1Codec {
     MESSAGE_OFFRAMP_ADDRESS_LENGTH,
     MESSAGE_OFFRAMP_ADDRESS_CONTENT,
     MESSAGE_FINALITY,
-    MESSAGE_GAS_LIMIT,
+    MESSAGE_EXECUTION_GAS_LIMIT,
+    MESSAGE_CALLBACK_GAS_LIMIT,
     MESSAGE_SENDER_LENGTH,
     MESSAGE_SENDER_CONTENT,
     MESSAGE_RECEIVER_LENGTH,
@@ -82,19 +83,22 @@ library MessageV1Codec {
   }
 
   /// @notice Message format used in the v1 protocol.
-  /// Protocol Header.
+  /// Static length fields.
   ///   uint8 version;              Version, for future use and backwards compatibility.
   ///   uint64 sourceChainSelector; Source Chain Selector.
   ///   uint64 destChainSelector;   Destination Chain Selector.
   ///   uint64 sequenceNumber;      Auto-incrementing sequence number for the message.
+  ///   uint32 executionGasLimit;   Gas limit for message execution on the destination chain.
+  ///   uint32 ccipReceiveGasLimit;    Gas limit for the user callback on the destination chain.
+  ///   uint16 finality;            Configurable per-message finality value.
+  ///   bytes32 ccvAndExecutorHash; Hash of the verifiers and executor addresses.
+  ///
+  /// Variable length fields.
+  ///
   ///   uint8 onRampAddressLength;  Length of the onRamp Address in bytes.
   ///   bytes onRampAddress;        Source Chain OnRamp as unpadded bytes.
   ///   uint8 offRampAddressLength; Length of the offRamp Address in bytes.
   ///   bytes offRampAddress;       Destination Chain OffRamp as unpadded bytes.
-  ///
-  /// User controlled data.
-  ///   uint16 finality;            Configurable per-message finality value.
-  ///   uint32 gasLimit;            Gas limit for message execution on the destination chain.
   ///   uint8 senderLength;         Length of the Sender Address in bytes.
   ///   bytes sender;               Sender address as unpadded bytes.
   ///   uint8 receiverLength;       Length of the Receiver Address in bytes.
@@ -113,21 +117,28 @@ library MessageV1Codec {
   /// to storage it would be in its encoded form.
   // solhint-disable-next-line gas-struct-packing
   struct MessageV1 {
-    // Protocol Header.
-    uint64 sourceChainSelector; // ─╮ Source Chain Selector.
-    uint64 destChainSelector; //    │ Destination Chain Selector.
-    //                              │ Per-lane-unique sequence number for the message. When faster-than-finality is used
-    //                              │ the guarantee that this value is unique no longer holds. After a re-org, a message
-    //                              │ could end up with a different sequence number. Messages that are older than the
-    uint64 sequenceNumber; //  ─────╯ chain finality delay should all have unique per-lane sequence numbers.
+    /// @notice Source Chain Selector.
+    uint64 sourceChainSelector;
+    /// @notice Destination Chain Selector.
+    uint64 destChainSelector;
+    /// @notice Per-lane-unique sequence number for the message. When faster-than-finality is used the guarantee that
+    /// this value is unique no longer holds. After a re-org, a message could end up with a different sequence number.
+    /// Messages that are older than the chain finality delay should all have unique per-lane sequence numbers.
+    uint64 sequenceNumber;
+    // Gas limit for message execution on the destination chain.
+    uint32 executionGasLimit;
+    // Gas limit for the user callback on the destination chain.
+    uint32 ccipReceiveGasLimit;
+    // Configurable per-message finality value.
+    uint16 finality;
+    // A hash of the verifiers and executor addresses. This is used by the offchain systems to validate the list of CCVs
+    // and executor that should be used for this message.
+    bytes32 ccvAndExecutorHash;
+    // Variable length fields - must match wire format order.
     // Source chain onRamp, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
     bytes onRampAddress;
     // Destination chain offRamp, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
     bytes offRampAddress;
-    // Configurable per-message finality value.
-    uint16 finality;
-    // Gas limit for message execution on the destination chain.
-    uint32 gasLimit;
     // Source chain sender address, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
     bytes sender;
     // Destination chain receiver address, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
@@ -153,6 +164,41 @@ library MessageV1Codec {
     // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
     // has to be set for the specific token.
     bytes extraData;
+  }
+
+  /// @notice Computes the hash of CCVs and executor addresses, prefixed with a length byte. This length byte ensures
+  /// the use of unpadded encoding is safe. Because EVM addresses are always 20 bytes, the length is hard-coded.
+  /// @dev Without the length byte, an array of two addresses [A, B] would hash the same as [AB] (concatenated). That
+  /// would allow for potential misreporting of CCVs/executor unless the offchain system knows the address lengths for
+  /// all chains it supports.
+  /// @param ccvs Array of CCV (Cross-Chain Verifier) addresses.
+  /// @param executor Address of the executor.
+  /// @return hash The keccak256 hash of the encoded CCVs and executor.
+  function _computeCCVAndExecutorHash(address[] memory ccvs, address executor) internal pure returns (bytes32) {
+    uint256 encodedLength = 1 + ccvs.length * 20 + 20;
+    // We overprovision the bytes array to avoid out of bounds writes. Since we write EVM addresses which are 20 bytes,
+    // and the size of a write is 32 bytes, the maximum out of bounds we can have is 12 bytes.
+    bytes memory encoded = new bytes(encodedLength + 12);
+    encoded[0] = bytes1(uint8(20));
+
+    // Skip length (32 bytes) and address length byte (1 byte).
+    uint256 offset = 33;
+    for (uint256 i = 0; i < ccvs.length; ++i) {
+      address ccvsAddress = ccvs[i];
+
+      // Any overshoot here is safe due to the writing of the executor address below.
+      assembly {
+        mstore(add(encoded, offset), shl(96, ccvsAddress))
+        offset := add(offset, 20)
+      }
+    }
+    assembly {
+      // Overshoot here is also safe due to overallocation of the bytes array.
+      mstore(add(encoded, offset), shl(96, executor))
+      mstore(encoded, encodedLength)
+    }
+
+    return keccak256(encoded);
   }
 
   /// @notice Encodes a TokenTransferV1 struct into bytes.
@@ -203,67 +249,71 @@ library MessageV1Codec {
     bytes calldata encoded,
     uint256 offset
   ) internal pure returns (TokenTransferV1 memory tokenTransfer, uint256 newOffset) {
-    // version (1 byte).
-    if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_VERSION);
-    uint8 version = uint8(encoded[offset++]);
-    if (version != 1) revert InvalidEncodingVersion(version);
+    // Unchecked is safe because the offset is only incremented with validated lengths.
+    unchecked {
+      // version (1 byte).
+      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_VERSION);
+      uint8 version = uint8(encoded[offset++]);
+      if (version != 1) revert InvalidEncodingVersion(version);
 
-    // amount (32 bytes).
-    if (offset + 32 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_AMOUNT);
-    tokenTransfer.amount = uint256(bytes32(encoded[offset:offset + 32]));
-    offset += 32;
+      // amount (32 bytes).
+      if (offset + 32 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_AMOUNT);
+      tokenTransfer.amount = uint256(bytes32(encoded[offset:offset + 32]));
+      offset += 32;
 
-    // sourcePoolAddressLength and sourcePoolAddress.
-    if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_SOURCE_POOL_LENGTH);
-    uint8 sourcePoolAddressLength = uint8(encoded[offset++]);
-    if (offset + sourcePoolAddressLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_SOURCE_POOL_CONTENT);
+      // sourcePoolAddressLength and sourcePoolAddress.
+      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_SOURCE_POOL_LENGTH);
+      uint8 sourcePoolAddressLength = uint8(encoded[offset++]);
+      if (offset + sourcePoolAddressLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_SOURCE_POOL_CONTENT);
+      }
+
+      tokenTransfer.sourcePoolAddress = encoded[offset:offset + sourcePoolAddressLength];
+      offset += sourcePoolAddressLength;
+
+      // sourceTokenAddressLength and sourceTokenAddress.
+      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_SOURCE_TOKEN_LENGTH);
+      uint8 sourceTokenAddressLength = uint8(encoded[offset++]);
+      if (offset + sourceTokenAddressLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_SOURCE_TOKEN_CONTENT);
+      }
+
+      tokenTransfer.sourceTokenAddress = encoded[offset:offset + sourceTokenAddressLength];
+      offset += sourceTokenAddressLength;
+
+      // destTokenAddressLength and destTokenAddress.
+      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_DEST_TOKEN_LENGTH);
+      uint8 destTokenAddressLength = uint8(encoded[offset++]);
+      if (offset + destTokenAddressLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_DEST_TOKEN_CONTENT);
+      }
+
+      tokenTransfer.destTokenAddress = encoded[offset:offset + destTokenAddressLength];
+      offset += destTokenAddressLength;
+
+      // tokenReceiverLength and tokenReceiver.
+      if (offset >= encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_TOKEN_RECEIVER_LENGTH);
+      }
+      uint8 tokenReceiverLength = uint8(encoded[offset++]);
+      if (offset + tokenReceiverLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_TOKEN_RECEIVER_CONTENT);
+      }
+
+      tokenTransfer.tokenReceiver = encoded[offset:offset + tokenReceiverLength];
+      offset += tokenReceiverLength;
+
+      // extraDataLength and extraData.
+      if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_EXTRA_DATA_LENGTH);
+      uint16 extraDataLength = uint16(bytes2(encoded[offset:offset + 2]));
+      offset += 2;
+      if (offset + extraDataLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_EXTRA_DATA_CONTENT);
+      }
+
+      tokenTransfer.extraData = encoded[offset:offset + extraDataLength];
+      offset += extraDataLength;
     }
-
-    tokenTransfer.sourcePoolAddress = encoded[offset:offset + sourcePoolAddressLength];
-    offset += sourcePoolAddressLength;
-
-    // sourceTokenAddressLength and sourceTokenAddress.
-    if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_SOURCE_TOKEN_LENGTH);
-    uint8 sourceTokenAddressLength = uint8(encoded[offset++]);
-    if (offset + sourceTokenAddressLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_SOURCE_TOKEN_CONTENT);
-    }
-
-    tokenTransfer.sourceTokenAddress = encoded[offset:offset + sourceTokenAddressLength];
-    offset += sourceTokenAddressLength;
-
-    // destTokenAddressLength and destTokenAddress.
-    if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_DEST_TOKEN_LENGTH);
-    uint8 destTokenAddressLength = uint8(encoded[offset++]);
-    if (offset + destTokenAddressLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_DEST_TOKEN_CONTENT);
-    }
-
-    tokenTransfer.destTokenAddress = encoded[offset:offset + destTokenAddressLength];
-    offset += destTokenAddressLength;
-
-    // tokenReceiverLength and tokenReceiver.
-    if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_TOKEN_RECEIVER_LENGTH);
-    uint8 tokenReceiverLength = uint8(encoded[offset++]);
-    if (offset + tokenReceiverLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_TOKEN_RECEIVER_CONTENT);
-    }
-
-    tokenTransfer.tokenReceiver = encoded[offset:offset + tokenReceiverLength];
-    offset += tokenReceiverLength;
-
-    // extraDataLength and extraData.
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_EXTRA_DATA_LENGTH);
-    uint16 extraDataLength = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
-    if (offset + extraDataLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_EXTRA_DATA_CONTENT);
-    }
-
-    tokenTransfer.extraData = encoded[offset:offset + extraDataLength];
-    offset += extraDataLength;
-
     return (tokenTransfer, offset);
   }
 
@@ -292,29 +342,38 @@ library MessageV1Codec {
     }
     if (message.data.length > type(uint16).max) revert InvalidDataLength(EncodingErrorLocation.ENCODE_DATA_LENGTH);
 
+    // We need to partially encode it in three parts to avoid stack too deep issues.
+    bytes memory staticLengthSection = abi.encodePacked(
+      uint8(1), // version.
+      message.sourceChainSelector,
+      message.destChainSelector,
+      message.sequenceNumber,
+      message.executionGasLimit,
+      message.ccipReceiveGasLimit,
+      message.finality,
+      message.ccvAndExecutorHash
+    );
+
+    bytes memory dynamicLengthPart1 = abi.encodePacked(
+      uint8(message.onRampAddress.length),
+      message.onRampAddress,
+      uint8(message.offRampAddress.length),
+      message.offRampAddress,
+      uint8(message.sender.length),
+      message.sender
+    );
+
     // Encode token the transfer if present. We checked above that there is at most 1 token transfer.
+    // We define it below the partial encoding to avoid stack too deep errors.
     bytes memory encodedTokenTransfers;
     if (message.tokenTransfer.length > 0) {
       encodedTokenTransfers = _encodeTokenTransferV1(message.tokenTransfer[0]);
     }
 
-    // Encoding has to be split into groups to avoid "Stack too deep" errors.
-    return bytes.concat(
+    return abi.encodePacked(
+      staticLengthSection,
+      dynamicLengthPart1,
       abi.encodePacked(
-        uint8(1), // version.
-        message.sourceChainSelector,
-        message.destChainSelector,
-        message.sequenceNumber,
-        uint8(message.onRampAddress.length),
-        message.onRampAddress,
-        uint8(message.offRampAddress.length),
-        message.offRampAddress,
-        message.finality,
-        message.gasLimit
-      ),
-      abi.encodePacked(
-        uint8(message.sender.length),
-        message.sender,
         uint8(message.receiver.length),
         message.receiver,
         uint16(message.destBlob.length),
@@ -332,115 +391,113 @@ library MessageV1Codec {
   /// @return message The decoded MessageV1 struct.
   function _decodeMessageV1(
     bytes calldata encoded
-  ) internal pure returns (MessageV1 memory) {
-    if (encoded.length < 37) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_MIN_SIZE); // Minimum size check.
+  ) internal pure returns (MessageV1 memory message) {
+    // Unchecked is safe because the offset is only incremented with validated lengths.
+    unchecked {
+      if (encoded.length < MESSAGE_V1_BASE_SIZE) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_MIN_SIZE);
 
-    MessageV1 memory message;
-    uint256 offset = 0;
+      uint8 version = uint8(encoded[0]);
+      if (version != 1) revert InvalidEncodingVersion(version);
 
-    uint8 version = uint8(encoded[offset++]);
-    if (version != 1) revert InvalidEncodingVersion(version);
+      // sourceChainSelector (8 bytes, big endian).
+      message.sourceChainSelector = uint64(bytes8(encoded[1:9]));
 
-    // Protocol Header.
-    // sourceChainSelector (8 bytes, big endian).
-    message.sourceChainSelector = uint64(bytes8(encoded[offset:offset + 8]));
-    offset += 8;
+      // destChainSelector (8 bytes, big endian).
+      message.destChainSelector = uint64(bytes8(encoded[9:17]));
 
-    // destChainSelector (8 bytes, big endian).
-    message.destChainSelector = uint64(bytes8(encoded[offset:offset + 8]));
-    offset += 8;
+      // sequenceNumber (8 bytes, big endian).
+      message.sequenceNumber = uint64(bytes8(encoded[17:25]));
 
-    // sequenceNumber (8 bytes, big endian).
-    message.sequenceNumber = uint64(bytes8(encoded[offset:offset + 8]));
-    offset += 8;
+      // executionGasLimit (4 bytes, big endian).
+      message.executionGasLimit = uint32(bytes4(encoded[25:29]));
 
-    // onRampAddressLength and onRampAddress.
-    uint8 onRampAddressLength = uint8(encoded[offset++]);
-    if (offset + onRampAddressLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.MESSAGE_ONRAMP_ADDRESS_CONTENT);
+      // ccipReceiveGasLimit (4 bytes, big endian).
+      message.ccipReceiveGasLimit = uint32(bytes4(encoded[29:33]));
+
+      // finality (2 bytes, big endian).
+      message.finality = uint16(bytes2(encoded[33:35]));
+
+      message.ccvAndExecutorHash = bytes32(encoded[35:67]);
+
+      // onRampAddressLength and onRampAddress.
+      uint256 offset = 67;
+      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_ONRAMP_ADDRESS_CONTENT);
+      uint8 onRampAddressLength = uint8(encoded[offset++]);
+      if (offset + onRampAddressLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.MESSAGE_ONRAMP_ADDRESS_CONTENT);
+      }
+
+      message.onRampAddress = encoded[offset:offset + onRampAddressLength];
+      offset += onRampAddressLength;
+
+      // offRampAddressLength and offRampAddress.
+      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_OFFRAMP_ADDRESS_LENGTH);
+      uint8 offRampAddressLength = uint8(encoded[offset++]);
+      if (offset + offRampAddressLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.MESSAGE_OFFRAMP_ADDRESS_CONTENT);
+      }
+
+      message.offRampAddress = encoded[offset:offset + offRampAddressLength];
+      offset += offRampAddressLength;
+
+      // senderLength and sender.
+      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_SENDER_LENGTH);
+      uint8 senderLength = uint8(encoded[offset++]);
+      if (offset + senderLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.MESSAGE_SENDER_CONTENT);
+      }
+
+      message.sender = encoded[offset:offset + senderLength];
+      offset += senderLength;
+
+      // receiverLength and receiver.
+      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_RECEIVER_LENGTH);
+      uint8 receiverLength = uint8(encoded[offset++]);
+      if (offset + receiverLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.MESSAGE_RECEIVER_CONTENT);
+      }
+
+      message.receiver = encoded[offset:offset + receiverLength];
+      offset += receiverLength;
+
+      // destBlobLength and destBlob.
+      if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_DEST_BLOB_LENGTH);
+      uint16 destBlobLength = uint16(bytes2(encoded[offset:offset + 2]));
+      offset += 2;
+      if (offset + destBlobLength > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.MESSAGE_DEST_BLOB_CONTENT);
+      }
+
+      message.destBlob = encoded[offset:offset + destBlobLength];
+      offset += destBlobLength;
+
+      // tokenTransferLength and tokenTransfer.
+      if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_TOKEN_TRANSFER_LENGTH);
+      uint16 tokenTransferLength = uint16(bytes2(encoded[offset:offset + 2]));
+      offset += 2;
+
+      // Decode token transfer, which is either 0 or 1.
+      if (tokenTransferLength == 0) {
+        message.tokenTransfer = new TokenTransferV1[](0);
+      } else {
+        message.tokenTransfer = new TokenTransferV1[](1);
+        uint256 expectedEnd = offset + tokenTransferLength;
+        (message.tokenTransfer[0], offset) = _decodeTokenTransferV1(encoded, offset);
+        if (offset != expectedEnd) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_TOKEN_TRANSFER_CONTENT);
+      }
+
+      // dataLength and data.
+      if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_DATA_LENGTH);
+      uint16 dataLength = uint16(bytes2(encoded[offset:offset + 2]));
+      offset += 2;
+      if (offset + dataLength > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_DATA_CONTENT);
+
+      message.data = encoded[offset:offset + dataLength];
+      offset += dataLength;
+
+      // Ensure we've consumed all bytes.
+      if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_FINAL_OFFSET);
     }
-
-    message.onRampAddress = encoded[offset:offset + onRampAddressLength];
-    offset += onRampAddressLength;
-
-    // offRampAddressLength and offRampAddress.
-    if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_OFFRAMP_ADDRESS_LENGTH);
-    uint8 offRampAddressLength = uint8(encoded[offset++]);
-    if (offset + offRampAddressLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.MESSAGE_OFFRAMP_ADDRESS_CONTENT);
-    }
-
-    message.offRampAddress = encoded[offset:offset + offRampAddressLength];
-    offset += offRampAddressLength;
-
-    // User controlled data.
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_FINALITY);
-
-    // finality (2 bytes, big endian).
-    message.finality = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
-
-    // gasLimit (4 bytes, big endian).
-    if (offset + 4 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_GAS_LIMIT);
-    message.gasLimit = uint32(bytes4(encoded[offset:offset + 4]));
-    offset += 4;
-
-    // senderLength and sender.
-    if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_SENDER_LENGTH);
-    uint8 senderLength = uint8(encoded[offset++]);
-    if (offset + senderLength > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_SENDER_CONTENT);
-
-    message.sender = encoded[offset:offset + senderLength];
-    offset += senderLength;
-
-    // receiverLength and receiver.
-    if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_RECEIVER_LENGTH);
-    uint8 receiverLength = uint8(encoded[offset++]);
-    if (offset + receiverLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.MESSAGE_RECEIVER_CONTENT);
-    }
-
-    message.receiver = encoded[offset:offset + receiverLength];
-    offset += receiverLength;
-
-    // destBlobLength and destBlob.
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_DEST_BLOB_LENGTH);
-    uint16 destBlobLength = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
-    if (offset + destBlobLength > encoded.length) {
-      revert InvalidDataLength(EncodingErrorLocation.MESSAGE_DEST_BLOB_CONTENT);
-    }
-
-    message.destBlob = encoded[offset:offset + destBlobLength];
-    offset += destBlobLength;
-
-    // tokenTransferLength and tokenTransfer.
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_TOKEN_TRANSFER_LENGTH);
-    uint16 tokenTransferLength = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
-
-    // Decode token transfer, which is either 0 or 1.
-    if (tokenTransferLength == 0) {
-      message.tokenTransfer = new TokenTransferV1[](0);
-    } else {
-      message.tokenTransfer = new TokenTransferV1[](1);
-      uint256 expectedEnd = offset + tokenTransferLength;
-      (message.tokenTransfer[0], offset) = _decodeTokenTransferV1(encoded, offset);
-      if (offset != expectedEnd) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_TOKEN_TRANSFER_CONTENT);
-    }
-
-    // dataLength and data.
-    if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_DATA_LENGTH);
-    uint16 dataLength = uint16(bytes2(encoded[offset:offset + 2]));
-    offset += 2;
-    if (offset + dataLength > encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_DATA_CONTENT);
-
-    message.data = encoded[offset:offset + dataLength];
-    offset += dataLength;
-
-    // Ensure we've consumed all bytes.
-    if (offset != encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_FINAL_OFFSET);
-
     return message;
   }
 }

@@ -5,21 +5,21 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
-import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
+import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {MockPoolV2} from "../../mocks/MockPoolV2.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract OnRamp_getCCVsForPool is OnRampSetup {
-  OnRampTestHelper internal s_onRampTestHelper;
+  OnRampHelper internal s_OnRampHelper;
   address internal s_token = makeAddr("token");
   address internal s_helperDefaultCCV;
 
   function setUp() public override {
     super.setUp();
 
-    s_onRampTestHelper = new OnRampTestHelper(
+    s_OnRampHelper = new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
@@ -48,7 +48,7 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
       offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
 
-    s_onRampTestHelper.applyDestChainConfigUpdates(destChainConfigArgs);
+    s_OnRampHelper.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
   function test_getCCVsForPool_ReturnsPoolCCVs_WhenPoolSupportsV2() public {
@@ -58,7 +58,7 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
 
     _deployPoolV2(expectedCCVs);
 
-    address[] memory result = s_onRampTestHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
+    address[] memory result = s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
 
     assertEq(result.length, expectedCCVs.length, "Should surface pool-provided CCVs");
     assertEq(result[0], expectedCCVs[0], "First CCV should match");
@@ -75,7 +75,7 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
       pool, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId), abi.encode(false)
     );
 
-    address[] memory result = s_onRampTestHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
+    address[] memory result = s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
 
     assertEq(result.length, 1, "Should fall back to default CCV when pool is V1");
     assertEq(result[0], s_helperDefaultCCV, "Returned CCV should be the helper default");
@@ -84,7 +84,7 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
   function test_getCCVsForPool_ReturnsDefaultCCVs_WhenPoolReturnsEmptyArray() public {
     _deployPoolV2(new address[](0));
 
-    address[] memory result = s_onRampTestHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
+    address[] memory result = s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
 
     assertEq(result.length, 1, "Should fall back to default CCV when pool is silent");
     assertEq(result[0], s_helperDefaultCCV, "Returned CCV should be the helper default");
@@ -98,7 +98,7 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
 
     _deployPoolV2(poolCCVs);
 
-    address[] memory result = s_onRampTestHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
+    address[] memory result = s_OnRampHelper.getCCVsForPool(DEST_CHAIN_SELECTOR, s_token, 100, 0, "");
 
     assertEq(result.length, poolCCVs.length, "Should substitute defaults for sentinel while preserving other CCVs");
     assertEq(result[0], poolCCVs[0], "First CCV should remain the pool requirement");
