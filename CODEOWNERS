@@ -8,6 +8,8 @@
 # solana development ownership
 /chains/solana @smartcontractkit/ccip-onchain-solana
 .github/workflows/solana.yml @smartcontractkit/ccip-onchain-solana
+.github/workflows/solana-verified-build.yml @smartcontractkit/ccip-onchain-solana
+.github/workflows/idl-compatibility-check.yml @smartcontractkit/ccip-onchain-solana
 
 # Deployment tooling
 /deployment @smartcontractkit/ccip-tooling

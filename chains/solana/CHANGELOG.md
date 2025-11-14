@@ -2,18 +2,26 @@
 
 This document describes the changes introduced in the different versions of the **Chainlink CCIP Solana programs**, located in [`chains/solana/contracts/programs`](https://github.com/smartcontractkit/chainlink-ccip/tree/main/chains/solana/contracts/programs).
 
----
+<!-- --- -->
 
-## [Unreleased] (1.6.0)
+<!-- ## [Unreleased] (1.6.1) -->
 <!-- ### Added
 - (Placeholder for upcoming features) -->
+
+<!-- ### Changed -->
+<!-- - (Placeholder for changes) -->
+
+<!-- ### Fixed
+- (Placeholder for bug fixes) -->
+
+---
+
+## [1.6.0]
 
 ### Changed
 
 - [Token Pools] Allow setting rate limit with rate and capacity set to 0 [#1290](https://github.com/smartcontractkit/chainlink-ccip/pull/1290)
 
-<!-- ### Fixed
-- (Placeholder for bug fixes) -->
 
 ---
 
@@ -32,8 +40,8 @@ This document describes the changes introduced in the different versions of the 
 
 ### Core Contracts & CCTP Token Pool
 
-    1. Commit [`7f8a0f403c3a`](https://github.com/smartcontractkit/chainlink-ccip/commit/7f8a0f403c3a)
-    1. Git Tag: [solana-v0.1.1-cctp](https://github.com/smartcontractkit/chainlink-ccip/releases/tag/solana-v0.1.1-cctp)
+1. Commit [`7f8a0f403c3a`](https://github.com/smartcontractkit/chainlink-ccip/commit/7f8a0f403c3a)
+1. Git Tag: [solana-v0.1.1-cctp](https://github.com/smartcontractkit/chainlink-ccip/releases/tag/solana-v0.1.1-cctp)
 
 #### Added
 
@@ -53,8 +61,8 @@ This document describes the changes introduced in the different versions of the 
 
 ### Lock and Release + Burn and Mint Token Pools
 
-    1. Commit: [`ee587a6c0562`](https://github.com/smartcontractkit/chainlink-ccip/commit/ee587a6c0562)
-    1. Git Tag: [solana-v0.1.1](https://github.com/smartcontractkit/chainlink-ccip/releases/tag/solana-v0.1.1)
+1. Commit: [`ee587a6c0562`](https://github.com/smartcontractkit/chainlink-ccip/commit/ee587a6c0562)
+1. Git Tag: [solana-v0.1.1](https://github.com/smartcontractkit/chainlink-ccip/releases/tag/solana-v0.1.1)
 
 #### Added
 

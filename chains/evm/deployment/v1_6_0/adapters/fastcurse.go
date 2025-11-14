@@ -222,6 +222,11 @@ func (ca *CurseAdapter) ListConnectedChains(e cldf.Environment, selector uint64)
 		if offRamp.OffRamp == (common.Address{}) {
 			continue // skip uninitialized off-ramps
 		}
+		// if chain is non-evm, skip ( TODO: support non-evm chains later)
+		_, exists := e.BlockChains.EVMChains()[offRamp.SourceChainSelector]
+		if !exists {
+			continue
+		}
 		connectedChains = append(connectedChains, offRamp.SourceChainSelector)
 	}
 	return connectedChains, nil
