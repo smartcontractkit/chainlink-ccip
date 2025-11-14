@@ -167,7 +167,7 @@ library MessageV1Codec {
   }
 
   /// @notice Computes the hash of CCVs and executor addresses, prefixed with a length byte. This length byte ensures
-  /// the use of encodePacked is safe. Because EVM addresses are always 20 bytes, the length is hard-coded.
+  /// the use of unpadded encoding is safe. Because EVM addresses are always 20 bytes, the length is hard-coded.
   /// @dev Without the length byte, an array of two addresses [A, B] would hash the same as [AB] (concatenated). That
   /// would allow for potential misreporting of CCVs/executor unless the offchain system knows the address lengths for
   /// all chains it supports.
@@ -175,21 +175,27 @@ library MessageV1Codec {
   /// @param executor Address of the executor.
   /// @return hash The keccak256 hash of the encoded CCVs and executor.
   function _computeCCVAndExecutorHash(address[] memory ccvs, address executor) internal pure returns (bytes32) {
-    bytes memory encoded = new bytes(1 + ccvs.length * 20 + 20);
+    uint256 encodedLength = 1 + ccvs.length * 20 + 20;
+    // We overprovision the bytes array to avoid out of bounds writes. Since we write EVM addresses which are 20 bytes,
+    // and the size of a write is 32 bytes, the maximum out of bounds we can have is 12 bytes.
+    bytes memory encoded = new bytes(encodedLength + 12);
     encoded[0] = bytes1(uint8(20));
 
-    // Skip length and address length bytes.
+    // Skip length (32 bytes) and address length byte (1 byte).
     uint256 offset = 33;
     for (uint256 i = 0; i < ccvs.length; ++i) {
       address ccvsAddress = ccvs[i];
 
+      // Any overshoot here is safe due to the writing of the executor address below.
       assembly {
         mstore(add(encoded, offset), shl(96, ccvsAddress))
         offset := add(offset, 20)
       }
     }
     assembly {
+      // Overshoot here is also safe due to overallocation of the bytes array.
       mstore(add(encoded, offset), shl(96, executor))
+      mstore(encoded, encodedLength)
     }
 
     return keccak256(encoded);
