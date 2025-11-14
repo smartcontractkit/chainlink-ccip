@@ -56,8 +56,8 @@ type ExecuteOffchainConfig struct {
 	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
 	MultipleReportsEnabled bool `json:"multipleReports"`
 
-	// SolanaChainWriterConfigVersion is a feature flag to specify which version of Solana ChainWriter configs to initialize
-	// the plugin with.
+	// SolanaChainWriterConfigVersion is a feature flag to specify which version of Solana ChainWriter configs to
+	// initialize the plugin with.
 	//
 	// Deprecated: this feature flag is no longer needed since only the latest version of the Solana ChainWriter config is
 	// used
