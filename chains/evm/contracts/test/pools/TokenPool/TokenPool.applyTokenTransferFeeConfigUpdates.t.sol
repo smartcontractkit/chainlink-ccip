@@ -111,7 +111,9 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
   }
 
-  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTokenTransferFeeConfig_EnabledWithZeroGasOverhead() public {
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTokenTransferFeeConfig_EnabledWithZeroGasOverhead()
+    public
+  {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 0, // Zero gas overhead
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
@@ -130,7 +132,8 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
   }
 
-  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTokenTransferFeeConfig_EnabledWithZeroBytesOverhead() public {
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTokenTransferFeeConfig_EnabledWithZeroBytesOverhead(
+  ) public {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: 0, // Zero bytes overhead
