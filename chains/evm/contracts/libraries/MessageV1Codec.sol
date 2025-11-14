@@ -3,9 +3,9 @@ pragma solidity ^0.8.4;
 
 /// @notice Library for CCIP MessageV1 encoding/decoding operations.
 /// @dev This library handles the complete V1 message format protocol including:
-/// - MessageV1 and TokenTransferV1 struct definitions
-/// - Encoding/decoding functions with comprehensive error handling
-/// - Detailed error location tracking for debugging
+/// - MessageV1 and TokenTransferV1 struct definitions.
+/// - Encoding/decoding functions with comprehensive error handling.
+/// - Detailed error location tracking for debugging.
 library MessageV1Codec {
   error InvalidDataLength(EncodingErrorLocation location);
   error InvalidEncodingVersion(uint8 version);
@@ -14,24 +14,24 @@ library MessageV1Codec {
   // Base size of a MessageV1 without variable length fields.
   // 1 (version) + 8 (sourceChain) + 8 (destChain) + 8 (seqNum) + 4 (executionGasLimit) +
   // 4 (ccipReceiveGasLimit) + 2 (finality) + 32 (ccvAndExecutorHash) + 1 (onRampLen) + 1 (offRampLen) +
-  // 1 (senderLen) + 1 (receiverLen) + 2 (destBlobLen) + 2 (tokenTransferLen) + 2 (dataLen) = 77
+  // 1 (senderLen) + 1 (receiverLen) + 2 (destBlobLen) + 2 (tokenTransferLen) + 2 (dataLen) = 77.
   uint256 public constant MESSAGE_V1_BASE_SIZE = 1 + 8 + 8 + 8 + 4 + 4 + 2 + 32 + 1 + 1 + 1 + 1 + 2 + 2 + 2;
   // The base size plus 20 bytes for sender and 20 bytes for onRamp addresses.
   // To be added:
-  // - receiver, offRamp and destBlob are dest chain specific
-  // - data is user specified
-  // - token transfer is optional and has variable size fields
+  // - receiver, offRamp and destBlob are dest chain specific.
+  // - data is user specified.
+  // - token transfer is optional and has variable size fields.
   uint256 public constant MESSAGE_V1_EVM_SOURCE_BASE_SIZE = MESSAGE_V1_BASE_SIZE + 20 + 20;
   uint256 public constant MESSAGE_V1_REMOTE_CHAIN_ADDRESSES = 2;
 
   // Base size of a TokenTransferV1 without variable length fields.
   // 1 (version) + 32 (amount) + 1 (sourcePoolLen) + 1 (sourceTokenLen) + 1 (destTokenLen) +
-  // 1 (tokenReceiverLen) + 2 (extraDataLen)
+  // 1 (tokenReceiverLen) + 2 (extraDataLen).
   uint256 public constant TOKEN_TRANSFER_V1_BASE_SIZE = 1 + 32 + 1 + 1 + 1 + 1 + 2;
   // The base size plus 20 bytes for sourcePool, 20 bytes for sourceToken.
   // To be added:
-  // - destToken is dest chain specific
-  // - extraData is a variable length field that is billed separately
+  // - destToken is dest chain specific.
+  // - extraData is a variable length field that is billed separately.
   uint256 public constant TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE = TOKEN_TRANSFER_V1_BASE_SIZE + 20 + 20;
 
   enum EncodingErrorLocation {

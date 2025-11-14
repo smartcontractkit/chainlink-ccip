@@ -14,7 +14,7 @@ contract OnRamp_getReceipts is OnRampSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    // Mock CCV responses for the default CCV from OnRampSetup
+    // Mock CCV responses for the default CCV from OnRampSetup.
     vm.mockCall(
       s_defaultCCV,
       abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector),
@@ -57,16 +57,16 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     assertEq(receipts.length, 2, "Should have 2 receipts: 1 CCV + 1 executor");
 
-    // Verify CCV receipt
+    // Verify CCV receipt.
     assertEq(receipts[0].issuer, s_defaultCCV, "First receipt issuer should be CCV");
     assertEq(receipts[0].destGasLimit, DEFAULT_CCV_GAS_LIMIT, "CCV gas limit should match");
 
-    // Verify executor receipt
+    // Verify executor receipt.
     assertEq(receipts[1].issuer, s_defaultExecutor, "Last receipt issuer should be executor");
     assertEq(receipts[1].destGasLimit, BASE_EXEC_GAS_COST + GAS_LIMIT);
     assertEq(receipts[1].feeTokenAmount, DEFAULT_EXEC_FEE_USD_CENTS);
 
-    // Verify total gasLimitSum includes extraArgs.gasLimit
+    // Verify total gasLimitSum includes extraArgs.gasLimit.
     uint32 expectedGasLimitSum = DEFAULT_CCV_GAS_LIMIT + BASE_EXEC_GAS_COST + GAS_LIMIT;
 
     assertEq(gasLimitSum, expectedGasLimitSum);

@@ -36,7 +36,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
   function test_forwardFromRouter_SequenceNumberPersistsAndIncrements() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
-    // use the stored seq as a running expected value
+    // Use the stored seq as a running expected value.
     OnRamp.DestChainConfig memory destConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     destConfig.sequenceNumber++;
     // 1) Expect seq to increment for the first message.
@@ -83,7 +83,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     });
     bytes32 messageId2 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
-    // Verify sequence numbers and message id are different
+    // Verify sequence numbers and message id are different.
     assertTrue(messageId1 != messageId2);
     OnRamp.DestChainConfig memory finalConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(finalConfig.sequenceNumber, destConfig.sequenceNumber);
@@ -114,7 +114,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
   function test_forwardFromRouter_RevertWhen_CursedByRMN() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
-    // Set a curse on the specific destination chain (subject-specific, not global)
+    // Set a curse on the specific destination chain (subject-specific, not global).
     _setMockRMNChainCurse(DEST_CHAIN_SELECTOR, true);
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.CursedByRMN.selector, DEST_CHAIN_SELECTOR));
