@@ -73,7 +73,7 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, disableTokenTransferFeeConfigs);
   }
 
-  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_DefaultBpsTooHigh() public {
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTransferFeeBps_DefaultBpsTooHigh() public {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
@@ -92,7 +92,7 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
   }
 
-  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_CustomBpsTooHigh() public {
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTransferFeeBps_CustomBpsTooHigh() public {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
@@ -122,26 +122,6 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
       defaultBlockConfirmationTransferFeeBps: 100,
       customBlockConfirmationTransferFeeBps: 200,
       isEnabled: true // Enabled with zero gas
-    });
-
-    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
-    feeConfigArgs[0] =
-      TokenPool.TokenTransferFeeConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, tokenTransferFeeConfig: feeConfig});
-
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidTokenTransferFeeConfig.selector, DEST_CHAIN_SELECTOR));
-    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
-  }
-
-  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTokenTransferFeeConfig_EnabledWithZeroBytesOverhead(
-  ) public {
-    IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
-      destGasOverhead: 50_000,
-      destBytesOverhead: 0, // Zero bytes overhead
-      defaultBlockConfirmationFeeUSDCents: 100,
-      customBlockConfirmationFeeUSDCents: 150,
-      defaultBlockConfirmationTransferFeeBps: 100,
-      customBlockConfirmationTransferFeeBps: 200,
-      isEnabled: true // Enabled with zero bytes
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);

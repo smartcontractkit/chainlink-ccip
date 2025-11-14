@@ -1102,8 +1102,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       if (tokenTransferFeeConfig.customBlockConfirmationTransferFeeBps >= BPS_DIVIDER) {
         revert InvalidTransferFeeBps(tokenTransferFeeConfig.customBlockConfirmationTransferFeeBps);
       }
-      // Gas and bytes overhead must be non-zero for proper fee accounting.
-      if (tokenTransferFeeConfig.destGasOverhead == 0 || tokenTransferFeeConfig.destBytesOverhead == 0) {
+      // Gas overhead must be non-zero for proper fee accounting.
+      if (tokenTransferFeeConfig.destGasOverhead == 0) {
         revert InvalidTokenTransferFeeConfig(destChainSelector);
       }
 
