@@ -26,7 +26,8 @@ contract TokenPoolV2_applyFee is TokenPoolV2Setup {
         defaultBlockConfirmationFeeUSDCents: 0,
         customBlockConfirmationFeeUSDCents: 0,
         defaultBlockConfirmationTransferFeeBps: defaultBlockConfirmationTransferFeeBps,
-        customBlockConfirmationTransferFeeBps: customBlockConfirmationTransferFeeBps
+        customBlockConfirmationTransferFeeBps: customBlockConfirmationTransferFeeBps,
+        isEnabled: true
       })
     });
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
@@ -57,7 +58,8 @@ contract TokenPoolV2_applyFee is TokenPoolV2Setup {
         defaultBlockConfirmationFeeUSDCents: 0,
         customBlockConfirmationFeeUSDCents: 0,
         defaultBlockConfirmationTransferFeeBps: defaultBlockConfirmationTransferFeeBps,
-        customBlockConfirmationTransferFeeBps: 0
+        customBlockConfirmationTransferFeeBps: 0,
+        isEnabled: true
       })
     });
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));

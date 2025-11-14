@@ -16,7 +16,8 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
       defaultBlockConfirmationFeeUSDCents: 100, // $1.00
       customBlockConfirmationFeeUSDCents: 150, // $1.50
       defaultBlockConfirmationTransferFeeBps: 123,
-      customBlockConfirmationTransferFeeBps: 456
+      customBlockConfirmationTransferFeeBps: 456,
+      isEnabled: true
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -36,6 +37,7 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     assertEq(returnedFeeConfig.customBlockConfirmationFeeUSDCents, feeConfig.customBlockConfirmationFeeUSDCents);
     assertEq(returnedFeeConfig.defaultBlockConfirmationTransferFeeBps, feeConfig.defaultBlockConfirmationTransferFeeBps);
     assertEq(returnedFeeConfig.customBlockConfirmationTransferFeeBps, feeConfig.customBlockConfirmationTransferFeeBps);
+    assertEq(returnedFeeConfig.isEnabled, feeConfig.isEnabled);
   }
 
   function test_getTokenTransferFeeConfig_DeleteConfig() public {
@@ -57,5 +59,6 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     assertEq(tokenTransferFeeConfig.customBlockConfirmationFeeUSDCents, 0);
     assertEq(tokenTransferFeeConfig.defaultBlockConfirmationTransferFeeBps, 0);
     assertEq(tokenTransferFeeConfig.customBlockConfirmationTransferFeeBps, 0);
+    assertEq(tokenTransferFeeConfig.isEnabled, false);
   }
 }

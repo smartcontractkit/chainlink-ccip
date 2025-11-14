@@ -137,7 +137,8 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
         defaultBlockConfirmationFeeUSDCents: 0,
         customBlockConfirmationFeeUSDCents: 0,
         defaultBlockConfirmationTransferFeeBps: defaultBlockConfirmationTransferFeeBps,
-        customBlockConfirmationTransferFeeBps: customBlockConfirmationTransferFeeBps
+        customBlockConfirmationTransferFeeBps: customBlockConfirmationTransferFeeBps,
+        isEnabled: true
       })
     });
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));

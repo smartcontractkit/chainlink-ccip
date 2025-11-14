@@ -786,14 +786,42 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     feeUSDCentsSum += verifierReceipts[verifierReceipts.length - 1].feeTokenAmount;
 
     if (message.tokenAmounts.length > 0) {
-      // TODO pool fees and add them to the sum
-      verifierReceipts[verifierReceipts.length - 2] = Receipt({
+      IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(message.tokenAmounts[0].token));
+      bool isEnabled = false;
+
+      // issuer is set to the token address, fee distribution logic will resolve token → pool and distribute fees according to the pool version.
+      Receipt memory tokenReceipt = Receipt({
         issuer: message.tokenAmounts[0].token,
         destGasLimit: 0,
         destBytesOverhead: 0,
         feeTokenAmount: 0,
         extraArgs: extraArgs.tokenArgs
       });
+
+      // Try to call `IPoolV2.getFee` to fetch fee components if the pool supports IPoolV2.
+      if (IERC165(address(pool)).supportsInterface(type(IPoolV2).interfaceId)) {
+        (tokenReceipt.feeTokenAmount, tokenReceipt.destGasLimit, tokenReceipt.destBytesOverhead,, isEnabled) = IPoolV2(
+          address(pool)
+        ).getFee(
+          message.tokenAmounts[0].token,
+          destChainSelector,
+          message.tokenAmounts[0].amount,
+          message.feeToken,
+          extraArgs.blockConfirmations,
+          extraArgs.tokenArgs
+        );
+      }
+
+      // If the pool doesn't support IPoolV2 or config is disabled, fall back to FeeQuoter.
+      if (!isEnabled) {
+        (tokenReceipt.feeTokenAmount, tokenReceipt.destGasLimit, tokenReceipt.destBytesOverhead) =
+          IFeeQuoter(s_dynamicConfig.feeQuoter).getTokenTransferFee(destChainSelector, message.tokenAmounts[0].token);
+      }
+
+      feeUSDCentsSum += tokenReceipt.feeTokenAmount;
+      gasLimitSum += tokenReceipt.destGasLimit;
+      bytesOverheadSum += tokenReceipt.destBytesOverhead;
+      verifierReceipts[verifierReceipts.length - 2] = tokenReceipt;
     }
 
     // TODO include bytes overhead in gasLimit calculation

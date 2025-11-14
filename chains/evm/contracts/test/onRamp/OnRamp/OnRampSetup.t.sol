@@ -15,6 +15,17 @@ import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensio
 
 contract OnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
+  uint32 internal constant POOL_FEE_USD_CENTS = 100; // $1.00
+  uint32 internal constant POOL_GAS_OVERHEAD = 50000;
+  uint32 internal constant POOL_BYTES_OVERHEAD = 128;
+
+  uint32 internal constant FEE_QUOTER_FEE_USD_CENTS = 50; // $0.50
+  uint32 internal constant FEE_QUOTER_GAS_OVERHEAD = 30000;
+  uint32 internal constant FEE_QUOTER_BYTES_OVERHEAD = 64;
+
+  uint32 internal constant VERIFIER_FEE_USD_CENTS = 200; // $2.00
+  uint32 internal constant VERIFIER_GAS = 100000;
+  uint32 internal constant VERIFIER_BYTES = 256;
 
   OnRampHelper internal s_onRamp;
   OffRamp internal s_offRampOnRemoteChain = OffRamp(makeAddr("OffRampRemote"));
@@ -123,7 +134,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     );
   }
 
-  // Helper function to create GenericExtraArgsV3 struct
+  // Helper function to create GenericExtraArgsV3 struct.
   function _createV3ExtraArgs(
     address[] memory ccvAddresses,
     bytes[] memory ccvArgs
@@ -140,7 +151,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     });
   }
 
-  // Helper function to assert that two CCV arrays are equal (using parallel address and bytes arrays)
+  // Helper function to assert that two CCV arrays are equal (using parallel address and bytes arrays).
   function _assertCCVArraysEqual(
     address[] memory actualAddresses,
     bytes[] memory actualArgs,
@@ -159,7 +170,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     }
   }
 
-  // Helper to populate token transfers
+  // Helper to populate token transfers.
   function _populateTokenTransfers(
     MessageV1Codec.MessageV1 memory messageV1,
     Client.EVM2AnyMessage memory message

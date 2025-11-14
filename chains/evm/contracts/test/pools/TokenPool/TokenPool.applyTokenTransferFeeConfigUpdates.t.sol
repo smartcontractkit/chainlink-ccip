@@ -16,18 +16,19 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
       defaultBlockConfirmationFeeUSDCents: 100, // $1.00
       customBlockConfirmationFeeUSDCents: 150, // $1.50
       defaultBlockConfirmationTransferFeeBps: 100, // 1%
-      customBlockConfirmationTransferFeeBps: 200 // 2%
+      customBlockConfirmationTransferFeeBps: 200, // 2%
+      isEnabled: true
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] =
       TokenPool.TokenTransferFeeConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, tokenTransferFeeConfig: feeConfig});
 
-    uint64[] memory destToUseDefaultFeeConfigs = new uint64[](0);
+    uint64[] memory disableTokenTransferFeeConfigs = new uint64[](0);
 
     vm.expectEmit();
     emit TokenPool.TokenTransferFeeConfigUpdated(DEST_CHAIN_SELECTOR, feeConfig);
-    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, destToUseDefaultFeeConfigs);
+    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, disableTokenTransferFeeConfigs);
   }
 
   function test_applyTokenTransferFeeConfigUpdates_DeleteConfig() public {
@@ -38,7 +39,8 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
       defaultBlockConfirmationFeeUSDCents: 100,
       customBlockConfirmationFeeUSDCents: 150,
       defaultBlockConfirmationTransferFeeBps: 100,
-      customBlockConfirmationTransferFeeBps: 200
+      customBlockConfirmationTransferFeeBps: 200,
+      isEnabled: true
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -48,13 +50,13 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
 
     // Now delete it
-    uint64[] memory destToUseDefaultFeeConfigs = new uint64[](1);
-    destToUseDefaultFeeConfigs[0] = DEST_CHAIN_SELECTOR;
+    uint64[] memory disableTokenTransferFeeConfigs = new uint64[](1);
+    disableTokenTransferFeeConfigs[0] = DEST_CHAIN_SELECTOR;
 
     vm.expectEmit();
     emit TokenPool.TokenTransferFeeConfigDeleted(DEST_CHAIN_SELECTOR);
     s_tokenPool.applyTokenTransferFeeConfigUpdates(
-      new TokenPool.TokenTransferFeeConfigArgs[](0), destToUseDefaultFeeConfigs
+      new TokenPool.TokenTransferFeeConfigArgs[](0), disableTokenTransferFeeConfigs
     );
   }
 
@@ -65,20 +67,21 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     vm.prank(STRANGER);
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](0);
-    uint64[] memory destToUseDefaultFeeConfigs = new uint64[](0);
+    uint64[] memory disableTokenTransferFeeConfigs = new uint64[](0);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, destToUseDefaultFeeConfigs);
+    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, disableTokenTransferFeeConfigs);
   }
 
-  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_DefaultBpsTooHigh() public {
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTransferFeeBps_DefaultBpsTooHigh() public {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
       defaultBlockConfirmationFeeUSDCents: 0,
       customBlockConfirmationFeeUSDCents: 0,
       defaultBlockConfirmationTransferFeeBps: uint16(BPS_DIVIDER),
-      customBlockConfirmationTransferFeeBps: 0
+      customBlockConfirmationTransferFeeBps: 0,
+      isEnabled: true
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -89,14 +92,15 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
   }
 
-  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_CustomBpsTooHigh() public {
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTransferFeeBps_CustomBpsTooHigh() public {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
       defaultBlockConfirmationFeeUSDCents: 0,
       customBlockConfirmationFeeUSDCents: 0,
       defaultBlockConfirmationTransferFeeBps: 0,
-      customBlockConfirmationTransferFeeBps: uint16(BPS_DIVIDER)
+      customBlockConfirmationTransferFeeBps: uint16(BPS_DIVIDER),
+      isEnabled: true
     });
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -104,6 +108,46 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
       TokenPool.TokenTransferFeeConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, tokenTransferFeeConfig: feeConfig});
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidTransferFeeBps.selector, BPS_DIVIDER));
+    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+  }
+
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTokenTransferFeeConfig_EnabledWithZeroGasOverhead()
+    public
+  {
+    IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
+      destGasOverhead: 0, // Zero gas overhead
+      destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+      defaultBlockConfirmationFeeUSDCents: 100,
+      customBlockConfirmationFeeUSDCents: 150,
+      defaultBlockConfirmationTransferFeeBps: 100,
+      customBlockConfirmationTransferFeeBps: 200,
+      isEnabled: true // Enabled with zero gas
+    });
+
+    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
+    feeConfigArgs[0] =
+      TokenPool.TokenTransferFeeConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, tokenTransferFeeConfig: feeConfig});
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidTokenTransferFeeConfig.selector, DEST_CHAIN_SELECTOR));
+    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+  }
+
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTokenTransferFeeConfig_IsEnabledFalse() public {
+    IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
+      destGasOverhead: 50_000,
+      destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+      defaultBlockConfirmationFeeUSDCents: 100,
+      customBlockConfirmationFeeUSDCents: 150,
+      defaultBlockConfirmationTransferFeeBps: 100,
+      customBlockConfirmationTransferFeeBps: 200,
+      isEnabled: false // Cannot set isEnabled: false directly
+    });
+
+    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
+    feeConfigArgs[0] =
+      TokenPool.TokenTransferFeeConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, tokenTransferFeeConfig: feeConfig});
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidTokenTransferFeeConfig.selector, DEST_CHAIN_SELECTOR));
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
   }
 }
