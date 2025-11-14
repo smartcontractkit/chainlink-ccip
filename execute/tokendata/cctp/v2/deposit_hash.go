@@ -79,18 +79,16 @@ func parseDepositHashParams(msg CCTPv2DecodedMessage) (depositHashParams, error)
 	var err error
 
 	// Parse sourceDomain
-	sourceDomainParsed, err := strconv.ParseUint(msg.SourceDomain, 10, 32)
+	params.sourceDomain, err = parseUint32Param(msg.SourceDomain, "source domain")
 	if err != nil {
-		return params, fmt.Errorf("failed to parse source domain: %w", err)
+		return params, err
 	}
-	params.sourceDomain = uint32(sourceDomainParsed)
 
 	// Parse destinationDomain
-	destDomainParsed, err := strconv.ParseUint(msg.DestinationDomain, 10, 32)
+	params.destinationDomain, err = parseUint32Param(msg.DestinationDomain, "destination domain")
 	if err != nil {
-		return params, fmt.Errorf("failed to parse destination domain: %w", err)
+		return params, err
 	}
-	params.destinationDomain = uint32(destDomainParsed)
 
 	// Parse amount
 	params.amount = new(big.Int)
@@ -113,11 +111,10 @@ func parseDepositHashParams(msg CCTPv2DecodedMessage) (depositHashParams, error)
 	}
 
 	// Parse minFinalityThreshold
-	minFinalityParsed, err := strconv.ParseUint(msg.MinFinalityThreshold, 10, 32)
+	params.minFinalityThreshold, err = parseUint32Param(msg.MinFinalityThreshold, "min finality threshold")
 	if err != nil {
-		return params, fmt.Errorf("failed to parse min finality threshold: %w", err)
+		return params, err
 	}
-	params.minFinalityThreshold = uint32(minFinalityParsed)
 
 	// Parse hex addresses to bytes32
 	params.mintRecipient, err = hexToBytes32(msg.DecodedMessageBody.MintRecipient)
@@ -185,4 +182,13 @@ func hexToBytes32(hexStr string) ([32]byte, error) {
 	copy(result[32-len(decoded):], decoded)
 
 	return result, nil
+}
+
+// parseUint32Param converts the given string to a uint32
+func parseUint32Param(param string, paramName string) (uint32, error) {
+	parsed, err := strconv.ParseUint(param, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse %s: %w", paramName, err)
+	}
+	return uint32(parsed), nil
 }
