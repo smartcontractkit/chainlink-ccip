@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -43,20 +45,44 @@ import (
 
 var ccipMessageSentTopic = onramp.OnRampCCIPMessageSent{}.Topic()
 
+type SourceDestPair struct {
+	SourceChainSelector uint64
+	DestChainSelector   uint64
+}
+
+type AnyMsgSentEvent struct {
+	SequenceNumber uint64
+	// RawEvent contains the raw event depending on the chain:
+	//  EVM:   *onramp.OnRampCCIPMessageSent
+	//  Aptos: module_onramp.CCIPMessageSent
+	RawEvent any
+}
+
 type CCIP16EVM struct {
 	e                      *deployment.Environment
 	chainDetailsBySelector map[uint64]chainsel.ChainDetails
 	ethClients             map[uint64]*ethclient.Client
-	sequenceNumber         uint64
-	rawEvent               any
+	expectedSeqNumRange    map[SourceDestPair]ccipocr3common.SeqNumRange
+	expectedSeqNumExec     map[SourceDestPair][]uint64
+	msgSentEvents          []*AnyMsgSentEvent
+}
+
+func NewEmptyCCIP16EVM() *CCIP16EVM {
+	return &CCIP16EVM{
+		chainDetailsBySelector: make(map[uint64]chainsel.ChainDetails),
+		ethClients:             make(map[uint64]*ethclient.Client),
+		expectedSeqNumRange:    make(map[SourceDestPair]ccipocr3common.SeqNumRange),
+		expectedSeqNumExec:     make(map[SourceDestPair][]uint64),
+		msgSentEvents:          make([]*AnyMsgSentEvent, 0),
+	}
 }
 
 // NewCCIP16EVM creates new smart-contracts wrappers with utility functions for CCIP16EVM implementation.
 func NewCCIP16EVM(ctx context.Context, e *deployment.Environment) (*CCIP16EVM, error) {
 	_ = zerolog.Ctx(ctx)
-	return &CCIP16EVM{
-		e: e,
-	}, nil
+	out := NewEmptyCCIP16EVM()
+	out.e = e
+	return out, nil
 }
 
 func (m *CCIP16EVM) SetCLDF(e *deployment.Environment) {
@@ -88,7 +114,7 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 		Receiver:     common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32),
 		Data:         []byte("hello eoa"),
 		TokenAmounts: nil,
-		FeeToken:     feeTokens[1],
+		FeeToken:     common.HexToAddress("0x0"),
 		ExtraArgs:    nil,
 	}
 	const errCodeInsufficientFee = "0x07da6ee6"
@@ -119,23 +145,32 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 	}
 	l.Info().Msg("Got contract instances, preparing to send CCIP message")
 	fmt.Println("Got contract instances, preparing to send CCIP message")
-	c, err := onRamp.GetDynamicConfig(nil)
+	tx, err := fq.UpdatePrices(sender, fee_quoter.InternalPriceUpdates{
+		TokenPriceUpdates: []fee_quoter.InternalTokenPriceUpdate{
+			{
+				SourceToken: feeTokens[0],
+				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
+			},
+			{
+				SourceToken: feeTokens[1],
+				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
+			},
+		},
+		GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
+			{
+				DestChainSelector: dest,
+				UsdPerUnitGas:     big.NewInt(20000e9),
+			},
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get onramp dynamic config: %w", err)
+		return fmt.Errorf("failed to update prices: %w", err)
 	}
-	fmt.Println("Got onramp dynamic config:", c.FeeQuoter)
-	fq2, err := fee_quoter.NewFeeQuoter(
-		c.FeeQuoter,
-		m.e.BlockChains.EVMChains()[src].Client)
+	_, err = m.e.BlockChains.EVMChains()[src].Confirm(tx)
 	if err != nil {
-		return fmt.Errorf("failed to create fee quoter instance: %w", err)
+		return fmt.Errorf("failed to confirm update prices transaction: %w", err)
 	}
-	feeTokens2, err := fq2.GetFeeTokens(nil)
-	if err != nil {
-		return fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
-	}
-	fmt.Println("Got fee tokens from fee quoter:", feeTokens2)
-	
+
 	var retryCount int
 	for {
 		fee, err := r.GetFee(&bind.CallOpts{Context: ctx}, dest, msg)
@@ -187,8 +222,17 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 		}
 		fmt.Println("Found CCIPMessageSent event")
 
-		m.sequenceNumber = it.Event.SequenceNumber
-		m.rawEvent = it.Event
+		sourceDest := SourceDestPair{SourceChainSelector: src, DestChainSelector: dest}
+		m.msgSentEvents = append(m.msgSentEvents, &AnyMsgSentEvent{
+			SequenceNumber: it.Event.SequenceNumber,
+			RawEvent:       it.Event,
+		})
+		m.expectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
+			m.expectedSeqNumRange[sourceDest].Start(),
+			ccipocr3common.SeqNum(m.msgSentEvents[len(m.msgSentEvents)-1].SequenceNumber)}
+		m.expectedSeqNumExec[sourceDest] = append(
+			m.expectedSeqNumExec[sourceDest],
+			it.Event.SequenceNumber)
 
 		return nil
 	}
@@ -196,13 +240,155 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 
 func (m *CCIP16EVM) GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error) {
 	_ = zerolog.Ctx(ctx)
-	return m.sequenceNumber, nil
+	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
+	seqRange, ok := m.expectedSeqNumRange[sourceDest]
+	if !ok {
+		return 0, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
+	}
+	return uint64(seqRange.End()), nil
+}
+
+type CommitReportTracker struct {
+	seenMessages map[uint64]map[uint64]bool
+}
+
+func NewCommitReportTracker(sourceChainSelector uint64, seqNrs ccipocr3common.SeqNumRange) CommitReportTracker {
+	seenMessages := make(map[uint64]map[uint64]bool)
+	seenMessages[sourceChainSelector] = make(map[uint64]bool)
+
+	for i := seqNrs.Start(); i <= seqNrs.End(); i++ {
+		seenMessages[sourceChainSelector][uint64(i)] = false
+	}
+	return CommitReportTracker{seenMessages: seenMessages}
+}
+
+func (c *CommitReportTracker) visitCommitReport(sourceChainSelector uint64, minSeqNr uint64, maxSeqNr uint64) {
+	if _, ok := c.seenMessages[sourceChainSelector]; !ok {
+		return
+	}
+
+	for i := minSeqNr; i <= maxSeqNr; i++ {
+		c.seenMessages[sourceChainSelector][i] = true
+	}
+}
+
+func (c *CommitReportTracker) allCommited(sourceChainSelector uint64) bool {
+	for _, v := range c.seenMessages[sourceChainSelector] {
+		if !v {
+			return false
+		}
+	}
+	return true
 }
 
 // WaitOneSentEventBySeqNo wait and fetch strictly one CCIPMessageSent event by selector and sequence number and selector.
 func (m *CCIP16EVM) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
-	_ = zerolog.Ctx(ctx)
-	return nil, nil
+	l := zerolog.Ctx(ctx)
+	a := &sequences.EVMAdapter{}
+	offAddr, err := a.GetOffRampAddress(m.e.DataStore, to)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get off ramp address: %w", err)
+	}
+	fmt.Println("Got off ramp address:", common.Bytes2Hex(offAddr))
+	offRamp, err := offramp.NewOffRamp(
+		common.BytesToAddress(offAddr),
+		m.e.BlockChains.EVMChains()[to].Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create off ramp instance: %w", err)
+	}
+	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
+	seqRange, ok := m.expectedSeqNumRange[sourceDest]
+	if !ok {
+		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
+	}
+
+	ptr := uint64(0)
+
+	sink := make(chan *offramp.OffRampCommitReportAccepted)
+	subscription, err := offRamp.WatchCommitReportAccepted(&bind.WatchOpts{
+		Context: context.Background(),
+		Start:   &ptr,
+	}, sink)
+	if err != nil {
+		return nil, fmt.Errorf("error to subscribe CommitReportAccepted : %w", err)
+	}
+
+	seenMessages := NewCommitReportTracker(from, seqRange)
+
+	verifyCommitReport := func(report *offramp.OffRampCommitReportAccepted) bool {
+		processRoots := func(roots []offramp.InternalMerkleRoot) bool {
+			for _, mr := range roots {
+				l.Info().Msgf(
+					"Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
+					mr.MinSeqNr, mr.MaxSeqNr, to, from, seqRange.String(), report.PriceUpdates.TokenPriceUpdates,
+				)
+				seenMessages.visitCommitReport(from, mr.MinSeqNr, mr.MaxSeqNr)
+
+				if mr.SourceChainSelector == from &&
+					uint64(seqRange.Start()) >= mr.MinSeqNr &&
+					uint64(seqRange.End()) <= mr.MaxSeqNr {
+					l.Info().Msgf(
+						"All sequence numbers committed in a single report [%d, %d]",
+						seqRange.Start(), seqRange.End(),
+					)
+					return true
+				}
+
+				// if !enforceSingleCommit && seenMessages.allCommited(from) {
+				// 	l.Info().Msgf(
+				// 		"All sequence numbers already committed from range [%d, %d]",
+				// 		seqRange.Start(), seqRange.End(),
+				// 	)
+				// 	return true
+				// }
+			}
+			return false
+		}
+
+		return processRoots(report.BlessedMerkleRoots) || processRoots(report.UnblessedMerkleRoots)
+	}
+
+	defer subscription.Unsubscribe()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, nil
+		case <-ticker.C:
+			l.Info().Msgf("Waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
+				to, from, seqRange.String())
+
+			// Need to do this because the subscription sometimes fails to get the event.
+			iter, err := offRamp.FilterCommitReportAccepted(&bind.FilterOpts{
+				Context: ctx,
+			})
+
+			// In some test case the test ends while the filter is still running resulting in a context.Canceled error.
+			if err != nil && !errors.Is(err, context.Canceled) {
+				return nil, fmt.Errorf("error filtering CommitReportAccepted: %w", err)
+			}
+			for iter.Next() {
+				event := iter.Event
+				verified := verifyCommitReport(event)
+				if verified {
+					return event, nil
+				}
+			}
+		case subErr := <-subscription.Err():
+			return nil, fmt.Errorf("subscription error: %w", subErr)
+		case <-timer.C:
+			return nil, fmt.Errorf("timed out after waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
+				to, from, seqRange.String())
+		case report := <-sink:
+			verified := verifyCommitReport(report)
+			if verified {
+				return report, nil
+			}
+		}
+	}
 }
 
 // WaitOneExecEventBySeqNo wait and fetch strictly one ExecutionStateChanged event by sequence number and selector.

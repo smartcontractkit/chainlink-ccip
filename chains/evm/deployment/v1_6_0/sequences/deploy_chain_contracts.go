@@ -245,6 +245,21 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, onRampRef)
 
+		// Add Authorized Caller to NonceManager
+		_, err = cldf_ops.ExecuteOperation(b, nonce_manager.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[nonce_manager.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:      common.HexToAddress(nonceManagerRef.Address),
+			Args: nonce_manager.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{
+					common.HexToAddress(offRampRef.Address),
+					common.HexToAddress(onRampRef.Address),
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)

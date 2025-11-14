@@ -105,7 +105,7 @@ func NewDefaultCLDFBundle(e *deployment.Environment) operations.Bundle {
 func NewCCIPImplFromNetwork(typ string) (CCIP16ProductConfiguration, error) {
 	switch typ {
 	case "anvil", "geth":
-		return &ccipEVM.CCIP16EVM{}, nil
+		return ccipEVM.NewEmptyCCIP16EVM(), nil
 	case "solana":
 		panic("implement Solana")
 	case "sui":

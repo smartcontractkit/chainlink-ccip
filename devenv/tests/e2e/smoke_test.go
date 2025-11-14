@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -65,9 +66,8 @@ func TestE2ESmoke(t *testing.T) {
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Logf("Testing CCIP message from chain %d to chain %d", tc.fromSelector, tc.toSelector)
-				// use impls to initiate andverify message passing betwee two chains
-				// tc.implOne.GetExpectedNextSequenceNumber()
 				tc.implOne.SendMessage(t.Context(), tc.fromSelector, tc.toSelector, nil, nil)
+				tc.implOne.WaitOneSentEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 5*time.Minute)
 				// tc.implOne.WaitOneExecEventBySeqNo()
 				// tc.implTwo.SendMessage(..)
 			})
