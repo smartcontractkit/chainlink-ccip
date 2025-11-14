@@ -240,7 +240,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     }
 
     // If the pool doesn't support IPoolV2 or didn't provide fee config, fall back to FeeQuoter.
-    if (feeUSDCents == 0) {
+    if (destGasOverhead == 0) {
       (feeUSDCents, destGasOverhead, destBytesOverhead) =
         IFeeQuoter(address(s_feeQuoter)).getTokenTransferFee(DEST_CHAIN_SELECTOR, token);
     }
