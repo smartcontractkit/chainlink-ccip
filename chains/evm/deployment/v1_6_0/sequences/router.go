@@ -17,7 +17,8 @@ import (
 
 type RouterApplyRampUpdatesSequenceInput struct {
 	Address        common.Address
-	UpdatesByChain map[uint64]routerops.ApplyRampsUpdatesArgs
+	ChainSelector  uint64
+	UpdatesByChain routerops.ApplyRampsUpdatesArgs
 }
 
 var (
@@ -27,21 +28,19 @@ var (
 		"Updates OnRamps and OffRamps on Router contracts across multiple EVM chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input RouterApplyRampUpdatesSequenceInput) (sequences.OnChainOutput, error) {
 			writes := make([]contract.WriteOutput, 0)
-			for chainSel, update := range input.UpdatesByChain {
-				chain, ok := chains.EVMChains()[chainSel]
-				if !ok {
-					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSel)
-				}
-				report, err := operations.ExecuteOperation(b, routerops.ApplyRampUpdates, chain, contract.FunctionInput[routerops.ApplyRampsUpdatesArgs]{
-					ChainSelector: chain.Selector,
-					Address:       input.Address,
-					Args:          update,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute RouterApplyRampUpdatesOp on %s: %w", chain, err)
-				}
-				writes = append(writes, report.Output)
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
+			report, err := operations.ExecuteOperation(b, routerops.ApplyRampUpdates, chain, contract.FunctionInput[routerops.ApplyRampsUpdatesArgs]{
+				ChainSelector: chain.Selector,
+				Address:       input.Address,
+				Args:          input.UpdatesByChain,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute RouterApplyRampUpdatesOp on %s: %w", chain, err)
+			}
+			writes = append(writes, report.Output)
 			batch, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
