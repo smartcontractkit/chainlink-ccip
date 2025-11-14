@@ -551,6 +551,139 @@ func TestDepositHash_ParseDepositHashParams(t *testing.T) {
 	}
 }
 
+func TestDepositHash_ParseUint32Param(t *testing.T) {
+	tests := []struct {
+		name        string
+		param       string
+		paramName   string
+		want        uint32
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:      "parse zero",
+			param:     "0",
+			paramName: "test param",
+			want:      0,
+			wantErr:   false,
+		},
+		{
+			name:      "parse one",
+			param:     "1",
+			paramName: "test param",
+			want:      1,
+			wantErr:   false,
+		},
+		{
+			name:      "parse small number",
+			param:     "123",
+			paramName: "test param",
+			want:      123,
+			wantErr:   false,
+		},
+		{
+			name:      "parse max uint32",
+			param:     "4294967295",
+			paramName: "test param",
+			want:      4294967295,
+			wantErr:   false,
+		},
+		{
+			name:        "empty string",
+			param:       "",
+			paramName:   "empty param",
+			wantErr:     true,
+			errContains: "failed to parse empty param",
+		},
+		{
+			name:        "not a number",
+			param:       "not_a_number",
+			paramName:   "invalid param",
+			wantErr:     true,
+			errContains: "failed to parse invalid param",
+		},
+		{
+			name:        "uint32 overflow",
+			param:       "4294967296",
+			paramName:   "overflow param",
+			wantErr:     true,
+			errContains: "failed to parse overflow param",
+		},
+		{
+			name:        "negative number",
+			param:       "-1",
+			paramName:   "negative param",
+			wantErr:     true,
+			errContains: "failed to parse negative param",
+		},
+		{
+			name:        "decimal number",
+			param:       "1.5",
+			paramName:   "decimal param",
+			wantErr:     true,
+			errContains: "failed to parse decimal param",
+		},
+		{
+			name:        "hex format",
+			param:       "0xFF",
+			paramName:   "hex param",
+			wantErr:     true,
+			errContains: "failed to parse hex param",
+		},
+		{
+			name:        "number with leading spaces",
+			param:       "  123",
+			paramName:   "spaces param",
+			wantErr:     true,
+			errContains: "failed to parse spaces param",
+		},
+		{
+			name:        "number with trailing spaces",
+			param:       "123  ",
+			paramName:   "trailing spaces param",
+			wantErr:     true,
+			errContains: "failed to parse trailing spaces param",
+		},
+		{
+			name:        "mixed alphanumeric",
+			param:       "123abc",
+			paramName:   "mixed param",
+			wantErr:     true,
+			errContains: "failed to parse mixed param",
+		},
+		{
+			name:        "large overflow",
+			param:       "999999999999999999",
+			paramName:   "large overflow",
+			wantErr:     true,
+			errContains: "failed to parse large overflow",
+		},
+		{
+			name:      "leading zeros",
+			param:     "000123",
+			paramName: "leading zeros param",
+			want:      123,
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseUint32Param(tt.param, tt.paramName)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				assert.Equal(t, uint32(0), got)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
 // TestDepositHash_SolidityCompatibility verifies that the Go implementation of CalculateDepositHash
 // produces identical results to the Solidity implementation in USDCSourcePoolDataCodec._calculateDepositHash.
 //
