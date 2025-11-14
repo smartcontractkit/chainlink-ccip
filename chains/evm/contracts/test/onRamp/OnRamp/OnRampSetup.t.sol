@@ -285,7 +285,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     return verifierReceipts;
   }
 
-  // Helper function to create GenericExtraArgsV3 struct
+  // Helper function to create GenericExtraArgsV3 struc
   function _createV3ExtraArgs(
     address[] memory ccvAddresses,
     bytes[] memory ccvArgs
