@@ -232,15 +232,16 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     bytes memory tokenArgs
   ) internal view virtual returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead) {
     IPoolV1 pool = IPoolV1(address(s_tokenAdminRegistry.getPool(token)));
+    bool isEnabled = false;
 
     // Try to call getFee if the pool supports IPoolV2.
     if (IERC165(address(pool)).supportsInterface(type(IPoolV2).interfaceId)) {
-      (feeUSDCents, destGasOverhead, destBytesOverhead,) =
+      (feeUSDCents, destGasOverhead, destBytesOverhead,, isEnabled) =
         IPoolV2(address(pool)).getFee(token, DEST_CHAIN_SELECTOR, amount, feeToken, finalityConfig, tokenArgs);
     }
 
-    // If the pool doesn't support IPoolV2 or didn't provide fee config, fall back to FeeQuoter.
-    if (destGasOverhead == 0) {
+    // If the pool doesn't support IPoolV2 or config is disabled, fall back to FeeQuoter.
+    if (!isEnabled) {
       (feeUSDCents, destGasOverhead, destBytesOverhead) =
         IFeeQuoter(address(s_feeQuoter)).getTokenTransferFee(DEST_CHAIN_SELECTOR, token);
     }

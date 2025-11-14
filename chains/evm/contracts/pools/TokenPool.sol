@@ -45,6 +45,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   error InvalidMinBlockConfirmation(uint16 requested, uint16 minBlockConfirmation);
   error InvalidTransferFeeBps(uint256 bps);
+  error InvalidTokenTransferFeeConfig(uint64 destChainSelector);
   error CallerIsNotARampOnRouter(address caller);
   error ZeroAddressInvalid();
   error SenderNotAllowed(address sender);
@@ -1080,27 +1081,38 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   // ================================================================
 
   /// @notice Updates the token transfer fee configurations for specified destination chains.
-  /// @param tokenTransferFeeConfigArgs Array of structs containing destination chain selectors and their fee.
-  /// @param destToUseDefaultFeeConfigs Array of destination chain selectors to delete custom fee configs for.
+  /// @param tokenTransferFeeConfigArgs Array of structs containing destination chain selectors and their fee configs.
+  /// @param disableTokenTransferFeeConfigs Array of destination chain selectors to disable custom fee configs for.
   function applyTokenTransferFeeConfigUpdates(
     TokenTransferFeeConfigArgs[] calldata tokenTransferFeeConfigArgs,
-    uint64[] calldata destToUseDefaultFeeConfigs
+    uint64[] calldata disableTokenTransferFeeConfigs
   ) external virtual onlyOwner {
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       uint64 destChainSelector = tokenTransferFeeConfigArgs[i].destChainSelector;
       TokenTransferFeeConfig calldata tokenTransferFeeConfig = tokenTransferFeeConfigArgs[i].tokenTransferFeeConfig;
+
+      // Reject configs with isEnabled: false - use disableTokenTransferFeeConfigs parameter instead.
+      if (!tokenTransferFeeConfig.isEnabled) {
+        revert InvalidTokenTransferFeeConfig(destChainSelector);
+      }
+
       if (tokenTransferFeeConfig.defaultBlockConfirmationTransferFeeBps >= BPS_DIVIDER) {
         revert InvalidTransferFeeBps(tokenTransferFeeConfig.defaultBlockConfirmationTransferFeeBps);
       }
       if (tokenTransferFeeConfig.customBlockConfirmationTransferFeeBps >= BPS_DIVIDER) {
         revert InvalidTransferFeeBps(tokenTransferFeeConfig.customBlockConfirmationTransferFeeBps);
       }
+      // Gas and bytes overhead must be non-zero for proper fee accounting.
+      if (tokenTransferFeeConfig.destGasOverhead == 0 || tokenTransferFeeConfig.destBytesOverhead == 0) {
+        revert InvalidTokenTransferFeeConfig(destChainSelector);
+      }
+
       s_tokenTransferFeeConfig[destChainSelector] = tokenTransferFeeConfig;
       emit TokenTransferFeeConfigUpdated(destChainSelector, tokenTransferFeeConfig);
     }
 
-    for (uint256 i = 0; i < destToUseDefaultFeeConfigs.length; ++i) {
-      uint64 destChainSelector = destToUseDefaultFeeConfigs[i];
+    for (uint256 i = 0; i < disableTokenTransferFeeConfigs.length; ++i) {
+      uint64 destChainSelector = disableTokenTransferFeeConfigs[i];
       delete s_tokenTransferFeeConfig[destChainSelector];
       emit TokenTransferFeeConfigDeleted(destChainSelector);
     }
@@ -1132,9 +1144,15 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     external
     view
     virtual
-    returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps)
+    returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector];
+
+    // If config is disabled, return zeros with isEnabled=false to signal OnRamp to use FeeQuoter defaults.
+    if (!feeConfig.isEnabled) {
+      return (0, 0, 0, 0, false);
+    }
+
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
       if (blockConfirmationRequested < s_customBlockConfirmationConfig.minBlockConfirmation) {
         revert InvalidMinBlockConfirmation(
@@ -1145,14 +1163,16 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
         feeConfig.customBlockConfirmationFeeUSDCents,
         feeConfig.destGasOverhead,
         feeConfig.destBytesOverhead,
-        feeConfig.customBlockConfirmationTransferFeeBps
+        feeConfig.customBlockConfirmationTransferFeeBps,
+        true
       );
     }
     return (
       feeConfig.defaultBlockConfirmationFeeUSDCents,
       feeConfig.destGasOverhead,
       feeConfig.destBytesOverhead,
-      feeConfig.defaultBlockConfirmationTransferFeeBps
+      feeConfig.defaultBlockConfirmationTransferFeeBps,
+      true
     );
   }
 

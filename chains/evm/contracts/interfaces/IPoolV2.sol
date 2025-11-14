@@ -16,7 +16,8 @@ interface IPoolV2 is IPoolV1 {
     uint32 customBlockConfirmationFeeUSDCents; //     │ Fee to charge for token transfer with custom block confirmation, multiples of 0.01 USD.
     //                                                │ The following two fee is deducted from the transferred asset, not added on top.
     uint16 defaultBlockConfirmationTransferFeeBps; // │ Fee in basis points for default finality transfers [0-10_000].
-    uint16 customBlockConfirmationTransferFeeBps; // ─╯ Fee in basis points for custom finality transfers [0-10_000].
+    uint16 customBlockConfirmationTransferFeeBps; //  │ Fee in basis points for custom finality transfers [0-10_000].
+    bool isEnabled; // ───────────────────────────────╯ Whether this config is enabled.
   }
 
   enum MessageDirection {
@@ -88,6 +89,7 @@ interface IPoolV2 is IPoolV1 {
   /// @return destGasOverhead Destination gas charged for accounting in the cost model.
   /// @return destBytesOverhead Destination calldata size attributed to the transfer.
   /// @return tokenFeeBps Bps charged in token units. Value of zero implies no in-token fee.
+  /// @return isEnabled Whether the pool's fee config is enabled. If false, OnRamp should use FeeQuoter defaults.
   function getFee(
     address localToken,
     uint64 destChainSelector,
@@ -95,7 +97,10 @@ interface IPoolV2 is IPoolV1 {
     address feeToken,
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
-  ) external view returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps);
+  )
+    external
+    view
+    returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled);
 
   /// @notice Gets the token address on the remote chain.
   /// @param remoteChainSelector Remote chain selector.

@@ -781,10 +781,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       uint256 feeUSDCents = 0;
       uint32 destGasOverhead = 0;
       uint32 destBytesOverhead = 0;
+      bool isEnabled = false;
 
       // Try to call `IPoolV2.getFee` to fetch fee components if the pool supports IPoolV2.
       if (IERC165(address(pool)).supportsInterface(type(IPoolV2).interfaceId)) {
-        (feeUSDCents, destGasOverhead, destBytesOverhead,) = IPoolV2(address(pool)).getFee(
+        (feeUSDCents, destGasOverhead, destBytesOverhead,, isEnabled) = IPoolV2(address(pool)).getFee(
           message.tokenAmounts[0].token,
           destChainSelector,
           message.tokenAmounts[0].amount,
@@ -794,8 +795,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         );
       }
 
-      // If the pool doesn't support IPoolV2 or didn't provide fee config, fall back to FeeQuoter.
-      if (destGasOverhead == 0) {
+      // If the pool doesn't support IPoolV2 or config is disabled, fall back to FeeQuoter.
+      if (!isEnabled) {
         (feeUSDCents, destGasOverhead, destBytesOverhead) =
           IFeeQuoter(s_dynamicConfig.feeQuoter).getTokenTransferFee(destChainSelector, message.tokenAmounts[0].token);
       }

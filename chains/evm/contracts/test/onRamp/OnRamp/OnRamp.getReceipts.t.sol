@@ -134,7 +134,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     );
   }
 
-  function test_getReceipts_WithTokens_PoolV2Fee_Success() public {
+  function test_getReceipts_WithTokens_PoolV2Fee() public {
     // Mock pool to support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
 
@@ -142,7 +142,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     vm.mockCall(
       s_pool,
       abi.encodeWithSelector(IPoolV2.getFee.selector),
-      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0))
+      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0), true)
     );
 
     // Mock verifiers.
@@ -184,7 +184,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[2].extraArgs, extraArgs.tokenArgs, "Pool extra args should match");
   }
 
-  function test_getReceipts_WithTokens_FeeQuoterFallback_Success() public {
+  function test_getReceipts_WithTokens_FeeQuoterFallback() public {
     // Mock pool to NOT support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false));
 
@@ -221,8 +221,8 @@ contract OnRamp_getReceipts is OnRampSetup {
     // Mock pool to support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
 
-    // Mock pool's getFee to return zeros (indicating it wants to use FeeQuoter).
-    vm.mockCall(s_pool, abi.encodeWithSelector(IPoolV2.getFee.selector), abi.encode(0, 0, 0, uint16(0)));
+    // Mock pool's getFee to return zeros with isEnabled=false (indicating it wants to use FeeQuoter).
+    vm.mockCall(s_pool, abi.encodeWithSelector(IPoolV2.getFee.selector), abi.encode(0, 0, 0, uint16(0), false));
 
     // Mock FeeQuoter's getTokenTransferFee.
     vm.mockCall(
@@ -250,7 +250,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[1].destBytesOverhead, FEE_QUOTER_BYTES_OVERHEAD, "Should fall back to FeeQuoter bytes");
   }
 
-  function test_getReceipts_NoTokens_Success() public {
+  function test_getReceipts_NoTokens() public {
     // Mock verifiers.
     address verifier1Impl = makeAddr("verifier1Impl");
     address verifier2Impl = makeAddr("verifier2Impl");
@@ -276,13 +276,13 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[2].issuer, s_defaultExecutor, "Last should be executor");
   }
 
-  function test_getReceipts_NoVerifiers_WithTokens_Success() public {
+  function test_getReceipts_NoVerifiers_WithTokens() public {
     // Mock pool to support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
     vm.mockCall(
       s_pool,
       abi.encodeWithSelector(IPoolV2.getFee.selector),
-      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0))
+      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0), true)
     );
 
     Client.EVM2AnyMessage memory message = _createMessage(100 ether);
@@ -306,7 +306,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     vm.mockCall(
       s_pool,
       abi.encodeWithSelector(IPoolV2.getFee.selector),
-      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0))
+      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0), true)
     );
 
     // Mock 3 verifiers
@@ -352,7 +352,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     vm.mockCall(
       s_pool,
       abi.encodeWithSelector(IPoolV2.getFee.selector),
-      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0))
+      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0), true)
     );
 
     // Mock verifier.
