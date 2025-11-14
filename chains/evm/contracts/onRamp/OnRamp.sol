@@ -818,6 +818,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
           IFeeQuoter(s_dynamicConfig.feeQuoter).getTokenTransferFee(destChainSelector, message.tokenAmounts[0].token);
       }
 
+      feeUSDCentsSum += tokenReceipt.feeTokenAmount;
+      gasLimitSum += tokenReceipt.destGasLimit;
+      bytesOverheadSum += tokenReceipt.destBytesOverhead;
       verifierReceipts[verifierReceipts.length - 2] = tokenReceipt;
     }
 

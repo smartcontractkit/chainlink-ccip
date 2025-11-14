@@ -10,45 +10,32 @@ import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
-import {OnRampTestHelper} from "../../helpers/OnRampTestHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract OnRamp_getReceipts is OnRampSetup {
-  OnRampTestHelper internal s_onRampHelper;
+  uint32 internal constant EXECUTOR_DEST_GAS = BASE_EXEC_GAS_COST + GAS_LIMIT;
   address internal s_sourceToken;
   address internal s_pool;
   address internal s_verifier1;
   address internal s_verifier2;
 
-  uint32 internal constant POOL_FEE_USD_CENTS = 100; // $1.00
-  uint32 internal constant POOL_GAS_OVERHEAD = 50000;
-  uint32 internal constant POOL_BYTES_OVERHEAD = 128;
-
-  uint32 internal constant FEE_QUOTER_FEE_USD_CENTS = 50; // $0.50
-  uint32 internal constant FEE_QUOTER_GAS_OVERHEAD = 30000;
-  uint32 internal constant FEE_QUOTER_BYTES_OVERHEAD = 64;
-
-  uint32 internal constant VERIFIER_FEE_USD_CENTS = 200; // $2.00
-  uint32 internal constant VERIFIER_GAS = 100000;
-  uint32 internal constant VERIFIER_BYTES = 256;
+  function _assertAggregates(
+    uint32 gasLimitSum,
+    uint256 feeUSDCentsSum,
+    uint256 verifierCount,
+    uint32 tokenGas,
+    uint32 tokenFee
+  ) internal pure {
+    uint256 expectedGas = EXECUTOR_DEST_GAS + (verifierCount * VERIFIER_GAS) + tokenGas;
+    uint256 expectedFee = (verifierCount * VERIFIER_FEE_USD_CENTS) + tokenFee;
+    assertEq(uint256(gasLimitSum), expectedGas, "gasLimitSum should include verifier, token and executor gas");
+    assertEq(feeUSDCentsSum, expectedFee, "feeUSDCentsSum should include verifier and token fees");
+  }
 
   function setUp() public override {
     super.setUp();
-
-    s_onRampHelper = new OnRampTestHelper(
-      OnRamp.StaticConfig({
-        chainSelector: SOURCE_CHAIN_SELECTOR,
-        rmnRemote: s_mockRMNRemote,
-        tokenAdminRegistry: address(s_tokenAdminRegistry)
-      }),
-      OnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter),
-        reentrancyGuardEntered: false,
-        feeAggregator: FEE_AGGREGATOR
-      })
-    );
 
     s_verifier1 = makeAddr("verifier1");
     s_verifier2 = makeAddr("verifier2");
@@ -67,7 +54,7 @@ contract OnRamp_getReceipts is OnRampSetup {
       defaultExecutor: s_defaultExecutor,
       offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
-    s_onRampHelper.applyDestChainConfigUpdates(args);
+    s_onRamp.applyDestChainConfigUpdates(args);
 
     s_pool = makeAddr("sourcePool");
     s_sourceToken = makeAddr("sourceToken");
@@ -159,7 +146,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     ccvs[1] = s_verifier2;
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
-    OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    _assertAggregates(gasLimitSum, feeUSDCentsSum, 2, POOL_GAS_OVERHEAD, POOL_FEE_USD_CENTS);
 
     // Should have: 2 verifiers + 1 token + 1 executor = 4 receipts.
     assertEq(receipts.length, 4, "Should have 4 receipts");
@@ -205,7 +194,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     ccvs[0] = s_verifier1;
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
-    OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    _assertAggregates(gasLimitSum, feeUSDCentsSum, 1, FEE_QUOTER_GAS_OVERHEAD, FEE_QUOTER_FEE_USD_CENTS);
 
     // Should have: 1 verifier + 1 token + 1 executor = 3 receipts.
     assertEq(receipts.length, 3, "Should have 3 receipts");
@@ -241,7 +232,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     ccvs[0] = s_verifier1;
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
-    OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    _assertAggregates(gasLimitSum, feeUSDCentsSum, 1, FEE_QUOTER_GAS_OVERHEAD, FEE_QUOTER_FEE_USD_CENTS);
 
     // Check token receipt falls back to FeeQuoter values.
     assertEq(receipts[1].issuer, s_sourceToken, "Token receipt should be present");
@@ -265,7 +258,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     ccvs[1] = s_verifier2;
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
-    OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    _assertAggregates(gasLimitSum, feeUSDCentsSum, 2, 0, 0);
 
     // Should have: 2 verifiers + 1 executor = 3 receipts (no token receipt).
     assertEq(receipts.length, 3, "Should have 3 receipts without tokens");
@@ -289,7 +284,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     address[] memory ccvs = new address[](0); // No verifiers.
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
-    OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    _assertAggregates(gasLimitSum, feeUSDCentsSum, 0, POOL_GAS_OVERHEAD, POOL_FEE_USD_CENTS);
 
     // Should have: 0 verifiers + 1 token + 1 executor = 2 receipts.
     assertEq(receipts.length, 2, "Should have 2 receipts");
@@ -329,7 +326,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     ccvs[2] = verifier3;
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
-    OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    _assertAggregates(gasLimitSum, feeUSDCentsSum, 3, POOL_GAS_OVERHEAD, POOL_FEE_USD_CENTS);
 
     // Should have: 3 verifiers + 1 token + 1 executor = 5 receipts.
     assertEq(receipts.length, 5, "Should have 5 receipts");
@@ -366,7 +365,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
     extraArgs.tokenArgs = customTokenArgs;
 
-    OnRamp.Receipt[] memory receipts = s_onRampHelper.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    _assertAggregates(gasLimitSum, feeUSDCentsSum, 1, POOL_GAS_OVERHEAD, POOL_FEE_USD_CENTS);
 
     // Verify token receipt has correct tokenArgs.
     assertEq(receipts[1].extraArgs, customTokenArgs, "Token receipt should have custom token args");

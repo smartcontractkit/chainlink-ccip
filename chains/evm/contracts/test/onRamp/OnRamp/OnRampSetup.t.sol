@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
-import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
-import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
-import {IPoolV1} from "../../../interfaces/IPool.sol";
-import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
-
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
@@ -18,10 +12,20 @@ import {MockExecutor} from "../../mocks/MockExecutor.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract OnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
+  uint32 internal constant POOL_FEE_USD_CENTS = 100; // $1.00
+  uint32 internal constant POOL_GAS_OVERHEAD = 50000;
+  uint32 internal constant POOL_BYTES_OVERHEAD = 128;
+
+  uint32 internal constant FEE_QUOTER_FEE_USD_CENTS = 50; // $0.50
+  uint32 internal constant FEE_QUOTER_GAS_OVERHEAD = 30000;
+  uint32 internal constant FEE_QUOTER_BYTES_OVERHEAD = 64;
+
+  uint32 internal constant VERIFIER_FEE_USD_CENTS = 200; // $2.00
+  uint32 internal constant VERIFIER_GAS = 100000;
+  uint32 internal constant VERIFIER_BYTES = 256;
 
   OnRampHelper internal s_onRamp;
   OffRamp internal s_offRampOnRemoteChain = OffRamp(makeAddr("OffRampRemote"));
