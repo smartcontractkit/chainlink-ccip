@@ -65,6 +65,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     );
   }
 
+
   function _createMessage(
     uint256 tokenAmount
   ) internal returns (Client.EVM2AnyMessage memory) {
@@ -81,6 +82,13 @@ contract OnRamp_getReceipts is OnRampSetup {
       extraArgs: ""
     });
   }
+
+  function test_getReceipts_feeConversionToTokenAmount() public view {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    // These extraArgs are already parsed so defaults don't get added automatically.
+    address[] memory ccvs = new address[](1);
+    ccvs[0] = s_defaultCCV;
 
   function _createExtraArgs(
     address[] memory ccvAddresses
@@ -326,13 +334,14 @@ contract OnRamp_getReceipts is OnRampSetup {
     ccvs[2] = verifier3;
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
-    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
+    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeTokenAmount) =
       s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
     _assertAggregates(gasLimitSum, feeUSDCentsSum, 3, POOL_GAS_OVERHEAD, POOL_FEE_USD_CENTS);
 
     // Should have: 3 verifiers + 1 token + 1 executor = 5 receipts.
     assertEq(receipts.length, 5, "Should have 5 receipts");
 
+    assertEq(2, receipts.length);
     // Verify order: verifiers (0-2), token (3), executor (4).
     assertEq(receipts[0].issuer, s_verifier1, "Receipt 0: verifier1");
     assertEq(receipts[1].issuer, s_verifier2, "Receipt 1: verifier2");
@@ -341,35 +350,158 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[4].issuer, s_defaultExecutor, "Receipt 4: executor (last)");
   }
 
+    // Verify CCV receipt.
+    assertEq(s_defaultCCV, receipts[0].issuer);
+    assertEq(DEFAULT_CCV_GAS_LIMIT, receipts[0].destGasLimit);
+    assertEq(DEFAULT_CCV_PAYLOAD_SIZE, receipts[0].destBytesOverhead);
+
+    // Verify executor receipt.
+    assertEq(s_defaultExecutor, receipts[1].issuer);
+    assertEq(BASE_EXEC_GAS_COST + GAS_LIMIT, receipts[1].destGasLimit);
+
+    // Verify gas limit sum includes calldata costs.
+    // The resolveGasCost function adds calldata gas: nonCalldataGas + calldataSize * destGasPerPayloadByteBase
+    // bytesOverhead = DEFAULT_CCV_PAYLOAD_SIZE + executor overhead (from receipts[1].destBytesOverhead)
+    uint32 totalBytesOverhead = receipts[0].destBytesOverhead + receipts[1].destBytesOverhead;
+    uint32 calldataGasCost = totalBytesOverhead * DEST_GAS_PER_PAYLOAD_BYTE_BASE;
+    uint32 expectedGasLimitSum = DEFAULT_CCV_GAS_LIMIT + BASE_EXEC_GAS_COST + GAS_LIMIT + calldataGasCost;
+    assertEq(expectedGasLimitSum, gasLimitSum, "gas limit mismatch");
+
+    // Calculate expected execution gas cost in USD cents.
+    // Account for rounding up.
+    uint256 execCostInUSDCents = ((uint256(expectedGasLimitSum) * USD_PER_GAS) * 100 + (1 ether - 1)) / 1e18;
+
+    // Calculate expected total fee in USD cents before conversion.
+    uint256 totalFeesInUSDCents = DEFAULT_CCV_FEE_USD_CENTS + DEFAULT_EXEC_FEE_USD_CENTS + execCostInUSDCents;
+
+    // Convert to fee token amount.
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+    uint256 expectedFeeTokenAmount = (totalFeesInUSDCents * 1e34) / feeTokenPrice;
+
+    assertEq(expectedFeeTokenAmount, feeTokenAmount, "fee token amount mismatch");
+
+    // Verify individual receipt fees are converted to token amounts.
+    // With fees around 45-60 cents and token price of 5e18, we expect > 5e16.
+    assertGt(receipts[0].feeTokenAmount, 5e16);
+    assertGt(receipts[1].feeTokenAmount, 5e16);
+  }
+
+  function test_getReceipts_multipleCCVs() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    // This CCV has very high gas limit so the expected fee is higher than in other tests.
+    uint32 newCCVGasLimit = 4_000_000;
+
+    address secondCCV = makeAddr("secondCCV");
+    vm.mockCall(
+      secondCCV,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector),
+      abi.encode(secondCCV)
+    );
+    vm.mockCall(
+      secondCCV, abi.encodeWithSelector(ICrossChainVerifierV1.getFee.selector), abi.encode(25, newCCVGasLimit, 128)
+    );
+
+    address[] memory ccvs = new address[](2);
+    ccvs[0] = s_defaultCCV;
+    ccvs[1] = secondCCV;
+
+    bytes[] memory ccvArgs = new bytes[](2);
+    ccvArgs[0] = "";
+    ccvArgs[1] = "";
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: ccvs,
+      ccvArgs: ccvArgs,
+      blockConfirmations: 12,
+      gasLimit: GAS_LIMIT,
+      executor: s_defaultExecutor,
+      executorArgs: "",
+      tokenReceiver: "",
+      tokenArgs: ""
+    });
+
+    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeTokenAmount) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+
+    assertEq(ccvs.length + 1, receipts.length);
+    assertEq(s_defaultCCV, receipts[0].issuer);
+    assertEq(secondCCV, receipts[1].issuer);
+    assertEq(s_defaultExecutor, receipts[2].issuer);
+
+    // Verify gas limit sum includes both CCVs and executor.
+    uint32 totalCCVGas = DEFAULT_CCV_GAS_LIMIT + newCCVGasLimit;
+    uint32 totalBytesOverhead =
+      receipts[0].destBytesOverhead + receipts[1].destBytesOverhead + receipts[2].destBytesOverhead;
+    uint32 calldataGasCost = totalBytesOverhead * DEST_GAS_PER_PAYLOAD_BYTE_BASE;
+    uint32 expectedGasLimitSum = totalCCVGas + BASE_EXEC_GAS_COST + GAS_LIMIT + calldataGasCost;
+    assertEq(expectedGasLimitSum, gasLimitSum);
+
+    assertGt(feeTokenAmount, 1e18);
+  }
+
   function test_getReceipts_TokenArgsPassedToPool() public {
-    bytes memory customTokenArgs = abi.encode("custom token args");
+  bytes memory customTokenArgs = abi.encode("custom token args");
 
     // Mock pool to support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
 
     // Expect pool's getFee to be called with correct tokenArgs.
     vm.mockCall(
-      s_pool,
-      abi.encodeWithSelector(IPoolV2.getFee.selector),
-      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0), true)
-    );
+    s_pool,
+    abi.encodeWithSelector(IPoolV2.getFee.selector),
+    abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0), true)
+  );
 
     // Mock verifier.
-    address verifier1Impl = makeAddr("verifier1Impl");
+  address verifier1Impl = makeAddr("verifier1Impl");
     _mockVerifier(s_verifier1, verifier1Impl);
     _mockVerifierFee(verifier1Impl);
 
     Client.EVM2AnyMessage memory message = _createMessage(100 ether);
-    address[] memory ccvs = new address[](1);
+  address[] memory ccvs = new address[](1);
     ccvs[0] = s_verifier1;
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
     extraArgs.tokenArgs = customTokenArgs;
 
-    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
-      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+  (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
+    s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
     _assertAggregates(gasLimitSum, feeUSDCentsSum, 1, POOL_GAS_OVERHEAD, POOL_FEE_USD_CENTS);
 
     // Verify token receipt has correct tokenArgs.
     assertEq(receipts[1].extraArgs, customTokenArgs, "Token receipt should have custom token args");
+  }
+
+  function test_getReceipts_NO_EXECUTION_ADDRESS() public view {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    address[] memory ccvs = new address[](1);
+    ccvs[0] = s_defaultCCV;
+
+    bytes[] memory ccvArgs = new bytes[](1);
+    ccvArgs[0] = "";
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: ccvs,
+      ccvArgs: ccvArgs,
+      blockConfirmations: 12,
+      gasLimit: 4_000_000, // A large gas limit that should be ignored for pricing.
+      executor: Client.NO_EXECUTION_ADDRESS,
+      executorArgs: "",
+      tokenReceiver: "",
+      tokenArgs: ""
+    });
+
+    (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+
+    assertEq(2, receipts.length);
+
+    // The receipt should specify gas limits normally.
+    assertEq(extraArgs.gasLimit + BASE_EXEC_GAS_COST, receipts[1].destGasLimit);
+
+    // Fee should only include CCV fee, not executor fee.
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+    uint256 expectedFeeTokenAmount = (DEFAULT_CCV_FEE_USD_CENTS * 1e34) / feeTokenPrice;
+    assertEq(expectedFeeTokenAmount, feeTokenAmount, "fee token amount mismatch");
   }
 }

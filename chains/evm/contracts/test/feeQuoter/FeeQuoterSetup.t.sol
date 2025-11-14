@@ -9,7 +9,7 @@ import {TokenSetup} from "../TokenSetup.t.sol";
 import {FeeQuoterHelper} from "../helpers/FeeQuoterHelper.sol";
 
 contract FeeQuoterSetup is TokenSetup {
-  uint112 internal constant USD_PER_GAS = 1e6; // 0.001 gwei
+  uint112 internal constant USD_PER_GAS = 1e12;
   uint112 internal constant USD_PER_DATA_AVAILABILITY_GAS = 1e9; // 1 gwei
 
   address internal constant DUMMY_CONTRACT_ADDRESS = 0x1111111111111111111111111111111111111112;

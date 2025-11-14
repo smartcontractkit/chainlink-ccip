@@ -736,19 +736,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     );
 
     // We sum the fees for the verifier, executor and the pool (if any).
-    (,, uint256 usdCentsFee) = _getReceipts(destChainSelector, message, resolvedExtraArgs);
+    (,, feeTokenAmount) = _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
-    // TODO: handle gas to fee token conversion here.
-
-    // TODO: it currently returns dollars, not fee token amount.
-    return usdCentsFee;
+    return feeTokenAmount;
   }
 
   function _getReceipts(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
-  ) internal view returns (Receipt[] memory verifierReceipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) {
+  ) internal view returns (Receipt[] memory verifierReceipts, uint32 gasLimitSum, uint256 feeTokenAmount) {
     // Already ensure there's room for the token transfer and executor receipts.
     verifierReceipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
     uint32 bytesOverheadSum = 0;
@@ -761,29 +758,20 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         revert DestinationChainNotSupportedByCCV(extraArgs.ccvs[i], destChainSelector);
       }
 
-      (uint256 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) = ICrossChainVerifierV1(implAddress)
+      (uint256 feeUSDCents, uint32 gasForVerification, uint32 ccvPayloadSizeBytes) = ICrossChainVerifierV1(implAddress)
         .getFee(destChainSelector, message, extraArgs.ccvArgs[i], extraArgs.blockConfirmations);
 
       verifierReceipts[i] = Receipt({
         issuer: extraArgs.ccvs[i],
         destGasLimit: gasForVerification,
-        destBytesOverhead: payloadSizeBytes,
+        destBytesOverhead: ccvPayloadSizeBytes,
         feeTokenAmount: feeUSDCents,
         extraArgs: extraArgs.ccvArgs[i]
       });
 
       gasLimitSum += gasForVerification;
-      bytesOverheadSum += payloadSizeBytes;
-      feeUSDCentsSum += feeUSDCents;
+      bytesOverheadSum += ccvPayloadSizeBytes;
     }
-
-    // This includes the user callback gas limit.
-    verifierReceipts[verifierReceipts.length - 1] =
-      _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
-
-    gasLimitSum += verifierReceipts[verifierReceipts.length - 1].destGasLimit;
-    bytesOverheadSum += verifierReceipts[verifierReceipts.length - 1].destBytesOverhead;
-    feeUSDCentsSum += verifierReceipts[verifierReceipts.length - 1].feeTokenAmount;
 
     if (message.tokenAmounts.length > 0) {
       IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(message.tokenAmounts[0].token));
@@ -824,9 +812,38 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       verifierReceipts[verifierReceipts.length - 2] = tokenReceipt;
     }
 
-    // TODO include bytes overhead in gasLimit calculation
+    uint256 executorIndex = verifierReceipts.length - 1;
+    // This includes the user callback gas limit.
+    verifierReceipts[executorIndex] =
+      _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
 
-    return (verifierReceipts, gasLimitSum, feeUSDCentsSum);
+    gasLimitSum += verifierReceipts[executorIndex].destGasLimit;
+    bytesOverheadSum += verifierReceipts[executorIndex].destBytesOverhead;
+
+    uint256 execCostInUSDCents;
+    (gasLimitSum, execCostInUSDCents) =
+      IFeeQuoter(s_dynamicConfig.feeQuoter).resolveGasCost(destChainSelector, gasLimitSum, bytesOverheadSum);
+
+    // Update the fee of the executor to include execution costs.
+    if (extraArgs.executor != Client.NO_EXECUTION_ADDRESS) {
+      verifierReceipts[executorIndex].feeTokenAmount += execCostInUSDCents;
+    }
+
+    // The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
+    uint256 feeTokenPrice = IFeeQuoter(s_dynamicConfig.feeQuoter).getValidatedTokenPrice(message.feeToken);
+
+    // Transform the USD based fees into fee token amounts & sum them.
+    for (uint256 i = 0; i < verifierReceipts.length; ++i) {
+      // Example:
+      // feeTokenPrice = $15 = 15e18
+      // usdFeeCents = $1.50 = 150
+      // feeTokenAmount = 150 * 1e34 / 15e18 = 1e17 (0.1 tokens of the fee token)
+      // Normally we'd multiple by 1e36, but since usdFeeCents has 2 decimals, we use 1e34 here.
+      verifierReceipts[i].feeTokenAmount = verifierReceipts[i].feeTokenAmount * 1e34 / feeTokenPrice;
+      feeTokenAmount += verifierReceipts[i].feeTokenAmount;
+    }
+
+    return (verifierReceipts, gasLimitSum, feeTokenAmount);
   }
 
   /// @notice Gets the execution fee receipt. Takes into account specifying the NO_EXECUTION_ADDRESS.
