@@ -30,18 +30,18 @@ type TokenTransferFeeForSrc struct {
 	Selector uint64                   `json:"selector" yaml:"selector"`
 }
 
-type SetTokenTransferFeeConfig struct {
+type SetTokenTransferFeeInput struct {
 	Version *semver.Version          `json:"version" yaml:"version"`
 	Args    []TokenTransferFeeForSrc `json:"args" yaml:"args"`
 	MCMS    mcms.Input               `json:"mcms" yaml:"mcms"`
 }
 
-func SetTokenTransferFee(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[SetTokenTransferFeeConfig] {
+func SetTokenTransferFee(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[SetTokenTransferFeeInput] {
 	return cldf.CreateChangeSet(makeApply(feeRegistry, mcmsRegistry), makeVerify(feeRegistry, mcmsRegistry))
 }
 
-func makeVerify(_ *FeeAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, SetTokenTransferFeeConfig) error {
-	return func(_ cldf.Environment, cfg SetTokenTransferFeeConfig) error {
+func makeVerify(_ *FeeAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, SetTokenTransferFeeInput) error {
+	return func(_ cldf.Environment, cfg SetTokenTransferFeeInput) error {
 		seenSrc := utils.NewSet[uint64]()
 		for i, src := range cfg.Args {
 			// Disallow duplicate src selectors
@@ -96,8 +96,8 @@ func makeVerify(_ *FeeAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cl
 	}
 }
 
-func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SetTokenTransferFeeConfig) (cldf.ChangesetOutput, error) {
-	return func(e cldf.Environment, cfg SetTokenTransferFeeConfig) (cldf.ChangesetOutput, error) {
+func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SetTokenTransferFeeInput) (cldf.ChangesetOutput, error) {
+	return func(e cldf.Environment, cfg SetTokenTransferFeeInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
@@ -126,9 +126,9 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 
 			report, err := cldf_ops.ExecuteSequence(
 				e.OperationsBundle,
-				adapter.SetTokenTransferFeeConfig(e.DataStore, src.Selector),
+				adapter.SetTokenTransferFee(e.DataStore, src.Selector),
 				e.BlockChains,
-				SetTokenTransferFeeConfigSequenceInput{
+				SetTokenTransferFeeSequenceInput{
 					Selector: src.Selector,
 					Settings: settings,
 				},
@@ -155,7 +155,7 @@ func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint6
 	}
 
 	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and address %s", src, dst, cfg.Address)
-	onchainCfg, err := adapter.GetTokenTransferFeeConfig(e, src, dst, cfg.Address)
+	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e, src, dst, cfg.Address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and address %s: %w", src, dst, cfg.Address, err)
 	}
@@ -165,7 +165,7 @@ func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint6
 		fallbacks = onchainCfg
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and address %s is already set on-chain; using on-chain values as defaults: %+v", src, dst, cfg.Address, fallbacks)
 	} else {
-		fallbacks = adapter.GetTokenTransferFeeConfigDefaults(src, dst)
+		fallbacks = adapter.GetDefaultTokenTransferFeeConfig(src, dst)
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and address %s is not set on-chain; using adapter defaults: %+v", src, dst, cfg.Address, fallbacks)
 	}
 

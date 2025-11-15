@@ -1,18 +1,18 @@
 package fees
 
-// SetTokenTransferFeeConfigSequenceInput defines the input for setting token transfer fee configurations in a sequence.
-type SetTokenTransferFeeConfigSequenceInput struct {
+// SetTokenTransferFeeSequenceInput defines the input for setting token transfer fee configurations in a sequence.
+type SetTokenTransferFeeSequenceInput struct {
 	Settings map[uint64]map[string]*TokenTransferFeeArgs `json:"settings" yaml:"settings"`
 	Selector uint64                                      `json:"selector" yaml:"selector"`
 }
 
 // TokenTransferFeeArgs defines the standardized configuration for token transfer fees for all chain families.
 type TokenTransferFeeArgs struct {
+	DestBytesOverhead uint32 `json:"destBytesOverhead" yaml:"destBytesOverhead"`
+	DestGasOverhead   uint32 `json:"destGasOverhead" yaml:"destGasOverhead"`
 	MinFeeUSDCents    uint32 `json:"minFeeUSDCents" yaml:"minFeeUSDCents"`
 	MaxFeeUSDCents    uint32 `json:"maxFeeUSDCents" yaml:"maxFeeUSDCents"`
 	DeciBps           uint16 `json:"deciBps" yaml:"deciBps"`
-	DestGasOverhead   uint32 `json:"destGasOverhead" yaml:"destGasOverhead"`
-	DestBytesOverhead uint32 `json:"destBytesOverhead" yaml:"destBytesOverhead"`
 	IsEnabled         bool   `json:"isEnabled" yaml:"isEnabled"`
 }
 

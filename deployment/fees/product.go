@@ -22,9 +22,9 @@ type feeAdapterID string
 
 // FeeAdapter defines the interface for fee adapters.
 type FeeAdapter interface {
-	GetTokenTransferFeeConfigDefaults(src uint64, dst uint64) TokenTransferFeeArgs
-	SetTokenTransferFeeConfig(ds datastore.DataStore, src uint64) *cldf_ops.Sequence[SetTokenTransferFeeConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	GetTokenTransferFeeConfig(e cldf.Environment, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
+	SetTokenTransferFee(ds datastore.DataStore, src uint64) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	GetOnchainTokenTransferFeeConfig(e cldf.Environment, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
+	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeArgs
 }
 
 // FeeAdapterRegistry maintains a registry of FeeAdapters for different chain families and versions.
