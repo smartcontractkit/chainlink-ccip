@@ -10,6 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+	"github.com/stretchr/testify/require"
+
 	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
@@ -24,13 +28,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-	"github.com/stretchr/testify/require"
+
+	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 func checkBidirectionalLaneConnectivity(

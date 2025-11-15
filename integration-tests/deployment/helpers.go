@@ -9,6 +9,10 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/stretchr/testify/require"
+
 	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	evmofframpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
@@ -22,13 +26,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/stretchr/testify/require"
+
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64) {
@@ -56,7 +58,7 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64) {
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
-	output.DataStore.Merge(e.DataStore)
+	require.NoError(t, output.DataStore.Merge(e.DataStore))
 	e.DataStore = output.DataStore.Seal()
 }
 
