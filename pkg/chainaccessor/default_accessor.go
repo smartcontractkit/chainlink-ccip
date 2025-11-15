@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -378,6 +379,17 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		}
 
 		msg.Message.Header.OnRamp = onRampAddress
+
+		// Populate TxHash from Sequence item
+		if len(item.TxHash) > 0 {
+			msg.Message.Header.TxHash = hexutil.Encode(item.TxHash)
+		} else {
+			// TxHash is empty - log warning and leave it empty
+			lggr.Warnw("transaction hash is empty",
+				"cursor", item.Cursor,
+				"seqNum", msg.Message.Header.SequenceNumber)
+		}
+
 		msgs = append(msgs, msg.Message)
 	}
 
