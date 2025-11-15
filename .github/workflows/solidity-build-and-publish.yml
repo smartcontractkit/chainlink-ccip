@@ -87,16 +87,6 @@ jobs:
         working-directory: chains/evm
         run: make wrappers
 
-      - name: Run native compile and generate wrappers including metadata
-        if: ${{ needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true' }}
-        working-directory: chains/evm
-        run: make wrappers-release
-
-      - name: Install and run forge --zksync, and generate wrappers
-        if: ${{ needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true' }}
-        working-directory: chains/evm
-        run: make wrappers-zksync
-
       - name: Check if Go solidity wrappers are updated
         working-directory: chains/evm
         run: |

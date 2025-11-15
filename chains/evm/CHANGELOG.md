@@ -1,3 +1,23 @@
+## 1.6.4
+
+CCIP 1.6.4 is a minor release that overhauls the USDC Token Pool to add support for CCTP V2 and enable easier future
+upgradability of USDC and Lock/Release Token Pools.
+
+### New Features
+
+Key Improvements include:
+
+- [#1115](https://github.com/smartcontractkit/chainlink-ccip/pull/1115) - **ERC20Lockbox** - To better support token pools 
+which hold tokens, a new contract has been created which will hold the tokens for the token pool instead. This allows users 
+which utilize Lock/Release pools to upgrade their token pool without having to engage in liquidity migrations. Instead only a 
+simple configuration call is needed. The SiloedLockReleaseTokenPool has also been modified to support the lockbox.
+
+- [#1133](https://github.com/smartcontractkit/chainlink-ccip/pull/1133) - **USDCTokenPoolCCTPV2** - A modified version of
+the USDC Token Pool which is capable of supporting Circle's CCTP V2. As CCTP V1 is being phased out, all existing USDC 
+Token Pools will be migrated to this in the near future.
+
+- [#1134](https://github.com/smartcontractkit/chainlink-ccip/pull/1134) - **USDCTokenPoolProxy** - A versatile new dispatcher
+contract which allows USDC to be sent using different mechanisms based on the destination chain including CCTP V1, CCTP V2, and Lock/Mint.
 
 ## 1.6.3
 
