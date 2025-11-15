@@ -126,7 +126,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 
 			report, err := cldf_ops.ExecuteSequence(
 				e.OperationsBundle,
-				adapter.SetTokenTransferFee(e.DataStore, src.Selector),
+				adapter.SetTokenTransferFee(e),
 				e.BlockChains,
 				SetTokenTransferFeeSequenceInput{
 					Selector: src.Selector,

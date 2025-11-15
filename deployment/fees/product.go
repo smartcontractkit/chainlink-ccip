@@ -7,7 +7,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -22,7 +21,7 @@ type feeAdapterID string
 
 // FeeAdapter defines the interface for fee adapters.
 type FeeAdapter interface {
-	SetTokenTransferFee(ds datastore.DataStore, src uint64) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SetTokenTransferFee(e cldf.Environment) *cldf_ops.Sequence[SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	GetOnchainTokenTransferFeeConfig(e cldf.Environment, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeArgs
 }

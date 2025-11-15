@@ -102,26 +102,27 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 	}, nil
 }
 
-func (a *FeesAdapter) SetTokenTransferFee(ds datastore.DataStore, src uint64) *operations.Sequence[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequence[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetTokenTransferFee",
 		semver.MustParse("1.6.0"),
 		"Sets token transfer fee configuration on CCIP 1.6.0 FeeQuoter contracts",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.SetTokenTransferFeeSequenceInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
+			src := input.Selector
 
-			fqAddr, err := a.getFeeQuoterAddress(ds, src)
+			fqAddr, err := a.getFeeQuoterAddress(e.DataStore, src)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 			}
 
 			updatesByChain := fqops.ApplyTokenTransferFeeConfigUpdatesInput{}
-			for dstSel, dstCfg := range input.Settings {
+			for dst, dstCfg := range input.Settings {
 				tokensToUseDefaultFeeConfigs := []fee_quoter.FeeQuoterTokenTransferFeeConfigRemoveArgs{}
 				tokenTransferFeeConfigs := []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{}
 				for rawTokenAddress, feeCfg := range dstCfg {
 					if !common.IsHexAddress(rawTokenAddress) {
-						return sequences.OnChainOutput{}, fmt.Errorf("invalid token address: %s", rawTokenAddress)
+						return sequences.OnChainOutput{}, fmt.Errorf("invalid token address for src %d and dst %d: %s", src, dst, rawTokenAddress)
 					}
 
 					token := common.HexToAddress(rawTokenAddress)
@@ -129,7 +130,7 @@ func (a *FeesAdapter) SetTokenTransferFee(ds datastore.DataStore, src uint64) *o
 						tokensToUseDefaultFeeConfigs = append(
 							tokensToUseDefaultFeeConfigs,
 							fee_quoter.FeeQuoterTokenTransferFeeConfigRemoveArgs{
-								DestChainSelector: dstSel,
+								DestChainSelector: dst,
 								Token:             token,
 							},
 						)
@@ -158,7 +159,7 @@ func (a *FeesAdapter) SetTokenTransferFee(ds datastore.DataStore, src uint64) *o
 				if len(tokenTransferFeeConfigs) > 0 {
 					updatesByChain.TokenTransferFeeConfigArgs = append(updatesByChain.TokenTransferFeeConfigArgs, fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{
 						TokenTransferFeeConfigs: tokenTransferFeeConfigs,
-						DestChainSelector:       dstSel,
+						DestChainSelector:       dst,
 					})
 				}
 			}
