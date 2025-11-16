@@ -65,7 +65,6 @@ contract OnRamp_getReceipts is OnRampSetup {
     );
   }
 
-
   function _createMessage(
     uint256 tokenAmount
   ) internal returns (Client.EVM2AnyMessage memory) {
@@ -82,13 +81,6 @@ contract OnRamp_getReceipts is OnRampSetup {
       extraArgs: ""
     });
   }
-
-  function test_getReceipts_feeConversionToTokenAmount() public view {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-
-    // These extraArgs are already parsed so defaults don't get added automatically.
-    address[] memory ccvs = new address[](1);
-    ccvs[0] = s_defaultCCV;
 
   function _createExtraArgs(
     address[] memory ccvAddresses
@@ -348,7 +340,6 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[2].issuer, verifier3, "Receipt 2: verifier3");
     assertEq(receipts[3].issuer, s_sourceToken, "Receipt 3: token (second to last)");
     assertEq(receipts[4].issuer, s_defaultExecutor, "Receipt 4: executor (last)");
-  }
 
     // Verify CCV receipt.
     assertEq(s_defaultCCV, receipts[0].issuer);
@@ -389,7 +380,7 @@ contract OnRamp_getReceipts is OnRampSetup {
   function test_getReceipts_multipleCCVs() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     // This CCV has very high gas limit so the expected fee is higher than in other tests.
-    uint32 newCCVGasLimit = 4_000_000;
+    uint32 newCCVGasLimit = 3_600_000;
 
     address secondCCV = makeAddr("secondCCV");
     vm.mockCall(
@@ -440,31 +431,31 @@ contract OnRamp_getReceipts is OnRampSetup {
   }
 
   function test_getReceipts_TokenArgsPassedToPool() public {
-  bytes memory customTokenArgs = abi.encode("custom token args");
+    bytes memory customTokenArgs = abi.encode("custom token args");
 
     // Mock pool to support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
 
     // Expect pool's getFee to be called with correct tokenArgs.
     vm.mockCall(
-    s_pool,
-    abi.encodeWithSelector(IPoolV2.getFee.selector),
-    abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0), true)
-  );
+      s_pool,
+      abi.encodeWithSelector(IPoolV2.getFee.selector),
+      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0), true)
+    );
 
     // Mock verifier.
-  address verifier1Impl = makeAddr("verifier1Impl");
+    address verifier1Impl = makeAddr("verifier1Impl");
     _mockVerifier(s_verifier1, verifier1Impl);
     _mockVerifierFee(verifier1Impl);
 
     Client.EVM2AnyMessage memory message = _createMessage(100 ether);
-  address[] memory ccvs = new address[](1);
+    address[] memory ccvs = new address[](1);
     ccvs[0] = s_verifier1;
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
     extraArgs.tokenArgs = customTokenArgs;
 
-  (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
-    s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    (OnRamp.Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
     _assertAggregates(gasLimitSum, feeUSDCentsSum, 1, POOL_GAS_OVERHEAD, POOL_FEE_USD_CENTS);
 
     // Verify token receipt has correct tokenArgs.
@@ -484,7 +475,7 @@ contract OnRamp_getReceipts is OnRampSetup {
       ccvs: ccvs,
       ccvArgs: ccvArgs,
       blockConfirmations: 12,
-      gasLimit: 4_000_000, // A large gas limit that should be ignored for pricing.
+      gasLimit: 3_600_000, // A large gas limit that should be ignored for pricing.
       executor: Client.NO_EXECUTION_ADDRESS,
       executorArgs: "",
       tokenReceiver: "",

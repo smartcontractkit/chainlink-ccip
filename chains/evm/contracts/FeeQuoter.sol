@@ -319,6 +319,13 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
 
     totalGas = nonCalldataGas + calldataSize * destChainConfig.destGasPerPayloadByteBase;
 
+    if (totalGas > destChainConfig.maxPerMsgGasLimit) {
+      revert MessageGasLimitTooHigh();
+    }
+    if (calldataSize > destChainConfig.maxDataBytes) {
+      revert MessageTooLarge(destChainConfig.maxDataBytes, calldataSize);
+    }
+
     // Get the gas price and remove any upper bits that might be used to report calldata cost.
     Internal.TimestampedPackedUint224 memory price = s_usdPerUnitGasByDestChainSelector[destChainSelector];
     if (price.timestamp == 0) {

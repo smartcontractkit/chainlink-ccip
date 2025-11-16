@@ -71,4 +71,18 @@ contract FeeQuoter_resolveGasCost is FeeQuoterSetup {
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.NoGasPriceAvailable.selector, chainWithoutGasPrice));
     s_feeQuoter.resolveGasCost(chainWithoutGasPrice, 0, 0);
   }
+
+  function test_resolveGasCost_RevertWhen_MessageGasLimitTooHigh() public {
+    uint32 exceedsMaxGas = MAX_GAS_LIMIT + 1;
+
+    vm.expectRevert(FeeQuoter.MessageGasLimitTooHigh.selector);
+    s_feeQuoter.resolveGasCost(DEST_CHAIN_SELECTOR, exceedsMaxGas, 0);
+  }
+
+  function test_resolveGasCost_RevertWhen_MessageTooLarge() public {
+    uint32 exceedsMaxDataBytes = MAX_DATA_SIZE + 1;
+
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, MAX_DATA_SIZE, exceedsMaxDataBytes));
+    s_feeQuoter.resolveGasCost(DEST_CHAIN_SELECTOR, 0, exceedsMaxDataBytes);
+  }
 }
