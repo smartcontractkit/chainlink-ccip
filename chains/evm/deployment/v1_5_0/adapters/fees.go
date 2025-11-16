@@ -88,19 +88,21 @@ func (a *FeesAdapter) getOnRampAddressInCache(src uint64, dst uint64) *common.Ad
 // are provided to this function. This process can be quite expensive if there are many OnRamp contracts deployed on
 // a single chain, which is the case for ETH testnet (249 on ramps at the time of this writing), and ETH mainnet (62
 // onramps at the time of this writing). To resolve this we use caching + goroutines to speed up the process. It may
-// also be worth investigating the possibility of using muticall3 in the future to batch these calls together.
+// also be worth investigating the possibility of using multicall3 in the future to batch these calls together.
 func (a *FeesAdapter) cacheOnRampAddress(e cldf.Environment, src uint64, dst uint64) error {
 	// If we already have the src <> dst onramp address cached, return early
+	e.Logger.Infof("Checking OnRamp address cache for src %d and dst %d", src, dst)
 	if a.getOnRampAddressInCache(src, dst) != nil {
+		e.Logger.Infof("OnRamp address for src %d and dst %d found in cache", src, dst)
 		return nil
 	}
 
 	// Fetch all v1.5 OnRamp addresses for the source chain from the datastore
-	filters := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{
+	onramps := e.DataStore.Addresses().Filter(
 		datastore.AddressRefByType(datastore.ContractType(onramp.ContractType)),
 		datastore.AddressRefByVersion(onramp.Version),
 		datastore.AddressRefByChainSelector(src),
-	}
+	)
 
 	// This will be used to short-circuit the goroutines when we find the onramp
 	errShortCircuit := errors.New("onramp found")
@@ -108,7 +110,7 @@ func (a *FeesAdapter) cacheOnRampAddress(e cldf.Environment, src uint64, dst uin
 	// Construct the onramp address cache concurrently - we stop as soon as we find the address
 	grp, grpCtx := errgroup.WithContext(e.GetContext())
 	grp.SetLimit(a.concurrency)
-	for _, addrRef := range e.DataStore.Addresses().Filter(filters...) {
+	for i, addrRef := range onramps {
 		addr, sel := addrRef.Address, addrRef.ChainSelector
 		if !common.IsHexAddress(addr) {
 			return fmt.Errorf("invalid OnRamp address %s for chain selector %d", addr, sel)
@@ -121,11 +123,13 @@ func (a *FeesAdapter) cacheOnRampAddress(e cldf.Environment, src uint64, dst uin
 
 		address := common.HexToAddress(addr)
 		grp.Go(func() error {
+			e.Logger.Infof("[%d/%d] Checking OnRamp at address %s on src %d for dst %d", i+1, len(onramps), address.Hex(), sel, dst)
 			onramp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(address, chain.Client)
 			if err != nil {
 				return fmt.Errorf("failed to instantiate OnRamp contract at address %s on chain selector %d: %w", address, sel, err)
 			}
 
+			e.Logger.Infof("[%d/%d] Fetching OnRamp static config for address %s on chain selector %d", i+1, len(onramps), address.Hex(), sel)
 			config, err := onramp.GetStaticConfig(&bind.CallOpts{Context: grpCtx})
 			if err != nil {
 				return fmt.Errorf("failed to get OnRamp static config for address %s on chain selector %d: %w", address, sel, err)
@@ -133,9 +137,14 @@ func (a *FeesAdapter) cacheOnRampAddress(e cldf.Environment, src uint64, dst uin
 
 			a.setOnRampAddressInCache(sel, config.DestChainSelector, &address)
 			if config.DestChainSelector == dst {
+				e.Logger.Infof("[%d/%d] Found OnRamp address %s for src %d and dst %d", i+1, len(onramps), address.Hex(), sel, dst)
 				return errShortCircuit
 			}
 
+			e.Logger.Infof(
+				"[%d/%d] OnRamp at address %s on src %d does not connect to dst %d (connects to dst %d)",
+				i+1, len(onramps), address.Hex(), sel, dst, config.DestChainSelector,
+			)
 			return nil
 		})
 	}
@@ -211,16 +220,17 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 	}
 
 	if !common.IsHexAddress(address) {
-		return fees.TokenTransferFeeArgs{}, fmt.Errorf("invalid contract address: %s", address)
+		return fees.TokenTransferFeeArgs{}, fmt.Errorf("invalid token address: %s", address)
 	}
 
 	// This gets the token transfer fee config for the given token from the EVM2EVMOnRamp contract
 	// https://sepolia.etherscan.io/address/0xf9765c80F6448e6d4d02BeF4a6b4152131A2F513#code#F1#L719
 	cfg, err := onRamp.GetTokenTransferFeeConfig(&bind.CallOpts{Context: e.GetContext()}, common.HexToAddress(address))
 	if err != nil {
-		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and address %s: %w", src, dst, address, err)
+		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to get token transfer fee config from OnRamp at %s for src %d, dst %d, token %s: %w", onRampAddr.Hex(), src, dst, address, err)
 	}
 
+	e.Logger.Infof("Fetched on-chain token transfer fee config for src %d, dst %d, token %s: %+v", src, dst, address, cfg)
 	return fees.TokenTransferFeeArgs{
 		DestBytesOverhead: cfg.DestBytesOverhead,
 		DestGasOverhead:   cfg.DestGasOverhead,

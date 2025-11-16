@@ -37,10 +37,6 @@ func (a *FeesAdapter) getFeeQuoterAddress(ds datastore.DataStore, src uint64) (c
 		return common.Address{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 	}
 
-	if !common.IsHexAddress(string(fqAddr)) {
-		return common.Address{}, fmt.Errorf("invalid FeeQuoter address %s for chain selector %d", fqAddr, src)
-	}
-
 	return common.BytesToAddress(fqAddr), nil
 }
 
@@ -78,20 +74,21 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 
 	fq, err := fee_quoter.NewFeeQuoter(fqAddr, chain.Client)
 	if err != nil {
-		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to instantiate FeeQuoter at %s: %w", fqAddr.Hex(), err)
+		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to instantiate FeeQuoter contract at address %s on chain selector %d: %w", fqAddr.Hex(), src, err)
 	}
 
 	if !common.IsHexAddress(address) {
-		return fees.TokenTransferFeeArgs{}, fmt.Errorf("invalid contract address: %s", address)
+		return fees.TokenTransferFeeArgs{}, fmt.Errorf("invalid token address: %s", address)
 	}
 
 	// This gets the token transfer fee config for the given token from the FeeQuoter contract
 	// https://etherscan.io/address/0x40858070814a57FdF33a613ae84fE0a8b4a874f7#code#F1#L819
 	cfg, err := fq.GetTokenTransferFeeConfig(&bind.CallOpts{Context: e.GetContext()}, dst, common.HexToAddress(address))
 	if err != nil {
-		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to get token transfer fee config from FeeQuoter at %s: %w", fqAddr.Hex(), err)
+		return fees.TokenTransferFeeArgs{}, fmt.Errorf("failed to get token transfer fee config from FeeQuoter at %s for src %d, dst %d, token %s: %w", fqAddr.Hex(), src, dst, address, err)
 	}
 
+	e.Logger.Infof("Fetched on-chain token transfer fee config for src %d, dst %d, token %s: %+v", src, dst, address, cfg)
 	return fees.TokenTransferFeeArgs{
 		DestBytesOverhead: cfg.DestBytesOverhead,
 		DestGasOverhead:   cfg.DestGasOverhead,
