@@ -21,7 +21,7 @@ type OnRampSetTokenTransferFeeConfigSequenceInput struct {
 }
 
 var OnRampSetTokenTransferFeeConfigSequence = operations.NewSequence(
-	"OnRampSetTokenTransferFeeConfigSequence",
+	"onramp:set-token-transfer-fee-config",
 	semver.MustParse("1.5.0"),
 	"Set token transfer fee config on the OnRamp 1.5.0 contract across multiple EVM chains",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input OnRampSetTokenTransferFeeConfigSequenceInput) (sequences.OnChainOutput, error) {
