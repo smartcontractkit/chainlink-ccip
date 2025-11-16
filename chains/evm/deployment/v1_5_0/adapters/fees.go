@@ -84,8 +84,8 @@ func (a *FeesAdapter) getOnRampAddressInCache(src uint64, dst uint64) *common.Ad
 //
 // NOTE: on v1.5 a single chain can have many EVM2EVMOnRamp contracts deployed, each one for a different destination
 // chain. As a result, we'll need need to iterate over all the EVM2EVMOnRamp contracts deployed on the source chain,
-// query the static config of each one, and compare the `DestChainSelector` field in the result with the one that we
-// are provided to this function. This process can be quite expensive if there are many OnRamp contracts deployed on
+// query the static config of each one, and compare the `DestChainSelector` field in the result with the one that is
+// provided to this function. This process can be quite expensive if there are many EVM OnRamp contracts deployed on
 // a single chain, which is the case for ETH testnet (249 on ramps at the time of this writing), and ETH mainnet (62
 // onramps at the time of this writing). To resolve this we use caching + goroutines to speed up the process. It may
 // also be worth investigating the possibility of using multicall3 in the future to batch these calls together.
