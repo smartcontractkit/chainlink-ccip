@@ -94,9 +94,13 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
-    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig(
-      address(newTokenPoolFactory), address(s_destRouter), address(s_rmnProxy), LOCAL_TOKEN_DECIMALS
-    );
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
+      remotePoolFactory: address(newTokenPoolFactory),
+      remoteRouter: address(s_destRouter),
+      remoteRMNProxy: address(s_rmnProxy),
+      remoteLockBox: address(s_lockBox),
+      remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
+    });
 
     // Create an array of remote pools where nothing exists yet, but we want to predict the address for
     // the new pool and token on DEST_CHAIN_SELECTOR.
@@ -233,9 +237,13 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
-    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig(
-      address(newTokenPoolFactory), address(s_destRouter), address(s_rmnProxy), LOCAL_TOKEN_DECIMALS
-    );
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
+      remotePoolFactory: address(newTokenPoolFactory),
+      remoteRouter: address(s_destRouter),
+      remoteRMNProxy: address(s_rmnProxy),
+      remoteLockBox: address(s_lockBox),
+      remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
+    });
 
     // Create an array of remote pools where nothing exists yet, but we want to predict the address for
     // the new pool and token on DEST_CHAIN_SELECTOR
@@ -331,7 +339,13 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       DEST_CHAIN_SELECTOR, // remoteChainSelector
       RANDOM_POOL_ADDRESS, // remotePoolAddress
       type(BurnMintTokenPool).creationCode, // remotePoolInitCode
-      TokenPoolFactory.RemoteChainConfig(address(0), address(0), address(0), 0), // remoteChainConfig
+      TokenPoolFactory.RemoteChainConfig({
+        remotePoolFactory: address(0),
+        remoteRouter: address(0),
+        remoteRMNProxy: address(0),
+        remoteLockBox: address(0),
+        remoteTokenDecimals: 0
+      }), // remoteChainConfig
       TokenPoolFactory.PoolType.BURN_MINT, // poolType
       RANDOM_TOKEN_ADDRESS, // remoteTokenAddress
       "", // remoteTokenInitCode
@@ -387,9 +401,13 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
-    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig(
-      address(newTokenPoolFactory), address(s_destRouter), address(s_rmnProxy), LOCAL_TOKEN_DECIMALS
-    );
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
+      remotePoolFactory: address(newTokenPoolFactory),
+      remoteRouter: address(s_destRouter),
+      remoteRMNProxy: address(s_rmnProxy),
+      remoteLockBox: address(s_lockBox),
+      remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
+    });
 
     FactoryBurnMintERC20 newLocalToken =
       new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
@@ -482,7 +500,13 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       DEST_CHAIN_SELECTOR, // remoteChainSelector
       RANDOM_POOL_ADDRESS, // remotePoolAddress
       type(BurnFromMintTokenPool).creationCode, // remotePoolInitCode
-      TokenPoolFactory.RemoteChainConfig(address(0), address(0), address(0), 0), // remoteChainConfig
+      TokenPoolFactory.RemoteChainConfig({
+        remotePoolFactory: address(0),
+        remoteRouter: address(0),
+        remoteRMNProxy: address(0),
+        remoteLockBox: address(0),
+        remoteTokenDecimals: 0
+      }), // remoteChainConfig
       TokenPoolFactory.PoolType.BURN_MINT, // poolType
       RANDOM_TOKEN_ADDRESS, // remoteTokenAddress
       "", // remoteTokenInitCode
@@ -543,9 +567,13 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
-    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig(
-      address(newTokenPoolFactory), address(s_destRouter), address(s_rmnProxy), REMOTE_TOKEN_DECIMALS
-    );
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
+      remotePoolFactory: address(newTokenPoolFactory),
+      remoteRouter: address(s_destRouter),
+      remoteRMNProxy: address(s_rmnProxy),
+      remoteLockBox: address(s_lockBox),
+      remoteTokenDecimals: REMOTE_TOKEN_DECIMALS
+    });
 
     // Create an array of remote pools where nothing exists yet, but we want to predict the address for
     // the new pool and token on DEST_CHAIN_SELECTOR

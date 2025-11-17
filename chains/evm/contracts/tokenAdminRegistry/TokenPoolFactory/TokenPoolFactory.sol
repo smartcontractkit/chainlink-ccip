@@ -41,16 +41,17 @@ contract TokenPoolFactory is ITypeAndVersion {
     // decimals which are needed for determining the remote address.
     PoolType poolType; // The type of pool to deploy, either Burn/Mint or Lock/Release.
     bytes remoteTokenAddress; // EVM address for remote token. If empty, the address will be predicted.
-    bytes remoteTokenInitCode; // The init code to be deployed on the remote chain and includes constructor params/
-    RateLimiter.Config rateLimiterConfig; // Token Pool rate limit. Values will be applied on incoming an outgoing messages
+    bytes remoteTokenInitCode; // The init code to be deployed on the remote chain and includes constructor params.
+    RateLimiter.Config rateLimiterConfig; // Token Pool rate limit. Values will be applied on incoming an outgoing messages.
   }
 
   // solhint-disable-next-line gas-struct-packing
   struct RemoteChainConfig {
-    address remotePoolFactory; // The factory contract on the remote chain which will make the deployment
-    address remoteRouter; // The router on the remote chain
-    address remoteRMNProxy; // The RMNProxy contract on the remote chain
-    uint8 remoteTokenDecimals; // The number of decimals for the token on the remote chain
+    address remotePoolFactory; // The factory contract on the remote chain which will make the deployment.
+    address remoteRouter; // The router on the remote chain.
+    address remoteRMNProxy; // The RMNProxy contract on the remote chain.
+    address remoteLockBox; // The lockBox contract on the remote chain (for LOCK_RELEASE pools).
+    uint8 remoteTokenDecimals; // The number of decimals for the token on the remote chain.
   }
 
   string public constant typeAndVersion = "TokenPoolFactory 1.5.1";
@@ -247,7 +248,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     TokenPool(poolAddress).applyChainUpdates(new uint64[](0), chainUpdates);
 
     // Begin the 2 step ownership transfer of the token pool to the msg.sender.
-    IOwnable(poolAddress).transferOwnership(address(msg.sender)); // 2 step ownership transfer.
+    IOwnable(poolAddress).transferOwnership(address(msg.sender));
 
     return poolAddress;
   }
@@ -256,8 +257,6 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @dev The init code hash is used with Create2 to predict the address of the pool on the remote chain.
   /// @dev ABI-encoding limitations prevent arbitrary constructor parameters from being used, so pool type must be.
   /// restricted to those with known types in the constructor. This function should be updated if new pool types are needed.
-  /// @dev Note: For LOCK_RELEASE pools, this function assumes the remote chain's factory also has a lockBox configured.
-  /// The remote lockBox address must be deterministically derivable or known for address prediction to work correctly.
   /// @param initCode The init code of the pool.
   /// @param remoteChainConfig The remote chain config for the pool.
   /// @param remoteTokenAddress The address of the remote token.
@@ -268,7 +267,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     RemoteChainConfig memory remoteChainConfig,
     address remoteTokenAddress,
     PoolType poolType
-  ) private view returns (bytes32) {
+  ) private pure returns (bytes32) {
     bytes memory constructorParams;
 
     // LockRelease pools have an additional lockBox parameter.
@@ -280,7 +279,7 @@ contract TokenPoolFactory is ITypeAndVersion {
         new address[](0),
         remoteChainConfig.remoteRMNProxy,
         remoteChainConfig.remoteRouter,
-        i_lockBox
+        remoteChainConfig.remoteLockBox
       );
     } else {
       // constructor(address token, uint8 localTokenDecimals, address[] allowlist, address rmnProxy, address router).
