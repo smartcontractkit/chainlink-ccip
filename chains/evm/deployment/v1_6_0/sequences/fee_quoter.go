@@ -27,6 +27,12 @@ type FeeQuoterUpdatePricesSequenceInput struct {
 	UpdatesByChain fee_quoter.InternalPriceUpdates
 }
 
+type FeeQuoterApplyTokenTransferFeeConfigUpdatesSequenceInput struct {
+	Address        common.Address
+	ChainSelector  uint64
+	UpdatesByChain fqops.ApplyTokenTransferFeeConfigUpdatesInput
+}
+
 var (
 	FeeQuoterApplyDestChainConfigUpdatesSequence = operations.NewSequence(
 		"FeeQuoterApplyDestChainConfigUpdatesSequence",
@@ -73,6 +79,34 @@ var (
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterUpdatePricesOp on %s: %w", chain, err)
+			}
+			writes = append(writes, report.Output)
+			batch, err := contract.NewBatchOperationFromWrites(writes)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			return sequences.OnChainOutput{
+				BatchOps: []mcms_types.BatchOperation{batch},
+			}, nil
+		})
+
+	FeeQuoterApplyTokenTransferFeeConfigUpdatesSequence = operations.NewSequence(
+		"FeeQuoterApplyTokenTransferFeeConfigUpdatesSequence",
+		semver.MustParse("1.6.0"),
+		"Update token transfer fee configs on FeeQuoter 1.6.0 contracts on multiple EVM chains",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input FeeQuoterApplyTokenTransferFeeConfigUpdatesSequenceInput) (sequences.OnChainOutput, error) {
+			writes := make([]contract.WriteOutput, 0)
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
+			report, err := operations.ExecuteOperation(b, fqops.FeeQuoterApplyTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesInput]{
+				ChainSelector: chain.Selector,
+				Address:       input.Address,
+				Args:          input.UpdatesByChain,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyTokenTransferFeeConfigUpdatesOp on %s: %w", chain, err)
 			}
 			writes = append(writes, report.Output)
 			batch, err := contract.NewBatchOperationFromWrites(writes)
