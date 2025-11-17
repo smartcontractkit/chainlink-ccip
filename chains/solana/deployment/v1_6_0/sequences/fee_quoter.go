@@ -54,7 +54,7 @@ var SetTokenTransferFeeConfig = cldf_ops.NewSequence(
 					},
 				)
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set token transfer fee config for token %s on chain %d: %w", tok, dst, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set token transfer fee config for token %s and destination %d: %w", tok, dst, err)
 				}
 				result.Addresses = append(result.Addresses, out.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)

@@ -117,7 +117,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				settings[dst.Selector] = map[string]*TokenTransferFeeArgs{}
 				for _, feeCfg := range dst.Settings {
 					if args, err := inferTokenTransferFeeArgs(adapter, e, src.Selector, dst.Selector, feeCfg); err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for address %s: %w", feeCfg.Address, err)
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for token %s: %w", feeCfg.Address, err)
 					} else {
 						settings[dst.Selector][feeCfg.Address] = args
 					}
@@ -150,23 +150,23 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 
 func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, error) {
 	if cfg.IsReset {
-		e.Logger.Infof("Reset requested for token transfer fee config for src %d, dst %d, and address %s; skipping inference", src, dst, cfg.Address)
+		e.Logger.Infof("Reset requested for token transfer fee config for src %d, dst %d, and token %s; skipping inference", src, dst, cfg.Address)
 		return nil, nil
 	}
 
-	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and address %s", src, dst, cfg.Address)
+	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and token %s", src, dst, cfg.Address)
 	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e, src, dst, cfg.Address)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and address %s: %w", src, dst, cfg.Address, err)
+		return nil, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and token %s: %w", src, dst, cfg.Address, err)
 	}
 
 	var fallbacks TokenTransferFeeArgs
 	if onchainCfg.IsEnabled {
 		fallbacks = onchainCfg
-		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and address %s is already set on-chain; using on-chain values as defaults: %+v", src, dst, cfg.Address, fallbacks)
+		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is already set on-chain; using on-chain values as defaults: %+v", src, dst, cfg.Address, fallbacks)
 	} else {
 		fallbacks = adapter.GetDefaultTokenTransferFeeConfig(src, dst)
-		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and address %s is not set on-chain; using adapter defaults: %+v", src, dst, cfg.Address, fallbacks)
+		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is not set on-chain; using adapter defaults: %+v", src, dst, cfg.Address, fallbacks)
 	}
 
 	return cfg.FeeArgs.Infer(fallbacks), nil

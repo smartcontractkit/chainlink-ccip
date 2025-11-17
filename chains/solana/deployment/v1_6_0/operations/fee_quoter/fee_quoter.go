@@ -298,7 +298,7 @@ var SetTokenTransferFeeConfig = operations.NewOperation(
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
 		remoteBillingPDA, _, _ := state.FindFqPerChainPerTokenConfigPDA(input.DstSelector, input.Token, input.FeeQuoter)
 		instruction, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(
-			input.SrcSelector,
+			input.DstSelector,
 			input.Token,
 			input.Config,
 			feeQuoterConfigPDA,

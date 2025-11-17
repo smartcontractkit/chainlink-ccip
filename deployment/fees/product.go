@@ -68,8 +68,8 @@ func (r *FeeAdapterRegistry) GetFeeAdapter(chainFamily string, version *semver.V
 	return adapter, ok
 }
 
-// GetFeeAdapterRegistry returns the global singleton instance.
-func GetFeeAdapterRegistry() *FeeAdapterRegistry {
+// GetRegistry returns the global singleton instance.
+func GetRegistry() *FeeAdapterRegistry {
 	once.Do(func() {
 		singletonRegistry = newFeeAdapterRegistry()
 	})
