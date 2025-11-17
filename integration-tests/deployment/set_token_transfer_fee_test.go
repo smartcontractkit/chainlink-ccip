@@ -194,4 +194,55 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	require.Equal(t, dstCfg.MaxFeeUSDCents, dstSensibleDefaults.MaxFeeUSDCents)
 	require.Equal(t, dstCfg.DeciBps, dstSensibleDefaults.DeciBps)
 	require.True(t, dstCfg.IsEnabled)
+
+	// Now reset the configs
+	_, err = fees.
+		SetTokenTransferFee(feesRegistry, mcmsRegistry).
+		Apply(*env, fees.SetTokenTransferFeeInput{
+			Version: v1_6_0,
+			MCMS:    mcms.Input{},
+			Args: []fees.TokenTransferFeeForSrc{
+				{
+					Selector: src,
+					Settings: []fees.TokenTransferFeeForDst{
+						{
+							Selector: dst,
+							Settings: []fees.TokenTransferFee{
+								{
+									Address: srcLinkRef.Address,
+									IsReset: true,
+									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{},
+								},
+							},
+						},
+					},
+				},
+				{
+					Selector: dst,
+					Settings: []fees.TokenTransferFeeForDst{
+						{
+							Selector: src,
+							Settings: []fees.TokenTransferFee{
+								{
+									Address: dstLinkRef.Address,
+									IsReset: true,
+									FeeArgs: fees.UnresolvedTokenTransferFeeArgs{},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+	require.NoError(t, err)
+
+	// Confirm that the config was disabled on the source
+	srcCfg, err = solFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, src, dst, srcLinkRef.Address)
+	require.NoError(t, err)
+	require.False(t, srcCfg.IsEnabled)
+
+	// Confirm that the config was disabled on the destination
+	dstCfg, err = evmFeesAdapter.GetOnchainTokenTransferFeeConfig(*env, dst, src, dstLinkRef.Address)
+	require.NoError(t, err)
+	require.False(t, dstCfg.IsEnabled)
 }
