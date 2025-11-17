@@ -9,7 +9,7 @@ contract LockReleaseTokenPool_withdrawalLiquidity is LockReleaseTokenPoolSetup {
   function testFuzz_withdrawLiquidity(
     uint256 amount
   ) public {
-    amount = bound(amount, 1, type(uint256).max);
+    vm.assume(amount > 0);
     uint256 balancePre = s_token.balanceOf(OWNER);
     s_token.approve(address(s_lockReleaseTokenPool), amount);
     s_lockReleaseTokenPool.provideLiquidity(amount);
