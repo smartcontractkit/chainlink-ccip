@@ -227,6 +227,8 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 			SequenceNumber: it.Event.SequenceNumber,
 			RawEvent:       it.Event,
 		})
+		fmt.Println("Appended CCIPMessageSent event with sequence number:", it.Event.SequenceNumber)
+		fmt.Println("Raw event data (hex):", it.Event)
 		m.expectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
 			m.expectedSeqNumRange[sourceDest].Start(),
 			ccipocr3common.SeqNum(m.msgSentEvents[len(m.msgSentEvents)-1].SequenceNumber)}
@@ -302,16 +304,16 @@ func (m *CCIP16EVM) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq u
 		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
 	}
 
-	ptr := uint64(0)
+	// ptr := uint64(0)
 
 	sink := make(chan *offramp.OffRampCommitReportAccepted)
-	subscription, err := offRamp.WatchCommitReportAccepted(&bind.WatchOpts{
-		Context: context.Background(),
-		Start:   &ptr,
-	}, sink)
-	if err != nil {
-		return nil, fmt.Errorf("error to subscribe CommitReportAccepted : %w", err)
-	}
+	// subscription, err := offRamp.WatchCommitReportAccepted(&bind.WatchOpts{
+	// 	Context: context.Background(),
+	// 	Start:   &ptr,
+	// }, sink)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error to subscribe CommitReportAccepted : %w", err)
+	// }
 
 	seenMessages := NewCommitReportTracker(from, seqRange)
 
@@ -348,7 +350,7 @@ func (m *CCIP16EVM) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq u
 		return processRoots(report.BlessedMerkleRoots) || processRoots(report.UnblessedMerkleRoots)
 	}
 
-	defer subscription.Unsubscribe()
+	// defer subscription.Unsubscribe()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	ticker := time.NewTicker(2 * time.Second)
@@ -377,8 +379,8 @@ func (m *CCIP16EVM) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq u
 					return event, nil
 				}
 			}
-		case subErr := <-subscription.Err():
-			return nil, fmt.Errorf("subscription error: %w", subErr)
+		// case subErr := <-subscription.Err():
+		// 	return nil, fmt.Errorf("subscription error: %w", subErr)
 		case <-timer.C:
 			return nil, fmt.Errorf("timed out after waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
 				to, from, seqRange.String())
