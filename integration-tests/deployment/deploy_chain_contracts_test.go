@@ -1,9 +1,7 @@
 package deployment
 
 import (
-	"context"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
@@ -28,7 +26,7 @@ import (
 
 func TestDeployChainContracts_Apply(t *testing.T) {
 	t.Parallel()
-	programsPath, ds, err := PreloadSolanaEnvironment(chain_selectors.SOLANA_MAINNET.Selector)
+	programsPath, ds, err := PreloadSolanaEnvironment(t, chain_selectors.SOLANA_MAINNET.Selector)
 	require.NoError(t, err, "Failed to set up Solana environment")
 	require.NotNil(t, ds, "Datastore should be created")
 
@@ -92,10 +90,10 @@ var solanaContracts = map[string]datastore.ContractType{
 	"access_controller": datastore.ContractType(mcmsops.AccessControllerProgramType),
 }
 
-func PreloadSolanaEnvironment(chainSelector uint64) (string, *datastore.MemoryDataStore, error) {
-	programsPath := os.TempDir()
+func PreloadSolanaEnvironment(t *testing.T, chainSelector uint64) (string, *datastore.MemoryDataStore, error) {
+	programsPath := t.TempDir()
 	ds := datastore.NewMemoryDataStore()
-	err := utils.DownloadSolanaCCIPProgramArtifacts(context.Background(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV0_1_1])
+	err := utils.DownloadSolanaCCIPProgramArtifacts(t.Context(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV0_1_1])
 	if err != nil {
 		return "", nil, err
 	}
@@ -122,7 +120,6 @@ func populateDatastore(ds *datastore.MemoryAddressRefStore, contracts map[string
 			Type:          ct,
 			Version:       version,
 		})
-
 		if err != nil {
 			return err
 		}

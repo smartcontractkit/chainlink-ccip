@@ -131,7 +131,7 @@ func checkBidirectionalLaneConnectivity(
 
 func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	t.Parallel()
-	programsPath, ds, err := PreloadSolanaEnvironment(chain_selectors.SOLANA_MAINNET.Selector)
+	programsPath, ds, err := PreloadSolanaEnvironment(t, chain_selectors.SOLANA_MAINNET.Selector)
 	require.NoError(t, err, "Failed to set up Solana environment")
 	require.NotNil(t, ds, "Datastore should be created")
 

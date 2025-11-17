@@ -29,21 +29,20 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	v1_6_0, err := semver.NewVersion("1.6.0")
 	require.NoError(t, err)
 
-	// Preload Solana programs
-	programsPath, ds, err := PreloadSolanaEnvironment(chainsel.SOLANA_DEVNET.Selector)
-	require.NoError(t, err, "Failed to set up Solana environment")
-	require.NotNil(t, ds, "Datastore should be created")
-
-	// Setup test environment
+	// Define source and destination chain selectors
 	src := chainsel.SOLANA_DEVNET.Selector
 	dst := chainsel.TEST_90000002.Selector
+
+	// Preload Solana programs
+	programsPath, ds, err := PreloadSolanaEnvironment(t, src)
+	require.NoError(t, err)
+
+	// Setup test environment
 	env, err := environment.New(t.Context(),
 		environment.WithSolanaContainer(t, []uint64{src}, programsPath, solanaProgramIDs),
 		environment.WithEVMSimulated(t, []uint64{dst}),
 	)
 	require.NoError(t, err)
-
-	// Add preloaded contracts to env datastore
 	env.DataStore = ds.Seal()
 
 	// Initialize v1.6.0 adapters
