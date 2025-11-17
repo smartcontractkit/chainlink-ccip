@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	evmadaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	soladaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
@@ -25,24 +24,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// NOTE: the following steps should be performed before running this test:
-//  1. the solana CLI should be installed
-//  2. in the `contracts` directory run `anchor keys sync`
-//  3. in the `solana` directory run `make docker-build-contracts`
 func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	// Define alias for v1.6.0
 	v1_6_0, err := semver.NewVersion("1.6.0")
 	require.NoError(t, err)
 
+	// Preload Solana programs
+	programsPath, ds, err := PreloadSolanaEnvironment(chainsel.SOLANA_DEVNET.Selector)
+	require.NoError(t, err, "Failed to set up Solana environment")
+	require.NotNil(t, ds, "Datastore should be created")
+
 	// Setup test environment
 	src := chainsel.SOLANA_DEVNET.Selector
 	dst := chainsel.TEST_90000002.Selector
 	env, err := environment.New(t.Context(),
-		// NOTE: no solana contracts should be pre-deployed here - this test will deploy all solana contracts
-		environment.WithSolanaContainer(t, []uint64{src}, testutils.ContractsDir, map[string]string{}),
+		environment.WithSolanaContainer(t, []uint64{src}, programsPath, solanaProgramIDs),
 		environment.WithEVMSimulated(t, []uint64{dst}),
 	)
 	require.NoError(t, err)
+
+	// Add preloaded contracts to env datastore
+	env.DataStore = ds.Seal()
 
 	// Initialize v1.6.0 adapters
 	solAdapter := solseqV1_6_0.SolanaAdapter{}
