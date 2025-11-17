@@ -1,4 +1,4 @@
-package changesets_test
+package deployment
 
 import (
 	"math/big"
