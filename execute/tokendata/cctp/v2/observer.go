@@ -7,13 +7,21 @@ package v2
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+)
+
+const (
+	// CCTPMessageStatusComplete indicates a CCTP message has been attested and is ready for processing
+	CCTPMessageStatusComplete = "complete"
 )
 
 type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
@@ -34,6 +42,8 @@ type CCTPv2TokenDataObserver struct {
 	supportedPoolsBySelector map[cciptypes.ChainSelector]string
 	attestationEncoder       AttestationEncoder
 	httpClient               CCTPv2HTTPClient
+	calculateDepositHashFn   func(CCTPv2DecodedMessage) ([32]byte, error)
+	messageToTokenDataFn     func(logger.Logger, context.Context, CCTPv2Message, AttestationEncoder) exectypes.TokenData
 }
 
 // NewCCTPv2TokenDataObserver creates a new CCTPv2 token data observer.
@@ -50,6 +60,8 @@ func NewCCTPv2TokenDataObserver(
 		supportedPoolsBySelector: supportedPoolsBySelector,
 		attestationEncoder:       attestationEncoder,
 		httpClient:               httpClient,
+		calculateDepositHashFn:   CalculateDepositHash,
+		messageToTokenDataFn:     CCTPv2MessageToTokenData,
 	}
 }
 
@@ -204,20 +216,185 @@ func (o *CCTPv2TokenDataObserver) convertCCTPv2MessagesToTokenData(
 	ctx context.Context,
 	cctpV2Messages map[CCTPv2RequestParams]CCTPv2Messages,
 ) map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData {
-	// TODO: impl
-	return nil
+	result := make(map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData)
+
+	// Iterate over each batch of messages keyed by request parameters
+	for requestParams, messages := range cctpV2Messages {
+		// Initialize the inner map for this request params
+		result[requestParams] = make(map[DepositHash][]exectypes.TokenData)
+
+		// Process each individual CCTP v2 message in the batch
+		for _, msg := range messages.Messages {
+			// Calculate the deposit hash for this message
+			depositHash, err := o.calculateDepositHashFn(msg.DecodedMessage)
+			if err != nil {
+				// TODO: metrics
+				o.lggr.Warnw("failed to calculate deposit hash for CCTP v2 message",
+					"eventNonce", msg.EventNonce,
+					"sourceDomain", msg.DecodedMessage.SourceDomain,
+					"err", err,
+				)
+				continue
+			}
+
+			// Convert the CCTP v2 message to token data
+			tokenData := o.messageToTokenDataFn(o.lggr, ctx, msg, o.attestationEncoder)
+
+			// Append the token data to the slice for this deposit hash
+			result[requestParams][depositHash] = append(result[requestParams][depositHash], tokenData)
+		}
+	}
+
+	return result
+}
+
+// CCTPv2MessageToTokenData converts a CCTPv2Message from Circle's API into TokenData.
+// It validates the message status, decodes the hex-encoded message and attestation fields,
+// and uses the attestationEncoder to create the final token data payload.
+func CCTPv2MessageToTokenData(
+	lggr logger.Logger,
+	ctx context.Context,
+	msg CCTPv2Message,
+	attestationEncoder AttestationEncoder,
+) exectypes.TokenData {
+	if msg.Status != CCTPMessageStatusComplete {
+		lggr.Debugw("CCTPv2 message not ready",
+			"status", msg.Status,
+			"eventNonce", msg.EventNonce,
+			"sourceDomain", msg.DecodedMessage.SourceDomain,
+		)
+		return exectypes.NewErrorTokenData(tokendata.ErrNotReady)
+	}
+
+	messageBytes, err := hex.DecodeString(strings.TrimPrefix(msg.Message, "0x"))
+	if err != nil {
+		lggr.Warnw("failed to decode CCTPv2 message hex",
+			"err", err,
+			"eventNonce", msg.EventNonce,
+			"sourceDomain", msg.DecodedMessage.SourceDomain,
+		)
+		return exectypes.NewErrorTokenData(err)
+	}
+	if len(messageBytes) == 0 {
+		lggr.Warnw("CCTPv2 message is empty",
+			"eventNonce", msg.EventNonce,
+			"sourceDomain", msg.DecodedMessage.SourceDomain,
+		)
+		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
+	}
+
+	attestationBytes, err := hex.DecodeString(strings.TrimPrefix(msg.Attestation, "0x"))
+	if err != nil {
+		lggr.Warnw("failed to decode CCTPv2 attestation hex",
+			"err", err,
+			"eventNonce", msg.EventNonce,
+			"sourceDomain", msg.DecodedMessage.SourceDomain,
+		)
+		return exectypes.NewErrorTokenData(err)
+	}
+	if len(attestationBytes) == 0 {
+		lggr.Warnw("CCTPv2 attestation is empty",
+			"eventNonce", msg.EventNonce,
+			"sourceDomain", msg.DecodedMessage.SourceDomain,
+		)
+		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
+	}
+
+	encodedData, err := attestationEncoder(ctx, messageBytes, attestationBytes)
+	if err != nil {
+		lggr.Warnw("failed to encode CCTPv2 attestation",
+			"err", err,
+			"eventNonce", msg.EventNonce,
+			"sourceDomain", msg.DecodedMessage.SourceDomain,
+		)
+		return exectypes.NewErrorTokenData(fmt.Errorf("unable to encode attestation: %w", err))
+	}
+
+	return exectypes.NewSuccessTokenData(encodedData)
+}
+
+// assignSingleTokenData finds and assigns token data for a single token amount.
+// It handles the complete lookup and consumption logic, returning the appropriate TokenData.
+// The function mutates tokenData by removing consumed items from the slices.
+// Returns:
+//   - NotSupportedTokenData() if token is not supported (wrong pool or invalid ExtraData)
+//   - NewErrorTokenData(ErrDataMissing) if token is supported but data not found or all consumed
+//   - The first available TokenData item if found (and removes it from the slice)
+func (o *CCTPv2TokenDataObserver) assignSingleTokenData(
+	chainSelector cciptypes.ChainSelector,
+	txHash TxHash,
+	tokenAmount cciptypes.RampTokenAmount,
+	tokenData map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData,
+) exectypes.TokenData {
+	// Check if this token is supported
+	if !o.IsTokenSupported(chainSelector, tokenAmount) {
+		return exectypes.NotSupportedTokenData()
+	}
+
+	// Decode the payload to get the deposit hash
+	payload, err := DecodeSourceTokenDataPayloadV2(tokenAmount.ExtraData)
+	if err != nil {
+		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
+	}
+
+	// Build request params for lookup
+	requestParams := CCTPv2RequestParams{
+		chainSelector: chainSelector,
+		sourceDomain:  payload.SourceDomain,
+		txHash:        txHash,
+	}
+
+	// Look up the token data
+	depositHashMap, found := tokenData[requestParams]
+	if !found {
+		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
+	}
+
+	tokenDataList, found := depositHashMap[payload.DepositHash]
+	if !found || len(tokenDataList) == 0 {
+		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
+	}
+
+	// Get the first available token data item
+	result := tokenDataList[0]
+
+	// Remove the consumed item from the slice
+	depositHashMap[payload.DepositHash] = tokenDataList[1:]
+
+	return result
 }
 
 // assignTokenData matches fetched token data from Circle's API back to the original messages and tokens.
 // For each token in each message:
 // - If NOT supported: returns NotSupportedTokenData()
 // - If supported but data not found: returns NewErrorTokenData(ErrDataMissing)
-// - If supported and data found: assigns the token data (each data item used only once)
+// - If supported and data found: assigns the token data (each data item used only once via mutation)
 // The structure is preserved: len(TokenAmounts) == len(result.TokenData) for each message.
+// Note: This method mutates tokenData by removing consumed items.
 func (o *CCTPv2TokenDataObserver) assignTokenData(
 	messages exectypes.MessageObservations,
 	tokenData map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData,
 ) exectypes.TokenDataObservations {
-	// TODO: impl
-	return nil
+	result := make(exectypes.TokenDataObservations)
+
+	// For each chain selector
+	for chainSelector, chainMessages := range messages {
+		result[chainSelector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+
+		// For each message
+		for seqNum, msg := range chainMessages {
+			tokenDataSlice := make([]exectypes.TokenData, 0, len(msg.TokenAmounts))
+
+			// For each TokenAmount in this message
+			for _, tokenAmount := range msg.TokenAmounts {
+				// assign TokenData to this TokenAmount
+				td := o.assignSingleTokenData(chainSelector, msg.Header.TxHash, tokenAmount, tokenData)
+				tokenDataSlice = append(tokenDataSlice, td)
+			}
+
+			result[chainSelector][seqNum] = exectypes.NewMessageTokenData(tokenDataSlice...)
+		}
+	}
+
+	return result
 }
