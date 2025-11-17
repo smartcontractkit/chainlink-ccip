@@ -2,12 +2,10 @@ package adapters
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
@@ -41,24 +39,7 @@ func (a *FeesAdapter) getFeeQuoterAddress(ds datastore.DataStore, src uint64) (c
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
-	minFeeUSDCents := uint32(25)
-
-	// NOTE: we validate that src != dst so only one of these if statements will execute
-	if src == chain_selectors.ETHEREUM_MAINNET.Selector {
-		minFeeUSDCents = 50
-	}
-	if dst == chain_selectors.ETHEREUM_MAINNET.Selector {
-		minFeeUSDCents = 150
-	}
-
-	return fees.TokenTransferFeeArgs{
-		DestBytesOverhead: 32,
-		DestGasOverhead:   90_000,
-		MinFeeUSDCents:    minFeeUSDCents,
-		MaxFeeUSDCents:    math.MaxUint32,
-		DeciBps:           0,
-		IsEnabled:         true,
-	}
+	return fees.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst)
 }
 
 func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src uint64, dst uint64, address string) (fees.TokenTransferFeeArgs, error) {

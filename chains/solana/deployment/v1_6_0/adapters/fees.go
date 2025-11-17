@@ -3,12 +3,10 @@ package adapters
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -42,24 +40,7 @@ func (a *FeesAdapter) getFeeQuoterAddress(ds datastore.DataStore, src uint64) (s
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
-	minFeeUSDCents := uint32(25)
-
-	// NOTE: we validate that src != dst so only one of these if statements will execute
-	if src == chain_selectors.ETHEREUM_MAINNET.Selector {
-		minFeeUSDCents = 50
-	}
-	if dst == chain_selectors.ETHEREUM_MAINNET.Selector {
-		minFeeUSDCents = 150
-	}
-
-	return fees.TokenTransferFeeArgs{
-		DestBytesOverhead: 32,
-		DestGasOverhead:   90_000,
-		MinFeeUSDCents:    minFeeUSDCents,
-		MaxFeeUSDCents:    math.MaxUint32,
-		DeciBps:           0,
-		IsEnabled:         true,
-	}
+	return fees.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst)
 }
 
 func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src uint64, dst uint64, address string) (fees.TokenTransferFeeArgs, error) {
