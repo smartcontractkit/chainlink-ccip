@@ -126,35 +126,13 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 }
 
 func (a *SolanaAdapter) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (cldf_datastore.AddressRef, error) {
-	var ref cldf_datastore.AddressRef
-	switch input.TimelockAction {
-	case mcms_types.TimelockActionSchedule:
-		ref = datastore.GetAddressRef(
-			e.DataStore.Addresses().Filter(),
-			chainSelector,
-			common_utils.ProposerManyChainMultisig,
-			common_utils.Version_1_6_0,
-			input.Qualifier,
-		)
-	case mcms_types.TimelockActionCancel:
-		ref = datastore.GetAddressRef(
-			e.DataStore.Addresses().Filter(),
-			chainSelector,
-			common_utils.CancellerManyChainMultisig,
-			common_utils.Version_1_6_0,
-			input.Qualifier,
-		)
-	case mcms_types.TimelockActionBypass:
-		ref = datastore.GetAddressRef(
-			e.DataStore.Addresses().Filter(),
-			chainSelector,
-			common_utils.BypasserManyChainMultisig,
-			common_utils.Version_1_6_0,
-			input.Qualifier,
-		)
-	default:
-		return ref, fmt.Errorf("unsupported timelock action %s for chain %d", input.TimelockAction, chainSelector)
-	}
+	ref := datastore.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chainSelector,
+		common_utils.RBACTimelock,
+		common_utils.Version_1_6_0,
+		input.Qualifier,
+	)
 	return ref, nil
 }
 
