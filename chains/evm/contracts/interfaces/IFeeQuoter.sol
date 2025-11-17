@@ -126,4 +126,16 @@ interface IFeeQuoter {
     uint64 destChainSelector,
     bytes calldata extraArgs
   ) external view returns (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs);
+
+  /// @notice Gets the resolved token transfer fee components for a token transfer.
+  /// @dev This function will check token-specific config first, then fall back to destination chain defaults.
+  /// @param destChainSelector The destination chain selector.
+  /// @param token The token address.
+  /// @return feeUSDCents The fee in USD cents (multiples of 0.01 USD).
+  /// @return destGasOverhead The gas charged to execute the token transfer on the destination chain.
+  /// @return destBytesOverhead The bytes overhead for the token transfer on the destination chain.
+  function getTokenTransferFee(
+    uint64 destChainSelector,
+    address token
+  ) external view returns (uint32 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead);
 }

@@ -413,6 +413,27 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     return s_tokenTransferFeeConfig[destChainSelector][token];
   }
 
+  /// @inheritdoc IFeeQuoter
+  function getTokenTransferFee(
+    uint64 destChainSelector,
+    address token
+  ) external view returns (uint32 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead) {
+    TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector][token];
+
+    if (feeConfig.isEnabled) {
+      // Use token-specific fee config override.
+      return (feeConfig.feeUSDCents, feeConfig.destGasOverhead, feeConfig.destBytesOverhead);
+    }
+
+    // Fall back to destination chain defaults.
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    return (
+      destChainConfig.defaultTokenFeeUSDCents,
+      destChainConfig.defaultTokenDestGasOverhead,
+      Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+    );
+  }
+
   /// @notice Sets the transfer fee config.
   /// @dev only callable by the owner or admin.
   function applyTokenTransferFeeConfigUpdates(
