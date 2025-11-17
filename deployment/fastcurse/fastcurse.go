@@ -162,6 +162,7 @@ func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) 
 				}
 				notAlreadyCursedSubjects = append(notAlreadyCursedSubjects, subject)
 			}
+			fmt.Printf("Not already cursed subjects for chain sel %d: %v\n", selector, notAlreadyCursedSubjects)
 			if len(notAlreadyCursedSubjects) == 0 {
 				e.Logger.Infof("No new subjects to curse on chain with selector %d, skipping", selector)
 				continue
