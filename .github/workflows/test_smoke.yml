@@ -1,0 +1,56 @@
+name: Smoke Tests
+
+on:
+  push:
+
+defaults:
+  run:
+    working-directory: devenv
+
+jobs:
+  nightly-performance:
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu24.04-16cores-64GB
+    strategy:
+      matrix:
+        test: [
+          # if your suite has more than 10 e2e tests or is slower than 10m consider splitting it to another runner here
+          { name: "TestE2ESmoke", config: "env.toml" },
+        ]
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - name: Install Just
+        uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
+        with:
+          just-version: '1.40.0'
+      - name: Authenticate to AWS ECR
+        uses: ./.github/actions/aws-ecr-auth
+        with:
+          role-to-assume: ${{ secrets.CCIP_IAM_ROLE }}
+          aws-region: us-east-1
+          registry-type: public
+      - name: Set up Go
+        uses: actions/setup-go@v6 # v6
+        with:
+          cache: true
+          go-version-file: devenv/go.mod
+          cache-dependency-path: |
+            devenv/go.sum
+      - name: Download Go dependencies
+        run: |
+          go mod download
+      - name: Run CCIP environment with config
+        run: |
+          ccip u ${{ matrix.test.config }}
+      - name: Run perf test
+        working-directory: devenv/tests/e2e
+        run: |
+          go test -v -run ${{ matrix.test.name }} -timeout 20m
