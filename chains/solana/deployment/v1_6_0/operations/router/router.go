@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
@@ -18,7 +19,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "Router"
-var DestChainType cldf_deployment.ContractType = "DestChain"
+var DestChainType cldf_deployment.ContractType = "RemoteDest"
 var ProgramName = "ccip_router"
 var ProgramSize = 5 * 1024 * 1024
 var Version *semver.Version = semver.MustParse("1.6.0")
@@ -139,6 +140,7 @@ var ConnectChains = operations.NewOperation(
 			ChainSelector: chain.Selector,
 			Type:          datastore.ContractType(DestChainType),
 			Version:       Version,
+			Qualifier:     strconv.FormatUint(input.RemoteChainSelector, 10),
 		}
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(

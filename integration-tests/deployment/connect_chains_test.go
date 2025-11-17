@@ -15,7 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	solanasequences "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
@@ -57,6 +57,7 @@ func checkBidirectionalLaneConnectivity(
 	offRampOnSrcAddr, err := solanaAdapter.GetOffRampAddress(e.DataStore, solanaChain.Selector)
 	require.NoError(t, err, "must get offRamp from srcAdapter")
 
+	// Validate EVM PDAs are set
 	offRampEvmSourceChainPDA, _, _ = state.FindOfframpSourceChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(offRampOnSrcAddr))
 	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
 	require.NoError(t, err)
@@ -71,6 +72,7 @@ func checkBidirectionalLaneConnectivity(
 	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
 	require.NoError(t, err, "failed to get account info")
 	require.Equal(t, !disable, destChainFqAccount.Config.IsEnabled)
+	require.Equal(t, solanasequences.TranslateFQ(evmChain.FeeQuoterDestChainConfig), destChainFqAccount.Config)
 
 	// EVM Validation
 	feeQuoterOnDestAddr, err := evmAdapter.GetFQAddress(e.DataStore, evmChain.Selector)
