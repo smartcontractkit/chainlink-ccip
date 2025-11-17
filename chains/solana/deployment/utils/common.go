@@ -22,7 +22,10 @@ const (
 	TimelockProgramType cldf_deployment.ContractType = "RBACTimelockProgram"
 	McmProgramType      cldf_deployment.ContractType = "ManyChainMultiSigProgram"
 	// special type for Solana that encodes PDA seed usage
-	TimelockCompositeAddress cldf_deployment.ContractType = "RBACTimelockProgramCompositeAddress"
+	ProposerSeed     cldf_deployment.ContractType = "ProposerSeed"
+	CancellerSeed    cldf_deployment.ContractType = "CancellerSeed"
+	BypasserSeed     cldf_deployment.ContractType = "BypasserSeed"
+	RBACTimelockSeed cldf_deployment.ContractType = "RBACTimelockSeed"
 )
 
 // Common parameters for transferring ownership of a program
@@ -71,77 +74,40 @@ func GetTimelockSignerPDA(
 	existingAddresses []cldf_datastore.AddressRef,
 	chainSelector uint64,
 	qualifier string) solana.PublicKey {
-	timelockProgram := datastore.GetAddressRef(
-		existingAddresses,
-		chainSelector,
-		TimelockProgramType,
-		common_utils.Version_1_6_0,
-		"",
-	)
 	// timelock seeds stored as a separate program type
 	// qualifier will identify the correct timelock instance
-	timelockSeed := datastore.GetAddressRef(
+	timelock := datastore.GetAddressRef(
 		existingAddresses,
 		chainSelector,
 		common_utils.RBACTimelock,
 		common_utils.Version_1_6_0,
 		qualifier,
 	)
+	id, seed, _ := mcms_solana.ParseContractAddress(timelock.Address)
 	return state.GetTimelockSignerPDA(
-		solana.MustPublicKeyFromBase58(timelockProgram.Address),
-		state.PDASeed([]byte(timelockSeed.Address)),
+		id,
+		state.PDASeed([]byte(seed[:])),
 	)
 }
 
 func GetMCMSignerPDA(
 	existingAddresses []cldf_datastore.AddressRef,
 	chainSelector uint64,
+	signerType cldf_deployment.ContractType,
 	qualifier string) solana.PublicKey {
-	mcmProgram := datastore.GetAddressRef(
-		existingAddresses,
-		chainSelector,
-		McmProgramType,
-		common_utils.Version_1_6_0,
-		"",
-	)
 	// mcm seeds stored as a separate program type
 	// qualifier will identify the correct mcm instance
-	mcmSeed := datastore.GetAddressRef(
+	mcm := datastore.GetAddressRef(
 		existingAddresses,
 		chainSelector,
-		common_utils.ProposerManyChainMultisig,
+		signerType,
 		common_utils.Version_1_6_0,
 		qualifier,
 	)
-	return state.GetMCMSignerPDA(
-		solana.MustPublicKeyFromBase58(mcmProgram.Address),
-		state.PDASeed([]byte(mcmSeed.Address)),
-	)
-}
-
-func GetTimelockCompositeAddress(
-	existingAddresses []cldf_datastore.AddressRef,
-	chainSelector uint64,
-	qualifier string) string {
-	timelockProgram := datastore.GetAddressRef(
-		existingAddresses,
-		chainSelector,
-		TimelockProgramType,
-		common_utils.Version_1_6_0,
-		"",
-	)
-	// timelock seeds stored as a separate program type
-	// qualifier will identify the correct timelock instance
-	timelockSeed := datastore.GetAddressRef(
-		existingAddresses,
-		chainSelector,
-		common_utils.RBACTimelock,
-		common_utils.Version_1_6_0,
-		qualifier,
-	)
-	return mcms_solana.ContractAddress(
-		solana.MustPublicKeyFromBase58(timelockProgram.Address),
-		mcms_solana.PDASeed([]byte(timelockSeed.Address)),
+	id, seed, _ := mcms_solana.ParseContractAddress(mcm.Address)
+	return state.GetTimelockSignerPDA(
+		id,
+		state.PDASeed([]byte(seed[:])),
 	)
 }
 

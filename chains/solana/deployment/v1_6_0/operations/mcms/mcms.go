@@ -248,9 +248,9 @@ func initializeAccessController(
 func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.AddressRef, error) {
 	mcm.SetProgramID(in.MCM)
 	// Should be one of:
-	// BypasserManyChainMultisig
-	// CancellerManyChainMultisig
-	// ProposerManyChainMultisig
+	// BypasserSeed
+	// CancellerSeed
+	// ProposerSeed
 	ref := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		in.ChainSel,
@@ -348,7 +348,7 @@ func initializeMCM(b operations.Bundle, deps Deps, mcmProgram solana.PublicKey, 
 func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) ([]cldf_datastore.AddressRef, error) {
 	timelock.SetProgramID(in.Timelock)
 	// Should be one of:
-	// RBACTimelock
+	// RBACTimelockSeed
 	ref := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		in.ChainSel,
@@ -387,7 +387,7 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) ([]cldf_
 				mcms_solana.PDASeed([]byte(seed[:])),
 			),
 			ChainSelector: deps.Chain.Selector,
-			Type:          cldf_datastore.ContractType(utils.TimelockCompositeAddress),
+			Type:          cldf_datastore.ContractType(common_utils.RBACTimelock),
 			Qualifier:     deps.Qualifier,
 			Version:       common_utils.Version_1_6_0,
 		},
