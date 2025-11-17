@@ -125,9 +125,9 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 					}
 
 					if feeCfg == nil {
-						// NOTE: the programs will always perform validation checks on the input config
-						// even if we are trying to disable it. As a result, we need to provide a valid
-						// set of dummy values even though none of them will actually be used.
+						// NOTE: the Solana FeeQuoter will always perform validation checks on the input
+						// config even if we are trying to disable it. As a result, we need to provide a
+						// proper set of values even though none of them will actually be used.
 						defaults := a.GetDefaultTokenTransferFeeConfig(src, dst)
 						remoteChainConfigs[dst][token] = fee_quoter.TokenTransferFeeConfig{
 							DestBytesOverhead: defaults.DestBytesOverhead,
