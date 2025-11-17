@@ -775,10 +775,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     if (message.tokenAmounts.length > 0) {
       IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(message.tokenAmounts[0].token));
-      bool isEnabled = false;
+      bool hasCustomFeeConfig = false;
+      uint256 poolReceiptIndex = extraArgs.ccvs.length;
 
-      // issuer is set to the token address, fee distribution logic will resolve token → pool and distribute fees according to the pool version.
-      Receipt memory tokenReceipt = Receipt({
+      verifierReceipts[poolReceiptIndex] = Receipt({
         issuer: message.tokenAmounts[0].token,
         destGasLimit: 0,
         destBytesOverhead: 0,
@@ -787,10 +787,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       });
 
       // Try to call `IPoolV2.getFee` to fetch fee components if the pool supports IPoolV2.
-      if (IERC165(address(pool)).supportsInterface(type(IPoolV2).interfaceId)) {
-        (tokenReceipt.feeTokenAmount, tokenReceipt.destGasLimit, tokenReceipt.destBytesOverhead,, isEnabled) = IPoolV2(
-          address(pool)
-        ).getFee(
+      if (pool.supportsInterface(type(IPoolV2).interfaceId)) {
+        (
+          verifierReceipts[poolReceiptIndex].feeTokenAmount,
+          verifierReceipts[poolReceiptIndex].destGasLimit,
+          verifierReceipts[poolReceiptIndex].destBytesOverhead,
+          ,
+          hasCustomFeeConfig
+        ) = IPoolV2(address(pool)).getFee(
           message.tokenAmounts[0].token,
           destChainSelector,
           message.tokenAmounts[0].amount,
@@ -801,14 +805,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
 
       // If the pool doesn't support IPoolV2 or config is disabled, fall back to FeeQuoter.
-      if (!isEnabled) {
-        (tokenReceipt.feeTokenAmount, tokenReceipt.destGasLimit, tokenReceipt.destBytesOverhead) =
-          IFeeQuoter(s_dynamicConfig.feeQuoter).getTokenTransferFee(destChainSelector, message.tokenAmounts[0].token);
+      if (!hasCustomFeeConfig) {
+        (
+          verifierReceipts[poolReceiptIndex].feeTokenAmount,
+          verifierReceipts[poolReceiptIndex].destGasLimit,
+          verifierReceipts[poolReceiptIndex].destBytesOverhead
+        ) = IFeeQuoter(s_dynamicConfig.feeQuoter).getTokenTransferFee(destChainSelector, message.tokenAmounts[0].token);
       }
-
-      gasLimitSum += tokenReceipt.destGasLimit;
-      bytesOverheadSum += tokenReceipt.destBytesOverhead;
-      verifierReceipts[verifierReceipts.length - 2] = tokenReceipt;
     }
 
     uint256 executorIndex = verifierReceipts.length - 1;
