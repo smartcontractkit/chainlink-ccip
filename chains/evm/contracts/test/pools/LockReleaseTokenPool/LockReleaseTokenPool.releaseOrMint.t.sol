@@ -2,8 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
-import {RateLimiter} from "../../../libraries/RateLimiter.sol";
-
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
 

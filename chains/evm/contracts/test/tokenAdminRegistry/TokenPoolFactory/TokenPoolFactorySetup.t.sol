@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
-import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {FactoryBurnMintERC20} from "../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
 import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";

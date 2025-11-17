@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
-import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
 
