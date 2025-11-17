@@ -45,7 +45,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     address predictedTokenAddress =
       Create2.computeAddress(dynamicSalt, keccak256(s_tokenInitCode), address(s_tokenPoolFactory));
 
-    // Create the constructor params for the predicted pool
+    // Create the constructor params for the predicted pool.
     bytes memory poolCreationParams =
       abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, new address[](0), s_rmnProxy, s_sourceRouter);
 
@@ -56,7 +56,12 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       dynamicSalt.computeAddress(keccak256(predictedPoolInitCode), address(s_tokenPoolFactory));
 
     (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
-      new TokenPoolFactory.RemoteTokenPoolInfo[](0), LOCAL_TOKEN_DECIMALS, s_tokenInitCode, s_poolInitCode, FAKE_SALT
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      s_tokenInitCode,
+      s_poolInitCode,
+      FAKE_SALT
     );
 
     assertNotEq(address(0), tokenAddress, "Token Address should not be 0");
@@ -78,26 +83,31 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     vm.startPrank(OWNER);
     bytes32 dynamicSalt = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
 
-    // We have to create a new factory, registry module, and token admin registry to simulate the other chain
+    // We have to create a new factory, registry module, and token admin registry to simulate the other chain.
     TokenAdminRegistry newTokenAdminRegistry = new TokenAdminRegistry();
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory =
-      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
+    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
+      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
+    );
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
-    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig(
-      address(newTokenPoolFactory), address(s_destRouter), address(s_rmnProxy), LOCAL_TOKEN_DECIMALS
-    );
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
+      remotePoolFactory: address(newTokenPoolFactory),
+      remoteRouter: address(s_destRouter),
+      remoteRMNProxy: address(s_rmnProxy),
+      remoteLockBox: address(s_lockBox),
+      remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
+    });
 
     // Create an array of remote pools where nothing exists yet, but we want to predict the address for
-    // the new pool and token on DEST_CHAIN_SELECTOR
+    // the new pool and token on DEST_CHAIN_SELECTOR.
     TokenPoolFactory.RemoteTokenPoolInfo[] memory remoteTokenPools = new TokenPoolFactory.RemoteTokenPoolInfo[](1);
 
     // The only field that matters is DEST_CHAIN_SELECTOR because we dont want any existing token pool or token
-    // on the remote chain
+    // on the remote chain.
     remoteTokenPools[0] = TokenPoolFactory.RemoteTokenPoolInfo(
       DEST_CHAIN_SELECTOR, // remoteChainSelector
       "", // remotePoolAddress
@@ -109,20 +119,21 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       RateLimiter.Config(false, 0, 0)
     );
 
-    // Predict the address of the token and pool on the DESTINATION chain
+    // Predict the address of the token and pool on the DESTINATION chain.
     address predictedTokenAddress = dynamicSalt.computeAddress(keccak256(s_tokenInitCode), address(newTokenPoolFactory));
 
     // Since the remote chain information was provided, we should be able to get the information from the newly
-    // deployed token pool using the available getter functions
+    // deployed token pool using the available getter functions.
     (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
       remoteTokenPools, // No existing remote pools
       LOCAL_TOKEN_DECIMALS, // 18 decimal token
+      TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode, // Token Init Code
       s_poolInitCode, // Pool Init Code
       FAKE_SALT // Salt
     );
 
-    // Ensure that the remote Token was set to the one we predicted
+    // Ensure that the remote Token was set to the one we predicted.
     assertEq(
       abi.encode(predictedTokenAddress),
       TokenPool(poolAddress).getRemoteToken(DEST_CHAIN_SELECTOR),
@@ -130,20 +141,20 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     );
 
     {
-      // Create the constructor params for the predicted pool
+      // Create the constructor params for the predicted pool.
       // The predictedTokenAddress is NOT abi-encoded since the raw evm-address
-      // is used in the constructor params
+      // is used in the constructor params.
       bytes memory predictedPoolCreationParams =
         abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, new address[](0), s_rmnProxy, address(s_destRouter));
 
-      // Take the init code and concat the destination params to it, the initCode shouldn't change
+      // Take the init code and concat the destination params to it, the initCode shouldn't change.
       bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);
 
-      // Predict the address of the pool on the DESTINATION chain
+      // Predict the address of the pool on the DESTINATION chain.
       address predictedPoolAddress =
         dynamicSalt.computeAddress(keccak256(predictedPoolInitCode), address(newTokenPoolFactory));
 
-      // Assert that the address set for the remote pool is the same as the predicted address
+      // Assert that the address set for the remote pool is the same as the predicted address.
       assertEq(
         abi.encode(predictedPoolAddress),
         TokenPool(poolAddress).getRemotePools(DEST_CHAIN_SELECTOR)[0],
@@ -154,7 +165,12 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // On the new token pool factory, representing a destination chain,
     // deploy a new token and a new pool
     (address newTokenAddress, address newPoolAddress) = newTokenPoolFactory.deployTokenAndTokenPool(
-      new TokenPoolFactory.RemoteTokenPoolInfo[](0), LOCAL_TOKEN_DECIMALS, s_tokenInitCode, s_poolInitCode, FAKE_SALT
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      s_tokenInitCode,
+      s_poolInitCode,
+      FAKE_SALT
     );
 
     assertEq(
@@ -215,14 +231,19 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory =
-      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
+    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
+      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
+    );
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
-    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig(
-      address(newTokenPoolFactory), address(s_destRouter), address(s_rmnProxy), LOCAL_TOKEN_DECIMALS
-    );
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
+      remotePoolFactory: address(newTokenPoolFactory),
+      remoteRouter: address(s_destRouter),
+      remoteRMNProxy: address(s_rmnProxy),
+      remoteLockBox: address(s_lockBox),
+      remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
+    });
 
     // Create an array of remote pools where nothing exists yet, but we want to predict the address for
     // the new pool and token on DEST_CHAIN_SELECTOR
@@ -244,7 +265,12 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions
     (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
-      remoteTokenPools, LOCAL_TOKEN_DECIMALS, s_tokenInitCode, s_poolInitCode, FAKE_SALT
+      remoteTokenPools,
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      s_tokenInitCode,
+      s_poolInitCode,
+      FAKE_SALT
     );
 
     assertEq(address(TokenPool(poolAddress).getToken()), tokenAddress, "Token Address should have been set locally");
@@ -281,6 +307,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     address newPoolAddress = newTokenPoolFactory.deployTokenPoolWithExistingToken(
       address(newRemoteToken),
       LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
       FAKE_SALT
@@ -312,7 +339,13 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       DEST_CHAIN_SELECTOR, // remoteChainSelector
       RANDOM_POOL_ADDRESS, // remotePoolAddress
       type(BurnMintTokenPool).creationCode, // remotePoolInitCode
-      TokenPoolFactory.RemoteChainConfig(address(0), address(0), address(0), 0), // remoteChainConfig
+      TokenPoolFactory.RemoteChainConfig({
+        remotePoolFactory: address(0),
+        remoteRouter: address(0),
+        remoteRMNProxy: address(0),
+        remoteLockBox: address(0),
+        remoteTokenDecimals: 0
+      }), // remoteChainConfig
       TokenPoolFactory.PoolType.BURN_MINT, // poolType
       RANDOM_TOKEN_ADDRESS, // remoteTokenAddress
       "", // remoteTokenInitCode
@@ -320,7 +353,12 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     );
 
     (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
-      remoteTokenPools, LOCAL_TOKEN_DECIMALS, s_tokenInitCode, s_poolInitCode, FAKE_SALT
+      remoteTokenPools,
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      s_tokenInitCode,
+      s_poolInitCode,
+      FAKE_SALT
     );
 
     assertNotEq(address(0), tokenAddress, "Token Address should not be 0");
@@ -357,14 +395,19 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory =
-      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
+    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
+      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
+    );
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
-    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig(
-      address(newTokenPoolFactory), address(s_destRouter), address(s_rmnProxy), LOCAL_TOKEN_DECIMALS
-    );
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
+      remotePoolFactory: address(newTokenPoolFactory),
+      remoteRouter: address(s_destRouter),
+      remoteRMNProxy: address(s_rmnProxy),
+      remoteLockBox: address(s_lockBox),
+      remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
+    });
 
     FactoryBurnMintERC20 newLocalToken =
       new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
@@ -392,7 +435,12 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions
     address poolAddress = s_tokenPoolFactory.deployTokenPoolWithExistingToken(
-      address(newLocalToken), LOCAL_TOKEN_DECIMALS, remoteTokenPools, type(LockReleaseTokenPool).creationCode, FAKE_SALT
+      address(newLocalToken),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.LOCK_RELEASE,
+      remoteTokenPools,
+      type(LockReleaseTokenPool).creationCode,
+      FAKE_SALT
     );
 
     // Check that the pool was correctly deployed on the local chain first
@@ -414,6 +462,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     (address newPoolAddress) = newTokenPoolFactory.deployTokenPoolWithExistingToken(
       address(newRemoteToken),
       LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.LOCK_RELEASE,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0), // No existing remote pools
       type(LockReleaseTokenPool).creationCode, // Pool Init Code
       FAKE_SALT // Salt
@@ -451,7 +500,13 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       DEST_CHAIN_SELECTOR, // remoteChainSelector
       RANDOM_POOL_ADDRESS, // remotePoolAddress
       type(BurnFromMintTokenPool).creationCode, // remotePoolInitCode
-      TokenPoolFactory.RemoteChainConfig(address(0), address(0), address(0), 0), // remoteChainConfig
+      TokenPoolFactory.RemoteChainConfig({
+        remotePoolFactory: address(0),
+        remoteRouter: address(0),
+        remoteRMNProxy: address(0),
+        remoteLockBox: address(0),
+        remoteTokenDecimals: 0
+      }), // remoteChainConfig
       TokenPoolFactory.PoolType.BURN_MINT, // poolType
       RANDOM_TOKEN_ADDRESS, // remoteTokenAddress
       "", // remoteTokenInitCode
@@ -459,7 +514,12 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     );
 
     (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
-      remoteTokenPools, LOCAL_TOKEN_DECIMALS, s_tokenInitCode, s_poolInitCode, FAKE_SALT
+      remoteTokenPools,
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      s_tokenInitCode,
+      s_poolInitCode,
+      FAKE_SALT
     );
 
     assertNotEq(address(0), tokenAddress, "Token Address should not be 0");
@@ -501,14 +561,19 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory =
-      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
+    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
+      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
+    );
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
-    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig(
-      address(newTokenPoolFactory), address(s_destRouter), address(s_rmnProxy), REMOTE_TOKEN_DECIMALS
-    );
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
+      remotePoolFactory: address(newTokenPoolFactory),
+      remoteRouter: address(s_destRouter),
+      remoteRMNProxy: address(s_rmnProxy),
+      remoteLockBox: address(s_lockBox),
+      remoteTokenDecimals: REMOTE_TOKEN_DECIMALS
+    });
 
     // Create an array of remote pools where nothing exists yet, but we want to predict the address for
     // the new pool and token on DEST_CHAIN_SELECTOR
@@ -530,7 +595,12 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions
     (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
-      remoteTokenPools, LOCAL_TOKEN_DECIMALS, s_tokenInitCode, s_poolInitCode, FAKE_SALT
+      remoteTokenPools,
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      s_tokenInitCode,
+      s_poolInitCode,
+      FAKE_SALT
     );
 
     assertEq(address(TokenPool(poolAddress).getToken()), tokenAddress, "Token Address should have been set locally");
@@ -567,6 +637,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     address newPoolAddress = newTokenPoolFactory.deployTokenPoolWithExistingToken(
       address(newRemoteToken),
       REMOTE_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
       FAKE_SALT
