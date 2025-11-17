@@ -5,6 +5,7 @@ import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "./libraries/Client.sol";
+import {ExtraArgsCodec} from "./libraries/ExtraArgsCodec.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
@@ -411,28 +412,22 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     uint64 destChainSelector,
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) internal view returns (uint256 tokenTransferFeeUSDWei, uint32 tokenTransferGas, uint32 tokenTransferBytesOverhead) {
-    uint256 numberOfTokens = tokenAmounts.length;
-
-    for (uint256 i = 0; i < numberOfTokens; ++i) {
-      TokenTransferFeeConfig memory transferFeeConfig =
-        s_tokenTransferFeeConfig[destChainSelector][tokenAmounts[i].token];
-
-      // If the token has no specific overrides configured, we use the global defaults.
-      if (!transferFeeConfig.isEnabled) {
-        tokenTransferFeeUSDWei += defaultTokenFeeUSDCents * 1e16;
-        tokenTransferGas += defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead += Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
-        continue;
-      }
-
-      tokenTransferGas += transferFeeConfig.destGasOverhead;
-      tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead;
-
-      // Convert USD values with 2 decimals to 18 decimals.
-      tokenTransferFeeUSDWei += uint256(transferFeeConfig.feeUSDCents) * 1e16;
+    if (tokenAmounts.length == 0) {
+      return (0, 0, 0);
     }
 
-    return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);
+    // Only support one token.
+    TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector][tokenAmounts[0].token];
+
+    if (!transferFeeConfig.isEnabled) {
+      return (defaultTokenFeeUSDCents * 1e16, defaultTokenDestGasOverhead, Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES);
+    }
+
+    return (
+      uint256(transferFeeConfig.feeUSDCents) * 1e16,
+      transferFeeConfig.destGasOverhead,
+      transferFeeConfig.destBytesOverhead
+    );
   }
 
   /// @notice Gets the transfer fee config for a given token.
@@ -929,19 +924,28 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
       Client.SVMExtraArgsV1 memory svmArgs = abi.decode(extraArgs[4:], (Client.SVMExtraArgsV1));
-      // 8 bytes bitmap + 2 bytes length + 32 bytes per account
-      bytes memory execArgs = new bytes(8 + 2 + svmArgs.accounts.length * 32);
-      // TODO fill SVM args
-
-      return (abi.encode(svmArgs.tokenReceiver), svmArgs.computeUnits, execArgs);
+      return (
+        abi.encode(svmArgs.tokenReceiver),
+        svmArgs.computeUnits,
+        ExtraArgsCodec._encodeSVMExecutorArgsV1(
+          ExtraArgsCodec.SVMExecutorArgsV1({
+            accounts: svmArgs.accounts,
+            accountIsWritableBitmap: svmArgs.accountIsWritableBitmap,
+            useATA: ExtraArgsCodec.SVMTokenReceiverUsage.DERIVE_ATA_AND_CREATE
+          })
+        )
+      );
     }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
       Client.SuiExtraArgsV1 memory suiArgs = _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit);
-      // 2 bytes length + 32 bytes per receiver object id
-      bytes memory execArgs = new bytes(2 + suiArgs.receiverObjectIds.length * 32);
-      // TODO fill Sui args
 
-      return (abi.encode(suiArgs.tokenReceiver), uint32(suiArgs.gasLimit), execArgs);
+      return (
+        abi.encode(suiArgs.tokenReceiver),
+        uint32(suiArgs.gasLimit),
+        ExtraArgsCodec._encodeSuiExecutorArgsV1(
+          ExtraArgsCodec.SuiExecutorArgsV1({receiverObjectIds: suiArgs.receiverObjectIds})
+        )
+      );
     }
 
     revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);

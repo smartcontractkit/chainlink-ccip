@@ -116,8 +116,8 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     // For SVM, tokenReceiver should be encoded, executorArgs should be constructed.
     assertEq(abi.encode(testTokenReceiver), tokenReceiver);
     assertEq(GAS_LIMIT, gasLimit);
-    // executorArgs should be 8 + 2 + (accounts.length * 32) = 74 bytes.
-    assertEq(2 + 8 + 32 * accounts.length, executorArgs.length);
+    // executorArgs should be 4 +2 + 8 + (accounts.length * 32) = 78 bytes.
+    assertEq(4 + 2 + 8 + 32 * accounts.length, executorArgs.length);
   }
 
   function test_resolveLegacyArgs_SVM_NoAccounts() public {
@@ -140,8 +140,8 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     // For SVM, tokenReceiver should be encoded.
     assertEq(abi.encode(testTokenReceiver), tokenReceiver);
     assertEq(GAS_LIMIT, gasLimit);
-    // executorArgs should be 8 + 2 + 0 = 10 bytes.
-    assertEq(10, executorArgs.length);
+    // executorArgs should be 4 + 8 + 2 + 0 = 14 bytes.
+    assertEq(14, executorArgs.length);
   }
 
   function test_resolveLegacyArgs_Sui() public {
@@ -167,8 +167,7 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     // For SUI, tokenReceiver should be encoded, executorArgs should be constructed.
     assertEq(abi.encode(testTokenReceiver), tokenReceiver);
     assertEq(GAS_LIMIT, gasLimit);
-    // executorArgs should be 2 + (receiverObjectIds.length * 32) = 98 bytes.
-    assertEq(2 + 32 * objectIds.length, executorArgs.length);
+    assertEq(4 + 1 + 32 * objectIds.length, executorArgs.length);
   }
 
   function test_resolveLegacyArgs_Sui_NoObjectIds() public {
@@ -190,8 +189,8 @@ contract FeeQuoter_resolveLegacyArgs is FeeQuoterSetup {
     // For SUI, tokenReceiver should be encoded.
     assertEq(abi.encode(testTokenReceiver), tokenReceiver);
     assertEq(GAS_LIMIT, gasLimit);
-    // executorArgs should be 2 + 0 = 2 bytes.
-    assertEq(2, executorArgs.length);
+    // executorArgs should be 4 + 1 = 5 bytes.
+    assertEq(5, executorArgs.length);
   }
 
   function test_resolveLegacyArgs_EVM_MaxGasLimit() public {
