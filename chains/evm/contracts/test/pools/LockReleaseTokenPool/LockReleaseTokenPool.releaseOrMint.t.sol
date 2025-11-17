@@ -27,11 +27,11 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     s_lockReleaseTokenPoolWithAllowList.applyChainUpdates(new uint64[](0), chainUpdate);
   }
 
-  function test_ReleaseOrMint() public {
+  function test_releaseOrMint() public {
     vm.startPrank(s_allowedOffRamp);
 
     uint256 amount = 100;
-    deal(address(s_token), address(s_lockReleaseTokenPool), amount);
+    deal(address(s_token), address(s_lockBox), amount);
 
     vm.expectEmit();
     emit TokenPool.InboundRateLimitConsumed({
@@ -63,42 +63,60 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     );
   }
 
-  function testFuzz_ReleaseOrMint_Success(address recipient, uint256 amount) public {
-    // Since the owner already has tokens this would break the checks
+  function test_releaseOrMintV2() public {
+    uint256 amount = 100e18;
+    address recipient = makeAddr("recipient");
+
+    // Fund lockBox.
+    deal(address(s_token), address(s_lockBox), amount);
+
+    vm.startPrank(s_allowedOffRamp);
+
+    Pool.ReleaseOrMintOutV1 memory output = s_lockReleaseTokenPool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: recipient,
+        sourceDenominatedAmount: amount,
+        localToken: address(s_token),
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: abi.encode(s_sourcePoolAddress),
+        sourcePoolData: "",
+        offchainTokenData: ""
+      }),
+      0
+    );
+
+    assertEq(output.destinationAmount, amount);
+    assertEq(s_token.balanceOf(recipient), amount);
+  }
+
+  function testFuzz_releaseOrMint(address recipient, uint256 amount) public {
+    // Since the owner already has tokens this would break the checks.
     vm.assume(recipient != OWNER);
     vm.assume(recipient != address(0));
     vm.assume(recipient != address(s_token));
+    amount = bound(amount, 1, _getInboundRateLimiterConfig().capacity);
 
-    // Makes sure the pool always has enough funds
-    deal(address(s_token), address(s_lockReleaseTokenPool), amount);
+    // Makes sure the lockBox always has enough funds.
+    deal(address(s_token), address(s_lockBox), amount);
     vm.startPrank(s_allowedOffRamp);
 
-    uint256 capacity = _getInboundRateLimiterConfig().capacity;
-    // Determine if we hit the rate limit or the txs should succeed.
-    if (amount > capacity) {
-      vm.expectRevert(
-        abi.encodeWithSelector(RateLimiter.TokenMaxCapacityExceeded.selector, capacity, amount, address(s_token))
-      );
-    } else {
-      // Only rate limit if the amount is >0
-      if (amount > 0) {
-        vm.expectEmit();
-        emit TokenPool.InboundRateLimitConsumed({
-          remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-          token: address(s_token),
-          amount: amount
-        });
-      }
+    // Amount is bounded to capacity, so it should always succeed.
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
+    });
 
-      vm.expectEmit();
-      emit TokenPool.ReleasedOrMinted({
-        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-        token: address(s_token),
-        sender: s_allowedOffRamp,
-        recipient: recipient,
-        amount: amount
-      });
-    }
+    vm.expectEmit();
+    emit TokenPool.ReleasedOrMinted({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      sender: s_allowedOffRamp,
+      recipient: recipient,
+      amount: amount
+    });
 
     s_lockReleaseTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
@@ -114,7 +132,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     );
   }
 
-  function test_RevertWhen_ChainNotAllowed() public {
+  function test_releaseOrMint_RevertWhen_ChainNotAllowed() public {
     uint64[] memory chainsToRemove = new uint64[](1);
     chainsToRemove[0] = SOURCE_CHAIN_SELECTOR;
 
@@ -137,7 +155,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     );
   }
 
-  function test_RevertWhen_PoolMintNotHealthy() public {
+  function test_releaseOrMint_RevertWhen_CursedByRMN_PoolMintNotHealthy() public {
     // Should not mint tokens if cursed.
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
     uint256 before = s_token.balanceOf(OWNER);

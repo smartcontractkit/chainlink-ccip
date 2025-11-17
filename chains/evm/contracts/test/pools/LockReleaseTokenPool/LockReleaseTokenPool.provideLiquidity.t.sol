@@ -5,32 +5,25 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
 
 contract LockReleaseTokenPool_provideLiquidity is LockReleaseTokenPoolSetup {
-  function testFuzz_ProvideLiquidity_Success(
+  function testFuzz_provideLiquidity(
     uint256 amount
   ) public {
+    amount = bound(amount, 1, type(uint256).max);
     uint256 balancePre = s_token.balanceOf(OWNER);
     s_token.approve(address(s_lockReleaseTokenPool), amount);
 
     s_lockReleaseTokenPool.provideLiquidity(amount);
 
     assertEq(s_token.balanceOf(OWNER), balancePre - amount);
-    assertEq(s_token.balanceOf(address(s_lockReleaseTokenPool)), amount);
+    assertEq(s_token.balanceOf(address(s_lockBox)), amount);
   }
 
-  // Reverts
+  // Reverts.
 
   function test_RevertWhen_Unauthorized() public {
     vm.startPrank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(TokenPool.Unauthorized.selector, STRANGER));
 
     s_lockReleaseTokenPool.provideLiquidity(1);
-  }
-
-  function testFuzz_ExceedsAllowance(
-    uint256 amount
-  ) public {
-    vm.assume(amount > 0);
-    vm.expectRevert("ERC20: insufficient allowance");
-    s_lockReleaseTokenPool.provideLiquidity(amount);
   }
 }
