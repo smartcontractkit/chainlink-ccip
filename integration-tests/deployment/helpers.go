@@ -69,12 +69,9 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 	mcmSigner := utils.GetMCMSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
+		common_utils.ProposerManyChainMultisig,
 		common_utils.CLLQualifier,
 	)
-	timelockCompositeAddress := utils.GetTimelockCompositeAddress(
-		e.DataStore.Addresses().Filter(),
-		chain.Selector,
-		common_utils.CLLQualifier)
 	err := utils.FundSolanaAccounts(
 		context.Background(),
 		[]solana.PublicKey{timelockSigner, mcmSigner},
@@ -82,8 +79,6 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 		chain.Client,
 	)
 	require.NoError(t, err)
-	t.Logf("Timelock Signer PDA: %s", timelockSigner.String())
-	t.Logf("Timelock Composite Address: %s", timelockCompositeAddress)
 	mcmsInput := mcmsapi.TransferOwnershipInput{
 		ChainInputs: []mcmsapi.TransferOwnershipPerChainInput{
 			{
