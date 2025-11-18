@@ -1,4 +1,4 @@
-package token_pools
+package changesets
 
 import (
 	"github.com/ethereum/go-ethereum/common"
@@ -6,7 +6,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_ops"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -20,7 +20,7 @@ type SetDomainsInput struct {
 type SetDomainsPerChainInput struct {
 	ChainSelector uint64
 	Address       common.Address
-	Domains       []usdc_token_pool_ops.DomainUpdate
+	Domains       []usdc_token_pool.DomainUpdate
 }
 
 func SetDomainsChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[SetDomainsInput] {
@@ -33,7 +33,7 @@ func setDomainsApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Envi
 		reports := make([]cldf_ops.Report[any, any], 0)
 
 		// Build the DomainsByChain map from per-chain inputs
-		domainsByChain := make(map[uint64][]usdc_token_pool_ops.DomainUpdate)
+		domainsByChain := make(map[uint64][]usdc_token_pool.DomainUpdate)
 		var address common.Address
 		for _, perChainInput := range input.ChainInputs {
 			if address == (common.Address{}) {

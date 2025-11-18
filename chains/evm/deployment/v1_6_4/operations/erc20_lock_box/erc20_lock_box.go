@@ -22,7 +22,7 @@ type ConstructorArgs struct {
 type AllowedCallerConfigArgs = erc20_lock_box.ERC20LockBoxAllowedCallerConfigArgs
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
-	Name:             "erc20-lock_box:deploy",
+	Name:             "erc20-lock-box:deploy",
 	Version:          Version,
 	Description:      "Deploys the ERC20Lockbox contract",
 	ContractMetadata: erc20_lock_box.ERC20LockBoxMetaData,
@@ -35,7 +35,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 })
 
 var ERC20LockboxConfigureAllowedCallers = contract.NewWrite(contract.WriteParams[[]AllowedCallerConfigArgs, *erc20_lock_box.ERC20LockBox]{
-	Name:         "erc20-lockbox:configure-allowed-callers",
+	Name:         "erc20-lock-box:configure-allowed-callers",
 	Version:      Version,
 	Description:  "Sets the allowed callers on the ERC20LockBox contract",
 	ContractType: ContractType,

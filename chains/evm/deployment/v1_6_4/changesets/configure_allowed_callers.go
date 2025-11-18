@@ -1,4 +1,4 @@
-package token_pools
+package changesets
 
 import (
 	"github.com/ethereum/go-ethereum/common"
@@ -9,7 +9,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 
-	erc20_lock_box "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 )
 
 type ConfigureAllowedCallersInput struct {
@@ -41,12 +42,12 @@ func configureAllowedCallersApply(mcmsRegistry *changesets.MCMSReaderRegistry) f
 		}
 
 		// Execute the sequence with the combined input
-		sequenceInput := erc20_lock_box.ConfigureAllowedCallersSequenceInput{
-			Address:               addressByChain,
-			AllowedCallersByChain: allowedCallersByChain,
+		sequenceInput := sequences.ConfigureAllowedCallersSequenceInput{
+			Address:                        addressByChain,
+			ConfigureAllowedCallersByChain: allowedCallersByChain,
 		}
 
-		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, erc20_lock_box.ERC20LockboxConfigureAllowedCallersSequence, e.BlockChains, sequenceInput)
+		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.ERC20LockboxConfigureAllowedCallersSequence, e.BlockChains, sequenceInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
