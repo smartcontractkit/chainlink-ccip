@@ -523,17 +523,15 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
-	// timelock seeds stored as a separate program type
-	// qualifier will identify the correct timelock instance
-	timelockAddr := datastore.GetAddressRef(
+	timelockProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
 		common_utils.RBACTimelock,
 		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
-	id, seed, _ := mcms_solana.ParseContractAddress(timelockAddr.Address)
-	timelockConfigPDA := state.GetTimelockSignerPDA(
+	id, seed, _ := mcms_solana.ParseContractAddress(timelockProgram.Address)
+	timelockConfigPDA := state.GetTimelockConfigPDA(
 		id,
 		state.PDASeed([]byte(seed[:])),
 	)
@@ -558,7 +556,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 		in.Qualifier,
 	)
 	instructionBuilder := timelock.NewBatchAddAccessInstruction([32]uint8(
-		state.PDASeed(seed[:])),
+		state.PDASeed([]byte(seed[:]))),
 		in.Role,
 		timelockConfigPDA,
 		solana.MustPublicKeyFromBase58(accessControllerProgram.Address),

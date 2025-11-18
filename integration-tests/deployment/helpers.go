@@ -79,7 +79,6 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 		chain.Client,
 	)
 	require.NoError(t, err)
-	t.Logf("Timelock Signer PDA: %s", timelockSigner.String())
 	mcmsInput := mcmsapi.TransferOwnershipInput{
 		ChainInputs: []mcmsapi.TransferOwnershipPerChainInput{
 			{

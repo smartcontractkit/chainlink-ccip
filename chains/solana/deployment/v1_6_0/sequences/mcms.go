@@ -188,10 +188,6 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
-	fmt.Println("Setting up roles in Timelock")
-	fmt.Printf("Proposer: %s\n", proposerRef.Address)
-	fmt.Printf("Canceller: %s\n", cancellerRef.Address)
-	fmt.Printf("Bypasser: %s\n", bypasserRef.Address)
 	proposerPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(proposerRef.Address)))
 	cancellerPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(cancellerRef.Address)))
 	bypasserPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(bypasserRef.Address)))
