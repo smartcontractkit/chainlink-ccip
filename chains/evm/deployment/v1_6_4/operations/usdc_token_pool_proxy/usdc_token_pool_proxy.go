@@ -19,9 +19,9 @@ var Version *semver.Version = semver.MustParse("1.6.4")
 type PoolAddresses = usdc_token_pool_proxy.USDCTokenPoolProxyPoolAddresses
 
 type ConstructorArgs struct {
-	Token     common.Address
-	USDCToken common.Address
-	Router    common.Address
+	Token         common.Address
+	PoolAddresses PoolAddresses
+	Router        common.Address
 }
 
 type UpdateLockOrBurnMechanismsArgs struct {
