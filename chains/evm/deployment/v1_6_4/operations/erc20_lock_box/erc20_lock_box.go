@@ -21,13 +21,8 @@ type ConstructorArgs struct {
 
 type AllowedCallerConfigArgs = erc20_lock_box.ERC20LockBoxAllowedCallerConfigArgs
 
-// erc20LockboxCallerWrapper implements bind.ContractCaller by wrapping ERC20LockBoxCallerRaw
-type erc20LockboxCallerWrapper struct {
-	callerRaw *erc20_lock_box.ERC20LockBoxCallerRaw
-}
-
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
-	Name:             "erc20-lockbox:deploy",
+	Name:             "erc20-lock_box:deploy",
 	Version:          Version,
 	Description:      "Deploys the ERC20Lockbox contract",
 	ContractMetadata: erc20_lock_box.ERC20LockBoxMetaData,
@@ -39,8 +34,8 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
-var ERC20LockboxSetAllowedCallers = contract.NewWrite(contract.WriteParams[[]AllowedCallerConfigArgs, *erc20_lock_box.ERC20LockBox]{
-	Name:         "erc20-lockbox:set-allowed-callers",
+var ERC20LockboxConfigureAllowedCallers = contract.NewWrite(contract.WriteParams[[]AllowedCallerConfigArgs, *erc20_lock_box.ERC20LockBox]{
+	Name:         "erc20-lockbox:configure-allowed-callers",
 	Version:      Version,
 	Description:  "Sets the allowed callers on the ERC20LockBox contract",
 	ContractType: ContractType,
