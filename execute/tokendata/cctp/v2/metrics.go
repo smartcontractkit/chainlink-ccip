@@ -49,6 +49,22 @@ var (
 		},
 		[]string{"destChainFamily", "destChainID", "sourceChainFamily", "sourceChainID", "sourceDomain"},
 	)
+
+	PromCCTPv2MessageToTokenDataErrorCounter = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ccip_exec_tokendata_cctpv2_message_to_token_data_error",
+			Help: "Count of CCTP v2 message to token data conversion errors",
+		},
+		[]string{"destChainFamily", "destChainID", "sourceChainFamily", "sourceChainID", "sourceDomain"},
+	)
+
+	PromCCTPv2AssignTokenDataFailureCounter = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ccip_exec_tokendata_cctpv2_assign_token_data_failure",
+			Help: "Count of CCTP v2 token data assignment failures",
+		},
+		[]string{"destChainFamily", "destChainID", "sourceChainFamily", "sourceChainID", "sourceDomain"},
+	)
 )
 
 // MetricsReporter provides metrics reporting functionality for CCTP v2 observer
@@ -57,6 +73,8 @@ type MetricsReporter interface {
 		sourceChain cciptypes.ChainSelector, sourceDomain uint32, success bool, httpStatus string, latency time.Duration)
 	TrackObserveLatency(numRequests int, latency time.Duration)
 	TrackDepositHashCalculationError(sourceChain cciptypes.ChainSelector, sourceDomain uint32)
+	TrackMessageToTokenDataError(sourceChain cciptypes.ChainSelector, sourceDomain uint32)
+	TrackAssignTokenDataFailure(sourceChain cciptypes.ChainSelector, sourceDomain uint32)
 }
 
 // MetricsReporterImpl implements MetricsReporter with actual Prometheus metrics
@@ -76,6 +94,12 @@ func (n *noOpMetricsReporter) TrackObserveLatency(int, time.Duration) {
 }
 
 func (n *noOpMetricsReporter) TrackDepositHashCalculationError(cciptypes.ChainSelector, uint32) {
+}
+
+func (n *noOpMetricsReporter) TrackMessageToTokenDataError(cciptypes.ChainSelector, uint32) {
+}
+
+func (n *noOpMetricsReporter) TrackAssignTokenDataFailure(cciptypes.ChainSelector, uint32) {
 }
 
 // NewMetricsReporter creates a new metrics reporter for CCTP v2
@@ -122,6 +146,28 @@ func (r *MetricsReporterImpl) TrackDepositHashCalculationError(
 ) {
 	sourceChainFamily, sourceChainID, _ := libs.GetChainInfoFromSelector(sourceChain)
 	PromCCTPv2DepositHashCalculationErrorCounter.
+		WithLabelValues(r.destChainFamily, r.destChainID, sourceChainFamily, sourceChainID,
+			strconv.FormatUint(uint64(sourceDomain), 10)).
+		Inc()
+}
+
+// TrackMessageToTokenDataError tracks message to token data conversion errors
+func (r *MetricsReporterImpl) TrackMessageToTokenDataError(
+	sourceChain cciptypes.ChainSelector, sourceDomain uint32,
+) {
+	sourceChainFamily, sourceChainID, _ := libs.GetChainInfoFromSelector(sourceChain)
+	PromCCTPv2MessageToTokenDataErrorCounter.
+		WithLabelValues(r.destChainFamily, r.destChainID, sourceChainFamily, sourceChainID,
+			strconv.FormatUint(uint64(sourceDomain), 10)).
+		Inc()
+}
+
+// TrackAssignTokenDataFailure tracks token data assignment failures
+func (r *MetricsReporterImpl) TrackAssignTokenDataFailure(
+	sourceChain cciptypes.ChainSelector, sourceDomain uint32,
+) {
+	sourceChainFamily, sourceChainID, _ := libs.GetChainInfoFromSelector(sourceChain)
+	PromCCTPv2AssignTokenDataFailureCounter.
 		WithLabelValues(r.destChainFamily, r.destChainID, sourceChainFamily, sourceChainID,
 			strconv.FormatUint(uint64(sourceDomain), 10)).
 		Inc()

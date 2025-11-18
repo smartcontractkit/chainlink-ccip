@@ -294,6 +294,11 @@ func (o *CCTPv2TokenDataObserver) convertCCTPv2MessagesToTokenData(
 			// Convert the CCTP v2 message to token data
 			tokenData := o.messageToTokenDataFn(ctx, o.lggr, msg, o.attestationEncoder)
 
+			// Track conversion errors
+			if tokenData.Error != nil {
+				o.metricsReporter.TrackMessageToTokenDataError(requestParams.chainSelector, requestParams.sourceDomain)
+			}
+
 			// Append the token data to the slice for this deposit hash
 			result[requestParams][depositHash] = append(result[requestParams][depositHash], tokenData)
 		}
@@ -401,11 +406,26 @@ func (o *CCTPv2TokenDataObserver) assignSingleTokenData(
 	// Look up the token data
 	depositHashMap, found := tokenData[requestParams]
 	if !found {
+		o.metricsReporter.TrackAssignTokenDataFailure(chainSelector, payload.SourceDomain)
+		o.lggr.Warnw("failed to assign CCTPv2 attestation - missing request params",
+			"err", err,
+			"chainSelector", chainSelector,
+			"sourceDomain", payload.SourceDomain,
+			"txHash", txHash,
+		)
 		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
 	}
 
 	tokenDataList, found := depositHashMap[payload.DepositHash]
 	if !found || len(tokenDataList) == 0 {
+		o.metricsReporter.TrackAssignTokenDataFailure(chainSelector, payload.SourceDomain)
+		o.lggr.Warnw("failed to assign CCTPv2 attestation - missing deposit hash",
+			"err", err,
+			"chainSelector", chainSelector,
+			"sourceDomain", payload.SourceDomain,
+			"txHash", txHash,
+			"depositHash", payload.DepositHash,
+		)
 		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
 	}
 

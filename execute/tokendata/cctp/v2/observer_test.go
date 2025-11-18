@@ -1548,6 +1548,7 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 			observer := &CCTPv2TokenDataObserver{
 				lggr:                     logger.Test(t),
 				supportedPoolsBySelector: tt.poolConfig,
+				metricsReporter:          NewNoOpMetricsReporter(),
 			}
 
 			result := observer.assignSingleTokenData(
@@ -1813,6 +1814,7 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 					testChain1: testPoolAddr,
 					testChain2: testPoolAddr,
 				},
+				metricsReporter: NewNoOpMetricsReporter(),
 			}
 
 			result := observer.assignTokenData(tt.messages, tt.tokenData)

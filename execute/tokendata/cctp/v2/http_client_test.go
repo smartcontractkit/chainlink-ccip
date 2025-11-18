@@ -65,6 +65,14 @@ func (m *MockMetricsReporter) TrackDepositHashCalculationError(sourceChain ccipt
 	m.Called(sourceChain, sourceDomain)
 }
 
+func (m *MockMetricsReporter) TrackMessageToTokenDataError(sourceChain cciptypes.ChainSelector, sourceDomain uint32) {
+	m.Called(sourceChain, sourceDomain)
+}
+
+func (m *MockMetricsReporter) TrackAssignTokenDataFailure(sourceChain cciptypes.ChainSelector, sourceDomain uint32) {
+	m.Called(sourceChain, sourceDomain)
+}
+
 func TestNewCCTPv2Client(t *testing.T) {
 	lggr := logger.Test(t)
 	config := pluginconfig.USDCCCTPObserverConfig{
