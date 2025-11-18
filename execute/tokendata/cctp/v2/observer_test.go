@@ -518,6 +518,80 @@ func (m *mockCCTPv2HTTPClient) GetMessages(
 	return CCTPv2Messages{}, nil
 }
 
+func (m *mockCCTPv2HTTPClient) addResponse(
+	chain cciptypes.ChainSelector,
+	domain uint32,
+	txHash string,
+	messages CCTPv2Messages,
+) {
+	params := CCTPv2RequestParams{
+		chainSelector: chain,
+		sourceDomain:  domain,
+		txHash:        txHash,
+	}
+	m.responses[params] = messages
+}
+
+func (m *mockCCTPv2HTTPClient) addError(
+	chain cciptypes.ChainSelector,
+	domain uint32,
+	txHash string,
+	err error,
+) {
+	params := CCTPv2RequestParams{
+		chainSelector: chain,
+		sourceDomain:  domain,
+		txHash:        txHash,
+	}
+	m.errors[params] = err
+}
+
+func (m *mockCCTPv2HTTPClient) getCallCount() int {
+	return len(m.calls)
+}
+
+func (m *mockCCTPv2HTTPClient) wasCalledWith(
+	chain cciptypes.ChainSelector,
+	domain uint32,
+	txHash string,
+) bool {
+	params := CCTPv2RequestParams{
+		chainSelector: chain,
+		sourceDomain:  domain,
+		txHash:        txHash,
+	}
+	for _, call := range m.calls {
+		if call == params {
+			return true
+		}
+	}
+	return false
+}
+
+// Helper to create a test observer with mock client
+func createObserverWithMock(
+	t *testing.T,
+	destChainSelector cciptypes.ChainSelector,
+	poolConfig map[cciptypes.ChainSelector]string,
+	mockClient *mockCCTPv2HTTPClient,
+) *CCTPv2TokenDataObserver {
+	return &CCTPv2TokenDataObserver{
+		lggr:                     logger.Test(t),
+		destChainSelector:        destChainSelector,
+		supportedPoolsBySelector: poolConfig,
+		attestationEncoder: func(ctx context.Context, msg cciptypes.Bytes, att cciptypes.Bytes) (cciptypes.Bytes, error) {
+			// Simple concatenation for testing
+			result := make([]byte, len(msg)+len(att))
+			copy(result, msg)
+			copy(result[len(msg):], att)
+			return result, nil
+		},
+		httpClient:             mockClient,
+		calculateDepositHashFn: CalculateDepositHash,
+		messageToTokenDataFn:   CCTPv2MessageToTokenData,
+	}
+}
+
 func TestCCTPv2MessageToTokenData(t *testing.T) {
 	validMessage := "1234567890abcdef"
 	validAttestation := "fedcba0987654321"
@@ -853,7 +927,7 @@ func TestCCTPv2MessageToTokenData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			encoder := tt.encoderSetup()
-			result := CCTPv2MessageToTokenData(logger.Test(t), context.Background(), tt.msg, encoder)
+			result := CCTPv2MessageToTokenData(context.Background(), logger.Test(t), tt.msg, encoder)
 
 			assert.Equal(t, tt.expectedReady, result.Ready)
 			if tt.expectedError != nil {
@@ -905,7 +979,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 	hash2 := mustHexToBytes32("2222222222222222222222222222222222222222222222222222222222222222")
 
 	type (
-		messageToTokenDataFn func(logger.Logger, context.Context, CCTPv2Message, AttestationEncoder) exectypes.TokenData
+		messageToTokenDataFn func(context.Context, logger.Logger, CCTPv2Message, AttestationEncoder) exectypes.TokenData
 		tokenDataMap         map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData
 	)
 
@@ -926,7 +1000,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 				}
 			},
 			setupMessageToTokenFn: func() messageToTokenDataFn {
-				return func(_ logger.Logger, _ context.Context, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
+				return func(_ context.Context, _ logger.Logger, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
 					t.Fatal("should not be called for empty input")
 					return exectypes.TokenData{}
 				}
@@ -955,7 +1029,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 				}
 			},
 			setupMessageToTokenFn: func() messageToTokenDataFn {
-				return func(_ logger.Logger, _ context.Context, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
+				return func(_ context.Context, _ logger.Logger, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
 					return exectypes.NewSuccessTokenData(cciptypes.Bytes("test-data-1"))
 				}
 			},
@@ -1002,7 +1076,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 			},
 			setupMessageToTokenFn: func() messageToTokenDataFn {
 				callCount := 0
-				return func(_ logger.Logger, _ context.Context, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
+				return func(_ context.Context, _ logger.Logger, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
 					callCount++
 					return exectypes.NewSuccessTokenData(cciptypes.Bytes(fmt.Sprintf("test-data-%d", callCount)))
 				}
@@ -1044,7 +1118,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 			},
 			setupMessageToTokenFn: func() messageToTokenDataFn {
 				callCount := 0
-				return func(_ logger.Logger, _ context.Context, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
+				return func(_ context.Context, _ logger.Logger, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
 					callCount++
 					return exectypes.NewSuccessTokenData(cciptypes.Bytes(fmt.Sprintf("data-%d", callCount)))
 				}
@@ -1090,7 +1164,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 				}
 			},
 			setupMessageToTokenFn: func() messageToTokenDataFn {
-				return func(_ logger.Logger, _ context.Context, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
+				return func(_ context.Context, _ logger.Logger, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
 					return exectypes.NewSuccessTokenData(cciptypes.Bytes("data"))
 				}
 			},
@@ -1134,7 +1208,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 			},
 			setupMessageToTokenFn: func() messageToTokenDataFn {
 				callCount := 0
-				return func(_ logger.Logger, _ context.Context, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
+				return func(_ context.Context, _ logger.Logger, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
 					callCount++
 					if callCount > 1 {
 						t.Fatal("should only be called once, second message has hash error")
@@ -1169,7 +1243,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 				}
 			},
 			setupMessageToTokenFn: func() messageToTokenDataFn {
-				return func(_ logger.Logger, _ context.Context, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
+				return func(_ context.Context, _ logger.Logger, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
 					t.Fatal("should not be called when hash calculation fails")
 					return exectypes.TokenData{}
 				}
@@ -1194,7 +1268,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 				}
 			},
 			setupMessageToTokenFn: func() messageToTokenDataFn {
-				return func(_ logger.Logger, _ context.Context, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
+				return func(_ context.Context, _ logger.Logger, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
 					t.Fatal("should not be called for empty messages")
 					return exectypes.TokenData{}
 				}
@@ -1225,7 +1299,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 				}
 			},
 			setupMessageToTokenFn: func() messageToTokenDataFn {
-				return func(_ logger.Logger, _ context.Context, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
+				return func(_ context.Context, _ logger.Logger, msg CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
 					return exectypes.NewErrorTokenData(tokendata.ErrNotReady)
 				}
 			},
@@ -1256,7 +1330,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 				}
 			},
 			setupMessageToTokenFn: func() messageToTokenDataFn {
-				return func(_ logger.Logger, ctx context.Context, _ CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
+				return func(ctx context.Context, _ logger.Logger, _ CCTPv2Message, _ AttestationEncoder) exectypes.TokenData {
 					assert.NotNil(t, ctx)
 					return exectypes.NewSuccessTokenData(cciptypes.Bytes("data"))
 				}

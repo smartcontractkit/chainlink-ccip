@@ -12,11 +12,11 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 )
 
 const (
@@ -43,7 +43,7 @@ type CCTPv2TokenDataObserver struct {
 	attestationEncoder       AttestationEncoder
 	httpClient               CCTPv2HTTPClient
 	calculateDepositHashFn   func(CCTPv2DecodedMessage) ([32]byte, error)
-	messageToTokenDataFn     func(logger.Logger, context.Context, CCTPv2Message, AttestationEncoder) exectypes.TokenData
+	messageToTokenDataFn     func(context.Context, logger.Logger, CCTPv2Message, AttestationEncoder) exectypes.TokenData
 }
 
 // NewCCTPv2TokenDataObserver creates a new CCTPv2 token data observer.
@@ -238,7 +238,7 @@ func (o *CCTPv2TokenDataObserver) convertCCTPv2MessagesToTokenData(
 			}
 
 			// Convert the CCTP v2 message to token data
-			tokenData := o.messageToTokenDataFn(o.lggr, ctx, msg, o.attestationEncoder)
+			tokenData := o.messageToTokenDataFn(ctx, o.lggr, msg, o.attestationEncoder)
 
 			// Append the token data to the slice for this deposit hash
 			result[requestParams][depositHash] = append(result[requestParams][depositHash], tokenData)
@@ -252,8 +252,8 @@ func (o *CCTPv2TokenDataObserver) convertCCTPv2MessagesToTokenData(
 // It validates the message status, decodes the hex-encoded message and attestation fields,
 // and uses the attestationEncoder to create the final token data payload.
 func CCTPv2MessageToTokenData(
-	lggr logger.Logger,
 	ctx context.Context,
+	lggr logger.Logger,
 	msg CCTPv2Message,
 	attestationEncoder AttestationEncoder,
 ) exectypes.TokenData {
