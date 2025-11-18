@@ -6,11 +6,11 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	mcmsops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -124,15 +124,15 @@ func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentC
 		cfg   types.Config
 	}{
 		{
-			utils.BypasserManyChainMultisig,
+			utils.BypasserSeed,
 			cfg.Bypasser,
 		},
 		{
-			utils.CancellerManyChainMultisig,
+			utils.CancellerSeed,
 			cfg.Canceller,
 		},
 		{
-			utils.ProposerManyChainMultisig,
+			utils.ProposerSeed,
 			cfg.Proposer,
 		},
 	}
@@ -148,14 +148,14 @@ func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentC
 		if err != nil {
 			return nil, fmt.Errorf("failed to init config type:%q, err:%w", cfg.ctype, err)
 		}
-		refs = append(refs, ref.Output)
+		refs = append(refs, ref.Output...)
 	}
 	return refs, nil
 }
 
 func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int, timelockAddress solana.PublicKey) ([]cldf_datastore.AddressRef, error) {
 	ref, err := operations.ExecuteOperation(b, mcmsops.InitTimelockOp, deps, mcmsops.InitTimelockInput{
-		ContractType: utils.RBACTimelock,
+		ContractType: utils.RBACTimelockSeed,
 		ChainSel:     deps.Chain.ChainSelector(),
 		MinDelay:     minDelay,
 		Timelock:     timelockAddress,
@@ -170,21 +170,21 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 	proposerRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.ChainSelector(),
-		utils.ProposerManyChainMultisig,
+		utils.ProposerSeed,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	cancellerRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.ChainSelector(),
-		utils.CancellerManyChainMultisig,
+		utils.CancellerSeed,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	bypasserRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.ChainSelector(),
-		utils.BypasserManyChainMultisig,
+		utils.BypasserSeed,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)

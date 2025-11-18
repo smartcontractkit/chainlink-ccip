@@ -31,23 +31,20 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	if !ok {
 		return mcms_types.ChainMetadata{}, fmt.Errorf("chain with selector %d not found in environment", chainSelector)
 	}
-	mcmAddress := datastore.GetAddressRef(
-		e.DataStore.Addresses().Filter(),
-		chainSelector,
-		utils.McmProgramType,
-		common_utils.Version_1_6_0,
-		"",
-	)
-	proposerSeed := datastore.GetAddressRef(
+	proposerAddr := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
 		common_utils.ProposerManyChainMultisig,
 		common_utils.Version_1_6_0,
 		input.Qualifier,
 	)
+	id, seed, err := mcms_solana.ParseContractAddress(proposerAddr.Address)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse proposer address %s for chain %d: %w", proposerAddr.Address, chainSelector, err)
+	}
 	proposer := mcms_solana.ContractAddress(
-		solana.MustPublicKeyFromBase58(mcmAddress.Address),
-		mcms_solana.PDASeed([]byte(proposerSeed.Address)),
+		id,
+		seed,
 	)
 	inspector := mcms_solana.NewInspector(chain.Client)
 	opcount, err := inspector.GetOpCount(context.Background(), proposer)
@@ -58,32 +55,34 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	var instanceSeed mcms_solana.PDASeed
 	switch input.TimelockAction {
 	case mcms_types.TimelockActionSchedule:
-		ref := datastore.GetAddressRef(
-			e.DataStore.Addresses().Filter(),
-			chainSelector,
-			common_utils.ProposerManyChainMultisig,
-			common_utils.Version_1_6_0,
-			input.Qualifier,
-		)
-		instanceSeed = mcms_solana.PDASeed([]byte(ref.Address))
+		// use proposer ref as seed
+		instanceSeed = seed
 	case mcms_types.TimelockActionCancel:
-		ref := datastore.GetAddressRef(
+		addr := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
 			chainSelector,
 			common_utils.CancellerManyChainMultisig,
 			common_utils.Version_1_6_0,
 			input.Qualifier,
 		)
-		instanceSeed = mcms_solana.PDASeed([]byte(ref.Address))
+		_, seed, err = mcms_solana.ParseContractAddress(addr.Address)
+		if err != nil {
+			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse address %s for chain %d: %w", proposerAddr.Address, chainSelector, err)
+		}
+		instanceSeed = mcms_solana.PDASeed(seed)
 	case mcms_types.TimelockActionBypass:
-		ref := datastore.GetAddressRef(
+		addr := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
 			chainSelector,
 			common_utils.BypasserManyChainMultisig,
 			common_utils.Version_1_6_0,
 			input.Qualifier,
 		)
-		instanceSeed = mcms_solana.PDASeed([]byte(ref.Address))
+		_, seed, err = mcms_solana.ParseContractAddress(addr.Address)
+		if err != nil {
+			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse address %s for chain %d: %w", proposerAddr.Address, chainSelector, err)
+		}
+		instanceSeed = mcms_solana.PDASeed(seed)
 	default:
 		return mcms_types.ChainMetadata{}, fmt.Errorf("unsupported timelock action %s for chain %d", input.TimelockAction, chainSelector)
 	}
@@ -110,7 +109,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	)
 	metadata, err := mcms_solana.NewChainMetadata(
 		opcount,
-		solana.MustPublicKeyFromBase58(mcmAddress.Address),
+		id,
 		instanceSeed,
 		solana.MustPublicKeyFromBase58(proposerAccount.Address),
 		solana.MustPublicKeyFromBase58(cancellerAccount.Address),
@@ -122,14 +121,14 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 }
 
 func (a *SolanaAdapter) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (cldf_datastore.AddressRef, error) {
-	timelockRef := datastore.GetAddressRef(
+	ref := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
-		utils.TimelockCompositeAddress,
+		common_utils.RBACTimelock,
 		common_utils.Version_1_6_0,
 		input.Qualifier,
 	)
-	return timelockRef, nil
+	return ref, nil
 }
 
 func (a *SolanaAdapter) GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (cldf_datastore.AddressRef, error) {
