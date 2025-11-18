@@ -17,12 +17,20 @@ import (
 
 type FeeQuoterApplyDestChainConfigUpdatesSequenceInput struct {
 	Address        common.Address
-	UpdatesByChain map[uint64][]fee_quoter.FeeQuoterDestChainConfigArgs
+	ChainSelector  uint64
+	UpdatesByChain []fee_quoter.FeeQuoterDestChainConfigArgs
 }
 
 type FeeQuoterUpdatePricesSequenceInput struct {
 	Address        common.Address
-	UpdatesByChain map[uint64]fee_quoter.InternalPriceUpdates
+	ChainSelector  uint64
+	UpdatesByChain fee_quoter.InternalPriceUpdates
+}
+
+type FeeQuoterApplyTokenTransferFeeConfigUpdatesSequenceInput struct {
+	Address        common.Address
+	ChainSelector  uint64
+	UpdatesByChain fqops.ApplyTokenTransferFeeConfigUpdatesInput
 }
 
 var (
@@ -32,21 +40,19 @@ var (
 		"Apply updates to destination chain configs on the FeeQuoter 1.6.0 contract across multiple EVM chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input FeeQuoterApplyDestChainConfigUpdatesSequenceInput) (sequences.OnChainOutput, error) {
 			writes := make([]contract.WriteOutput, 0)
-			for chainSel, update := range input.UpdatesByChain {
-				chain, ok := chains.EVMChains()[chainSel]
-				if !ok {
-					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSel)
-				}
-				report, err := operations.ExecuteOperation(b, fqops.FeeQuoterApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.FeeQuoterDestChainConfigArgs]{
-					ChainSelector: chain.Selector,
-					Address:       input.Address,
-					Args:          update,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyDestChainConfigUpdatesOp on %s: %w", chain, err)
-				}
-				writes = append(writes, report.Output)
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
+			report, err := operations.ExecuteOperation(b, fqops.FeeQuoterApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.FeeQuoterDestChainConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       input.Address,
+				Args:          input.UpdatesByChain,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyDestChainConfigUpdatesOp on %s: %w", chain, err)
+			}
+			writes = append(writes, report.Output)
 			batch, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
@@ -62,21 +68,47 @@ var (
 		"Update token and gas prices on FeeQuoter 1.6.0 contracts on multiple EVM chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input FeeQuoterUpdatePricesSequenceInput) (sequences.OnChainOutput, error) {
 			writes := make([]contract.WriteOutput, 0)
-			for chainSel, update := range input.UpdatesByChain {
-				chain, ok := chains.EVMChains()[chainSel]
-				if !ok {
-					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSel)
-				}
-				report, err := operations.ExecuteOperation(b, fqops.FeeQuoterUpdatePrices, chain, contract.FunctionInput[fee_quoter.InternalPriceUpdates]{
-					ChainSelector: chain.Selector,
-					Address:       input.Address,
-					Args:          update,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterUpdatePricesOp on %s: %w", chain, err)
-				}
-				writes = append(writes, report.Output)
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
+			report, err := operations.ExecuteOperation(b, fqops.FeeQuoterUpdatePrices, chain, contract.FunctionInput[fee_quoter.InternalPriceUpdates]{
+				ChainSelector: chain.Selector,
+				Address:       input.Address,
+				Args:          input.UpdatesByChain,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterUpdatePricesOp on %s: %w", chain, err)
+			}
+			writes = append(writes, report.Output)
+			batch, err := contract.NewBatchOperationFromWrites(writes)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			return sequences.OnChainOutput{
+				BatchOps: []mcms_types.BatchOperation{batch},
+			}, nil
+		})
+
+	FeeQuoterApplyTokenTransferFeeConfigUpdatesSequence = operations.NewSequence(
+		"FeeQuoterApplyTokenTransferFeeConfigUpdatesSequence",
+		semver.MustParse("1.6.0"),
+		"Update token transfer fee configs on FeeQuoter 1.6.0 contracts on multiple EVM chains",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input FeeQuoterApplyTokenTransferFeeConfigUpdatesSequenceInput) (sequences.OnChainOutput, error) {
+			writes := make([]contract.WriteOutput, 0)
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
+			report, err := operations.ExecuteOperation(b, fqops.FeeQuoterApplyTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesInput]{
+				ChainSelector: chain.Selector,
+				Address:       input.Address,
+				Args:          input.UpdatesByChain,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyTokenTransferFeeConfigUpdatesOp on %s: %w", chain, err)
+			}
+			writes = append(writes, report.Output)
 			batch, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)

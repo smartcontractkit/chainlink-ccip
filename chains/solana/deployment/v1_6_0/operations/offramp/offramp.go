@@ -4,16 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
@@ -21,11 +15,17 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/mcms/types"
 )
 
 var ContractType cldf_deployment.ContractType = "OffRamp"
 var SourceChainType cldf_deployment.ContractType = "RemoteSource"
-var ProgramName = "off_ramp"
+var ProgramName = "ccip_offramp"
 var ProgramSize = int(1.5 * 1024 * 1024)
 var Version *semver.Version = semver.MustParse("1.6.0")
 
@@ -230,6 +230,7 @@ var ConnectChains = operations.NewOperation(
 			ChainSelector: chain.Selector,
 			Type:          datastore.ContractType(SourceChainType),
 			Version:       Version,
+			Qualifier:     strconv.FormatUint(input.RemoteChainSelector, 10),
 		}
 		return sequences.OnChainOutput{
 			BatchOps:  batches,

@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
@@ -140,6 +141,7 @@ var ConnectChains = operations.NewOperation(
 			ChainSelector: chain.Selector,
 			Type:          datastore.ContractType(DestChainType),
 			Version:       Version,
+			Qualifier:     strconv.FormatUint(input.RemoteChainSelector, 10),
 		}
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
