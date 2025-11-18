@@ -148,14 +148,14 @@ func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentC
 		if err != nil {
 			return nil, fmt.Errorf("failed to init config type:%q, err:%w", cfg.ctype, err)
 		}
-		refs = append(refs, ref.Output)
+		refs = append(refs, ref.Output...)
 	}
 	return refs, nil
 }
 
 func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int, timelockAddress solana.PublicKey) ([]cldf_datastore.AddressRef, error) {
 	ref, err := operations.ExecuteOperation(b, mcmsops.InitTimelockOp, deps, mcmsops.InitTimelockInput{
-		ContractType: common_utils.RBACTimelock,
+		ContractType: utils.RBACTimelockSeed,
 		ChainSel:     deps.Chain.ChainSelector(),
 		MinDelay:     minDelay,
 		Timelock:     timelockAddress,
@@ -188,6 +188,10 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
+	fmt.Println("Setting up roles in Timelock")
+	fmt.Printf("Proposer: %s\n", proposerRef.Address)
+	fmt.Printf("Canceller: %s\n", cancellerRef.Address)
+	fmt.Printf("Bypasser: %s\n", bypasserRef.Address)
 	proposerPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(proposerRef.Address)))
 	cancellerPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(cancellerRef.Address)))
 	bypasserPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(bypasserRef.Address)))

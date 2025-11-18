@@ -34,8 +34,8 @@ var (
 	TimelockProgramName = "timelock"
 	TimelockProgramSize = 1 * 1024 * 1024
 
-	McmProgramName                              = "mcm"
-	McmProgramSize                              = 1 * 1024 * 1024
+	McmProgramName = "mcm"
+	McmProgramSize = 1 * 1024 * 1024
 
 	ProposerAccessControllerAccount  cldf_deployment.ContractType = "ProposerAccessControllerAccount"
 	ExecutorAccessControllerAccount  cldf_deployment.ContractType = "ExecutorAccessControllerAccount"
@@ -245,7 +245,7 @@ func initializeAccessController(
 	return nil
 }
 
-func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.AddressRef, error) {
+func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) ([]cldf_datastore.AddressRef, error) {
 	mcm.SetProgramID(in.MCM)
 	// Should be one of:
 	// BypasserSeed
@@ -258,6 +258,17 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.Ad
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
+	var outType cldf_datastore.ContractType
+	switch in.ContractType {
+	case utils.BypasserSeed:
+		outType = cldf_datastore.ContractType(common_utils.BypasserManyChainMultisig)
+	case utils.CancellerSeed:
+		outType = cldf_datastore.ContractType(common_utils.CancellerManyChainMultisig)
+	case utils.ProposerSeed:
+		outType = cldf_datastore.ContractType(common_utils.ProposerManyChainMultisig)
+	default:
+		return []cldf_datastore.AddressRef{}, fmt.Errorf("unsupported mcm contract type: %s", in.ContractType)
+	}
 
 	var mcmSeed state.PDASeed
 	if ref.Address != "" {
@@ -267,9 +278,9 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.Ad
 		err := common.GetAccountDataBorshInto(b.GetContext(), deps.Chain.Client, mcmConfigPDA, rpc.CommitmentConfirmed, &data)
 		if err == nil {
 			b.Logger.Infow("mcm config already initialized, skipping initialization", "chain", deps.Chain.String())
-			return cldf_datastore.AddressRef{}, nil
+			return []cldf_datastore.AddressRef{}, nil
 		}
-		return cldf_datastore.AddressRef{}, fmt.Errorf("unable to read mcm ConfigPDA account config %q", mcmConfigPDA.String())
+		return []cldf_datastore.AddressRef{}, fmt.Errorf("unable to read mcm ConfigPDA account config %q", mcmConfigPDA.String())
 	}
 
 	b.Logger.Infow("mcm config not initialized, initializing", "chain", deps.Chain.String())
@@ -278,7 +289,7 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.Ad
 	b.Logger.Infow("generated MCM seed", "seed", string(seed[:]))
 	err := initializeMCM(b, deps, in.MCM, seed)
 	if err != nil {
-		return cldf_datastore.AddressRef{}, fmt.Errorf("failed to initialize mcm: %w", err)
+		return []cldf_datastore.AddressRef{}, fmt.Errorf("failed to initialize mcm: %w", err)
 	}
 
 	encodedAddress := mcms_solana.ContractAddress(in.MCM, mcms_solana.PDASeed(seed))
@@ -286,16 +297,28 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (cldf_datastore.Ad
 	configurer := mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()))
 	tx, err := configurer.SetConfig(b.GetContext(), encodedAddress, &in.MCMConfig, false)
 	if err != nil {
-		return cldf_datastore.AddressRef{}, fmt.Errorf("failed to set config on mcm: %w", err)
+		return []cldf_datastore.AddressRef{}, fmt.Errorf("failed to set config on mcm: %w", err)
 	}
 	b.Logger.Infow("called SetConfig on MCM", "transaction", tx.Hash)
 
-	return cldf_datastore.AddressRef{
-		Address:       string(seed[:]),
-		ChainSelector: deps.Chain.Selector,
-		Type:          cldf_datastore.ContractType(in.ContractType),
-		Qualifier:     deps.Qualifier,
-		Version:       common_utils.Version_1_6_0,
+	return []cldf_datastore.AddressRef{
+		{
+			Address: mcms_solana.ContractAddress(
+				solana.MustPublicKeyFromBase58(in.MCM.String()),
+				mcms_solana.PDASeed([]byte(seed[:])),
+			),
+			ChainSelector: deps.Chain.Selector,
+			Type:          outType,
+			Qualifier:     deps.Qualifier,
+			Version:       common_utils.Version_1_6_0,
+		},
+		{
+			Address:       string(seed[:]),
+			ChainSelector: deps.Chain.Selector,
+			Type:          cldf_datastore.ContractType(in.ContractType),
+			Qualifier:     deps.Qualifier,
+			Version:       common_utils.Version_1_6_0,
+		},
 	}, nil
 }
 
@@ -500,25 +523,19 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
-	timelockProgram := datastore.GetAddressRef(
-		deps.ExistingAddresses,
-		deps.Chain.Selector,
-		utils.TimelockProgramType,
-		common_utils.Version_1_6_0,
-		in.Qualifier,
-	)
 	// timelock seeds stored as a separate program type
 	// qualifier will identify the correct timelock instance
-	timelockSeed := datastore.GetAddressRef(
+	timelockAddr := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
 		common_utils.RBACTimelock,
 		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
-	timelockConfigPDA := state.GetTimelockConfigPDA(
-		solana.MustPublicKeyFromBase58(timelockProgram.Address),
-		state.PDASeed([]byte(timelockSeed.Address)),
+	id, seed, _ := mcms_solana.ParseContractAddress(timelockAddr.Address)
+	timelockConfigPDA := state.GetTimelockSignerPDA(
+		id,
+		state.PDASeed([]byte(seed[:])),
 	)
 	var roleAccessController cldf_deployment.ContractType
 	switch in.Role {
@@ -541,7 +558,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 		in.Qualifier,
 	)
 	instructionBuilder := timelock.NewBatchAddAccessInstruction([32]uint8(
-		state.PDASeed([]byte(timelockSeed.Address))),
+		state.PDASeed(seed[:])),
 		in.Role,
 		timelockConfigPDA,
 		solana.MustPublicKeyFromBase58(accessControllerProgram.Address),
