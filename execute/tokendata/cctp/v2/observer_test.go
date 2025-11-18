@@ -1359,6 +1359,7 @@ func TestCCTPv2TokenDataObserver_ConvertCCTPv2MessagesToTokenData(t *testing.T) 
 				attestationEncoder: func(ctx context.Context, msg, att cciptypes.Bytes) (cciptypes.Bytes, error) {
 					return cciptypes.Bytes("encoded"), nil
 				},
+				metricsReporter: NewNoOpMetricsReporter(),
 			}
 
 			result := observer.convertCCTPv2MessagesToTokenData(context.Background(), tt.input)

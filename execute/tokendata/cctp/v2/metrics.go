@@ -32,12 +32,31 @@ var (
 		},
 		[]string{"destChainFamily", "destChainID", "sourceChainFamily", "sourceChainID", "sourceDomain", "success", "httpStatus"},
 	)
+
+	PromCCTPv2ObserveLatencyHistogram = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "ccip_exec_tokendata_cctpv2_observe_latency",
+			Help:    "Latency of CCTP v2 Observe() calls",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"destChainFamily", "destChainID", "numRequests"},
+	)
+
+	PromCCTPv2DepositHashCalculationErrorCounter = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ccip_exec_tokendata_cctpv2_deposit_hash_calculation_error",
+			Help: "Count of CCTP v2 deposit hash calculation errors",
+		},
+		[]string{"destChainFamily", "destChainID", "sourceChainFamily", "sourceChainID", "sourceDomain"},
+	)
 )
 
 // MetricsReporter provides metrics reporting functionality for CCTP v2 observer
 type MetricsReporter interface {
 	TrackAttestationAPILatency(
 		sourceChain cciptypes.ChainSelector, sourceDomain uint32, success bool, httpStatus string, latency time.Duration)
+	TrackObserveLatency(numRequests int, latency time.Duration)
+	TrackDepositHashCalculationError(sourceChain cciptypes.ChainSelector, sourceDomain uint32)
 }
 
 // MetricsReporterImpl implements MetricsReporter with actual Prometheus metrics
@@ -51,6 +70,12 @@ type MetricsReporterImpl struct {
 type noOpMetricsReporter struct{}
 
 func (n *noOpMetricsReporter) TrackAttestationAPILatency(cciptypes.ChainSelector, uint32, bool, string, time.Duration) {
+}
+
+func (n *noOpMetricsReporter) TrackObserveLatency(int, time.Duration) {
+}
+
+func (n *noOpMetricsReporter) TrackDepositHashCalculationError(cciptypes.ChainSelector, uint32) {
 }
 
 // NewMetricsReporter creates a new metrics reporter for CCTP v2
@@ -82,4 +107,22 @@ func (r *MetricsReporterImpl) TrackAttestationAPILatency(
 		WithLabelValues(r.destChainFamily, r.destChainID, sourceChainFamily, sourceChainID,
 			strconv.FormatUint(uint64(sourceDomain), 10), strconv.FormatBool(success), httpStatus).
 		Observe(latency.Seconds())
+}
+
+// TrackObserveLatency tracks the overall latency of Observe() calls
+func (r *MetricsReporterImpl) TrackObserveLatency(numRequests int, latency time.Duration) {
+	PromCCTPv2ObserveLatencyHistogram.
+		WithLabelValues(r.destChainFamily, r.destChainID, strconv.Itoa(numRequests)).
+		Observe(latency.Seconds())
+}
+
+// TrackDepositHashCalculationError tracks deposit hash calculation errors
+func (r *MetricsReporterImpl) TrackDepositHashCalculationError(
+	sourceChain cciptypes.ChainSelector, sourceDomain uint32,
+) {
+	sourceChainFamily, sourceChainID, _ := libs.GetChainInfoFromSelector(sourceChain)
+	PromCCTPv2DepositHashCalculationErrorCounter.
+		WithLabelValues(r.destChainFamily, r.destChainID, sourceChainFamily, sourceChainID,
+			strconv.FormatUint(uint64(sourceDomain), 10)).
+		Inc()
 }

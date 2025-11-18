@@ -57,6 +57,14 @@ func (m *MockMetricsReporter) TrackAttestationAPILatency(
 	m.Called(sourceChain, sourceDomain, success, httpStatus, latency)
 }
 
+func (m *MockMetricsReporter) TrackObserveLatency(numRequests int, latency time.Duration) {
+	m.Called(numRequests, latency)
+}
+
+func (m *MockMetricsReporter) TrackDepositHashCalculationError(sourceChain cciptypes.ChainSelector, sourceDomain uint32) {
+	m.Called(sourceChain, sourceDomain)
+}
+
 func TestNewCCTPv2Client(t *testing.T) {
 	lggr := logger.Test(t)
 	config := pluginconfig.USDCCCTPObserverConfig{

@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -114,8 +115,16 @@ func (o *CCTPv2TokenDataObserver) Observe(
 	ctx context.Context,
 	messages exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
+	var cctpV2RequestParams mapset.Set[CCTPv2RequestParams]
+
+	startTime := time.Now()
+	defer func() {
+		latency := time.Since(startTime)
+		o.metricsReporter.TrackObserveLatency(cctpV2RequestParams.Cardinality(), latency)
+	}()
+
 	// Extract the CCTPv2 API requests that need to be made
-	cctpV2RequestParams := o.getCCTPv2RequestParams(messages)
+	cctpV2RequestParams = o.getCCTPv2RequestParams(messages)
 
 	// Execute these API requests to fetch CCTPv2Messages
 	cctpV2Messages := o.makeCCTPv2Requests(ctx, cctpV2RequestParams)
@@ -273,7 +282,7 @@ func (o *CCTPv2TokenDataObserver) convertCCTPv2MessagesToTokenData(
 			// Calculate the deposit hash for this message
 			depositHash, err := o.calculateDepositHashFn(msg.DecodedMessage)
 			if err != nil {
-				// TODO: metrics
+				o.metricsReporter.TrackDepositHashCalculationError(requestParams.chainSelector, requestParams.sourceDomain)
 				o.lggr.Warnw("failed to calculate deposit hash for CCTP v2 message",
 					"eventNonce", msg.EventNonce,
 					"sourceDomain", msg.DecodedMessage.SourceDomain,
