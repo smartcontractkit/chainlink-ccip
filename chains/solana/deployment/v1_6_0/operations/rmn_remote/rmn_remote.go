@@ -213,7 +213,7 @@ var Curse = operations.NewOperation(
 )
 
 var Uncurse = operations.NewOperation(
-	"rmn-remote:curse",
+	"rmn-remote:uncurse",
 	Version,
 	"Lifts curses for subjects with RMNRemote",
 	func(b operations.Bundle, chain cldf_solana.Chain, input CurseInput) (sequences.OnChainOutput, error) {
@@ -234,7 +234,7 @@ var Uncurse = operations.NewOperation(
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to build curse instruction: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build uncurse instruction: %w", err)
 			}
 			ins = append(ins, ix)
 		}
@@ -316,7 +316,7 @@ func IsSubjectCursed(chain cldf_solana.Chain, program solana.PublicKey, subject 
 			return true, nil
 		}
 		return false, fmt.Errorf("unexpected global curse for non-global subject")
-	case 9007: // address curse
+	case 9005: // address curse
 		return true, nil
 	default:
 		return false, fmt.Errorf("unexpected error code returned from RMNRemote: %d", curseType)
