@@ -38,10 +38,6 @@ var (
 					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSel)
 				}
 
-				fmt.Println("Reached USDCTokenPoolSetDomainsSequence sequence execution for chain: ", chain.Selector)
-				fmt.Println("Domains: ", domains)
-				fmt.Println("Address: ", input.Address)
-
 				// Execute the operation USDCTokenPoolSetDomains, on "chain", with the input being an array of
 				// DomainUpdate structs, with the first and only item being the domains for the given chain selector
 				report, err := operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolSetDomains, chain, contract.FunctionInput[[]usdc_token_pool_ops.DomainUpdate]{
