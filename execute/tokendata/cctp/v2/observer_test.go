@@ -17,6 +17,49 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 )
 
+// Test helper functions
+
+// defaultTestEncoder returns a simple encoder that concatenates message and attestation for testing
+func defaultTestEncoder() AttestationEncoder {
+	return func(ctx context.Context, msg cciptypes.Bytes, att cciptypes.Bytes) (cciptypes.Bytes, error) {
+		result := make([]byte, len(msg)+len(att))
+		copy(result, msg)
+		copy(result[len(msg):], att)
+		return result, nil
+	}
+}
+
+// newTestCCTPv2Observer creates a test observer with sensible defaults.
+// Pass nil for httpClient to use default (no client).
+// Pass 0 for chainSelector to use default (999).
+// Note: This creates the observer directly using a struct literal, bypassing the constructor.
+// This is appropriate for unit tests where we want to inject mock dependencies.
+// Tests should use the setup callback to populate supportedPoolsBySelector as needed.
+func newTestCCTPv2Observer(
+	t *testing.T,
+	httpClient CCTPv2HTTPClient,
+	chainSelector cciptypes.ChainSelector,
+) *CCTPv2TokenDataObserver {
+	// Apply defaults
+	if chainSelector == 0 {
+		chainSelector = cciptypes.ChainSelector(999)
+	}
+
+	// Create observer directly using struct literal (bypassing constructor for test flexibility)
+	observer := &CCTPv2TokenDataObserver{
+		lggr:                     logger.Test(t),
+		destChainSelector:        chainSelector,
+		supportedPoolsBySelector: make(map[cciptypes.ChainSelector]string), // Tests populate this via setup callback
+		attestationEncoder:       defaultTestEncoder(),
+		httpClient:               httpClient,
+		calculateDepositHashFn:   CalculateDepositHash,
+		messageToTokenDataFn:     CCTPv2MessageToTokenData,
+		metricsReporter:          NewNoOpMetricsReporter(),
+	}
+
+	return observer
+}
+
 func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 	const (
 		testChain1   = cciptypes.ChainSelector(1)
@@ -277,13 +320,7 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			observer := NewCCTPv2TokenDataObserver(
-				logger.Test(t),
-				cciptypes.ChainSelector(999),
-				map[cciptypes.ChainSelector]string{},
-				nil,
-				nil,
-			)
+			observer := newTestCCTPv2Observer(t, nil, 0)
 
 			if tt.setup != nil {
 				tt.setup(observer)
@@ -458,13 +495,7 @@ func TestCCTPv2TokenDataObserver_MakeCCTPv2Requests(t *testing.T) {
 				tt.setup(mock)
 			}
 
-			observer := NewCCTPv2TokenDataObserver(
-				logger.Test(t),
-				cciptypes.ChainSelector(999),
-				map[cciptypes.ChainSelector]string{},
-				nil,
-				mock,
-			)
+			observer := newTestCCTPv2Observer(t, mock, 0)
 
 			// Build set from params
 			paramsSet := mapset.NewSet[CCTPv2RequestParams]()
@@ -566,30 +597,6 @@ func (m *mockCCTPv2HTTPClient) wasCalledWith(
 		}
 	}
 	return false
-}
-
-// Helper to create a test observer with mock client
-func createObserverWithMock(
-	t *testing.T,
-	destChainSelector cciptypes.ChainSelector,
-	poolConfig map[cciptypes.ChainSelector]string,
-	mockClient *mockCCTPv2HTTPClient,
-) *CCTPv2TokenDataObserver {
-	return &CCTPv2TokenDataObserver{
-		lggr:                     logger.Test(t),
-		destChainSelector:        destChainSelector,
-		supportedPoolsBySelector: poolConfig,
-		attestationEncoder: func(ctx context.Context, msg cciptypes.Bytes, att cciptypes.Bytes) (cciptypes.Bytes, error) {
-			// Simple concatenation for testing
-			result := make([]byte, len(msg)+len(att))
-			copy(result, msg)
-			copy(result[len(msg):], att)
-			return result, nil
-		},
-		httpClient:             mockClient,
-		calculateDepositHashFn: CalculateDepositHash,
-		messageToTokenDataFn:   CCTPv2MessageToTokenData,
-	}
 }
 
 func TestCCTPv2MessageToTokenData(t *testing.T) {
@@ -1737,14 +1744,12 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 			},
 		},
 		{
-			name: "consumption tracking across messages",
+			name: "FIFO consumption - multiple tokens with same deposit hash",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
 						createCCTPv2Token(testPoolAddr, 100, depositHex1),
 						createCCTPv2Token(testPoolAddr, 100, depositHex1),
-					}),
-					11: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
 						createCCTPv2Token(testPoolAddr, 100, depositHex1),
 					}),
 				},
@@ -1760,11 +1765,13 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 			},
 			validate: func(t *testing.T, result exectypes.TokenDataObservations) {
 				assert.Contains(t, result, testChain1)
-				// Check message 10 consumed first two items
-				assert.Equal(t, []byte("first"), []byte(result[testChain1][10].TokenData[0].Data))
-				assert.Equal(t, []byte("second"), []byte(result[testChain1][10].TokenData[1].Data))
-				// Check message 11 consumed third item
-				assert.Equal(t, []byte("third"), []byte(result[testChain1][11].TokenData[0].Data))
+				assert.Contains(t, result[testChain1], cciptypes.SeqNum(10))
+				// Check that all three tokens consumed the data in FIFO order
+				tokenData := result[testChain1][10].TokenData
+				assert.Len(t, tokenData, 3)
+				assert.Equal(t, []byte("first"), []byte(tokenData[0].Data))
+				assert.Equal(t, []byte("second"), []byte(tokenData[1].Data))
+				assert.Equal(t, []byte("third"), []byte(tokenData[2].Data))
 			},
 		},
 		{

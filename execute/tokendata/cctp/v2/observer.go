@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -42,6 +43,7 @@ type CCTPv2TokenDataObserver struct {
 	supportedPoolsBySelector map[cciptypes.ChainSelector]string
 	attestationEncoder       AttestationEncoder
 	httpClient               CCTPv2HTTPClient
+	metricsReporter          MetricsReporter
 	calculateDepositHashFn   func(CCTPv2DecodedMessage) ([32]byte, error)
 	messageToTokenDataFn     func(context.Context, logger.Logger, CCTPv2Message, AttestationEncoder) exectypes.TokenData
 }
@@ -50,19 +52,43 @@ type CCTPv2TokenDataObserver struct {
 func NewCCTPv2TokenDataObserver(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
-	supportedPoolsBySelector map[cciptypes.ChainSelector]string,
+	usdcConfig pluginconfig.USDCCCTPObserverConfig,
 	attestationEncoder AttestationEncoder,
-	httpClient CCTPv2HTTPClient,
-) *CCTPv2TokenDataObserver {
+) (*CCTPv2TokenDataObserver, error) {
+	metricsReporter, err := NewMetricsReporter(lggr, destChainSelector)
+	if err != nil {
+		lggr.Errorw("Failed to create CCTP v2 metrics reporter",
+			"error", err,
+			"destChainSelector", destChainSelector,
+		)
+		return nil, fmt.Errorf("create metrics reporter: %w", err)
+	}
+
+	httpClient, err := NewCCTPv2Client(lggr, usdcConfig, metricsReporter)
+	if err != nil {
+		lggr.Errorw("Failed to create CCTP v2 HTTP client",
+			"destChainSelector", destChainSelector,
+			"error", err,
+		)
+		return nil, fmt.Errorf("create attestation client: %w", err)
+	}
+
+	supportedPoolsBySelector := make(map[cciptypes.ChainSelector]string)
+	for chainSelector, tokenConfig := range usdcConfig.Tokens {
+		supportedPoolsBySelector[chainSelector] = tokenConfig.SourcePoolAddress
+	}
+	lggr.Infow("Created CCTPv2 Token Data Observer")
+
 	return &CCTPv2TokenDataObserver{
 		lggr:                     lggr,
 		destChainSelector:        destChainSelector,
 		supportedPoolsBySelector: supportedPoolsBySelector,
 		attestationEncoder:       attestationEncoder,
 		httpClient:               httpClient,
+		metricsReporter:          metricsReporter,
 		calculateDepositHashFn:   CalculateDepositHash,
 		messageToTokenDataFn:     CCTPv2MessageToTokenData,
-	}
+	}, nil
 }
 
 // Observe fetches CCTPv2 attestations for USDC tokens in the provided messages.

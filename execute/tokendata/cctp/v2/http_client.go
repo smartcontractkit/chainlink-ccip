@@ -33,12 +33,6 @@ type CCTPv2HTTPClient interface {
 	) (CCTPv2Messages, error)
 }
 
-// MetricsReporter provides metrics reporting for attestation API calls
-type MetricsReporter interface {
-	TrackAttestationAPILatency(
-		sourceChain cciptypes.ChainSelector, sourceDomain uint32, success bool, httpStatus string, latency time.Duration)
-}
-
 // CCTPv2HTTPClientImpl implements CCTPv2AttestationClient using HTTP calls to Circle's attestation API
 type CCTPv2HTTPClientImpl struct {
 	lggr            logger.Logger

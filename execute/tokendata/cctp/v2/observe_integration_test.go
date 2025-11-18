@@ -50,7 +50,13 @@ func createObserverForIntegrationTest(
 	poolConfig map[cciptypes.ChainSelector]string,
 	mockClient *mockCCTPv2HTTPClient,
 ) *CCTPv2TokenDataObserver {
-	return createObserverWithMock(t, 1, poolConfig, mockClient)
+	// Create observer with mock HTTP client
+	observer := newTestCCTPv2Observer(t, mockClient, cciptypes.ChainSelector(1))
+
+	// Set pool configuration directly
+	observer.supportedPoolsBySelector = poolConfig
+
+	return observer
 }
 
 func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
