@@ -212,6 +212,25 @@ func (o *CCTPv2TokenDataObserver) makeCCTPv2Requests(
 // by request parameters and deposit hash for efficient lookup in the assignment phase.
 // Note that each CCTPv2Message contains an Attestation and MessageBody, and TokenData is simply the serialization of
 // (Attestation, MessageBody)
+//
+// It's necessary to group by DepositHash so that we can associate TokenData with a TokenAmount. Given a CCIP Message
+// and one of its TokenAmount, we can look up the TokenData by:
+// - parsing TokenAmount.ExtraData: tokenPayload := SourceTokenDataPayloadV2
+// - constructing reqParams := CCTPv2RequestParams { Message.Header.TxHash, tokenPayload.sourceDomain }
+// - look up TokenData via result[reqParams][tokenPayload.DepositHash]
+// and then popping the first TokenData in the list
+//
+// DepositHash maps to []exectypes.TokenData instead of a single TokenData because there can be multiple
+// USDC CCTPv2 transfers with identical params (e.g. same amount, receiver, etc), which means there will be multiple
+// CCTPv2Messages with the same DepositHash. In this case, the attestations are fungible. For example, if we have:
+//
+// tokenPayloadA with DepositHashX
+// tokenPayloadB with DepositHashX
+// cctpV2Message1 with attestation1 and DepositHashX
+// cctpV2Message2 with attestation2 and DepositHashX
+//
+// then attestation1 can be assigned to **either** tokenPayloadA or tokenPayloadB, and attestation2 assigned to the
+// other tokenPayload.
 func (o *CCTPv2TokenDataObserver) convertCCTPv2MessagesToTokenData(
 	ctx context.Context,
 	cctpV2Messages map[CCTPv2RequestParams]CCTPv2Messages,
