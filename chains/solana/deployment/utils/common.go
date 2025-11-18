@@ -105,7 +105,7 @@ func GetMCMSignerPDA(
 		qualifier,
 	)
 	id, seed, _ := mcms_solana.ParseContractAddress(mcm.Address)
-	return state.GetTimelockSignerPDA(
+	return state.GetMCMSignerPDA(
 		id,
 		state.PDASeed([]byte(seed[:])),
 	)

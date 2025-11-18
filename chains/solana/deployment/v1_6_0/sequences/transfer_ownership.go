@@ -31,13 +31,6 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	if !ok {
 		return mcms_types.ChainMetadata{}, fmt.Errorf("chain with selector %d not found in environment", chainSelector)
 	}
-	mcmAddress := datastore.GetAddressRef(
-		e.DataStore.Addresses().Filter(),
-		chainSelector,
-		utils.McmProgramType,
-		common_utils.Version_1_6_0,
-		"",
-	)
 	proposerAddr := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
@@ -62,32 +55,34 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	var instanceSeed mcms_solana.PDASeed
 	switch input.TimelockAction {
 	case mcms_types.TimelockActionSchedule:
-		ref := datastore.GetAddressRef(
-			e.DataStore.Addresses().Filter(),
-			chainSelector,
-			utils.ProposerSeed,
-			common_utils.Version_1_6_0,
-			input.Qualifier,
-		)
-		instanceSeed = mcms_solana.PDASeed([]byte(ref.Address))
+		// use proposer ref as seed
+		instanceSeed = seed
 	case mcms_types.TimelockActionCancel:
-		ref := datastore.GetAddressRef(
+		addr := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
 			chainSelector,
-			utils.CancellerSeed,
+			common_utils.CancellerManyChainMultisig,
 			common_utils.Version_1_6_0,
 			input.Qualifier,
 		)
-		instanceSeed = mcms_solana.PDASeed([]byte(ref.Address))
+		_, seed, err = mcms_solana.ParseContractAddress(addr.Address)
+		if err != nil {
+			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse address %s for chain %d: %w", proposerAddr.Address, chainSelector, err)
+		}
+		instanceSeed = mcms_solana.PDASeed(seed)
 	case mcms_types.TimelockActionBypass:
-		ref := datastore.GetAddressRef(
+		addr := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
 			chainSelector,
-			utils.BypasserSeed,
+			common_utils.BypasserManyChainMultisig,
 			common_utils.Version_1_6_0,
 			input.Qualifier,
 		)
-		instanceSeed = mcms_solana.PDASeed([]byte(ref.Address))
+		_, seed, err = mcms_solana.ParseContractAddress(addr.Address)
+		if err != nil {
+			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse address %s for chain %d: %w", proposerAddr.Address, chainSelector, err)
+		}
+		instanceSeed = mcms_solana.PDASeed(seed)
 	default:
 		return mcms_types.ChainMetadata{}, fmt.Errorf("unsupported timelock action %s for chain %d", input.TimelockAction, chainSelector)
 	}
@@ -114,7 +109,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	)
 	metadata, err := mcms_solana.NewChainMetadata(
 		opcount,
-		solana.MustPublicKeyFromBase58(mcmAddress.Address),
+		id,
 		instanceSeed,
 		solana.MustPublicKeyFromBase58(proposerAccount.Address),
 		solana.MustPublicKeyFromBase58(cancellerAccount.Address),
