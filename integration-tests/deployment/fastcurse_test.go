@@ -40,7 +40,7 @@ import (
 func TestFastCurseSolanaAndEVM(t *testing.T) {
 	chain1 := chainsel.TEST_90000001.Selector
 	chain2 := chainsel.TEST_90000002.Selector
-	programsPath, dstr, err := PreloadSolanaEnvironment(chainsel.SOLANA_MAINNET.Selector)
+	programsPath, dstr, err := PreloadSolanaEnvironment(t, chainsel.SOLANA_MAINNET.Selector)
 	require.NoError(t, err, "Failed to set up Solana environment")
 	require.NotNil(t, dstr, "Datastore should be created")
 	solanaChains := []uint64{
