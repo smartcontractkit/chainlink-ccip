@@ -20,7 +20,6 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
