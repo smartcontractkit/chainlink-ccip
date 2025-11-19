@@ -310,7 +310,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   // ================================================================
 
   /// @inheritdoc IFeeQuoter
-  function resolveGasCost(
+  function quoteGasForExec(
     uint64 destChainSelector,
     uint32 nonCalldataGas,
     uint32 calldataSize

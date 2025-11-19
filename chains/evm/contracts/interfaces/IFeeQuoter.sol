@@ -5,13 +5,13 @@ import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 
 interface IFeeQuoter {
-  /// @notice Resolves the total gas and gas cost in USD cents.
+  /// @notice Quotes the total gas and gas cost in USD cents.
   /// @param destChainSelector The destination chain selector.
   /// @param nonCalldataGas The non-calldata gas to be used for the message.
   /// @param calldataSize The size of the calldata in bytes.
   /// @return totalGas The total gas needed for the message.
   /// @return gasCostInUsdCents The gas cost in USD cents, taking into account the calldata cost as well.
-  function resolveGasCost(
+  function quoteGasForExec(
     uint64 destChainSelector,
     uint32 nonCalldataGas,
     uint32 calldataSize
