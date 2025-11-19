@@ -48,6 +48,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InvalidDestChainAddress(bytes destChainAddress);
   error CustomBlockConfirmationNotSupportedOnPoolV1();
   error TokenArgsNotSupportedOnPoolV1();
+  error InsufficientFeeTokenAmount(uint256 provided, uint256 required);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -249,7 +250,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     CCIPMessageSentEventData memory eventData;
     // Populate receipts for verifiers, pool and executor in that order.
-    (eventData.receipts, newMessage.executionGasLimit,) = _getReceipts(destChainSelector, message, resolvedExtraArgs);
+    uint256 receiptsFeeTokenAmount;
+    (eventData.receipts, newMessage.executionGasLimit, receiptsFeeTokenAmount) =
+      _getReceipts(destChainSelector, message, resolvedExtraArgs);
+
+    if (feeTokenAmount < receiptsFeeTokenAmount) {
+      revert InsufficientFeeTokenAmount(feeTokenAmount, receiptsFeeTokenAmount);
+    }
+    _distributeFees(destChainSelector, message, eventData.receipts);
 
     // 4. lockOrBurn.
 
@@ -298,6 +306,37 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     s_dynamicConfig.reentrancyGuardEntered = false;
 
     return messageId;
+  }
+
+  /// @notice Distributes the fee token to each receipt issuer.
+  /// @dev Token pool receipt payments are routed to the pool only if it supports IPoolV2 interface.
+  function _distributeFees(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message,
+    Receipt[] memory receipts
+  ) internal {
+    uint256 tokenReceiptIndex = type(uint256).max;
+    IPoolV1 tokenPool;
+    if (message.tokenAmounts.length > 0) {
+      tokenReceiptIndex = receipts.length - 2;
+      tokenPool = getPoolBySourceToken(destChainSelector, IERC20(message.tokenAmounts[0].token));
+    }
+
+    IERC20 feeToken = IERC20(message.feeToken);
+    for (uint256 i = 0; i < receipts.length; ++i) {
+      uint256 receiptFee = receipts[i].feeTokenAmount;
+      if (receiptFee == 0) continue;
+
+      if (i == tokenReceiptIndex) {
+        if (IERC165(address(tokenPool)).supportsInterface(type(IPoolV2).interfaceId)) {
+          feeToken.safeTransfer(address(tokenPool), receiptFee);
+        }
+        continue;
+      }
+
+      address issuer = receipts[i].issuer;
+      feeToken.safeTransfer(issuer, receiptFee);
+    }
   }
 
   /// @notice Merges lane mandated and pool required CCVs with user-provided CCVs.
