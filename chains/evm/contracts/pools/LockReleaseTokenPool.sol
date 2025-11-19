@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {ERC20LockBox} from "./ERC20LockBox.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -27,16 +28,35 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @notice The address of the rebalancer.
   address internal s_rebalancer;
 
+  /// @notice The lock box for the token pool.
+  ERC20LockBox internal immutable i_lockBox;
+
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+    address router,
+    address lockBox
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
+    if (lockBox == address(0)) revert ZeroAddressInvalid();
+
+    token.safeApprove(lockBox, type(uint256).max);
+    i_lockBox = ERC20LockBox(lockBox);
+  }
+
+  /// @notice Locks the tokens in the lockBox.
+  /// @dev The router has already transferred the full amount to this contract before calling lockOrBurn.
+  /// For V1 the amount = full amount. For V2 the amount = destTokenAmount (after fees), and fees remain on this contract.
+  function _lockOrBurn(
+    uint256 amount
+  ) internal virtual override {
+    i_lockBox.deposit(address(i_token), amount);
+  }
 
   function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
-    i_token.safeTransfer(receiver, amount);
+    // Release tokens from the lock box to the receiver.
+    i_lockBox.withdraw(address(i_token), amount, receiver);
   }
 
   /// @notice Gets rebalancer, can be address(0) if none is configured.
@@ -66,6 +86,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
+    i_lockBox.deposit(address(i_token), amount);
     emit LiquidityAdded(msg.sender, amount);
   }
 
@@ -76,8 +97,8 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) external {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
-    if (i_token.balanceOf(address(this)) < amount) revert InsufficientLiquidity();
-    i_token.safeTransfer(msg.sender, amount);
+    // Withdraw the tokens directly from the lockbox to the rebalancer.
+    i_lockBox.withdraw(address(i_token), amount, msg.sender);
     emit LiquidityRemoved(msg.sender, amount);
   }
 

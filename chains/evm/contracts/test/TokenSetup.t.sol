@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {BurnMintTokenPool} from "../pools/BurnMintTokenPool.sol";
+import {ERC20LockBox} from "../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../pools/TokenPool.sol";
 import {TokenAdminRegistry} from "../tokenAdminRegistry/TokenAdminRegistry.sol";
@@ -19,6 +20,7 @@ contract TokenSetup is BaseTest {
   address internal s_destFeeToken;
 
   TokenAdminRegistry internal s_tokenAdminRegistry;
+  ERC20LockBox internal s_lockBox;
 
   mapping(address sourceToken => address sourcePool) internal s_sourcePoolByToken;
   mapping(address sourceToken => address destPool) internal s_destPoolBySourceToken;
@@ -46,7 +48,7 @@ contract TokenSetup is BaseTest {
     }
 
     LockReleaseTokenPool pool = new LockReleaseTokenPool(
-      IERC20(token), DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), router
+      IERC20(token), DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), router, address(s_lockBox)
     );
 
     if (isSourcePool) {
@@ -84,6 +86,9 @@ contract TokenSetup is BaseTest {
       return;
     }
 
+    s_tokenAdminRegistry = new TokenAdminRegistry();
+    s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
+
     // Source tokens & pools
     address sourceLink = _deploySourceToken("sLINK", type(uint256).max, 18);
     _deployLockReleasePool(sourceLink, true);
@@ -104,12 +109,10 @@ contract TokenSetup is BaseTest {
 
     s_destTokenBySourceToken[sourceEth] = destEth;
 
-    // Float the dest link lock release pool with funds
-    IERC20(destLink).transfer(s_destPoolByToken[destLink], 1000 ether);
+    // Float the dest link lock release pool with funds.
+    IERC20(destLink).transfer(address(s_lockBox), 1000 ether);
 
-    s_tokenAdminRegistry = new TokenAdminRegistry();
-
-    // Set pools in the registry
+    // Set pools in the registry.
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
       address token = s_sourceTokens[i];
       address pool = s_sourcePoolByToken[token];
@@ -135,6 +138,12 @@ contract TokenSetup is BaseTest {
         s_sourceTokens[i]
       );
     }
+
+    // Configure lockBox allowed callers for lock release pools.
+    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
+    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({token: sourceLink, caller: OWNER, allowed: true});
+    allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({token: destLink, caller: OWNER, allowed: true});
+    s_lockBox.configureAllowedCallers(allowedCallers);
   }
 
   function _setPool(
