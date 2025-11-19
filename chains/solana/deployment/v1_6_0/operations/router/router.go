@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -174,6 +175,13 @@ var AddOffRamp = operations.NewOperation(
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Router)
 		authority := GetAuthority(chain, input.Router)
+		var sourceChainAccount ccip_offramp.SourceChain
+		offRampSourceChainPDA, _, _ := state.FindOfframpSourceChainPDA(input.RemoteChainSelector, input.OffRamp)
+		err := chain.GetAccountDataBorshInto(context.Background(), offRampSourceChainPDA, &sourceChainAccount)
+		if err == nil {
+			fmt.Println("Remote chain state account found:", sourceChainAccount)
+			return sequences.OnChainOutput{}, nil
+		}
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		allowedOffRampRemotePDA, _ := state.FindAllowedOfframpPDA(input.RemoteChainSelector, input.OffRamp, input.Router)
 		ixn, err := ccip_router.NewAddOfframpInstruction(
