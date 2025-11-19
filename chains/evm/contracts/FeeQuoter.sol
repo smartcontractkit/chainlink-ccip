@@ -309,6 +309,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   // │                       Fee quoting                            │
   // ================================================================
 
+  /// @inheritdoc IFeeQuoter
   function resolveGasCost(
     uint64 destChainSelector,
     uint32 nonCalldataGas,

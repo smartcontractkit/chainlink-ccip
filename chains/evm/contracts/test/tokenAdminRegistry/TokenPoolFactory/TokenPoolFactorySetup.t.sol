@@ -32,8 +32,9 @@ contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
     s_registryModuleOwnerCustom = new RegistryModuleOwnerCustom(address(s_tokenAdminRegistry));
     s_tokenAdminRegistry.addRegistryModule(address(s_registryModuleOwnerCustom));
 
-    s_tokenPoolFactory =
-      new TokenPoolFactory(s_tokenAdminRegistry, s_registryModuleOwnerCustom, s_rmnProxy, address(s_sourceRouter));
+    s_tokenPoolFactory = new TokenPoolFactory(
+      s_tokenAdminRegistry, s_registryModuleOwnerCustom, s_rmnProxy, address(s_sourceRouter), address(s_lockBox)
+    );
 
     // Create Init Code for BurnMintERC20 TestToken with 18 decimals and supply cap of max uint256 value
     s_tokenCreationParams = abi.encode("TestToken", "TT", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
