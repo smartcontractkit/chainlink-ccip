@@ -179,7 +179,7 @@ var AddOffRamp = operations.NewOperation(
 		offRampSourceChainPDA, _, _ := state.FindOfframpSourceChainPDA(input.RemoteChainSelector, input.OffRamp)
 		err := chain.GetAccountDataBorshInto(context.Background(), offRampSourceChainPDA, &sourceChainAccount)
 		if err == nil {
-			fmt.Println("Remote chain state account found:", sourceChainAccount)
+			b.Logger.Info("Remote chain state account found:", sourceChainAccount)
 			return sequences.OnChainOutput{}, nil
 		}
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
