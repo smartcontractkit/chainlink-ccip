@@ -70,9 +70,17 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   constructor(
     string memory storageLocation
   ) {
-    s_storageLocation = storageLocation;
+    _setStorageLocation(storageLocation);
+  }
 
-    emit StorageLocationUpdated("", storageLocation);
+  /// @notice Updates the storage location.
+  /// @param storageLocation The new storage location.
+  function _setStorageLocation(
+    string memory storageLocation
+  ) internal {
+    string memory oldLocation = s_storageLocation;
+    s_storageLocation = storageLocation;
+    emit StorageLocationUpdated(oldLocation, storageLocation);
   }
 
   /// @inheritdoc ICrossChainVerifierV1

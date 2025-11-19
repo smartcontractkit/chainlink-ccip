@@ -101,6 +101,28 @@ interface ITokenMessenger {
     uint32 minFinalityThreshold
   ) external;
 
+  /// @notice Burns USDC on source through Circle's Cross Chain Transfer Protocol V2.
+  /// Custom hook data is included within the message body, which gets attested to along with the rest of the message.
+  /// @dev This function is only available for CCTP V2.
+  /// @param amount Amount of tokens to deposit and burn.
+  /// @param destinationDomain Destination domain identifier.
+  /// @param mintRecipient Address of mint recipient on destination domain.
+  /// @param burnToken The address of the token being burned.
+  /// @param destinationCaller Allowed caller of receiveMessage() on the destination domain as bytes32.
+  /// @param maxFee Maximum fee to pay on destination for fast transfer, specified in units of burnToken. Should be 0 when using standard transfer.
+  /// @param minFinalityThreshold Minimum finality threshold at which the burn will be attested (2000 for standard, 1000 for fast).
+  /// @param hookData Additional data to attest and process on destination.
+  function depositForBurnWithHook(
+    uint256 amount,
+    uint32 destinationDomain,
+    bytes32 mintRecipient,
+    address burnToken,
+    bytes32 destinationCaller,
+    uint32 maxFee,
+    uint32 minFinalityThreshold,
+    bytes calldata hookData
+  ) external;
+
   /// Returns the version of the message body format.
   /// @dev immutable
   function messageBodyVersion() external view returns (uint32);
