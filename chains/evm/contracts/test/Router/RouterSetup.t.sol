@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IEVM2AnyOnRampClient} from "../../interfaces/IEVM2AnyOnRampClient.sol";
-
 import {Router} from "../../Router.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
