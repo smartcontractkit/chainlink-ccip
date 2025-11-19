@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 
@@ -9,7 +10,9 @@ import (
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -70,19 +73,31 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		offRampAddress := solana.PublicKeyFromBytes(input.Dest.OffRamp)
 		ccipRouterProgram := solana.PublicKeyFromBytes(input.Dest.Router)
 
-		// OffRamp must be added to Router before initialization
-		routerOut, err := operations.ExecuteOperation(b, routerops.AddOffRamp, chains.SolanaChains()[input.Dest.Selector], routerops.ConnectChainsParams{
-			Router:              ccipRouterProgram,
-			OffRamp:             offRampAddress,
-			RemoteChainSelector: input.Source.Selector,
-			AllowlistEnabled:    input.Source.AllowListEnabled,
-			AllowedSenders:      TranslateAllowlist(input.Source.AllowList),
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to add OffRamp to Router: %w", err)
+		chain := chains.SolanaChains()[input.Dest.Selector]
+		var sourceChainAccount ccip_offramp.SourceChain
+		offRampSourceChainPDA, _, _ := state.FindOfframpSourceChainPDA(input.Source.Selector, offRampAddress)
+		err := chain.GetAccountDataBorshInto(context.Background(), offRampSourceChainPDA, &sourceChainAccount)
+		addOffRamp := true
+		if err == nil {
+			fmt.Println("Remote chain state account found:", sourceChainAccount)
+			addOffRamp = false
 		}
-		result.Addresses = append(result.Addresses, routerOut.Output.Addresses...)
-		result.BatchOps = append(result.BatchOps, routerOut.Output.BatchOps...)
+
+		if addOffRamp {
+			// OffRamp must be added to Router before initialization
+			routerOut, err := operations.ExecuteOperation(b, routerops.AddOffRamp, chains.SolanaChains()[input.Dest.Selector], routerops.ConnectChainsParams{
+				Router:              ccipRouterProgram,
+				OffRamp:             offRampAddress,
+				RemoteChainSelector: input.Source.Selector,
+				AllowlistEnabled:    input.Source.AllowListEnabled,
+				AllowedSenders:      TranslateAllowlist(input.Source.AllowList),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to add OffRamp to Router: %w", err)
+			}
+			result.Addresses = append(result.Addresses, routerOut.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, routerOut.Output.BatchOps...)
+		}
 
 		// Add DestChain to OffRamp
 		offRampOut, err := operations.ExecuteOperation(b, offrampops.ConnectChains, chains.SolanaChains()[input.Dest.Selector], offrampops.ConnectChainsParams{
