@@ -11,7 +11,7 @@ import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-import {EnumerableMap} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableMap.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 /// @notice The FeeQuoter contract responsibility is to:
 ///   - Store the current gas price in USD for a given destination chain.
@@ -19,7 +19,7 @@ import {EnumerableMap} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 ///   - Manage chain specific fee calculations.
 /// The authorized callers in the contract represent the fee price updaters.
 contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
-  using EnumerableMap for EnumerableMap.AddressToUintMap;
+  using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
   error TokenNotSupported(address token);
@@ -44,7 +44,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   error InvalidSVMExtraArgsWritableBitmap(uint64 accountIsWritableBitmap, uint256 numAccounts);
   error TooManySuiExtraArgsReceiverObjectIds(uint256 numReceiverObjectIds, uint256 maxReceiverObjectIds);
 
-  event FeeTokenAddedOrFeeUpdated(address indexed feeToken, uint256 feeMultiplierWeiPerEth);
+  event FeeTokenAdded(address indexed feeToken);
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
@@ -115,12 +115,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     address token; // ────────────╯ Token address.
   }
 
-  /// @dev Struct with fee token configuration for a token.
-  struct FeeTokenArgs {
-    address token; // // ──────────────────╮ Token address.
-    uint64 premiumMultiplierWeiPerEth; // ─╯ Multiplier for fee token specific premiums or discounts.
-  }
-
   string public constant override typeAndVersion = "FeeQuoter 1.7.0-dev";
 
   /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to
@@ -156,12 +150,12 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
 
   /// @dev Set of fee tokens that can be used to pay for fees. The keys of the mapping are the fee multipliers which
   /// can be used to set a premium or discount for a specific fee token.
-  EnumerableMap.AddressToUintMap private s_feeTokens;
+  EnumerableSet.AddressSet private s_feeTokens;
 
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
-    FeeTokenArgs[] memory feeTokens,
+    address[] memory feeTokens,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
   ) AuthorizedCallers(priceUpdaters) {
@@ -235,16 +229,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
 
   /// @inheritdoc IFeeQuoter
   function getFeeTokens() external view returns (address[] memory) {
-    return s_feeTokens.keys();
-  }
-
-  /// @notice Gets the fee configuration for a token.
-  /// @param token The token to get the fee configuration for.
-  /// @return premiumMultiplierWeiPerEth The multiplier for destination chain specific premiums.
-  function getPremiumMultiplierWeiPerEth(
-    address token
-  ) external view returns (uint64 premiumMultiplierWeiPerEth) {
-    return uint64(s_feeTokens.get(token));
+    return s_feeTokens.values();
   }
 
   /// @notice Add and remove tokens from feeTokens set.
@@ -253,7 +238,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   /// to calculate fees.
   function applyFeeTokensUpdates(
     address[] memory feeTokensToRemove,
-    FeeTokenArgs[] memory feeTokensToAdd
+    address[] memory feeTokensToAdd
   ) external onlyOwner {
     _applyFeeTokensUpdates(feeTokensToRemove, feeTokensToAdd);
   }
@@ -262,17 +247,15 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens.
   /// and can be used to calculate fees.
-  function _applyFeeTokensUpdates(address[] memory feeTokensToRemove, FeeTokenArgs[] memory feeTokensToAdd) private {
+  function _applyFeeTokensUpdates(address[] memory feeTokensToRemove, address[] memory feeTokensToAdd) private {
     for (uint256 i = 0; i < feeTokensToRemove.length; ++i) {
       if (s_feeTokens.remove(feeTokensToRemove[i])) {
         emit FeeTokenRemoved(feeTokensToRemove[i]);
       }
     }
     for (uint256 i = 0; i < feeTokensToAdd.length; ++i) {
-      FeeTokenArgs memory update = feeTokensToAdd[i];
-
-      s_feeTokens.set(update.token, update.premiumMultiplierWeiPerEth);
-      emit FeeTokenAddedOrFeeUpdated(update.token, update.premiumMultiplierWeiPerEth);
+      s_feeTokens.add(feeTokensToAdd[i]);
+      emit FeeTokenAdded(feeTokensToAdd[i]);
     }
   }
 
@@ -376,7 +359,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
       premiumFeeUSDWei = uint256(destChainConfig.networkFeeUSDCents) * 1e16;
     }
     // Apply the premium multiplier for the fee token, making it 36 decimals
-    premiumFeeUSDWei *= s_feeTokens.get(message.feeToken);
+    if (message.feeToken == i_linkToken) {
+      premiumFeeUSDWei *= 9e17; // 0.9x for LINK
+    } else {
+      premiumFeeUSDWei *= 1e18; // 1.0x for other tokens
+    }
 
     uint256 destCallDataCost =
       (message.data.length + tokenTransferBytesOverhead) * destChainConfig.destGasPerPayloadByteBase;

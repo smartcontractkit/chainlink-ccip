@@ -135,9 +135,8 @@ contract Router_ccipSend is RouterSetup {
   }
 
   function test_NonLinkFeeToken() public {
-    FeeQuoter.FeeTokenArgs[] memory feeTokens = new FeeQuoter.FeeTokenArgs[](1);
-    feeTokens[0].token = s_sourceTokens[1];
-    feeTokens[0].premiumMultiplierWeiPerEth = 1e18;
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = s_sourceTokens[1];
 
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
 
