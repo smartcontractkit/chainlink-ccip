@@ -135,26 +135,30 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
       s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
-    assertGt(feeTokenAmount, 1e16);
+
+    // Verify total fee matches sum of individual receipts.
+    uint256 expectedTotal =
+      receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount + receipts[3].feeTokenAmount;
+    assertEq(feeTokenAmount, expectedTotal);
 
     // Should have: 2 verifiers + 1 token + 1 executor = 4 receipts.
     assertEq(receipts.length, 4, "Should have 4 receipts");
 
-    // Check verifier receipts (first 2).
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+    uint256 expectedVerifierFee = (uint256(VERIFIER_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
     assertEq(receipts[0].issuer, s_verifier1, "First receipt should be from verifier1");
-    assertGt(receipts[0].feeTokenAmount, 1e16, "Verifier1 fee should be in token amount");
+    assertEq(receipts[0].feeTokenAmount, expectedVerifierFee, "Verifier1 fee should match");
     assertEq(receipts[0].destGasLimit, VERIFIER_GAS, "Verifier1 gas should match");
     assertEq(receipts[0].destBytesOverhead, VERIFIER_BYTES, "Verifier1 bytes should match");
 
     assertEq(receipts[1].issuer, s_verifier2, "Second receipt should be from verifier2");
-    assertGt(receipts[1].feeTokenAmount, 1e16, "Verifier2 fee should be in token amount");
+    assertEq(receipts[1].feeTokenAmount, expectedVerifierFee, "Verifier2 fee should match");
 
-    // Check executor receipt (last).
     assertEq(receipts[3].issuer, s_defaultExecutor, "Last receipt should be from executor");
 
-    // Check token pool receipt (second to last).
+    uint256 expectedPoolFee = (uint256(POOL_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
     assertEq(receipts[2].issuer, s_sourceToken, "Second to last receipt should be from token");
-    assertGt(receipts[2].feeTokenAmount, 1e16, "Pool fee should be in token amount");
+    assertEq(receipts[2].feeTokenAmount, expectedPoolFee, "Pool fee should match");
     assertEq(receipts[2].destGasLimit, POOL_GAS_OVERHEAD, "Pool gas overhead should match");
     assertEq(receipts[2].destBytesOverhead, POOL_BYTES_OVERHEAD, "Pool bytes overhead should match");
     assertEq(receipts[2].extraArgs, extraArgs.tokenArgs, "Pool extra args should match");
@@ -221,11 +225,16 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
       s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
-    assertGt(feeTokenAmount, 1e16);
+
+    // Verify total fee matches sum of individual receipts.
+    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
+    assertEq(feeTokenAmount, expectedTotal);
 
     // Check token receipt falls back to FeeQuoter values.
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+    uint256 expectedTokenFee = (uint256(FEE_QUOTER_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
     assertEq(receipts[1].issuer, s_sourceToken, "Token receipt should be present");
-    assertGt(receipts[1].feeTokenAmount, 1e15, "Should have token amount fee");
+    assertEq(receipts[1].feeTokenAmount, expectedTokenFee, "Should fall back to FeeQuoter fee");
     assertEq(receipts[1].destGasLimit, FEE_QUOTER_GAS_OVERHEAD, "Should fall back to FeeQuoter gas");
     assertEq(receipts[1].destBytesOverhead, FEE_QUOTER_BYTES_OVERHEAD, "Should fall back to FeeQuoter bytes");
   }
@@ -247,7 +256,10 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
       s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
-    assertGt(feeTokenAmount, 1e16);
+
+    // Verify total fee matches sum of individual receipts.
+    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
+    assertEq(feeTokenAmount, expectedTotal);
 
     // Should have: 2 verifiers + 1 executor = 3 receipts (no token receipt).
     assertEq(receipts.length, 3, "Should have 3 receipts without tokens");
@@ -273,14 +285,19 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
       s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
-    assertGt(feeTokenAmount, 1e16);
+
+    // Verify total fee matches sum of individual receipts.
+    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount;
+    assertEq(feeTokenAmount, expectedTotal);
 
     // Should have: 0 verifiers + 1 token + 1 executor = 2 receipts.
     assertEq(receipts.length, 2, "Should have 2 receipts");
 
-    // Check receipts order
+    // Check receipts order.
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+    uint256 expectedPoolFee = (uint256(POOL_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
     assertEq(receipts[0].issuer, s_sourceToken, "First should be token");
-    assertGt(receipts[0].feeTokenAmount, 1e16, "Token fee should be in token amount");
+    assertEq(receipts[0].feeTokenAmount, expectedPoolFee, "Token fee should match");
     assertEq(receipts[1].issuer, s_defaultExecutor, "Last should be executor");
   }
 
@@ -316,6 +333,11 @@ contract OnRamp_getReceipts is OnRampSetup {
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
       s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
+    // Verify total fee matches sum of individual receipts.
+    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount
+      + receipts[3].feeTokenAmount + receipts[4].feeTokenAmount;
+    assertEq(feeTokenAmount, expectedTotal);
+
     // Should have: 3 verifiers + 1 token + 1 executor = 5 receipts.
     assertEq(receipts.length, 5, "Should have 5 receipts");
 
@@ -325,9 +347,6 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[2].issuer, verifier3, "Receipt 2: verifier3");
     assertEq(receipts[3].issuer, s_sourceToken, "Receipt 3: token (second to last)");
     assertEq(receipts[4].issuer, s_defaultExecutor, "Receipt 4: executor (last)");
-
-    // Verify fees are in token amounts (1e18 based), not USD cents.
-    assertGt(feeTokenAmount, 1e16);
   }
 
   function test_getReceipts_multipleCCVs() public {
@@ -367,12 +386,14 @@ contract OnRamp_getReceipts is OnRampSetup {
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
       s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
 
+    // Verify total fee matches sum of individual receipts.
+    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
+    assertEq(feeTokenAmount, expectedTotal);
+
     assertEq(ccvs.length + 1, receipts.length);
     assertEq(s_defaultCCV, receipts[0].issuer);
     assertEq(secondCCV, receipts[1].issuer);
     assertEq(s_defaultExecutor, receipts[2].issuer);
-
-    assertGt(feeTokenAmount, 1e17);
   }
 
   function test_getReceipts_TokenArgsPassedToPool() public {
@@ -401,9 +422,10 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
       s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
-    assertGt(feeTokenAmount, 1e16);
 
-    // Verify token receipt has correct tokenArgs.
+    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
+    assertEq(feeTokenAmount, expectedTotal);
+
     assertEq(receipts[1].extraArgs, customTokenArgs, "Token receipt should have custom token args");
   }
 
@@ -436,5 +458,6 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     // NO_EXECUTION_ADDRESS results in zero executor fee.
     // Total fee may be zero if CCV fee is also zero.
+    assertEq(0, receipts[1].feeTokenAmount);
   }
 }
