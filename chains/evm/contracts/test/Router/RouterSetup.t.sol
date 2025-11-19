@@ -57,9 +57,6 @@ contract RouterSetup is FeeQuoterSetup {
     offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: makeAddr("offRamp1")});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
-    // Mock a fee for the onRamp so the router can calculate fees.
-    vm.mockCall(address(s_onRamp), abi.encodeWithSelector(IEVM2AnyOnRampClient.getFee.selector), abi.encode(1e17));
-
     // Pre approve the first token so the gas estimates of the tests only cover actual gas usage from the ramps.
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2 ** 128);
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2 ** 128);
