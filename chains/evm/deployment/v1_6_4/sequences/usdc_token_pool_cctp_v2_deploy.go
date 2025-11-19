@@ -86,6 +86,10 @@ var USDCTokenPoolCCTPV2DeploySequence = operations.NewSequence(
 			},
 		})
 
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure allowed callers for the CCTPMessageTransmitterProxy on %s: %w", chain, err)
+		}
+
 		// Begin transferring ownership to MCMS. A separate changeset will be used to accept ownership.
 		_, err = operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,

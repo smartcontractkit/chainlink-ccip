@@ -50,6 +50,9 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			}
 
 			timelockRef, err := reader.GetTimelockRef(e, perChainInput.ChainSelector, input.MCMS)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain %d: %w", perChainInput.ChainSelector, err)
+			}
 			sequenceInput := sequences.SiloedUSDCTokenPoolDeploySequenceInput{
 				ChainSelector: perChainInput.ChainSelector,
 				Token:         perChainInput.Token,
