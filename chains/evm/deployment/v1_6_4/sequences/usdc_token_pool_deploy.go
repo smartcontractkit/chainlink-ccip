@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
+	usdc_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -24,6 +25,7 @@ type USDCTokenPoolDeploySequenceInput struct {
 	RMNProxy                    common.Address
 	Router                      common.Address
 	SupportedUSDCVersion        uint32
+	MCMSAddress                 common.Address
 }
 
 var USDCTokenPoolDeploySequence = operations.NewSequence(
@@ -62,6 +64,16 @@ var USDCTokenPoolDeploySequence = operations.NewSequence(
 			// Get the deployed address from the report
 			cctpProxyAddress = common.HexToAddress(cctpProxyReport.Output.Address)
 			addresses = append(addresses, cctpProxyReport.Output)
+
+			// Begin transferring ownership to MCMS. A separate changeset will be used to accept ownership.
+			_, err = operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
+				ChainSelector: input.ChainSelector,
+				Address:       cctpProxyAddress,
+				Args:          input.MCMSAddress,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership of the CCTPMessageTransmitterProxy to MCMS on %s: %w", chain, err)
+			}
 		}
 
 		// Deploy USDCTokenPool using the deployed CCTPMessageTransmitterProxy address
@@ -98,6 +110,16 @@ var USDCTokenPoolDeploySequence = operations.NewSequence(
 				},
 			},
 		})
+
+		// Begin transferring ownership of the token pool to MCMS
+		_, err = operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
+			ChainSelector: input.ChainSelector,
+			Address:       common.HexToAddress(report.Output.Address),
+			Args:          input.MCMSAddress,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership of the token pool to MCMS on %s: %w", chain, err)
+		}
 
 		addresses = append(addresses, report.Output)
 		return sequences.OnChainOutput{

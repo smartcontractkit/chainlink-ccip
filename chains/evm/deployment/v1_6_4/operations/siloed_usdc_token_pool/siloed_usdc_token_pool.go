@@ -1,6 +1,9 @@
 package siloed_usdc_token_pool
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -12,9 +15,12 @@ var ContractType cldf_deployment.ContractType = "SiloedUSDCTokenPool"
 var Version *semver.Version = semver.MustParse("1.6.4")
 
 type ConstructorArgs struct {
-	Token     common.Address
-	USDCToken common.Address
-	Router    common.Address
+	Token              common.Address
+	LocalTokenDecimals uint8
+	Allowlist          []common.Address
+	RMNProxy           common.Address
+	Router             common.Address
+	LockBox            common.Address
 }
 
 type AuthorizedCallerUpdateArgs = siloed_usdc_token_pool.AuthorizedCallersAuthorizedCallerArgs
@@ -29,5 +35,26 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 			EVM: common.FromHex(siloed_usdc_token_pool.SiloedUSDCTokenPoolBin),
 		},
 	},
-	Validate: func(ConstructorArgs) error { return nil },
+	Validate: func(args ConstructorArgs) error {
+		if args.Token == (common.Address{}) {
+			return errors.New("Token address cannot be zero")
+		}
+
+		if args.RMNProxy == (common.Address{}) {
+			return errors.New("RMNProxy address cannot be zero")
+		}
+
+		if args.Router == (common.Address{}) {
+			return errors.New("Router address cannot be zero")
+		}
+
+		if args.LockBox == (common.Address{}) {
+			return errors.New("LockBox address cannot be zero")
+		}
+
+		if args.LocalTokenDecimals != 6 {
+			return fmt.Errorf("Local token decimals must be 6")
+		}
+		return nil
+	},
 })

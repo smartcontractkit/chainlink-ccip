@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -27,16 +28,31 @@ type USDCTokenPoolCCTPV2DeployInput struct {
 	MCMS        mcms.Input
 }
 
-func USDCTokenPoolCCTPV2DeployChangeset() deployment.ChangeSetV2[USDCTokenPoolCCTPV2DeployInput] {
-	return cldf.CreateChangeSet(usdcTokenPoolCCTPV2DeployApply(), usdcTokenPoolCCTPV2DeployVerify())
+func USDCTokenPoolCCTPV2DeployChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) deployment.ChangeSetV2[USDCTokenPoolCCTPV2DeployInput] {
+	return cldf.CreateChangeSet(usdcTokenPoolCCTPV2DeployApply(mcmsRegistry), usdcTokenPoolCCTPV2DeployVerify(mcmsRegistry))
 }
 
-func usdcTokenPoolCCTPV2DeployApply() func(cldf.Environment, USDCTokenPoolCCTPV2DeployInput) (cldf.ChangesetOutput, error) {
+func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, USDCTokenPoolCCTPV2DeployInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input USDCTokenPoolCCTPV2DeployInput) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
 
 		for _, perChainInput := range input.ChainInputs {
+
+			chainFamily, err := chain_selectors.GetSelectorFamily(perChainInput.ChainSelector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", perChainInput.ChainSelector, err)
+			}
+			reader, ok := mcmsRegistry.GetMCMSReader(chainFamily)
+			if !ok {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no MCMSReader registered for chain family '%s'", chainFamily)
+			}
+
+			timelockRef, err := reader.GetTimelockRef(e, perChainInput.ChainSelector, input.MCMS)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain %d: %w", perChainInput.ChainSelector, err)
+			}
+
 			sequenceInput := sequences.USDCTokenPoolCCTPV2DeploySequenceInput{
 				ChainSelector:  perChainInput.ChainSelector,
 				TokenMessenger: perChainInput.TokenMessenger,
@@ -44,6 +60,7 @@ func usdcTokenPoolCCTPV2DeployApply() func(cldf.Environment, USDCTokenPoolCCTPV2
 				Allowlist:      perChainInput.Allowlist,
 				RMNProxy:       perChainInput.RMNProxy,
 				Router:         perChainInput.Router,
+				MCMSAddress:    common.HexToAddress(timelockRef.Address),
 			}
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.USDCTokenPoolCCTPV2DeploySequence, e.BlockChains, sequenceInput)
 			if err != nil {
@@ -63,7 +80,7 @@ func usdcTokenPoolCCTPV2DeployApply() func(cldf.Environment, USDCTokenPoolCCTPV2
 	}
 }
 
-func usdcTokenPoolCCTPV2DeployVerify() func(cldf.Environment, USDCTokenPoolCCTPV2DeployInput) error {
+func usdcTokenPoolCCTPV2DeployVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, USDCTokenPoolCCTPV2DeployInput) error {
 	return func(e cldf.Environment, input USDCTokenPoolCCTPV2DeployInput) error {
 		if err := input.MCMS.Validate(); err != nil {
 			return err

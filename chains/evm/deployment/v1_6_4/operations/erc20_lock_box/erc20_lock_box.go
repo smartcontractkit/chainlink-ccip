@@ -1,6 +1,8 @@
 package erc20_lock_box
 
 import (
+	"errors"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -31,7 +33,12 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 			EVM: common.FromHex(erc20_lock_box.ERC20LockBoxBin),
 		},
 	},
-	Validate: func(ConstructorArgs) error { return nil },
+	Validate: func(args ConstructorArgs) error {
+		if args.TokenAdminRegistry == (common.Address{}) {
+			return errors.New("TokenAdminRegistry address cannot be zero")
+		}
+		return nil
+	},
 })
 
 var ERC20LockboxConfigureAllowedCallers = contract.NewWrite(contract.WriteParams[[]AllowedCallerConfigArgs, *erc20_lock_box.ERC20LockBox]{

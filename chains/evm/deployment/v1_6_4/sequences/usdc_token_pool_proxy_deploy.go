@@ -12,6 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	usdc_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
 )
 
 type DeployUSDCTokenPoolProxySequenceInput struct {
@@ -19,6 +21,7 @@ type DeployUSDCTokenPoolProxySequenceInput struct {
 	Token         common.Address
 	PoolAddresses usdc_token_pool_proxy.PoolAddresses
 	Router        common.Address
+	MCMSAddress   common.Address
 }
 
 var DeployUSDCTokenPoolProxySequence = operations.NewSequence(
@@ -46,6 +49,16 @@ var DeployUSDCTokenPoolProxySequence = operations.NewSequence(
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy USDCTokenPoolProxy on %s: %w", chain, err)
+		}
+
+		// Begin transferring ownership to MCMS. A separate changeset will be used to accept ownership.
+		_, err = operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
+			ChainSelector: input.ChainSelector,
+			Address:       common.HexToAddress(report.Output.Address),
+			Args:          input.MCMSAddress,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership to MCMS on %s: %w", chain, err)
 		}
 
 		return sequences.OnChainOutput{

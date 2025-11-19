@@ -1,6 +1,8 @@
 package usdc_token_pool
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -76,5 +78,24 @@ var USDCTokenPoolUpdateAuthorizedCallers = contract.NewWrite(contract.WriteParam
 	Validate:        func(AuthorizedCallerUpdate) error { return nil },
 	CallContract: func(usdcTokenPool *usdc_token_pool.USDCTokenPool, opts *bind.TransactOpts, args AuthorizedCallerUpdate) (*types.Transaction, error) {
 		return usdcTokenPool.ApplyAuthorizedCallerUpdates(opts, args)
+	},
+})
+
+var USDCTokenPoolTransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *usdc_token_pool.USDCTokenPool]{
+	Name:            "usdc-token-pool:transfer-ownership",
+	Version:         Version,
+	Description:     "Transfers ownership of the USDCTokenPool contract",
+	ContractType:    ContractType,
+	ContractABI:     usdc_token_pool.USDCTokenPoolABI,
+	NewContract:     usdc_token_pool.NewUSDCTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*usdc_token_pool.USDCTokenPool, common.Address],
+	Validate: func(newOwner common.Address) error {
+		if newOwner == (common.Address{}) {
+			return fmt.Errorf("new owner cannot be the zero address")
+		}
+		return nil
+	},
+	CallContract: func(usdcTokenPool *usdc_token_pool.USDCTokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return usdcTokenPool.TransferOwnership(opts, args)
 	},
 })
