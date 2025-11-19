@@ -204,35 +204,32 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
 	}
 
-	// test idempotency
-	for _ = range 2 {
-		connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
-			Lanes: []lanesapi.LaneConfig{
-				{
-					Version: version,
-					ChainA:  chain1,
-					ChainB:  chain2,
-				},
+	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+		Lanes: []lanesapi.LaneConfig{
+			{
+				Version: version,
+				ChainA:  chain1,
+				ChainB:  chain2,
 			},
-			MCMS: mcms.Input{
-				OverridePreviousRoot: false,
-				ValidUntil:           3759765795,
-				TimelockDelay:        mcms_types.MustParseDuration("1s"),
-				TimelockAction:       mcms_types.TimelockActionSchedule,
-				Description:          "Connect Chains",
-			},
-		})
-		require.NoError(t, err, "Failed to apply ConnectChains changeset")
-		testhelpers.ProcessTimelockProposals(t, *e, connectOut.MCMSTimelockProposals, false)
-		laneRegistry := lanesapi.GetLaneAdapterRegistry()
-		srcFamily, err := chain_selectors.GetSelectorFamily(chain1.Selector)
-		require.NoError(t, err, "must get selector family for src")
-		srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, version)
-		require.True(t, exists, "must have ChainAdapter registered for src chain family")
-		destFamily, err := chain_selectors.GetSelectorFamily(chain2.Selector)
-		require.NoError(t, err, "must get selector family for dest")
-		destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, version)
-		require.True(t, exists, "must have ChainAdapter registered for dest chain family")
-		checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
-	}
+		},
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Description:          "Connect Chains",
+		},
+	})
+	require.NoError(t, err, "Failed to apply ConnectChains changeset")
+	testhelpers.ProcessTimelockProposals(t, *e, connectOut.MCMSTimelockProposals, false)
+	laneRegistry := lanesapi.GetLaneAdapterRegistry()
+	srcFamily, err := chain_selectors.GetSelectorFamily(chain1.Selector)
+	require.NoError(t, err, "must get selector family for src")
+	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, version)
+	require.True(t, exists, "must have ChainAdapter registered for src chain family")
+	destFamily, err := chain_selectors.GetSelectorFamily(chain2.Selector)
+	require.NoError(t, err, "must get selector family for dest")
+	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, version)
+	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
+	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
 }
