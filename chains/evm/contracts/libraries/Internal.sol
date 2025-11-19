@@ -36,21 +36,18 @@ library Internal {
   address public constant GAS_ESTIMATION_SENDER = address(0xC11C11C11C11C11C11C11C11C11C11C11C11C1);
 
   /// @notice A collection of token price and gas price updates.
-  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct PriceUpdates {
     TokenPriceUpdate[] tokenPriceUpdates;
     GasPriceUpdate[] gasPriceUpdates;
   }
 
   /// @notice Token price in USD.
-  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct TokenPriceUpdate {
     address sourceToken; // Source token.
     uint224 usdPerToken; // 1e18 USD per 1e18 of the smallest token denomination.
   }
 
   /// @notice Gas price for a given chain in USD, its value may contain tightly packed fields.
-  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct GasPriceUpdate {
     uint64 destChainSelector; // Destination chain selector.
     uint224 usdPerUnitGas; // 1e18 USD per smallest unit (e.g. wei) of destination chain gas.
@@ -144,7 +141,6 @@ library Internal {
   /// IN_PROGRESS currently being executed, used a replay protection.
   /// SUCCESS successfully executed. End state.
   /// FAILURE unsuccessfully executed, manual execution is now enabled.
-  /// @dev RMN depends on this enum, if changing, please notify the RMN maintainers.
   enum MessageExecutionState {
     UNTOUCHED,
     IN_PROGRESS,
@@ -170,8 +166,7 @@ library Internal {
   }
 
   /// @dev Holds a merkle root and interval for a source chain so that an array of these can be passed in the CommitReport.
-  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
-  /// @dev inefficient struct packing intentionally chosen to maintain order of specificity. Not a storage struct so impact is minimal.
+  /// @dev Inefficient struct packing intentionally chosen to maintain order of specificity. Not a storage struct so impact is minimal.
   // solhint-disable-next-line gas-struct-packing
   struct MerkleRoot {
     uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to

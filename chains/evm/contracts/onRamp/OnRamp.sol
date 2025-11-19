@@ -463,7 +463,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   // ================================================================
 
   /// @notice Returns the static onRamp config.
-  /// @dev RMN depends on this function, if modified, please notify the RMN maintainers.
   /// @return staticConfig the static configuration.
   function getStaticConfig() public view returns (StaticConfig memory) {
     return StaticConfig({
