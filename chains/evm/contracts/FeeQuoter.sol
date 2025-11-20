@@ -24,6 +24,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   error TokenNotSupported(address token);
   error FeeTokenNotSupported(address token);
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
+  error NoGasPriceAvailable(uint64 destChainSelector);
   error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
   error MessageGasLimitTooHigh();
   error MessageComputeUnitLimitTooHigh();
@@ -141,8 +142,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   /// @dev The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
   /// @dev Price of 1e18 represents 1 USD per 1e18 token amount.
   ///     1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30.
-  ///     1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18.
-  ///     1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18.
+  ///     1 ETH  = 3,000 USD per full token, each full token is 1e18 units -> 3000 * 1e18 * 1e18 / 1e18 = 3_000e18.
+  ///     1 LINK = 15.00 USD per full token, each full token is 1e18 units -> 15 * 1e18 * 1e18 / 1e18 = 15e18.
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
 
   /// @dev The destination chain specific fee configs.
@@ -307,6 +308,38 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   // ================================================================
   // │                       Fee quoting                            │
   // ================================================================
+
+  /// @inheritdoc IFeeQuoter
+  function quoteGasForExec(
+    uint64 destChainSelector,
+    uint32 nonCalldataGas,
+    uint32 calldataSize
+  ) external view returns (uint32 totalGas, uint256 gasCostInUsdCents) {
+    DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
+    if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
+
+    totalGas = nonCalldataGas + calldataSize * destChainConfig.destGasPerPayloadByteBase;
+
+    if (totalGas > destChainConfig.maxPerMsgGasLimit) {
+      revert MessageGasLimitTooHigh();
+    }
+    if (calldataSize > destChainConfig.maxDataBytes) {
+      revert MessageTooLarge(destChainConfig.maxDataBytes, calldataSize);
+    }
+
+    // Get the gas price and remove any upper bits that might be used to report calldata cost.
+    Internal.TimestampedPackedUint224 memory price = s_usdPerUnitGasByDestChainSelector[destChainSelector];
+    if (price.timestamp == 0) {
+      revert NoGasPriceAvailable(destChainSelector);
+    }
+
+    // Gas cost is 1e18 denominated while cents are 1e2 denominated, so we divide by 1e16.
+    // We add (1e16 - 1) before division to round up, this ensures that we can never reach a fee of zero when there is a
+    // non-zero gas cost.
+    gasCostInUsdCents = (totalGas * uint256(uint112(price.value)) + (1e16 - 1)) / 1e16;
+
+    return (totalGas, gasCostInUsdCents);
+  }
 
   /// @inheritdoc IFeeQuoter
   /// @dev The function should always validate message.extraArgs, message.receiver and family-specific configs.

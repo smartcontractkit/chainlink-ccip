@@ -158,4 +158,145 @@ contract ExtraArgsCodec_Test is BaseTest {
   ) internal pure {
     assertEq(keccak256(abi.encode(args1)), keccak256(abi.encode(args2)));
   }
+
+  function test_gas_abi_encode() public pure {
+    bytes.concat(
+      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
+      abi.encode(
+        ExtraArgsCodec.GenericExtraArgsV3({
+          ccvs: new address[](2),
+          ccvArgs: new bytes[](2),
+          blockConfirmations: 34,
+          gasLimit: 59499,
+          executor: address(0x1234567890123456789012345678901234567890),
+          executorArgs: "3282389428935872359872395885792839273525",
+          tokenReceiver: "3282389428935872359872329385792837273525",
+          tokenArgs: ""
+        })
+      )
+    );
+  }
+
+  function test_gas_abi_packed() public pure {
+    ExtraArgsCodec._encodeGenericExtraArgsV3(
+      ExtraArgsCodec.GenericExtraArgsV3({
+        ccvs: new address[](2),
+        ccvArgs: new bytes[](2),
+        blockConfirmations: 34,
+        gasLimit: 59499,
+        executor: address(0x1234567890123456789012345678901234567890),
+        executorArgs: "3282389428935872359872395885792839273525",
+        tokenReceiver: "3282389428935872359872329385792837273525",
+        tokenArgs: ""
+      })
+    );
+  }
+
+  function test_gas_decode_abi_packed() public {
+    vm.pauseGasMetering();
+    EncodeDecoder encoderDecoder = new EncodeDecoder();
+
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(
+      ExtraArgsCodec.GenericExtraArgsV3({
+        ccvs: new address[](2),
+        ccvArgs: new bytes[](2),
+        blockConfirmations: 34,
+        gasLimit: 59499,
+        executor: address(0x1234567890123456789012345678901234567890),
+        executorArgs: "3282389428935872359872395885792839273525",
+        tokenReceiver: "3282389428935872359872329385792837273525",
+        tokenArgs: ""
+      })
+    );
+
+    vm.resumeGasMetering();
+
+    encoderDecoder.decodePacked(extraArgs);
+  }
+
+  function test_gas_decode_abi_encode() public {
+    vm.pauseGasMetering();
+
+    EncodeDecoder encoderDecoder = new EncodeDecoder();
+    bytes memory extraArgs = bytes.concat(
+      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
+      abi.encode(
+        ExtraArgsCodec.GenericExtraArgsV3({
+          ccvs: new address[](2),
+          ccvArgs: new bytes[](2),
+          blockConfirmations: 34,
+          gasLimit: 59499,
+          executor: address(0x1234567890123456789012345678901234567890),
+          executorArgs: "3282389428935872359872395885792839273525",
+          tokenReceiver: "3282389428935872359872329385792837273525",
+          tokenArgs: ""
+        })
+      )
+    );
+
+    vm.resumeGasMetering();
+
+    encoderDecoder.decodeABI(extraArgs);
+  }
+
+  function test_gas_decode_empty_abi_encode() public {
+    vm.pauseGasMetering();
+
+    EncodeDecoder encoderDecoder = new EncodeDecoder();
+    bytes memory extraArgs = bytes.concat(
+      ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG,
+      abi.encode(
+        ExtraArgsCodec.GenericExtraArgsV3({
+          ccvs: new address[](0),
+          ccvArgs: new bytes[](0),
+          blockConfirmations: 34,
+          gasLimit: 59499,
+          executor: address(0),
+          executorArgs: "",
+          tokenReceiver: "",
+          tokenArgs: ""
+        })
+      )
+    );
+
+    vm.resumeGasMetering();
+
+    encoderDecoder.decodeABI(extraArgs);
+  }
+
+  function test_gas_decode_empty_packed() public {
+    vm.pauseGasMetering();
+
+    EncodeDecoder encoderDecoder = new EncodeDecoder();
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(
+      ExtraArgsCodec.GenericExtraArgsV3({
+        ccvs: new address[](0),
+        ccvArgs: new bytes[](0),
+        blockConfirmations: 34,
+        gasLimit: 59499,
+        executor: address(0),
+        executorArgs: "",
+        tokenReceiver: "",
+        tokenArgs: ""
+      })
+    );
+
+    vm.resumeGasMetering();
+
+    encoderDecoder.decodePacked(extraArgs);
+  }
+}
+
+contract EncodeDecoder {
+  function decodePacked(
+    bytes calldata extraArgs
+  ) external pure {
+    ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
+  }
+
+  function decodeABI(
+    bytes calldata extraArgs
+  ) external pure {
+    abi.decode(extraArgs[4:], (ExtraArgsCodec.GenericExtraArgsV3));
+  }
 }
