@@ -41,11 +41,15 @@ var USDCTokenPoolDeploySequence = operations.NewSequence(
 		var cctpProxyAddress common.Address
 		var addresses []datastore.AddressRef
 
+		var isFreshTransmitterProxy = false
+
 		// On some chains the CCTPMessageTransmitterProxy is already deployed, so we can use it directly if it has been provided. If it is not this is an indicator
 		// that we need to deploy it.
 		if input.CCTPMessageTransmitterProxy != (common.Address{}) {
 			cctpProxyAddress = input.CCTPMessageTransmitterProxy
 		} else {
+			isFreshTransmitterProxy = true
+
 			// Deploy CCTPMessageTransmitterProxy first so that it can be used by the USDCTokenPool contract
 			cctpProxyReport, err := operations.ExecuteOperation(b, cctp_message_transmitter_proxy.Deploy, chain, contract.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
 				ChainSelector: input.ChainSelector,
@@ -97,19 +101,18 @@ var USDCTokenPoolDeploySequence = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy USDCTokenPool on %s: %w", chain, err)
 		}
 
-		// Configure the allowed callers for the CCTPMessageTransmitterProxy
-		// Assumes that the executer of this sequence already has ownership of the
-		// CCTPMessageTransmitterProxy being used.
-		_, err = operations.ExecuteOperation(b, cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyConfigureAllowedCallers, chain, contract.FunctionInput[[]cctp_message_transmitter_proxy.AllowedCallerConfigArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       cctpProxyAddress,
-			Args: []cctp_message_transmitter_proxy.AllowedCallerConfigArgs{
-				{
-					Caller:  common.HexToAddress(report.Output.Address),
-					Allowed: true,
+		if isFreshTransmitterProxy {
+			_, err = operations.ExecuteOperation(b, cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyConfigureAllowedCallers, chain, contract.FunctionInput[[]cctp_message_transmitter_proxy.AllowedCallerConfigArgs]{
+				ChainSelector: input.ChainSelector,
+				Address:       cctpProxyAddress,
+				Args: []cctp_message_transmitter_proxy.AllowedCallerConfigArgs{
+					{
+						Caller:  common.HexToAddress(report.Output.Address),
+						Allowed: true,
+					},
 				},
-			},
-		})
+			})
+		}
 
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure allowed callers for the CCTPMessageTransmitterProxy on %s: %w", chain, err)
