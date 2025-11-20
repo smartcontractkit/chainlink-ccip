@@ -8,11 +8,16 @@ import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
 
 contract TokenPool_setRateLimitAdmin is TokenPoolSetup {
   function test_SetRateLimitAdmin() public {
-    assertEq(address(0), s_tokenPool.getRateLimitAdmin());
+    address newRateLimitAdmin = makeAddr("newRateLimitAdmin");
+    (,,, address currentRateLimitAdmin) = s_tokenPool.getDynamicConfig();
+    assertEq(address(0), currentRateLimitAdmin);
+
     vm.expectEmit();
-    emit TokenPool.RateLimitAdminSet(OWNER);
-    s_tokenPool.setRateLimitAdmin(OWNER);
-    assertEq(OWNER, s_tokenPool.getRateLimitAdmin());
+    emit TokenPool.DynamicConfigSet(address(s_sourceRouter), 0, 0, newRateLimitAdmin);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), 0, 0, newRateLimitAdmin);
+
+    (,,, address updatedRateLimitAdmin) = s_tokenPool.getDynamicConfig();
+    assertEq(newRateLimitAdmin, updatedRateLimitAdmin);
   }
 
   // Reverts
@@ -21,6 +26,6 @@ contract TokenPool_setRateLimitAdmin is TokenPoolSetup {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_tokenPool.setRateLimitAdmin(STRANGER);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), 0, 0, STRANGER);
   }
 }

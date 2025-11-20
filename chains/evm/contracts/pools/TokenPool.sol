@@ -84,8 +84,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
-  event DynamicConfigSet(address router, uint16 minBlockConfirmations, uint256 thresholdAmountForAdditionalCCVs);
-  event RateLimitAdminSet(address rateLimitAdmin);
+  event DynamicConfigSet(
+    address router, uint16 minBlockConfirmations, uint256 thresholdAmountForAdditionalCCVs, address rateLimitAdmin
+  );
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event CCVConfigUpdated(
@@ -252,25 +253,31 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return i_rmnProxy;
   }
 
-  /// @notice Gets the pool's Router
-  /// @return router The pool's Router
+  /// @notice Gets the pools dynamic configuration.
   function getDynamicConfig()
     public
     view
     virtual
-    returns (address router, uint16 minBlockConfirmations, uint256 thresholdAmountForAdditionalCCVs)
+    returns (
+      address router,
+      uint16 minBlockConfirmations,
+      uint256 thresholdAmountForAdditionalCCVs,
+      address rateLimitAdmin
+    )
   {
-    return (address(s_router), s_minBlockConfirmation, s_thresholdAmountForAdditionalCCVs);
+    return (address(s_router), s_minBlockConfirmation, s_thresholdAmountForAdditionalCCVs, s_rateLimitAdmin);
   }
 
   /// @notice Sets the dynamic configuration for the pool.
   /// @param router The address of the router contract.
   /// @param minBlockConfirmations The minimum block confirmations required for custom finality transfers.
   /// @param thresholdAmountForAdditionalCCVs The threshold amount above which additional CCVs are required.
+  /// @param rateLimitAdmin The address of the rate limiter admin.
   function setDynamicConfig(
     address router,
     uint16 minBlockConfirmations,
-    uint256 thresholdAmountForAdditionalCCVs
+    uint256 thresholdAmountForAdditionalCCVs,
+    address rateLimitAdmin
   ) public onlyOwner {
     if (router == address(0)) revert ZeroAddressInvalid();
 
@@ -278,8 +285,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     // Since 0 means default finality it is a valid value.
     s_minBlockConfirmation = minBlockConfirmations;
     s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;
+    s_rateLimitAdmin = rateLimitAdmin;
 
-    emit DynamicConfigSet(router, minBlockConfirmations, thresholdAmountForAdditionalCCVs);
+    emit DynamicConfigSet(router, minBlockConfirmations, thresholdAmountForAdditionalCCVs, rateLimitAdmin);
   }
 
   /// @notice Signals which version of the pool interface is supported.
@@ -713,21 +721,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// the token pool on chain B requires a capacity of 105 to successfully execute both messages at the same time.
   /// The exact additional capacity required depends on the refill rate and the size of the source chain epochs and the
   /// CCIP round time. For simplicity, a 5-10% buffer should be sufficient in most cases.
-
-  /// @notice Sets the rate limiter admin address.
-  /// @dev Only callable by the owner.
-  /// @param rateLimitAdmin The new rate limiter admin address.
-  function setRateLimitAdmin(
-    address rateLimitAdmin
-  ) external onlyOwner {
-    s_rateLimitAdmin = rateLimitAdmin;
-    emit RateLimitAdminSet(rateLimitAdmin);
-  }
-
-  /// @notice Gets the rate limiter admin address.
-  function getRateLimitAdmin() external view returns (address) {
-    return s_rateLimitAdmin;
-  }
 
   /// @notice Consumes outbound rate limiting capacity in this pool.
   function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
@@ -1177,23 +1170,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     );
   }
 
-  /// @notice Withdraws accrued fee token balances to the provided `recipient`.
-  /// @dev Pools accrue fees directly on this contract. Lock/release pools send bridge liquidity to their ERC20 lockbox
-  /// during the lock flow, which means any balance left on this contract represents fees that have accrued to the pool.
-  /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract balance is safe
-  /// and clears only accrued fees.
-  /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
-  /// @param recipient The address that should receive the withdrawn balances.
-  function withdrawFeeTokens(address[] calldata feeTokens, address recipient) external onlyOwner {
-    for (uint256 i = 0; i < feeTokens.length; ++i) {
-      uint256 feeTokenBalance = IERC20(feeTokens[i]).balanceOf(address(this));
-      if (feeTokenBalance > 0) {
-        IERC20(feeTokens[i]).safeTransfer(recipient, feeTokenBalance);
-        emit FeeTokenWithdrawn(recipient, address(feeTokens[i]), feeTokenBalance);
-      }
-    }
-  }
-
   /// @dev Deducts the fee from the transferred amount based on the configured basis points (not added on top).
   /// @param lockOrBurnIn The original lock or burn request.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
@@ -1222,5 +1198,22 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     // Calculate and deduct the fee from the transfer amount.
     uint256 feeAmount = (lockOrBurnIn.amount * tokenFeeBps) / BPS_DIVIDER;
     return lockOrBurnIn.amount - feeAmount;
+  }
+
+  /// @notice Withdraws accrued fee token balances to the provided `recipient`.
+  /// @dev Pools accrue fees directly on this contract. Lock/release pools send bridge liquidity to their ERC20 lockbox
+  /// during the lock flow, which means any balance left on this contract represents fees that have accrued to the pool.
+  /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract balance is safe
+  /// and clears only accrued fees.
+  /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
+  /// @param recipient The address that should receive the withdrawn balances.
+  function withdrawFeeTokens(address[] calldata feeTokens, address recipient) external onlyOwner {
+    for (uint256 i = 0; i < feeTokens.length; ++i) {
+      uint256 feeTokenBalance = IERC20(feeTokens[i]).balanceOf(address(this));
+      if (feeTokenBalance > 0) {
+        IERC20(feeTokens[i]).safeTransfer(recipient, feeTokenBalance);
+        emit FeeTokenWithdrawn(recipient, address(feeTokens[i]), feeTokenBalance);
+      }
+    }
   }
 }

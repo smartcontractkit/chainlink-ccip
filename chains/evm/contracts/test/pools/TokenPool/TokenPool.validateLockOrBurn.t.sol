@@ -29,7 +29,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
       inboundRateLimiterConfig: inboundFastConfig
     });
     vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, 0);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, 0, address(0));
     s_tokenPool.setCustomBlockConfirmationRateLimitConfig(rateLimitArgs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
@@ -50,7 +50,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
   function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmation() public {
     uint16 minBlockConfirmation = 5;
     vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, 0);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, 0, address(0));
 
     vm.startPrank(s_allowedOnRamp);
 
