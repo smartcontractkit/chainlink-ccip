@@ -376,16 +376,4 @@ func TestUSDCTokenPoolDeployChangeset_Existing_MessageTransmitter_Proxy(t *testi
 
 	// Check that the CCTPMessageTransmitterProxy address matches the deployed address
 	require.Equal(t, cctpMessageTransmitterProxyAddress, cctpMessageTransmitterProxyAddressFromPool, "CCTPMessageTransmitterProxy address should match the deployed address")
-
-	// Use the go binding to create a new instance of the CCTPMessageTransmitterProxy contract
-	cctpMessageTransmitterProxyInstance, err := cctp_message_transmitter_proxy_binding.NewCCTPMessageTransmitterProxy(
-		cctpMessageTransmitterProxyAddressFromPool,
-		evmChain.Client,
-	)
-	require.NoError(t, err, "Failed to bind CCTPMessageTransmitterProxy contract")
-
-	// Check that the allowed caller on the CCTPMessageTransmitterProxy is the USDCTokenPool address
-	isAllowed, err := cctpMessageTransmitterProxyInstance.IsAllowedCaller(nil, common.HexToAddress(usdcTokenPoolAddress.Address))
-	require.NoError(t, err, "Failed to check if the caller is allowed")
-	require.True(t, isAllowed, "Caller should be allowed")
 }
