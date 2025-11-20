@@ -254,9 +254,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     (eventData.receipts, newMessage.executionGasLimit, receiptsFeeTokenAmount) =
       _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
-    if (feeTokenAmount < receiptsFeeTokenAmount) {
-      revert InsufficientFeeTokenAmount(feeTokenAmount, receiptsFeeTokenAmount);
-    }
+    // We don't need to check for feeTokenAmount < receiptsFeeTokenAmount here as that is done in getFee called by the router.
     _distributeFees(destChainSelector, message, eventData.receipts);
 
     // 4. lockOrBurn.

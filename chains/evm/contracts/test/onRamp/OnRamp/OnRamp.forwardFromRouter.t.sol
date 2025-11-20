@@ -121,13 +121,4 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.expectRevert(abi.encodeWithSelector(OnRamp.CursedByRMN.selector, DEST_CHAIN_SELECTOR));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
   }
-
-  function test_forwardFromRouter_RevertWhen_InsufficientFeeTokenAmount() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    uint256 totalFee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
-    deal(s_sourceFeeToken, address(s_onRamp), totalFee - 1);
-
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.InsufficientFeeTokenAmount.selector, totalFee - 1, totalFee));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, totalFee - 1, STRANGER);
-  }
 }
