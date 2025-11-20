@@ -53,13 +53,27 @@ func (a *EVMAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uin
 }
 
 func (a *EVMAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
-		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(fee_quoter.ContractType),
-		Version:       fee_quoter.Version,
-	}, chainSelector, evm_datastore_utils.ToByteArray)
-	if err != nil {
-		return nil, err
+	// might be multiple fee quoters on a chain, just return the latest one
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
+		datastore.AddressRefByChainSelector(chainSelector),
+	)
+	latestVersion := semver.MustParse("1.6.0")
+	tooHighVersion := semver.MustParse("1.7.0")
+	var addr []byte
+	var err error
+	for _, ref := range refs {
+		v := ref.Version
+		// we want the latest version below 1.7.0
+		if v.GreaterThanEqual(latestVersion) &&
+			v.LessThan(tooHighVersion) {
+			latestVersion = v
+			addr, err = evm_datastore_utils.ToByteArray(ref)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 	}
 	return addr, nil
 }
