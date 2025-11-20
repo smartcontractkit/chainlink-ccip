@@ -211,7 +211,7 @@ jobs:
       - name: Setup DB
         shell: bash
         run: |
-          go get github.com/smartcontractkit/chainlink/v2/core/store/cmd/preparetest@d2c56f4161f3431268cb52e717a77b7ea7dcef09
+          go get github.com/smartcontractkit/chainlink/v2/core/store/cmd/preparetest@5b5d3f204863e43445685cb2f569f37514bb84f5
           go run github.com/smartcontractkit/chainlink/v2/core/store/cmd/preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
