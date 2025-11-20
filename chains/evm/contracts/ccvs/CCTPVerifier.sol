@@ -13,24 +13,26 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
-/// @notice The CCTPV2Verifier creates CCTP V2 messages on source and verifies them on destination.
-/// @dev This verifier is not backwards compatible with CCTP V1.
-contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
+/// @notice The CCTPVerifier creates USDC burn messages on source and delivers them on destination.
+/// @dev This verifier is for CCTP V2 and is not backwards compatible with CCTP V1.
+contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   using SafeERC20 for IERC20;
 
-  error CCVVersionMismatch(bytes4 expected, bytes4 got);
   error CustomFinalityArraysMustBeSameLength();
   error CustomFinalitiesMustBeStrictlyIncreasing();
   error InvalidCCVData();
+  error InvalidCCVVersion(bytes4 expected, bytes4 got);
+  error InvalidDomainUpdate(DomainUpdate args);
   error InvalidMessageTransmitterOnProxy(address expected, address got);
   error InvalidMessageTransmitterVersion(uint32 expected, uint32 got);
   error InvalidReceiver(bytes receiver);
   error InvalidTokenMessengerVersion(uint32 expected, uint32 got);
+  error InvalidMessageId(bytes32 expected, bytes32 got);
+  error InvalidMessageSender(bytes32 expected, bytes32 got);
   error InvalidMessageVersion(uint32 expected, uint32 got);
   error InvalidToken(address token);
   error InvalidTokenTransferLength(uint256 length);
   error MaxFeeExceedsUint32(uint256 maxFee);
-  error MessageIdMismatch(bytes32 computed, bytes32 attested);
   error MissingCustomFinalities();
   error OnlyCallableByOwnerOrAllowlistAdmin();
   error ReceiveMessageCallFailed();
@@ -38,6 +40,7 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
   error UnsupportedFinality(uint32 finality);
   error ZeroAddressNotAllowed();
 
+  event DomainsSet(DomainUpdate[] domains);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
   event StaticConfigSet(
     address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier
@@ -46,8 +49,9 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
 
   /// @notice The arguments required to update a remote domain.
   // solhint-disable-next-line gas-struct-packing
-  struct DomainUpdateArgs {
-    bytes32 allowedCaller; // Address allowed to mint on the domain (i.e. the MessageTransmitterProxy on destination).
+  struct DomainUpdate {
+    bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
+    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the TokenMessengerProxy).
     bytes32 mintRecipient; // Address to mint USDC to on the destination chain.
     uint32 domainIdentifier; // Unique domain ID used across CCTP.
     uint64 destChainSelector; // The corresponding CCIP destination chain selector for the domain.
@@ -68,7 +72,8 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
   /// @notice A domain is a CCTP-specific representation of a destination chain.
   /// @dev Zero is a valid domain identifier.
   struct Domain {
-    bytes32 allowedCaller; // Address allowed to mint on the domain (i.e. the MessageTransmitterProxy on destination).
+    bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
+    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the TokenMessengerProxy).
     bytes32 mintRecipient; // Address to mint USDC to on the destination chain.
     uint32 domainIdentifier; // ─╮ Unique domain ID used across CCTP.
     bool enabled; // ────────────╯ Whether or not the domain is enabled.
@@ -86,17 +91,17 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
   /// @notice Dynamic configuration for this chain.
   struct DynamicConfig {
     address feeAggregator; // ──╮ Address to which fees are withdrawn.
-    address allowlistAdmin; // ─╯ Address permitted to update the allowlist in addition to the owner.
+    address allowlistAdmin; // ─╯ Address permitted to update the allowlist (in addition to the owner).
   }
 
-  string public constant override typeAndVersion = "CCTPV2Verifier 1.7.0-dev";
-  /// @notice The preimage is bytes4(keccak256("CCTPV2Verifier 1.7.0")).
-  bytes4 internal constant VERSION_TAG_V1_7_0 = 0xb4161002;
+  string public constant override typeAndVersion = "CCTPVerifier 1.7.0-dev";
+  /// @notice The preimage is bytes4(keccak256("CCTPVerifier 1.7.0")).
+  bytes4 internal constant VERSION_TAG_V1_7_0 = 0x8e1d1a9d;
   /// @notice CCTP contracts use the number 1 to represent V2, as 0 represents V1.
   uint32 private constant SUPPORTED_USDC_VERSION = 1;
   /// @notice The division factor for basis points. This also represents the maximum bps fee.
   uint16 internal constant BPS_DIVIDER = 10_000;
-  /// @notice The length of a CCTP V2 message, including the message body with the hook data expected by this verifier.
+  /// @notice The length of a CCTP message, including the message body + hook data expected by this verifier.
   /// @dev Message format.
   ///     * Field                      Bytes      Type       Index
   ///     * version                    4          uint32     0
@@ -125,7 +130,7 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
   ///     * verifierVersion            4          bytes4     0
   ///     * messageId                  32         bytes32    4
   /// @dev Total bytes = (4 * 3) + (32 * 4) + (4 * 2) + 4 + (32 * 7) + 4 + 32 = 412.
-  uint256 public constant CCTP_V2_MESSAGE_LENGTH = 412;
+  uint256 public constant CCTP_MESSAGE_LENGTH = 412;
   /// @notice The length of a signature provided by the CCTP attestation service.
   /// @dev 65-byte ECDSA signature: v (32) + r (32) + s (1).
   uint256 public constant SIGNATURE_LENGTH = 65;
@@ -134,13 +139,13 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
 
   /// @notice The USDC token contract.
   IERC20 private immutable i_usdcToken;
-  /// @notice The message transmitter proxy, which is used on destination as a non-upgradeable caller of all CCTP V2 messages.
+  /// @notice The message transmitter proxy, which is used on destination as a non-upgradeable caller of all CCTP messages.
   /// @dev Instead of calling receiveMessage directly, we use a proxy to enable upgrades to the verifier without invalidating in-flight messages.
   /// CCTP messages define an address permitted to call receiveMessage, which will always be the message transmitter proxy.
   CCTPMessageTransmitterProxy private immutable i_messageTransmitterProxy;
-  /// @notice The token messenger, which is used on source to send USDC over CCTP V2.
+  /// @notice The token messenger, which is used on source to send USDC over CCTP.
   /// @dev The token messenger calls into the message transmitter after burning USDC and forming the app-specific message body.
-  ITokenMessenger private immutable i_tokenMessenger;
+  ITokenMessenger private immutable i_tokenMessenger; // TODO: Update to TokenMessengerProxy when available.
   /// @notice The local domain identifier, i.e. a CCTP-specific identifier for the chain to which this contract is deployed.
   uint32 private immutable i_localDomainIdentifier;
 
@@ -164,13 +169,13 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
         || address(usdcToken) == address(0)
     ) revert ZeroAddressNotAllowed();
 
-    // Ensure that the token messenger is for CCTP V2.
+    // Ensure that the token messenger is for CCTP.
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
     if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) {
       revert InvalidTokenMessengerVersion(SUPPORTED_USDC_VERSION, tokenMessengerVersion);
     }
 
-    // Ensure that the message transmitter is for CCTP V2.
+    // Ensure that the message transmitter is for CCTP.
     IMessageTransmitter messageTransmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
     uint32 messageTransmitterVersion = messageTransmitter.version();
     if (messageTransmitterVersion != SUPPORTED_USDC_VERSION) {
@@ -210,10 +215,8 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
     bytes calldata // verifierArgs
   ) external returns (bytes memory verifierReturnData) {
     // For EVM, sender is expected to be 20 bytes.
-    {
-      address senderAddress = address(bytes20(message.sender));
-      _assertSenderIsAllowed(message.destChainSelector, senderAddress);
-    }
+    address senderAddress = address(bytes20(message.sender));
+    _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
     Domain storage domain = s_chainToDomain[message.destChainSelector];
     if (!domain.enabled) revert UnknownDomain(message.destChainSelector);
@@ -222,10 +225,9 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
     // The address of the token transferred must correspond to USDC.
     if (message.tokenTransfer.length != 1) revert InvalidTokenTransferLength(message.tokenTransfer.length);
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = message.tokenTransfer[0];
-    {
-      address sourceTokenAddress = address(bytes20(tokenTransfer.sourceTokenAddress));
-      if (sourceTokenAddress != address(i_usdcToken)) revert InvalidToken(sourceTokenAddress);
-    }
+
+    address sourceTokenAddress = address(bytes20(tokenTransfer.sourceTokenAddress));
+    if (sourceTokenAddress != address(i_usdcToken)) revert InvalidToken(sourceTokenAddress);
 
     if (message.tokenTransfer[0].tokenReceiver.length != 32) {
       revert InvalidReceiver(message.tokenTransfer[0].tokenReceiver);
@@ -248,7 +250,7 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
         finality: message.finality,
         messageId: messageId,
         domainIdentifier: domain.domainIdentifier,
-        allowedCaller: domain.allowedCaller
+        allowedCaller: domain.allowedCallerOnDest
       })
     );
 
@@ -263,6 +265,10 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
     (uint32 finalityThreshold, uint16 bps, bool found) = _getCCTPFinalityThresholdAndBps(params.finality);
     if (!found) revert UnsupportedFinality(params.finality);
 
+    // The maximum fee, taken on destination, is a percentage of the total amount transferred.
+    // We use bps to calculate the smallest possible value that we can set as the max fee.
+    // The bps values configured for each finality threshold on this chain must mirror those used by CCTP.
+    // CCTP defines different bps values for each chain.
     uint256 maxFee = params.amount * bps / BPS_DIVIDER;
     if (maxFee > type(uint32).max) revert MaxFeeExceedsUint32(maxFee);
 
@@ -272,10 +278,6 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
       params.receiver,
       address(i_usdcToken),
       params.allowedCaller,
-      // The maximum fee, taken on destination, is a percentage of the total amount transferred.
-      // We use bps to calculate the smallest possible value that we can set as the max fee.
-      // The bps values configured for each finality threshold on this chain must mirror those used by CCTP V2.
-      // CCTP V2 defines different bps values for each chain.
       uint32(maxFee),
       finalityThreshold,
       // The hook data includes the version tag and the message ID.
@@ -288,8 +290,8 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
   /// @notice Returns the CCTP finality threshold and bps for the given CCIP finality.
   /// @param finality The CCIP finality.
   /// @return finalityThreshold The CCTP finality threshold.
-  /// @return bps The bps charged on destinaton by CCTP for the finality threshold on this source chain.
-  /// @return found Whether the finality threshold and bps were found. We can't rely on 0 values because 0 may be valid.
+  /// @return bps The bps charged on destinaton by CCTP for the finality threshold.
+  /// @return found Whether the finality threshold and bps were found. We can't rely on 0 values because 0 could be valid.
   function _getCCTPFinalityThresholdAndBps(
     uint32 finality
   ) internal view returns (uint32 finalityThreshold, uint16 bps, bool found) {
@@ -312,42 +314,44 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
   }
 
   /// @inheritdoc ICrossChainVerifierV1
-  function verifyMessage(
-    MessageV1Codec.MessageV1 memory, // message
-    bytes32 messageHash,
-    bytes calldata ccvData
-  ) external {
-    // Message transmitter a minimum signature threshold of 1.
+  function verifyMessage(MessageV1Codec.MessageV1 memory message, bytes32 messageHash, bytes calldata ccvData) external {
+    // Message transmitter requires a minimum signature threshold of 1.
     // Our ccvData should therefore define at least 1 signature.
-    if (ccvData.length < VERIFIER_VERSION_LENGTH + CCTP_V2_MESSAGE_LENGTH + SIGNATURE_LENGTH) revert InvalidCCVData();
+    if (ccvData.length < VERIFIER_VERSION_LENGTH + CCTP_MESSAGE_LENGTH + SIGNATURE_LENGTH) revert InvalidCCVData();
 
     bytes4 versionPrefix = bytes4(ccvData[:VERIFIER_VERSION_LENGTH]);
-    if (versionPrefix != VERSION_TAG_V1_7_0) revert CCVVersionMismatch(VERSION_TAG_V1_7_0, versionPrefix);
+    if (versionPrefix != VERSION_TAG_V1_7_0) revert InvalidCCVVersion(VERSION_TAG_V1_7_0, versionPrefix);
 
     // The attested version is the first 4 bytes of the hook data, which occupies the last 36 bytes of the CCTP message.
     // We exclude the last 32 bytes of the hook data, which contains the message ID, to get the version.
     bytes4 attestedVersion = bytes4(
-      ccvData[
-        VERIFIER_VERSION_LENGTH + CCTP_V2_MESSAGE_LENGTH - 36:VERIFIER_VERSION_LENGTH + CCTP_V2_MESSAGE_LENGTH - 32
-      ]
+      ccvData[VERIFIER_VERSION_LENGTH + CCTP_MESSAGE_LENGTH - 36:VERIFIER_VERSION_LENGTH + CCTP_MESSAGE_LENGTH - 32]
     );
-    if (attestedVersion != VERSION_TAG_V1_7_0) revert CCVVersionMismatch(VERSION_TAG_V1_7_0, attestedVersion);
+    if (attestedVersion != VERSION_TAG_V1_7_0) revert InvalidCCVVersion(VERSION_TAG_V1_7_0, attestedVersion);
 
     // The attested message ID should match the hash passed into this function.
     // If not, there is a mismatch between what was attested and what was computed within this transaction.
-    bytes32 messageId = bytes32(
-      ccvData[VERIFIER_VERSION_LENGTH + CCTP_V2_MESSAGE_LENGTH - 32:VERIFIER_VERSION_LENGTH + CCTP_V2_MESSAGE_LENGTH]
-    );
-    if (messageHash != messageId) revert MessageIdMismatch(messageHash, messageId);
+    bytes32 messageId =
+      bytes32(ccvData[VERIFIER_VERSION_LENGTH + CCTP_MESSAGE_LENGTH - 32:VERIFIER_VERSION_LENGTH + CCTP_MESSAGE_LENGTH]);
+    if (messageHash != messageId) revert InvalidMessageId(messageHash, messageId);
 
-    // Call into CCTP V2 via the message transmitter proxy.
+    // The messageSender property of the messageBody must align with the allowedCallerOnSource.
+    // This check is critical to ensure that CCIP is unable to process burn messages generated by other systems.
+    Domain storage sourceDomain = s_chainToDomain[message.sourceChainSelector];
+    if (!sourceDomain.enabled) revert UnknownDomain(message.sourceChainSelector);
+    // messageSender starts 148 (messageBody index) + 100 (index within messageBody) = 248 bytes after the verifier version tag.
+    bytes32 messageSender = bytes32(ccvData[VERIFIER_VERSION_LENGTH + 248:VERIFIER_VERSION_LENGTH + 280]);
+    if (messageSender != sourceDomain.allowedCallerOnSource) {
+      revert InvalidMessageSender(sourceDomain.allowedCallerOnSource, messageSender);
+    }
+
+    // Call into CCTP via the message transmitter proxy.
     // CCTP will validate signatures against the message before minting USDC.
+    // Attestation occupies all bytes following the CCTP message.
     if (
-      // message
-      // attestation
       !i_messageTransmitterProxy.receiveMessage(
-        ccvData[VERIFIER_VERSION_LENGTH:VERIFIER_VERSION_LENGTH + CCTP_V2_MESSAGE_LENGTH],
-        ccvData[VERIFIER_VERSION_LENGTH + CCTP_V2_MESSAGE_LENGTH:]
+        ccvData[VERIFIER_VERSION_LENGTH:VERIFIER_VERSION_LENGTH + CCTP_MESSAGE_LENGTH],
+        ccvData[VERIFIER_VERSION_LENGTH + CCTP_MESSAGE_LENGTH:]
       )
     ) {
       revert ReceiveMessageCallFailed();
@@ -429,6 +433,42 @@ contract CCTPV2Verifier is Ownable2StepMsgSender, BaseVerifier {
 
     s_finalityConfig = finalityConfig;
     emit FinalityConfigSet(finalityConfig);
+  }
+
+  /// @notice Gets the CCTP domain for a given CCIP chain selector.
+  /// @param chainSelector The CCIP chain selector corresponding to the domain.
+  /// @return domain The CCTP domain corresponding to the given chain selector.
+  function getDomain(
+    uint64 chainSelector
+  ) external view returns (Domain memory) {
+    return s_chainToDomain[chainSelector];
+  }
+
+  /// @notice Sets the CCTP domain for a CCIP chain selector.
+  /// @param domains The array of DomainUpdate structs to set.
+  /// @dev Must validate mapping of selectors -> (domain, caller) prior to calling this function.
+  function setDomains(
+    DomainUpdate[] calldata domains
+  ) external onlyOwner {
+    for (uint256 i = 0; i < domains.length; ++i) {
+      DomainUpdate memory domain = domains[i];
+      if (
+        domain.allowedCallerOnDest == bytes32(0) || domain.allowedCallerOnSource == bytes32(0)
+          || domain.destChainSelector == 0
+      ) {
+        revert InvalidDomainUpdate(domain);
+      }
+
+      s_chainToDomain[domain.destChainSelector] = Domain({
+        allowedCallerOnDest: domain.allowedCallerOnDest,
+        allowedCallerOnSource: domain.allowedCallerOnSource,
+        mintRecipient: domain.mintRecipient,
+        domainIdentifier: domain.domainIdentifier,
+        enabled: domain.enabled
+      });
+    }
+
+    emit DomainsSet(domains);
   }
 
   /// @notice Updates destination chain configurations.
