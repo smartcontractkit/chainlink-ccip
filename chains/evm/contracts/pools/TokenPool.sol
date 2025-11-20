@@ -84,7 +84,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
-  event DynamicConfigSet(address router, uint256 thresholdAmountForAdditionalCCVs);
+  event DynamicConfigSet(address router, uint16 minBlockConfirmations, uint256 thresholdAmountForAdditionalCCVs);
   event RateLimitAdminSet(address rateLimitAdmin);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
@@ -173,15 +173,23 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   address internal immutable i_rmnProxy;
   /// @dev The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
+
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
   /// Only takes effect if i_allowlistEnabled is true.
   /// This can be used to ensure only token-issuer specified addresses can move tokens.
   EnumerableSet.AddressSet internal s_allowlist;
-  /// @dev The address of the router
-  IRouter internal s_router;
   /// @dev Threshold token transfer amount above which additional CCVs are required.
   /// Value of 0 means that there is no threshold and additional CCVs are not required for any transfer amount.
   uint256 internal s_thresholdAmountForAdditionalCCVs;
+  /// @dev The address of the router
+  IRouter internal s_router;
+  /// @dev Minimum block confirmation on the source chain, 0 means the default finality.
+  uint16 internal s_minBlockConfirmation;
+  // Separate buckets provide isolated rate limits for transfers with custom block confirmation, as their risk profiles differ from default transfers.
+  mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) internal
+    s_outboundRateLimiterConfig;
+  mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketInbound) internal s_inboundRateLimiterConfig;
+
   /// @dev A set of allowed chain selectors. We want the allowlist to be enumerable to
   /// be able to quickly determine (without parsing logs) who can access the pool.
   /// @dev The chain selectors are in uint256 format because of the EnumerableSet implementation.
@@ -193,8 +201,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice The address of the rate limiter admin.
   /// @dev Can be address(0) if none is configured.
   address internal s_rateLimitAdmin;
-  /// @dev Tracks custom block confirmation parameters and per-lane rate limit buckets.
-  CustomBlockConfirmationConfig internal s_customBlockConfirmationConfig;
+
   /// @dev Stores verifier (CCV) requirements keyed by remote chain selector.
   mapping(uint64 remoteChainSelector => CCVConfig ccvConfig) internal s_verifierConfig;
   /// @dev Optional token-transfer fee overrides keyed by destination chain selector.
@@ -247,18 +254,32 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @notice Gets the pool's Router
   /// @return router The pool's Router
-  function getDynamicConfig() public view virtual returns (address router, uint256 thresholdAmountForAdditionalCCVs) {
-    return (address(s_router), s_thresholdAmountForAdditionalCCVs);
+  function getDynamicConfig()
+    public
+    view
+    virtual
+    returns (address router, uint16 minBlockConfirmations, uint256 thresholdAmountForAdditionalCCVs)
+  {
+    return (address(s_router), s_minBlockConfirmation, s_thresholdAmountForAdditionalCCVs);
   }
 
   /// @notice Sets the dynamic configuration for the pool.
   /// @param router The address of the router contract.
+  /// @param minBlockConfirmations The minimum block confirmations required for custom finality transfers.
   /// @param thresholdAmountForAdditionalCCVs The threshold amount above which additional CCVs are required.
-  function setDynamicConfig(address router, uint256 thresholdAmountForAdditionalCCVs) public onlyOwner {
+  function setDynamicConfig(
+    address router,
+    uint16 minBlockConfirmations,
+    uint256 thresholdAmountForAdditionalCCVs
+  ) public onlyOwner {
     if (router == address(0)) revert ZeroAddressInvalid();
+
     s_router = IRouter(router);
+    // Since 0 means default finality it is a valid value.
+    s_minBlockConfirmation = minBlockConfirmations;
     s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;
-    emit DynamicConfigSet(router, thresholdAmountForAdditionalCCVs);
+
+    emit DynamicConfigSet(router, minBlockConfirmations, thresholdAmountForAdditionalCCVs);
   }
 
   /// @notice Signals which version of the pool interface is supported.
@@ -394,7 +415,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
     uint256 amount = lockOrBurnIn.amount;
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
-      uint16 minBlockConfirmationConfigured = s_customBlockConfirmationConfig.minBlockConfirmation;
+      uint16 minBlockConfirmationConfigured = s_minBlockConfirmation;
       if (minBlockConfirmationConfigured != 0) {
         if (blockConfirmationRequested < minBlockConfirmationConfigured) {
           revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
@@ -727,7 +748,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     uint64 remoteChainSelector,
     uint256 amount
   ) internal virtual {
-    s_customBlockConfirmationConfig.outboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
+    s_outboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
 
     emit CustomBlockConfirmationOutboundRateLimitConsumed({
       token: address(i_token),
@@ -738,7 +759,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @notice Consumes custom block confirmation inbound rate limiting capacity in this pool.
   function _consumeCustomBlockConfirmationInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
-    s_customBlockConfirmationConfig.inboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
+    s_inboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
 
     emit CustomBlockConfirmationInboundRateLimitConsumed({
       token: address(i_token),
@@ -771,7 +792,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Returns the minimum block confirmations configured for custom block confirmation transfers.
   /// @return blockConfirmationConfigured The configured minimum block confirmations.
   function getMinBlockConfirmation() external view returns (uint16 blockConfirmationConfigured) {
-    return s_customBlockConfirmationConfig.minBlockConfirmation;
+    return s_minBlockConfirmation;
   }
 
   /// @notice Returns the outbound and inbound custom block confirmation rate limiter state for the given remote chain.
@@ -788,10 +809,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       RateLimiter.TokenBucket memory inboundRateLimiterState
     )
   {
-    CustomBlockConfirmationConfig storage config = s_customBlockConfirmationConfig;
     return (
-      config.outboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState(),
-      config.inboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState()
+      s_outboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState(),
+      s_inboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState()
     );
   }
 
@@ -929,38 +949,21 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   // │              Custom Block Confirmation Config                │
   // ================================================================
 
-  /// @notice Updates the custom block confirmation configuration for token transfers.
-  function applyCustomBlockConfirmationConfigUpdates(
-    uint16 minBlockConfirmation,
-    CustomBlockConfirmationRateLimitConfigArgs[] calldata rateLimitConfigArgs
-  ) external virtual onlyOwner {
-    CustomBlockConfirmationConfig storage config = s_customBlockConfirmationConfig;
-    config.minBlockConfirmation = minBlockConfirmation;
-    _setCustomBlockConfirmationRateLimitConfig(rateLimitConfigArgs);
-    emit CustomBlockConfirmationUpdated(minBlockConfirmation);
-  }
-
   /// @notice Sets the custom block confirmation based rate limit configurations for specified remote chains.
   /// @param rateLimitConfigArgs Array of structs containing remote chain selectors and their rate limiter configs.
   function setCustomBlockConfirmationRateLimitConfig(
     CustomBlockConfirmationRateLimitConfigArgs[] calldata rateLimitConfigArgs
   ) external virtual {
     if (msg.sender != s_rateLimitAdmin && msg.sender != owner()) revert Unauthorized(msg.sender);
-    _setCustomBlockConfirmationRateLimitConfig(rateLimitConfigArgs);
-  }
 
-  function _setCustomBlockConfirmationRateLimitConfig(
-    CustomBlockConfirmationRateLimitConfigArgs[] calldata rateLimitConfigArgs
-  ) internal {
-    CustomBlockConfirmationConfig storage customBlockConfirmationConfig = s_customBlockConfirmationConfig;
     for (uint256 i = 0; i < rateLimitConfigArgs.length; ++i) {
       CustomBlockConfirmationRateLimitConfigArgs calldata configArgs = rateLimitConfigArgs[i];
       uint64 remoteChainSelector = configArgs.remoteChainSelector;
       if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
       RateLimiter._validateTokenBucketConfig(configArgs.outboundRateLimiterConfig);
-      RateLimiter.TokenBucket storage outboundBucket =
-        customBlockConfirmationConfig.outboundRateLimiterConfig[remoteChainSelector];
+      RateLimiter.TokenBucket storage outboundBucket = s_outboundRateLimiterConfig[remoteChainSelector];
+
       bool outboundUninitialized = outboundBucket.lastUpdated == 0 && outboundBucket.capacity == 0
         && outboundBucket.rate == 0 && outboundBucket.tokens == 0 && !outboundBucket.isEnabled;
       if (outboundUninitialized && configArgs.outboundRateLimiterConfig.isEnabled) {
@@ -970,8 +973,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       outboundBucket._setTokenBucketConfig(configArgs.outboundRateLimiterConfig);
 
       RateLimiter._validateTokenBucketConfig(configArgs.inboundRateLimiterConfig);
-      RateLimiter.TokenBucket storage inboundBucket =
-        customBlockConfirmationConfig.inboundRateLimiterConfig[remoteChainSelector];
+      RateLimiter.TokenBucket storage inboundBucket = s_inboundRateLimiterConfig[remoteChainSelector];
+
       bool inboundUninitialized = inboundBucket.lastUpdated == 0 && inboundBucket.capacity == 0
         && inboundBucket.rate == 0 && inboundBucket.tokens == 0 && !inboundBucket.isEnabled;
       if (inboundUninitialized && configArgs.inboundRateLimiterConfig.isEnabled) {
@@ -1154,10 +1157,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     }
 
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
-      if (blockConfirmationRequested < s_customBlockConfirmationConfig.minBlockConfirmation) {
-        revert InvalidMinBlockConfirmation(
-          blockConfirmationRequested, s_customBlockConfirmationConfig.minBlockConfirmation
-        );
+      if (blockConfirmationRequested < s_minBlockConfirmation) {
+        revert InvalidMinBlockConfirmation(blockConfirmationRequested, s_minBlockConfirmation);
       }
       return (
         feeConfig.customBlockConfirmationFeeUSDCents,

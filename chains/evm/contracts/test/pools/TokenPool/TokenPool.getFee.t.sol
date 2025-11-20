@@ -79,9 +79,7 @@ contract TokenPoolV2_getFee is TokenPoolV2Setup {
 
     vm.startPrank(OWNER);
     // Set custom block confirmation config with minimum of 10 blocks
-    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(
-      minBlockConfirmation, new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](0)
-    );
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, 0);
 
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,

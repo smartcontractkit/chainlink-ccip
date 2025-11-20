@@ -124,10 +124,12 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     uint16 customBlockConfirmationTransferFeeBps = 500;
     uint256 amount = 1000e18;
 
+    // Mint tokens to the pool so they can be burned
+    deal(address(s_token), address(s_pool), amount);
+
     vm.startPrank(OWNER);
-    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(
-      minBlockConfirmation, new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](0)
-    );
+    s_pool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, 0);
+
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -141,7 +143,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
         isEnabled: true
       })
     });
-    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+    s_pool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       originalSender: OWNER,
@@ -152,9 +154,9 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     });
 
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.lockOrBurn(lockOrBurnIn);
+    s_pool.lockOrBurn(lockOrBurnIn);
 
-    assertEq(IERC20(s_token).balanceOf(address(s_tokenPool)), 0); // No fees should be accumulated
+    assertEq(IERC20(s_token).balanceOf(address(s_pool)), 0); // No fees should be accumulated
   }
 
   // Should not burn tokens if cursed.

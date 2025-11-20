@@ -49,7 +49,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
 
     // Set threshold amount.
     uint256 thresholdAmount = 1000;
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), thresholdAmount);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), 0, thresholdAmount);
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedOutboundBelow = s_tokenPool.getRequiredCCVs(
@@ -84,7 +84,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
 
     // Set threshold amount.
     uint256 thresholdAmount = 1000;
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), thresholdAmount);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), 0, thresholdAmount);
 
     // Test with amount above threshold but no additional CCVs, should return only base CCVs.
     address[] memory storedOutbound = s_tokenPool.getRequiredCCVs(
@@ -137,7 +137,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
 
     // Set threshold amount.
     uint256 thresholdAmount = 1000;
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), thresholdAmount);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), 0, thresholdAmount);
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedInboundBelow = s_tokenPool.getRequiredCCVs(
@@ -172,7 +172,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
 
     // Set threshold amount.
     uint256 thresholdAmount = 1000;
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), thresholdAmount);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), 0, thresholdAmount);
 
     // Test with amount above threshold but no additional CCVs, should return only base CCVs.
     address[] memory storedInbound = s_tokenPool.getRequiredCCVs(
