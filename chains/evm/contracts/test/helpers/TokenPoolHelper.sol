@@ -11,10 +11,10 @@ contract TokenPoolHelper is TokenPool {
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
 
   function encodeLocalDecimals() external view returns (bytes memory) {
     return _encodeLocalDecimals();

@@ -10,6 +10,7 @@ import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
+import {AdvancedPoolHooks} from "./AdvancedPoolHooks.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -48,8 +49,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   error InvalidTokenTransferFeeConfig(uint64 destChainSelector);
   error CallerIsNotARampOnRouter(address caller);
   error ZeroAddressInvalid();
-  error SenderNotAllowed(address sender);
-  error AllowListNotEnabled();
   error NonExistentChain(uint64 remoteChainSelector);
   error ChainNotAllowed(uint64 remoteChainSelector);
   error CursedByRMN();
@@ -82,8 +81,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event ChainRemoved(uint64 remoteChainSelector);
   event RemotePoolAdded(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
-  event AllowListAdd(address sender);
-  event AllowListRemove(address sender);
   event DynamicConfigSet(
     address router, uint16 minBlockConfirmations, uint256 thresholdAmountForAdditionalCCVs, address rateLimitAdmin
   );
@@ -172,13 +169,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   uint8 internal immutable i_tokenDecimals;
   /// @dev The address of the RMN proxy
   address internal immutable i_rmnProxy;
-  /// @dev The immutable flag that indicates if the pool is access-controlled.
-  bool internal immutable i_allowlistEnabled;
-
-  /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
-  /// Only takes effect if i_allowlistEnabled is true.
-  /// This can be used to ensure only token-issuer specified addresses can move tokens.
-  EnumerableSet.AddressSet internal s_allowlist;
+  /// @dev Optional advanced pool hooks contract for additional features like allowlists
+  AdvancedPoolHooks internal immutable i_advancedPoolHooks;
   /// @dev Threshold token transfer amount above which additional CCVs are required.
   /// Value of 0 means that there is no threshold and additional CCVs are not required for any transfer amount.
   uint256 internal s_thresholdAmountForAdditionalCCVs;
@@ -208,7 +200,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @dev Optional token-transfer fee overrides keyed by destination chain selector.
   mapping(uint64 destChainSelector => TokenTransferFeeConfig tokenTransferFeeConfig) internal s_tokenTransferFeeConfig;
 
-  constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
+  constructor(IERC20 token, uint8 localTokenDecimals, address advancedPoolHooks, address rmnProxy, address router) {
     if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) {
       revert ZeroAddressInvalid();
     }
@@ -224,14 +216,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       // assume the supplied token decimals are correct.
     }
     i_tokenDecimals = localTokenDecimals;
+    i_advancedPoolHooks = AdvancedPoolHooks(advancedPoolHooks);
 
     s_router = IRouter(router);
-
-    // Pool can be set as permissioned or permissionless at deployment time only to save hot-path gas.
-    i_allowlistEnabled = allowlist.length > 0;
-    if (i_allowlistEnabled) {
-      _applyAllowListUpdates(new address[](0), allowlist);
-    }
   }
 
   /// @inheritdoc IPoolV1
@@ -408,7 +395,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Validates the lock or burn input for correctness on
   /// - token to be locked or burned
   /// - RMN curse status
-  /// - allowlist status
+  /// - allowlist status (if advanced hooks are configured)
   /// - if the sender is a valid onRamp
   /// - rate limiting for either default or custom block confirmation transfer messages.
   /// @param lockOrBurnIn The input to validate.
@@ -418,7 +405,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function _validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 blockConfirmationRequested) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
-    _checkAllowList(lockOrBurnIn.originalSender);
+
+    // Check allowlist if advanced hooks are configured
+    if (address(i_advancedPoolHooks) != address(0)) {
+      i_advancedPoolHooks.checkAllowList(lockOrBurnIn.originalSender);
+    }
 
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
     uint256 amount = lockOrBurnIn.amount;
@@ -782,12 +773,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     );
   }
 
-  /// @notice Returns the minimum block confirmations configured for custom block confirmation transfers.
-  /// @return blockConfirmationConfigured The configured minimum block confirmations.
-  function getMinBlockConfirmation() external view returns (uint16 blockConfirmationConfigured) {
-    return s_minBlockConfirmation;
-  }
-
   /// @notice Returns the outbound and inbound custom block confirmation rate limiter state for the given remote chain.
   /// @param remoteChainSelector The remote chain selector.
   /// @return outboundRateLimiterState The outbound token bucket.
@@ -825,20 +810,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       _setRateLimitConfig(remoteChainSelectors[i], outboundConfigs[i], inboundConfigs[i]);
     }
-  }
-
-  /// @notice Sets the chain rate limiter config.
-  /// @param remoteChainSelector The remote chain selector for which the rate limits apply.
-  /// @param outboundConfig The new outbound rate limiter config, meaning the onRamp rate limits for the given chain.
-  /// @param inboundConfig The new inbound rate limiter config, meaning the offRamp rate limits for the given chain.
-  function setChainRateLimiterConfig(
-    uint64 remoteChainSelector,
-    RateLimiter.Config memory outboundConfig,
-    RateLimiter.Config memory inboundConfig
-  ) external {
-    if (msg.sender != s_rateLimitAdmin && msg.sender != owner()) revert Unauthorized(msg.sender);
-
-    _setRateLimitConfig(remoteChainSelector, outboundConfig, inboundConfig);
   }
 
   function _setRateLimitConfig(
@@ -882,60 +853,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   ) internal view virtual {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!s_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
-  }
-
-  // ================================================================
-  // │                          Allowlist                           │
-  // ================================================================
-
-  function _checkAllowList(
-    address sender
-  ) internal view {
-    if (i_allowlistEnabled) {
-      if (!s_allowlist.contains(sender)) {
-        revert SenderNotAllowed(sender);
-      }
-    }
-  }
-
-  /// @notice Gets whether the allowlist functionality is enabled.
-  /// @return true is enabled, false if not.
-  function getAllowListEnabled() external view returns (bool) {
-    return i_allowlistEnabled;
-  }
-
-  /// @notice Gets the allowed addresses.
-  /// @return The allowed addresses.
-  function getAllowList() external view returns (address[] memory) {
-    return s_allowlist.values();
-  }
-
-  /// @notice Apply updates to the allow list.
-  /// @param removes The addresses to be removed.
-  /// @param adds The addresses to be added.
-  function applyAllowListUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
-    _applyAllowListUpdates(removes, adds);
-  }
-
-  /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
-  function _applyAllowListUpdates(address[] memory removes, address[] memory adds) internal {
-    if (!i_allowlistEnabled) revert AllowListNotEnabled();
-
-    for (uint256 i = 0; i < removes.length; ++i) {
-      address toRemove = removes[i];
-      if (s_allowlist.remove(toRemove)) {
-        emit AllowListRemove(toRemove);
-      }
-    }
-    for (uint256 i = 0; i < adds.length; ++i) {
-      address toAdd = adds[i];
-      if (toAdd == address(0)) {
-        continue;
-      }
-      if (s_allowlist.add(toAdd)) {
-        emit AllowListAdd(toAdd);
-      }
-    }
   }
 
   // ================================================================

@@ -2,7 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+
 import {Pool} from "../../../libraries/Pool.sol";
+import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
 
@@ -96,7 +98,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
   function test_lockOrBurn_RevertWhen_SenderNotAllowed_LockOrBurnWithAllowList() public {
     vm.startPrank(s_allowedOnRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(AdvancedPoolHooks.SenderNotAllowed.selector, STRANGER));
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(
       Pool.LockOrBurnInV1({

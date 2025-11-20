@@ -26,7 +26,7 @@ contract TokenPoolV2Setup is BaseTest {
     deal(address(s_token), OWNER, type(uint256).max);
 
     s_tokenPool = new TokenPoolHelper(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
     );
 
     bytes[] memory remotePoolAddresses = new bytes[](1);

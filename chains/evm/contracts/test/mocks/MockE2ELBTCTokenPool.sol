@@ -21,11 +21,11 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
 
   constructor(
     IBurnMintERC20 token,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router,
     bytes memory destPoolData
-  ) TokenPool(token, 8, allowlist, rmnProxy, router) {
+  ) TokenPool(token, 8, advancedPoolHooks, rmnProxy, router) {
     s_destPoolData = destPoolData;
   }
 

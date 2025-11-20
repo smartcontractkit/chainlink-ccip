@@ -39,12 +39,7 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
     s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
 
     s_siloedLockReleaseTokenPool = new SiloedLockReleaseTokenPool(
-      s_token,
-      DEFAULT_TOKEN_DECIMALS,
-      new address[](0),
-      address(s_mockRMNRemote),
-      address(s_sourceRouter),
-      address(s_lockBox)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
     );
 
     // Mock the token pool for the token to be the siloed lock release token pool so that we can test the allowed caller configuration

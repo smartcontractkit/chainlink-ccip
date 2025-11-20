@@ -18,7 +18,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
-      new address[](0),
+      address(0),
       address(s_mockRMNRemote),
       address(s_router)
     );

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
 
 contract TokenPoolWithAllowListSetup is TokenPoolSetup {
   address[] internal s_allowedSenders;
+  AdvancedPoolHooks internal s_advancedPoolHooks;
 
   function setUp() public virtual override {
     TokenPoolSetup.setUp();
@@ -13,8 +15,9 @@ contract TokenPoolWithAllowListSetup is TokenPoolSetup {
     s_allowedSenders.push(STRANGER);
     s_allowedSenders.push(OWNER);
 
+    s_advancedPoolHooks = new AdvancedPoolHooks(s_allowedSenders);
     s_tokenPool = new TokenPoolHelper(
-      s_token, DEFAULT_TOKEN_DECIMALS, s_allowedSenders, address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
     );
   }
 }

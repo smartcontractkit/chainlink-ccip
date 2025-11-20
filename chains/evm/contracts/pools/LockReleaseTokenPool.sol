@@ -34,11 +34,11 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router,
     address lockBox
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
 
     token.safeApprove(lockBox, type(uint256).max);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
@@ -15,11 +16,11 @@ contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListS
 
     for (uint256 i = 0; i < 2; ++i) {
       vm.expectEmit();
-      emit TokenPool.AllowListAdd(newAddresses[i]);
+      emit AdvancedPoolHooks.AllowListAdd(newAddresses[i]);
     }
 
-    s_tokenPool.applyAllowListUpdates(new address[](0), newAddresses);
-    address[] memory setAddresses = s_tokenPool.getAllowList();
+    s_advancedPoolHooks.applyAllowListUpdates(new address[](0), newAddresses);
+    address[] memory setAddresses = s_advancedPoolHooks.getAllowList();
 
     assertEq(s_allowedSenders[0], setAddresses[0]);
     assertEq(s_allowedSenders[1], setAddresses[1]);
@@ -35,13 +36,13 @@ contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListS
     removeAddresses[0] = address(1);
 
     vm.expectEmit();
-    emit TokenPool.AllowListRemove(address(1));
+    emit AdvancedPoolHooks.AllowListRemove(address(1));
 
     vm.expectEmit();
-    emit TokenPool.AllowListAdd(address(3));
+    emit AdvancedPoolHooks.AllowListAdd(address(3));
 
-    s_tokenPool.applyAllowListUpdates(removeAddresses, newAddresses);
-    setAddresses = s_tokenPool.getAllowList();
+    s_advancedPoolHooks.applyAllowListUpdates(removeAddresses, newAddresses);
+    setAddresses = s_advancedPoolHooks.getAllowList();
 
     assertEq(s_allowedSenders[0], setAddresses[0]);
     assertEq(s_allowedSenders[1], setAddresses[1]);
@@ -51,23 +52,23 @@ contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListS
     // remove all from allowlist
     for (uint256 i = 0; i < setAddresses.length; ++i) {
       vm.expectEmit();
-      emit TokenPool.AllowListRemove(setAddresses[i]);
+      emit AdvancedPoolHooks.AllowListRemove(setAddresses[i]);
     }
 
-    s_tokenPool.applyAllowListUpdates(setAddresses, new address[](0));
-    setAddresses = s_tokenPool.getAllowList();
+    s_advancedPoolHooks.applyAllowListUpdates(setAddresses, new address[](0));
+    setAddresses = s_advancedPoolHooks.getAllowList();
 
     assertEq(0, setAddresses.length);
   }
 
   function test_SetAllowListSkipsZero() public {
-    uint256 setAddressesLength = s_tokenPool.getAllowList().length;
+    uint256 setAddressesLength = s_advancedPoolHooks.getAllowList().length;
 
     address[] memory newAddresses = new address[](1);
     newAddresses[0] = address(0);
 
-    s_tokenPool.applyAllowListUpdates(new address[](0), newAddresses);
-    address[] memory setAddresses = s_tokenPool.getAllowList();
+    s_advancedPoolHooks.applyAllowListUpdates(new address[](0), newAddresses);
+    address[] memory setAddresses = s_advancedPoolHooks.getAllowList();
 
     assertEq(setAddresses.length, setAddressesLength);
   }
@@ -78,16 +79,14 @@ contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListS
     vm.stopPrank();
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     address[] memory newAddresses = new address[](2);
-    s_tokenPool.applyAllowListUpdates(new address[](0), newAddresses);
+    s_advancedPoolHooks.applyAllowListUpdates(new address[](0), newAddresses);
   }
 
   function test_RevertWhen_AllowListNotEnabled() public {
-    s_tokenPool = new TokenPoolHelper(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
-    );
+    AdvancedPoolHooks hooksWithoutAllowList = new AdvancedPoolHooks(new address[](0));
 
-    vm.expectRevert(TokenPool.AllowListNotEnabled.selector);
+    vm.expectRevert(AdvancedPoolHooks.AllowListNotEnabled.selector);
 
-    s_tokenPool.applyAllowListUpdates(new address[](0), new address[](2));
+    hooksWithoutAllowList.applyAllowListUpdates(new address[](0), new address[](2));
   }
 }

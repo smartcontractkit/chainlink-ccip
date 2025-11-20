@@ -16,10 +16,10 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   constructor(
     IBurnMintERC20 token,
     uint8 localTokenDecimals,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router
-  ) BurnMintTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+  ) BurnMintTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
 
   /// @notice Burn the token in the pool
   /// @dev The _validateLockOrBurn check is an essential security check
