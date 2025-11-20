@@ -23,9 +23,9 @@ import (
 	mock_usdc_token_messenger "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_usdc_token_messenger"
 	mock_usdc_token_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_usdc_token_transmitter"
 
-	usdc_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/usdc_token_pool"
-
+	authorized_caller_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/authorized_caller"
 	cctp_message_transmitter_proxy_binding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
+	usdc_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/usdc_token_pool"
 
 	usdc_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
 
@@ -192,6 +192,37 @@ func TestUSDCTokenPoolDeployChangeset_NoExisting_MessageTransmitter_Proxy(t *tes
 	isAllowed, err := cctpMessageTransmitterProxyInstance.IsAllowedCaller(nil, common.HexToAddress(usdcTokenPoolAddress.Address))
 	require.NoError(t, err, "Failed to check if the caller is allowed")
 	require.True(t, isAllowed, "Caller should be allowed")
+
+	// Apply authorized caller updates to the USDCTokenPool
+	applyAuthorizedCallerUpdatesInput := changesets.ApplyAuthorizedCallerUpdatesInput{
+		ChainInputs: []changesets.ApplyAuthorizedCallerUpdatesInputPerChain{
+			{
+				ChainSelector: uint64(chain_selectors.TEST_90000001.Selector),
+				Address:       common.HexToAddress(usdcTokenPoolAddress.Address),
+				AuthorizedCallerUpdates: authorized_caller_ops.AuthorizedCallerUpdateArgs{
+					AddedCallers: []common.Address{common.Address{1}},
+				},
+			},
+		},
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            "test",
+			Description:          "Apply authorized caller updates",
+		},
+	}
+	applyAuthorizedCallerUpdatesChangeset := changesets.ApplyAuthorizedCallerUpdatesChangeset(mcmsRegistry)
+	applyAuthorizedCallerUpdatesChangesetOutput, err := applyAuthorizedCallerUpdatesChangeset.Apply(*e, applyAuthorizedCallerUpdatesInput)
+	require.NoError(t, err, "ApplyAuthorizedCallerUpdatesChangeset should not error")
+	require.Greater(t, len(applyAuthorizedCallerUpdatesChangesetOutput.Reports), 0)
+
+	// Check that the allowed caller on the USDCTokenPool is the CCTPMessageTransmitterProxy address
+	allAuthorizedCallers, err := usdcTokenPoolInstance.GetAllAuthorizedCallers(nil)
+	require.NoError(t, err, "Failed to get all authorized callers")
+
+	require.Equal(t, allAuthorizedCallers, []common.Address{common.Address{1}}, "There should only be one authorized caller")
 }
 
 func TestUSDCTokenPoolDeployChangeset_Existing_MessageTransmitter_Proxy(t *testing.T) {

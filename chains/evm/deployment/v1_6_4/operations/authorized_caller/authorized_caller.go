@@ -22,7 +22,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	Description:     "Applies authorized caller updates to a contract implementing the AuthorizedCallers interface",
 	ContractType:    "AuthorizedCallers",
 	ContractABI:     usdc_token_pool.USDCTokenPoolABI,
-	NewContract:     nil,
+	NewContract:     usdc_token_pool.NewUSDCTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*usdc_token_pool.USDCTokenPool, AuthorizedCallerUpdateArgs],
 	Validate:        func(AuthorizedCallerUpdateArgs) error { return nil },
 	CallContract: func(usdcTokenPool *usdc_token_pool.USDCTokenPool, opts *bind.TransactOpts, args AuthorizedCallerUpdateArgs) (*types.Transaction, error) {
