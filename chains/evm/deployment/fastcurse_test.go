@@ -270,14 +270,12 @@ func TestFastCurse(t *testing.T) {
 	crInput1_6_0 := fastcurse.CurseRegistryInput{
 		CursingFamily:       chainsel.FamilyEVM,
 		CursingVersion:      semver.MustParse("1.6.0"),
-		SubjectFamily:       chainsel.FamilyEVM,
 		CurseAdapter:        adaptersv1_6_0.NewCurseAdapter(),
 		CurseSubjectAdapter: adaptersv1_6_0.NewCurseAdapter(),
 	}
 	crInput1_5_0 := fastcurse.CurseRegistryInput{
 		CursingFamily:       chainsel.FamilyEVM,
 		CursingVersion:      semver.MustParse("1.5.0"),
-		SubjectFamily:       chainsel.FamilyEVM,
 		CurseAdapter:        adaptersv1_5_0.NewCurseAdapter(),
 		CurseSubjectAdapter: adaptersv1_5_0.NewCurseAdapter(),
 	}
@@ -570,14 +568,12 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	crInput1_6_0 := fastcurse.CurseRegistryInput{
 		CursingFamily:       chainsel.FamilyEVM,
 		CursingVersion:      semver.MustParse("1.6.0"),
-		SubjectFamily:       chainsel.FamilyEVM,
 		CurseAdapter:        adaptersv1_6_0.NewCurseAdapter(),
 		CurseSubjectAdapter: adaptersv1_6_0.NewCurseAdapter(),
 	}
 	crInput1_5_0 := fastcurse.CurseRegistryInput{
 		CursingFamily:       chainsel.FamilyEVM,
 		CursingVersion:      semver.MustParse("1.5.0"),
-		SubjectFamily:       chainsel.FamilyEVM,
 		CurseAdapter:        adaptersv1_5_0.NewCurseAdapter(),
 		CurseSubjectAdapter: adaptersv1_5_0.NewCurseAdapter(),
 	}
