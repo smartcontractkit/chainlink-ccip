@@ -33,7 +33,7 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
-func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64) {
+func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, qualifiers []string) {
 	// For EVM only, set the timelock admin
 	var timelockAdmin common.Address
 	chain1, ok := e.BlockChains.EVMChains()[selector]
@@ -43,7 +43,7 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64) {
 	dReg := mcmsapi.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	cs := mcmsapi.DeployMCMS(dReg)
-	for _, qualifier := range []string{common_utils.CLLQualifier, "RMNMCMS"} {
+	for _, qualifier := range qualifiers {
 		output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
 			AdapterVersion: version,
 			Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{

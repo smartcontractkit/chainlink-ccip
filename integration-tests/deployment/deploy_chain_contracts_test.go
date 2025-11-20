@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
@@ -20,6 +22,10 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -59,8 +65,141 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
 
-	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier})
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	// Transfer from one qualifier to another
+	fromQualifier := common_utils.CLLQualifier
+	toQualifier := common_utils.RMNTimelockQualifier
+	chain := e.BlockChains.SolanaChains()[chain_selectors.SOLANA_MAINNET.Selector]
+	fromTimelockSigner := utils.GetTimelockSignerPDA(
+		e.DataStore.Addresses().Filter(),
+		chain.Selector,
+		fromQualifier)
+	toTimelockSigner := utils.GetTimelockSignerPDA(
+		e.DataStore.Addresses().Filter(),
+		chain.Selector,
+		toQualifier)
+	toMcmSigner := utils.GetMCMSignerPDA(
+		e.DataStore.Addresses().Filter(),
+		chain.Selector,
+		common_utils.ProposerManyChainMultisig,
+		toQualifier,
+	)
+	err = utils.FundSolanaAccounts(
+		context.Background(),
+		[]solana.PublicKey{toTimelockSigner, toMcmSigner},
+		100,
+		chain.Client,
+	)
+	require.NoError(t, err)
+	mcmsInput := mcmsapi.TransferOwnershipInput{
+		ChainInputs: []mcmsapi.TransferOwnershipPerChainInput{
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(routerops.ContractType),
+						Version: routerops.Version,
+					},
+				},
+				CurrentOwner:  fromTimelockSigner.String(),
+				ProposedOwner: toTimelockSigner.String(),
+			},
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(offrampops.ContractType),
+						Version: offrampops.Version,
+					},
+				},
+				CurrentOwner:  fromTimelockSigner.String(),
+				ProposedOwner: toTimelockSigner.String(),
+			},
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(fqops.ContractType),
+						Version: fqops.Version,
+					},
+				},
+				CurrentOwner:  fromTimelockSigner.String(),
+				ProposedOwner: toTimelockSigner.String(),
+			},
+			{
+				ChainSelector: chain.Selector,
+				ContractRef: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(rmnremoteops.ContractType),
+						Version: rmnremoteops.Version,
+					},
+				},
+				CurrentOwner:  fromTimelockSigner.String(),
+				ProposedOwner: toTimelockSigner.String(),
+			},
+		},
+		AdapterVersion: semver.MustParse("1.6.0"),
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            fromQualifier,
+			Description:          "Transfer ownership test",
+		},
+	}
+
+	transferOutput, err := mcmsapi.TransferOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
+	require.NoError(t, err)
+	require.Greater(t, len(transferOutput.Reports), 0)
+	require.Equal(t, 1, len(transferOutput.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *e, transferOutput.MCMSTimelockProposals, false)
+	
+	mcmsInput.MCMS.Qualifier = toQualifier
+
+	acceptOutput, err := mcmsapi.AcceptOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
+	require.NoError(t, err)
+	require.Greater(t, len(acceptOutput.Reports), 0)
+	require.Equal(t, 1, len(acceptOutput.MCMSTimelockProposals))
+
+	testhelpers.ProcessTimelockProposals(t, *e, acceptOutput.MCMSTimelockProposals, false)
+	// router verify
+	program := datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chain.Selector,
+		routerops.ContractType,
+		common_utils.Version_1_6_0,
+		"",
+	)
+	require.Equal(t, toTimelockSigner, routerops.GetAuthority(chain, solana.MustPublicKeyFromBase58(program.Address)))
+	// offramp verify
+	program = datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chain.Selector,
+		offrampops.ContractType,
+		common_utils.Version_1_6_0,
+		"",
+	)
+	require.Equal(t, toTimelockSigner, offrampops.GetAuthority(chain, solana.MustPublicKeyFromBase58(program.Address)))
+	// fee quoter verify
+	program = datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chain.Selector,
+		fqops.ContractType,
+		common_utils.Version_1_6_0,
+		"",
+	)
+	require.Equal(t, toTimelockSigner, fqops.GetAuthority(chain, solana.MustPublicKeyFromBase58(program.Address)))
+	// rmn remote verify
+	program = datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chain.Selector,
+		rmnremoteops.ContractType,
+		common_utils.Version_1_6_0,
+		"",
+	)
+	require.Equal(t, toTimelockSigner, rmnremoteops.GetAuthority(chain, solana.MustPublicKeyFromBase58(program.Address)))
 }
 
 var solanaProgramIDs = map[string]string{

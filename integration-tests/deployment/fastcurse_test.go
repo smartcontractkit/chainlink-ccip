@@ -75,7 +75,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
-	DeployMCMS(t, env, chainsel.SOLANA_MAINNET.Selector)
+	DeployMCMS(t, env, chainsel.SOLANA_MAINNET.Selector, []string{deploymentutils.CLLQualifier})
 	SolanaTransferOwnership(t, env, chainsel.SOLANA_MAINNET.Selector)
 	ds := datastore.NewMemoryDataStore()
 	bundle := env.OperationsBundle
