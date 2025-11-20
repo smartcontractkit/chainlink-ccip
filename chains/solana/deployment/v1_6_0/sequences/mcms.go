@@ -107,6 +107,7 @@ func initAccessController(b operations.Bundle, deps mcmsops.Deps, accessControll
 				ContractType:     role,
 				ChainSel:         deps.Chain.ChainSelector(),
 				AccessController: accessController,
+				Qualifier:       deps.Qualifier, // used for testing purposes
 			})
 		if err != nil {
 			return nil, fmt.Errorf("failed to init access controller for role %s: %w", role, err)
@@ -144,6 +145,7 @@ func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentC
 				MCMConfig:    cfg.cfg,
 				ChainSel:     deps.Chain.ChainSelector(),
 				MCM:          mcmAddress,
+				Qualifier:    deps.Qualifier, // used for testing purposes
 			})
 		if err != nil {
 			return nil, fmt.Errorf("failed to init config type:%q, err:%w", cfg.ctype, err)
@@ -159,6 +161,7 @@ func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int, tim
 		ChainSel:     deps.Chain.ChainSelector(),
 		MinDelay:     minDelay,
 		Timelock:     timelockAddress,
+		Qualifier:    deps.Qualifier, // used for testing purposes
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to init timelock: %w", err)
@@ -216,6 +219,7 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 		_, err := operations.ExecuteOperation(b, mcmsops.AddAccessOp, deps, mcmsops.AddAccessInput{
 			Role:     role.role,
 			Accounts: role.pdas,
+			Qualifier: deps.Qualifier, // used for testing purposes
 		})
 		if err != nil {
 			return fmt.Errorf("failed to add access for role %d: %w", role.role, err)

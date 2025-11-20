@@ -133,6 +133,7 @@ type (
 		ContractType     cldf_deployment.ContractType
 		ChainSel         uint64
 		AccessController solana.PublicKey
+		Qualifier        string
 	}
 
 	InitMCMInput struct {
@@ -140,6 +141,7 @@ type (
 		MCMConfig    types.Config
 		ChainSel     uint64
 		MCM          solana.PublicKey
+		Qualifier    string
 	}
 
 	InitTimelockInput struct {
@@ -147,13 +149,14 @@ type (
 		ChainSel     uint64
 		MinDelay     *big.Int
 		Timelock     solana.PublicKey
+		Qualifier    string
 	}
 
 	AddAccessInput struct {
-		Qualifier string
 		Role      timelock.Role
 		Accounts  []solana.PublicKey
 		ChainSel  uint64
+		Qualifier string
 	}
 )
 
@@ -521,7 +524,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 		deps.Chain.Selector,
 		AccessControllerProgramType,
 		common_utils.Version_1_6_0,
-		in.Qualifier,
+		"",
 	)
 	timelockProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,

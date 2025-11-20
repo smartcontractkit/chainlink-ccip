@@ -33,7 +33,7 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
-func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64) {
+func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, qualifiers []string) {
 	// For EVM only, set the timelock admin
 	var timelockAdmin common.Address
 	chain1, ok := e.BlockChains.EVMChains()[selector]
@@ -43,23 +43,25 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64) {
 	dReg := mcmsapi.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	cs := mcmsapi.DeployMCMS(dReg)
-	output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
-		AdapterVersion: version,
-		Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
-			selector: {
-				Canceller:        testhelpers.SingleGroupMCMS(),
-				Bypasser:         testhelpers.SingleGroupMCMS(),
-				Proposer:         testhelpers.SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(0),
-				Qualifier:        ptr.String(common_utils.CLLQualifier),
-				TimelockAdmin:    timelockAdmin,
+	for _, qualifier := range qualifiers {
+		output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
+			AdapterVersion: version,
+			Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
+				selector: {
+					Canceller:        testhelpers.SingleGroupMCMS(),
+					Bypasser:         testhelpers.SingleGroupMCMS(),
+					Proposer:         testhelpers.SingleGroupMCMS(),
+					TimelockMinDelay: big.NewInt(0),
+					Qualifier:        ptr.String(qualifier),
+					TimelockAdmin:    timelockAdmin,
+				},
 			},
-		},
-	})
-	require.NoError(t, err)
-	require.Greater(t, len(output.Reports), 0)
-	require.NoError(t, output.DataStore.Merge(e.DataStore))
-	e.DataStore = output.DataStore.Seal()
+		})
+		require.NoError(t, err)
+		require.Greater(t, len(output.Reports), 0)
+		require.NoError(t, output.DataStore.Merge(e.DataStore))
+		e.DataStore = output.DataStore.Seal()
+	}
 }
 
 func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector uint64) {

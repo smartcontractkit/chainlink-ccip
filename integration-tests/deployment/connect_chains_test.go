@@ -184,7 +184,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		out.DataStore.Merge(e.DataStore)
 		e.DataStore = out.DataStore.Seal()
 	}
-	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{cciputils.CLLQualifier})
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 	// TODO: EVM doesn't work with a non-zero timelock delay
 	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
@@ -217,6 +217,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            cciputils.CLLQualifier,
 			Description:          "Connect Chains",
 		},
 	})
