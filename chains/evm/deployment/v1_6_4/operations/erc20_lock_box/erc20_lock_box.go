@@ -49,7 +49,6 @@ var ERC20LockboxConfigureAllowedCallers = contract.NewWrite(contract.WriteParams
 	ContractABI:  erc20_lock_box.ERC20LockBoxABI,
 	NewContract:  erc20_lock_box.NewERC20LockBox,
 	IsAllowedCaller: func(erc20Lockbox *erc20_lock_box.ERC20LockBox, opts *bind.CallOpts, caller common.Address, input []AllowedCallerConfigArgs) (bool, error) {
-		// TODO: Return to possibly checking for ownership if contract reads are possible
 		return true, nil
 	},
 	Validate: func([]AllowedCallerConfigArgs) error { return nil },

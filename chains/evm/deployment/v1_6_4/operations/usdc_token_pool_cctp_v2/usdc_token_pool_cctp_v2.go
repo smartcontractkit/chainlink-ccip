@@ -37,23 +37,23 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Validate: func(args ConstructorArgs) error {
 		// Ensure none of the critical addresses or allowlist are zeroed.
 		if args.TokenMessenger == (common.Address{}) {
-			return errors.New("TokenMessenger address cannot be zero")
+			return errors.New("tokenMessenger address cannot be zero")
 		}
 		if args.CCTPMessageTransmitterProxy == (common.Address{}) {
-			return errors.New("CCTPMessageTransmitterProxy address cannot be zero")
+			return errors.New("cctpMessageTransmitterProxy address cannot be zero")
 		}
 		if args.Token == (common.Address{}) {
-			return errors.New("Token address cannot be zero")
+			return errors.New("token address cannot be zero")
 		}
 		if args.RMNProxy == (common.Address{}) {
-			return errors.New("RMNProxy address cannot be zero")
+			return errors.New("rmnProxy address cannot be zero")
 		}
 		if args.Router == (common.Address{}) {
-			return errors.New("Router address cannot be zero")
+			return errors.New("router address cannot be zero")
 		}
 		for i, addr := range args.Allowlist {
 			if addr == (common.Address{}) {
-				return fmt.Errorf("Allowlist address at index %d cannot be zero", i)
+				return fmt.Errorf("allowlist address at index %d cannot be zero", i)
 			}
 		}
 		return nil

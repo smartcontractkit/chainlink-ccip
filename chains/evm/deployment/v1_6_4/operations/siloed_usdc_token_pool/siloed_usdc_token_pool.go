@@ -37,23 +37,23 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	},
 	Validate: func(args ConstructorArgs) error {
 		if args.Token == (common.Address{}) {
-			return errors.New("Token address cannot be zero")
+			return errors.New("token address cannot be zero")
 		}
 
 		if args.RMNProxy == (common.Address{}) {
-			return errors.New("RMNProxy address cannot be zero")
+			return errors.New("rmnProxy address cannot be zero")
 		}
 
 		if args.Router == (common.Address{}) {
-			return errors.New("Router address cannot be zero")
+			return errors.New("router address cannot be zero")
 		}
 
 		if args.LockBox == (common.Address{}) {
-			return errors.New("LockBox address cannot be zero")
+			return errors.New("lockBox address cannot be zero")
 		}
 
 		if args.LocalTokenDecimals != 6 {
-			return fmt.Errorf("Local token decimals must be 6")
+			return fmt.Errorf("local token decimals must be 6")
 		}
 		return nil
 	},
