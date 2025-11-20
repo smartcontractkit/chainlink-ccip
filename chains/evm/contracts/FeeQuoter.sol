@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
+import {ILegacyFeeQuoter} from "./interfaces/ILegacyFeeQuoter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Client} from "./libraries/Client.sol";
@@ -18,7 +19,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 ///   - Store the price of a token in USD allowing the owner or priceUpdater to update this value.
 ///   - Manage chain specific fee calculations.
 /// The authorized callers in the contract represent the fee price updaters.
-contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
+contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
@@ -325,7 +326,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     return (totalGas, gasCostInUsdCents);
   }
 
-  /// @inheritdoc IFeeQuoter
+  /// @inheritdoc ILegacyFeeQuoter
   /// @dev The function should always validate message.extraArgs, message.receiver and family-specific configs.
   function getValidatedFee(
     uint64 destChainSelector,
@@ -766,7 +767,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     return gasLimit;
   }
 
-  /// @inheritdoc IFeeQuoter
+  /// @inheritdoc ILegacyFeeQuoter
   /// @dev precondition - onRampTokenTransfers and sourceTokenAmounts lengths must be equal.
   function processMessageArgs(
     uint64 destChainSelector,
@@ -842,7 +843,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
   }
 
-  /// @inheritdoc IFeeQuoter
+  /// @inheritdoc ILegacyFeeQuoter
   function processPoolReturnData(
     uint64 destChainSelector,
     Internal.EVM2AnyTokenTransfer[] calldata onRampTokenTransfers,
