@@ -41,14 +41,14 @@ var USDCTokenPoolDeploySequence = operations.NewSequence(
 		var cctpProxyAddress common.Address
 		var addresses []datastore.AddressRef
 
-		var isFreshTransmitterProxy = false
+		var isNewTransmitterProxy bool
 
 		// On some chains the CCTPMessageTransmitterProxy is already deployed, so we can use it directly if it has been provided. If it is not this is an indicator
 		// that we need to deploy it.
 		if input.CCTPMessageTransmitterProxy != (common.Address{}) {
 			cctpProxyAddress = input.CCTPMessageTransmitterProxy
 		} else {
-			isFreshTransmitterProxy = true
+			isNewTransmitterProxy = true
 
 			// Deploy CCTPMessageTransmitterProxy first so that it can be used by the USDCTokenPool contract
 			cctpProxyReport, err := operations.ExecuteOperation(b, cctp_message_transmitter_proxy.Deploy, chain, contract.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
@@ -101,7 +101,7 @@ var USDCTokenPoolDeploySequence = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy USDCTokenPool on %s: %w", chain, err)
 		}
 
-		if isFreshTransmitterProxy {
+		if isNewTransmitterProxy {
 			_, err = operations.ExecuteOperation(b, cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyConfigureAllowedCallers, chain, contract.FunctionInput[[]cctp_message_transmitter_proxy.AllowedCallerConfigArgs]{
 				ChainSelector: input.ChainSelector,
 				Address:       cctpProxyAddress,
