@@ -40,6 +40,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   uint16 internal constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
 
   uint32 internal constant DEST_DOMAIN_IDENTIFIER = 9999;
+  uint32 internal constant LOCAL_DOMAIN_IDENTIFIER = 8888;
   bytes32 internal constant ALLOWED_CALLER_ON_DEST = keccak256("allowedCallerOnDest");
   bytes32 internal constant ALLOWED_CALLER_ON_SOURCE = keccak256("allowedCallerOnSource");
 
@@ -49,7 +50,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     BurnMintERC20 usdcToken = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
     s_USDCToken = usdcToken;
 
-    s_mockMessageTransmitter = new MockE2EUSDCTransmitterCCTPV2(1, DEST_DOMAIN_IDENTIFIER, address(s_USDCToken));
+    s_mockMessageTransmitter = new MockE2EUSDCTransmitterCCTPV2(1, LOCAL_DOMAIN_IDENTIFIER, address(s_USDCToken));
     s_mockTokenMessenger = new MockUSDCTokenMessenger(1, address(s_mockMessageTransmitter));
     s_messageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockTokenMessenger);
 

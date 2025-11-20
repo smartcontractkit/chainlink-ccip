@@ -47,6 +47,15 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   );
   event FinalityConfigSet(FinalityConfig finalityConfig);
 
+  /// @notice The static configuration.
+  // solhint-disable-next-line gas-struct-packing
+  struct StaticConfig {
+    address tokenMessenger; // The address of the token messenger.
+    address messageTransmitterProxy; // The address of the message transmitter proxy.
+    address usdcToken; // The address of the USDC token.
+    uint32 localDomainIdentifier; // The local domain identifier.
+  }
+
   /// @notice The arguments required to update a remote domain.
   // solhint-disable-next-line gas-struct-packing
   struct DomainUpdate {
@@ -199,7 +208,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     i_usdcToken.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
 
     emit StaticConfigSet(
-      address(tokenMessenger), address(messageTransmitterProxy), address(usdcToken), i_localDomainIdentifier
+      address(i_tokenMessenger), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier
     );
 
     _setDynamicConfig(dynamicConfig);
@@ -361,6 +370,17 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   // ================================================================
   // │                           Config                             │
   // ================================================================
+
+  /// @notice Returns the static configuration.
+  /// @return staticConfig The static configuration.
+  function getStaticConfig() external view returns (StaticConfig memory staticConfig) {
+    return StaticConfig({
+      tokenMessenger: address(i_tokenMessenger),
+      messageTransmitterProxy: address(i_messageTransmitterProxy),
+      usdcToken: address(i_usdcToken),
+      localDomainIdentifier: i_localDomainIdentifier
+    });
+  }
 
   /// @notice Returns the dynamic configuration.
   /// @return dynamicConfig The dynamic configuration.
