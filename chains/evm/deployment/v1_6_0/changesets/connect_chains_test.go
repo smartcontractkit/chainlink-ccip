@@ -141,7 +141,7 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 
 	mcmsRegistry := cs_core.GetRegistry()
 	dReg := deployops.GetRegistry()
-	version := semver.MustParse("1.6.3")
+	version := semver.MustParse("1.6.0")
 	for _, chainSel := range chains {
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
