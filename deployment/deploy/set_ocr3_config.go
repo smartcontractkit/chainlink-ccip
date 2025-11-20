@@ -53,10 +53,10 @@ func setOCR3ConfigVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistry) 
 
 func ocr3ConfigArgs(e cldf.Environment, homeChainSelector uint64, chainSelector uint64, configType utils.ConfigType) ([]OCR3ConfigArgs, error) {
 	ccipHomeAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		ChainSelector: chainSelector,
+		ChainSelector: homeChainSelector,
 		Type:          datastore.ContractType(utils.CCIPHome),
 		Version:       &OCR3Version,
-	}, chainSelector, datastore_utils.FullRef)
+	}, homeChainSelector, datastore_utils.FullRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find CCIPHome address in datastore: %w", err)
 	}
@@ -67,10 +67,10 @@ func ocr3ConfigArgs(e cldf.Environment, homeChainSelector uint64, chainSelector 
 	}
 
 	crAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		ChainSelector: chainSelector,
+		ChainSelector: homeChainSelector,
 		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
 		Version:       &OCR3Version,
-	}, chainSelector, datastore_utils.FullRef)
+	}, homeChainSelector, datastore_utils.FullRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find CapabilitiesRegistry address in datastore: %w", err)
 	}
@@ -149,6 +149,7 @@ func setOCR3ConfigApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSReader
 			ocrReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.SetOCR3Config(), e.BlockChains,
 				SetOCR3ConfigInput{
 					ChainSelector: selector,
+					Datastore:     e.DataStore,
 					Configs:       configs,
 				})
 			if err != nil {
