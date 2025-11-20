@@ -250,9 +250,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     CCIPMessageSentEventData memory eventData;
     // Populate receipts for verifiers, pool and executor in that order.
-    uint256 receiptsFeeTokenAmount;
-    (eventData.receipts, newMessage.executionGasLimit, receiptsFeeTokenAmount) =
-      _getReceipts(destChainSelector, message, resolvedExtraArgs);
+    (eventData.receipts, newMessage.executionGasLimit,) = _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
     // We don't need to check for feeTokenAmount < receiptsFeeTokenAmount here as that is done in getFee called by the router.
     _distributeFees(destChainSelector, message, eventData.receipts);
@@ -313,27 +311,24 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     Client.EVM2AnyMessage calldata message,
     Receipt[] memory receipts
   ) internal {
+    IERC20 feeToken = IERC20(message.feeToken);
     uint256 tokenReceiptIndex = type(uint256).max;
-    IPoolV1 tokenPool;
     if (message.tokenAmounts.length > 0) {
       tokenReceiptIndex = receipts.length - 2;
-      tokenPool = getPoolBySourceToken(destChainSelector, IERC20(message.tokenAmounts[0].token));
+      IPoolV1 tokenPool = getPoolBySourceToken(destChainSelector, IERC20(message.tokenAmounts[0].token));
+      // Token receipts use the underlying token address as the “issuer” but in case the token's pool
+      // supports the IPoolV2 interface, the pool receive the fee share as fee handling logic built in.
+      // V1 pools intentionally leave the balance sitting on the OnRamp so it can be withdrawn later.
+      if (IERC165(address(tokenPool)).supportsInterface(type(IPoolV2).interfaceId)) {
+        feeToken.safeTransfer(address(tokenPool), receipts[tokenReceiptIndex].feeTokenAmount);
+      }
     }
 
-    IERC20 feeToken = IERC20(message.feeToken);
     for (uint256 i = 0; i < receipts.length; ++i) {
       uint256 receiptFee = receipts[i].feeTokenAmount;
-      if (receiptFee == 0) continue;
-
-      if (i == tokenReceiptIndex) {
-        if (IERC165(address(tokenPool)).supportsInterface(type(IPoolV2).interfaceId)) {
-          feeToken.safeTransfer(address(tokenPool), receiptFee);
-        }
-        continue;
-      }
-
-      address issuer = receipts[i].issuer;
-      feeToken.safeTransfer(issuer, receiptFee);
+      // We skip fee distribution if the fee is zero or if this is the token receipt (handled separately before the loop).
+      if (receiptFee == 0 || i == tokenReceiptIndex) continue;
+      feeToken.safeTransfer(receipts[i].issuer, receiptFee);
     }
   }
 
