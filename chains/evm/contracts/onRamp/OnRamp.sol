@@ -876,7 +876,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     uint256 execCostInUSDCents;
     (gasLimitSum, execCostInUSDCents) =
-      IFeeQuoter(s_dynamicConfig.feeQuoter).resolveGasCost(destChainSelector, gasLimitSum, bytesOverheadSum);
+      IFeeQuoter(s_dynamicConfig.feeQuoter).quoteGasForExec(destChainSelector, gasLimitSum, bytesOverheadSum);
 
     // Update the fee of the executor to include execution costs.
     if (extraArgs.executor != Client.NO_EXECUTION_ADDRESS) {
