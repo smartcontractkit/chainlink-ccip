@@ -156,14 +156,17 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 
 	mcmsRegistry := cs_core.GetRegistry()
 	dReg := deployops.GetRegistry()
-	version := semver.MustParse("1.6.0")
+	chainSelToVersion := map[uint64]*semver.Version{
+		chain_selectors.SOLANA_MAINNET.Selector: semver.MustParse("1.6.0"),
+		chain_selectors.ETHEREUM_MAINNET.Selector: semver.MustParse("1.6.3"),
+	}
 	for _, chainSel := range allChains {
 		mint, _ := solana.NewRandomPrivateKey()
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
 			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
 				chainSel: {
-					Version: version,
+					Version: chainSelToVersion[chainSel],
 					// LINK TOKEN CONFIG
 					// token private key used to deploy the LINK token. Solana: base58 encoded private key
 					TokenPrivKey: mint.String(),
@@ -194,11 +197,13 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	svmEncoded, err := hex.DecodeString(cciputils.SVMFamilySelector)
 	require.NoError(t, err, "Failed to decode SVM family selector")
 	chain1 := lanesapi.ChainDefinition{
+		Version:                  chainSelToVersion[chain_selectors.SOLANA_MAINNET.Selector],
 		Selector:                 chain_selectors.SOLANA_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e17),
 		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, svmEncoded),
 	}
 	chain2 := lanesapi.ChainDefinition{
+		Version:                  chainSelToVersion[chain_selectors.ETHEREUM_MAINNET.Selector],
 		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e9),
 		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
@@ -207,7 +212,6 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
-				Version: version,
 				ChainA:  chain1,
 				ChainB:  chain2,
 			},
@@ -225,11 +229,11 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	laneRegistry := lanesapi.GetLaneAdapterRegistry()
 	srcFamily, err := chain_selectors.GetSelectorFamily(chain1.Selector)
 	require.NoError(t, err, "must get selector family for src")
-	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, version)
+	srcAdapter, exists := laneRegistry.GetLaneAdapter(srcFamily, chain1.Version)
 	require.True(t, exists, "must have ChainAdapter registered for src chain family")
 	destFamily, err := chain_selectors.GetSelectorFamily(chain2.Selector)
 	require.NoError(t, err, "must get selector family for dest")
-	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, version)
+	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, chain2.Version)
 	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
 	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
 }

@@ -12,6 +12,10 @@ type ChainDefinition struct {
 	// Selector is the chain selector of this chain.
 	// This is provided by the user
 	Selector uint64
+	// Version is the version of CCIP deployed on this chain.
+	// This allows us to support minor version differences between chains.
+	// This is provided by the user
+	Version      *semver.Version
 	// GasPrice defines the USD price (18 decimals) per unit gas for this chain as a destination.
 	// This is provided by the user
 	GasPrice *big.Int
@@ -73,7 +77,6 @@ type ConnectChainsConfig struct {
 type LaneConfig struct {
 	ChainA       ChainDefinition
 	ChainB       ChainDefinition
-	Version      *semver.Version
 	IsDisabled   bool
 	TestRouter   bool
 	ExtraConfigs ExtraConfigs

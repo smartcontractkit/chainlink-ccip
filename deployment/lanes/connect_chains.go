@@ -34,7 +34,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			chainAAdapter, exists := laneRegistry.GetLaneAdapter(chainAFamily, lane.Version)
+			chainAAdapter, exists := laneRegistry.GetLaneAdapter(chainAFamily, chainA.Version)
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", chainAFamily)
 			}
@@ -42,7 +42,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			chainBAdapter, exists := laneRegistry.GetLaneAdapter(chainBFamily, lane.Version)
+			chainBAdapter, exists := laneRegistry.GetLaneAdapter(chainBFamily, chainB.Version)
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", chainBFamily)
 			}

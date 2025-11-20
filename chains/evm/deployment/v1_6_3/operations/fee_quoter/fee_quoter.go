@@ -17,7 +17,7 @@ import (
 
 var (
 	ContractType cldf_deployment.ContractType = "FeeQuoter"
-	Version      *semver.Version              = semver.MustParse("1.6.0")
+	Version      *semver.Version              = semver.MustParse("1.6.3")
 )
 
 type ConstructorArgs struct {

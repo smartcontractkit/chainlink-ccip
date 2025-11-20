@@ -141,7 +141,7 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 
 	mcmsRegistry := cs_core.GetRegistry()
 	dReg := deployops.GetRegistry()
-	version := semver.MustParse("1.6.0")
+	version := semver.MustParse("1.6.3")
 	for _, chainSel := range chains {
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
@@ -167,11 +167,13 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 	require.NoError(t, err, "Failed to decode EVM family selector")
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
+		Version:                  version,
 		GasPrice:                 big.NewInt(1e17),
 		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
 	}
 	chain2 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.POLYGON_MAINNET.Selector,
+		Version:                  version,
 		GasPrice:                 big.NewInt(1e9),
 		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
 	}
@@ -179,7 +181,6 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
-				Version: version,
 				ChainA:  chain1,
 				ChainB:  chain2,
 			},
