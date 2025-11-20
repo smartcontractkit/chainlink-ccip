@@ -58,17 +58,15 @@ func (a *EVMAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) 
 		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
 		datastore.AddressRefByChainSelector(chainSelector),
 	)
-	latestVersion := semver.MustParse("0.0.0")
+	latestVersion := semver.MustParse("1.6.0")
 	tooHighVersion := semver.MustParse("1.7.0")
 	var addr []byte
 	var err error
 	for _, ref := range refs {
 		v := ref.Version
-		if v.GreaterThan(latestVersion) {
-			// we want the latest version below 1.7.0
-			if v.GreaterThanEqual(tooHighVersion) {
-				continue
-			}
+		// we want the latest version below 1.7.0
+		if v.GreaterThanEqual(latestVersion) &&
+			v.LessThan(tooHighVersion) {
 			latestVersion = v
 			addr, err = evm_datastore_utils.ToByteArray(ref)
 			if err != nil {
