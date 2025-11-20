@@ -81,10 +81,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
   /// @notice Configures finality handling for this chain.
   struct FinalityConfig {
-    uint16 defaultCCTPFinalityThreshold; // ──╮ CCTP finality threshold applied when CCIP finality is 0.
+    uint32 defaultCCTPFinalityThreshold; // ──╮ CCTP finality threshold applied when CCIP finality is 0.
     uint16 defaultCCTPFinalityBps; // ────────╯ Basis points charged for standard CCTP transfers on destination.
-    uint16[] customCCIPFinalities; // CCIP finality thresholds for custom finalities (enforced to be in ascending order).
-    uint16[] customCCTPFinalityThresholds; // Corresponding CCTP finality thresholds for custom CCIP finalities.
+    uint32[] customCCIPFinalities; // CCIP finality thresholds for custom finalities (enforced to be in ascending order).
+    uint32[] customCCTPFinalityThresholds; // Corresponding CCTP finality thresholds for custom CCIP finalities.
     uint16[] customCCTPFinalityBps; // Basis points charged for CCTP transfers using custom finalities on destination.
   }
 
@@ -96,11 +96,11 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
   string public constant override typeAndVersion = "CCTPVerifier 1.7.0-dev";
   /// @notice The preimage is bytes4(keccak256("CCTPVerifier 1.7.0")).
-  bytes4 internal constant VERSION_TAG_V1_7_0 = 0x8e1d1a9d;
+  bytes4 private constant VERSION_TAG_V1_7_0 = 0x8e1d1a9d;
   /// @notice CCTP contracts use the number 1 to represent V2, as 0 represents V1.
   uint32 private constant SUPPORTED_USDC_VERSION = 1;
   /// @notice The division factor for basis points. This also represents the maximum bps fee.
-  uint16 internal constant BPS_DIVIDER = 10_000;
+  uint16 private constant BPS_DIVIDER = 10_000;
   /// @notice The length of a CCTP message, including the message body + hook data expected by this verifier.
   /// @dev Message format.
   ///     * Field                      Bytes      Type       Index
@@ -130,12 +130,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   ///     * verifierVersion            4          bytes4     0
   ///     * messageId                  32         bytes32    4
   /// @dev Total bytes = (4 * 3) + (32 * 4) + (4 * 2) + 4 + (32 * 7) + 4 + 32 = 412.
-  uint256 public constant CCTP_MESSAGE_LENGTH = 412;
+  uint256 private constant CCTP_MESSAGE_LENGTH = 412;
   /// @notice The length of a signature provided by the CCTP attestation service.
   /// @dev 65-byte ECDSA signature: v (32) + r (32) + s (1).
-  uint256 public constant SIGNATURE_LENGTH = 65;
+  uint256 private constant SIGNATURE_LENGTH = 65;
   /// @notice The number of bytes allocated to encoding the verifier version in the hook data.
-  uint256 internal constant VERIFIER_VERSION_LENGTH = 4;
+  uint256 private constant VERIFIER_VERSION_LENGTH = 4;
 
   /// @notice The USDC token contract.
   IERC20 private immutable i_usdcToken;
@@ -294,12 +294,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @return found Whether the finality threshold and bps were found. We can't rely on 0 values because 0 could be valid.
   function _getCCTPFinalityThresholdAndBps(
     uint32 finality
-  ) internal view returns (uint32 finalityThreshold, uint16 bps, bool found) {
+  ) private view returns (uint32 finalityThreshold, uint16 bps, bool found) {
     if (finality == 0) {
       // Apply standard CCTP finality when CCIP finality is set to the default value of 0.
       return (s_finalityConfig.defaultCCTPFinalityThreshold, s_finalityConfig.defaultCCTPFinalityBps, true);
     } else {
-      uint16[] memory customCCIPFinalities = s_finalityConfig.customCCIPFinalities;
+      uint32[] memory customCCIPFinalities = s_finalityConfig.customCCIPFinalities;
       for (uint256 i = 0; i < customCCIPFinalities.length; ++i) {
         if (i == customCCIPFinalities.length - 1 || finality < customCCIPFinalities[i]) {
           // If we've reached the last custom finality available, we must use it no matter what.
@@ -380,7 +380,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @param dynamicConfig The dynamic configuration.
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
-  ) internal {
+  ) private {
     if (dynamicConfig.feeAggregator == address(0)) revert ZeroAddressNotAllowed();
 
     s_dynamicConfig = dynamicConfig;
@@ -408,7 +408,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @param finalityConfig The finality configuration.
   function _setFinalityConfig(
     FinalityConfig memory finalityConfig
-  ) internal {
+  ) private {
     // We require at least one custom finality, otherwise CCTP fast finality won't be supported.
     if (finalityConfig.customCCIPFinalities.length == 0) revert MissingCustomFinalities();
 
