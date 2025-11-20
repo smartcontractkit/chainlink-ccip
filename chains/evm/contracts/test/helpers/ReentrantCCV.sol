@@ -39,16 +39,16 @@ contract ReentrantCCV is ICrossChainVerifierV1, ICrossChainVerifierResolver {
   function verifyMessage(
     MessageV1Codec.MessageV1 memory message,
     bytes32, // messageHash
-    bytes memory ccvData
+    bytes memory verifierResults
   ) external override {
     // Create a dummy report to trigger reentrancy.
     address[] memory ccvs = new address[](1);
     ccvs[0] = address(this);
-    bytes[] memory ccvDataArray = new bytes[](1);
-    ccvDataArray[0] = ccvData;
+    bytes[] memory verifierResultsArray = new bytes[](1);
+    verifierResultsArray[0] = verifierResults;
 
     // This should trigger the reentrancy guard.
-    i_offRamp.execute(MessageV1Codec._encodeMessageV1(message), ccvs, ccvDataArray);
+    i_offRamp.execute(MessageV1Codec._encodeMessageV1(message), ccvs, verifierResultsArray);
   }
 
   function supportsInterface(
@@ -62,7 +62,7 @@ contract ReentrantCCV is ICrossChainVerifierV1, ICrossChainVerifierResolver {
   }
 
   function getInboundImplementation(
-    bytes calldata // ccvData
+    bytes calldata // verifierResults
   ) external view returns (address) {
     return address(this);
   }

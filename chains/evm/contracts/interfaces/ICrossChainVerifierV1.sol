@@ -9,7 +9,7 @@ import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165
 interface ICrossChainVerifierV1 is IERC165 {
   /// @notice Verification of the message, in any way the OffRamp wants. This could be using a signature, a quorum
   /// of signatures, using native interop, or some ZK light client. Any proof required for the verification is supplied
-  /// through the ccvData parameter.
+  /// through the verifierResults parameter.
   /// @param message The message to be verified. For efficiency, the messageID is also supplied, which acts as a small
   /// payload that once verified means the entire message is verified. Every component of the message is part of the
   /// message ID through hashing the struct. The entire message is provided to be able to act differently for different
@@ -17,14 +17,18 @@ interface ICrossChainVerifierV1 is IERC165 {
   /// @param messageId A convenient 32 byte hash of the entire message. It can be recomputed from the passed in message
   /// at the cost of a not-insignificant amount of gas. Any CCV MUST include the messageID or the entire message struct
   /// as part of its proof.
-  /// @param ccvData All the data that is specific to the CCV. This often means it contains some sort of proof, but it
+  /// @param verifierResults All the data that is specific to the CCV. This often means it contains some sort of proof, but it
   /// can also contain certain metadata like a nonce that's specific to the CCV. If any metadata like that exists and is
   /// important to the security of the CCV, it MUST be verified as well using the proof. A recommended way to do this is
-  /// to encode a proof and the metadata separately in the ccvData and then concatenate the messageId with this metadata
+  /// to encode a proof and the metadata separately in the verifierResults and then concatenate the messageId with this metadata
   /// to get the payload that will be verified. In the case of a simple signature verification this means that the CCV
   /// offchain system must sign the concatenated (messageId, ccvMetaData) and not just the messageId. If no metadata
   /// is required, simply signing the messageId is enough.
-  function verifyMessage(MessageV1Codec.MessageV1 memory message, bytes32 messageId, bytes memory ccvData) external;
+  function verifyMessage(
+    MessageV1Codec.MessageV1 memory message,
+    bytes32 messageId,
+    bytes memory verifierResults
+  ) external;
 
   /// @notice Quotes the fee, including gas and calldata bytes, for a CCIP message to a destination chain.
   /// @dev This takes EVM2AnyMessage (instead of MessageV1) because the router client API that user contracts interact

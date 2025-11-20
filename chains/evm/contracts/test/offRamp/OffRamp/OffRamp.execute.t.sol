@@ -25,11 +25,11 @@ contract GasBoundedExecuteCaller {
   function callExecute(
     bytes memory message,
     address[] calldata ccvs,
-    bytes[] calldata ccvData,
+    bytes[] calldata verifierResults,
     uint256 gasForCall
   ) external {
     address offRamp = address(i_offRamp);
-    bytes memory payload = abi.encodeCall(i_offRamp.execute, (message, ccvs, ccvData));
+    bytes memory payload = abi.encodeCall(i_offRamp.execute, (message, ccvs, verifierResults));
 
     assembly {
       let success := call(gasForCall, offRamp, 0, add(payload, 0x20), mload(payload), 0, 0)
@@ -90,15 +90,15 @@ contract OffRamp_execute is OffRampSetup {
 
   function _getReportComponents(
     MessageV1Codec.MessageV1 memory message
-  ) internal view returns (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) {
-    ccvData = new bytes[](1);
-    ccvData[0] = abi.encode("mock ccv data");
-    return (MessageV1Codec._encodeMessageV1(message), _arrayOf(s_defaultCCV), ccvData);
+  ) internal view returns (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) {
+    verifierResults = new bytes[](1);
+    verifierResults[0] = abi.encode("mock ccv data");
+    return (MessageV1Codec._encodeMessageV1(message), _arrayOf(s_defaultCCV), verifierResults);
   }
 
   function test_execute() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
     // Expect execution state change event.
     vm.expectEmit();
@@ -110,7 +110,7 @@ contract OffRamp_execute is OffRampSetup {
       ""
     );
 
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
 
     // Verify final state is SUCCESS.
     assertEq(
@@ -127,7 +127,7 @@ contract OffRamp_execute is OffRampSetup {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     MockReceiverV2 mock = new MockReceiverV2(_arrayOf(s_defaultCCV), new address[](0), 0);
     message.receiver = abi.encodePacked(address(mock)); // Add receiver to message.
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
     // Set OffRamp as a valid OffRamp on the Router.
     Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
@@ -144,7 +144,7 @@ contract OffRamp_execute is OffRampSetup {
       ""
     );
 
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
 
     // Verify final state is SUCCESS.
     assertEq(
@@ -159,9 +159,9 @@ contract OffRamp_execute is OffRampSetup {
 
   function test_execute_RunsOutOfGasAndSetsStateToFailure() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, 90000);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, 90000);
 
     // Verify final state is FAILURE.
     assertEq(
@@ -185,7 +185,7 @@ contract OffRamp_execute is OffRampSetup {
     address[] memory ccvs = new address[](2);
     ccvs[0] = address(maliciousCCV);
     ccvs[1] = s_defaultCCV;
-    bytes[] memory ccvData = new bytes[](2);
+    bytes[] memory verifierResults = new bytes[](2);
 
     _setGetCCVsReturnData(address(bytes20(message.receiver)), message.sourceChainSelector, ccvs, new address[](0), 0);
 
@@ -198,19 +198,19 @@ contract OffRamp_execute is OffRampSetup {
       abi.encodeWithSelector(OffRamp.ReentrancyGuardReentrantCall.selector)
     );
 
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
   }
 
   function test_execute_InsufficientGasToCompleteTx_setsToFailure() public {
     uint256 gasForCall = 90_000;
     MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
     bytes32 messageId = keccak256(encodedMessage);
 
     // Mock validateReport to pass initial checks.
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, ccvData[0])),
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, verifierResults[0])),
       abi.encode(true)
     );
 
@@ -234,7 +234,9 @@ contract OffRamp_execute is OffRampSetup {
       abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
     );
 
-    GasBoundedExecuteCaller(Internal.GAS_ESTIMATION_SENDER).callExecute(encodedMessage, ccvs, ccvData, gasForCall);
+    GasBoundedExecuteCaller(Internal.GAS_ESTIMATION_SENDER).callExecute(
+      encodedMessage, ccvs, verifierResults, gasForCall
+    );
   }
 
   function test_execute_RevertWhen_CursedByRMN() public {
@@ -247,9 +249,9 @@ contract OffRamp_execute is OffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR));
     MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
-    s_gasBoundedExecuteCaller.callExecute(encodedMsg, ccvs, ccvData, PLENTY_OF_GAS);
+    s_gasBoundedExecuteCaller.callExecute(encodedMsg, ccvs, verifierResults, PLENTY_OF_GAS);
   }
 
   function test_execute_RevertWhen_SourceChainNotEnabled() public {
@@ -261,9 +263,9 @@ contract OffRamp_execute is OffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.SourceChainNotEnabled.selector, SOURCE_CHAIN_SELECTOR));
     MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    (bytes memory encodedMsg, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
-    s_gasBoundedExecuteCaller.callExecute(encodedMsg, ccvs, ccvData, PLENTY_OF_GAS);
+    s_gasBoundedExecuteCaller.callExecute(encodedMsg, ccvs, verifierResults, PLENTY_OF_GAS);
   }
 
   function test_execute_RevertWhen_InvalidOnRamp() public {
@@ -272,10 +274,10 @@ contract OffRamp_execute is OffRampSetup {
     // Modify message with wrong onRamp address.
     message.onRampAddress = abi.encodePacked(makeAddr("invalid onRamp"));
 
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRamp.selector, ON_RAMP, message.onRampAddress));
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
   }
 
   function test_execute_RevertWhen_InvalidMessageDestChainSelector() public {
@@ -284,15 +286,15 @@ contract OffRamp_execute is OffRampSetup {
     // Modify message with wrong destination chain selector.
     message.destChainSelector = DEST_CHAIN_SELECTOR + 1; // Wrong destination.
 
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidMessageDestChainSelector.selector, message.destChainSelector));
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
   }
 
-  function test_execute_RevertWhen_InvalidCCVDataLength() public {
+  function test_execute_RevertWhen_InvalidVerifierResultsLength() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMessage, address[] memory originalCcvs, bytes[] memory originalCcvData) =
+    (bytes memory encodedMessage, address[] memory originalCcvs, bytes[] memory originalVerifierResults) =
       _getReportComponents(message);
 
     // Create mismatched array lengths.
@@ -300,19 +302,21 @@ contract OffRamp_execute is OffRampSetup {
     for (uint256 i = 0; i < originalCcvs.length; i++) {
       ccvs[i] = originalCcvs[i];
     }
-    // Keep ccvData the same, creating mismatch.
-    bytes[] memory ccvData = originalCcvData;
+    // Keep verifierResults the same, creating mismatch.
+    bytes[] memory verifierResults = originalVerifierResults;
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidCCVDataLength.selector, ccvs.length, ccvData.length));
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, ccvData, PLENTY_OF_GAS);
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRamp.InvalidVerifierResultsLength.selector, ccvs.length, verifierResults.length)
+    );
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
   }
 
   function test_execute_RevertWhen_SkippedAlreadyExecutedMessage() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
     // Execute the message successfully first time.
-    s_offRamp.execute(encodedMessage, ccvs, ccvData);
+    s_offRamp.execute(encodedMessage, ccvs, verifierResults);
 
     // Verify it's in SUCCESS state.
     assertEq(
@@ -333,12 +337,12 @@ contract OffRamp_execute is OffRampSetup {
         message.sequenceNumber
       )
     );
-    s_offRamp.execute(encodedMessage, ccvs, ccvData);
+    s_offRamp.execute(encodedMessage, ccvs, verifierResults);
   }
 
   function test_execute_RevertWhen_ExecuteSingleMessageFails() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
     bytes memory revertReason = "ExecuteSingleMessage failed";
 
     // Mock executeSingleMessage to revert.
@@ -355,7 +359,7 @@ contract OffRamp_execute is OffRampSetup {
 
     // The message should succeed but set execution state to FAILURE due to executeSingleMessage revert.
     // This verifies that execution failures are handled gracefully.
-    s_offRamp.execute(encodedMessage, ccvs, ccvData);
+    s_offRamp.execute(encodedMessage, ccvs, verifierResults);
 
     // Verify message state changed to FAILURE
     assertEq(

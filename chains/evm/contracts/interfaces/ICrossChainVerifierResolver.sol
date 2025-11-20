@@ -3,15 +3,15 @@ pragma solidity ^0.8.24;
 
 /// @notice Resolves and returns the appropriate verifier contract for the given outbound / inbound traffic.
 interface ICrossChainVerifierResolver {
-  /// @notice Returns the appropriate verifier contract based on the given ccvData.
-  /// @dev The OffRamp is responsible for calling this function using the ccvData it receives from the executor.
+  /// @notice Returns the appropriate verifier contract based on the given verifierResults.
+  /// @dev The OffRamp is responsible for calling this function using the verifierResults it receives from the executor.
   /// If the verifier specified by the executor is actually a resolver, the OffRamp will call this function to get the actual verifier contract.
-  /// Verifiers can build resolvers that process the ccvData in accordance with how their verifier forms ccvData. For example, their verifier may
-  /// prefix the ccvData with a version identifier, which the resolver can parse to determine the correct verifier contract.
-  /// @param ccvData The ccvData formed by the verifier.
+  /// Verifiers can build resolvers that process the verifierResults in accordance with how their verifier forms verifierResults. For example, their verifier may
+  /// prefix the verifierResults with a version identifier, which the resolver can parse to determine the correct verifier contract.
+  /// @param verifierResults The verifierResults formed by the verifier.
   /// @return verifierAddress The address of the verifier contract.
   function getInboundImplementation(
-    bytes calldata ccvData
+    bytes calldata verifierResults
   ) external view returns (address);
 
   /// @notice Returns the appropriate verifier contract based on the given destChainSelector.
