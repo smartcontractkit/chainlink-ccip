@@ -35,7 +35,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	},
 	Validate: func(args ConstructorArgs) error {
 		if args.TokenAdminRegistry == (common.Address{}) {
-			return errors.New("TokenAdminRegistry address cannot be zero")
+			return errors.New("tokenAdminRegistry address cannot be zero")
 		}
 		return nil
 	},
