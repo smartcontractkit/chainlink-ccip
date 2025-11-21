@@ -136,10 +136,8 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   function applyAllowlistUpdates(
     AllowlistConfigArgs[] calldata allowlistConfigArgsItems
   ) external {
-    if (msg.sender != owner()) {
-      if (msg.sender != s_dynamicConfig.allowlistAdmin) {
-        revert OnlyCallableByOwnerOrAllowlistAdmin();
-      }
+    if (msg.sender != owner() && msg.sender != s_dynamicConfig.allowlistAdmin) {
+      revert OnlyCallableByOwnerOrAllowlistAdmin();
     }
 
     _applyAllowlistUpdates(allowlistConfigArgsItems);
@@ -150,9 +148,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   function updateStorageLocation(
     string memory newLocation
   ) external onlyOwner {
-    emit BaseVerifier.StorageLocationUpdated(s_storageLocation, newLocation);
-
-    s_storageLocation = newLocation;
+    _setStorageLocation(newLocation);
   }
 
   /// @notice Exposes the version tag.
