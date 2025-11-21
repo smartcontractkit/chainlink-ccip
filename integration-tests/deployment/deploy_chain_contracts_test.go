@@ -16,7 +16,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
-	mcmsops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/mcms"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
@@ -66,6 +65,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
 
 	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier})
+	SolanaTransferMCMSContracts(t, e, chain_selectors.SOLANA_MAINNET.Selector, common_utils.CLLQualifier)
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 	// Transfer from one qualifier to another
 	fromQualifier := common_utils.CLLQualifier
@@ -155,7 +155,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	require.Greater(t, len(transferOutput.Reports), 0)
 	require.Equal(t, 1, len(transferOutput.MCMSTimelockProposals))
 	testhelpers.ProcessTimelockProposals(t, *e, transferOutput.MCMSTimelockProposals, false)
-	
+
 	mcmsInput.MCMS.Qualifier = toQualifier
 
 	acceptOutput, err := mcmsapi.AcceptOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
@@ -225,7 +225,7 @@ var solanaContracts = map[string]datastore.ContractType{
 	"rmn_remote":        datastore.ContractType(rmnremoteops.ContractType),
 	"mcm":               datastore.ContractType(utils.McmProgramType),
 	"timelock":          datastore.ContractType(utils.TimelockProgramType),
-	"access_controller": datastore.ContractType(mcmsops.AccessControllerProgramType),
+	"access_controller": datastore.ContractType(utils.AccessControllerProgramType),
 }
 
 func PreloadSolanaEnvironment(t *testing.T, chainSelector uint64) (string, *datastore.MemoryDataStore, error) {

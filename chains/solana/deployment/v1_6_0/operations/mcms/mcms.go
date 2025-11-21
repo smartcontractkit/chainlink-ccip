@@ -27,20 +27,14 @@ import (
 )
 
 var (
-	AccessControllerProgramType cldf_deployment.ContractType = "AccessControllerProgram"
-	AccessControllerProgramName                              = "access_controller"
-	AccessControllerProgramSize                              = 1 * 1024 * 1024
+	AccessControllerProgramName = "access_controller"
+	AccessControllerProgramSize = 1 * 1024 * 1024
 
 	TimelockProgramName = "timelock"
 	TimelockProgramSize = 1 * 1024 * 1024
 
 	McmProgramName = "mcm"
 	McmProgramSize = 1 * 1024 * 1024
-
-	ProposerAccessControllerAccount  cldf_deployment.ContractType = "ProposerAccessControllerAccount"
-	ExecutorAccessControllerAccount  cldf_deployment.ContractType = "ExecutorAccessControllerAccount"
-	CancellerAccessControllerAccount cldf_deployment.ContractType = "CancellerAccessControllerAccount"
-	BypasserAccessControllerAccount  cldf_deployment.ContractType = "BypasserAccessControllerAccount"
 )
 
 var AccessControllerDeploy = operations.NewOperation(
@@ -52,7 +46,7 @@ var AccessControllerDeploy = operations.NewOperation(
 			b,
 			chain,
 			input,
-			AccessControllerProgramType,
+			utils.AccessControllerProgramType,
 			common_utils.Version_1_6_0,
 			"",
 			AccessControllerProgramName,
@@ -122,6 +116,20 @@ var AddAccessOp = operations.NewOperation(
 	addAccess,
 )
 
+var TransferOwnershipOp = operations.NewOperation(
+	"transfer-ownership-op",
+	common_utils.Version_1_6_0,
+	"Transfers ownership of programs to timelock",
+	transferToTimelockSolanaOp,
+)
+
+var AcceptOwnershipOp = operations.NewOperation(
+	"accept-ownership-op",
+	common_utils.Version_1_6_0,
+	"Accepts ownership of programs from timelock",
+	acceptOwnershipTimelockSolanaOp,
+)
+
 type (
 	Deps struct {
 		Chain             cldf_solana.Chain
@@ -157,6 +165,20 @@ type (
 		Accounts  []solana.PublicKey
 		ChainSel  uint64
 		Qualifier string
+	}
+
+	OwnableContract struct {
+		ProgramID solana.PublicKey
+		Seed      [32]byte
+		OwnerPDA  solana.PublicKey
+		Type      cldf_deployment.ContractType
+	}
+
+	TransferToTimelockInput struct {
+		Contract     OwnableContract
+		Qualifier    string
+		CurrentOwner solana.PublicKey
+		NewOwner     solana.PublicKey
 	}
 )
 
@@ -459,35 +481,35 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 	accessControllerProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		AccessControllerProgramType,
+		utils.AccessControllerProgramType,
 		common_utils.Version_1_6_0,
 		"",
 	)
 	proposerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		ProposerAccessControllerAccount,
+		utils.ProposerAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	executorAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		ExecutorAccessControllerAccount,
+		utils.ExecutorAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	cancellerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		CancellerAccessControllerAccount,
+		utils.CancellerAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	bypasserAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		BypasserAccessControllerAccount,
+		utils.BypasserAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
@@ -522,7 +544,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 	accessControllerProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		AccessControllerProgramType,
+		utils.AccessControllerProgramType,
 		common_utils.Version_1_6_0,
 		"",
 	)
@@ -541,13 +563,13 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 	var roleAccessController cldf_deployment.ContractType
 	switch in.Role {
 	case timelock.Proposer_Role:
-		roleAccessController = ProposerAccessControllerAccount
+		roleAccessController = utils.ProposerAccessControllerAccount
 	case timelock.Executor_Role:
-		roleAccessController = ExecutorAccessControllerAccount
+		roleAccessController = utils.ExecutorAccessControllerAccount
 	case timelock.Canceller_Role:
-		roleAccessController = CancellerAccessControllerAccount
+		roleAccessController = utils.CancellerAccessControllerAccount
 	case timelock.Bypasser_Role:
-		roleAccessController = BypasserAccessControllerAccount
+		roleAccessController = utils.BypasserAccessControllerAccount
 	default:
 		return cldf_datastore.AddressRef{}, fmt.Errorf("unknown role: %d", in.Role)
 	}
@@ -582,6 +604,61 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 	return cldf_datastore.AddressRef{}, nil
 }
 
+func transferToTimelockSolanaOp(b operations.Bundle, deps Deps, in TransferToTimelockInput) ([]types.BatchOperation, error) {
+	out := make([]types.BatchOperation, 0)
+
+	solChain := deps.Chain
+
+	chainSelector := solChain.ChainSelector()
+
+	contract := in.Contract
+	transferInstruction, err := transferOwnershipInstruction(
+		contract.ProgramID,
+		contract.Seed,
+		in.NewOwner,
+		contract.OwnerPDA,
+		solChain.DeployerKey.PublicKey())
+	if err != nil {
+		return out, fmt.Errorf("failed to create transfer ownership instruction: %w", err)
+	}
+	if in.CurrentOwner != solChain.DeployerKey.PublicKey() {
+		transferBatch, err := utils.BuildMCMSBatchOperation(
+			chainSelector,
+			[]solana.Instruction{transferInstruction},
+			contract.ProgramID.String(),
+			string(contract.Type),
+		)
+		if err != nil {
+			return out, fmt.Errorf("failed to build accept ownership mcms transaction: %w", err)
+		}
+		out = append(out, transferBatch)
+	} else {
+		err = solChain.Confirm([]solana.Instruction{transferInstruction})
+		if err != nil {
+			return out, fmt.Errorf("failed to confirm instruction: %w", err)
+		}
+	}
+
+	return out, nil
+}
+
+func acceptOwnershipTimelockSolanaOp(b operations.Bundle, deps Deps, in TransferToTimelockInput) ([]types.BatchOperation, error) {
+	out := make([]types.BatchOperation, 0)
+
+	solChain := deps.Chain
+
+	chainSelector := solChain.ChainSelector()
+
+	contract := in.Contract
+	acceptMCMSTransaction, err := acceptMCMSTransaction(chainSelector, contract, in.NewOwner)
+	if err != nil {
+		return out, fmt.Errorf("failed to create accept ownership mcms transaction: %w", err)
+	}
+	out = append(out, acceptMCMSTransaction)
+
+	return out, nil
+}
+
 func randomSeed() state.PDASeed {
 	const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -591,4 +668,88 @@ func randomSeed() state.PDASeed {
 	}
 
 	return state.PDASeed(bytes.Trim(seed[:], "\x00"))
+}
+
+func transferOwnershipInstruction(
+	programID solana.PublicKey, seed state.PDASeed, proposedOwner, ownerPDA, auth solana.PublicKey,
+) (solana.Instruction, error) {
+	if (seed == state.PDASeed{}) {
+		return newSeedlessTransferOwnershipInstruction(programID, proposedOwner, ownerPDA, auth)
+	}
+	return newSeededTransferOwnershipInstruction(programID, seed, proposedOwner, ownerPDA, auth)
+}
+
+func acceptMCMSTransaction(
+	selector uint64,
+	contract OwnableContract,
+	authority solana.PublicKey,
+) (types.BatchOperation, error) {
+	acceptInstruction, err := acceptOwnershipInstruction(contract.ProgramID, contract.Seed, contract.OwnerPDA, authority)
+	if err != nil {
+		return types.BatchOperation{}, fmt.Errorf("failed to build accept ownership instruction: %w", err)
+	}
+	acceptMCMSTx, err := utils.BuildMCMSBatchOperation(
+		selector,
+		[]solana.Instruction{acceptInstruction},
+		contract.ProgramID.String(),
+		string(contract.Type),
+	)
+	if err != nil {
+		return types.BatchOperation{}, fmt.Errorf("failed to build accept ownership mcms transaction: %w", err)
+	}
+	return acceptMCMSTx, nil
+}
+
+func acceptOwnershipInstruction(programID solana.PublicKey, seed state.PDASeed, ownerPDA, auth solana.PublicKey,
+) (solana.Instruction, error) {
+	if (seed == state.PDASeed{}) {
+		return newSeedlessAcceptOwnershipInstruction(programID, ownerPDA, auth)
+	}
+	return newSeededAcceptOwnershipInstruction(programID, seed, ownerPDA, auth)
+}
+
+func newSeededTransferOwnershipInstruction(
+	programID solana.PublicKey, seed state.PDASeed, proposedOwner, config, authority solana.PublicKey,
+) (solana.Instruction, error) {
+	ix, err := mcm.NewTransferOwnershipInstruction(seed, proposedOwner, config, authority).ValidateAndBuild()
+	return &seededInstruction{ix, programID}, err
+}
+
+func newSeededAcceptOwnershipInstruction(
+	programID solana.PublicKey, seed state.PDASeed, config, authority solana.PublicKey,
+) (solana.Instruction, error) {
+	ix, err := mcm.NewAcceptOwnershipInstruction(seed, config, authority).ValidateAndBuild()
+	return &seededInstruction{ix, programID}, err
+}
+
+func newSeedlessTransferOwnershipInstruction(
+	programID, proposedOwner, config, authority solana.PublicKey,
+) (solana.Instruction, error) {
+	ix, err := access_controller.NewTransferOwnershipInstruction(proposedOwner, config, authority).ValidateAndBuild()
+	return &seedlessInstruction{ix, programID}, err
+}
+
+func newSeedlessAcceptOwnershipInstruction(
+	programID, config, authority solana.PublicKey,
+) (solana.Instruction, error) {
+	ix, err := access_controller.NewAcceptOwnershipInstruction(config, authority).ValidateAndBuild()
+	return &seedlessInstruction{ix, programID}, err
+}
+
+type seedlessInstruction struct {
+	*access_controller.Instruction
+	programID solana.PublicKey
+}
+
+func (s *seedlessInstruction) ProgramID() solana.PublicKey {
+	return s.programID
+}
+
+type seededInstruction struct {
+	*mcm.Instruction
+	programID solana.PublicKey
+}
+
+func (s *seededInstruction) ProgramID() solana.PublicKey {
+	return s.programID
 }

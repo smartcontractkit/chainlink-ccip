@@ -19,13 +19,19 @@ import (
 )
 
 const (
-	TimelockProgramType cldf_deployment.ContractType = "RBACTimelockProgram"
-	McmProgramType      cldf_deployment.ContractType = "ManyChainMultiSigProgram"
+	TimelockProgramType         cldf_deployment.ContractType = "RBACTimelockProgram"
+	McmProgramType              cldf_deployment.ContractType = "ManyChainMultiSigProgram"
+	AccessControllerProgramType cldf_deployment.ContractType = "AccessControllerProgram"
 	// special type for Solana that encodes PDA seed usage
 	ProposerSeed     cldf_deployment.ContractType = "ProposerSeed"
 	CancellerSeed    cldf_deployment.ContractType = "CancellerSeed"
 	BypasserSeed     cldf_deployment.ContractType = "BypasserSeed"
 	RBACTimelockSeed cldf_deployment.ContractType = "RBACTimelockSeed"
+	// access controller accounts
+	ProposerAccessControllerAccount  cldf_deployment.ContractType = "ProposerAccessControllerAccount"
+	ExecutorAccessControllerAccount  cldf_deployment.ContractType = "ExecutorAccessControllerAccount"
+	CancellerAccessControllerAccount cldf_deployment.ContractType = "CancellerAccessControllerAccount"
+	BypasserAccessControllerAccount  cldf_deployment.ContractType = "BypasserAccessControllerAccount"
 )
 
 // Common parameters for transferring ownership of a program
