@@ -5,7 +5,6 @@ import {IEVM2AnyOnRampClient} from "../../interfaces/IEVM2AnyOnRampClient.sol";
 import {IRouterClient} from "../../interfaces/IRouterClient.sol";
 import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 
-import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -135,9 +134,8 @@ contract Router_ccipSend is RouterSetup {
   }
 
   function test_NonLinkFeeToken() public {
-    FeeQuoter.FeeTokenArgs[] memory feeTokens = new FeeQuoter.FeeTokenArgs[](1);
-    feeTokens[0].token = s_sourceTokens[1];
-    feeTokens[0].premiumMultiplierWeiPerEth = 1e18;
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = s_sourceTokens[1];
 
     s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
 

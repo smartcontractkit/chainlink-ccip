@@ -64,7 +64,6 @@ contract FeeQuoterSetup is TokenSetup {
   address[] internal s_sourceFeeTokens;
   uint224[] internal s_sourceTokenPrices;
 
-  FeeQuoter.FeeTokenArgs[] internal s_feeQuoterPremiumMultiplierWeiPerEthArgs;
   FeeQuoter.TokenTransferFeeConfigArgs[] internal s_feeQuoterTokenTransferFeeConfigArgs;
 
   mapping(address token => address dataFeedAddress) internal s_dataFeedByToken;
@@ -119,19 +118,6 @@ contract FeeQuoterSetup is TokenSetup {
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = OWNER;
 
-    s_feeQuoterPremiumMultiplierWeiPerEthArgs.push(
-      FeeQuoter.FeeTokenArgs({
-        token: s_sourceFeeToken,
-        premiumMultiplierWeiPerEth: 5e17 // 0.5x
-      })
-    );
-    s_feeQuoterPremiumMultiplierWeiPerEthArgs.push(
-      FeeQuoter.FeeTokenArgs({
-        token: s_sourceRouter.getWrappedNative(),
-        premiumMultiplierWeiPerEth: 2e18 // 2x
-      })
-    );
-
     s_feeQuoterTokenTransferFeeConfigArgs.push();
     s_feeQuoterTokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
@@ -174,7 +160,7 @@ contract FeeQuoterSetup is TokenSetup {
     s_feeQuoter = new FeeQuoterHelper(
       FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
       priceUpdaters,
-      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
+      s_sourceFeeTokens,
       s_feeQuoterTokenTransferFeeConfigArgs,
       _generateFeeQuoterDestChainConfigArgs()
     );
