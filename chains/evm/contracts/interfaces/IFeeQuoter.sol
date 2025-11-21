@@ -74,7 +74,6 @@ interface IFeeQuoter {
     uint32 calldataSize
   ) external view returns (uint32 totalGas, uint256 gasCostInUsdCents);
 
-
   /// @notice Resolves legacy extra args for backward compatibility. Only has to support EVM, SVM, Aptos and SUI chain
   /// families as all future families have to use the new extraArgs format.
   /// @param destChainSelector The destination chain selector.

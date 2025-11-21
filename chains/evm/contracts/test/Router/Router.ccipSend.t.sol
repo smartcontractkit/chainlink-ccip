@@ -5,7 +5,6 @@ import {IEVM2AnyOnRampClient} from "../../interfaces/IEVM2AnyOnRampClient.sol";
 import {IRouterClient} from "../../interfaces/IRouterClient.sol";
 import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 
-import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";

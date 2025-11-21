@@ -42,6 +42,9 @@ interface ILegacyFeeQuoter {
   ) external view returns (uint256 feeTokenAmount);
 
   /// @notice Convert a given token amount to target token amount.
+  /// @dev this function assumes that no more than 1e59 dollars are sent as payment.
+  /// If more is sent, the multiplication of feeTokenAmount and feeTokenValue will overflow.
+  /// Since there isn't even close to 1e59 dollars in the world economy this is safe.
   /// @param fromToken The given token address.
   /// @param fromTokenAmount The given token amount.
   /// @param toToken The target token address.

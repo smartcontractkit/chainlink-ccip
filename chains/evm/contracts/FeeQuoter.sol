@@ -326,98 +326,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     return (totalGas, gasCostInUsdCents);
   }
 
-  /// @inheritdoc ILegacyFeeQuoter
-  /// @dev The function should always validate message.extraArgs, message.receiver and family-specific configs.
-  function getValidatedFee(
-    uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata message
-  ) external view returns (uint256 feeTokenAmount) {
-    DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
-    if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
-    if (!s_feeTokens.contains(message.feeToken)) revert FeeTokenNotSupported(message.feeToken);
-
-    uint256 gasLimit = _validateMessageAndResolveGasLimitForDestination(destChainSelector, destChainConfig, message);
-
-    // The below call asserts that feeToken is a supported token.
-    uint224 feeTokenPrice = getValidatedTokenPrice(message.feeToken);
-
-    // Calculate premiumFee in USD with 18 decimals precision first.
-    // If message-only and no token transfers, a flat network fee is charged.
-    // If there are token transfers, premiumFee is calculated from token transfer fee.
-    // If there are both token transfers and message, premiumFee is only calculated from token transfer fee.
-    uint256 premiumFeeUSDWei = 0;
-    uint32 tokenTransferGas = 0;
-    uint32 tokenTransferBytesOverhead = 0;
-    if (message.tokenAmounts.length > 0) {
-      (premiumFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead) = _getTokenTransferCost(
-        destChainConfig.defaultTokenFeeUSDCents,
-        destChainConfig.defaultTokenDestGasOverhead,
-        destChainSelector,
-        message.tokenAmounts
-      );
-    } else {
-      // Convert USD cents with 2 decimals to 18 decimals.
-      premiumFeeUSDWei = uint256(destChainConfig.networkFeeUSDCents) * 1e16;
-    }
-    // Apply the premium multiplier for the fee token, making it 36 decimals
-    if (message.feeToken == i_linkToken) {
-      premiumFeeUSDWei *= 9e17; // 0.9x for LINK
-    } else {
-      premiumFeeUSDWei *= 1e18; // 1.0x for other tokens
-    }
-
-    uint256 destCallDataCost =
-      (message.data.length + tokenTransferBytesOverhead) * destChainConfig.destGasPerPayloadByteBase;
-
-    // We add the destination chain CCIP overhead (commit, exec), the token transfer gas, the calldata cost and the msg
-    // gas limit to get the total gas the tx costs to execute on the destination chain.
-    uint256 totalDestChainGas = destChainConfig.destGasOverhead + tokenTransferGas + destCallDataCost + gasLimit;
-    uint224 packedGasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector].value;
-
-    // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
-    // The result is the fee in the feeTokens smallest denominations (e.g. wei for ETH).
-    // uint112(packedGasPrice) = executionGasPrice
-    return (totalDestChainGas * uint112(packedGasPrice) * 1e18 + premiumFeeUSDWei) / feeTokenPrice;
-  }
-
-  /// @notice Returns the token transfer cost parameters.
-  /// A basis point fee is calculated from the USD value of each token transfer.
-  /// For each individual transfer, this fee is between [minFeeUSD, maxFeeUSD].
-  /// Total transfer fee is the sum of each individual token transfer fee.
-  /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
-  /// @dev Splitting one token transfer into multiple transfers is discouraged, as it will result in a transferFee
-  /// equal or greater than the same amount aggregated/de-duped.
-  /// @param defaultTokenFeeUSDCents the default token fee in USD cents.
-  /// @param defaultTokenDestGasOverhead the default token destination gas overhead.
-  /// @param destChainSelector the destination chain selector.
-  /// @param tokenAmounts token transfers in the message.
-  /// @return tokenTransferFeeUSDWei total token transfer bps fee in USD with 18 decimals.
-  /// @return tokenTransferGas total execution gas of the token transfers.
-  /// @return tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
-  function _getTokenTransferCost(
-    uint256 defaultTokenFeeUSDCents,
-    uint32 defaultTokenDestGasOverhead,
-    uint64 destChainSelector,
-    Client.EVMTokenAmount[] calldata tokenAmounts
-  ) internal view returns (uint256 tokenTransferFeeUSDWei, uint32 tokenTransferGas, uint32 tokenTransferBytesOverhead) {
-    if (tokenAmounts.length == 0) {
-      return (0, 0, 0);
-    }
-
-    // Only support one token.
-    TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector][tokenAmounts[0].token];
-
-    if (!transferFeeConfig.isEnabled) {
-      return (defaultTokenFeeUSDCents * 1e16, defaultTokenDestGasOverhead, Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES);
-    }
-
-    return (
-      uint256(transferFeeConfig.feeUSDCents) * 1e16,
-      transferFeeConfig.destGasOverhead,
-      transferFeeConfig.destBytesOverhead
-    );
-  }
-
   /// @notice Gets the transfer fee config for a given token.
   /// @param destChainSelector The destination chain selector.
   /// @param token The token address.
@@ -495,35 +403,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   // ================================================================
   // │             Validations & message processing                 │
   // ================================================================
-
-  /// @notice Validates that the destAddress matches the expected format of the family.
-  /// @param chainFamilySelector Tag to identify the target family.
-  /// @param destAddress Dest address to validate.
-  /// @dev precondition - assumes the family tag is correct and validated.
-  function _validateDestFamilyAddress(
-    bytes4 chainFamilySelector,
-    bytes memory destAddress,
-    uint256 gasLimit
-  ) internal pure {
-    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
-      return Internal._validateEVMAddress(destAddress);
-    }
-    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      // SVM addresses don't have a precompile space at the first X addresses, instead we validate that if the gasLimit
-      // is non-zero, the address must not be 0x0.
-      return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? 1 : 0);
-    }
-    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS) {
-      return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
-    }
-    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM) {
-      return Internal._validateTVMAddress(destAddress);
-    }
-    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
-      return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? Internal.SUI_PRECOMPILE_SPACE : 0);
-    }
-    revert InvalidChainFamilySelector(chainFamilySelector);
-  }
 
   /// @notice Parse and validate the SVM specific Extra Args Bytes.
   function _parseSVMExtraArgsFromBytes(
@@ -614,6 +493,180 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       return Client.GenericExtraArgsV2({gasLimit: abi.decode(argsData, (uint256)), allowOutOfOrderExecution: false});
     }
     revert InvalidExtraArgsTag();
+  }
+
+  /// @inheritdoc IFeeQuoter
+  // solhint-disable-next-line chainlink-solidity/explicit-returns
+  function resolveLegacyArgs(
+    uint64 destChainSelector,
+    bytes calldata extraArgs
+  ) external view returns (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) {
+    DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
+    if (
+      destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
+        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
+    ) {
+      return (
+        "",
+        uint32(
+          _parseGenericExtraArgsFromBytes(
+            extraArgs, destChainConfig.defaultTxGasLimit, destChainConfig.maxPerMsgGasLimit
+          ).gasLimit
+        ),
+        ""
+      );
+    }
+    if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
+      Client.SVMExtraArgsV1 memory svmArgs = _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit);
+      return (
+        abi.encode(svmArgs.tokenReceiver),
+        svmArgs.computeUnits,
+        ExtraArgsCodec._encodeSVMExecutorArgsV1(
+          ExtraArgsCodec.SVMExecutorArgsV1({
+            accounts: svmArgs.accounts,
+            accountIsWritableBitmap: svmArgs.accountIsWritableBitmap,
+            useATA: ExtraArgsCodec.SVMTokenReceiverUsage.DERIVE_ATA_AND_CREATE
+          })
+        )
+      );
+    }
+    if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
+      Client.SuiExtraArgsV1 memory suiArgs = _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit);
+
+      return (
+        abi.encode(suiArgs.tokenReceiver),
+        uint32(suiArgs.gasLimit),
+        ExtraArgsCodec._encodeSuiExecutorArgsV1(
+          ExtraArgsCodec.SuiExecutorArgsV1({receiverObjectIds: suiArgs.receiverObjectIds})
+        )
+      );
+    }
+
+    revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
+  }
+
+  // ================================================================
+  // │                           Configs                            │
+  // ================================================================
+
+  /// @notice Returns the configured config for the dest chain selector.
+  /// @param destChainSelector Destination chain selector to fetch config for.
+  /// @return destChainConfig Config for the destination chain.
+  function getDestChainConfig(
+    uint64 destChainSelector
+  ) external view returns (DestChainConfig memory) {
+    return s_destChainConfigs[destChainSelector];
+  }
+
+  /// @notice Updates the destination chain specific config.
+  /// @param destChainConfigArgs Array of source chain specific configs.
+  function applyDestChainConfigUpdates(
+    DestChainConfigArgs[] memory destChainConfigArgs
+  ) external onlyOwner {
+    _applyDestChainConfigUpdates(destChainConfigArgs);
+  }
+
+  /// @notice Internal version of applyDestChainConfigUpdates.
+  function _applyDestChainConfigUpdates(
+    DestChainConfigArgs[] memory destChainConfigArgs
+  ) internal {
+    for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
+      DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
+      uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
+      DestChainConfig memory destChainConfig = destChainConfigArg.destChainConfig;
+
+      // destChainSelector must be non-zero, defaultTxGasLimit must be set, must be less than maxPerMsgGasLimit
+      if (
+        destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
+          || destChainConfig.defaultTxGasLimit > destChainConfig.maxPerMsgGasLimit
+          || (
+            destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
+              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SVM
+              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_APTOS
+              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SUI
+              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_TVM
+          )
+      ) {
+        revert InvalidDestChainConfig(destChainSelector);
+      }
+
+      // If the chain family selector is zero, it indicates that the chain was never configured and we
+      // are adding a new chain.
+      if (s_destChainConfigs[destChainSelector].chainFamilySelector == 0) {
+        emit DestChainAdded(destChainSelector, destChainConfig);
+      } else {
+        emit DestChainConfigUpdated(destChainSelector, destChainConfig);
+      }
+
+      s_destChainConfigs[destChainSelector] = destChainConfig;
+    }
+  }
+
+  /// @notice Returns the static FeeQuoter config.
+  /// @return staticConfig The static configuration.
+  function getStaticConfig() external view returns (StaticConfig memory) {
+    return StaticConfig({maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg, linkToken: i_linkToken});
+  }
+
+  // ================================================================
+  // │                       Legacy functions                       │
+  // ================================================================
+
+  // Legacy functions are still required for pre-1.7 CCIP but can be removed once all lanes are migrated to 1.7+.
+
+  /// @inheritdoc ILegacyFeeQuoter
+  /// @dev The function should always validate message.extraArgs, message.receiver and family-specific configs.
+  function getValidatedFee(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message
+  ) external view returns (uint256 feeTokenAmount) {
+    DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
+    if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
+    if (!s_feeTokens.contains(message.feeToken)) revert FeeTokenNotSupported(message.feeToken);
+
+    uint256 gasLimit = _validateMessageAndResolveGasLimitForDestination(destChainSelector, destChainConfig, message);
+
+    // The below call asserts that feeToken is a supported token.
+    uint224 feeTokenPrice = getValidatedTokenPrice(message.feeToken);
+
+    // Calculate premiumFee in USD with 18 decimals precision first.
+    // If message-only and no token transfers, a flat network fee is charged.
+    // If there are token transfers, premiumFee is calculated from token transfer fee.
+    // If there are both token transfers and message, premiumFee is only calculated from token transfer fee.
+    uint256 premiumFeeUSDWei = 0;
+    uint32 tokenTransferGas = 0;
+    uint32 tokenTransferBytesOverhead = 0;
+    if (message.tokenAmounts.length > 0) {
+      (premiumFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead) = _getTokenTransferCost(
+        destChainConfig.defaultTokenFeeUSDCents,
+        destChainConfig.defaultTokenDestGasOverhead,
+        destChainSelector,
+        message.tokenAmounts
+      );
+    } else {
+      // Convert USD cents with 2 decimals to 18 decimals.
+      premiumFeeUSDWei = uint256(destChainConfig.networkFeeUSDCents) * 1e16;
+    }
+    // Apply the premium multiplier for the fee token, making it 36 decimals
+    if (message.feeToken == i_linkToken) {
+      premiumFeeUSDWei *= 9e17; // 0.9x for LINK
+    } else {
+      premiumFeeUSDWei *= 1e18; // 1.0x for other tokens
+    }
+
+    uint256 destCallDataCost =
+      (message.data.length + tokenTransferBytesOverhead) * destChainConfig.destGasPerPayloadByteBase;
+
+    // We add the destination chain CCIP overhead (commit, exec), the token transfer gas, the calldata cost and the msg
+    // gas limit to get the total gas the tx costs to execute on the destination chain.
+    uint256 totalDestChainGas = destChainConfig.destGasOverhead + tokenTransferGas + destCallDataCost + gasLimit;
+    uint224 packedGasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector].value;
+
+    // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
+    // The result is the fee in the feeTokens smallest denominations (e.g. wei for ETH).
+    // uint112(packedGasPrice) = executionGasPrice
+    return (totalDestChainGas * uint112(packedGasPrice) * 1e18 + premiumFeeUSDWei) / feeTokenPrice;
   }
 
   /// @notice Validate the forwarded message to ensure it matches the configuration limits (message length, number of
@@ -767,6 +820,96 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     return gasLimit;
   }
 
+  /// @notice Validates that the destAddress matches the expected format of the family.
+  /// @param chainFamilySelector Tag to identify the target family.
+  /// @param destAddress Dest address to validate.
+  /// @dev precondition - assumes the family tag is correct and validated.
+  function _validateDestFamilyAddress(
+    bytes4 chainFamilySelector,
+    bytes memory destAddress,
+    uint256 gasLimit
+  ) internal pure {
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
+      return Internal._validateEVMAddress(destAddress);
+    }
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
+      // SVM addresses don't have a precompile space at the first X addresses, instead we validate that if the gasLimit
+      // is non-zero, the address must not be 0x0.
+      return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? 1 : 0);
+    }
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS) {
+      return Internal._validate32ByteAddress(destAddress, Internal.APTOS_PRECOMPILE_SPACE);
+    }
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM) {
+      return Internal._validateTVMAddress(destAddress);
+    }
+    if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
+      return Internal._validate32ByteAddress(destAddress, gasLimit > 0 ? Internal.SUI_PRECOMPILE_SPACE : 0);
+    }
+    revert InvalidChainFamilySelector(chainFamilySelector);
+  }
+
+  /// @notice Returns the token transfer cost parameters.
+  /// A basis point fee is calculated from the USD value of each token transfer.
+  /// For each individual transfer, this fee is between [minFeeUSD, maxFeeUSD].
+  /// Total transfer fee is the sum of each individual token transfer fee.
+  /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
+  /// @dev Splitting one token transfer into multiple transfers is discouraged, as it will result in a transferFee
+  /// equal or greater than the same amount aggregated/de-duped.
+  /// @param defaultTokenFeeUSDCents the default token fee in USD cents.
+  /// @param defaultTokenDestGasOverhead the default token destination gas overhead.
+  /// @param destChainSelector the destination chain selector.
+  /// @param tokenAmounts token transfers in the message.
+  /// @return tokenTransferFeeUSDWei total token transfer bps fee in USD with 18 decimals.
+  /// @return tokenTransferGas total execution gas of the token transfers.
+  /// @return tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
+  function _getTokenTransferCost(
+    uint256 defaultTokenFeeUSDCents,
+    uint32 defaultTokenDestGasOverhead,
+    uint64 destChainSelector,
+    Client.EVMTokenAmount[] calldata tokenAmounts
+  ) internal view returns (uint256 tokenTransferFeeUSDWei, uint32 tokenTransferGas, uint32 tokenTransferBytesOverhead) {
+    if (tokenAmounts.length == 0) {
+      return (0, 0, 0);
+    }
+
+    // Only support one token.
+    TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector][tokenAmounts[0].token];
+
+    if (!transferFeeConfig.isEnabled) {
+      return (defaultTokenFeeUSDCents * 1e16, defaultTokenDestGasOverhead, Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES);
+    }
+
+    return (
+      uint256(transferFeeConfig.feeUSDCents) * 1e16,
+      transferFeeConfig.destGasOverhead,
+      transferFeeConfig.destBytesOverhead
+    );
+  }
+
+  /// @inheritdoc ILegacyFeeQuoter
+  function getTokenAndGasPrices(
+    address token,
+    uint64 destChainSelector
+  ) external view returns (uint224 tokenPrice, uint224 gasPriceValue) {
+    if (!s_destChainConfigs[destChainSelector].isEnabled) revert DestinationChainNotEnabled(destChainSelector);
+    return (getValidatedTokenPrice(token), s_usdPerUnitGasByDestChainSelector[destChainSelector].value);
+  }
+
+  /// @inheritdoc ILegacyFeeQuoter
+  function convertTokenAmount(
+    address fromToken,
+    uint256 fromTokenAmount,
+    address toToken
+  ) public view returns (uint256) {
+    /// Example:
+    /// fromTokenAmount:   1e18      // 1 ETH
+    /// ETH:               2_000e18
+    /// LINK:              15e18
+    /// return:            1e18 * 2_000e18 / 15e18 = 133e18 (133 LINK)
+    return (fromTokenAmount * getValidatedTokenPrice(fromToken)) / getValidatedTokenPrice(toToken);
+  }
+
   /// @inheritdoc ILegacyFeeQuoter
   /// @dev precondition - onRampTokenTransfers and sourceTokenAmounts lengths must be equal.
   function processMessageArgs(
@@ -880,165 +1023,5 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       destExecDataPerToken[i] = abi.encode(destGasAmount);
     }
     return destExecDataPerToken;
-  }
-
-  /// @notice Resolves legacy extra args for backward compatibility. Only has to support EVM, SVM, Aptos and SUI chain
-  /// families as all future families have to use the new extraArgs format.
-  /// @param destChainSelector The destination chain selector.
-  /// @param extraArgs The extra args bytes.
-  /// @return tokenReceiver The token receiver address encoded as bytes. Always length 32 or 0.
-  /// @return gasLimit The gas limit to use for the message.
-  /// @return executorArgs The executor args encoded as bytes. These are transformed into the new format.
-  // solhint-disable-next-line chainlink-solidity/explicit-returns
-  function resolveLegacyArgs(
-    uint64 destChainSelector,
-    bytes calldata extraArgs
-  ) external view returns (bytes memory tokenReceiver, uint32 gasLimit, bytes memory executorArgs) {
-    DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
-    if (
-      destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM
-        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
-        || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
-    ) {
-      return (
-        "",
-        uint32(
-          _parseGenericExtraArgsFromBytes(
-            extraArgs, destChainConfig.defaultTxGasLimit, destChainConfig.maxPerMsgGasLimit
-          ).gasLimit
-        ),
-        ""
-      );
-    }
-    if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
-      Client.SVMExtraArgsV1 memory svmArgs = abi.decode(extraArgs[4:], (Client.SVMExtraArgsV1));
-      return (
-        abi.encode(svmArgs.tokenReceiver),
-        svmArgs.computeUnits,
-        ExtraArgsCodec._encodeSVMExecutorArgsV1(
-          ExtraArgsCodec.SVMExecutorArgsV1({
-            accounts: svmArgs.accounts,
-            accountIsWritableBitmap: svmArgs.accountIsWritableBitmap,
-            useATA: ExtraArgsCodec.SVMTokenReceiverUsage.DERIVE_ATA_AND_CREATE
-          })
-        )
-      );
-    }
-    if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
-      Client.SuiExtraArgsV1 memory suiArgs = _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit);
-
-      return (
-        abi.encode(suiArgs.tokenReceiver),
-        uint32(suiArgs.gasLimit),
-        ExtraArgsCodec._encodeSuiExecutorArgsV1(
-          ExtraArgsCodec.SuiExecutorArgsV1({receiverObjectIds: suiArgs.receiverObjectIds})
-        )
-      );
-    }
-
-    revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
-  }
-
-  // ================================================================
-  // │                           Configs                            │
-  // ================================================================
-
-  /// @notice Returns the configured config for the dest chain selector.
-  /// @param destChainSelector Destination chain selector to fetch config for.
-  /// @return destChainConfig Config for the destination chain.
-  function getDestChainConfig(
-    uint64 destChainSelector
-  ) external view returns (DestChainConfig memory) {
-    return s_destChainConfigs[destChainSelector];
-  }
-
-  /// @notice Updates the destination chain specific config.
-  /// @param destChainConfigArgs Array of source chain specific configs.
-  function applyDestChainConfigUpdates(
-    DestChainConfigArgs[] memory destChainConfigArgs
-  ) external onlyOwner {
-    _applyDestChainConfigUpdates(destChainConfigArgs);
-  }
-
-  /// @notice Internal version of applyDestChainConfigUpdates.
-  function _applyDestChainConfigUpdates(
-    DestChainConfigArgs[] memory destChainConfigArgs
-  ) internal {
-    for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
-      DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
-      uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
-      DestChainConfig memory destChainConfig = destChainConfigArg.destChainConfig;
-
-      // destChainSelector must be non-zero, defaultTxGasLimit must be set, must be less than maxPerMsgGasLimit
-      if (
-        destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
-          || destChainConfig.defaultTxGasLimit > destChainConfig.maxPerMsgGasLimit
-          || (
-            destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SVM
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_APTOS
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SUI
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_TVM
-          )
-      ) {
-        revert InvalidDestChainConfig(destChainSelector);
-      }
-
-      // If the chain family selector is zero, it indicates that the chain was never configured and we
-      // are adding a new chain.
-      if (s_destChainConfigs[destChainSelector].chainFamilySelector == 0) {
-        emit DestChainAdded(destChainSelector, destChainConfig);
-      } else {
-        emit DestChainConfigUpdated(destChainSelector, destChainConfig);
-      }
-
-      s_destChainConfigs[destChainSelector] = destChainConfig;
-    }
-  }
-
-  /// @notice Returns the static FeeQuoter config.
-  /// @return staticConfig The static configuration.
-  function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg, linkToken: i_linkToken});
-  }
-
-  // ================================================================
-  // │                       Legacy functions                       │
-  // ================================================================
-
-  // Legacy functions are still required for pre-1.7 CCIP but can be removed once all lanes are migrated to 1.7+.
-
-  /// @notice Gets the fee token price and the gas price, both denominated in dollars.
-  /// @param token The source token to get the price for.
-  /// @param destChainSelector The destination chain to get the gas price for.
-  /// @return tokenPrice The price of the feeToken in 1e18 dollars per base unit.
-  /// @return gasPriceValue The price of gas in 1e18 dollars per base unit.
-  function getTokenAndGasPrices(
-    address token,
-    uint64 destChainSelector
-  ) external view returns (uint224 tokenPrice, uint224 gasPriceValue) {
-    if (!s_destChainConfigs[destChainSelector].isEnabled) revert DestinationChainNotEnabled(destChainSelector);
-    return (getValidatedTokenPrice(token), s_usdPerUnitGasByDestChainSelector[destChainSelector].value);
-  }
-
-  /// @notice Convert a given token amount to target token amount.
-  /// @dev this function assumes that no more than 1e59 dollars are sent as payment.
-  /// If more is sent, the multiplication of feeTokenAmount and feeTokenValue will overflow.
-  /// Since there isn't even close to 1e59 dollars in the world economy this is safe.
-  /// @param fromToken The given token address.
-  /// @param fromTokenAmount The given token amount.
-  /// @param toToken The target token address.
-  /// @return toTokenAmount The target token amount.
-  function convertTokenAmount(
-    address fromToken,
-    uint256 fromTokenAmount,
-    address toToken
-  ) public view returns (uint256) {
-    /// Example:
-    /// fromTokenAmount:   1e18      // 1 ETH
-    /// ETH:               2_000e18
-    /// LINK:              5e18
-    /// return:            1e18 * 2_000e18 / 5e18 = 400e18 (400 LINK)
-    return (fromTokenAmount * getValidatedTokenPrice(fromToken)) / getValidatedTokenPrice(toToken);
   }
 }
