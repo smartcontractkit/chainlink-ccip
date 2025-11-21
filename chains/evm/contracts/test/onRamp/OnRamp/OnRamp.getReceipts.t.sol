@@ -145,7 +145,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts.length, 4, "Should have 4 receipts");
 
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
-    uint256 expectedVerifierFee = (uint256(VERIFIER_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
+    uint256 expectedVerifierFee = (uint256(VERIFIER_FEE_USD_CENTS) * 1e30 * LINK_BPS_MULTIPLIER) / feeTokenPrice;
     assertEq(receipts[0].issuer, s_verifier1, "First receipt should be from verifier1");
     assertEq(receipts[0].feeTokenAmount, expectedVerifierFee, "Verifier1 fee should match");
     assertEq(receipts[0].destGasLimit, VERIFIER_GAS, "Verifier1 gas should match");
@@ -157,6 +157,8 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[3].issuer, s_defaultExecutor, "Last receipt should be from executor");
 
     uint256 expectedPoolFee = (uint256(POOL_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
+    // Apply LINK discount.
+    expectedPoolFee = (expectedPoolFee * LINK_BPS_MULTIPLIER) / 10000;
     assertEq(receipts[2].issuer, s_sourceToken, "Second to last receipt should be from token");
     assertEq(receipts[2].feeTokenAmount, expectedPoolFee, "Pool fee should match");
     assertEq(receipts[2].destGasLimit, POOL_GAS_OVERHEAD, "Pool gas overhead should match");
@@ -233,6 +235,8 @@ contract OnRamp_getReceipts is OnRampSetup {
     // Check token receipt falls back to FeeQuoter values.
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
     uint256 expectedTokenFee = (uint256(FEE_QUOTER_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
+    // Apply LINK discount.
+    expectedTokenFee = (expectedTokenFee * LINK_BPS_MULTIPLIER) / 10000;
     assertEq(receipts[1].issuer, s_sourceToken, "Token receipt should be present");
     assertEq(receipts[1].feeTokenAmount, expectedTokenFee, "Should fall back to FeeQuoter fee");
     assertEq(receipts[1].destGasLimit, FEE_QUOTER_GAS_OVERHEAD, "Should fall back to FeeQuoter gas");
@@ -296,6 +300,8 @@ contract OnRamp_getReceipts is OnRampSetup {
     // Check receipts order.
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
     uint256 expectedPoolFee = (uint256(POOL_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
+    // Apply LINK discount.
+    expectedPoolFee = (expectedPoolFee * LINK_BPS_MULTIPLIER) / 10000;
     assertEq(receipts[0].issuer, s_sourceToken, "First should be token");
     assertEq(receipts[0].feeTokenAmount, expectedPoolFee, "Token fee should match");
     assertEq(receipts[1].issuer, s_defaultExecutor, "Last should be executor");

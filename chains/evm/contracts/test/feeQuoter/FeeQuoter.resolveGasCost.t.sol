@@ -9,8 +9,8 @@ contract FeeQuoter_quoteGasForExec is FeeQuoterSetup {
     uint32 nonCalldataGas = 100_000;
     uint32 calldataSize = 0;
 
-    (uint32 totalGas, uint256 gasCostInUsdCents) =
-      s_feeQuoter.quoteGasForExec(DEST_CHAIN_SELECTOR, nonCalldataGas, calldataSize);
+    (uint32 totalGas, uint256 gasCostInUsdCents,,) =
+      s_feeQuoter.quoteGasForExec(DEST_CHAIN_SELECTOR, nonCalldataGas, calldataSize, s_sourceFeeToken);
 
     // With zero calldata, total gas should equal non-calldata gas.
     assertEq(nonCalldataGas, totalGas);
@@ -23,8 +23,8 @@ contract FeeQuoter_quoteGasForExec is FeeQuoterSetup {
     uint32 nonCalldataGas = 0;
     uint32 calldataSize = 1000;
 
-    (uint32 totalGas, uint256 gasCostInUsdCents) =
-      s_feeQuoter.quoteGasForExec(DEST_CHAIN_SELECTOR, nonCalldataGas, calldataSize);
+    (uint32 totalGas, uint256 gasCostInUsdCents,,) =
+      s_feeQuoter.quoteGasForExec(DEST_CHAIN_SELECTOR, nonCalldataGas, calldataSize, s_sourceFeeToken);
 
     // With zero non-calldata gas, total should be calldata cost only.
     uint32 expectedTotalGas = calldataSize * DEST_GAS_PER_PAYLOAD_BYTE_BASE;
@@ -38,8 +38,8 @@ contract FeeQuoter_quoteGasForExec is FeeQuoterSetup {
     uint32 nonCalldataGas = 200_000;
     uint32 calldataSize = 500;
 
-    (uint32 totalGas, uint256 gasCostInUsdCents) =
-      s_feeQuoter.quoteGasForExec(DEST_CHAIN_SELECTOR, nonCalldataGas, calldataSize);
+    (uint32 totalGas, uint256 gasCostInUsdCents,,) =
+      s_feeQuoter.quoteGasForExec(DEST_CHAIN_SELECTOR, nonCalldataGas, calldataSize, s_sourceFeeToken);
 
     // Total gas should be sum of non-calldata and calldata gas.
     uint32 expectedTotalGas = nonCalldataGas + (calldataSize * DEST_GAS_PER_PAYLOAD_BYTE_BASE);
@@ -55,7 +55,7 @@ contract FeeQuoter_quoteGasForExec is FeeQuoterSetup {
     uint64 disabledChainSelector = 999999;
 
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.DestinationChainNotEnabled.selector, disabledChainSelector));
-    s_feeQuoter.quoteGasForExec(disabledChainSelector, 0, 0);
+    s_feeQuoter.quoteGasForExec(disabledChainSelector, 0, 0, s_sourceFeeToken);
   }
 
   function test_quoteGasForExec_RevertWhen_NoGasPriceAvailable() public {
@@ -69,20 +69,20 @@ contract FeeQuoter_quoteGasForExec is FeeQuoterSetup {
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
 
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.NoGasPriceAvailable.selector, chainWithoutGasPrice));
-    s_feeQuoter.quoteGasForExec(chainWithoutGasPrice, 0, 0);
+    s_feeQuoter.quoteGasForExec(chainWithoutGasPrice, 0, 0, s_sourceFeeToken);
   }
 
   function test_quoteGasForExec_RevertWhen_MessageGasLimitTooHigh() public {
     uint32 exceedsMaxGas = MAX_GAS_LIMIT + 1;
 
     vm.expectRevert(FeeQuoter.MessageGasLimitTooHigh.selector);
-    s_feeQuoter.quoteGasForExec(DEST_CHAIN_SELECTOR, exceedsMaxGas, 0);
+    s_feeQuoter.quoteGasForExec(DEST_CHAIN_SELECTOR, exceedsMaxGas, 0, s_sourceFeeToken);
   }
 
   function test_quoteGasForExec_RevertWhen_MessageTooLarge() public {
     uint32 exceedsMaxDataBytes = MAX_DATA_SIZE + 1;
 
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.MessageTooLarge.selector, MAX_DATA_SIZE, exceedsMaxDataBytes));
-    s_feeQuoter.quoteGasForExec(DEST_CHAIN_SELECTOR, 0, exceedsMaxDataBytes);
+    s_feeQuoter.quoteGasForExec(DEST_CHAIN_SELECTOR, 0, exceedsMaxDataBytes, s_sourceFeeToken);
   }
 }

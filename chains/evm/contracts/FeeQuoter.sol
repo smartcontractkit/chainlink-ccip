@@ -118,6 +118,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
   string public constant override typeAndVersion = "FeeQuoter 1.7.0-dev";
 
+  uint256 private constant LINK_BASIS_POINTS_MULTIPLIER = 90_00; // 90%
+
   /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to
   /// misconfiguration.
   uint96 internal immutable i_maxFeeJuelsPerMsg;
@@ -298,8 +300,13 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   function quoteGasForExec(
     uint64 destChainSelector,
     uint32 nonCalldataGas,
-    uint32 calldataSize
-  ) external view returns (uint32 totalGas, uint256 gasCostInUsdCents) {
+    uint32 calldataSize,
+    address feeToken
+  )
+    external
+    view
+    returns (uint32 totalGas, uint256 gasCostInUsdCents, uint256 feeTokenPrice, uint256 premiumBasisPointsMultiplier)
+  {
     DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
     if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
@@ -323,7 +330,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     // non-zero gas cost.
     gasCostInUsdCents = (totalGas * uint256(uint112(price.value)) + (1e16 - 1)) / 1e16;
 
-    return (totalGas, gasCostInUsdCents);
+    // Applies the premium or discount based on the fee token used.
+    // Payments in Link get a 10% discount, consistent with the legacy code paths.
+    premiumBasisPointsMultiplier = feeToken == i_linkToken ? LINK_BASIS_POINTS_MULTIPLIER : 100_00;
+
+    return (totalGas, gasCostInUsdCents, getValidatedTokenPrice(feeToken), premiumBasisPointsMultiplier);
   }
 
   /// @notice Gets the transfer fee config for a given token.
@@ -650,7 +661,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     }
     // Apply the premium multiplier for the fee token, making it 36 decimals
     if (message.feeToken == i_linkToken) {
-      premiumFeeUSDWei *= 9e17; // 0.9x for LINK
+      // LINK_BASIS_POINTS_MULTIPLIER is 1e4 based (bps) to we multiply by 1e14 to get to 36 decimals.
+      premiumFeeUSDWei *= LINK_BASIS_POINTS_MULTIPLIER * 1e14; // 0.9x for LINK
     } else {
       premiumFeeUSDWei *= 1e18; // 1.0x for other tokens
     }
