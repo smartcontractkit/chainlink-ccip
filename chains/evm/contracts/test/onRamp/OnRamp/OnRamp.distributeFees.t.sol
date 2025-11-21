@@ -20,7 +20,7 @@ contract OnRamp_distributeFees is OnRampSetup {
     (OnRamp.Receipt[] memory receipts, uint256 totalFee) = _buildReceipts(false);
     deal(s_sourceFeeToken, address(s_onRamp), totalFee);
 
-    s_onRamp.distributeFees(DEST_CHAIN_SELECTOR, message, receipts);
+    s_onRamp.distributeFees(message, receipts);
 
     IERC20 feeToken = IERC20(s_sourceFeeToken);
     assertEq(feeToken.balanceOf(s_verifier), receipts[0].feeTokenAmount);
@@ -35,16 +35,13 @@ contract OnRamp_distributeFees is OnRampSetup {
     (OnRamp.Receipt[] memory receipts, uint256 totalFee) = _buildReceipts(true);
     deal(s_sourceFeeToken, address(s_onRamp), totalFee);
 
-    address pool = s_sourcePoolByToken[token];
-
-    s_onRamp.distributeFees(DEST_CHAIN_SELECTOR, message, receipts);
+    s_onRamp.distributeFees(message, receipts);
 
     IERC20 feeToken = IERC20(s_sourceFeeToken);
     assertEq(feeToken.balanceOf(s_verifier), receipts[0].feeTokenAmount);
     assertEq(feeToken.balanceOf(s_executor), receipts[2].feeTokenAmount);
-    assertEq(feeToken.balanceOf(pool), receipts[1].feeTokenAmount);
+    assertEq(feeToken.balanceOf(s_sourcePoolByToken[token]), receipts[1].feeTokenAmount);
     assertEq(feeToken.balanceOf(address(s_onRamp)), 0);
-    assertEq(feeToken.balanceOf(receipts[1].issuer), 0);
   }
 
   function test_distributeFees_TokenPoolV1RetainsInOnRamp() public {
@@ -59,7 +56,7 @@ contract OnRamp_distributeFees is OnRampSetup {
       pool, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId), abi.encode(false)
     );
 
-    s_onRamp.distributeFees(DEST_CHAIN_SELECTOR, message, receipts);
+    s_onRamp.distributeFees(message, receipts);
 
     IERC20 feeToken = IERC20(s_sourceFeeToken);
     assertEq(feeToken.balanceOf(s_verifier), receipts[0].feeTokenAmount);
@@ -76,7 +73,7 @@ contract OnRamp_distributeFees is OnRampSetup {
       receipts[0] =
         OnRamp.Receipt({issuer: s_verifier, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 1e16, extraArgs: ""});
       receipts[1] = OnRamp.Receipt({
-        issuer: s_sourceTokens[0],
+        issuer: s_sourcePoolByToken[s_sourceTokens[0]],
         destGasLimit: 0,
         destBytesOverhead: 0,
         feeTokenAmount: 2e16,

@@ -67,11 +67,7 @@ contract OnRampHelper is OnRamp {
     return _getReceipts(destChainSelector, message, extraArgs);
   }
 
-  function distributeFees(
-    uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata message,
-    Receipt[] memory receipts
-  ) external {
-    _distributeFees(destChainSelector, message, receipts);
+  function distributeFees(Client.EVM2AnyMessage calldata message, Receipt[] memory receipts) external {
+    _distributeFees(message, receipts);
   }
 }

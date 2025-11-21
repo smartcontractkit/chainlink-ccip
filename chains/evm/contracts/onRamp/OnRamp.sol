@@ -48,7 +48,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InvalidDestChainAddress(bytes destChainAddress);
   error CustomBlockConfirmationNotSupportedOnPoolV1();
   error TokenArgsNotSupportedOnPoolV1();
-  error InsufficientFeeTokenAmount(uint256 provided, uint256 required);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -253,7 +252,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     (eventData.receipts, newMessage.executionGasLimit,) = _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
     // We don't need to check for feeTokenAmount < receiptsFeeTokenAmount here as that is done in getFee called by the router.
-    _distributeFees(destChainSelector, message, eventData.receipts);
+    _distributeFees(message, eventData.receipts);
 
     // 4. lockOrBurn.
 
@@ -306,16 +305,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   /// @notice Distributes the fee token to each receipt issuer.
   /// @dev Token pool receipt payments are routed to the pool only if it supports IPoolV2 interface.
-  function _distributeFees(
-    uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata message,
-    Receipt[] memory receipts
-  ) internal {
+  function _distributeFees(Client.EVM2AnyMessage calldata message, Receipt[] memory receipts) internal {
     IERC20 feeToken = IERC20(message.feeToken);
     uint256 tokenReceiptIndex = type(uint256).max;
     if (message.tokenAmounts.length > 0) {
       tokenReceiptIndex = receipts.length - 2;
-      IPoolV1 tokenPool = getPoolBySourceToken(destChainSelector, IERC20(message.tokenAmounts[0].token));
+      address tokenPool = receipts[tokenReceiptIndex].issuer;
       // Token receipts use the underlying token address as the “issuer” but in case the token's pool
       // supports the IPoolV2 interface, the pool receive the fee share as fee handling logic built in.
       // V1 pools intentionally leave the balance sitting on the OnRamp so it can be withdrawn later.
@@ -821,10 +816,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // Since the ordering is known, we can directly calculate the index for the pool receipt.
       uint256 poolReceiptIndex = extraArgs.ccvs.length;
 
-      // issuer is set to the token address, fee distribution logic will resolve token → pool and distribute fees
-      // according to the pool version.
+      // issuer is set to the token pool address.
       receipts[poolReceiptIndex] = Receipt({
-        issuer: message.tokenAmounts[0].token,
+        issuer: address(pool),
         destGasLimit: 0,
         destBytesOverhead: 0,
         feeTokenAmount: 0,
