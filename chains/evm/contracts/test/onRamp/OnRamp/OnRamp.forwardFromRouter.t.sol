@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
-
 import {Client} from "../../../libraries/Client.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
@@ -12,6 +11,8 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     super.setUp();
 
     vm.startPrank(address(s_sourceRouter));
+    // Router normally forwards the fee token balance before calling the onRamp.
+    deal(s_sourceFeeToken, address(s_onRamp), type(uint96).max);
   }
 
   function test_forwardFromRouter_oldExtraArgs() public {
