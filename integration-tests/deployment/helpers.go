@@ -42,7 +42,7 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 	}
 	dReg := mcmsapi.GetRegistry()
 	version := semver.MustParse("1.6.0")
-	cs := mcmsapi.DeployMCMS(dReg)
+	cs := mcmsapi.DeployMCMS(dReg, nil)
 	for _, qualifier := range qualifiers {
 		output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
 			AdapterVersion: version,

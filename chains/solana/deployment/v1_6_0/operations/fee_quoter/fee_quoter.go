@@ -55,7 +55,7 @@ var Initialize = operations.NewOperation(
 	"Initializes the FeeQuoter 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		fee_quoter.SetProgramID(input.FeeQuoter)
-		programData, err := utils.GetSolProgramData(chain, input.FeeQuoter)
+		programData, err := utils.GetSolProgramData(chain.Client, input.FeeQuoter)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}

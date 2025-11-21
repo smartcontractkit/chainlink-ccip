@@ -27,7 +27,7 @@ func GetSolProgramSize(chain cldf_solana.Chain, programID solana.PublicKey) (int
 	return programBytes, nil
 }
 
-func GetSolProgramData(chain cldf_solana.Chain, programID solana.PublicKey) (struct {
+func GetSolProgramData(client *solrpc.Client, programID solana.PublicKey) (struct {
 	DataType uint32
 	Address  solana.PublicKey
 }, error) {
@@ -35,7 +35,7 @@ func GetSolProgramData(chain cldf_solana.Chain, programID solana.PublicKey) (str
 		DataType uint32
 		Address  solana.PublicKey
 	}
-	data, err := chain.Client.GetAccountInfoWithOpts(context.Background(), programID, &solrpc.GetAccountInfoOpts{
+	data, err := client.GetAccountInfoWithOpts(context.Background(), programID, &solrpc.GetAccountInfoOpts{
 		Commitment: solrpc.CommitmentConfirmed,
 	})
 	if err != nil {

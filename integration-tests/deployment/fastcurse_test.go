@@ -192,7 +192,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	// deploy mcms
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
-	cs := deploy.DeployMCMS(dReg)
+	cs := deploy.DeployMCMS(dReg, nil)
 	evmChain1 := env.BlockChains.EVMChains()[chain1]
 	evmChain2 := env.BlockChains.EVMChains()[chain2]
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{

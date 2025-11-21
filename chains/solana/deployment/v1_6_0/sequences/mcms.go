@@ -75,21 +75,25 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize MCMs: %w", err)
 			}
-			output.Addresses = append(output.Addresses, initMcmRef...)
-			deps.ExistingAddresses = append(deps.ExistingAddresses, initMcmRef...)
+			output.Addresses = append(output.Addresses, initMcmRef.NewAddresses...)
+			output.BatchOps = append(output.BatchOps, initMcmRef.BatchOps...)
+			deps.ExistingAddresses = append(deps.ExistingAddresses, initMcmRef.NewAddresses...)
 
 			initTimelockRef, err := initTimelock(b, deps, in.TimelockMinDelay, timelockAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize Timelock: %w", err)
 			}
-			output.Addresses = append(output.Addresses, initTimelockRef...)
-			deps.ExistingAddresses = append(deps.ExistingAddresses, initTimelockRef...)
+			output.Addresses = append(output.Addresses, initTimelockRef.NewAddresses...)
+			output.BatchOps = append(output.BatchOps, initTimelockRef.BatchOps...)
+			deps.ExistingAddresses = append(deps.ExistingAddresses, initTimelockRef.NewAddresses...)
 
 			// roles
-			err = setupRoles(b, deps, mcmAddress)
+			setupRolesOutput, err := setupRoles(b, deps, mcmAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to setup roles in Timelock: %w", err)
 			}
+			output.Addresses = append(output.Addresses, setupRolesOutput.NewAddresses...)
+			output.BatchOps = append(output.BatchOps, setupRolesOutput.BatchOps...)
 
 			return output, err
 		},
@@ -121,8 +125,8 @@ func initAccessController(b operations.Bundle, deps mcmsops.Deps, accessControll
 	return refs, nil
 }
 
-func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentConfigPerChain, mcmAddress solana.PublicKey) ([]cldf_datastore.AddressRef, error) {
-	var refs []cldf_datastore.AddressRef
+func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentConfigPerChain, mcmAddress solana.PublicKey) (mcmsops.MCMOutput, error) {
+	var output mcmsops.MCMOutput
 	configs := []struct {
 		ctype cldf_deployment.ContractType
 		cfg   types.Config
@@ -151,14 +155,15 @@ func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentC
 				Qualifier:    deps.Qualifier, // used for testing purposes
 			})
 		if err != nil {
-			return nil, fmt.Errorf("failed to init config type:%q, err:%w", cfg.ctype, err)
+			return mcmsops.MCMOutput{}, fmt.Errorf("failed to init config type:%q, err:%w", cfg.ctype, err)
 		}
-		refs = append(refs, ref.Output...)
+		output.NewAddresses = append(output.NewAddresses, ref.Output.NewAddresses...)
+		output.BatchOps = append(output.BatchOps, ref.Output.BatchOps...)
 	}
-	return refs, nil
+	return output, nil
 }
 
-func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int, timelockAddress solana.PublicKey) ([]cldf_datastore.AddressRef, error) {
+func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int, timelockAddress solana.PublicKey) (mcmsops.MCMOutput, error) {
 	ref, err := operations.ExecuteOperation(b, mcmsops.InitTimelockOp, deps, mcmsops.InitTimelockInput{
 		ContractType: utils.RBACTimelockSeed,
 		ChainSel:     deps.Chain.ChainSelector(),
@@ -167,12 +172,13 @@ func initTimelock(b operations.Bundle, deps mcmsops.Deps, minDelay *big.Int, tim
 		Qualifier:    deps.Qualifier, // used for testing purposes
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to init timelock: %w", err)
+		return mcmsops.MCMOutput{}, fmt.Errorf("failed to init timelock: %w", err)
 	}
 	return ref.Output, nil
 }
 
-func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.PublicKey) error {
+func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.PublicKey) (mcmsops.MCMOutput, error) {
+	var output mcmsops.MCMOutput
 	proposerRef := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.ChainSelector(),
@@ -219,16 +225,18 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 		},
 	}
 	for _, role := range roles {
-		_, err := operations.ExecuteOperation(b, mcmsops.AddAccessOp, deps, mcmsops.AddAccessInput{
+		out, err := operations.ExecuteOperation(b, mcmsops.AddAccessOp, deps, mcmsops.AddAccessInput{
 			Role:      role.role,
 			Accounts:  role.pdas,
 			Qualifier: deps.Qualifier, // used for testing purposes
 		})
 		if err != nil {
-			return fmt.Errorf("failed to add access for role %d: %w", role.role, err)
+			return mcmsops.MCMOutput{}, fmt.Errorf("failed to add access for role %d: %w", role.role, err)
 		}
+		output.NewAddresses = append(output.NewAddresses, out.Output.NewAddresses...)
+		output.BatchOps = append(output.BatchOps, out.Output.BatchOps...)
 	}
-	return nil
+	return output, nil
 }
 
 // assume refs are in the order returned by GetAllMCMS
