@@ -311,10 +311,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     if (message.tokenAmounts.length > 0) {
       tokenReceiptIndex = receipts.length - 2;
       address tokenPool = receipts[tokenReceiptIndex].issuer;
-      // Token receipts use the underlying token address as the “issuer” but in case the token's pool
-      // supports the IPoolV2 interface, the pool receive the fee share as fee handling logic built in.
+      // In case the token pool supports the IPoolV2 interface, the pool receive the fee share as fee handling logic built in.
       // V1 pools intentionally leave the balance sitting on the OnRamp so it can be withdrawn later.
-      if (IERC165(address(tokenPool)).supportsInterface(type(IPoolV2).interfaceId)) {
+      if (IERC165(tokenPool).supportsInterface(type(IPoolV2).interfaceId)) {
         feeToken.safeTransfer(address(tokenPool), receipts[tokenReceiptIndex].feeTokenAmount);
       }
     }
