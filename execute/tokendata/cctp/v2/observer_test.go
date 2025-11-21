@@ -549,6 +549,56 @@ func (m *mockCCTPv2HTTPClient) GetMessages(
 	return CCTPv2Messages{}, nil
 }
 
+func (m *mockCCTPv2HTTPClient) addResponse(
+	chain cciptypes.ChainSelector,
+	domain uint32,
+	txHash string,
+	messages CCTPv2Messages,
+) {
+	params := CCTPv2RequestParams{
+		chainSelector: chain,
+		sourceDomain:  domain,
+		txHash:        txHash,
+	}
+	m.responses[params] = messages
+}
+
+func (m *mockCCTPv2HTTPClient) addError(
+	chain cciptypes.ChainSelector,
+	domain uint32,
+	txHash string,
+	err error,
+) {
+	params := CCTPv2RequestParams{
+		chainSelector: chain,
+		sourceDomain:  domain,
+		txHash:        txHash,
+	}
+	m.errors[params] = err
+}
+
+func (m *mockCCTPv2HTTPClient) getCallCount() int {
+	return len(m.calls)
+}
+
+func (m *mockCCTPv2HTTPClient) wasCalledWith(
+	chain cciptypes.ChainSelector,
+	domain uint32,
+	txHash string,
+) bool {
+	params := CCTPv2RequestParams{
+		chainSelector: chain,
+		sourceDomain:  domain,
+		txHash:        txHash,
+	}
+	for _, call := range m.calls {
+		if call == params {
+			return true
+		}
+	}
+	return false
+}
+
 func TestCCTPv2MessageToTokenData(t *testing.T) {
 	validMessage := "1234567890abcdef"
 	validAttestation := "fedcba0987654321"
