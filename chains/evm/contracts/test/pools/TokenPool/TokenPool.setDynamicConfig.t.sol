@@ -8,19 +8,16 @@ contract TokenPoolWithAllowList_setDynamicConfig is TokenPoolWithAllowListSetup 
   function test_setDynamicConfig() public {
     address newRouter = makeAddr("newRouter");
     uint16 newMinBlockConfirmations = 5;
-    uint256 newThresholdAmount = 1234;
     address newRateLimitAdmin = makeAddr("newRateLimitAdmin");
 
     vm.expectEmit();
-    emit TokenPool.DynamicConfigSet(newRouter, newMinBlockConfirmations, newThresholdAmount, newRateLimitAdmin);
+    emit TokenPool.DynamicConfigSet(newRouter, newMinBlockConfirmations, newRateLimitAdmin);
 
-    s_tokenPool.setDynamicConfig(newRouter, newMinBlockConfirmations, newThresholdAmount, newRateLimitAdmin);
+    s_tokenPool.setDynamicConfig(newRouter, newMinBlockConfirmations, newRateLimitAdmin);
 
-    (address router, uint16 minBlockConfirmations, uint256 thresholdAmount, address rateLimitAdmin) =
-      s_tokenPool.getDynamicConfig();
+    (address router, uint16 minBlockConfirmations, address rateLimitAdmin) = s_tokenPool.getDynamicConfig();
     assertEq(newRouter, router);
     assertEq(newMinBlockConfirmations, minBlockConfirmations);
-    assertEq(newThresholdAmount, thresholdAmount);
     assertEq(newRateLimitAdmin, rateLimitAdmin);
   }
 
@@ -31,6 +28,6 @@ contract TokenPoolWithAllowList_setDynamicConfig is TokenPoolWithAllowListSetup 
 
     vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
 
-    s_tokenPool.setDynamicConfig(newRouter, 0, 1234, address(0));
+    s_tokenPool.setDynamicConfig(newRouter, 0, address(0));
   }
 }

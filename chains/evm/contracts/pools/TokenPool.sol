@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IAdvancedPoolHooks} from "../interfaces/IAdvancedPoolHooks.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 
-import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
-import {AdvancedPoolHooks} from "./AdvancedPoolHooks.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -36,10 +35,8 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 /// 0.000567 tokens.
 /// In the case of a burnMint pool on chain A, these funds are burned in the pool on chain A.
 /// In the case of a lockRelease pool on chain A, these funds accumulate in the pool on chain A.
-
 abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.Bytes32Set;
-  using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
   using RateLimiter for RateLimiter.TokenBucket;
   using SafeERC20 for IERC20;
@@ -81,18 +78,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event ChainRemoved(uint64 remoteChainSelector);
   event RemotePoolAdded(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
-  event DynamicConfigSet(
-    address router, uint16 minBlockConfirmations, uint256 thresholdAmountForAdditionalCCVs, address rateLimitAdmin
-  );
+  event DynamicConfigSet(address router, uint16 minBlockConfirmations, address rateLimitAdmin);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
-  event CCVConfigUpdated(
-    uint64 indexed remoteChainSelector,
-    address[] outboundCCVs,
-    address[] outboundCCVsToAddAboveThreshold,
-    address[] inboundCCVs,
-    address[] inboundCCVsToAddAboveThreshold
-  );
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
   event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector);
   event CustomBlockConfirmationOutboundRateLimitConsumed(
@@ -101,7 +89,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event CustomBlockConfirmationInboundRateLimitConsumed(
     uint64 indexed remoteChainSelector, address token, uint256 amount
   );
-  event CustomBlockConfirmationUpdated(uint16 minBlockConfirmation);
   event CustomBlockConfirmationRateLimitConfigured(
     uint64 remoteChainSelector,
     RateLimiter.Config outboundRateLimiterConfig,
@@ -124,32 +111,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     EnumerableSet.Bytes32Set remotePools; // Set of remote pool hashes, ABI encoded in the case of a remote EVM chain.
   }
 
-  struct CustomBlockConfirmationConfig {
-    uint16 minBlockConfirmation; // Minimum block confirmation on the source chain that token issuers consider sufficiently secure (0 means the default finality).
-    // Separate buckets provide isolated rate limits for transfers with custom block confirmation, as their risk profiles differ from default transfers.
-    mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) outboundRateLimiterConfig;
-    mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketInbound) inboundRateLimiterConfig;
-  }
-
   struct CustomBlockConfirmationRateLimitConfigArgs {
     uint64 remoteChainSelector; // Remote chain selector.
     RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limiter configuration.
     RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limiter configuration.
-  }
-
-  struct CCVConfig {
-    address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
-    address[] outboundCCVsToAddAboveThreshold; // Additional CCVs that are required for outgoing messages above s_thresholdTransferAmount to the remote chain.
-    address[] inboundCCVs; // CCVs required for incoming messages from the remote chain.
-    address[] inboundCCVsToAddAboveThreshold; // Additional CCVs that are required for incoming messages above s_thresholdTransferAmount from the remote chain.
-  }
-
-  struct CCVConfigArg {
-    uint64 remoteChainSelector;
-    address[] outboundCCVs;
-    address[] outboundCCVsToAddAboveThreshold;
-    address[] inboundCCVs;
-    address[] inboundCCVsToAddAboveThreshold;
   }
 
   /// @dev Struct with args for setting the token transfer fee configurations for a destination chain and a set of tokens.
@@ -169,11 +134,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   uint8 internal immutable i_tokenDecimals;
   /// @dev The address of the RMN proxy
   address internal immutable i_rmnProxy;
-  /// @dev Optional advanced pool hooks contract for additional features like allowlists
-  AdvancedPoolHooks internal immutable i_advancedPoolHooks;
-  /// @dev Threshold token transfer amount above which additional CCVs are required.
-  /// Value of 0 means that there is no threshold and additional CCVs are not required for any transfer amount.
-  uint256 internal s_thresholdAmountForAdditionalCCVs;
+  /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management
+  IAdvancedPoolHooks internal immutable i_advancedPoolHooks;
+
   /// @dev The address of the router
   IRouter internal s_router;
   /// @dev Minimum block confirmation on the source chain, 0 means the default finality.
@@ -182,7 +145,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) internal
     s_outboundRateLimiterConfig;
   mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketInbound) internal s_inboundRateLimiterConfig;
-
   /// @dev A set of allowed chain selectors. We want the allowlist to be enumerable to
   /// be able to quickly determine (without parsing logs) who can access the pool.
   /// @dev The chain selectors are in uint256 format because of the EnumerableSet implementation.
@@ -194,9 +156,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice The address of the rate limiter admin.
   /// @dev Can be address(0) if none is configured.
   address internal s_rateLimitAdmin;
-
-  /// @dev Stores verifier (CCV) requirements keyed by remote chain selector.
-  mapping(uint64 remoteChainSelector => CCVConfig ccvConfig) internal s_verifierConfig;
   /// @dev Optional token-transfer fee overrides keyed by destination chain selector.
   mapping(uint64 destChainSelector => TokenTransferFeeConfig tokenTransferFeeConfig) internal s_tokenTransferFeeConfig;
 
@@ -216,7 +175,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       // assume the supplied token decimals are correct.
     }
     i_tokenDecimals = localTokenDecimals;
-    i_advancedPoolHooks = AdvancedPoolHooks(advancedPoolHooks);
+    i_advancedPoolHooks = IAdvancedPoolHooks(advancedPoolHooks);
 
     s_router = IRouter(router);
   }
@@ -245,36 +204,24 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     public
     view
     virtual
-    returns (
-      address router,
-      uint16 minBlockConfirmations,
-      uint256 thresholdAmountForAdditionalCCVs,
-      address rateLimitAdmin
-    )
+    returns (address router, uint16 minBlockConfirmations, address rateLimitAdmin)
   {
-    return (address(s_router), s_minBlockConfirmation, s_thresholdAmountForAdditionalCCVs, s_rateLimitAdmin);
+    return (address(s_router), s_minBlockConfirmation, s_rateLimitAdmin);
   }
 
   /// @notice Sets the dynamic configuration for the pool.
   /// @param router The address of the router contract.
   /// @param minBlockConfirmations The minimum block confirmations required for custom finality transfers.
-  /// @param thresholdAmountForAdditionalCCVs The threshold amount above which additional CCVs are required.
   /// @param rateLimitAdmin The address of the rate limiter admin.
-  function setDynamicConfig(
-    address router,
-    uint16 minBlockConfirmations,
-    uint256 thresholdAmountForAdditionalCCVs,
-    address rateLimitAdmin
-  ) public onlyOwner {
+  function setDynamicConfig(address router, uint16 minBlockConfirmations, address rateLimitAdmin) public onlyOwner {
     if (router == address(0)) revert ZeroAddressInvalid();
 
     s_router = IRouter(router);
     // Since 0 means default finality it is a valid value.
     s_minBlockConfirmation = minBlockConfirmations;
-    s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;
     s_rateLimitAdmin = rateLimitAdmin;
 
-    emit DynamicConfigSet(router, minBlockConfirmations, thresholdAmountForAdditionalCCVs, rateLimitAdmin);
+    emit DynamicConfigSet(router, minBlockConfirmations, rateLimitAdmin);
   }
 
   /// @notice Signals which version of the pool interface is supported.
@@ -818,10 +765,13 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     RateLimiter.Config memory inboundConfig
   ) internal {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+
     RateLimiter._validateTokenBucketConfig(outboundConfig);
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
+
     RateLimiter._validateTokenBucketConfig(inboundConfig);
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
+
     emit DefaultFinalityRateLimitConfigured(remoteChainSelector, outboundConfig, inboundConfig);
   }
 
@@ -903,50 +853,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   // │                          CCV                                 │
   // ================================================================
 
-  /// @notice Updates the CCV configuration for specified remote chains.
-  /// If the array includes address(0), it indicates that the default CCV should be used alongside any other specified CCVs.
-  /// @dev Additional CCVs should only be configured for transfers above the threshold amount set in s_thresholdAmountForAdditionalCCVs and should not duplicate base CCVs.
-  /// Base CCVs are always required, while add-above-threshold CCVs are only required when the transfer amount exceeds the threshold.
-  function applyCCVConfigUpdates(
-    CCVConfigArg[] calldata ccvConfigArgs
-  ) external virtual onlyOwner {
-    for (uint256 i = 0; i < ccvConfigArgs.length; ++i) {
-      uint64 remoteChainSelector = ccvConfigArgs[i].remoteChainSelector;
-      address[] calldata outboundCCVs = ccvConfigArgs[i].outboundCCVs;
-      address[] calldata outboundCCVsToAddAboveThreshold = ccvConfigArgs[i].outboundCCVsToAddAboveThreshold;
-      address[] calldata inboundCCVs = ccvConfigArgs[i].inboundCCVs;
-      address[] calldata inboundCCVsToAddAboveThreshold = ccvConfigArgs[i].inboundCCVsToAddAboveThreshold;
-
-      // check for duplicates in outbound CCVs.
-      CCVConfigValidation._assertNoDuplicates(outboundCCVs);
-      CCVConfigValidation._assertNoDuplicates(outboundCCVsToAddAboveThreshold);
-
-      // check for duplicates in inbound CCVs.
-      CCVConfigValidation._assertNoDuplicates(inboundCCVs);
-      CCVConfigValidation._assertNoDuplicates(inboundCCVsToAddAboveThreshold);
-
-      s_verifierConfig[remoteChainSelector] = CCVConfig({
-        outboundCCVs: outboundCCVs,
-        outboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
-        inboundCCVs: inboundCCVs,
-        inboundCCVsToAddAboveThreshold: inboundCCVsToAddAboveThreshold
-      });
-      emit CCVConfigUpdated({
-        remoteChainSelector: remoteChainSelector,
-        outboundCCVs: outboundCCVs,
-        outboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
-        inboundCCVs: inboundCCVs,
-        inboundCCVsToAddAboveThreshold: inboundCCVsToAddAboveThreshold
-      });
-    }
-  }
-
   /// @notice Returns the set of required CCVs for transfers in a specific direction.
+  /// @dev This function delegates to AdvancedPoolHooks if configured, otherwise returns an empty array.
   /// @param remoteChainSelector The remote chain selector for this transfer.
   /// @param amount The amount being transferred.
-  /// This implementation returns base CCVs for all transfers, and includes additional CCVs when the transfer amount
-  /// is above the configured threshold. Implementers can override this function to define custom logic based on these
-  /// params.
+  /// @param direction The direction of the transfer (Inbound or Outbound).
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredCCVs(
     address, // localToken
@@ -956,37 +867,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     bytes calldata, // extraData
     IPoolV2.MessageDirection direction
   ) external view virtual returns (address[] memory requiredCCVs) {
-    CCVConfig storage config = s_verifierConfig[remoteChainSelector];
-    if (direction == IPoolV2.MessageDirection.Inbound) {
-      return _resolveRequiredCCVs(config.inboundCCVs, config.inboundCCVsToAddAboveThreshold, amount);
+    if (address(i_advancedPoolHooks) == address(0)) {
+      return new address[](0);
     }
-    return _resolveRequiredCCVs(config.outboundCCVs, config.outboundCCVsToAddAboveThreshold, amount);
-  }
-
-  function _resolveRequiredCCVs(
-    address[] storage baseCCVsStorage,
-    address[] storage requiredCCVsAboveThresholdStorage,
-    uint256 amount
-  ) internal view returns (address[] memory requiredCCVs) {
-    address[] memory baseCCVs = baseCCVsStorage;
-    // If amount is above threshold, combine base and additional CCVs.
-    uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
-    if (thresholdAmount != 0 && amount >= thresholdAmount) {
-      address[] memory thresholdCCVs = requiredCCVsAboveThresholdStorage;
-      if (thresholdCCVs.length > 0) {
-        requiredCCVs = new address[](baseCCVs.length + thresholdCCVs.length);
-        // Copy base CCVs.
-        for (uint256 i = 0; i < baseCCVs.length; ++i) {
-          requiredCCVs[i] = baseCCVs[i];
-        }
-        // Copy additional CCVs.
-        for (uint256 i = 0; i < thresholdCCVs.length; ++i) {
-          requiredCCVs[baseCCVs.length + i] = thresholdCCVs[i];
-        }
-        return requiredCCVs;
-      }
-    }
-    return baseCCVs;
+    return i_advancedPoolHooks.getRequiredCCVs(remoteChainSelector, amount, direction);
   }
 
   // ================================================================
@@ -1092,7 +976,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
   /// A value of zero (WAIT_FOR_FINALITY) applies default finality fees.
   /// @return destAmount The amount after fee deduction.
-
   function _applyFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested

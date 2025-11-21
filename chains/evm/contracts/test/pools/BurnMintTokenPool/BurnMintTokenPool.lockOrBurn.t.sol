@@ -127,7 +127,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     deal(address(s_token), address(s_pool), amount);
 
     vm.startPrank(OWNER);
-    s_pool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, 0, address(0));
+    s_pool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({

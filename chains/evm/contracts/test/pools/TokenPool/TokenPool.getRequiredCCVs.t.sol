@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
@@ -10,8 +11,8 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     address[] memory outboundCCVs = new address[](1);
     outboundCCVs[0] = makeAddr("outboundCCV1");
 
-    TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
-    configArgs[0] = TokenPool.CCVConfigArg({
+    AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
+    configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
       outboundCCVsToAddAboveThreshold: new address[](0),
@@ -19,7 +20,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
       inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
+    s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedOutbound =
@@ -36,8 +37,8 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     address[] memory outboundCCVsToAddAboveThreshold = new address[](1);
     outboundCCVsToAddAboveThreshold[0] = makeAddr("additionalOutboundCCV1");
 
-    TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
-    configArgs[0] = TokenPool.CCVConfigArg({
+    AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
+    configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
       outboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
@@ -45,22 +46,20 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
       inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
+    s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
 
-    // Set threshold amount.
-    uint256 thresholdAmount = 1000;
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), 0, thresholdAmount, address(0));
+    // Threshold is set in AdvancedPoolHooks constructor as CCV_THRESHOLD_AMOUNT
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedOutboundBelow = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount - 500, 0, "", IPoolV2.MessageDirection.Outbound
+      address(s_token), DEST_CHAIN_SELECTOR, CCV_THRESHOLD_AMOUNT - 500, 0, "", IPoolV2.MessageDirection.Outbound
     );
     assertEq(storedOutboundBelow.length, 1);
     assertEq(storedOutboundBelow[0], outboundCCVs[0]);
 
     // Test with amount above threshold, should return base + additional CCVs.
     address[] memory storedOutboundAbove = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.MessageDirection.Outbound
+      address(s_token), DEST_CHAIN_SELECTOR, CCV_THRESHOLD_AMOUNT + 500, 0, "", IPoolV2.MessageDirection.Outbound
     );
     assertEq(storedOutboundAbove.length, 2);
     assertEq(storedOutboundAbove[0], outboundCCVs[0]);
@@ -71,8 +70,8 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     address[] memory outboundCCVs = new address[](1);
     outboundCCVs[0] = makeAddr("outboundCCV1");
 
-    TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
-    configArgs[0] = TokenPool.CCVConfigArg({
+    AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
+    configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
       outboundCCVsToAddAboveThreshold: new address[](0),
@@ -80,15 +79,13 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
       inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
+    s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
 
-    // Set threshold amount.
-    uint256 thresholdAmount = 1000;
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), 0, thresholdAmount, address(0));
+    // Threshold is set in AdvancedPoolHooks constructor
 
     // Test with amount above threshold but no additional CCVs, should return only base CCVs.
     address[] memory storedOutbound = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.MessageDirection.Outbound
+      address(s_token), DEST_CHAIN_SELECTOR, CCV_THRESHOLD_AMOUNT + 500, 0, "", IPoolV2.MessageDirection.Outbound
     );
     assertEq(storedOutbound.length, 1);
     assertEq(storedOutbound[0], outboundCCVs[0]);
@@ -98,8 +95,8 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     address[] memory inboundCCVs = new address[](1);
     inboundCCVs[0] = makeAddr("inboundCCV1");
 
-    TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
-    configArgs[0] = TokenPool.CCVConfigArg({
+    AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
+    configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
       outboundCCVsToAddAboveThreshold: new address[](0),
@@ -107,7 +104,7 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
       inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
+    s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedInbound =
@@ -124,8 +121,8 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     address[] memory inboundCCVsToAddAboveThreshold = new address[](1);
     inboundCCVsToAddAboveThreshold[0] = makeAddr("additionalInboundCCV1");
 
-    TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
-    configArgs[0] = TokenPool.CCVConfigArg({
+    AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
+    configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
       outboundCCVsToAddAboveThreshold: new address[](0),
@@ -133,22 +130,20 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
       inboundCCVsToAddAboveThreshold: inboundCCVsToAddAboveThreshold
     });
 
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
+    s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
 
-    // Set threshold amount.
-    uint256 thresholdAmount = 1000;
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), 0, thresholdAmount, address(0));
+    // Threshold is set in AdvancedPoolHooks constructor
 
     // Test with amount below threshold, should return only base CCVs.
     address[] memory storedInboundBelow = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount - 500, 0, "", IPoolV2.MessageDirection.Inbound
+      address(s_token), DEST_CHAIN_SELECTOR, CCV_THRESHOLD_AMOUNT - 500, 0, "", IPoolV2.MessageDirection.Inbound
     );
     assertEq(storedInboundBelow.length, 1);
     assertEq(storedInboundBelow[0], inboundCCVs[0]);
 
     // Test with amount above threshold, should return base + additional CCVs.
     address[] memory storedInboundAbove = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.MessageDirection.Inbound
+      address(s_token), DEST_CHAIN_SELECTOR, CCV_THRESHOLD_AMOUNT + 500, 0, "", IPoolV2.MessageDirection.Inbound
     );
     assertEq(storedInboundAbove.length, 2);
     assertEq(storedInboundAbove[0], inboundCCVs[0]);
@@ -159,8 +154,8 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
     address[] memory inboundCCVs = new address[](1);
     inboundCCVs[0] = makeAddr("inboundCCV1");
 
-    TokenPool.CCVConfigArg[] memory configArgs = new TokenPool.CCVConfigArg[](1);
-    configArgs[0] = TokenPool.CCVConfigArg({
+    AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
+    configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
       outboundCCVsToAddAboveThreshold: new address[](0),
@@ -168,15 +163,13 @@ contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
       inboundCCVsToAddAboveThreshold: new address[](0)
     });
 
-    s_tokenPool.applyCCVConfigUpdates(configArgs);
+    s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
 
-    // Set threshold amount.
-    uint256 thresholdAmount = 1000;
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), 0, thresholdAmount, address(0));
+    // Threshold is set in AdvancedPoolHooks constructor
 
     // Test with amount above threshold but no additional CCVs, should return only base CCVs.
     address[] memory storedInbound = s_tokenPool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, thresholdAmount + 500, 0, "", IPoolV2.MessageDirection.Inbound
+      address(s_token), DEST_CHAIN_SELECTOR, CCV_THRESHOLD_AMOUNT + 500, 0, "", IPoolV2.MessageDirection.Inbound
     );
     assertEq(storedInbound.length, 1);
     assertEq(storedInbound[0], inboundCCVs[0]);

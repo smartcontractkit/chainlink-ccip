@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Router} from "../../../Router.sol";
+import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
@@ -10,7 +11,9 @@ import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/Bu
 contract TokenPoolV2Setup is BaseTest {
   BurnMintERC20 internal s_token;
   TokenPoolHelper internal s_tokenPool;
+  AdvancedPoolHooks internal s_advancedPoolHooks;
   uint16 internal constant BPS_DIVIDER = 10_000;
+  uint256 internal constant CCV_THRESHOLD_AMOUNT = 1000e18;
   address public s_sender = makeAddr("sender");
   bytes public s_receiver = abi.encode(makeAddr("receiver"));
 
@@ -25,8 +28,11 @@ contract TokenPoolV2Setup is BaseTest {
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
+    // Create AdvancedPoolHooks with CCV threshold
+    s_advancedPoolHooks = new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT);
+
     s_tokenPool = new TokenPoolHelper(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
     );
 
     bytes[] memory remotePoolAddresses = new bytes[](1);

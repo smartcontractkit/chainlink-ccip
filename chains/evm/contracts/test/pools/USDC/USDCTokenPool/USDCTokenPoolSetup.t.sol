@@ -44,7 +44,7 @@ contract USDCTokenPoolSetup is USDCSetup {
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
 
     s_allowedList.push(vm.randomAddress());
-    AdvancedPoolHooks advancedHooks = new AdvancedPoolHooks(s_allowedList);
+    AdvancedPoolHooks advancedHooks = new AdvancedPoolHooks(s_allowedList, 0);
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(
       s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,

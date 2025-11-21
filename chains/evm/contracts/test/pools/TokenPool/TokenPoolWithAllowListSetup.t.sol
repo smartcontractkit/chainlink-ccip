@@ -15,7 +15,7 @@ contract TokenPoolWithAllowListSetup is TokenPoolSetup {
     s_allowedSenders.push(STRANGER);
     s_allowedSenders.push(OWNER);
 
-    s_advancedPoolHooks = new AdvancedPoolHooks(s_allowedSenders);
+    s_advancedPoolHooks = new AdvancedPoolHooks(s_allowedSenders, 0);
     s_tokenPool = new TokenPoolHelper(
       s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
     );
