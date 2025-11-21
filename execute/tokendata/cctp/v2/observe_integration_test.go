@@ -143,10 +143,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		validate   func(*testing.T, exectypes.TokenDataObservations, *mockCCTPv2HTTPClient)
 	}{
 		// ============================================================
-		// BASIC HAPPY PATH SCENARIOS (1-3)
+		// BASIC HAPPY PATH SCENARIOS
 		// ============================================================
 		{
-			name: "1. Single chain, single message, single supported token with data found",
+			name: "Single chain, single message, single supported token with data found",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -176,7 +176,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "2. Single chain, single message, multiple supported tokens with unique deposit hashes",
+			name: "Single chain, single message, multiple supported tokens with unique deposit hashes",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -210,7 +210,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "3. Multiple chains, multiple messages",
+			name: "Multiple chains, multiple messages",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -261,10 +261,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		},
 
 		// ============================================================
-		// SAME DEPOSIT HASH EDGE CASES (4-7) ⭐
+		// SAME DEPOSIT HASH EDGE CASES
 		// ============================================================
 		{
-			name: "4. Two token transfers with SAME deposit hash in SAME transaction - sufficient data",
+			name: "Two token transfers with SAME deposit hash in SAME transaction - sufficient data",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -294,7 +294,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "5. Three token transfers with SAME deposit hash in SAME transaction - insufficient data",
+			name: "Three token transfers with SAME deposit hash in SAME transaction - insufficient data",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -327,7 +327,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "6. Multiple tokens with SAME deposit hash in SAME transaction - exact match",
+			name: "Multiple tokens with SAME deposit hash in SAME transaction - exact match",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -361,7 +361,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "7. Multiple tokens with SAME deposit hash across DIFFERENT messages in same transaction",
+			name: "Multiple tokens with SAME deposit hash across DIFFERENT messages in same transaction",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -401,10 +401,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		},
 
 		// ============================================================
-		// DIFFERENT DEPOSIT HASH SCENARIOS (8-9)
+		// DIFFERENT DEPOSIT HASH SCENARIOS
 		// ============================================================
 		{
-			name: "8. Multiple tokens with different deposit hashes - all found",
+			name: "Multiple tokens with different deposit hashes - all found",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -435,7 +435,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "9. Multiple tokens with different deposit hashes - partial matches",
+			name: "Multiple tokens with different deposit hashes - partial matches",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -469,10 +469,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		},
 
 		// ============================================================
-		// MIXED TOKEN SUPPORT SCENARIOS (10-14)
+		// MIXED TOKEN SUPPORT SCENARIOS
 		// ============================================================
 		{
-			name: "10. Mix of supported and unsupported tokens (wrong pool)",
+			name: "Mix of supported and unsupported tokens (wrong pool)",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -504,7 +504,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "11. Mix of supported and unsupported tokens (invalid ExtraData)",
+			name: "Mix of supported and unsupported tokens (invalid ExtraData)",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -539,7 +539,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "12. All tokens unsupported",
+			name: "All tokens unsupported",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -565,7 +565,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "13. Supported token but not configured for that chain",
+			name: "Supported token but not configured for that chain",
 			messages: exectypes.MessageObservations{
 				testChain2: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -588,7 +588,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "14. Empty ExtraData",
+			name: "Empty ExtraData",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -611,10 +611,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		},
 
 		// ============================================================
-		// ERROR HANDLING FROM DEPENDENCIES (15-22)
+		// ERROR HANDLING FROM DEPENDENCIES
 		// ============================================================
 		{
-			name: "15. HTTP client returns error",
+			name: "HTTP client returns error",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -635,7 +635,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "16. HTTP client returns error for one request, success for another",
+			name: "HTTP client returns error for one request, success for another",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -668,7 +668,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "17. Message status is not 'complete'",
+			name: "Message status is not 'complete'",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -694,7 +694,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "18. Empty message list from HTTP client",
+			name: "Empty message list from HTTP client",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -715,7 +715,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "19. Message with empty txHash is skipped",
+			name: "Message with empty txHash is skipped",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage("", []cciptypes.RampTokenAmount{
@@ -734,7 +734,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "20. Mix of messages with and without txHash",
+			name: "Mix of messages with and without txHash",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage("", []cciptypes.RampTokenAmount{
@@ -763,7 +763,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "21. calculateDepositHash returns error (simulated with custom function)",
+			name: "calculateDepositHash returns error (simulated with custom function)",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -797,7 +797,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "22. Different source domains in same transaction",
+			name: "Different source domains in same transaction",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -833,10 +833,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		},
 
 		// ============================================================
-		// EMPTY/NIL INPUT SCENARIOS (23-27)
+		// EMPTY/NIL INPUT SCENARIOS
 		// ============================================================
 		{
-			name:       "23. Empty MessageObservations",
+			name:       "Empty MessageObservations",
 			messages:   exectypes.MessageObservations{},
 			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock:  func(m *mockCCTPv2HTTPClient) {},
@@ -846,7 +846,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "24. Message with no tokens",
+			name: "Message with no tokens",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{}),
@@ -863,7 +863,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "25. Chain with no messages",
+			name: "Chain with no messages",
 			messages: exectypes.MessageObservations{
 				testChain1: {},
 			},
@@ -876,7 +876,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "26. Empty pool configuration",
+			name: "Empty pool configuration",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -895,7 +895,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "27. Nil TokenAmounts slice",
+			name: "Nil TokenAmounts slice",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: {
@@ -916,10 +916,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		},
 
 		// ============================================================
-		// DATA MATCHING/CONSUMPTION SCENARIOS (28-31)
+		// DATA MATCHING/CONSUMPTION SCENARIOS
 		// ============================================================
 		{
-			name: "28. Token data assigned in order (FIFO)",
+			name: "Token data assigned in order (FIFO)",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -954,7 +954,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "29. Request deduplication by (chain, domain, txHash)",
+			name: "Request deduplication by (chain, domain, txHash)",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -988,7 +988,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "30. Data not shared across different request params",
+			name: "Data not shared across different request params",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -1019,7 +1019,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "31. Multiple deposits with overlapping hashes - complex consumption",
+			name: "Multiple deposits with overlapping hashes - complex consumption",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -1059,10 +1059,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		},
 
 		// ============================================================
-		// STRUCTURE PRESERVATION (32-34)
+		// STRUCTURE PRESERVATION
 		// ============================================================
 		{
-			name: "32. Output structure matches input structure exactly",
+			name: "Output structure matches input structure exactly",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -1118,7 +1118,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "33. Sequence numbers preserved correctly",
+			name: "Sequence numbers preserved correctly",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					1: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -1152,7 +1152,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "34. Token count matches input for each message",
+			name: "Token count matches input for each message",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -1187,10 +1187,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		},
 
 		// ============================================================
-		// INTEGRATION/COMPLEX SCENARIOS (35-38)
+		// INTEGRATION/COMPLEX SCENARIOS
 		// ============================================================
 		{
-			name: "35. Large scale: many chains, messages, tokens",
+			name: "Large scale: many chains, messages, tokens",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -1240,7 +1240,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "36. Mixed success and failure across multiple messages",
+			name: "Mixed success and failure across multiple messages",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -1273,7 +1273,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "37. All possible token states in one observation",
+			name: "All possible token states in one observation",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -1318,7 +1318,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "38. Realistic production scenario",
+			name: "Realistic production scenario",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					100: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -1377,10 +1377,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		},
 
 		// ============================================================
-		// CONTEXT HANDLING (39-40)
+		// CONTEXT HANDLING
 		// ============================================================
 		{
-			name: "39. Context passed through to HTTP client",
+			name: "Context passed through to HTTP client",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
@@ -1403,7 +1403,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "40. Observe never returns error (errors are in TokenData)",
+			name: "Observe never returns error (errors are in TokenData)",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
