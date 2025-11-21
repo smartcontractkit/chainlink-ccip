@@ -141,6 +141,9 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
 
   function _assertSenderIsAllowed(uint64 destChainSelector, address sender) internal view virtual {
     DestChainConfig storage destChainConfig = _getDestChainConfig(destChainSelector);
+    if (address(destChainConfig.router) == address(0)) {
+      revert DestinationNotSupported(destChainSelector);
+    }
     // CCVs should query the OnRamp address from the router, this allows for OnRamp updates without touching CCVs
     // OnRamp address may be zero intentionally to pause, which should stop all messages.
     if (msg.sender != destChainConfig.router.getOnRamp(destChainSelector)) {

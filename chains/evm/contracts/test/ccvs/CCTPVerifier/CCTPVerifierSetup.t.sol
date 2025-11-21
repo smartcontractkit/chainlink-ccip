@@ -32,10 +32,12 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   CCTPMessageTransmitterProxy internal s_messageTransmitterProxy;
   IBurnMintERC20 internal s_USDCToken;
 
+  uint16 internal constant BPS_DIVIDER = 10_000;
+
   uint32 internal constant CCTP_STANDARD_FINALITY_THRESHOLD = 2000;
   uint16 internal constant CCTP_STANDARD_FINALITY_BPS = 0;
 
-  uint32 internal constant CCIP_FAST_FINALITY_THRESHOLD = 1;
+  uint16 internal constant CCIP_FAST_FINALITY_THRESHOLD = 1;
   uint32 internal constant CCTP_FAST_FINALITY_THRESHOLD = 1000;
   uint16 internal constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
 
@@ -54,7 +56,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     s_mockTokenMessenger = new MockUSDCTokenMessenger(1, address(s_mockMessageTransmitter));
     s_messageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockTokenMessenger);
 
-    uint32[] memory customCCIPFinalities = new uint32[](1);
+    uint16[] memory customCCIPFinalities = new uint16[](1);
     customCCIPFinalities[0] = CCIP_FAST_FINALITY_THRESHOLD;
 
     uint32[] memory customCCTPFinalityThresholds = new uint32[](1);

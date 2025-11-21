@@ -10,7 +10,7 @@ import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract CCTPVerifier_constructor is CCTPVerifierSetup {
-  uint32[] internal s_customCCIPFinalities = new uint32[](1);
+  uint16[] internal s_customCCIPFinalities = new uint16[](1);
 
   function setUp() public override {
     super.setUp();

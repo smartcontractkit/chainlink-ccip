@@ -7,7 +7,7 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 
 contract CCTPVerifier_setFinalityConfig is CCTPVerifierSetup {
   function test_setFinalityConfig() public {
-    uint32[] memory customCCIPFinalities = new uint32[](1);
+    uint16[] memory customCCIPFinalities = new uint16[](1);
     customCCIPFinalities[0] = CCIP_FAST_FINALITY_THRESHOLD;
 
     uint32[] memory customCCTPFinalityThresholds = new uint32[](1);
@@ -47,7 +47,7 @@ contract CCTPVerifier_setFinalityConfig is CCTPVerifierSetup {
       CCTPVerifier.FinalityConfig({
         defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
         defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: new uint32[](0),
+        customCCIPFinalities: new uint16[](0),
         customCCTPFinalityThresholds: new uint32[](0),
         customCCTPFinalityBps: new uint16[](0)
       })
@@ -60,7 +60,7 @@ contract CCTPVerifier_setFinalityConfig is CCTPVerifierSetup {
       CCTPVerifier.FinalityConfig({
         defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
         defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: new uint32[](0),
+        customCCIPFinalities: new uint16[](0),
         customCCTPFinalityThresholds: new uint32[](0),
         customCCTPFinalityBps: new uint16[](0)
       })
@@ -73,7 +73,7 @@ contract CCTPVerifier_setFinalityConfig is CCTPVerifierSetup {
       CCTPVerifier.FinalityConfig({
         defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
         defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: new uint32[](1),
+        customCCIPFinalities: new uint16[](1),
         customCCTPFinalityThresholds: new uint32[](2),
         customCCTPFinalityBps: new uint16[](1)
       })
@@ -86,7 +86,7 @@ contract CCTPVerifier_setFinalityConfig is CCTPVerifierSetup {
       CCTPVerifier.FinalityConfig({
         defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
         defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: new uint32[](1),
+        customCCIPFinalities: new uint16[](1),
         customCCTPFinalityThresholds: new uint32[](1),
         customCCTPFinalityBps: new uint16[](2)
       })
@@ -94,7 +94,7 @@ contract CCTPVerifier_setFinalityConfig is CCTPVerifierSetup {
   }
 
   function test_setFinalityConfig_RevertWhen_CustomFinalitiesMustBeStrictlyIncreasing() public {
-    uint32[] memory customCCIPFinalities = new uint32[](2);
+    uint16[] memory customCCIPFinalities = new uint16[](2);
     customCCIPFinalities[0] = CCIP_FAST_FINALITY_THRESHOLD + 1;
     customCCIPFinalities[1] = CCIP_FAST_FINALITY_THRESHOLD;
 
@@ -113,7 +113,7 @@ contract CCTPVerifier_setFinalityConfig is CCTPVerifierSetup {
   function test_setFinalityConfig_RevertWhen_CustomFinalitiesMustBeStrictlyIncreasing_CustomFinalityCannotBeZero()
     public
   {
-    uint32[] memory customCCIPFinalities = new uint32[](1);
+    uint16[] memory customCCIPFinalities = new uint16[](1);
     customCCIPFinalities[0] = 0;
 
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.CustomFinalitiesMustBeStrictlyIncreasing.selector));

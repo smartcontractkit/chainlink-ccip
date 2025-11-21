@@ -92,7 +92,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   struct FinalityConfig {
     uint32 defaultCCTPFinalityThreshold; // ──╮ CCTP finality threshold applied when CCIP finality is 0.
     uint16 defaultCCTPFinalityBps; // ────────╯ Basis points charged for standard CCTP transfers on destination.
-    uint32[] customCCIPFinalities; // CCIP finality thresholds for custom finalities (enforced to be in ascending order).
+    uint16[] customCCIPFinalities; // CCIP finality thresholds for custom finalities (enforced to be in ascending order).
     uint32[] customCCTPFinalityThresholds; // Corresponding CCTP finality thresholds for custom CCIP finalities.
     uint16[] customCCTPFinalityBps; // Basis points charged for CCTP transfers using custom finalities on destination.
   }
@@ -271,8 +271,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   function _depositForBurn(
     DepositForBurnParams memory params
   ) private {
-    (uint32 finalityThreshold, uint16 bps, bool found) = _getCCTPFinalityThresholdAndBps(params.finality);
-    if (!found) revert UnsupportedFinality(params.finality);
+    (uint32 finalityThreshold, uint16 bps) = _getCCTPFinalityThresholdAndBps(params.finality);
 
     // The maximum fee, taken on destination, is a percentage of the total amount transferred.
     // We use bps to calculate the smallest possible value that we can set as the max fee.
@@ -300,26 +299,25 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @param finality The CCIP finality.
   /// @return finalityThreshold The CCTP finality threshold.
   /// @return bps The bps charged on destinaton by CCTP for the finality threshold.
-  /// @return found Whether the finality threshold and bps were found. We can't rely on 0 values because 0 could be valid.
   function _getCCTPFinalityThresholdAndBps(
     uint32 finality
-  ) private view returns (uint32 finalityThreshold, uint16 bps, bool found) {
-    if (finality == 0) {
-      // Apply standard CCTP finality when CCIP finality is set to the default value of 0.
-      return (s_finalityConfig.defaultCCTPFinalityThreshold, s_finalityConfig.defaultCCTPFinalityBps, true);
-    } else {
-      uint32[] memory customCCIPFinalities = s_finalityConfig.customCCIPFinalities;
+  ) private view returns (uint32 finalityThreshold, uint16 bps) {
+    if (finality != 0) {
+      // The length of the customCCIPFinalities array is guaranteed to be at least 1.
+      // Therefore, if finality is not 0, we will find a match here.
+      uint16[] memory customCCIPFinalities = s_finalityConfig.customCCIPFinalities;
       for (uint256 i = 0; i < customCCIPFinalities.length; ++i) {
         if (i == customCCIPFinalities.length - 1 || finality < customCCIPFinalities[i]) {
           // If we've reached the last custom finality available, we must use it no matter what.
           // If we've reached a finality that is greater than the requested finality, we will round up to it.
           // This mirrors the behavior of CCTP finality thresholds, which round up if the requested finality exceeds a threshold.
-          return (s_finalityConfig.customCCTPFinalityThresholds[i], s_finalityConfig.customCCTPFinalityBps[i], true);
+          return (s_finalityConfig.customCCTPFinalityThresholds[i], s_finalityConfig.customCCTPFinalityBps[i]);
         }
       }
     }
 
-    return (0, 0, false);
+    // Apply standard CCTP finality when CCIP finality is set to the default value of 0.
+    return (s_finalityConfig.defaultCCTPFinalityThreshold, s_finalityConfig.defaultCCTPFinalityBps);
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -443,7 +441,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     // Validates that custom CCIP finalities are in ascending order.
     // We can initialize previous finality to 0, as 0 is the default finality value.
     // It always maps to standard CCTP transfer and should never be listed as a custom finality.
-    uint32 previousFinality = 0;
+    uint16 previousFinality = 0;
     for (uint256 i = 0; i < finalityConfig.customCCIPFinalities.length; ++i) {
       if (finalityConfig.customCCIPFinalities[i] <= previousFinality) {
         revert CustomFinalitiesMustBeStrictlyIncreasing();
