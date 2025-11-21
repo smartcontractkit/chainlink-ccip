@@ -86,13 +86,17 @@ func getUpgradeableLoaderState(client *solRpc.Client, progPubkey solana.PublicKe
 }
 
 func GetUpgradeAuthority(client *solRpc.Client, progDataPubkey solana.PublicKey) (solana.PublicKey, error) {
-	state, err := getUpgradeableLoaderState(client, progDataPubkey)
+	data, err := GetSolProgramData(client, progDataPubkey)
+	if err != nil {
+		return solana.PublicKey{}, fmt.Errorf("failed to get program data for %s: %w", progDataPubkey.String(), err)
+	}
+	state, err := getUpgradeableLoaderState(client, data.Address)
 	if err != nil {
 		return solana.PublicKey{}, fmt.Errorf("failed to get upgrade authority for program data %s: %w", progDataPubkey.String(), err)
 	}
 
 	if state.ProgramData == nil {
-		return solana.PublicKey{}, errors.New("unexpected state: not programdata")
+		return solana.PublicKey{}, errors.New("unexpected state: no programdata")
 	}
 
 	if state.ProgramData.AuthorityOption == 0 {

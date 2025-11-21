@@ -59,7 +59,7 @@ var Initialize = operations.NewOperation(
 	"Initializes the RMNRemote 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		rmn_remote.SetProgramID(input.RMNRemote)
-		programData, err := utils.GetSolProgramData(chain, input.RMNRemote)
+		programData, err := utils.GetSolProgramData(chain.Client, input.RMNRemote)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
