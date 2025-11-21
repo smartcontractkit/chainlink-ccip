@@ -11,9 +11,9 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
     domainUpdates[0] = CCTPVerifier.DomainUpdate({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
-      mintRecipient: bytes32(0),
-      domainIdentifier: DEST_DOMAIN_IDENTIFIER,
-      destChainSelector: DEST_CHAIN_SELECTOR,
+      mintRecipientOnDest: bytes32(0),
+      domainIdentifier: REMOTE_DOMAIN_IDENTIFIER,
+      chainSelector: DEST_CHAIN_SELECTOR,
       enabled: true
     });
 
@@ -25,8 +25,8 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
     CCTPVerifier.Domain memory domain = s_cctpVerifier.getDomain(DEST_CHAIN_SELECTOR);
     assertEq(domain.allowedCallerOnDest, ALLOWED_CALLER_ON_DEST);
     assertEq(domain.allowedCallerOnSource, ALLOWED_CALLER_ON_SOURCE);
-    assertEq(domain.mintRecipient, bytes32(0));
-    assertEq(domain.domainIdentifier, DEST_DOMAIN_IDENTIFIER);
+    assertEq(domain.mintRecipientOnDest, bytes32(0));
+    assertEq(domain.domainIdentifier, REMOTE_DOMAIN_IDENTIFIER);
     assertEq(domain.enabled, true);
 
     // Disable the domain.
@@ -51,9 +51,9 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
     domainUpdates[0] = CCTPVerifier.DomainUpdate({
       allowedCallerOnDest: bytes32(0),
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
-      mintRecipient: bytes32(0),
-      domainIdentifier: DEST_DOMAIN_IDENTIFIER,
-      destChainSelector: DEST_CHAIN_SELECTOR,
+      mintRecipientOnDest: bytes32(0),
+      domainIdentifier: REMOTE_DOMAIN_IDENTIFIER,
+      chainSelector: DEST_CHAIN_SELECTOR,
       enabled: true
     });
 
@@ -66,9 +66,9 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
     domainUpdates[0] = CCTPVerifier.DomainUpdate({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: bytes32(0),
-      mintRecipient: bytes32(0),
-      domainIdentifier: DEST_DOMAIN_IDENTIFIER,
-      destChainSelector: DEST_CHAIN_SELECTOR,
+      mintRecipientOnDest: bytes32(0),
+      domainIdentifier: REMOTE_DOMAIN_IDENTIFIER,
+      chainSelector: DEST_CHAIN_SELECTOR,
       enabled: true
     });
 
@@ -81,9 +81,9 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
     domainUpdates[0] = CCTPVerifier.DomainUpdate({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
-      mintRecipient: bytes32(0),
-      domainIdentifier: DEST_DOMAIN_IDENTIFIER,
-      destChainSelector: 0,
+      mintRecipientOnDest: bytes32(0),
+      domainIdentifier: REMOTE_DOMAIN_IDENTIFIER,
+      chainSelector: 0,
       enabled: true
     });
 

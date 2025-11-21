@@ -36,7 +36,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error MissingCustomFinalities();
   error OnlyCallableByOwnerOrAllowlistAdmin();
   error ReceiveMessageCallFailed();
-  error UnknownDomain(uint64 destChainSelector);
+  error UnknownDomain(uint64 chainSelector);
   error UnsupportedFinality(uint32 finality);
   error ZeroAddressNotAllowed();
 
@@ -61,9 +61,9 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   struct DomainUpdate {
     bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
     bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the TokenMessengerProxy).
-    bytes32 mintRecipient; // Address to mint USDC to on the destination chain.
+    bytes32 mintRecipientOnDest; // Address to mint USDC to on the destination chain.
     uint32 domainIdentifier; // Unique domain ID used across CCTP.
-    uint64 destChainSelector; // The corresponding CCIP destination chain selector for the domain.
+    uint64 chainSelector; // The corresponding CCIP destination chain selector for the domain.
     bool enabled; // Whether or not the domain is enabled.
   }
 
@@ -83,7 +83,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   struct Domain {
     bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
     bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the TokenMessengerProxy).
-    bytes32 mintRecipient; // Address to mint USDC to on the destination chain.
+    bytes32 mintRecipientOnDest; // Address to mint USDC to on the destination chain.
     uint32 domainIdentifier; // ─╮ Unique domain ID used across CCTP.
     bool enabled; // ────────────╯ Whether or not the domain is enabled.
   }
@@ -246,8 +246,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     // For EVM chains, the mintRecipient is not used.
     // Solana requires it, as the mintRecipient will be a PDA owned by the pool.
     // The PDA will forward the tokens to their final destination after minting.
-    if (domain.mintRecipient != bytes32(0)) {
-      decodedReceiver = domain.mintRecipient;
+    if (domain.mintRecipientOnDest != bytes32(0)) {
+      decodedReceiver = domain.mintRecipientOnDest;
     } else {
       decodedReceiver = abi.decode(tokenTransfer.tokenReceiver, (bytes32));
     }
@@ -472,15 +472,15 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       DomainUpdate memory domain = domains[i];
       if (
         domain.allowedCallerOnDest == bytes32(0) || domain.allowedCallerOnSource == bytes32(0)
-          || domain.destChainSelector == 0
+          || domain.chainSelector == 0
       ) {
         revert InvalidDomainUpdate(domain);
       }
 
-      s_chainToDomain[domain.destChainSelector] = Domain({
+      s_chainToDomain[domain.chainSelector] = Domain({
         allowedCallerOnDest: domain.allowedCallerOnDest,
         allowedCallerOnSource: domain.allowedCallerOnSource,
-        mintRecipient: domain.mintRecipient,
+        mintRecipientOnDest: domain.mintRecipientOnDest,
         domainIdentifier: domain.domainIdentifier,
         enabled: domain.enabled
       });
