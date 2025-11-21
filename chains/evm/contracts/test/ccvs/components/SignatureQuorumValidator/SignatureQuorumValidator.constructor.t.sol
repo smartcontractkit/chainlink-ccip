@@ -11,7 +11,7 @@ contract SignatureQuorumValidator_constructor is SignatureValidatorSetup {
 
     address[] memory testSigners = new address[](1);
     testSigners[0] = vm.addr(PRIVATE_KEY_0);
-    verifier.setSignatureConfig(testSigners, 1);
+    verifier.setSignatureConfig(SignatureValidatorSetup.DEFAULT_SOURCE_CHAIN_SELECTOR, testSigners, 1);
 
     uint256 expectedChainId = uint128(block.chainid);
     uint256 newChainId = expectedChainId + 100000;
@@ -24,6 +24,6 @@ contract SignatureQuorumValidator_constructor is SignatureValidatorSetup {
     bytes memory signature = abi.encodePacked(r, s);
 
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.ForkedChain.selector, expectedChainId, newChainId));
-    verifier.validateSignatures(testHash, signature);
+    verifier.validateSignatures(SignatureValidatorSetup.DEFAULT_SOURCE_CHAIN_SELECTOR, testHash, signature);
   }
 }

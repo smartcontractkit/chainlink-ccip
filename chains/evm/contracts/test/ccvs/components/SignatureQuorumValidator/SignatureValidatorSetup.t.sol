@@ -11,6 +11,7 @@ contract SignatureValidatorSetup is BaseTest {
   uint256 internal constant PRIVATE_KEY_1 = 0x70b919c82f0b4791a5b7c6a7275970ace1748759ebdaa8a5c3a4b2f5a8b1e8d2;
   uint256 internal constant PRIVATE_KEY_2 = 0x80b919c82f0b4791a5b7c6a7275970ace1748759ebdaa8a5c3a4b2f5a8b1e8d3;
   uint256 internal constant PRIVATE_KEY_3 = 0x90b919c82f0b4791a5b7c6a7275970ace1748759ebdaa8a5c3a4b2f5a8b1e8d4;
+  uint64 public constant DEFAULT_SOURCE_CHAIN_SELECTOR = 1;
 
   address[] internal s_validSigners;
   uint256[] internal s_validSignerKeys;
@@ -41,7 +42,7 @@ contract SignatureValidatorSetup is BaseTest {
     _sortSignersByAddress();
 
     s_sigQuorumVerifier = new SignatureQuorumValidatorHelper();
-    s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 1);
+    s_sigQuorumVerifier.setSignatureConfig(DEFAULT_SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
   }
 
   function _sortSignersByAddress() internal {

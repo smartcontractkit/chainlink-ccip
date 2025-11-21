@@ -7,6 +7,7 @@ import {SignatureValidatorSetup} from "./SignatureValidatorSetup.t.sol";
 
 contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup {
   bytes32 internal constant TEST_HASH = keccak256("test message");
+  uint64 internal sourceChainSelector = SignatureValidatorSetup.DEFAULT_SOURCE_CHAIN_SELECTOR;
 
   function _createSignatures(uint256[] memory signerKeys, bytes32 hash) internal pure returns (bytes memory) {
     bytes memory signatures = "";
@@ -20,7 +21,7 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
   }
 
   function test_validateSignatures_MultipleSignatures() public {
-    s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 3);
+    s_sigQuorumVerifier.setSignatureConfig(sourceChainSelector, s_validSigners, 3);
 
     uint256[] memory signerKeys = new uint256[](3);
     signerKeys[0] = s_validSignerKeys[0];
@@ -29,12 +30,12 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
 
     bytes memory signatures = _createSignatures(signerKeys, TEST_HASH);
 
-    s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
+    s_sigQuorumVerifier.validateSignatures(sourceChainSelector, TEST_HASH, signatures);
   }
 
   function test_validateSignatures_ExtraSignatures() public {
     // Set threshold to 2 but provide 3 signatures.
-    s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 2);
+    s_sigQuorumVerifier.setSignatureConfig(sourceChainSelector, s_validSigners, 2);
 
     uint256[] memory signerKeys = new uint256[](3);
     signerKeys[0] = s_validSignerKeys[0];
@@ -44,21 +45,42 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
     bytes memory signatures = _createSignatures(signerKeys, TEST_HASH);
 
     // Should not revert - extra signatures are allowed.
-    s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
+    s_sigQuorumVerifier.validateSignatures(sourceChainSelector, TEST_HASH, signatures);
   }
 
   // Reverts
 
-  function test_validateSignatures_RevertWhen_NoSignersConfigured() public {
+  function test_validateSignatures_RevertWhen_NoSignersConfiguredOnSource() public {
     // Deploy new verifier with no signers.
     SignatureQuorumValidatorHelper newVerifier = new SignatureQuorumValidatorHelper();
 
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
-    newVerifier.validateSignatures(TEST_HASH, "");
+    vm.expectRevert(
+      abi.encodeWithSelector(SignatureQuorumValidator.NoSignersSetForSource.selector, sourceChainSelector)
+    );
+    newVerifier.validateSignatures(sourceChainSelector, TEST_HASH, "");
+  }
+
+  function test_validateSignatures_RevertWhen_SignaturesFromDifferentSource() public {
+    bytes32 hashSourceA = keccak256("message-src-a");
+    bytes32 hashSourceB = keccak256("message-src-b");
+
+    uint64 sourceBChainSelector = 20;
+    s_sigQuorumVerifier.setSignatureConfig(sourceBChainSelector, s_validSigners, 3);
+
+    uint256[] memory signerKeys = new uint256[](3);
+    signerKeys[0] = s_validSignerKeys[0];
+    signerKeys[1] = s_validSignerKeys[1];
+    signerKeys[2] = s_validSignerKeys[2];
+
+    bytes memory signaturesForSourceAMessage = _createSignatures(signerKeys, hashSourceA);
+
+    // Trying to validate source B's message using a the signatures for source A should revert.
+    vm.expectRevert(SignatureQuorumValidator.UnauthorizedSigner.selector);
+    s_sigQuorumVerifier.validateSignatures(sourceBChainSelector, hashSourceB, signaturesForSourceAMessage);
   }
 
   function test_validateSignatures_RevertWhen_ForkedChain() public {
-    s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 1);
+    s_sigQuorumVerifier.setSignatureConfig(sourceChainSelector, s_validSigners, 1);
 
     uint256[] memory signerKeys = new uint256[](1);
     signerKeys[0] = s_validSignerKeys[0];
@@ -70,11 +92,11 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
     vm.chainId(newChainId);
 
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.ForkedChain.selector, originalChainId, newChainId));
-    s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
+    s_sigQuorumVerifier.validateSignatures(sourceChainSelector, TEST_HASH, signatures);
   }
 
   function test_validateSignatures_RevertWhen_WrongNumberOfSignatures() public {
-    s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 3);
+    s_sigQuorumVerifier.setSignatureConfig(sourceChainSelector, s_validSigners, 3);
 
     // Provide only 2 signatures when 3 are required.
     uint256[] memory signerKeys = new uint256[](2);
@@ -84,11 +106,11 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
     bytes memory signatures = _createSignatures(signerKeys, TEST_HASH);
 
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.WrongNumberOfSignatures.selector));
-    s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
+    s_sigQuorumVerifier.validateSignatures(sourceChainSelector, TEST_HASH, signatures);
   }
 
   function test_validateSignatures_RevertWhen_UnauthorizedSigner() public {
-    s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 1);
+    s_sigQuorumVerifier.setSignatureConfig(sourceChainSelector, s_validSigners, 1);
 
     // Use a signer key not in the valid set.
     uint256 unauthorizedKey = 0x1234567890abcdef;
@@ -98,11 +120,11 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
     bytes memory signatures = _createSignatures(signerKeys, TEST_HASH);
 
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.UnauthorizedSigner.selector));
-    s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
+    s_sigQuorumVerifier.validateSignatures(sourceChainSelector, TEST_HASH, signatures);
   }
 
   function test_validateSignatures_RevertWhen_UnorderedSignatures() public {
-    s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 2);
+    s_sigQuorumVerifier.setSignatureConfig(sourceChainSelector, s_validSigners, 2);
 
     // Get two signers and ensure they're ordered, then reverse them.
     address addr0 = vm.addr(s_validSignerKeys[0]);
@@ -123,27 +145,27 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
     bytes memory signatures = abi.encodePacked(r1, s1, r0, s0);
 
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.NonOrderedOrNonUniqueSignatures.selector));
-    s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
+    s_sigQuorumVerifier.validateSignatures(sourceChainSelector, TEST_HASH, signatures);
   }
 
   function test_validateSignatures_RevertWhen_DuplicateSignatures() public {
-    s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 2);
+    s_sigQuorumVerifier.setSignatureConfig(sourceChainSelector, s_validSigners, 2);
 
     // Create duplicate signatures manually.
     (bytes32 r, bytes32 s) = _signWithV27(s_validSignerKeys[0], TEST_HASH);
     bytes memory signatures = abi.encodePacked(r, s, r, s); // Same signature twice.
 
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.NonOrderedOrNonUniqueSignatures.selector));
-    s_sigQuorumVerifier.validateSignatures(TEST_HASH, signatures);
+    s_sigQuorumVerifier.validateSignatures(sourceChainSelector, TEST_HASH, signatures);
   }
 
   function test_validateSignatures_RevertWhen_InvalidSignatureLength() public {
-    s_sigQuorumVerifier.setSignatureConfig(s_validSigners, 1);
+    s_sigQuorumVerifier.setSignatureConfig(sourceChainSelector, s_validSigners, 1);
 
     // Create signature with wrong length (63 bytes instead of 64).
     bytes memory invalidSignature = new bytes(63);
 
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.WrongNumberOfSignatures.selector));
-    s_sigQuorumVerifier.validateSignatures(TEST_HASH, invalidSignature);
+    s_sigQuorumVerifier.validateSignatures(sourceChainSelector, TEST_HASH, invalidSignature);
   }
 }

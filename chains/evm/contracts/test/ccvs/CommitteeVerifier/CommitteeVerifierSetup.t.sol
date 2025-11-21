@@ -14,6 +14,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
   uint256 internal constant PRIVATE_KEY_0 = 0x60b919c82f0b4791a5b7c6a7275970ace1748759ebdaa8a5c3a4b2f5a8b1e8d1;
   address internal constant MOCK_SENDER = 0x3333333333333333333333333333333333333333;
   address internal constant MOCK_RECEIVER = 0x4444444444444444444444444444444444444444;
+  uint64 public constant DEFAULT_SOURCE_CHAIN_SELECTOR = 1;
 
   function setUp() public virtual override {
     super.setUp();
@@ -24,7 +25,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
     address[] memory validSigner = new address[](1);
     validSigner[0] = vm.addr(PRIVATE_KEY_0);
 
-    s_committeeVerifier.setSignatureConfig(validSigner, 1);
+    s_committeeVerifier.setSignatureConfig(DEFAULT_SOURCE_CHAIN_SELECTOR, validSigner, 1);
 
     BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
     destChainConfigs[0] = BaseVerifier.DestChainConfigArgs({
