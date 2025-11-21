@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
-
-import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {ITokenMessenger} from "../../../pools/USDC/interfaces/ITokenMessenger.sol";
+
+import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
+import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -23,6 +23,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
     emit CCTPVerifier.StaticConfigSet(
       address(s_mockTokenMessenger), address(s_messageTransmitterProxy), address(s_USDCToken), LOCAL_DOMAIN_IDENTIFIER
     );
+
     new CCTPVerifier(
       s_mockTokenMessenger,
       s_messageTransmitterProxy,

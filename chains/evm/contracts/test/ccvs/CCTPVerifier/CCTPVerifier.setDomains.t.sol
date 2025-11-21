@@ -19,6 +19,7 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
 
     vm.expectEmit();
     emit CCTPVerifier.DomainsSet(domainUpdates);
+
     s_cctpVerifier.setDomains(domainUpdates);
 
     // Check the domains.
@@ -33,6 +34,7 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
     domainUpdates[0].enabled = false;
     vm.expectEmit();
     emit CCTPVerifier.DomainsSet(domainUpdates);
+
     s_cctpVerifier.setDomains(domainUpdates);
 
     // Check the domains again.

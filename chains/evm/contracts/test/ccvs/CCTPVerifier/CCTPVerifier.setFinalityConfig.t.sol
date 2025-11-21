@@ -26,6 +26,7 @@ contract CCTPVerifier_setFinalityConfig is CCTPVerifierSetup {
 
     vm.expectEmit();
     emit CCTPVerifier.FinalityConfigSet(finalityConfig);
+
     s_cctpVerifier.setFinalityConfig(finalityConfig);
 
     // Check the finality config.

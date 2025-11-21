@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
+
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
-
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
-
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 contract CCTPVerifierSetup is BaseVerifierSetup {
   // solhint-disable-next-line gas-struct-packing
@@ -58,8 +57,10 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   CCTPMessageTransmitterProxy internal s_messageTransmitterProxy;
   IBurnMintERC20 internal s_USDCToken;
 
-  uint256 internal s_transferAmount = 10e6; // 10 USDC
+  bytes internal s_tokenReceiver;
+  address internal s_tokenReceiverAddress;
 
+  uint256 internal constant TRANSFER_AMOUNT = 10e6; // 10 USDC
   uint16 internal constant BPS_DIVIDER = 10_000;
 
   uint32 internal constant CCTP_STANDARD_FINALITY_THRESHOLD = 2000;
@@ -76,6 +77,9 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
 
   function setUp() public virtual override {
     super.setUp();
+
+    s_tokenReceiverAddress = makeAddr("tokenReceiver");
+    s_tokenReceiver = abi.encode(s_tokenReceiverAddress);
 
     BurnMintERC20 usdcToken = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
     s_USDCToken = usdcToken;

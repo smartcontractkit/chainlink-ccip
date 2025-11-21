@@ -11,12 +11,9 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   CCTPVerifierSetup.CCTPMessage internal s_baseCCTPMessage;
-  address internal s_mintRecipient;
 
   function setUp() public virtual override {
     super.setUp();
-
-    s_mintRecipient = makeAddr("mintRecipient");
 
     s_baseCCTPMessage = CCTPVerifierSetup.CCTPMessage({
       header: CCTPVerifierSetup.CCTPMessageHeader({
@@ -33,8 +30,8 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
       body: CCTPVerifierSetup.CCTPMessageBody({
         version: 1,
         burnToken: bytes32(abi.encode(s_USDCToken)),
-        mintRecipient: bytes32(abi.encode(s_mintRecipient)),
-        amount: s_transferAmount,
+        mintRecipient: bytes32(abi.encode(s_tokenReceiverAddress)),
+        amount: TRANSFER_AMOUNT,
         messageSender: ALLOWED_CALLER_ON_SOURCE,
         maxFee: 1e6, // 1 USDC
         feeExecuted: 0,
@@ -60,14 +57,13 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   }
 
   function test_verifyMessage() public {
-    bytes memory tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
       SOURCE_CHAIN_SELECTOR,
       CCIP_FAST_FINALITY_THRESHOLD,
       address(s_USDCToken),
-      s_transferAmount,
-      tokenReceiver
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
 
     s_baseCCTPMessage.hookData.messageId = messageHash;
@@ -77,18 +73,17 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
 
     // Ensure that the mint recipient received the tokens.
     // Mock transmitter always just mints 1 token.
-    assertEq(IERC20(address(s_USDCToken)).balanceOf(s_mintRecipient), 1);
+    assertEq(IERC20(address(s_USDCToken)).balanceOf(s_tokenReceiverAddress), 1);
   }
 
   function test_verifyMessage_RevertWhen_InvalidCCVData() public {
-    bytes memory tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
       SOURCE_CHAIN_SELECTOR,
       CCIP_FAST_FINALITY_THRESHOLD,
       address(s_USDCToken),
-      s_transferAmount,
-      tokenReceiver
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
 
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidCCVData.selector));
@@ -96,14 +91,13 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   }
 
   function test_verifyMessage_RevertWhen_InvalidCCVVersion_VersionPrefix() public {
-    bytes memory tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
       SOURCE_CHAIN_SELECTOR,
       CCIP_FAST_FINALITY_THRESHOLD,
       address(s_USDCToken),
-      s_transferAmount,
-      tokenReceiver
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
     bytes4 invalidVersion = bytes4(uint32(0x01020304));
 
@@ -117,16 +111,14 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   }
 
   function test_verifyMessage_RevertWhen_InvalidCCVVersion_AttestedVersion() public {
-    bytes memory tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
       SOURCE_CHAIN_SELECTOR,
       CCIP_FAST_FINALITY_THRESHOLD,
       address(s_USDCToken),
-      s_transferAmount,
-      tokenReceiver
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
-
     bytes4 invalidVersion = bytes4(uint32(0x01020304));
 
     s_baseCCTPMessage.hookData.verifierVersion = invalidVersion;
@@ -139,14 +131,13 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   }
 
   function test_verifyMessage_RevertWhen_InvalidMessageId() public {
-    bytes memory tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
       SOURCE_CHAIN_SELECTOR,
       CCIP_FAST_FINALITY_THRESHOLD,
       address(s_USDCToken),
-      s_transferAmount,
-      tokenReceiver
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
 
     bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
@@ -156,14 +147,13 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   }
 
   function test_verifyMessage_RevertWhen_UnknownDomain() public {
-    bytes memory tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
       SOURCE_CHAIN_SELECTOR,
       CCIP_FAST_FINALITY_THRESHOLD,
       address(s_USDCToken),
-      s_transferAmount,
-      tokenReceiver
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
 
     s_baseCCTPMessage.hookData.messageId = messageHash;
@@ -186,15 +176,14 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   }
 
   function test_verifyMessage_RevertWhen_InvalidMessageSender() public {
-    bytes memory tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
     bytes32 invalidMessageSender = keccak256("invalidMessageSender");
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
       SOURCE_CHAIN_SELECTOR,
       CCIP_FAST_FINALITY_THRESHOLD,
       address(s_USDCToken),
-      s_transferAmount,
-      tokenReceiver
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
 
     s_baseCCTPMessage.hookData.messageId = messageHash;
@@ -208,14 +197,13 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   }
 
   function test_verifyMessage_RevertWhen_ReceiveMessageCallFailed() public {
-    bytes memory tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
       SOURCE_CHAIN_SELECTOR,
       CCIP_FAST_FINALITY_THRESHOLD,
       address(s_USDCToken),
-      s_transferAmount,
-      tokenReceiver
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
     );
 
     s_baseCCTPMessage.hookData.messageId = messageHash;
