@@ -125,8 +125,8 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     s_cctpVerifier.applyDestChainConfigUpdates(destChainConfigArgs);
 
     // Set the domains.
-    CCTPVerifier.DomainUpdate[] memory domains = new CCTPVerifier.DomainUpdate[](1);
-    domains[0] = CCTPVerifier.DomainUpdate({
+    CCTPVerifier.SetDomainArgs[] memory domains = new CCTPVerifier.SetDomainArgs[](1);
+    domains[0] = CCTPVerifier.SetDomainArgs({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
       mintRecipientOnDest: bytes32(0),
@@ -154,10 +154,18 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   ) internal pure returns (bytes memory) {
     return abi.encodePacked(
       verifierVersion, // Prefix for routing.
+      _encodeCCTPMessage(cctpMessage),
+      new bytes(65) // Signature.
+    );
+  }
+
+  function _encodeCCTPMessage(
+    CCTPVerifierSetup.CCTPMessage memory cctpMessage
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(
       _encodeCCTPMessageHeader(cctpMessage.header),
       _encodeCCTPMessageBody(cctpMessage.body),
-      _encodeCCTPMessageHookData(cctpMessage.hookData),
-      new bytes(65) // Signature.
+      _encodeCCTPMessageHookData(cctpMessage.hookData)
     );
   }
 

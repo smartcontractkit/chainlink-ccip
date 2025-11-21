@@ -36,6 +36,12 @@ contract MockE2EUSDCTransmitterCCTPV2 is IMessageTransmitterWithRelay {
    * @param message Raw bytes of message
    */
   event MessageSent(bytes message);
+  /**
+   * @notice Emitted when a new message is received
+   * @param message Raw bytes of message
+   * @param attestation Raw bytes of attestation
+   */
+  event MessageReceived(bytes message, bytes attestation);
 
   constructor(uint32 _version, uint32 _localDomain, address token) {
     i_version = _version;
@@ -59,7 +65,7 @@ contract MockE2EUSDCTransmitterCCTPV2 is IMessageTransmitterWithRelay {
   /// minFinalityThreshold       4              uint32    140
   /// finalityThresholdExecuted  4              uint32    144
   /// messageBody                dynamic        bytes     148
-  function receiveMessage(bytes calldata message, bytes calldata) external returns (bool success) {
+  function receiveMessage(bytes calldata message, bytes calldata attestation) external returns (bool success) {
     // The receiver of the funds is the _mintRecipient in the following encoded format
     //   function _formatMessage(
     //    uint32 _version,             4
@@ -74,6 +80,8 @@ contract MockE2EUSDCTransmitterCCTPV2 is IMessageTransmitterWithRelay {
     address recipient = address(bytes20(message[148 + 36 + 12:148 + 36 + 12 + 20]));
     // We always mint 1 token to not complicate the test.
     i_token.mint(recipient, 1);
+
+    emit MessageReceived(message, attestation);
 
     return s_shouldSucceed;
   }

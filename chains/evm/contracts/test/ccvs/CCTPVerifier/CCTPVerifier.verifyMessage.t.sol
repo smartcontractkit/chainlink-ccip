@@ -5,6 +5,7 @@ import {IMessageTransmitter} from "../../../pools/USDC/interfaces/IMessageTransm
 
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -44,8 +45,8 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     });
 
     // Set the domain for the source chain.
-    CCTPVerifier.DomainUpdate[] memory domainUpdates = new CCTPVerifier.DomainUpdate[](1);
-    domainUpdates[0] = CCTPVerifier.DomainUpdate({
+    CCTPVerifier.SetDomainArgs[] memory domainUpdates = new CCTPVerifier.SetDomainArgs[](1);
+    domainUpdates[0] = CCTPVerifier.SetDomainArgs({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
       mintRecipientOnDest: bytes32(0),
@@ -68,6 +69,12 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
 
     s_baseCCTPMessage.hookData.messageId = messageHash;
     bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    // Ensure that the mint recipient has no tokens yet.
+    assertEq(IERC20(address(s_USDCToken)).balanceOf(s_tokenReceiverAddress), 0);
+
+    vm.expectEmit();
+    emit MockE2EUSDCTransmitterCCTPV2.MessageReceived(_encodeCCTPMessage(s_baseCCTPMessage), new bytes(65));
 
     s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
 
@@ -160,8 +167,8 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
 
     // Disable domain.
-    CCTPVerifier.DomainUpdate[] memory domainUpdates = new CCTPVerifier.DomainUpdate[](1);
-    domainUpdates[0] = CCTPVerifier.DomainUpdate({
+    CCTPVerifier.SetDomainArgs[] memory domainUpdates = new CCTPVerifier.SetDomainArgs[](1);
+    domainUpdates[0] = CCTPVerifier.SetDomainArgs({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
       mintRecipientOnDest: bytes32(0),

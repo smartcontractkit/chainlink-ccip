@@ -49,8 +49,8 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
 
     // Set a custom mint recipient for the domain.
     bytes32 customMintRecipient = bytes32(uint256(uint160(makeAddr("customMintRecipient"))));
-    CCTPVerifier.DomainUpdate[] memory domainUpdates = new CCTPVerifier.DomainUpdate[](1);
-    domainUpdates[0] = CCTPVerifier.DomainUpdate({
+    CCTPVerifier.SetDomainArgs[] memory domainUpdates = new CCTPVerifier.SetDomainArgs[](1);
+    domainUpdates[0] = CCTPVerifier.SetDomainArgs({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
       mintRecipientOnDest: customMintRecipient,
@@ -223,8 +223,8 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     );
 
     // Disable domain.
-    CCTPVerifier.DomainUpdate[] memory domainUpdates = new CCTPVerifier.DomainUpdate[](1);
-    domainUpdates[0] = CCTPVerifier.DomainUpdate({
+    CCTPVerifier.SetDomainArgs[] memory domainUpdates = new CCTPVerifier.SetDomainArgs[](1);
+    domainUpdates[0] = CCTPVerifier.SetDomainArgs({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
       mintRecipientOnDest: bytes32(0),

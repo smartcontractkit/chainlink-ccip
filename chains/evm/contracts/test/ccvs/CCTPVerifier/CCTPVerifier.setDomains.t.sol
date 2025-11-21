@@ -7,8 +7,8 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 
 contract CCTPVerifier_setDomains is CCTPVerifierSetup {
   function test_setDomains() public {
-    CCTPVerifier.DomainUpdate[] memory domainUpdates = new CCTPVerifier.DomainUpdate[](1);
-    domainUpdates[0] = CCTPVerifier.DomainUpdate({
+    CCTPVerifier.SetDomainArgs[] memory domainUpdates = new CCTPVerifier.SetDomainArgs[](1);
+    domainUpdates[0] = CCTPVerifier.SetDomainArgs({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
       mintRecipientOnDest: bytes32(0),
@@ -45,12 +45,12 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
   function test_setDomains_RevertWhen_OnlyCallableByOwner() public {
     vm.startPrank(STRANGER);
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_cctpVerifier.setDomains(new CCTPVerifier.DomainUpdate[](0));
+    s_cctpVerifier.setDomains(new CCTPVerifier.SetDomainArgs[](0));
   }
 
   function test_setDomains_RevertWhen_InvalidDomain_AllowedCallerOnDestIsZero() public {
-    CCTPVerifier.DomainUpdate[] memory domainUpdates = new CCTPVerifier.DomainUpdate[](1);
-    domainUpdates[0] = CCTPVerifier.DomainUpdate({
+    CCTPVerifier.SetDomainArgs[] memory domainUpdates = new CCTPVerifier.SetDomainArgs[](1);
+    domainUpdates[0] = CCTPVerifier.SetDomainArgs({
       allowedCallerOnDest: bytes32(0),
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
       mintRecipientOnDest: bytes32(0),
@@ -59,13 +59,13 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
       enabled: true
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidDomainUpdate.selector, domainUpdates[0]));
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidSetDomainArgs.selector, domainUpdates[0]));
     s_cctpVerifier.setDomains(domainUpdates);
   }
 
   function test_setDomains_RevertWhen_InvalidDomain_AllowedCallerOnSourceIsZero() public {
-    CCTPVerifier.DomainUpdate[] memory domainUpdates = new CCTPVerifier.DomainUpdate[](1);
-    domainUpdates[0] = CCTPVerifier.DomainUpdate({
+    CCTPVerifier.SetDomainArgs[] memory domainUpdates = new CCTPVerifier.SetDomainArgs[](1);
+    domainUpdates[0] = CCTPVerifier.SetDomainArgs({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: bytes32(0),
       mintRecipientOnDest: bytes32(0),
@@ -74,13 +74,13 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
       enabled: true
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidDomainUpdate.selector, domainUpdates[0]));
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidSetDomainArgs.selector, domainUpdates[0]));
     s_cctpVerifier.setDomains(domainUpdates);
   }
 
   function test_setDomains_RevertWhen_InvalidDomain_DestChainSelectorIsZero() public {
-    CCTPVerifier.DomainUpdate[] memory domainUpdates = new CCTPVerifier.DomainUpdate[](1);
-    domainUpdates[0] = CCTPVerifier.DomainUpdate({
+    CCTPVerifier.SetDomainArgs[] memory domainUpdates = new CCTPVerifier.SetDomainArgs[](1);
+    domainUpdates[0] = CCTPVerifier.SetDomainArgs({
       allowedCallerOnDest: ALLOWED_CALLER_ON_DEST,
       allowedCallerOnSource: ALLOWED_CALLER_ON_SOURCE,
       mintRecipientOnDest: bytes32(0),
@@ -89,7 +89,7 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
       enabled: true
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidDomainUpdate.selector, domainUpdates[0]));
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidSetDomainArgs.selector, domainUpdates[0]));
     s_cctpVerifier.setDomains(domainUpdates);
   }
 }
