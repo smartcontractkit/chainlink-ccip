@@ -635,13 +635,18 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
+	upgradeAuthority, err := utils.GetUpgradeAuthority(deps.Chain.Client, id)
+	if err != nil {
+		return MCMOutput{}, fmt.Errorf("failed to get upgrade authority: %w", err)
+	}
+
 	instructionBuilder := timelock.NewBatchAddAccessInstruction([32]uint8(
 		state.PDASeed([]byte(seed[:]))),
 		in.Role,
 		timelockConfigPDA,
 		solana.MustPublicKeyFromBase58(accessControllerProgram.Address),
 		solana.MustPublicKeyFromBase58(roleAccount.Address),
-		deps.Chain.DeployerKey.PublicKey())
+		upgradeAuthority)
 
 	for _, account := range in.Accounts {
 		instructionBuilder.Append(solana.Meta(account))
@@ -650,11 +655,6 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 	instruction, err := instructionBuilder.ValidateAndBuild()
 	if err != nil {
 		return MCMOutput{}, fmt.Errorf("failed to build BatchAddAccess instruction: %w", err)
-	}
-
-	upgradeAuthority, err := utils.GetUpgradeAuthority(deps.Chain.Client, id)
-	if err != nil {
-		return MCMOutput{}, fmt.Errorf("failed to get upgrade authority: %w", err)
 	}
 
 	if upgradeAuthority != deps.Chain.DeployerKey.PublicKey() {
@@ -671,7 +671,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 			BatchOps: []types.BatchOperation{batch},
 		}, nil
 	}
-	
+
 	err = deps.Chain.Confirm([]solana.Instruction{instruction})
 	if err != nil {
 		return MCMOutput{}, fmt.Errorf("failed to confirm BatchAddAccess instruction: %w", err)
@@ -692,7 +692,7 @@ func transferToTimelockSolanaOp(b operations.Bundle, deps Deps, in TransferToTim
 		contract.Seed,
 		in.NewOwner,
 		contract.OwnerPDA,
-		solChain.DeployerKey.PublicKey())
+		in.CurrentOwner)
 	if err != nil {
 		return out, fmt.Errorf("failed to create transfer ownership instruction: %w", err)
 	}
