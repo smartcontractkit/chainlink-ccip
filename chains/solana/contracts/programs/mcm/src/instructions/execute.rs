@@ -89,9 +89,15 @@ pub fn execute<'info>(
     ];
     let signer = &[&seeds[..]];
 
-    ctx.accounts.expiring_root_and_op_count.op_count += 1;
-
     invoke_signed(&instruction, acc_infos, signer)?;
+
+    // Reload the accounts to avoid Anchor writing back the stale outer copy on exit
+    // (in case the CPI modified any accounts present in this outer context)
+    ctx.accounts.multisig_config.reload()?;
+    ctx.accounts.root_metadata.reload()?;
+    ctx.accounts.expiring_root_and_op_count.reload()?;
+
+    ctx.accounts.expiring_root_and_op_count.op_count += 1;
 
     emit!(OpExecuted {
         nonce,
