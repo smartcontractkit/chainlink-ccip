@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
+import {IExecutor} from "../../../interfaces/IExecutor.sol";
 import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
@@ -465,5 +466,74 @@ contract OnRamp_getReceipts is OnRampSetup {
     // NO_EXECUTION_ADDRESS results in zero executor fee.
     // Total fee may be zero if CCV fee is also zero.
     assertEq(0, receipts[1].feeTokenAmount);
+  }
+
+  function test_getReceipts_bpsMultiplierOnlyAppliedToUsdBasedFees() public {
+    vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
+    vm.mockCall(
+      s_pool,
+      abi.encodeWithSelector(IPoolV2.getFee.selector),
+      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0), true)
+    );
+
+    address verifier1Impl = makeAddr("verifier1Impl");
+    _mockVerifier(s_verifier1, verifier1Impl);
+    _mockVerifierFee(verifier1Impl);
+
+    uint32 executorFlatFeeUSDCents = 50; // $0.50.
+    uint32 totalGasReturned = 200_000;
+    uint256 execGasCostUSDCents = 10_00; // $10.00 for gas execution cost.
+    uint256 bpsMultiplier = 80_00; // 20% discount.
+
+    vm.mockCall(
+      s_defaultExecutor, abi.encodeWithSelector(IExecutor.getFee.selector), abi.encode(executorFlatFeeUSDCents)
+    );
+
+    Client.EVM2AnyMessage memory message = _createMessage(100 ether);
+    address[] memory ccvs = new address[](1);
+    ccvs[0] = s_verifier1;
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
+
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+
+    // Mock quoteGasForExec to return specific bpsMultiplier and gas cost.
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(totalGasReturned, execGasCostUSDCents, feeTokenPrice, bpsMultiplier)
+    );
+
+    (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+
+    assertEq(receipts.length, 3, "Should have 3 receipts");
+
+    // USD-based fees (verifier, pool, executor flat fee) should have bpsMultiplier applied.
+    assertEq(
+      receipts[0].feeTokenAmount,
+      (uint256(VERIFIER_FEE_USD_CENTS) * bpsMultiplier * 1e30) / feeTokenPrice,
+      "Verifier fee with bpsMultiplier"
+    );
+    assertEq(
+      receipts[1].feeTokenAmount,
+      (uint256(POOL_FEE_USD_CENTS) * bpsMultiplier * 1e30) / feeTokenPrice,
+      "Pool fee with bpsMultiplier"
+    );
+
+    // Executor fee: flat fee (WITH bps) + gas execution cost (WITHOUT bps multiplier).
+    uint256 expectedExecutorFlatFee = (executorFlatFeeUSDCents * bpsMultiplier * 1e30) / feeTokenPrice;
+    uint256 expectedGasExecutionCost = (execGasCostUSDCents * 1e34) / feeTokenPrice;
+    assertEq(
+      receipts[2].feeTokenAmount,
+      expectedExecutorFlatFee + expectedGasExecutionCost,
+      "Executor: flat fee WITH bps + gas cost WITHOUT bps"
+    );
+
+    // Verify total fee matches sum.
+    assertEq(
+      feeTokenAmount,
+      receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount,
+      "Total matches sum"
+    );
   }
 }

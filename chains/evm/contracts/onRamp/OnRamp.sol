@@ -839,26 +839,29 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       s_dynamicConfig.feeQuoter
     ).quoteGasForExec(destChainSelector, gasLimitSum, bytesOverheadSum, message.feeToken);
 
-    gasLimitSum = updatedGasLimitSum;
-
-    // Update the fee of the executor to include execution costs.
-    if (extraArgs.executor != Client.NO_EXECUTION_ADDRESS) {
-      receipts[executorIndex].feeTokenAmount += execCostInUSDCents;
-    }
-
-    // Transform the USD based fees into fee token amounts & sum them.
+    // Transform the USD based fees into fee token amounts & sum them. For the executor, if the executor isn't
+    // NO_EXECUTION_ADDRESS we also add the execution cost.
     for (uint256 i = 0; i < receipts.length; ++i) {
       // Example:
-      // feeTokenPrice = $15 = 15e18
-      // usdFeeCents = $1.50 = 150
-      // feeTokenAmount = 150 * 1e34 / 15e18 = 1e17 (0.1 tokens of the fee token)
+      // - feeTokenPrice = $15 = 15e18
+      // - usdFeeCents = $1.50 = 150
+      // - feeTokenAmount = 150 * 1e34 / 15e18 = 1e17 (0.1 tokens of the fee token)
       // Normally we'd multiple by 1e36, but since usdFeeCents has 2 decimals and bpsMultiplier has 4 decimals, we use
       // 1e30 here.
-      receipts[i].feeTokenAmount = receipts[i].feeTokenAmount * bpsMultiplier * 1e30 / feeTokenPrice;
+      receipts[i].feeTokenAmount *= bpsMultiplier * 1e30 / feeTokenPrice;
+
+      if (i == executorIndex) {
+        // Update the fee of the executor to include execution costs.
+        if (extraArgs.executor != Client.NO_EXECUTION_ADDRESS) {
+          // Add execution cost to the executor's fee. Execution cost should not be multiplied by bpsMultiplier.
+          receipts[i].feeTokenAmount += execCostInUSDCents * 1e34 / feeTokenPrice;
+        }
+      }
+
       feeTokenAmount += receipts[i].feeTokenAmount;
     }
 
-    return (receipts, gasLimitSum, feeTokenAmount);
+    return (receipts, updatedGasLimitSum, feeTokenAmount);
   }
 
   /// @notice Gets the execution fee receipt. Takes into account specifying the NO_EXECUTION_ADDRESS.
