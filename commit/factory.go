@@ -146,6 +146,12 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		readerFacades[chain] = cr
 	}
 
+	// Wrap chainAccessors to clear TxHash
+	wrappedAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
+	for chainSel, accessor := range p.chainAccessors {
+		wrappedAccessors[chainSel] = readerpkg.NewChainAccessorWrapper(accessor, offchainConfig.PopulateTxHashEnabled)
+	}
+
 	// Bind the RMNHome contract
 	var rmnHomeReader readerpkg.RMNHome
 	if offchainConfig.RMNEnabled {
@@ -181,7 +187,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
-		p.chainAccessors,
+		wrappedAccessors,
 		readerFacades,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
@@ -193,7 +199,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	// The node supports the chain that the token prices are on.
-	_, ok := p.chainAccessors[offchainConfig.PriceFeedChainSelector]
+	_, ok := wrappedAccessors[offchainConfig.PriceFeedChainSelector]
 	if ok {
 		// Bind all token aggregate contracts
 		for _, info := range offchainConfig.TokenInfo {
@@ -203,7 +209,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 					fmt.Errorf("failed to create unknown address from aggregator address %s: %w",
 						info.AggregatorAddress, err)
 			}
-			err = p.chainAccessors[offchainConfig.PriceFeedChainSelector].
+			err = wrappedAccessors[offchainConfig.PriceFeedChainSelector].
 				Sync(ctx, consts.ContractNamePriceAggregator, priceAggAddress)
 			if err != nil {
 				return nil, ocr3types.ReportingPluginInfo{},
@@ -215,7 +221,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 
 	onChainTokenPricesReader := readerpkg.NewPriceReader(
 		logutil.WithComponent(lggr, "PriceReader"),
-		p.chainAccessors,
+		wrappedAccessors,
 		offchainConfig.TokenInfo,
 		ccipReader,
 		offchainConfig.PriceFeedChainSelector,

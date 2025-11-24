@@ -146,6 +146,10 @@ type CommitOffchainConfig struct {
 	// in order to avoid delays when there are reports from multiple sources.
 	// NOTE: this can only be used if RMNEnabled == false.
 	MultipleReportsEnabled bool `json:"multipleReports"`
+
+	// PopulateTxHashEnabled enables populating the TxHash field in message headers.
+	// When disabled, TxHash will be omitted from messages for backwards compatibility.
+	PopulateTxHashEnabled bool `json:"populateTxHashEnabled"`
 }
 
 const (

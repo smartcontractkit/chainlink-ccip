@@ -145,7 +145,7 @@ func (p PluginFactory) NewReportingPlugin(
 	// Wrap chainAccessors to control TxHash population based on config
 	wrappedAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 	for chainSel, accessor := range p.chainAccessors {
-		wrappedAccessors[chainSel] = NewChainAccessorWrapper(accessor, offchainConfig.PopulateTxHashEnabled)
+		wrappedAccessors[chainSel] = readerpkg.NewChainAccessorWrapper(accessor, offchainConfig.PopulateTxHashEnabled)
 	}
 
 	ccipReader, err := readerpkg.NewCCIPChainReader(
