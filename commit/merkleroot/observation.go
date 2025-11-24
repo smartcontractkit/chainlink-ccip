@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -568,7 +569,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 			defer wg.Done()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
-				if errors.Is(err, contractreader.ErrNoBindings) {
+				if isNoBindingsError(err) {
 					// when a source chain is disabled there will not be a binding for the onRamp contract
 					// we don't want to log this as an error.
 					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
@@ -777,4 +778,11 @@ func (o observerImpl) ObserveFChain(ctx context.Context) map[cciptypes.ChainSele
 
 func (o observerImpl) Close() error {
 	return nil
+}
+
+func isNoBindingsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, contractreader.ErrNoBindings) || strings.Contains(err.Error(), "no bindings")
 }
