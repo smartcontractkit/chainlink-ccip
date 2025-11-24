@@ -383,11 +383,6 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		// Populate TxHash from Sequence item
 		if len(item.TxHash) > 0 {
 			msg.Message.Header.TxHash = hexutil.Encode(item.TxHash)
-		} else {
-			// TxHash is empty - log warning and leave it empty
-			lggr.Warnw("transaction hash is empty",
-				"cursor", item.Cursor,
-				"seqNum", msg.Message.Header.SequenceNumber)
 		}
 
 		msgs = append(msgs, msg.Message)

@@ -142,10 +142,16 @@ func (p PluginFactory) NewReportingPlugin(
 		readerFacades[chain] = cr
 	}
 
+	// Wrap chainAccessors to control TxHash population based on config
+	wrappedAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
+	for chainSel, accessor := range p.chainAccessors {
+		wrappedAccessors[chainSel] = NewChainAccessorWrapper(accessor, offchainConfig.PopulateTxHashEnabled)
+	}
+
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
-		p.chainAccessors,
+		wrappedAccessors,
 		readerFacades,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
@@ -163,7 +169,7 @@ func (p PluginFactory) NewReportingPlugin(
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
 		p.looppCCIPProviderSupported,
-		p.chainAccessors,
+		wrappedAccessors,
 		p.extendedReaders,
 		p.addrCodec,
 	)
