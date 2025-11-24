@@ -63,7 +63,7 @@ type FeeQuoterDestChainConfig struct {
 	DefaultTxGasLimit                 uint32
 	GasMultiplierWeiPerEth            uint64
 	GasPriceStalenessThreshold        uint32
-	NetworkFeeUSDCents                uint32
+	NetworkFeeUSDCents                uint16
 }
 
 type ConnectChainsConfig struct {
