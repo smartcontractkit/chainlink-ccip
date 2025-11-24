@@ -91,7 +91,7 @@ type ContractParams struct {
 
 type DeployChainContractsInput struct {
 	ChainSelector     uint64 // Only exists to differentiate sequence runs on different chains
-	CREATE2Factory   common.Address
+	CREATE2Factory    common.Address
 	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
 }
@@ -207,15 +207,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					// TODO: Add Timelock here when MCMS support is needed.
 					chain.DeployerKey.From,
 				},
-				FeeTokens: []fee_quoter.FeeTokenArgs{
-					{
-						Token:                      common.HexToAddress(linkRef.Address),
-						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoter.LINKPremiumMultiplierWeiPerEth,
-					},
-					{
-						Token:                      common.HexToAddress(wethRef.Address),
-						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoter.WETHPremiumMultiplierWeiPerEth,
-					},
+				FeeTokens: []common.Address{
+					common.HexToAddress(linkRef.Address), common.HexToAddress(wethRef.Address),
 				},
 				// Skipped fields:
 				// - TokenPriceFeeds (will not be used in 1.7.0)
@@ -295,7 +288,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifiers {
 			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
-				CREATE2Factory:   input.CREATE2Factory,
+				CREATE2Factory:    input.CREATE2Factory,
 				ExistingAddresses: input.ExistingAddresses,
 				Params:            committeeVerifierParams,
 			})
