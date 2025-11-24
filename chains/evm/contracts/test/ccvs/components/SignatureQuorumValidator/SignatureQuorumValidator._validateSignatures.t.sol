@@ -60,6 +60,9 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
     newVerifier.validateSignatures(sourceChainSelector, TEST_HASH, "");
   }
 
+  // Even if multiple source chains share signers, signatures intended for one source chain
+  // can not be used to validate messages from different source chains, because the message
+  // hash will change.
   function test_validateSignatures_RevertWhen_SignaturesFromDifferentSource() public {
     bytes32 hashSourceA = keccak256("message-src-a");
     bytes32 hashSourceB = keccak256("message-src-b");
