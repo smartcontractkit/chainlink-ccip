@@ -614,7 +614,7 @@ func (l *DefaultAccessor) ExecutedMessages(
 			append(executed[stateChange.SourceChainSelector], stateChange.SequenceNumber)
 	}
 
-	lggr.Debug("decoded executed message sequence numbers", "executed", executed)
+	lggr.Debugw("decoded executed message sequence numbers", "executed", executed)
 	return executed, nil
 }
 
