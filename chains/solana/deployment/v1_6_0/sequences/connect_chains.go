@@ -139,7 +139,7 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig 
 		DefaultTxGasLimit:                 fqc.DefaultTxGasLimit,
 		GasMultiplierWeiPerEth:            fqc.GasMultiplierWeiPerEth,
 		GasPriceStalenessThreshold:        fqc.GasPriceStalenessThreshold,
-		NetworkFeeUsdcents:                fqc.NetworkFeeUSDCents,
+		NetworkFeeUsdcents:                uint32(fqc.NetworkFeeUSDCents),
 	}
 }
 

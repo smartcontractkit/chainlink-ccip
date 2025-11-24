@@ -26,6 +26,7 @@ func CreateBasicFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfig {
 		DefaultTxGasLimit:           200_000,
 		NetworkFeeUSDCents:          10,
 		ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c}, // EVM
+		LinkFeeMultiplierPercent:    90,
 	}
 }
 
