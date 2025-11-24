@@ -267,6 +267,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       })
     );
 
+    // We do not return the verifier version here.
+    // Offchain verifier is expected to pull verifier version from the hook data & prefix the ccvData with it.
     return "";
   }
 
