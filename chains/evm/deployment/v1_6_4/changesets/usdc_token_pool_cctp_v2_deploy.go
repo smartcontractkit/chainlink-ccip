@@ -91,7 +91,7 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 				if perChainInput.Token == (common.Address{}) {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token address for chain %d: %w", perChainInput.ChainSelector, err)
 				}
-				TokenAddress = retrievedTokenAddress
+				TokenAddress = perChainInput.Token
 			} else if err == nil {
 				TokenAddress = retrievedTokenAddress
 			}

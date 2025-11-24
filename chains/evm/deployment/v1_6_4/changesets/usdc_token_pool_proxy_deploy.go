@@ -90,7 +90,7 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 				ChainSelector: perChainInput.ChainSelector,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 
-			cctpV2PoolAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			cctpV2PoolAddress, _ := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:          datastore.ContractType("USDCTokenPoolCCTPV2"),
 				Version:       semver.MustParse("1.6.4"),
 				ChainSelector: perChainInput.ChainSelector,
