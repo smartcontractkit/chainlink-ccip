@@ -860,9 +860,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     gasLimitSum += receipts[executorIndex].destGasLimit;
     bytesOverheadSum += receipts[executorIndex].destBytesOverhead;
 
-    (uint32 updatedGasLimitSum, uint256 execCostInUSDCents, uint256 feeTokenPrice, uint256 bpsMultiplier) = IFeeQuoter(
-      s_dynamicConfig.feeQuoter
-    ).quoteGasForExec(destChainSelector, gasLimitSum, bytesOverheadSum, message.feeToken);
+    (uint32 updatedGasLimitSum, uint256 execCostInUSDCents, uint256 feeTokenPrice, uint256 percentMultiplier) =
+    IFeeQuoter(s_dynamicConfig.feeQuoter).quoteGasForExec(
+      destChainSelector, gasLimitSum, bytesOverheadSum, message.feeToken
+    );
 
     // Transform the USD based fees into fee token amounts & sum them. For the executor, if the executor isn't
     // NO_EXECUTION_ADDRESS we also add the execution cost.
@@ -871,9 +872,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // - feeTokenPrice = $15 = 15e18
       // - usdFeeCents = $1.50 = 150
       // - feeTokenAmount = 150 * 1e34 / 15e18 = 1e17 (0.1 tokens of the fee token)
-      // Normally we'd multiple by 1e36, but since usdFeeCents has 2 decimals and bpsMultiplier has 4 decimals, we use
-      // 1e30 here.
-      receipts[i].feeTokenAmount *= bpsMultiplier * 1e30 / feeTokenPrice;
+      // Normally we'd multiple by 1e36, but since usdFeeCents has 2 decimals and bpsMultiplier has 2 decimals, we use
+      // 1e32 here.
+      receipts[i].feeTokenAmount *= percentMultiplier * 1e32 / feeTokenPrice;
 
       if (i == executorIndex) {
         // Update the fee of the executor to include execution costs.

@@ -70,7 +70,7 @@ interface IFeeQuoter {
   /// @return totalGas The total gas needed for the message.
   /// @return gasCostInUsdCents The gas cost in USD cents, taking into account the calldata cost as well.
   /// @return feeTokenPrice The price of the fee token in 1e18 USD.
-  /// @return premiumBasisPointsMultiplier The premium in basis points.
+  /// @return premiumPercentMultiplier The premium in percent.
   function quoteGasForExec(
     uint64 destChainSelector,
     uint32 nonCalldataGas,
@@ -79,7 +79,7 @@ interface IFeeQuoter {
   )
     external
     view
-    returns (uint32 totalGas, uint256 gasCostInUsdCents, uint256 feeTokenPrice, uint256 premiumBasisPointsMultiplier);
+    returns (uint32 totalGas, uint256 gasCostInUsdCents, uint256 feeTokenPrice, uint256 premiumPercentMultiplier);
 
   /// @notice Resolves legacy extra args for backward compatibility. Only has to support EVM, SVM, Aptos and SUI chain
   /// families as all future families have to use the new extraArgs format.

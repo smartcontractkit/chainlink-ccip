@@ -20,6 +20,8 @@ contract FeeQuoterSetup is TokenSetup {
   uint16 internal constant MAX_TOKENS_LENGTH = 1;
   uint32 internal constant MAX_GAS_LIMIT = 4_000_000;
 
+  uint8 internal constant LINK_FEE_MULTIPLIER_PERCENT = 90; // 10% discount
+
   // OnRamp
   uint96 internal constant MAX_MSG_FEES_JUELS = 1_000e18;
   uint32 internal constant DEST_GAS_OVERHEAD = 300_000;
@@ -210,7 +212,8 @@ contract FeeQuoterSetup is TokenSetup {
         defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
         defaultTxGasLimit: GAS_LIMIT,
         networkFeeUSDCents: 1_00,
-        chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM
+        chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+        linkFeeMultiplierPercent: LINK_FEE_MULTIPLIER_PERCENT
       })
     });
     return destChainConfigs;

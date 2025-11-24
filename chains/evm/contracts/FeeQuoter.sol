@@ -76,7 +76,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     uint16 defaultTokenFeeUSDCents; //     │ Default token fee charged per token transfer.
     uint32 defaultTokenDestGasOverhead; // │ Default gas charged to execute a token transfer on the destination chain.
     uint32 defaultTxGasLimit; //           │ Default gas limit for a tx.
-    uint32 networkFeeUSDCents; // ─────────╯ Flat network fee to charge for messages, multiples of 0.01 USD.
+    uint16 networkFeeUSDCents; //          │ Flat network fee to charge for messages, multiples of 0.01 USD.
+    uint8 linkFeeMultiplierPercent; // ────╯ Basis points discount to apply when fee is paid in LINK.
   }
 
   /// @dev Struct to hold the configs and its destination chain selector. Same as DestChainConfig but with the
@@ -117,8 +118,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   }
 
   string public constant override typeAndVersion = "FeeQuoter 1.7.0-dev";
-
-  uint256 private constant LINK_BASIS_POINTS_MULTIPLIER = 90_00; // 90%
 
   /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to
   /// misconfiguration.
@@ -305,7 +304,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   )
     external
     view
-    returns (uint32 totalGas, uint256 gasCostInUsdCents, uint256 feeTokenPrice, uint256 premiumBasisPointsMultiplier)
+    returns (uint32 totalGas, uint256 gasCostInUsdCents, uint256 feeTokenPrice, uint256 premiumPercentMultiplier)
   {
     DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
     if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
@@ -331,10 +330,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     gasCostInUsdCents = (totalGas * uint256(uint112(price.value)) + (1e16 - 1)) / 1e16;
 
     // Applies the premium or discount based on the fee token used.
-    // Payments in Link get a 10% discount, consistent with the legacy code paths.
-    premiumBasisPointsMultiplier = feeToken == i_linkToken ? LINK_BASIS_POINTS_MULTIPLIER : 100_00;
+    // Payments in Link get a discount, consistent with the legacy code paths. 100% for non-link fee's
+    premiumPercentMultiplier = feeToken == i_linkToken ? destChainConfig.linkFeeMultiplierPercent : 100;
 
-    return (totalGas, gasCostInUsdCents, getValidatedTokenPrice(feeToken), premiumBasisPointsMultiplier);
+    return (totalGas, gasCostInUsdCents, getValidatedTokenPrice(feeToken), premiumPercentMultiplier);
   }
 
   /// @notice Gets the transfer fee config for a given token.
@@ -659,10 +658,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       // Convert USD cents with 2 decimals to 18 decimals.
       premiumFeeUSDWei = uint256(destChainConfig.networkFeeUSDCents) * 1e16;
     }
-    // Apply the premium multiplier for the fee token, making it 36 decimals
+    // Apply the premium multiplier for the fee token, making it 36 decimals.
     if (message.feeToken == i_linkToken) {
-      // LINK_BASIS_POINTS_MULTIPLIER is 1e4 based (bps) to we multiply by 1e14 to get to 36 decimals.
-      premiumFeeUSDWei *= LINK_BASIS_POINTS_MULTIPLIER * 1e14; // 0.9x for LINK
+      // destChainConfig is 1e2 based (percent) to we multiply by 1e16 to get to 36 decimals.
+      premiumFeeUSDWei *= uint256(destChainConfig.linkFeeMultiplierPercent) * 1e16; // Discount for LINK.
     } else {
       premiumFeeUSDWei *= 1e18; // 1.0x for other tokens
     }
