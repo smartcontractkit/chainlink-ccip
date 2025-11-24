@@ -34,7 +34,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   uint256 public constant MIN_USDC_MESSAGE_LENGTH = 280;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "USDCTokenPoolCCTPV2 1.6.x-dev";
+    return "USDCTokenPoolCCTPV2 1.6.4";
   }
 
   /// @dev This contract is only used for CCTP V2, which is why the supportedUSDCVersion field of the parent

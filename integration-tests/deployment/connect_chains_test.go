@@ -10,12 +10,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+	"github.com/stretchr/testify/require"
+
 	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	solanasequences "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
@@ -24,13 +28,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-	"github.com/stretchr/testify/require"
+
+	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 func checkBidirectionalLaneConnectivity(
@@ -57,6 +59,7 @@ func checkBidirectionalLaneConnectivity(
 	offRampOnSrcAddr, err := solanaAdapter.GetOffRampAddress(e.DataStore, solanaChain.Selector)
 	require.NoError(t, err, "must get offRamp from srcAdapter")
 
+	// Validate EVM PDAs are set
 	offRampEvmSourceChainPDA, _, _ = state.FindOfframpSourceChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(offRampOnSrcAddr))
 	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
 	require.NoError(t, err)
@@ -71,6 +74,7 @@ func checkBidirectionalLaneConnectivity(
 	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
 	require.NoError(t, err, "failed to get account info")
 	require.Equal(t, !disable, destChainFqAccount.Config.IsEnabled)
+	require.Equal(t, solanasequences.TranslateFQ(evmChain.FeeQuoterDestChainConfig), destChainFqAccount.Config)
 
 	// EVM Validation
 	feeQuoterOnDestAddr, err := evmAdapter.GetFQAddress(e.DataStore, evmChain.Selector)
@@ -131,7 +135,7 @@ func checkBidirectionalLaneConnectivity(
 
 func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	t.Parallel()
-	programsPath, ds, err := PreloadSolanaEnvironment(chain_selectors.SOLANA_MAINNET.Selector)
+	programsPath, ds, err := PreloadSolanaEnvironment(t, chain_selectors.SOLANA_MAINNET.Selector)
 	require.NoError(t, err, "Failed to set up Solana environment")
 	require.NotNil(t, ds, "Datastore should be created")
 
@@ -180,7 +184,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		out.DataStore.Merge(e.DataStore)
 		e.DataStore = out.DataStore.Seal()
 	}
-	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{cciputils.CLLQualifier})
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 	// TODO: EVM doesn't work with a non-zero timelock delay
 	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
@@ -213,6 +217,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            cciputils.CLLQualifier,
 			Description:          "Connect Chains",
 		},
 	})

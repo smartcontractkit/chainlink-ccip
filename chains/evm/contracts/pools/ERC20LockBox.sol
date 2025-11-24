@@ -53,7 +53,7 @@ contract ERC20LockBox is ITypeAndVersion {
   /// without requiring the token pool owner's approval.
   mapping(address token => mapping(address caller => bool isAllowed)) internal s_allowedCallers;
 
-  string public constant typeAndVersion = "ERC20LockBox 1.6.2-dev";
+  string public constant typeAndVersion = "ERC20LockBox 1.6.4";
 
   constructor(
     address tokenAdminRegistry

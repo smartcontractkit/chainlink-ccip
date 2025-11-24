@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -37,11 +38,11 @@ type MCMSDeploymentConfigPerChainWithAddress struct {
 	ExistingAddresses []datastore.AddressRef
 }
 
-func DeployMCMS(deployerReg *DeployerRegistry) cldf.ChangeSetV2[MCMSDeploymentConfig] {
-	return cldf.CreateChangeSet(deployMCMSApply(deployerReg), deployMCMSVerify(deployerReg))
+func DeployMCMS(deployerReg *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[MCMSDeploymentConfig] {
+	return cldf.CreateChangeSet(deployMCMSApply(deployerReg, mcmsRegistry), deployMCMSVerify(deployerReg, mcmsRegistry))
 }
 
-func deployMCMSVerify(_ *DeployerRegistry) func(cldf.Environment, MCMSDeploymentConfig) error {
+func deployMCMSVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, MCMSDeploymentConfig) error {
 	return func(e cldf.Environment, cfg MCMSDeploymentConfig) error {
 		// TODO: implement
 		if cfg.AdapterVersion == nil {
@@ -51,9 +52,10 @@ func deployMCMSVerify(_ *DeployerRegistry) func(cldf.Environment, MCMSDeployment
 	}
 }
 
-func deployMCMSApply(d *DeployerRegistry) func(cldf.Environment, MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
+func deployMCMSApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
+		batchOps := make([]mcms_types.BatchOperation, 0)
 		ds := datastore.NewMemoryDataStore()
 		for selector, mcmsCfg := range cfg.Chains {
 			family, err := chain_selectors.GetSelectorFamily(selector)
@@ -83,12 +85,14 @@ func deployMCMSApply(d *DeployerRegistry) func(cldf.Environment, MCMSDeploymentC
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 				}
 			}
+			batchOps = append(batchOps, deployReport.Output.BatchOps...)
 			reports = append(reports, deployReport.ExecutionReports...)
 		}
 
-		return changesets.NewOutputBuilder(e, nil).
+		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithDataStore(ds).
+			WithBatchOps(batchOps).
 			Build(mcms.Input{}) // for deployment, we don't need an MCMS proposal
 	}
 }
