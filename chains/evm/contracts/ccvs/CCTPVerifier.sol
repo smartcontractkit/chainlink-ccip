@@ -18,8 +18,6 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   using SafeERC20 for IERC20;
 
-  error CustomFinalityArraysMustBeSameLength();
-  error CustomFinalitiesMustBeStrictlyIncreasing();
   error InvalidCCVData();
   error InvalidCCVVersion(bytes4 expected, bytes4 got);
   error InvalidMessageTransmitterOnProxy(address expected, address got);
@@ -32,9 +30,9 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidToken(address token);
   error InvalidTokenTransferLength(uint256 length);
   error MaxFeeExceedsUint32(uint256 maxFee);
-  error MissingCustomFinalities();
   error OnlyCallableByOwnerOrAllowlistAdmin();
   error ReceiveMessageCallFailed();
+  error InvalidFastFinalityBps(uint16 fastFinalityBps);
   error InvalidSetDomainArgs(SetDomainArgs args);
   error UnknownDomain(uint64 chainSelector);
   error UnsupportedFinality(uint32 finality);
@@ -45,7 +43,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   event StaticConfigSet(
     address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier
   );
-  event FinalityConfigSet(FinalityConfig finalityConfig);
 
   /// @notice The static configuration.
   struct StaticConfig {
@@ -85,19 +82,11 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     bool enabled; // ────────────╯ Whether or not the domain is enabled.
   }
 
-  /// @notice Configures finality handling for this chain.
-  struct FinalityConfig {
-    uint32 defaultCCTPFinalityThreshold; // ──╮ CCTP finality threshold applied when CCIP finality is 0.
-    uint16 defaultCCTPFinalityBps; // ────────╯ Basis points charged for standard CCTP transfers on destination.
-    uint16[] customCCIPFinalities; // CCIP finality thresholds for custom finalities (enforced to be in ascending order).
-    uint32[] customCCTPFinalityThresholds; // Corresponding CCTP finality thresholds for custom CCIP finalities.
-    uint16[] customCCTPFinalityBps; // Basis points charged for CCTP transfers using custom finalities on destination.
-  }
-
   /// @notice Dynamic configuration for this chain.
   struct DynamicConfig {
     address feeAggregator; // ──╮ Address to which fees are withdrawn.
-    address allowlistAdmin; // ─╯ Address permitted to update the allowlist (in addition to the owner).
+    address allowlistAdmin; //  | Address permitted to update the allowlist (in addition to the owner).
+    uint16 fastFinalityBps; // ─╯ Basis points charged for fast finality on destination.
   }
 
   string public constant override typeAndVersion = "CCTPVerifier 1.7.0-dev";
@@ -150,6 +139,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   uint256 private constant VERIFIER_VERSION_START = VERIFIER_VERSION_SIZE + 148 + 228;
   /// @notice The starting index of the message ID in the CCV data.
   uint256 private constant MESSAGE_ID_START = VERIFIER_VERSION_SIZE + 148 + 228 + VERIFIER_VERSION_SIZE;
+  /// @notice The standard finality threshold for CCTP.
+  /// @dev Used when CCIP finality == 0 (i.e. the default value).
+  uint32 private constant CCTP_STANDARD_FINALITY_THRESHOLD = 2000;
+  /// @notice The fast finality threshold for CCTP.
+  /// @dev Used when CCIP finality > 0.
+  uint32 private constant CCTP_FAST_FINALITY_THRESHOLD = 1000;
 
   /// @notice The USDC token contract.
   IERC20 private immutable i_usdcToken;
@@ -167,15 +162,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   mapping(uint64 remoteChainSelector => Domain cctpDomain) private s_chainToDomain;
   /// @notice The dynamic configuration.
   DynamicConfig private s_dynamicConfig;
-  /// @notice The finality configuration.
-  FinalityConfig private s_finalityConfig;
 
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy messageTransmitterProxy,
     IERC20 usdcToken,
     string memory storageLocation,
-    FinalityConfig memory finalityConfig,
     DynamicConfig memory dynamicConfig
   ) BaseVerifier(storageLocation) {
     if (
@@ -217,7 +209,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     );
 
     _setDynamicConfig(dynamicConfig);
-    _setFinalityConfig(finalityConfig);
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -237,13 +228,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
     // We expect exactly one token transfer per message.
     if (message.tokenTransfer.length != 1) revert InvalidTokenTransferLength(message.tokenTransfer.length);
-    MessageV1Codec.TokenTransferV1 memory tokenTransfer = message.tokenTransfer[0];
 
     // The address of the token transferred must correspond to USDC.
-    address sourceTokenAddress = address(bytes20(tokenTransfer.sourceTokenAddress));
+    address sourceTokenAddress = address(bytes20(message.tokenTransfer[0].sourceTokenAddress));
     if (sourceTokenAddress != address(i_usdcToken)) revert InvalidToken(sourceTokenAddress);
 
-    if (message.tokenTransfer[0].tokenReceiver.length != 32) {
+    if (message.tokenTransfer[0].tokenReceiver.length > 32) {
       revert InvalidReceiver(message.tokenTransfer[0].tokenReceiver);
     }
 
@@ -254,12 +244,21 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     if (domain.mintRecipientOnDest != bytes32(0)) {
       decodedReceiver = domain.mintRecipientOnDest;
     } else {
-      decodedReceiver = abi.decode(tokenTransfer.tokenReceiver, (bytes32));
+      bytes memory receiver = message.tokenTransfer[0].tokenReceiver;
+      uint256 length = receiver.length;
+      // solhint-disable-next-line no-inline-assembly
+      assembly {
+        // Load the data, skipping the length word.
+        let data := mload(add(receiver, 32))
+        // Left-pad the data with (32-length) bytes.
+        // Right-shifting the data by (32-length) bytes * 8 bits per byte achieves this.
+        decodedReceiver := shr(mul(sub(32, length), 8), data)
+      }
     }
 
     _depositForBurn(
       DepositForBurnParams({
-        amount: tokenTransfer.amount,
+        amount: message.tokenTransfer[0].amount,
         receiver: decodedReceiver,
         finality: message.finality,
         messageId: messageId,
@@ -276,7 +275,15 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   function _depositForBurn(
     DepositForBurnParams memory params
   ) private {
-    (uint32 finalityThreshold, uint16 bps) = _getCCTPFinalityThresholdAndBps(params.finality);
+    uint32 finalityThreshold;
+    uint16 bps;
+    if (params.finality == 0) {
+      finalityThreshold = CCTP_STANDARD_FINALITY_THRESHOLD;
+      bps = 0; // No fee is charged on destination for standard finality.
+    } else {
+      finalityThreshold = CCTP_FAST_FINALITY_THRESHOLD;
+      bps = s_dynamicConfig.fastFinalityBps;
+    }
 
     // The maximum fee, taken on destination, is a percentage of the total amount transferred.
     // We use bps to calculate the smallest possible value that we can set as the max fee.
@@ -298,31 +305,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       // Inclusion of the message ID ensures that the contents of the CCIP message can't be tampered with on destination.
       bytes.concat(VERSION_TAG_V1_7_0, params.messageId)
     );
-  }
-
-  /// @notice Returns the CCTP finality threshold and bps for the given CCIP finality.
-  /// @param finality The CCIP finality.
-  /// @return finalityThreshold The CCTP finality threshold.
-  /// @return bps The bps charged on destinaton by CCTP for the finality threshold.
-  function _getCCTPFinalityThresholdAndBps(
-    uint32 finality
-  ) private view returns (uint32 finalityThreshold, uint16 bps) {
-    if (finality != 0) {
-      // The length of the customCCIPFinalities array is guaranteed to be at least 1.
-      // Therefore, if finality is not 0, we will find a match here.
-      uint16[] memory customCCIPFinalities = s_finalityConfig.customCCIPFinalities;
-      for (uint256 i = 0; i < customCCIPFinalities.length; ++i) {
-        if (i == customCCIPFinalities.length - 1 || finality < customCCIPFinalities[i]) {
-          // If we've reached the last custom finality available, we must use it no matter what.
-          // If we've reached a finality that is greater than the requested finality, we will round up to it.
-          // This mirrors the behavior of CCTP finality thresholds, which round up if the requested finality exceeds a threshold.
-          return (s_finalityConfig.customCCTPFinalityThresholds[i], s_finalityConfig.customCCTPFinalityBps[i]);
-        }
-      }
-    }
-
-    // Apply standard CCTP finality when CCIP finality is set to the default value of 0.
-    return (s_finalityConfig.defaultCCTPFinalityThreshold, s_finalityConfig.defaultCCTPFinalityBps);
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -400,57 +382,13 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     DynamicConfig memory dynamicConfig
   ) private {
     if (dynamicConfig.feeAggregator == address(0)) revert ZeroAddressNotAllowed();
+    if (dynamicConfig.fastFinalityBps == 0 || dynamicConfig.fastFinalityBps > BPS_DIVIDER) {
+      revert InvalidFastFinalityBps(dynamicConfig.fastFinalityBps);
+    }
 
     s_dynamicConfig = dynamicConfig;
 
     emit DynamicConfigSet(dynamicConfig);
-  }
-
-  /// @notice Returns the finality configuration for this chain.
-  /// @return finalityConfig The finality configuration.
-  function getFinalityConfig() external view returns (FinalityConfig memory finalityConfig) {
-    return s_finalityConfig;
-  }
-
-  /// @notice Sets the finality configuration for this chain.
-  /// @dev This function validates that custom finality values are sorted in ascending order.
-  /// @param finalityConfig The finality configuration.
-  function setFinalityConfig(
-    FinalityConfig memory finalityConfig
-  ) external onlyOwner {
-    _setFinalityConfig(finalityConfig);
-  }
-
-  /// @notice Sets the finality configuration for this chain.
-  /// @dev This function validates that custom finality values are sorted in ascending order.
-  /// @param finalityConfig The finality configuration.
-  function _setFinalityConfig(
-    FinalityConfig memory finalityConfig
-  ) private {
-    // We require at least one custom finality, otherwise CCTP fast finality won't be supported.
-    if (finalityConfig.customCCIPFinalities.length == 0) revert MissingCustomFinalities();
-
-    // All arrays must be the same length.
-    if (
-      finalityConfig.customCCIPFinalities.length != finalityConfig.customCCTPFinalityThresholds.length
-        || finalityConfig.customCCIPFinalities.length != finalityConfig.customCCTPFinalityBps.length
-    ) {
-      revert CustomFinalityArraysMustBeSameLength();
-    }
-
-    // Validates that custom CCIP finalities are in ascending order.
-    // We can initialize previous finality to 0, as 0 is the default finality value.
-    // It always maps to standard CCTP transfer and should never be listed as a custom finality.
-    uint16 previousFinality = 0;
-    for (uint256 i = 0; i < finalityConfig.customCCIPFinalities.length; ++i) {
-      if (finalityConfig.customCCIPFinalities[i] <= previousFinality) {
-        revert CustomFinalitiesMustBeStrictlyIncreasing();
-      }
-      previousFinality = finalityConfig.customCCIPFinalities[i];
-    }
-
-    s_finalityConfig = finalityConfig;
-    emit FinalityConfigSet(finalityConfig);
   }
 
   /// @notice Gets the CCTP domain for a given CCIP chain selector.

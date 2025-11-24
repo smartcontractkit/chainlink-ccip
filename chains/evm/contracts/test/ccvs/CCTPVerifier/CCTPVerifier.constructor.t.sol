@@ -10,14 +10,6 @@ import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract CCTPVerifier_constructor is CCTPVerifierSetup {
-  uint16[] internal s_customCCIPFinalities = new uint16[](1);
-
-  function setUp() public override {
-    super.setUp();
-
-    s_customCCIPFinalities[0] = CCIP_FAST_FINALITY_THRESHOLD;
-  }
-
   function test_constructor() public {
     vm.expectEmit();
     emit CCTPVerifier.StaticConfigSet(
@@ -29,14 +21,11 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_messageTransmitterProxy,
       s_USDCToken,
       STORAGE_LOCATION,
-      CCTPVerifier.FinalityConfig({
-        defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
-        defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: s_customCCIPFinalities,
-        customCCTPFinalityThresholds: new uint32[](1),
-        customCCTPFinalityBps: new uint16[](1)
-      }),
-      CCTPVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN})
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: FEE_AGGREGATOR,
+        allowlistAdmin: ALLOWLIST_ADMIN,
+        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      })
     );
 
     // Check allowance of the token messenger on the USDC token.
@@ -57,14 +46,11 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_messageTransmitterProxy,
       s_USDCToken,
       STORAGE_LOCATION,
-      CCTPVerifier.FinalityConfig({
-        defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
-        defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: s_customCCIPFinalities,
-        customCCTPFinalityThresholds: new uint32[](1),
-        customCCTPFinalityBps: new uint16[](1)
-      }),
-      CCTPVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN})
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: FEE_AGGREGATOR,
+        allowlistAdmin: ALLOWLIST_ADMIN,
+        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      })
     );
   }
 
@@ -75,14 +61,11 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       CCTPMessageTransmitterProxy(address(0)),
       s_USDCToken,
       STORAGE_LOCATION,
-      CCTPVerifier.FinalityConfig({
-        defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
-        defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: s_customCCIPFinalities,
-        customCCTPFinalityThresholds: new uint32[](1),
-        customCCTPFinalityBps: new uint16[](1)
-      }),
-      CCTPVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN})
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: FEE_AGGREGATOR,
+        allowlistAdmin: ALLOWLIST_ADMIN,
+        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      })
     );
   }
 
@@ -93,14 +76,11 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_messageTransmitterProxy,
       IERC20(address(0)),
       STORAGE_LOCATION,
-      CCTPVerifier.FinalityConfig({
-        defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
-        defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: s_customCCIPFinalities,
-        customCCTPFinalityThresholds: new uint32[](1),
-        customCCTPFinalityBps: new uint16[](1)
-      }),
-      CCTPVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN})
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: FEE_AGGREGATOR,
+        allowlistAdmin: ALLOWLIST_ADMIN,
+        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      })
     );
   }
 
@@ -114,14 +94,11 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_messageTransmitterProxy,
       s_USDCToken,
       STORAGE_LOCATION,
-      CCTPVerifier.FinalityConfig({
-        defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
-        defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: s_customCCIPFinalities,
-        customCCTPFinalityThresholds: new uint32[](1),
-        customCCTPFinalityBps: new uint16[](1)
-      }),
-      CCTPVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN})
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: FEE_AGGREGATOR,
+        allowlistAdmin: ALLOWLIST_ADMIN,
+        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      })
     );
   }
 
@@ -133,14 +110,11 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_messageTransmitterProxy,
       s_USDCToken,
       STORAGE_LOCATION,
-      CCTPVerifier.FinalityConfig({
-        defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
-        defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: s_customCCIPFinalities,
-        customCCTPFinalityThresholds: new uint32[](1),
-        customCCTPFinalityBps: new uint16[](1)
-      }),
-      CCTPVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN})
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: FEE_AGGREGATOR,
+        allowlistAdmin: ALLOWLIST_ADMIN,
+        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      })
     );
   }
 
@@ -160,14 +134,11 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_messageTransmitterProxy,
       s_USDCToken,
       STORAGE_LOCATION,
-      CCTPVerifier.FinalityConfig({
-        defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
-        defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: s_customCCIPFinalities,
-        customCCTPFinalityThresholds: new uint32[](1),
-        customCCTPFinalityBps: new uint16[](1)
-      }),
-      CCTPVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN})
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: FEE_AGGREGATOR,
+        allowlistAdmin: ALLOWLIST_ADMIN,
+        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      })
     );
   }
 }

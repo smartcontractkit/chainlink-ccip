@@ -9,7 +9,8 @@ contract CCTPVerifier_setDynamicConfig is CCTPVerifierSetup {
   function test_setDynamicConfig() public {
     CCTPVerifier.DynamicConfig memory newConfig = CCTPVerifier.DynamicConfig({
       feeAggregator: makeAddr("feeAggregator2"),
-      allowlistAdmin: makeAddr("allowlistAdmin2")
+      allowlistAdmin: makeAddr("allowlistAdmin2"),
+      fastFinalityBps: CCTP_FAST_FINALITY_BPS
     });
 
     vm.expectEmit();
@@ -20,6 +21,7 @@ contract CCTPVerifier_setDynamicConfig is CCTPVerifierSetup {
     CCTPVerifier.DynamicConfig memory got = s_cctpVerifier.getDynamicConfig();
     assertEq(got.feeAggregator, newConfig.feeAggregator);
     assertEq(got.allowlistAdmin, newConfig.allowlistAdmin);
+    assertEq(got.fastFinalityBps, newConfig.fastFinalityBps);
   }
 
   function test_setDynamicConfig_RevertWhen_OnlyCallableByOwner() public {

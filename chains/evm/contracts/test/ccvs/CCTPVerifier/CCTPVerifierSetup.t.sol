@@ -62,13 +62,13 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
 
   uint256 internal constant TRANSFER_AMOUNT = 10e6; // 10 USDC
   uint16 internal constant BPS_DIVIDER = 10_000;
+  uint16 internal constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
 
   uint32 internal constant CCTP_STANDARD_FINALITY_THRESHOLD = 2000;
-  uint16 internal constant CCTP_STANDARD_FINALITY_BPS = 0;
-
-  uint16 internal constant CCIP_FAST_FINALITY_THRESHOLD = 1;
   uint32 internal constant CCTP_FAST_FINALITY_THRESHOLD = 1000;
-  uint16 internal constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
+
+  uint16 internal constant CCIP_STANDARD_FINALITY_THRESHOLD = 0;
+  uint16 internal constant CCIP_FAST_FINALITY_THRESHOLD = 1;
 
   uint32 internal constant REMOTE_DOMAIN_IDENTIFIER = 9999;
   uint32 internal constant LOCAL_DOMAIN_IDENTIFIER = 8888;
@@ -88,28 +88,16 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     s_mockTokenMessenger = new MockUSDCTokenMessenger(1, address(s_mockMessageTransmitter));
     s_messageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockTokenMessenger);
 
-    uint16[] memory customCCIPFinalities = new uint16[](1);
-    customCCIPFinalities[0] = CCIP_FAST_FINALITY_THRESHOLD;
-
-    uint32[] memory customCCTPFinalityThresholds = new uint32[](1);
-    customCCTPFinalityThresholds[0] = CCTP_FAST_FINALITY_THRESHOLD;
-
-    uint16[] memory customCCTPFinalityBps = new uint16[](1);
-    customCCTPFinalityBps[0] = CCTP_FAST_FINALITY_BPS;
-
     s_cctpVerifier = new CCTPVerifier(
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
       STORAGE_LOCATION,
-      CCTPVerifier.FinalityConfig({
-        defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
-        defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: customCCIPFinalities,
-        customCCTPFinalityThresholds: customCCTPFinalityThresholds,
-        customCCTPFinalityBps: customCCTPFinalityBps
-      }),
-      CCTPVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN})
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: FEE_AGGREGATOR,
+        allowlistAdmin: ALLOWLIST_ADMIN,
+        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      })
     );
 
     // Apply dest chain config updates.

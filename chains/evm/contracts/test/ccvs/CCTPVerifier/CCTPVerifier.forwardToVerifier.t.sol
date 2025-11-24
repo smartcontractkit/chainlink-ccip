@@ -107,58 +107,6 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
   }
 
-  function test_forwardToVerifier_MultipleCustomFinalities() public {
-    // Update finality config to have 2 custom finalities.
-    uint32 cctpSlowFinalityThreshold = 5000;
-    uint256 expectedMaxFee;
-    // Use a finality between 1 and 100 to ensure that we round up to the slower finality.
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
-      SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, 50, address(s_USDCToken), TRANSFER_AMOUNT, s_tokenReceiver
-    );
-    {
-      uint16 ccipSlowFinalityThreshold = 100;
-      uint16 cctpSlowFinalityBps = 5; // 0.05%
-
-      uint16[] memory customCCIPFinalities = new uint16[](2);
-      customCCIPFinalities[0] = CCIP_FAST_FINALITY_THRESHOLD;
-      customCCIPFinalities[1] = ccipSlowFinalityThreshold;
-      uint32[] memory customCCTPFinalityThresholds = new uint32[](2);
-      customCCTPFinalityThresholds[0] = CCTP_FAST_FINALITY_THRESHOLD;
-      customCCTPFinalityThresholds[1] = cctpSlowFinalityThreshold;
-      uint16[] memory customCCTPFinalityBps = new uint16[](2);
-      customCCTPFinalityBps[0] = CCTP_FAST_FINALITY_BPS;
-      customCCTPFinalityBps[1] = cctpSlowFinalityBps;
-
-      CCTPVerifier.FinalityConfig memory finalityConfig = CCTPVerifier.FinalityConfig({
-        defaultCCTPFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
-        defaultCCTPFinalityBps: CCTP_STANDARD_FINALITY_BPS,
-        customCCIPFinalities: customCCIPFinalities,
-        customCCTPFinalityThresholds: customCCTPFinalityThresholds,
-        customCCTPFinalityBps: customCCTPFinalityBps
-      });
-      s_cctpVerifier.setFinalityConfig(finalityConfig);
-
-      expectedMaxFee = TRANSFER_AMOUNT * cctpSlowFinalityBps / BPS_DIVIDER;
-    }
-
-    vm.expectEmit();
-    emit ITokenMessenger.DepositForBurn(
-      address(s_USDCToken),
-      TRANSFER_AMOUNT,
-      address(s_cctpVerifier),
-      abi.decode(s_tokenReceiver, (bytes32)),
-      REMOTE_DOMAIN_IDENTIFIER,
-      s_mockTokenMessenger.DESTINATION_TOKEN_MESSENGER(),
-      ALLOWED_CALLER_ON_DEST,
-      uint32(expectedMaxFee),
-      cctpSlowFinalityThreshold,
-      bytes.concat(s_cctpVerifier.versionTag(), messageId)
-    );
-
-    vm.startPrank(s_onRamp);
-    s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
-  }
-
   function test_forwardToVerifier_RevertWhen_CallerIsNotARampOnRouter() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
       SOURCE_CHAIN_SELECTOR,
@@ -290,7 +238,7 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
   }
 
   function test_forwardToVerifier_RevertWhen_InvalidReceiver() public {
-    bytes memory tokenReceiver = abi.encodePacked(makeAddr("invalidReceiver"));
+    bytes memory tokenReceiver = new bytes(33); // 33 bytes is too long for a bytes32.
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
       SOURCE_CHAIN_SELECTOR,
       DEST_CHAIN_SELECTOR,
