@@ -7,7 +7,7 @@ import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 interface ICrossChainVerifierV1 is IERC165 {
-  /// @notice Verification of the message, in any way the OffRamp wants. This could be using a signature, a quorum
+  /// @notice Verification of the message, in any way the verifier wants. This could be using a signature, a quorum
   /// of signatures, using native interop, or some ZK light client. Any proof required for the verification is supplied
   /// through the verifierResults parameter.
   /// @param message The message to be verified. For efficiency, the messageID is also supplied, which acts as a small
