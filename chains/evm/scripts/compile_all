@@ -10,6 +10,8 @@ echo " └───────────────────────�
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_LARGE_TOKEN_POOL=5000
 OPTIMIZE_RUNS_TOKEN_POOL=5000
+OPTIMIZE_RUNS_ONRAMP=20000
+
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
@@ -57,6 +59,9 @@ function getOptimizations() {
     case $contract_name in
       "HybridLockReleaseUSDCTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
+        ;;
+      "OnRamp")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_ONRAMP"
         ;;
     esac
 
