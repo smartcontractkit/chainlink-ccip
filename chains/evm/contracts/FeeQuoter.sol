@@ -77,7 +77,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     uint32 defaultTokenDestGasOverhead; // │ Default gas charged to execute a token transfer on the destination chain.
     uint32 defaultTxGasLimit; //           │ Default gas limit for a tx.
     uint16 networkFeeUSDCents; //          │ Flat network fee to charge for messages, multiples of 0.01 USD.
-    uint8 linkFeeMultiplierPercent; // ────╯ Basis points discount to apply when fee is paid in LINK.
+    uint8 linkFeeMultiplierPercent; // ────╯ Percentage multiplier to apply when fee is paid in LINK. 90 = 10% discount.
   }
 
   /// @dev Struct to hold the configs and its destination chain selector. Same as DestChainConfig but with the
@@ -590,13 +590,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       if (
         destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
           || destChainConfig.defaultTxGasLimit > destChainConfig.maxPerMsgGasLimit
-          || (
-            destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SVM
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_APTOS
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SUI
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_TVM
-          )
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }

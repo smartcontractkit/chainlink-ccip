@@ -468,7 +468,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(0, receipts[1].feeTokenAmount);
   }
 
-  function test_getReceipts_bpsMultiplierOnlyAppliedToUsdBasedFees() public {
+  function test_getReceipts_BpsMultiplierOnlyAppliedToUsdBasedFees() public {
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
     vm.mockCall(
       s_pool,
