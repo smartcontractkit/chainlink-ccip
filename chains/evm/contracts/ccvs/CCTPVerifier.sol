@@ -138,8 +138,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @dev Total CCTP message bytes = (4 * 3) + (32 * 4) + (4 * 2) + 4 + (32 * 7) + 4 + 32 = 412.
   uint256 private constant CCTP_MESSAGE_SIZE = 412;
   /// @notice The number of bytes in the verifier version.
+  /// @dev We include the verifier version in the prefix to enable compatibility with version-based proxy contracts.
+  /// We also include it within the hook data to ensure that it gets signed by the attestation service.
   uint256 private constant VERIFIER_VERSION_SIZE = 4;
-  /// @notice Total CCV data bytes = 4 + CCTP_MESSAGE_SIZE + 65 (ECDSA signature with recovery byte).
+  /// @notice Total CCV data bytes = VERIFIER_VERSION_SIZE + CCTP_MESSAGE_SIZE + 65 (ECDSA signature with recovery byte).
   /// CCTP message transmitter requires a minimum signature threshold of 1, so we account for at least one signature here.
   uint256 private constant MINIMUM_CCV_DATA_SIZE = VERIFIER_VERSION_SIZE + CCTP_MESSAGE_SIZE + 65;
   /// @notice The starting index of the messageSender in the CCV data.
