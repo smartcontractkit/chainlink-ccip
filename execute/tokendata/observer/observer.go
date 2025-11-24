@@ -12,6 +12,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	cctpv2 "github.com/smartcontractkit/chainlink-ccip/execute/tokendata/cctp/v2"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -69,12 +70,28 @@ func NewConfigBasedCompositeObservers(
 		// e.g. observers[i] := config.CreateTokenDataObserver()
 		switch {
 		case c.USDCCCTPObserverConfig != nil:
-			observer, err := usdc.NewUSDCTokenDataObserver(
-				ctx, lggr, destChainSelector,
-				*c.USDCCCTPObserverConfig,
-				encoder.EncodeUSDC, looppCCIPProviderSupported, chainAccessors, readers, addrCodec)
-			if err != nil {
-				return nil, fmt.Errorf("create USDC/CCTP token observer: %w", err)
+			var observer TokenDataObserver
+			var err error
+
+			// Use version to determine which observer implementation to use
+			if c.Version == "2" {
+				lggr.Info("Creating USDC/CCTP v2 token observer")
+				observer, err = cctpv2.NewCCTPv2TokenDataObserver(
+					lggr, destChainSelector,
+					*c.USDCCCTPObserverConfig,
+					encoder.EncodeUSDC)
+				if err != nil {
+					return nil, fmt.Errorf("create USDC/CCTP v2 token observer: %w", err)
+				}
+			} else {
+				lggr.Info("Creating USDC/CCTP v1 token observer")
+				observer, err = usdc.NewUSDCTokenDataObserver(
+					ctx, lggr, destChainSelector,
+					*c.USDCCCTPObserverConfig,
+					encoder.EncodeUSDC, looppCCIPProviderSupported, chainAccessors, readers, addrCodec)
+				if err != nil {
+					return nil, fmt.Errorf("create USDC/CCTP v1 token observer: %w", err)
+				}
 			}
 
 			if c.USDCCCTPObserverConfig.IsForeground() {

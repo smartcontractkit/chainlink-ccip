@@ -8,7 +8,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	feequoterops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
-	mcmsops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/mcms"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
@@ -89,21 +88,21 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	proposerAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
-		mcmsops.ProposerAccessControllerAccount,
+		utils.ProposerAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		input.Qualifier,
 	)
 	cancellerAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
-		mcmsops.CancellerAccessControllerAccount,
+		utils.CancellerAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		input.Qualifier,
 	)
 	bypasserAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
-		mcmsops.BypasserAccessControllerAccount,
+		utils.BypasserAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		input.Qualifier,
 	)
@@ -199,8 +198,15 @@ func (a *SolanaAdapter) SequenceTransferOwnershipViaMCMS() *cldf_ops.Sequence[de
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
 					}
 					output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
+				// assume access controller will have all MCMS refs
+				case utils.AccessControllerProgramType.String():
+					report, err := transferAllMCMS(b, chain, in)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
+					}
+					output.BatchOps = append(output.BatchOps, report.BatchOps...)
 				default:
-					return sequences.OnChainOutput{}, fmt.Errorf("unsupported contract type %s for ownership transfer via MCMS on Solana", contractRef.Type)
+					b.Logger.Debugf("unsupported contract type %s for ownership transfer via MCMS on Solana", contractRef.Type)
 				}
 			}
 			return output, nil
@@ -272,8 +278,15 @@ func (a *SolanaAdapter) SequenceAcceptOwnership() *cldf_ops.Sequence[deployops.T
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
 					}
 					output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
+				// assume access controller will have all MCMS refs
+				case utils.AccessControllerProgramType.String():
+					report, err := acceptAllMCMS(b, chain, in)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
+					}
+					output.BatchOps = append(output.BatchOps, report.BatchOps...)
 				default:
-					return sequences.OnChainOutput{}, fmt.Errorf("unsupported contract type %s for ownership transfer via MCMS on Solana", contractRef.Type)
+					b.Logger.Debugf("unsupported contract type %s for ownership transfer via MCMS on Solana", contractRef.Type)
 				}
 			}
 			return output, nil

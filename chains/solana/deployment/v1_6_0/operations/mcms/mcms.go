@@ -27,20 +27,14 @@ import (
 )
 
 var (
-	AccessControllerProgramType cldf_deployment.ContractType = "AccessControllerProgram"
-	AccessControllerProgramName                              = "access_controller"
-	AccessControllerProgramSize                              = 1 * 1024 * 1024
+	AccessControllerProgramName = "access_controller"
+	AccessControllerProgramSize = 1 * 1024 * 1024
 
 	TimelockProgramName = "timelock"
 	TimelockProgramSize = 1 * 1024 * 1024
 
 	McmProgramName = "mcm"
 	McmProgramSize = 1 * 1024 * 1024
-
-	ProposerAccessControllerAccount  cldf_deployment.ContractType = "ProposerAccessControllerAccount"
-	ExecutorAccessControllerAccount  cldf_deployment.ContractType = "ExecutorAccessControllerAccount"
-	CancellerAccessControllerAccount cldf_deployment.ContractType = "CancellerAccessControllerAccount"
-	BypasserAccessControllerAccount  cldf_deployment.ContractType = "BypasserAccessControllerAccount"
 )
 
 var AccessControllerDeploy = operations.NewOperation(
@@ -52,7 +46,7 @@ var AccessControllerDeploy = operations.NewOperation(
 			b,
 			chain,
 			input,
-			AccessControllerProgramType,
+			utils.AccessControllerProgramType,
 			common_utils.Version_1_6_0,
 			"",
 			AccessControllerProgramName,
@@ -122,6 +116,20 @@ var AddAccessOp = operations.NewOperation(
 	addAccess,
 )
 
+var TransferOwnershipOp = operations.NewOperation(
+	"transfer-ownership-op",
+	common_utils.Version_1_6_0,
+	"Transfers ownership of programs to timelock",
+	transferToTimelockSolanaOp,
+)
+
+var AcceptOwnershipOp = operations.NewOperation(
+	"accept-ownership-op",
+	common_utils.Version_1_6_0,
+	"Accepts ownership of programs from timelock",
+	acceptOwnershipTimelockSolanaOp,
+)
+
 type (
 	Deps struct {
 		Chain             cldf_solana.Chain
@@ -152,11 +160,30 @@ type (
 		Qualifier    string
 	}
 
+	MCMOutput struct {
+		NewAddresses []cldf_datastore.AddressRef
+		BatchOps     []types.BatchOperation
+	}
+
 	AddAccessInput struct {
 		Role      timelock.Role
 		Accounts  []solana.PublicKey
 		ChainSel  uint64
 		Qualifier string
+	}
+
+	OwnableContract struct {
+		ProgramID solana.PublicKey
+		Seed      [32]byte
+		OwnerPDA  solana.PublicKey
+		Type      cldf_deployment.ContractType
+	}
+
+	TransferToTimelockInput struct {
+		Contract     OwnableContract
+		Qualifier    string
+		CurrentOwner solana.PublicKey
+		NewOwner     solana.PublicKey
 	}
 )
 
@@ -248,7 +275,7 @@ func initializeAccessController(
 	return nil
 }
 
-func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) ([]cldf_datastore.AddressRef, error) {
+func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error) {
 	mcm.SetProgramID(in.MCM)
 	// Should be one of:
 	// BypasserSeed
@@ -270,7 +297,7 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) ([]cldf_datastore.
 	case utils.ProposerSeed:
 		outType = cldf_datastore.ContractType(common_utils.ProposerManyChainMultisig)
 	default:
-		return []cldf_datastore.AddressRef{}, fmt.Errorf("unsupported mcm contract type: %s", in.ContractType)
+		return MCMOutput{}, fmt.Errorf("unsupported mcm contract type: %s", in.ContractType)
 	}
 
 	var mcmSeed state.PDASeed
@@ -281,18 +308,32 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) ([]cldf_datastore.
 		err := common.GetAccountDataBorshInto(b.GetContext(), deps.Chain.Client, mcmConfigPDA, rpc.CommitmentConfirmed, &data)
 		if err == nil {
 			b.Logger.Infow("mcm config already initialized, skipping initialization", "chain", deps.Chain.String())
-			return []cldf_datastore.AddressRef{}, nil
+			return MCMOutput{}, nil
 		}
-		return []cldf_datastore.AddressRef{}, fmt.Errorf("unable to read mcm ConfigPDA account config %q", mcmConfigPDA.String())
+		return MCMOutput{}, fmt.Errorf("unable to read mcm ConfigPDA account config %q", mcmConfigPDA.String())
 	}
 
 	b.Logger.Infow("mcm config not initialized, initializing", "chain", deps.Chain.String())
 
 	seed := randomSeed()
 	b.Logger.Infow("generated MCM seed", "seed", string(seed[:]))
-	err := initializeMCM(b, deps, in.MCM, seed)
+	ixns, err := initializeMCM(b, deps, in.MCM, seed)
 	if err != nil {
-		return []cldf_datastore.AddressRef{}, fmt.Errorf("failed to initialize mcm: %w", err)
+		return MCMOutput{}, fmt.Errorf("failed to initialize mcm: %w", err)
+	}
+
+	var batches []types.BatchOperation
+	if len(ixns) > 0 {
+		batch, err := utils.BuildMCMSBatchOperation(
+			deps.Chain.Selector,
+			ixns,
+			in.MCM.String(),
+			in.ContractType.String(),
+		)
+		if err != nil {
+			return MCMOutput{}, fmt.Errorf("failed to build timelock initialization batch operation: %w", err)
+		}
+		batches = append(batches, batch)
 	}
 
 	encodedAddress := mcms_solana.ContractAddress(in.MCM, mcms_solana.PDASeed(seed))
@@ -300,37 +341,39 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) ([]cldf_datastore.
 	configurer := mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()))
 	tx, err := configurer.SetConfig(b.GetContext(), encodedAddress, &in.MCMConfig, false)
 	if err != nil {
-		return []cldf_datastore.AddressRef{}, fmt.Errorf("failed to set config on mcm: %w", err)
+		return MCMOutput{}, fmt.Errorf("failed to set config on mcm: %w", err)
 	}
 	b.Logger.Infow("called SetConfig on MCM", "transaction", tx.Hash)
 
-	return []cldf_datastore.AddressRef{
-		{
-			Address: mcms_solana.ContractAddress(
-				solana.MustPublicKeyFromBase58(in.MCM.String()),
-				mcms_solana.PDASeed([]byte(seed[:])),
-			),
-			ChainSelector: deps.Chain.Selector,
-			Type:          outType,
-			Qualifier:     deps.Qualifier,
-			Version:       common_utils.Version_1_6_0,
-		},
-		{
-			Address:       string(seed[:]),
-			ChainSelector: deps.Chain.Selector,
-			Type:          cldf_datastore.ContractType(in.ContractType),
-			Qualifier:     deps.Qualifier,
-			Version:       common_utils.Version_1_6_0,
-		},
-	}, nil
+	return MCMOutput{
+		BatchOps: batches,
+		NewAddresses: []cldf_datastore.AddressRef{
+			{
+				Address: mcms_solana.ContractAddress(
+					solana.MustPublicKeyFromBase58(in.MCM.String()),
+					mcms_solana.PDASeed([]byte(seed[:])),
+				),
+				ChainSelector: deps.Chain.Selector,
+				Type:          outType,
+				Qualifier:     deps.Qualifier,
+				Version:       common_utils.Version_1_6_0,
+			},
+			{
+				Address:       string(seed[:]),
+				ChainSelector: deps.Chain.Selector,
+				Type:          cldf_datastore.ContractType(in.ContractType),
+				Qualifier:     deps.Qualifier,
+				Version:       common_utils.Version_1_6_0,
+			},
+		}}, nil
 }
 
-func initializeMCM(b operations.Bundle, deps Deps, mcmProgram solana.PublicKey, multisigID state.PDASeed) error {
+func initializeMCM(b operations.Bundle, deps Deps, mcmProgram solana.PublicKey, multisigID state.PDASeed) ([]solana.Instruction, error) {
 	var mcmConfig mcm.MultisigConfig
 	err := deps.Chain.GetAccountDataBorshInto(b.GetContext(), state.GetMCMConfigPDA(mcmProgram, multisigID), &mcmConfig)
 	if err == nil {
 		b.Logger.Infow("MCM already initialized, skipping initialization", "chain", deps.Chain.String())
-		return nil
+		return nil, nil
 	}
 
 	var programData struct {
@@ -341,18 +384,23 @@ func initializeMCM(b operations.Bundle, deps Deps, mcmProgram solana.PublicKey, 
 
 	data, err := deps.Chain.Client.GetAccountInfoWithOpts(b.GetContext(), mcmProgram, opts)
 	if err != nil {
-		return fmt.Errorf("failed to get mcm program account info: %w", err)
+		return nil, fmt.Errorf("failed to get mcm program account info: %w", err)
 	}
 	err = bin.UnmarshalBorsh(&programData, data.Bytes())
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal program data: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal program data: %w", err)
+	}
+
+	upgradeAuthority, err := utils.GetUpgradeAuthority(deps.Chain.Client, mcmProgram)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get upgrade authority: %w", err)
 	}
 
 	instruction, err := mcm.NewInitializeInstruction(
 		deps.Chain.Selector,
 		multisigID,
 		state.GetMCMConfigPDA(mcmProgram, multisigID),
-		deps.Chain.DeployerKey.PublicKey(),
+		upgradeAuthority,
 		solana.SystemProgramID,
 		mcmProgram,
 		programData.Address,
@@ -360,18 +408,22 @@ func initializeMCM(b operations.Bundle, deps Deps, mcmProgram solana.PublicKey, 
 		state.GetMCMExpiringRootAndOpCountPDA(mcmProgram, multisigID),
 	).ValidateAndBuild()
 	if err != nil {
-		return fmt.Errorf("failed to build instruction: %w", err)
+		return nil, fmt.Errorf("failed to build instruction: %w", err)
 	}
 
-	err = deps.Chain.Confirm([]solana.Instruction{instruction})
-	if err != nil {
-		return fmt.Errorf("failed to confirm instructions: %w", err)
+	if upgradeAuthority == deps.Chain.DeployerKey.PublicKey() {
+		err = deps.Chain.Confirm([]solana.Instruction{instruction})
+		if err != nil {
+			return nil, fmt.Errorf("failed to confirm instructions: %w", err)
+		}
+	} else {
+		b.Logger.Infow("skipping confirm of initialize instruction as upgrade authority is not deployer key	", "chain", deps.Chain.String())
+		return []solana.Instruction{instruction}, nil
 	}
-
-	return nil
+	return nil, nil
 }
 
-func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) ([]cldf_datastore.AddressRef, error) {
+func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (MCMOutput, error) {
 	timelock.SetProgramID(in.Timelock)
 	// Should be one of:
 	// RBACTimelockSeed
@@ -391,9 +443,9 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) ([]cldf_
 		err := deps.Chain.GetAccountDataBorshInto(b.GetContext(), timelockConfigPDA, &timelockConfig)
 		if err == nil {
 			b.Logger.Infow("timelock config already initialized, skipping initialization", "chain", deps.Chain.String())
-			return []cldf_datastore.AddressRef{}, nil
+			return MCMOutput{}, nil
 		}
-		return []cldf_datastore.AddressRef{}, fmt.Errorf("unable to read timelock ConfigPDA account config %s", timelockConfigPDA.String())
+		return MCMOutput{}, fmt.Errorf("unable to read timelock ConfigPDA account config %s", timelockConfigPDA.String())
 	}
 
 	b.Logger.Infow("timelock config not initialized, initializing", "chain", deps.Chain.String())
@@ -401,34 +453,49 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) ([]cldf_
 	seed := randomSeed()
 	b.Logger.Infow("generated Timelock seed", "seed", string(seed[:]))
 
-	err := initializeTimelock(b, deps, in.Timelock, seed, in.MinDelay)
+	ixns, err := initializeTimelock(b, deps, in.Timelock, seed, in.MinDelay)
 	if err != nil {
-		return []cldf_datastore.AddressRef{}, fmt.Errorf("failed to initialize timelock: %w", err)
+		return MCMOutput{}, fmt.Errorf("failed to initialize timelock: %w", err)
+	}
+	var batches []types.BatchOperation
+	if len(ixns) > 0 {
+		batch, err := utils.BuildMCMSBatchOperation(
+			deps.Chain.Selector,
+			ixns,
+			in.Timelock.String(),
+			in.ContractType.String(),
+		)
+		if err != nil {
+			return MCMOutput{}, fmt.Errorf("failed to build timelock initialization batch operation: %w", err)
+		}
+		batches = append(batches, batch)
 	}
 
-	return []cldf_datastore.AddressRef{
-		{
-			Address: mcms_solana.ContractAddress(
-				solana.MustPublicKeyFromBase58(in.Timelock.String()),
-				mcms_solana.PDASeed([]byte(seed[:])),
-			),
-			ChainSelector: deps.Chain.Selector,
-			Type:          cldf_datastore.ContractType(common_utils.RBACTimelock),
-			Qualifier:     deps.Qualifier,
-			Version:       common_utils.Version_1_6_0,
-		},
-		{
-			Address:       string(seed[:]),
-			ChainSelector: deps.Chain.Selector,
-			Type:          cldf_datastore.ContractType(in.ContractType),
-			Qualifier:     deps.Qualifier,
-			Version:       common_utils.Version_1_6_0,
-		},
-	}, nil
+	return MCMOutput{
+		BatchOps: batches,
+		NewAddresses: []cldf_datastore.AddressRef{
+			{
+				Address: mcms_solana.ContractAddress(
+					solana.MustPublicKeyFromBase58(in.Timelock.String()),
+					mcms_solana.PDASeed([]byte(seed[:])),
+				),
+				ChainSelector: deps.Chain.Selector,
+				Type:          cldf_datastore.ContractType(common_utils.RBACTimelock),
+				Qualifier:     deps.Qualifier,
+				Version:       common_utils.Version_1_6_0,
+			},
+			{
+				Address:       string(seed[:]),
+				ChainSelector: deps.Chain.Selector,
+				Type:          cldf_datastore.ContractType(in.ContractType),
+				Qualifier:     deps.Qualifier,
+				Version:       common_utils.Version_1_6_0,
+			},
+		}}, nil
 }
 
 func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.PublicKey,
-	timelockID state.PDASeed, minDelay *big.Int) error {
+	timelockID state.PDASeed, minDelay *big.Int) ([]solana.Instruction, error) {
 	if minDelay == nil {
 		minDelay = big.NewInt(0)
 	}
@@ -438,7 +505,7 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 		&timelockConfig)
 	if err == nil {
 		b.Logger.Infow("Timelock already initialized, skipping initialization", "chain", deps.Chain.String())
-		return nil
+		return nil, nil
 	}
 
 	var programData struct {
@@ -449,54 +516,59 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 
 	data, err := deps.Chain.Client.GetAccountInfoWithOpts(b.GetContext(), timelockProgram, opts)
 	if err != nil {
-		return fmt.Errorf("failed to get timelock program account info: %w", err)
+		return nil, fmt.Errorf("failed to get timelock program account info: %w", err)
 	}
 	err = bin.UnmarshalBorsh(&programData, data.Bytes())
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal program data: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal program data: %w", err)
 	}
 
 	accessControllerProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		AccessControllerProgramType,
+		utils.AccessControllerProgramType,
 		common_utils.Version_1_6_0,
 		"",
 	)
 	proposerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		ProposerAccessControllerAccount,
+		utils.ProposerAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	executorAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		ExecutorAccessControllerAccount,
+		utils.ExecutorAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	cancellerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		CancellerAccessControllerAccount,
+		utils.CancellerAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
 	bypasserAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		BypasserAccessControllerAccount,
+		utils.BypasserAccessControllerAccount,
 		common_utils.Version_1_6_0,
 		deps.Qualifier,
 	)
+
+	upgradeAuthority, err := utils.GetUpgradeAuthority(deps.Chain.Client, timelockProgram)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get upgrade authority: %w", err)
+	}
 
 	instruction, err := timelock.NewInitializeInstruction(
 		timelockID,
 		minDelay.Uint64(),
 		state.GetTimelockConfigPDA(timelockProgram, timelockID),
-		deps.Chain.DeployerKey.PublicKey(),
+		upgradeAuthority,
 		solana.SystemProgramID,
 		timelockProgram,
 		programData.Address,
@@ -507,22 +579,27 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 		solana.MustPublicKeyFromBase58(bypasserAccount.Address),
 	).ValidateAndBuild()
 	if err != nil {
-		return fmt.Errorf("failed to build instruction: %w", err)
+		return nil, fmt.Errorf("failed to build instruction: %w", err)
 	}
 
-	err = deps.Chain.Confirm([]solana.Instruction{instruction})
-	if err != nil {
-		return fmt.Errorf("failed to confirm instructions: %w", err)
+	if upgradeAuthority == deps.Chain.DeployerKey.PublicKey() {
+		err = deps.Chain.Confirm([]solana.Instruction{instruction})
+		if err != nil {
+			return nil, fmt.Errorf("failed to confirm instructions: %w", err)
+		}
+	} else {
+		b.Logger.Infow("skipping confirm of initialize instruction as upgrade authority is not deployer key")
+		return []solana.Instruction{instruction}, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
-func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastore.AddressRef, error) {
+func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, error) {
 	accessControllerProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
-		AccessControllerProgramType,
+		utils.AccessControllerProgramType,
 		common_utils.Version_1_6_0,
 		"",
 	)
@@ -541,15 +618,15 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 	var roleAccessController cldf_deployment.ContractType
 	switch in.Role {
 	case timelock.Proposer_Role:
-		roleAccessController = ProposerAccessControllerAccount
+		roleAccessController = utils.ProposerAccessControllerAccount
 	case timelock.Executor_Role:
-		roleAccessController = ExecutorAccessControllerAccount
+		roleAccessController = utils.ExecutorAccessControllerAccount
 	case timelock.Canceller_Role:
-		roleAccessController = CancellerAccessControllerAccount
+		roleAccessController = utils.CancellerAccessControllerAccount
 	case timelock.Bypasser_Role:
-		roleAccessController = BypasserAccessControllerAccount
+		roleAccessController = utils.BypasserAccessControllerAccount
 	default:
-		return cldf_datastore.AddressRef{}, fmt.Errorf("unknown role: %d", in.Role)
+		return MCMOutput{}, fmt.Errorf("unknown role: %d", in.Role)
 	}
 	roleAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
@@ -558,13 +635,18 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
+	upgradeAuthority, err := utils.GetUpgradeAuthority(deps.Chain.Client, id)
+	if err != nil {
+		return MCMOutput{}, fmt.Errorf("failed to get upgrade authority: %w", err)
+	}
+
 	instructionBuilder := timelock.NewBatchAddAccessInstruction([32]uint8(
 		state.PDASeed([]byte(seed[:]))),
 		in.Role,
 		timelockConfigPDA,
 		solana.MustPublicKeyFromBase58(accessControllerProgram.Address),
 		solana.MustPublicKeyFromBase58(roleAccount.Address),
-		deps.Chain.DeployerKey.PublicKey())
+		upgradeAuthority)
 
 	for _, account := range in.Accounts {
 		instructionBuilder.Append(solana.Meta(account))
@@ -572,14 +654,84 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (cldf_datastor
 
 	instruction, err := instructionBuilder.ValidateAndBuild()
 	if err != nil {
-		return cldf_datastore.AddressRef{}, fmt.Errorf("failed to build BatchAddAccess instruction: %w", err)
+		return MCMOutput{}, fmt.Errorf("failed to build BatchAddAccess instruction: %w", err)
+	}
+
+	if upgradeAuthority != deps.Chain.DeployerKey.PublicKey() {
+		batch, err := utils.BuildMCMSBatchOperation(
+			deps.Chain.Selector,
+			[]solana.Instruction{instruction},
+			id.String(),
+			utils.TimelockProgramType.String(),
+		)
+		if err != nil {
+			return MCMOutput{}, fmt.Errorf("failed to build timelock initialization batch operation: %w", err)
+		}
+		return MCMOutput{
+			BatchOps: []types.BatchOperation{batch},
+		}, nil
 	}
 
 	err = deps.Chain.Confirm([]solana.Instruction{instruction})
 	if err != nil {
-		return cldf_datastore.AddressRef{}, fmt.Errorf("failed to confirm BatchAddAccess instruction: %w", err)
+		return MCMOutput{}, fmt.Errorf("failed to confirm BatchAddAccess instruction: %w", err)
 	}
-	return cldf_datastore.AddressRef{}, nil
+	return MCMOutput{}, nil
+}
+
+func transferToTimelockSolanaOp(b operations.Bundle, deps Deps, in TransferToTimelockInput) ([]types.BatchOperation, error) {
+	out := make([]types.BatchOperation, 0)
+
+	solChain := deps.Chain
+
+	chainSelector := solChain.ChainSelector()
+
+	contract := in.Contract
+	transferInstruction, err := transferOwnershipInstruction(
+		contract.ProgramID,
+		contract.Seed,
+		in.NewOwner,
+		contract.OwnerPDA,
+		in.CurrentOwner)
+	if err != nil {
+		return out, fmt.Errorf("failed to create transfer ownership instruction: %w", err)
+	}
+	if in.CurrentOwner != solChain.DeployerKey.PublicKey() {
+		transferBatch, err := utils.BuildMCMSBatchOperation(
+			chainSelector,
+			[]solana.Instruction{transferInstruction},
+			contract.ProgramID.String(),
+			string(contract.Type),
+		)
+		if err != nil {
+			return out, fmt.Errorf("failed to build accept ownership mcms transaction: %w", err)
+		}
+		out = append(out, transferBatch)
+	} else {
+		err = solChain.Confirm([]solana.Instruction{transferInstruction})
+		if err != nil {
+			return out, fmt.Errorf("failed to confirm instruction: %w", err)
+		}
+	}
+
+	return out, nil
+}
+
+func acceptOwnershipTimelockSolanaOp(b operations.Bundle, deps Deps, in TransferToTimelockInput) ([]types.BatchOperation, error) {
+	out := make([]types.BatchOperation, 0)
+
+	solChain := deps.Chain
+
+	chainSelector := solChain.ChainSelector()
+
+	contract := in.Contract
+	acceptMCMSTransaction, err := acceptMCMSTransaction(chainSelector, contract, in.NewOwner)
+	if err != nil {
+		return out, fmt.Errorf("failed to create accept ownership mcms transaction: %w", err)
+	}
+	out = append(out, acceptMCMSTransaction)
+
+	return out, nil
 }
 
 func randomSeed() state.PDASeed {
@@ -591,4 +743,88 @@ func randomSeed() state.PDASeed {
 	}
 
 	return state.PDASeed(bytes.Trim(seed[:], "\x00"))
+}
+
+func transferOwnershipInstruction(
+	programID solana.PublicKey, seed state.PDASeed, proposedOwner, ownerPDA, auth solana.PublicKey,
+) (solana.Instruction, error) {
+	if (seed == state.PDASeed{}) {
+		return newSeedlessTransferOwnershipInstruction(programID, proposedOwner, ownerPDA, auth)
+	}
+	return newSeededTransferOwnershipInstruction(programID, seed, proposedOwner, ownerPDA, auth)
+}
+
+func acceptMCMSTransaction(
+	selector uint64,
+	contract OwnableContract,
+	authority solana.PublicKey,
+) (types.BatchOperation, error) {
+	acceptInstruction, err := acceptOwnershipInstruction(contract.ProgramID, contract.Seed, contract.OwnerPDA, authority)
+	if err != nil {
+		return types.BatchOperation{}, fmt.Errorf("failed to build accept ownership instruction: %w", err)
+	}
+	acceptMCMSTx, err := utils.BuildMCMSBatchOperation(
+		selector,
+		[]solana.Instruction{acceptInstruction},
+		contract.ProgramID.String(),
+		string(contract.Type),
+	)
+	if err != nil {
+		return types.BatchOperation{}, fmt.Errorf("failed to build accept ownership mcms transaction: %w", err)
+	}
+	return acceptMCMSTx, nil
+}
+
+func acceptOwnershipInstruction(programID solana.PublicKey, seed state.PDASeed, ownerPDA, auth solana.PublicKey,
+) (solana.Instruction, error) {
+	if (seed == state.PDASeed{}) {
+		return newSeedlessAcceptOwnershipInstruction(programID, ownerPDA, auth)
+	}
+	return newSeededAcceptOwnershipInstruction(programID, seed, ownerPDA, auth)
+}
+
+func newSeededTransferOwnershipInstruction(
+	programID solana.PublicKey, seed state.PDASeed, proposedOwner, config, authority solana.PublicKey,
+) (solana.Instruction, error) {
+	ix, err := mcm.NewTransferOwnershipInstruction(seed, proposedOwner, config, authority).ValidateAndBuild()
+	return &seededInstruction{ix, programID}, err
+}
+
+func newSeededAcceptOwnershipInstruction(
+	programID solana.PublicKey, seed state.PDASeed, config, authority solana.PublicKey,
+) (solana.Instruction, error) {
+	ix, err := mcm.NewAcceptOwnershipInstruction(seed, config, authority).ValidateAndBuild()
+	return &seededInstruction{ix, programID}, err
+}
+
+func newSeedlessTransferOwnershipInstruction(
+	programID, proposedOwner, config, authority solana.PublicKey,
+) (solana.Instruction, error) {
+	ix, err := access_controller.NewTransferOwnershipInstruction(proposedOwner, config, authority).ValidateAndBuild()
+	return &seedlessInstruction{ix, programID}, err
+}
+
+func newSeedlessAcceptOwnershipInstruction(
+	programID, config, authority solana.PublicKey,
+) (solana.Instruction, error) {
+	ix, err := access_controller.NewAcceptOwnershipInstruction(config, authority).ValidateAndBuild()
+	return &seedlessInstruction{ix, programID}, err
+}
+
+type seedlessInstruction struct {
+	*access_controller.Instruction
+	programID solana.PublicKey
+}
+
+func (s *seedlessInstruction) ProgramID() solana.PublicKey {
+	return s.programID
+}
+
+type seededInstruction struct {
+	*mcm.Instruction
+	programID solana.PublicKey
+}
+
+func (s *seededInstruction) ProgramID() solana.PublicKey {
+	return s.programID
 }
