@@ -72,7 +72,7 @@ var Initialize = operations.NewOperation(
 	"Initializes the OffRamp 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		ccip_offramp.SetProgramID(input.OffRamp)
-		programData, err := utils.GetSolProgramData(chain, input.OffRamp)
+		programData, err := utils.GetSolProgramData(chain.Client, input.OffRamp)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
@@ -125,7 +125,7 @@ var InitializeConfig = operations.NewOperation(
 	"Initializes the config of the OffRamp 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		ccip_offramp.SetProgramID(input.OffRamp)
-		programData, err := utils.GetSolProgramData(chain, input.OffRamp)
+		programData, err := utils.GetSolProgramData(chain.Client, input.OffRamp)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
