@@ -16,7 +16,7 @@ import (
 )
 
 type ConfigureAllowedCallersSequenceInput struct {
-	Address                        map[uint64]common.Address
+	AddressesByChain               map[uint64]common.Address
 	ConfigureAllowedCallersByChain map[uint64][]erc20_lock_box_ops.AllowedCallerConfigArgs
 }
 
@@ -30,7 +30,7 @@ var (
 
 			// Iterate over each chain selector in the input
 			for chainSel, allowedCallers := range input.ConfigureAllowedCallersByChain {
-				address, ok := input.Address[chainSel]
+				address, ok := input.AddressesByChain[chainSel]
 				if !ok {
 					return sequences.OnChainOutput{}, fmt.Errorf("address not found for chain selector %d", chainSel)
 				}

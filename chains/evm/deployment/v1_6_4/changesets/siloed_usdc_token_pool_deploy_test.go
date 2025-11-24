@@ -53,20 +53,47 @@ func TestSiloedUSDCTokenPoolDeployChangeset(t *testing.T) {
 	_, err = evmChain.Confirm(tx)
 	require.NoError(t, err, "Failed to confirm token deployment transaction")
 
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType("USDCToken"),
+		Version:       semver.MustParse("1.0.0"),
+		Address:       tokenAddress.Hex(),
+		ChainSelector: chainSelector,
+	})
+	require.NoError(t, err, "Failed to add USDCToken address to datastore")
+
 	allowlist := []common.Address{common.Address{2}}
 	rmnProxyAddress := common.Address{3}
 	routerAddress := common.Address{4}
 	lockBoxAddress := common.Address{5}
 
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType("ERC20Lockbox"),
+		Version:       semver.MustParse("1.6.4"),
+		Address:       lockBoxAddress.Hex(),
+		ChainSelector: chainSelector,
+	})
+
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType("Router"),
+		Version:       semver.MustParse("1.2.0"),
+		Address:       routerAddress.Hex(),
+		ChainSelector: chainSelector,
+	})
+	require.NoError(t, err, "Failed to add router address to datastore")
+
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType("RMN"),
+		Version:       semver.MustParse("1.5.0"),
+		Address:       rmnProxyAddress.Hex(),
+		ChainSelector: chainSelector,
+	})
+	require.NoError(t, err, "Failed to add RMN proxy address to datastore")
+
 	changesetInput := changesets.SiloedUSDCTokenPoolDeployInput{
 		ChainInputs: []changesets.SiloedUSDCTokenPoolDeployInputPerChain{
 			{
 				ChainSelector: chainSelector,
-				Token:         tokenAddress,
 				Allowlist:     allowlist,
-				RMNProxy:      rmnProxyAddress,
-				Router:        routerAddress,
-				LockBox:       lockBoxAddress,
 			},
 		},
 		MCMS: mcms.Input{

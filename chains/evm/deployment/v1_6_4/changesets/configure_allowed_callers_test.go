@@ -132,7 +132,6 @@ func TestConfigureAllowedCallersSequence(t *testing.T) {
 		ChainInputs: []changesets.ConfigureAllowedCallersPerChainInput{
 			{
 				ChainSelector: chainSelector,
-				Address:       common.HexToAddress(erc20LockBoxRef.Address),
 				AllowedCallers: []erc20_lock_box.AllowedCallerConfigArgs{
 					{
 						Token:   tokenAddress,

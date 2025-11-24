@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -11,6 +12,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
+
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 type ConfigureAllowedCallersInput struct {
@@ -20,10 +24,11 @@ type ConfigureAllowedCallersInput struct {
 
 type ConfigureAllowedCallersPerChainInput struct {
 	ChainSelector  uint64
-	Address        common.Address
 	AllowedCallers []erc20_lock_box.AllowedCallerConfigArgs
 }
 
+// This changeset is used to configure the allowed callers for a given token in the ERC20Lockbox contract.
+// It is different from the apply_authorized_caller_updates changeset which is used for the USDCTokenPool, SiloedUSDCTokenPool, and USDCTokenPoolCCTPV2 contracts.
 func ConfigureAllowedCallersChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ConfigureAllowedCallersInput] {
 	return cldf.CreateChangeSet(configureAllowedCallersApply(mcmsRegistry), configureAllowedCallersVerify(mcmsRegistry))
 }
@@ -34,16 +39,25 @@ func configureAllowedCallersApply(mcmsRegistry *changesets.MCMSReaderRegistry) f
 		reports := make([]cldf_ops.Report[any, any], 0)
 
 		// Build the Address and AllowedCallersByChain maps from per-chain inputs
-		addressByChain := make(map[uint64]common.Address)
+		addressesByChain := make(map[uint64]common.Address)
 		allowedCallersByChain := make(map[uint64][]erc20_lock_box.AllowedCallerConfigArgs)
 		for _, perChainInput := range input.ChainInputs {
-			addressByChain[perChainInput.ChainSelector] = perChainInput.Address
+
+			erc20_lock_box_address, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          datastore.ContractType(erc20_lock_box.ContractType),
+				Version:       erc20_lock_box.Version,
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+			addressesByChain[perChainInput.ChainSelector] = erc20_lock_box_address
 			allowedCallersByChain[perChainInput.ChainSelector] = perChainInput.AllowedCallers
 		}
 
 		// Execute the sequence with the combined input
 		sequenceInput := sequences.ConfigureAllowedCallersSequenceInput{
-			Address:                        addressByChain,
+			AddressesByChain:               addressesByChain,
 			ConfigureAllowedCallersByChain: allowedCallersByChain,
 		}
 
@@ -60,6 +74,7 @@ func configureAllowedCallersApply(mcmsRegistry *changesets.MCMSReaderRegistry) f
 			WithBatchOps(batchOps).
 			Build(input.MCMS)
 	}
+
 }
 
 func configureAllowedCallersVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureAllowedCallersInput) error {

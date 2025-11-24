@@ -16,8 +16,8 @@ import (
 )
 
 type SetDomainsSequenceInput struct {
-	Address        common.Address
-	DomainsByChain map[uint64][]usdc_token_pool_ops.DomainUpdate
+	AddressesByChain map[uint64]common.Address
+	DomainsByChain   map[uint64][]usdc_token_pool_ops.DomainUpdate
 }
 
 var (
@@ -42,7 +42,7 @@ var (
 				// DomainUpdate structs, with the first and only item being the domains for the given chain selector
 				report, err := operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolSetDomains, chain, contract.FunctionInput[[]usdc_token_pool_ops.DomainUpdate]{
 					ChainSelector: chain.Selector,
-					Address:       input.Address,
+					Address:       input.AddressesByChain[chainSel],
 					Args:          domains,
 				})
 				fmt.Println("Report output in sequence: ", report.Output)

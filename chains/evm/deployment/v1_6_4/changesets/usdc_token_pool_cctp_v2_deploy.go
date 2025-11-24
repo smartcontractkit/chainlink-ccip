@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
@@ -12,6 +13,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 type USDCTokenPoolCCTPV2DeployInputPerChain struct {
@@ -19,8 +23,6 @@ type USDCTokenPoolCCTPV2DeployInputPerChain struct {
 	TokenMessenger common.Address
 	Token          common.Address
 	Allowlist      []common.Address
-	RMNProxy       common.Address
-	Router         common.Address
 }
 
 type USDCTokenPoolCCTPV2DeployInput struct {
@@ -28,6 +30,10 @@ type USDCTokenPoolCCTPV2DeployInput struct {
 	MCMS        mcms.Input
 }
 
+// This changeset is used to deploy the USDCTokenPoolCCTPV2 contract on a given chain.
+// Note: In addition to deploying the USDCTokenPoolCCTPV2 contract, this changeset will also deploy the CCTPMessageTransmitterProxy contract,
+// configure the allowed callers for the CCTPMessageTransmitterProxy contract, and then begin the ownership transfer to MCMS.
+// A separate changeset will be used to accept ownership of the USDCTokenPoolCCTPV2 contract.
 func USDCTokenPoolCCTPV2DeployChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) deployment.ChangeSetV2[USDCTokenPoolCCTPV2DeployInput] {
 	return cldf.CreateChangeSet(usdcTokenPoolCCTPV2DeployApply(mcmsRegistry), usdcTokenPoolCCTPV2DeployVerify(mcmsRegistry))
 }
@@ -53,13 +59,50 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain %d: %w", perChainInput.ChainSelector, err)
 			}
 
+			routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          datastore.ContractType("Router"),
+				Version:       semver.MustParse("1.2.0"),
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+
+			rmnAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          datastore.ContractType("RMN"),
+				Version:       semver.MustParse("1.5.0"),
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+
+			var TokenAddress common.Address
+			// If the token address is not found in the datastore, perhaps because it is a new chain
+			// then use the token address from the input
+			retrievedTokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          datastore.ContractType("USDCToken"),
+				Version:       semver.MustParse("1.0.0"),
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			// If the error is not nil, then check if the token address was provided in the input, and if so use that,
+			// otherwise revert because the token address is required.
+			if err != nil {
+				if perChainInput.Token == (common.Address{}) {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token address for chain %d: %w", perChainInput.ChainSelector, err)
+				}
+				TokenAddress = retrievedTokenAddress
+			} else if err == nil {
+				TokenAddress = retrievedTokenAddress
+			}
+
 			sequenceInput := sequences.USDCTokenPoolCCTPV2DeploySequenceInput{
 				ChainSelector:  perChainInput.ChainSelector,
 				TokenMessenger: perChainInput.TokenMessenger,
-				Token:          perChainInput.Token,
+				Token:          TokenAddress,
 				Allowlist:      perChainInput.Allowlist,
-				RMNProxy:       perChainInput.RMNProxy,
-				Router:         perChainInput.Router,
+				RMNProxy:       rmnAddress,
+				Router:         routerAddress,
 				MCMSAddress:    common.HexToAddress(timelockRef.Address),
 			}
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.USDCTokenPoolCCTPV2DeploySequence, e.BlockChains, sequenceInput)

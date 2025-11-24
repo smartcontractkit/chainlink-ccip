@@ -6,7 +6,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
 	usdc_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -38,47 +37,7 @@ var USDCTokenPoolDeploySequence = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 		}
 
-		var cctpProxyAddress common.Address
 		var addresses []datastore.AddressRef
-
-		var isNewTransmitterProxy bool
-
-		// On some chains the CCTPMessageTransmitterProxy is already deployed, so we can use it directly if it has been provided. If it is not this is an indicator
-		// that we need to deploy it.
-		if input.CCTPMessageTransmitterProxy != (common.Address{}) {
-			cctpProxyAddress = input.CCTPMessageTransmitterProxy
-		} else {
-			isNewTransmitterProxy = true
-
-			// Deploy CCTPMessageTransmitterProxy first so that it can be used by the USDCTokenPool contract
-			cctpProxyReport, err := operations.ExecuteOperation(b, cctp_message_transmitter_proxy.Deploy, chain, contract.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
-				ChainSelector: input.ChainSelector,
-				TypeAndVersion: deployment.NewTypeAndVersion(
-					cctp_message_transmitter_proxy.ContractType,
-					*cctp_message_transmitter_proxy.Version,
-				),
-				Args: cctp_message_transmitter_proxy.ConstructorArgs{
-					TokenMessenger: input.TokenMessenger,
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPMessageTransmitterProxy on %s: %w", chain, err)
-			}
-
-			// Get the deployed address from the report
-			cctpProxyAddress = common.HexToAddress(cctpProxyReport.Output.Address)
-			addresses = append(addresses, cctpProxyReport.Output)
-
-			// Begin transferring ownership to MCMS. A separate changeset will be used to accept ownership.
-			_, err = operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
-				ChainSelector: input.ChainSelector,
-				Address:       cctpProxyAddress,
-				Args:          input.MCMSAddress,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership of the CCTPMessageTransmitterProxy to MCMS on %s: %w", chain, err)
-			}
-		}
 
 		// Deploy USDCTokenPool using the deployed CCTPMessageTransmitterProxy address
 		report, err := operations.ExecuteOperation(b, usdc_token_pool.Deploy, chain, contract.DeployInput[usdc_token_pool.ConstructorArgs]{
@@ -89,7 +48,7 @@ var USDCTokenPoolDeploySequence = operations.NewSequence(
 			),
 			Args: usdc_token_pool.ConstructorArgs{
 				TokenMessenger:              input.TokenMessenger,
-				CCTPMessageTransmitterProxy: cctpProxyAddress,
+				CCTPMessageTransmitterProxy: input.CCTPMessageTransmitterProxy,
 				Token:                       input.Token,
 				Allowlist:                   input.Allowlist,
 				RMNProxy:                    input.RMNProxy,
@@ -99,19 +58,6 @@ var USDCTokenPoolDeploySequence = operations.NewSequence(
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy USDCTokenPool on %s: %w", chain, err)
-		}
-
-		if isNewTransmitterProxy {
-			_, err = operations.ExecuteOperation(b, cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyConfigureAllowedCallers, chain, contract.FunctionInput[[]cctp_message_transmitter_proxy.AllowedCallerConfigArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       cctpProxyAddress,
-				Args: []cctp_message_transmitter_proxy.AllowedCallerConfigArgs{
-					{
-						Caller:  common.HexToAddress(report.Output.Address),
-						Allowed: true,
-					},
-				},
-			})
 		}
 
 		if err != nil {
