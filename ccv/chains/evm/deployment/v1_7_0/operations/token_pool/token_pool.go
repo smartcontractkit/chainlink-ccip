@@ -1,9 +1,12 @@
 package token_pool
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/aws/smithy-go/ptr"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -16,7 +19,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	burn_mint_token_pool_v1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 var ContractType cldf_deployment.ContractType = "TokenPool"
@@ -29,6 +35,7 @@ type ConstructorArgs struct {
 	Allowlist          []common.Address
 	RMNProxy           common.Address
 	Router             common.Address
+	LockBox            common.Address // Optional: required for LockRelease pools in v1.6.4+
 }
 
 type ChainUpdate struct {
@@ -80,24 +87,110 @@ type ApplyCustomBlockConfirmationConfigArgs struct {
 	RateLimitConfigArgs  []CustomBlockConfirmationRateLimitConfigArg
 }
 
-var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
-	Name:             "token-pool:deploy",
-	Version:          semver.MustParse("1.7.0"),
-	Description:      "Deploys various TokenPool contracts (i.e. BurnMint, LockRelease)",
-	ContractMetadata: burn_mint_token_pool_latest.BurnMintTokenPoolMetaData, // Just to get the expected constructor args
-	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+// Deploy creates a deployment operation for token pool contracts.
+// Unlike contract.NewDeploy, this handles conditional constructor parameters:
+// - BurnMintTokenPool: 5 params (token, decimals, allowlist, rmnProxy, router)
+// - LockReleaseTokenPool v1.7.0+: 6 params (adds lockBox)
+var Deploy = operations.NewOperation(
+	"token-pool:deploy",
+	semver.MustParse("1.7.0"),
+	"Deploys various TokenPool contracts (BurnMint, LockRelease) with version-appropriate constructor args",
+	func(b operations.Bundle, chain evm.Chain, input contract.DeployInput[ConstructorArgs]) (datastore.AddressRef, error) {
+		// Get bytecode and metadata for this type/version
+		info, err := getDeploymentInfo(input.TypeAndVersion)
+		if err != nil {
+			return datastore.AddressRef{}, err
+		}
+
+		// Build constructor args based on pool type and version
+		args := buildConstructorArgs(input.TypeAndVersion, input.Args)
+
+		addr, tx, _, deployErr := bind.DeployContract(
+			chain.DeployerKey,
+			info.parsedABI,
+			info.bytecode,
+			chain.Client,
+			args...,
+		)
+
+		// Confirm deployment
+		_, confirmErr := cldf_deployment.ConfirmIfNoError(chain, tx, deployErr)
+		if confirmErr != nil {
+			return datastore.AddressRef{}, fmt.Errorf("failed to deploy %s: %w", input.TypeAndVersion, confirmErr)
+		}
+
+		b.Logger.Debugw("Deployed token pool", "type", input.TypeAndVersion, "address", addr.Hex(), "chain", chain.Selector)
+
+		return datastore.AddressRef{
+			Address:       addr.Hex(),
+			ChainSelector: input.ChainSelector,
+			Type:          datastore.ContractType(input.TypeAndVersion.Type),
+			Version:       &input.TypeAndVersion.Version,
+			Qualifier:     ptr.ToString(input.Qualifier),
+		}, nil
+	},
+)
+
+func buildConstructorArgs(typeAndVersion cldf_deployment.TypeAndVersion, args ConstructorArgs) []any {
+	baseArgs := []any{
+		args.Token,
+		args.LocalTokenDecimals,
+		args.Allowlist,
+		args.RMNProxy,
+		args.Router,
+	}
+
+	// LockReleaseTokenPool v1.7.0+ requires lockBox parameter
+	if typeAndVersion.Type == lock_release_token_pool_v1_7_0_ops.ContractType &&
+		typeAndVersion.Version.Major() >= 1 && typeAndVersion.Version.Minor() >= 7 {
+		return append(baseArgs, args.LockBox)
+	}
+
+	return baseArgs
+}
+
+type deploymentInfo struct {
+	bytecode  []byte
+	parsedABI abi.ABI
+}
+
+func getDeploymentInfo(typeAndVersion cldf_deployment.TypeAndVersion) (deploymentInfo, error) {
+	deploymentMap := map[string]struct {
+		metadata *bind.MetaData
+		bytecode []byte
+	}{
 		cldf_deployment.NewTypeAndVersion(burn_mint_token_pool_v1_7_0_ops.ContractType, *semver.MustParse("1.7.0")).String(): {
-			EVM: common.FromHex(burn_mint_token_pool_latest.BurnMintTokenPoolBin),
+			metadata: burn_mint_token_pool_latest.BurnMintTokenPoolMetaData,
+			bytecode: common.FromHex(burn_mint_token_pool_latest.BurnMintTokenPoolBin),
 		},
 		cldf_deployment.NewTypeAndVersion(burn_mint_token_pool_v1_7_0_ops.ContractType, *semver.MustParse("1.6.1")).String(): {
-			EVM: common.FromHex(burn_mint_token_pool_v1_6_1.BurnMintTokenPoolBin),
+			metadata: burn_mint_token_pool_v1_6_1.BurnMintTokenPoolMetaData,
+			bytecode: common.FromHex(burn_mint_token_pool_v1_6_1.BurnMintTokenPoolBin),
 		},
 		cldf_deployment.NewTypeAndVersion(lock_release_token_pool_v1_7_0_ops.ContractType, *semver.MustParse("1.7.0")).String(): {
-			EVM: common.FromHex(lock_release_token_pool_latest.LockReleaseTokenPoolBin),
+			metadata: lock_release_token_pool_latest.LockReleaseTokenPoolMetaData,
+			bytecode: common.FromHex(lock_release_token_pool_latest.LockReleaseTokenPoolBin),
 		},
-	},
-	Validate: func(ConstructorArgs) error { return nil },
-})
+	}
+
+	data, ok := deploymentMap[typeAndVersion.String()]
+	if !ok {
+		return deploymentInfo{}, fmt.Errorf("no deployment info for %s", typeAndVersion)
+	}
+
+	parsedABI, err := data.metadata.GetAbi()
+	if err != nil {
+		return deploymentInfo{}, fmt.Errorf("failed to parse ABI for %s: %w", typeAndVersion, err)
+	}
+	if parsedABI == nil {
+		return deploymentInfo{}, fmt.Errorf("ABI is nil for %s", typeAndVersion)
+	}
+
+	return deploymentInfo{
+		bytecode:  data.bytecode,
+		parsedABI: *parsedABI,
+	}, nil
+}
 
 var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdatesArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:apply-chain-updates",

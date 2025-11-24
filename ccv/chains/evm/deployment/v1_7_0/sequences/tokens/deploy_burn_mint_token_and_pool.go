@@ -68,6 +68,13 @@ var DeployBurnMintTokenAndPool = cldf_ops.NewSequence(
 		deployTokenReport.Output.Qualifier = input.DeployTokenPoolInput.TokenSymbol // Use the token symbol as the qualifier.
 		addresses = append(addresses, deployTokenReport.Output)
 
+		// Validate that lock box address is provided for lock/release pools
+		if input.DeployTokenPoolInput.TokenPoolType == "LockReleaseTokenPool" {
+			if input.DeployTokenPoolInput.ConstructorArgs.LockBox == (common.Address{}) {
+				return sequences.OnChainOutput{}, fmt.Errorf("lock box address must be provided in ConstructorArgs for LockReleaseTokenPool")
+			}
+		}
+
 		// Deploy token pool.
 		input.DeployTokenPoolInput.ConstructorArgs.Token = common.HexToAddress(deployTokenReport.Output.Address) // Set the token address to the deployed token.
 		deployTokenPoolReport, err := cldf_ops.ExecuteSequence(b, DeployTokenPool, chain, input.DeployTokenPoolInput)

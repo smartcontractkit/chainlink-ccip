@@ -39,6 +39,9 @@ type DeployTokenPoolCfg struct {
 	Router datastore.AddressRef
 	// Allowlist is the list of addresses allowed to transfer the token.
 	Allowlist []common.Address
+	// LockBox is the address of the ERC20LockBox contract for LockReleaseTokenPool.
+	// Required for LockReleaseTokenPool, ignored for other pool types.
+	LockBox common.Address
 }
 
 func (c DeployTokenPoolCfg) ChainSelector() uint64 {

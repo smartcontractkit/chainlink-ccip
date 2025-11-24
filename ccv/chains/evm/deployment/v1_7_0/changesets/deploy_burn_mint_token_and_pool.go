@@ -61,6 +61,7 @@ var DeployBurnMintTokenAndPool = changesets.NewFromOnChainSequence(changesets.Ne
 					Allowlist:          cfg.Allowlist,
 					RMNProxy:           rmnProxy,
 					Router:             router,
+					LockBox:            cfg.LockBox,
 				},
 			},
 		}, nil
