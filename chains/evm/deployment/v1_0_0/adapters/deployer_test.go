@@ -36,7 +36,7 @@ func TestDeployMCMS(t *testing.T) {
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deployops.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
-	cs := deployops.DeployMCMS(dReg)
+	cs := deployops.DeployMCMS(dReg, nil)
 	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{

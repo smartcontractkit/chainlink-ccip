@@ -152,7 +152,7 @@ func TestFastCurse(t *testing.T) {
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deploy.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
-	cs := deploy.DeployMCMS(dReg)
+	cs := deploy.DeployMCMS(dReg, nil)
 	evmChain1 := env.BlockChains.EVMChains()[chain1]
 	evmChain2 := env.BlockChains.EVMChains()[chain2]
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
@@ -459,7 +459,7 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deploy.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
-	cs := deploy.DeployMCMS(dReg)
+	cs := deploy.DeployMCMS(dReg, nil)
 	mcmsChainInput := make(map[uint64]deploy.MCMSDeploymentConfigPerChain)
 	for _, sel := range []uint64{chain1, chain2, chain3} {
 		evmChain := env.BlockChains.EVMChains()[sel]

@@ -49,7 +49,7 @@ func TestTransferOwnership(t *testing.T) {
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deploy.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
-	deployMCMS := deploy.DeployMCMS(dReg)
+	deployMCMS := deploy.DeployMCMS(dReg, nil)
 	output, err := deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{

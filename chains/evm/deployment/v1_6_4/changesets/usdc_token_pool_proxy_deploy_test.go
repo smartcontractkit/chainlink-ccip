@@ -102,7 +102,7 @@ func TestDeployUSDCTokenPoolProxyChangeset_BothPoolsDeployed(t *testing.T) {
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deploy.GetRegistry()
 	dReg.RegisterDeployer(chain_selectors.FamilyEVM, deploy.MCMSVersion, evmDeployer)
-	cs := deploy.DeployMCMS(dReg)
+	cs := deploy.DeployMCMS(dReg, nil)
 	output, err := cs.Apply(*e, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
@@ -233,7 +233,7 @@ func TestDeployUSDCTokenPoolProxyChangeset_OnlyCCTPV2PoolDeployed(t *testing.T) 
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deploy.GetRegistry()
 	dReg.RegisterDeployer(chain_selectors.FamilyEVM, deploy.MCMSVersion, evmDeployer)
-	cs := deploy.DeployMCMS(dReg)
+	cs := deploy.DeployMCMS(dReg, nil)
 	output, err := cs.Apply(*e, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
@@ -364,7 +364,7 @@ func TestDeployUSDCTokenPoolProxyChangeset_OnlyCCTPV1PoolDeployed(t *testing.T) 
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deploy.GetRegistry()
 	dReg.RegisterDeployer(chain_selectors.FamilyEVM, deploy.MCMSVersion, evmDeployer)
-	cs := deploy.DeployMCMS(dReg)
+	cs := deploy.DeployMCMS(dReg, nil)
 	output, err := cs.Apply(*e, deploy.MCMSDeploymentConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
