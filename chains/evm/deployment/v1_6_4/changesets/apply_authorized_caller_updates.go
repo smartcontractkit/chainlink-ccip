@@ -38,15 +38,15 @@ func applyAuthorizedCallerUpdatesApply(mcmsRegistry *changesets.MCMSReaderRegist
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
-		addressByChain := make(map[uint64]common.Address)
+		addressesByChain := make(map[uint64]common.Address)
 		authorizedCallerUpdatesByChain := make(map[uint64]authorized_caller_ops.AuthorizedCallerUpdateArgs)
 		for _, perChainInput := range input.ChainInputs {
-			addressByChain[perChainInput.ChainSelector] = perChainInput.Address
+			addressesByChain[perChainInput.ChainSelector] = perChainInput.Address
 			authorizedCallerUpdatesByChain[perChainInput.ChainSelector] = perChainInput.AuthorizedCallerUpdates
 		}
 
 		sequenceInput := sequences.ApplyAuthorizedCallerUpdatesSequenceInput{
-			Address:                        addressByChain,
+			AddressesByChain:               addressesByChain,
 			AuthorizedCallerUpdatesByChain: authorizedCallerUpdatesByChain,
 		}
 

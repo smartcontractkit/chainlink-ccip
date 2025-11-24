@@ -5,7 +5,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -41,18 +40,13 @@ func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 		ds := datastore.NewMemoryDataStore()
 
 		for _, perChainInput := range input.ChainInputs {
-			chainFamily, err := chain_selectors.GetSelectorFamily(perChainInput.ChainSelector)
+			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          "RBACTimelock",
+				Version:       semver.MustParse("1.0.0"),
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", perChainInput.ChainSelector, err)
-			}
-			reader, ok := mcmsRegistry.GetMCMSReader(chainFamily)
-			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no MCMSReader registered for chain family '%s'", chainFamily)
-			}
-
-			timelockRef, err := reader.GetTimelockRef(e, perChainInput.ChainSelector, input.MCMS)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain %d: %w", perChainInput.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get time lock address for chain %d: %w", perChainInput.ChainSelector, err)
 			}
 
 			tokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
@@ -104,7 +98,7 @@ func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 				RMNProxy:                    rmnAddress,
 				Router:                      routerAddress,
 				SupportedUSDCVersion:        0, // For CCTP V1 the version will always be zero since it is the first version
-				MCMSAddress:                 common.HexToAddress(timelockRef.Address),
+				MCMSAddress:                 timeLockAddress,
 			}
 
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.USDCTokenPoolDeploySequence, e.BlockChains, sequenceInput)

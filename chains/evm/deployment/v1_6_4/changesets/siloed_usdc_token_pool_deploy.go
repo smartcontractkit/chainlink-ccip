@@ -13,8 +13,6 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
-
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	router "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	rmn_proxy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
@@ -43,18 +41,13 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 
 		for _, perChainInput := range input.ChainInputs {
 
-			chainFamily, err := chain_selectors.GetSelectorFamily(perChainInput.ChainSelector)
+			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          "RBACTimelock",
+				Version:       semver.MustParse("1.0.0"),
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", perChainInput.ChainSelector, err)
-			}
-			reader, ok := mcmsRegistry.GetMCMSReader(chainFamily)
-			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no MCMSReader registered for chain family '%s'", chainFamily)
-			}
-
-			timelockRef, err := reader.GetTimelockRef(e, perChainInput.ChainSelector, input.MCMS)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain %d: %w", perChainInput.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get time lock address for chain %d: %w", perChainInput.ChainSelector, err)
 			}
 
 			erc20LockboxAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
@@ -100,7 +93,7 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 				RMNProxy:      rmnProxyAddress,
 				Router:        routerAddress,
 				LockBox:       erc20LockboxAddress,
-				MCMSAddress:   common.HexToAddress(timelockRef.Address),
+				MCMSAddress:   timeLockAddress,
 			}
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.SiloedUSDCTokenPoolDeploySequence, e.BlockChains, sequenceInput)
 			if err != nil {

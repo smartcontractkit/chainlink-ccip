@@ -5,7 +5,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -44,19 +43,13 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 		ds := datastore.NewMemoryDataStore()
 
 		for _, perChainInput := range input.ChainInputs {
-
-			chainFamily, err := chain_selectors.GetSelectorFamily(perChainInput.ChainSelector)
+			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          "RBACTimelock",
+				Version:       semver.MustParse("1.0.0"),
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", perChainInput.ChainSelector, err)
-			}
-			reader, ok := mcmsRegistry.GetMCMSReader(chainFamily)
-			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no MCMSReader registered for chain family '%s'", chainFamily)
-			}
-
-			timelockRef, err := reader.GetTimelockRef(e, perChainInput.ChainSelector, input.MCMS)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain %d: %w", perChainInput.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get time lock address for chain %d: %w", perChainInput.ChainSelector, err)
 			}
 
 			routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
@@ -117,7 +110,7 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 				Allowlist:      perChainInput.Allowlist,
 				RMNProxy:       rmnAddress,
 				Router:         routerAddress,
-				MCMSAddress:    common.HexToAddress(timelockRef.Address),
+				MCMSAddress:    timeLockAddress,
 			}
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.USDCTokenPoolCCTPV2DeploySequence, e.BlockChains, sequenceInput)
 			if err != nil {
