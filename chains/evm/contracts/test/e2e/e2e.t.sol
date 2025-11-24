@@ -88,6 +88,12 @@ contract e2e is OnRampSetup {
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
     s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+
+    // Seed existing fee recipients so ERC20 transfers reflect real deployments where
+    // verifiers/executors already hold a balance (avoids the first 20k gas cold-init cost).
+    deal(s_sourceFeeToken, defaultCCVs[0], 1);
+    deal(s_sourceFeeToken, s_userSpecifiedCCV, 1);
+    deal(s_sourceFeeToken, s_defaultExecutor, 1);
   }
 
   function test_e2e() public {

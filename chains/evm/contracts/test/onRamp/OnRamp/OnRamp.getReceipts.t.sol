@@ -160,7 +160,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     uint256 expectedPoolFee = (uint256(POOL_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
     // Apply LINK discount.
     expectedPoolFee = (expectedPoolFee * LINK_BPS_MULTIPLIER) / 10000;
-    assertEq(receipts[2].issuer, s_sourceToken, "Second to last receipt should be from token");
+    assertEq(receipts[2].issuer, s_pool, "Second to last receipt should be from token");
     assertEq(receipts[2].feeTokenAmount, expectedPoolFee, "Pool fee should match");
     assertEq(receipts[2].destGasLimit, POOL_GAS_OVERHEAD, "Pool gas overhead should match");
     assertEq(receipts[2].destBytesOverhead, POOL_BYTES_OVERHEAD, "Pool bytes overhead should match");
@@ -196,7 +196,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts.length, 3, "Should have 3 receipts");
 
     // Check token pool receipt uses FeeQuoter values.
-    assertEq(receipts[1].issuer, s_sourceToken, "Token receipt should be second to last");
+    assertEq(receipts[1].issuer, s_pool, "Token receipt should be second to last");
     assertGt(receipts[1].feeTokenAmount, 1e15, "Should have token amount fee");
     assertEq(receipts[1].destGasLimit, FEE_QUOTER_GAS_OVERHEAD, "Should use FeeQuoter gas overhead");
     assertEq(receipts[1].destBytesOverhead, FEE_QUOTER_BYTES_OVERHEAD, "Should use FeeQuoter bytes overhead");
@@ -238,7 +238,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     uint256 expectedTokenFee = (uint256(FEE_QUOTER_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
     // Apply LINK discount.
     expectedTokenFee = (expectedTokenFee * LINK_BPS_MULTIPLIER) / 10000;
-    assertEq(receipts[1].issuer, s_sourceToken, "Token receipt should be present");
+    assertEq(receipts[1].issuer, s_pool, "Token receipt should be present");
     assertEq(receipts[1].feeTokenAmount, expectedTokenFee, "Should fall back to FeeQuoter fee");
     assertEq(receipts[1].destGasLimit, FEE_QUOTER_GAS_OVERHEAD, "Should fall back to FeeQuoter gas");
     assertEq(receipts[1].destBytesOverhead, FEE_QUOTER_BYTES_OVERHEAD, "Should fall back to FeeQuoter bytes");
@@ -303,7 +303,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     uint256 expectedPoolFee = (uint256(POOL_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
     // Apply LINK discount.
     expectedPoolFee = (expectedPoolFee * LINK_BPS_MULTIPLIER) / 10000;
-    assertEq(receipts[0].issuer, s_sourceToken, "First should be token");
+    assertEq(receipts[0].issuer, s_pool, "First should be token");
     assertEq(receipts[0].feeTokenAmount, expectedPoolFee, "Token fee should match");
     assertEq(receipts[1].issuer, s_defaultExecutor, "Last should be executor");
   }
@@ -352,7 +352,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[0].issuer, s_verifier1, "Receipt 0: verifier1");
     assertEq(receipts[1].issuer, s_verifier2, "Receipt 1: verifier2");
     assertEq(receipts[2].issuer, verifier3, "Receipt 2: verifier3");
-    assertEq(receipts[3].issuer, s_sourceToken, "Receipt 3: token (second to last)");
+    assertEq(receipts[3].issuer, s_pool, "Receipt 3: token pool (second to last)");
     assertEq(receipts[4].issuer, s_defaultExecutor, "Receipt 4: executor (last)");
   }
 
