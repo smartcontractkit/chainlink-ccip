@@ -780,6 +780,10 @@ func (o observerImpl) Close() error {
 	return nil
 }
 
+// isNoBindingsError checks if the error is a no bindings error. We check both for the sentinel error
+// and for the error message containing "no bindings" to cover different implementations since not all
+// chain accessors use contract reader anymore.
+// TODO: consider adding chain-agnostic ChainAccessor error types to cl-common.
 func isNoBindingsError(err error) bool {
 	if err == nil {
 		return false
