@@ -142,21 +142,16 @@ func (p PluginFactory) NewReportingPlugin(
 		readerFacades[chain] = cr
 	}
 
-	// Wrap chainAccessors to control TxHash population based on config
-	wrappedAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
-	for chainSel, accessor := range p.chainAccessors {
-		wrappedAccessors[chainSel] = readerpkg.NewChainAccessorWrapper(accessor, offchainConfig.PopulateTxHashEnabled)
-	}
-
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
-		wrappedAccessors,
+		p.chainAccessors,
 		readerFacades,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 		p.addrCodec,
+		offchainConfig.PopulateTxHashEnabled,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create ccip reader: %w", err)
@@ -169,7 +164,7 @@ func (p PluginFactory) NewReportingPlugin(
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
 		p.looppCCIPProviderSupported,
-		wrappedAccessors,
+		p.chainAccessors,
 		p.extendedReaders,
 		p.addrCodec,
 	)

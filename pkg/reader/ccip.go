@@ -39,11 +39,12 @@ type ccipChainReader struct {
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
 
-	destChain      cciptypes.ChainSelector
-	offrampAddress string
-	configPoller   ConfigPoller
-	addrCodec      cciptypes.AddressCodec
-	donAddressBook *addressbook.Book
+	destChain             cciptypes.ChainSelector
+	offrampAddress        string
+	configPoller          ConfigPoller
+	addrCodec             cciptypes.AddressCodec
+	donAddressBook        *addressbook.Book
+	populateTxHashEnabled bool
 }
 
 func newCCIPChainReaderInternal(
@@ -55,6 +56,7 @@ func newCCIPChainReaderInternal(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
+	populateTxHashEnabled bool,
 ) (*ccipChainReader, error) {
 	return newCCIPChainReaderWithConfigPollerInternal(
 		ctx,
@@ -66,6 +68,7 @@ func newCCIPChainReaderInternal(
 		offrampAddress,
 		addrCodec,
 		nil,
+		populateTxHashEnabled,
 	)
 }
 
@@ -79,6 +82,7 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
 	configPoller ConfigPoller,
+	populateTxHashEnabled bool,
 ) (*ccipChainReader, error) {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
@@ -92,14 +96,15 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	}
 
 	reader := &ccipChainReader{
-		lggr:            lggr,
-		contractReaders: crs,
-		contractWriters: contractWriters,
-		accessors:       chainAccessors,
-		destChain:       destChain,
-		offrampAddress:  offrampAddrStr,
-		addrCodec:       addrCodec,
-		donAddressBook:  addressbook.NewBook(),
+		lggr:                  lggr,
+		contractReaders:       crs,
+		contractWriters:       contractWriters,
+		accessors:             chainAccessors,
+		destChain:             destChain,
+		offrampAddress:        offrampAddrStr,
+		addrCodec:             addrCodec,
+		donAddressBook:        addressbook.NewBook(),
+		populateTxHashEnabled: populateTxHashEnabled,
 	}
 
 	// Initialize cache with readers
@@ -267,6 +272,13 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	// Ensure the onRamp address hasn't changed during the query.
 	if !bytes.Equal(onRampAddressBeforeQuery, onRampAddressAfterQuery) {
 		return nil, fmt.Errorf("onRamp address has changed from %s to %s", onRampAddressBeforeQuery, onRampAddressAfterQuery)
+	}
+
+	// Clear TxHash if population is disabled
+	if !r.populateTxHashEnabled {
+		for i := range messages {
+			messages[i].Header.TxHash = ""
+		}
 	}
 
 	return messages, nil

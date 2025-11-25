@@ -146,12 +146,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		readerFacades[chain] = cr
 	}
 
-	// Wrap chainAccessors to clear TxHash
-	wrappedAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
-	for chainSel, accessor := range p.chainAccessors {
-		wrappedAccessors[chainSel] = readerpkg.NewChainAccessorWrapper(accessor, offchainConfig.PopulateTxHashEnabled)
-	}
-
 	// Bind the RMNHome contract
 	var rmnHomeReader readerpkg.RMNHome
 	if offchainConfig.RMNEnabled {
@@ -187,19 +181,20 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
-		wrappedAccessors,
+		p.chainAccessors,
 		readerFacades,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 		p.addrCodec,
+		offchainConfig.PopulateTxHashEnabled,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create CCIP chain reader: %w", err)
 	}
 
 	// The node supports the chain that the token prices are on.
-	_, ok := wrappedAccessors[offchainConfig.PriceFeedChainSelector]
+	_, ok := p.chainAccessors[offchainConfig.PriceFeedChainSelector]
 	if ok {
 		// Bind all token aggregate contracts
 		for _, info := range offchainConfig.TokenInfo {
@@ -209,7 +204,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 					fmt.Errorf("failed to create unknown address from aggregator address %s: %w",
 						info.AggregatorAddress, err)
 			}
-			err = wrappedAccessors[offchainConfig.PriceFeedChainSelector].
+			err = p.chainAccessors[offchainConfig.PriceFeedChainSelector].
 				Sync(ctx, consts.ContractNamePriceAggregator, priceAggAddress)
 			if err != nil {
 				return nil, ocr3types.ReportingPluginInfo{},
@@ -221,7 +216,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 
 	onChainTokenPricesReader := readerpkg.NewPriceReader(
 		logutil.WithComponent(lggr, "PriceReader"),
-		wrappedAccessors,
+		p.chainAccessors,
 		offchainConfig.TokenInfo,
 		ccipReader,
 		offchainConfig.PriceFeedChainSelector,

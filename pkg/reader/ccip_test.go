@@ -96,6 +96,7 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 		destChain,
 		offRamp,
 		mockAddrCodec,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -156,6 +157,7 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 		destChain,
 		offRamp,
 		mockAddrCodec,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -212,6 +214,7 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 		destChain,
 		offRamp,
 		mockAddrCodec,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -273,6 +276,7 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 		destChain,
 		offRamp,
 		mockAddrCodec,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -653,6 +657,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: readermocks.NewMockContractReaderFacade(t),
 		}, contractWriters, chainC, offrampAddress, mockAddrCodec,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -706,6 +711,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		chainC,
 		offRampAddress,
 		internal.NewMockAddressCodecHex(t),
+		false,
 	)
 	require.NoError(t, err)
 
@@ -1045,6 +1051,7 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 				chainB,
 				offRampAddress,
 				internal.NewMockAddressCodecHex(t),
+				false,
 			)
 			require.NoError(t, err)
 
@@ -1265,6 +1272,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			offRampAddress,
 			internal.NewMockAddressCodecHex(t),
 			mockCache,
+			false,
 		)
 		require.NoError(t, err)
 
@@ -1313,6 +1321,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			offRampAddress,
 			internal.NewMockAddressCodecHex(t),
 			mockCache,
+			false,
 		)
 		require.NoError(t, err)
 
@@ -1355,6 +1364,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			offRampAddress,
 			internal.NewMockAddressCodecHex(t),
 			mockCache,
+			false,
 		)
 		require.NoError(t, err)
 
@@ -1478,6 +1488,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			chainB,
 			offRampAddress,
 			internal.NewMockAddressCodecHex(t),
+			false,
 		)
 		require.NoError(t, err)
 
@@ -1534,6 +1545,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			destChain,
 			offRampAddress,
 			internal.NewMockAddressCodecHex(t),
+			false,
 		)
 		require.NoError(t, err)
 
@@ -1569,6 +1581,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			destChain,
 			offRampAddress,
 			internal.NewMockAddressCodecHex(t),
+			false,
 		)
 		require.NoError(t, err)
 
@@ -1609,6 +1622,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			destChain,
 			offRampAddress,
 			internal.NewMockAddressCodecHex(t),
+			false,
 		)
 		require.NoError(t, err)
 
@@ -1650,6 +1664,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			destChain,
 			offRampAddress,
 			internal.NewMockAddressCodecHex(t),
+			false,
 		)
 		require.NoError(t, err)
 
@@ -1670,6 +1685,7 @@ func TestCCIPChainReader_GetChainFeePriceUpdate(t *testing.T) {
 			destChain,
 			[]byte("0x3"),
 			internal.NewMockAddressCodecHex(t),
+			false,
 		)
 		require.NoError(t, err)
 
