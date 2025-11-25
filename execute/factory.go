@@ -179,6 +179,9 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
 	}
 
+	// Track LOOPP enablement status via Beholder
+	metricsReporter.TrackLooppProviderSupported(p.looppCCIPProviderSupported)
+
 	return NewPlugin(
 			p.donID,
 			config,
