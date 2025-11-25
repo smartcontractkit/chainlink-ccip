@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
+import {IExecutor} from "../../../interfaces/IExecutor.sol";
 import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
@@ -145,7 +146,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts.length, 4, "Should have 4 receipts");
 
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
-    uint256 expectedVerifierFee = (uint256(VERIFIER_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
+    uint256 expectedVerifierFee = (uint256(VERIFIER_FEE_USD_CENTS) * 1e32 * LINK_FEE_MULTIPLIER_PERCENT) / feeTokenPrice;
     assertEq(receipts[0].issuer, s_verifier1, "First receipt should be from verifier1");
     assertEq(receipts[0].feeTokenAmount, expectedVerifierFee, "Verifier1 fee should match");
     assertEq(receipts[0].destGasLimit, VERIFIER_GAS, "Verifier1 gas should match");
@@ -157,7 +158,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[3].issuer, s_defaultExecutor, "Last receipt should be from executor");
 
     uint256 expectedPoolFee = (uint256(POOL_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
-    assertEq(receipts[2].issuer, s_sourceToken, "Second to last receipt should be from token");
+    // Apply LINK discount.
+    expectedPoolFee = (expectedPoolFee * LINK_FEE_MULTIPLIER_PERCENT) / 100;
+    assertEq(receipts[2].issuer, s_pool, "Second to last receipt should be from token");
     assertEq(receipts[2].feeTokenAmount, expectedPoolFee, "Pool fee should match");
     assertEq(receipts[2].destGasLimit, POOL_GAS_OVERHEAD, "Pool gas overhead should match");
     assertEq(receipts[2].destBytesOverhead, POOL_BYTES_OVERHEAD, "Pool bytes overhead should match");
@@ -193,7 +196,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts.length, 3, "Should have 3 receipts");
 
     // Check token pool receipt uses FeeQuoter values.
-    assertEq(receipts[1].issuer, s_sourceToken, "Token receipt should be second to last");
+    assertEq(receipts[1].issuer, s_pool, "Token receipt should be second to last");
     assertGt(receipts[1].feeTokenAmount, 1e15, "Should have token amount fee");
     assertEq(receipts[1].destGasLimit, FEE_QUOTER_GAS_OVERHEAD, "Should use FeeQuoter gas overhead");
     assertEq(receipts[1].destBytesOverhead, FEE_QUOTER_BYTES_OVERHEAD, "Should use FeeQuoter bytes overhead");
@@ -233,7 +236,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     // Check token receipt falls back to FeeQuoter values.
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
     uint256 expectedTokenFee = (uint256(FEE_QUOTER_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
-    assertEq(receipts[1].issuer, s_sourceToken, "Token receipt should be present");
+    // Apply LINK discount.
+    expectedTokenFee = (expectedTokenFee * LINK_FEE_MULTIPLIER_PERCENT) / 100;
+    assertEq(receipts[1].issuer, s_pool, "Token receipt should be present");
     assertEq(receipts[1].feeTokenAmount, expectedTokenFee, "Should fall back to FeeQuoter fee");
     assertEq(receipts[1].destGasLimit, FEE_QUOTER_GAS_OVERHEAD, "Should fall back to FeeQuoter gas");
     assertEq(receipts[1].destBytesOverhead, FEE_QUOTER_BYTES_OVERHEAD, "Should fall back to FeeQuoter bytes");
@@ -296,7 +301,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     // Check receipts order.
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
     uint256 expectedPoolFee = (uint256(POOL_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
-    assertEq(receipts[0].issuer, s_sourceToken, "First should be token");
+    // Apply LINK discount.
+    expectedPoolFee = (expectedPoolFee * LINK_FEE_MULTIPLIER_PERCENT) / 100;
+    assertEq(receipts[0].issuer, s_pool, "First should be token");
     assertEq(receipts[0].feeTokenAmount, expectedPoolFee, "Token fee should match");
     assertEq(receipts[1].issuer, s_defaultExecutor, "Last should be executor");
   }
@@ -345,7 +352,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[0].issuer, s_verifier1, "Receipt 0: verifier1");
     assertEq(receipts[1].issuer, s_verifier2, "Receipt 1: verifier2");
     assertEq(receipts[2].issuer, verifier3, "Receipt 2: verifier3");
-    assertEq(receipts[3].issuer, s_sourceToken, "Receipt 3: token (second to last)");
+    assertEq(receipts[3].issuer, s_pool, "Receipt 3: token pool (second to last)");
     assertEq(receipts[4].issuer, s_defaultExecutor, "Receipt 4: executor (last)");
   }
 
@@ -459,5 +466,74 @@ contract OnRamp_getReceipts is OnRampSetup {
     // NO_EXECUTION_ADDRESS results in zero executor fee.
     // Total fee may be zero if CCV fee is also zero.
     assertEq(0, receipts[1].feeTokenAmount);
+  }
+
+  function test_getReceipts_BpsMultiplierOnlyAppliedToUsdBasedFees() public {
+    vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
+    vm.mockCall(
+      s_pool,
+      abi.encodeWithSelector(IPoolV2.getFee.selector),
+      abi.encode(POOL_FEE_USD_CENTS, POOL_GAS_OVERHEAD, POOL_BYTES_OVERHEAD, uint16(0), true)
+    );
+
+    address verifier1Impl = makeAddr("verifier1Impl");
+    _mockVerifier(s_verifier1, verifier1Impl);
+    _mockVerifierFee(verifier1Impl);
+
+    uint32 executorFlatFeeUSDCents = 50; // $0.50.
+    uint32 totalGasReturned = 200_000;
+    uint256 execGasCostUSDCents = 10_00; // $10.00 for gas execution cost.
+    uint256 percentMultiplier = 80; // 80% (20% discount).
+
+    vm.mockCall(
+      s_defaultExecutor, abi.encodeWithSelector(IExecutor.getFee.selector), abi.encode(executorFlatFeeUSDCents)
+    );
+
+    Client.EVM2AnyMessage memory message = _createMessage(100 ether);
+    address[] memory ccvs = new address[](1);
+    ccvs[0] = s_verifier1;
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
+
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+
+    // Mock quoteGasForExec to return specific percentMultiplier and gas cost.
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(totalGasReturned, execGasCostUSDCents, feeTokenPrice, percentMultiplier)
+    );
+
+    (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+
+    assertEq(receipts.length, 3, "Should have 3 receipts");
+
+    // USD-based fees (verifier, pool, executor flat fee) should have percentMultiplier applied.
+    assertEq(
+      receipts[0].feeTokenAmount,
+      (uint256(VERIFIER_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice,
+      "Verifier fee with percentMultiplier"
+    );
+    assertEq(
+      receipts[1].feeTokenAmount,
+      (uint256(POOL_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice,
+      "Pool fee with percentMultiplier"
+    );
+    assertEq(receipts[1].issuer, s_pool, "Pool receipt");
+
+    // Executor fee: flat fee (WITH percent) + gas execution cost (WITHOUT percent multiplier).
+    uint256 expectedExecutorFlatFee = (executorFlatFeeUSDCents * percentMultiplier * 1e32) / feeTokenPrice;
+    uint256 expectedGasExecutionCost = (execGasCostUSDCents * 1e34) / feeTokenPrice;
+    assertEq(
+      receipts[2].feeTokenAmount,
+      expectedExecutorFlatFee + expectedGasExecutionCost,
+      "Executor: flat fee WITH bps + gas cost WITHOUT bps"
+    );
+
+    assertEq(
+      feeTokenAmount,
+      receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount,
+      "Total matches sum"
+    );
   }
 }

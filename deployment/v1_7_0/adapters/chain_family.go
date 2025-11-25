@@ -30,7 +30,7 @@ type CommitteeVerifierDestChainConfig struct {
 type ExecutorDestChainConfig struct {
 	// The fee charged by the executor to process messages to this chain.
 	USDCentsFee uint16
-	// Whether or not this destination chain is enabled.
+	// Whether this destination chain is enabled.
 	Enabled bool
 }
 
@@ -55,7 +55,9 @@ type FeeQuoterDestChainConfig struct {
 	// Default gas limit for a tx.
 	DefaultTxGasLimit uint32
 	// Flat network fee to charge for messages, multiples of 0.01 USD.
-	NetworkFeeUSDCents uint32
+	NetworkFeeUSDCents uint16
+	// Percent multiplier for payments in LINK token.
+	LinkFeeMultiplierPercent uint8
 }
 
 // RemoteChainConfig defines the configuration for a remote chain.
@@ -116,7 +118,7 @@ type ConfigureChainForLanesInput struct {
 	RemoteChains map[uint64]RemoteChainConfig[[]byte, string]
 }
 
-// Chain is a configurable chain family.
+// ChainFamily is a configurable chain family.
 type ChainFamily interface {
 	// ConfigureChainForLanes performs all configuration required for a chain of this family to send messages to other chains.
 	// The sequence should target a single chain.
