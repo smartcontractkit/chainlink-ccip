@@ -1,6 +1,7 @@
 package sequences_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
@@ -15,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -60,6 +62,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			var committeeVerifier string
 			var committeeVerifierResolver string
 			var executorAddress string
+			var linkTokenAddress string
 			for _, addr := range deploymentReport.Output.Addresses {
 				switch addr.Type {
 				case datastore.ContractType(router.ContractType):
@@ -76,6 +79,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 					executorAddress = addr.Address
 				case datastore.ContractType(committee_verifier.ResolverType):
 					committeeVerifierResolver = addr.Address
+				case datastore.ContractType(link.ContractType):
+					linkTokenAddress = addr.Address
 				}
 			}
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
@@ -203,6 +208,28 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, expectedExecConfig.USDCentsFee, gotExecConfig.UsdCentsFee, "UsdCentsFee in Executor dest chain config should match")
 			require.True(t, gotExecConfig.Enabled, "Dest chain selector on Executor should be enabled")
 
+			// For this test, there is no offchain component providing prices. We have to initialize a token price for
+			// the fee token (assumed to be LINK) so that fee calculation can succeed.
+			_, err = operations.ExecuteOperation(e.OperationsBundle, fee_quoter.UpdatePrices, evmChain, contract.FunctionInput[fee_quoter.PriceUpdates]{
+				ChainSelector: evmChain.Selector,
+				Address:       common.HexToAddress(feeQuoter),
+				Args: fee_quoter.PriceUpdates{
+					TokenPriceUpdates: []fee_quoter.TokenPriceUpdate{
+						{
+							SourceToken: common.HexToAddress(linkTokenAddress),
+							UsdPerToken: big.NewInt(1e18), // $1.00 with 18 decimals
+						},
+					},
+					GasPriceUpdates: []fee_quoter.GasPriceUpdate{
+						{
+							DestChainSelector: remoteChainSelector,
+							UsdPerUnitGas:     big.NewInt(1e6),
+						},
+					},
+				},
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+
 			/////////////////////////////////////////
 			// Try sending CCIP message /////////////
 			/////////////////////////////////////////
@@ -218,7 +245,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 					GasLimit:           80_000,
 					BlockConfirmations: 0,
 					Ccvs:               []common.Address{common.HexToAddress(committeeVerifierResolver)},
-					CcvArgs:            [][]byte{[]byte{}},
+					CcvArgs:            [][]byte{{}},
 					Executor:           common.HexToAddress(executorAddress),
 					ExecutorArgs:       []byte{},
 					TokenReceiver:      []byte{},
