@@ -20,6 +20,8 @@ contract FeeQuoterSetup is TokenSetup {
   uint16 internal constant MAX_TOKENS_LENGTH = 1;
   uint32 internal constant MAX_GAS_LIMIT = 4_000_000;
 
+  uint8 internal constant LINK_FEE_MULTIPLIER_PERCENT = 90; // 10% discount
+
   // OnRamp
   uint96 internal constant MAX_MSG_FEES_JUELS = 1_000e18;
   uint32 internal constant DEST_GAS_OVERHEAD = 300_000;
@@ -64,7 +66,6 @@ contract FeeQuoterSetup is TokenSetup {
   address[] internal s_sourceFeeTokens;
   uint224[] internal s_sourceTokenPrices;
 
-  FeeQuoter.FeeTokenArgs[] internal s_feeQuoterPremiumMultiplierWeiPerEthArgs;
   FeeQuoter.TokenTransferFeeConfigArgs[] internal s_feeQuoterTokenTransferFeeConfigArgs;
 
   mapping(address token => address dataFeedAddress) internal s_dataFeedByToken;
@@ -119,19 +120,6 @@ contract FeeQuoterSetup is TokenSetup {
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = OWNER;
 
-    s_feeQuoterPremiumMultiplierWeiPerEthArgs.push(
-      FeeQuoter.FeeTokenArgs({
-        token: s_sourceFeeToken,
-        premiumMultiplierWeiPerEth: 5e17 // 0.5x
-      })
-    );
-    s_feeQuoterPremiumMultiplierWeiPerEthArgs.push(
-      FeeQuoter.FeeTokenArgs({
-        token: s_sourceRouter.getWrappedNative(),
-        premiumMultiplierWeiPerEth: 2e18 // 2x
-      })
-    );
-
     s_feeQuoterTokenTransferFeeConfigArgs.push();
     s_feeQuoterTokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
@@ -174,7 +162,7 @@ contract FeeQuoterSetup is TokenSetup {
     s_feeQuoter = new FeeQuoterHelper(
       FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
       priceUpdaters,
-      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
+      s_sourceFeeTokens,
       s_feeQuoterTokenTransferFeeConfigArgs,
       _generateFeeQuoterDestChainConfigArgs()
     );
@@ -224,7 +212,8 @@ contract FeeQuoterSetup is TokenSetup {
         defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
         defaultTxGasLimit: GAS_LIMIT,
         networkFeeUSDCents: 1_00,
-        chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM
+        chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+        linkFeeMultiplierPercent: LINK_FEE_MULTIPLIER_PERCENT
       })
     });
     return destChainConfigs;
