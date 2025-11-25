@@ -237,24 +237,8 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
   }
 
-  function test_forwardToVerifier_RevertWhen_InvalidReceiver_TooLong() public {
-    bytes memory tokenReceiver = new bytes(33);
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
-      SOURCE_CHAIN_SELECTOR,
-      DEST_CHAIN_SELECTOR,
-      CCIP_FAST_FINALITY_THRESHOLD,
-      address(s_USDCToken),
-      TRANSFER_AMOUNT,
-      tokenReceiver
-    );
-
-    vm.startPrank(s_onRamp);
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidReceiver.selector, tokenReceiver));
-    s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
-  }
-
-  function test_forwardToVerifier_RevertWhen_InvalidReceiver_TooShort() public {
-    bytes memory tokenReceiver = new bytes(31);
+  function test_forwardToVerifier_RevertWhen_InvalidReceiver() public {
+    bytes memory tokenReceiver = new bytes(33); // 33 bytes is too long for a bytes32.
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
       SOURCE_CHAIN_SELECTOR,
       DEST_CHAIN_SELECTOR,

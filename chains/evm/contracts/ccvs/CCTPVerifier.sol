@@ -231,7 +231,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       revert InvalidToken(tokenTransfer.sourceTokenAddress);
     }
 
-    if (tokenTransfer.tokenReceiver.length != 32) {
+    if (tokenTransfer.tokenReceiver.length > 32) {
       revert InvalidReceiver(tokenTransfer.tokenReceiver);
     }
 
@@ -242,7 +242,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     if (domain.mintRecipientOnDest != bytes32(0)) {
       decodedReceiver = domain.mintRecipientOnDest;
     } else {
-      decodedReceiver = abi.decode(tokenTransfer.tokenReceiver, (bytes32));
+      decodedReceiver =
+        bytes32(uint256(bytes32(tokenTransfer.tokenReceiver)) >> (256 - tokenTransfer.tokenReceiver.length * 8));
     }
 
     DepositForBurnParams memory params = DepositForBurnParams({
@@ -251,7 +252,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD
     });
 
-    uint256 maxFee = 0;
+    uint256 maxFee;
     if (params.finality != 0) {
       params.finalityThreshold = CCTP_FAST_FINALITY_THRESHOLD;
 
