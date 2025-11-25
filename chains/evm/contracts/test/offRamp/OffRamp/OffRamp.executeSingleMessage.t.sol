@@ -24,7 +24,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     // Mock validateReport for default message structure.
     bytes32 messageHash = keccak256(MessageV1Codec._encodeMessageV1(message));
 
-    bytes memory defaultVerifierResults = abi.encode("mock ccv data");
+    bytes memory defaultVerifierResults = abi.encode("mock verifier results");
     vm.mockCall(
       s_defaultCCV,
       abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageHash, defaultVerifierResults)),

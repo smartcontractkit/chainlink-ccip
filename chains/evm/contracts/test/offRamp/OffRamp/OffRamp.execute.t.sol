@@ -59,12 +59,14 @@ contract OffRamp_execute is OffRampSetup {
 
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeWithSelector(ICrossChainVerifierResolver.getInboundImplementation.selector, abi.encode("mock ccv data")),
+      abi.encodeWithSelector(
+        ICrossChainVerifierResolver.getInboundImplementation.selector, abi.encode("mock verifier results")
+      ),
       abi.encode(s_defaultCCV)
     );
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageHash, abi.encode("mock ccv data"))),
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageHash, abi.encode("mock verifier results"))),
       abi.encode(true)
     );
   }
@@ -92,7 +94,7 @@ contract OffRamp_execute is OffRampSetup {
     MessageV1Codec.MessageV1 memory message
   ) internal view returns (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) {
     verifierResults = new bytes[](1);
-    verifierResults[0] = abi.encode("mock ccv data");
+    verifierResults[0] = abi.encode("mock verifier results");
     return (MessageV1Codec._encodeMessageV1(message), _arrayOf(s_defaultCCV), verifierResults);
   }
 
