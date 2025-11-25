@@ -27,7 +27,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidMessageId(bytes32 expected, bytes32 got);
   error InvalidMessageSender(bytes32 expected, bytes32 got);
   error InvalidMessageVersion(uint32 expected, uint32 got);
-  error InvalidToken(address token);
+  error InvalidToken(bytes token);
   error InvalidTokenTransferLength(uint256 length);
   error MaxFeeExceedsUint32(uint256 maxFee);
   error OnlyCallableByOwnerOrAllowlistAdmin();
@@ -64,14 +64,9 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
   /// @notice Parameters for _depositForBurn (stack too deep measure).
   struct DepositForBurnParams {
-    uint256 amount; // The amount of USDC to deposit for burn.
-    bytes32 receiver; // The receiver of the minted USDC on the destination chain.
     bytes32 messageId; // The message ID of the CCIP message.
-    bytes32 allowedCaller; // The allowed caller of the message transmitter on the destination chain.
     uint32 finality; // The finality of the CCIP message.
-    uint32 domainIdentifier; // The domain identifier of the destination chain.
     uint32 finalityThreshold; // The CCTP finality threshold.
-    uint16 bps; // The bps charged by CCTP on destination.
   }
 
   /// @notice A domain is a CCTP-specific representation of a destination chain.
@@ -222,19 +217,19 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     bytes calldata // verifierArgs
   ) external returns (bytes memory verifierReturnData) {
     // For EVM, sender is expected to be 20 bytes.
-    address senderAddress = address(bytes20(message.sender));
-    _assertSenderIsAllowed(message.destChainSelector, senderAddress);
+    _assertSenderIsAllowed(message.destChainSelector, address(bytes20(message.sender)));
 
     Domain storage domain = s_chainToDomain[message.destChainSelector];
     if (!domain.enabled) revert UnknownDomain(message.destChainSelector);
 
     // We expect exactly one token transfer per message.
     if (message.tokenTransfer.length != 1) revert InvalidTokenTransferLength(message.tokenTransfer.length);
-    MessageV1Codec.TokenTransferV1 memory tokenTransfer = message.tokenTransfer[0];
 
+    MessageV1Codec.TokenTransferV1 memory tokenTransfer = message.tokenTransfer[0];
     // The address of the token transferred must correspond to USDC.
-    address sourceTokenAddress = address(bytes20(tokenTransfer.sourceTokenAddress));
-    if (sourceTokenAddress != address(i_usdcToken)) revert InvalidToken(sourceTokenAddress);
+    if (address(bytes20(tokenTransfer.sourceTokenAddress)) != address(i_usdcToken)) {
+      revert InvalidToken(tokenTransfer.sourceTokenAddress);
+    }
 
     if (tokenTransfer.tokenReceiver.length != 32) {
       revert InvalidReceiver(tokenTransfer.tokenReceiver);
@@ -251,34 +246,29 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     }
 
     DepositForBurnParams memory params = DepositForBurnParams({
-      amount: tokenTransfer.amount,
-      receiver: decodedReceiver,
       messageId: messageId,
-      allowedCaller: domain.allowedCallerOnDest,
       finality: message.finality,
-      domainIdentifier: domain.domainIdentifier,
-      finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
-      bps: 0 // No fee is charged on destination for standard finality.
+      finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD
     });
 
-    if (message.finality != 0) {
+    uint256 maxFee = 0;
+    if (params.finality != 0) {
       params.finalityThreshold = CCTP_FAST_FINALITY_THRESHOLD;
-      params.bps = s_dynamicConfig.fastFinalityBps;
+
+      // The maximum fee, taken on destination, is a percentage of the total amount transferred.
+      // We use bps to calculate the smallest possible value that we can set as the max fee.
+      // The bps values configured for each finality threshold on this chain must mirror those used by CCTP.
+      // CCTP defines different bps values for each chain.
+      maxFee = tokenTransfer.amount * s_dynamicConfig.fastFinalityBps / BPS_DIVIDER;
+      if (maxFee > type(uint32).max) revert MaxFeeExceedsUint32(maxFee);
     }
 
-    // The maximum fee, taken on destination, is a percentage of the total amount transferred.
-    // We use bps to calculate the smallest possible value that we can set as the max fee.
-    // The bps values configured for each finality threshold on this chain must mirror those used by CCTP.
-    // CCTP defines different bps values for each chain.
-    uint256 maxFee = params.amount * params.bps / BPS_DIVIDER;
-    if (maxFee > type(uint32).max) revert MaxFeeExceedsUint32(maxFee);
-
     i_tokenMessenger.depositForBurnWithHook(
-      params.amount,
-      params.domainIdentifier,
-      params.receiver,
+      tokenTransfer.amount,
+      domain.domainIdentifier,
+      decodedReceiver,
       address(i_usdcToken),
-      params.allowedCaller,
+      domain.allowedCallerOnDest,
       uint32(maxFee),
       params.finalityThreshold,
       // The hook data includes the version tag and the message ID.
