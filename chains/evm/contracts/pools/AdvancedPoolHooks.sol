@@ -179,8 +179,11 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// is above the configured threshold.
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredCCVs(
+    address,
     uint64 remoteChainSelector,
     uint256 amount,
+    uint16,
+    bytes calldata,
     IPoolV2.MessageDirection direction
   ) external view returns (address[] memory requiredCCVs) {
     CCVConfig storage config = s_verifierConfig[remoteChainSelector];

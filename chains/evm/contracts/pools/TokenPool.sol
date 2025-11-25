@@ -752,7 +752,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     RateLimiter.Config[] calldata outboundConfigs,
     RateLimiter.Config[] calldata inboundConfigs
   ) external {
-    if (msg.sender != s_rateLimitAdmin && msg.sender != owner()) revert Unauthorized(msg.sender);
+    _onlyOwnerOrRateLimitAdmin();
     if (remoteChainSelectors.length != outboundConfigs.length || remoteChainSelectors.length != inboundConfigs.length) {
       revert MismatchedArrayLengths();
     }
@@ -808,6 +808,13 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     if (!s_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
   }
 
+  /// @notice Checks whether the msg.sender is either the owner or the rate limit admin.
+  function _onlyOwnerOrRateLimitAdmin() internal view virtual {
+    if (msg.sender != s_rateLimitAdmin && msg.sender != owner()) {
+      revert Unauthorized(msg.sender);
+    }
+  }
+
   // ================================================================
   // │              Custom Block Confirmation Config                │
   // ================================================================
@@ -817,10 +824,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function setCustomBlockConfirmationRateLimitConfig(
     CustomBlockConfirmationRateLimitConfigArgs[] calldata rateLimitConfigArgs
   ) external virtual {
-    if (msg.sender != s_rateLimitAdmin && msg.sender != owner()) revert Unauthorized(msg.sender);
+    _onlyOwnerOrRateLimitAdmin();
 
     for (uint256 i = 0; i < rateLimitConfigArgs.length; ++i) {
       CustomBlockConfirmationRateLimitConfigArgs calldata configArgs = rateLimitConfigArgs[i];
+
       uint64 remoteChainSelector = configArgs.remoteChainSelector;
       if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
