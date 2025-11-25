@@ -233,7 +233,7 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     );
 
     vm.startPrank(s_onRamp);
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidToken.selector, invalidToken));
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidToken.selector, abi.encodePacked(invalidToken)));
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
   }
 
