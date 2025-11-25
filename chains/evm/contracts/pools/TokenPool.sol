@@ -242,9 +242,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
-    bytes memory // tokenArgs
+    bytes calldata tokenArgs
   ) public virtual returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested);
+    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
     destTokenAmount = _applyFee(lockOrBurnIn, blockConfirmationRequested);
     _lockOrBurn(destTokenAmount);
 
@@ -270,7 +270,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
     _lockOrBurn(lockOrBurnIn.amount);
 
     emit LockedOrBurned({
@@ -349,14 +349,13 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
-  function _validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 blockConfirmationRequested) internal {
+  function _validateLockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes memory tokenArgs
+  ) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
-
-    // Check allowlist if advanced hooks are configured
-    if (address(i_advancedPoolHooks) != address(0)) {
-      i_advancedPoolHooks.checkAllowList(lockOrBurnIn.originalSender);
-    }
 
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
     uint256 amount = lockOrBurnIn.amount;
@@ -370,6 +369,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       }
     } else {
       _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
+    }
+
+    if (address(i_advancedPoolHooks) != address(0)) {
+      i_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
     }
   }
 
@@ -860,17 +863,19 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @param direction The direction of the transfer (Inbound or Outbound).
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredCCVs(
-    address, // localToken
+    address localToken,
     uint64 remoteChainSelector,
     uint256 amount,
-    uint16, // blockConfirmationRequested
-    bytes calldata, // extraData
+    uint16 blockConfirmationRequested,
+    bytes calldata extraData,
     IPoolV2.MessageDirection direction
   ) external view virtual returns (address[] memory requiredCCVs) {
     if (address(i_advancedPoolHooks) == address(0)) {
       return new address[](0);
     }
-    return i_advancedPoolHooks.getRequiredCCVs(remoteChainSelector, amount, direction);
+    return i_advancedPoolHooks.getRequiredCCVs(
+      localToken, remoteChainSelector, amount, blockConfirmationRequested, extraData, direction
+    );
   }
 
   // ================================================================
@@ -921,7 +926,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function getTokenTransferFeeConfig(
     address, // localToken
     uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata, // message
     uint16, // blockConfirmationRequested
     bytes calldata // tokenArgs
   ) external view virtual returns (TokenTransferFeeConfig memory feeConfig) {

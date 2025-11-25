@@ -14,7 +14,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     emit TokenPool.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
 
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0, "");
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
@@ -40,7 +40,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     );
 
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, type(uint16).max);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, type(uint16).max, "");
 
     (RateLimiter.TokenBucket memory outboundBucket,) =
       s_tokenPool.getCurrentCustomBlockConfirmationRateLimiterState(DEST_CHAIN_SELECTOR);
@@ -59,7 +59,7 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
         TokenPool.InvalidMinBlockConfirmation.selector, minBlockConfirmation - 1, minBlockConfirmation
       )
     );
-    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1000e18), minBlockConfirmation - 1);
+    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1000e18), minBlockConfirmation - 1, "");
   }
 
   function _buildLockOrBurnIn(

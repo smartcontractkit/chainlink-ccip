@@ -66,14 +66,12 @@ interface IPoolV2 is IPoolV1 {
   /// @notice Returns the fee overrides for transferring the pool's token to a destination chain.
   /// @notice localToken The address of the local token.
   /// @param destChainSelector The chain selector of the destination chain.
-  /// @param message The message to be sent to the destination chain.
   /// @param blockConfirmationRequested Requested block confirmation.
   /// @param tokenArgs Additional token argument from the CCIP message.
   /// @return feeConfig the fee configuration for transferring the token to the destination chain.
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata message,
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external view returns (TokenTransferFeeConfig memory feeConfig);

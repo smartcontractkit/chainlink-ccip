@@ -27,9 +27,8 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
 
     // Test getting the config
-    Client.EVM2AnyMessage memory message;
     IPoolV2.TokenTransferFeeConfig memory returnedFeeConfig =
-      s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
+      s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, 0, "");
 
     assertEq(returnedFeeConfig.destGasOverhead, feeConfig.destGasOverhead);
     assertEq(returnedFeeConfig.destBytesOverhead, feeConfig.destBytesOverhead);
@@ -48,9 +47,8 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(new TokenPool.TokenTransferFeeConfigArgs[](0), toDelete);
 
     // Test getting the deleted config
-    Client.EVM2AnyMessage memory message;
     IPoolV2.TokenTransferFeeConfig memory tokenTransferFeeConfig =
-      s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
+      s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, 0, "");
 
     // assert default values are returned
     assertEq(tokenTransferFeeConfig.destGasOverhead, 0);

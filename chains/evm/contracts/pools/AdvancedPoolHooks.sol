@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IAdvancedPoolHooks} from "../interfaces/IAdvancedPoolHooks.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
+
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
+import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+
 import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
-/// @notice Advanced pool hooks for additional security features like allowlists and CCV management
-/// @dev This is a standalone contract that can be optionally used by TokenPools
-contract AdvancedPoolHooks is Ownable2StepMsgSender {
+/// @notice Advanced pool hooks for additional security features like allowlists and CCV management.
+/// @dev This is a standalone contract that can optionally be used by TokenPools.
+contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error AllowListNotEnabled();
@@ -64,6 +68,11 @@ contract AdvancedPoolHooks is Ownable2StepMsgSender {
     s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;
   }
 
+  /// @inheritdoc IAdvancedPoolHooks
+  function preflightCheck(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16, bytes calldata) external view {
+    checkAllowList(lockOrBurnIn.originalSender);
+  }
+
   // ================================================================
   // │                          Allowlist                           │
   // ================================================================
@@ -72,7 +81,7 @@ contract AdvancedPoolHooks is Ownable2StepMsgSender {
   /// @param sender The address to check
   function checkAllowList(
     address sender
-  ) external view {
+  ) public view {
     if (i_allowlistEnabled) {
       if (!s_allowlist.contains(sender)) {
         revert SenderNotAllowed(sender);
@@ -181,27 +190,27 @@ contract AdvancedPoolHooks is Ownable2StepMsgSender {
     return _resolveRequiredCCVs(config.outboundCCVs, config.outboundCCVsToAddAboveThreshold, amount);
   }
 
-  /// @notice Gets the threshold amount above which additional CCVs are required
-  /// @return The threshold amount
+  /// @notice Gets the threshold amount above which additional CCVs are required.
+  /// @return The threshold amount.
   function getThresholdAmount() external view returns (uint256) {
     return s_thresholdAmountForAdditionalCCVs;
   }
 
-  /// @notice Sets the threshold amount above which additional CCVs are required
-  /// @param thresholdAmount The new threshold amount
+  /// @notice Sets the threshold amount above which additional CCVs are required.
+  /// @param thresholdAmount The new threshold amount.
   function setThresholdAmount(
     uint256 thresholdAmount
   ) external onlyOwner {
     s_thresholdAmountForAdditionalCCVs = thresholdAmount;
+
     emit ThresholdAmountSet(thresholdAmount);
   }
 
   function _resolveRequiredCCVs(
-    address[] storage baseCCVsStorage,
+    address[] memory baseCCVs,
     address[] storage requiredCCVsAboveThresholdStorage,
     uint256 amount
   ) internal view returns (address[] memory requiredCCVs) {
-    address[] memory baseCCVs = baseCCVsStorage;
     // If amount is above threshold, combine base and additional CCVs.
     uint256 thresholdAmount = s_thresholdAmountForAdditionalCCVs;
     if (thresholdAmount != 0 && amount >= thresholdAmount) {

@@ -33,11 +33,15 @@ contract TokenPoolHelper is TokenPool {
   function validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) external {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
   }
 
-  function validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) external {
-    _validateLockOrBurn(lockOrBurnIn, finality);
+  function validateLockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 finality,
+    bytes calldata tokenArgs
+  ) external {
+    _validateLockOrBurn(lockOrBurnIn, finality, tokenArgs);
   }
 
   function validateReleaseOrMint(
