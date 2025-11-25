@@ -41,9 +41,13 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 
 		for _, perChainInput := range input.ChainInputs {
 
+			// Get the timelock address from the datastore based on the MCMS qualifier and chain selector
+			// Without the qualifier, the datastore will sometimes throw an error when fetching the address due to the
+			// datastore containing >1 address with the same type and version.
 			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:          "RBACTimelock",
 				Version:       semver.MustParse("1.0.0"),
+				Qualifier:     input.MCMS.Qualifier,
 				ChainSelector: perChainInput.ChainSelector,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
