@@ -56,11 +56,15 @@ type ExecuteOffchainConfig struct {
 	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
 	MultipleReportsEnabled bool `json:"multipleReports"`
 
+	// PopulateTxHashEnabled enables populating the TxHash field in message headers.
+	// When disabled, TxHash will be omitted from messages for backwards compatibility.
+	PopulateTxHashEnabled bool `json:"populateTxHashEnabled"`
+
 	// SolanaChainWriterConfigVersion is a feature flag to specify which version of Solana ChainWriter configs to
 	// initialize the plugin with.
 	//
-	// Deprecated: this feature flag is no longer needed since only the latest version of the Solana ChainWriter config is
-	// used
+	// Deprecated: this feature flag is no longer needed since only the latest version of the Solana ChainWriter config
+	// is used
 	SolanaChainWriterConfigVersion *string `json:"solanaAccountDerivation,omitempty"`
 }
 

@@ -151,6 +151,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 		p.addrCodec,
+		offchainConfig.PopulateTxHashEnabled,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create ccip reader: %w", err)
