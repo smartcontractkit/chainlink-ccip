@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolWithAllowListSetup} from "./TokenPoolWithAllowListSetup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolWithAllowList_setDynamicConfig is TokenPoolWithAllowListSetup {
+contract TokenPoolWithAllowList_setDynamicConfig is AdvancedPoolHooksSetup {
   function test_setDynamicConfig() public {
     address newRouter = makeAddr("newRouter");
     uint16 newMinBlockConfirmations = 5;

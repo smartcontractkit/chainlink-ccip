@@ -3,9 +3,9 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {
+contract AdvancedPoolHooks_getRequiredCCVsOutbound is AdvancedPoolHooksSetup {
   function test_getRequiredCCVs_Outbound_BaseCCVs() public {
     address[] memory outboundCCVs = new address[](1);
     outboundCCVs[0] = makeAddr("outboundCCV1");

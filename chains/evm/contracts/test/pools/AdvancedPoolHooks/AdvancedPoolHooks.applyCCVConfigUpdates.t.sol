@@ -4,16 +4,14 @@ pragma solidity ^0.8.24;
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
-  // Test helper addresses.
+contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
   address internal s_ccv1 = makeAddr("ccv1");
   address internal s_ccv2 = makeAddr("ccv2");
 
-  function test_applyCCVConfigUpdate() public {
-    // Prepare test data.
+  function test_applyCCVConfigUpdates() public {
     address[] memory outboundCCVs = new address[](1);
     outboundCCVs[0] = s_ccv1;
 
@@ -39,7 +37,6 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     });
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
 
-    // Verify the configuration was stored correctly.
     address[] memory storedOutbound =
       s_tokenPool.getRequiredCCVs(address(0), DEST_CHAIN_SELECTOR, 0, 0, "", IPoolV2.MessageDirection.Outbound);
     address[] memory storedInbound =
@@ -54,7 +51,7 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
 
   // Reverts
 
-  function test_applyCCVConfigUpdate_RevertWhen_OnlyCallableByOwner() public {
+  function test_applyCCVConfigUpdates_RevertWhen_OnlyCallableByOwner() public {
     vm.stopPrank();
     vm.prank(STRANGER);
 
@@ -64,7 +61,7 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
   }
 
-  function test_applyCCVConfigUpdate_RevertWhen_DuplicateCCV_Outbound() public {
+  function test_applyCCVConfigUpdates_RevertWhen_DuplicateCCV_Outbound() public {
     AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
     address[] memory duplicateOutbound = new address[](3);
     duplicateOutbound[0] = s_ccv1;
@@ -86,7 +83,7 @@ contract TokenPoolV2_applyCCVConfigUpdates is TokenPoolV2Setup {
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
   }
 
-  function test_applyCCVConfigUpdate_RevertWhen_DuplicateCCV_Inbound() public {
+  function test_applyCCVConfigUpdates_RevertWhen_DuplicateCCV_Inbound() public {
     AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
     address[] memory validOutbound = new address[](1);
     validOutbound[0] = s_ccv1;

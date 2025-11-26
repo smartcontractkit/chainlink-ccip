@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
+contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
   function test_validateLockOrBurn() public {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 

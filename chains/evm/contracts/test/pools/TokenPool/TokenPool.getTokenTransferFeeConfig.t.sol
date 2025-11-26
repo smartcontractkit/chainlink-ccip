@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
+contract TokenPoolV2_getTokenTransferFeeConfig is AdvancedPoolHooksSetup {
   function test_getTokenTransferFeeConfig() public {
     // Set up a fee config first.
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({

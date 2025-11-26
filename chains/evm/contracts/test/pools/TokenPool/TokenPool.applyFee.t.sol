@@ -5,9 +5,9 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_applyFee is TokenPoolV2Setup {
+contract TokenPoolV2_applyFee is AdvancedPoolHooksSetup {
   function test_applyFee_CustomFinality() public {
     uint16 minBlockConfirmation = 5;
     uint16 defaultBlockConfirmationTransferFeeBps = 100;
