@@ -341,9 +341,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Validates the lock or burn input for correctness on
   /// - token to be locked or burned
   /// - RMN curse status
-  /// - allowlist status (if advanced hooks are configured)
   /// - if the sender is a valid onRamp
   /// - rate limiting for either default or custom block confirmation transfer messages.
+  /// - preflight checks hooks (if enabled)
   /// @param lockOrBurnIn The input to validate.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message. A value of zero is used for default finality.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
