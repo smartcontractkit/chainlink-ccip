@@ -14,8 +14,6 @@ library RateLimiter {
   error InvalidRateLimitRate(Config rateLimiterConfig);
   error DisabledNonZeroRateLimit(Config config);
 
-  event ConfigChanged(Config config);
-
   struct TokenBucket {
     uint128 tokens; // ────╮ Current number of tokens that are in the bucket.
     uint32 lastUpdated; // │ Timestamp in seconds of the last token refill, good for 100+ years.
@@ -90,20 +88,11 @@ library RateLimiter {
   /// @param s_bucket The token bucket.
   /// @param config The new config.
   function _setTokenBucketConfig(TokenBucket storage s_bucket, Config memory config) internal {
-    // First update the bucket to make sure the proper rate is used for all the time up until the config change.
-    uint256 timeDiff = block.timestamp - s_bucket.lastUpdated;
-    if (timeDiff != 0) {
-      s_bucket.tokens = uint128(_calculateRefill(s_bucket.capacity, s_bucket.tokens, timeDiff, s_bucket.rate));
-
-      s_bucket.lastUpdated = uint32(block.timestamp);
-    }
-
-    s_bucket.tokens = uint128(_min(config.capacity, s_bucket.tokens));
     s_bucket.isEnabled = config.isEnabled;
+    s_bucket.tokens = config.capacity;
     s_bucket.capacity = config.capacity;
     s_bucket.rate = config.rate;
-
-    emit ConfigChanged(config);
+    s_bucket.lastUpdated = uint32(block.timestamp);
   }
 
   /// @notice Validates the token bucket config.

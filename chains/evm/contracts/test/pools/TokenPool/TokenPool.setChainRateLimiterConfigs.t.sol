@@ -27,18 +27,10 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
   }
 
   function testFuzz_SetChainRateLimiterConfigs_Success(uint128 capacity, uint128 rate, uint32 newTime) public {
-    // Cap the lower bound to 4 so 4/2 is still >= 2
-    vm.assume(capacity >= 4);
-    // Cap the lower bound to 2 so 2/2 is still >= 1
-    rate = uint128(bound(rate, 2, capacity - 2));
+    rate = uint128(bound(rate, 0, capacity));
     // Bucket updates only work on increasing time
     newTime = uint32(bound(newTime, block.timestamp + 1, type(uint32).max));
     vm.warp(newTime);
-
-    (RateLimiter.TokenBucket memory outboundBefore, RateLimiter.TokenBucket memory inboundBefore) =
-      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR);
-    uint256 oldOutboundTokens = outboundBefore.tokens;
-    uint256 oldInboundTokens = inboundBefore.tokens;
 
     RateLimiter.Config memory newOutboundConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
     RateLimiter.Config memory newInboundConfig =
@@ -54,28 +46,20 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     newInboundConfigs[0] = newInboundConfig;
 
     vm.expectEmit();
-    emit RateLimiter.ConfigChanged(newOutboundConfig);
-    vm.expectEmit();
-    emit RateLimiter.ConfigChanged(newInboundConfig);
-    vm.expectEmit();
     emit TokenPool.DefaultFinalityRateLimitConfigured(DEST_CHAIN_SELECTOR, newOutboundConfig, newInboundConfig);
 
     s_tokenPool.setChainRateLimiterConfigs(chainSelectors, newOutboundConfigs, newInboundConfigs);
-
-    uint256 expectedTokens = RateLimiter._min(newOutboundConfig.capacity, oldOutboundTokens);
 
     (RateLimiter.TokenBucket memory outboundAfter, RateLimiter.TokenBucket memory inboundAfter) =
       s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR);
     assertEq(outboundAfter.capacity, newOutboundConfig.capacity);
     assertEq(outboundAfter.rate, newOutboundConfig.rate);
-    assertEq(outboundAfter.tokens, expectedTokens);
+    assertEq(outboundAfter.tokens, newOutboundConfig.capacity);
     assertEq(outboundAfter.lastUpdated, newTime);
-
-    expectedTokens = RateLimiter._min(newInboundConfig.capacity, oldInboundTokens);
 
     assertEq(inboundAfter.capacity, newInboundConfig.capacity);
     assertEq(inboundAfter.rate, newInboundConfig.rate);
-    assertEq(inboundAfter.tokens, expectedTokens);
+    assertEq(inboundAfter.tokens, newInboundConfig.capacity);
     assertEq(inboundAfter.lastUpdated, newTime);
   }
 

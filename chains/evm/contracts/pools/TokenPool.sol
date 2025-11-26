@@ -576,9 +576,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
     for (uint256 i = 0; i < chainsToAdd.length; ++i) {
       ChainUpdate memory newChain = chainsToAdd[i];
-      RateLimiter._validateTokenBucketConfig(newChain.outboundRateLimiterConfig);
-      RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig);
-
       if (newChain.remoteTokenAddress.length == 0) {
         revert ZeroAddressInvalid();
       }
@@ -589,21 +586,12 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       }
 
       RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[newChain.remoteChainSelector];
+      RateLimiter._validateTokenBucketConfig(newChain.outboundRateLimiterConfig);
+      remoteChainConfig.outboundRateLimiterConfig._setTokenBucketConfig(newChain.outboundRateLimiterConfig);
 
-      remoteChainConfig.outboundRateLimiterConfig = RateLimiter.TokenBucket({
-        rate: newChain.outboundRateLimiterConfig.rate,
-        capacity: newChain.outboundRateLimiterConfig.capacity,
-        tokens: newChain.outboundRateLimiterConfig.capacity,
-        lastUpdated: uint32(block.timestamp),
-        isEnabled: newChain.outboundRateLimiterConfig.isEnabled
-      });
-      remoteChainConfig.inboundRateLimiterConfig = RateLimiter.TokenBucket({
-        rate: newChain.inboundRateLimiterConfig.rate,
-        capacity: newChain.inboundRateLimiterConfig.capacity,
-        tokens: newChain.inboundRateLimiterConfig.capacity,
-        lastUpdated: uint32(block.timestamp),
-        isEnabled: newChain.inboundRateLimiterConfig.isEnabled
-      });
+      RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig);
+      remoteChainConfig.inboundRateLimiterConfig._setTokenBucketConfig(newChain.inboundRateLimiterConfig);
+
       remoteChainConfig.remoteTokenAddress = newChain.remoteTokenAddress;
 
       for (uint256 j = 0; j < newChain.remotePoolAddresses.length; ++j) {
@@ -757,24 +745,42 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     }
 
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
-      _setRateLimitConfig(remoteChainSelectors[i], outboundConfigs[i], inboundConfigs[i]);
+      uint64 remoteChainSelector = remoteChainSelectors[i];
+      if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+
+      RateLimiter._validateTokenBucketConfig(outboundConfigs[i]);
+      s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfigs[i]);
+
+      RateLimiter._validateTokenBucketConfig(inboundConfigs[i]);
+      s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfigs[i]);
+
+      emit DefaultFinalityRateLimitConfigured(remoteChainSelector, outboundConfigs[i], inboundConfigs[i]);
     }
   }
 
-  function _setRateLimitConfig(
-    uint64 remoteChainSelector,
-    RateLimiter.Config memory outboundConfig,
-    RateLimiter.Config memory inboundConfig
-  ) internal {
-    if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+  /// @notice Sets the custom block confirmation based rate limit configurations for specified remote chains.
+  /// @param rateLimitConfigArgs Array of structs containing remote chain selectors and their rate limiter configs.
+  function setCustomBlockConfirmationRateLimitConfig(
+    CustomBlockConfirmationRateLimitConfigArgs[] calldata rateLimitConfigArgs
+  ) external virtual {
+    _onlyOwnerOrRateLimitAdmin();
 
-    RateLimiter._validateTokenBucketConfig(outboundConfig);
-    s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
+    for (uint256 i = 0; i < rateLimitConfigArgs.length; ++i) {
+      CustomBlockConfirmationRateLimitConfigArgs calldata configArgs = rateLimitConfigArgs[i];
 
-    RateLimiter._validateTokenBucketConfig(inboundConfig);
-    s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
+      uint64 remoteChainSelector = configArgs.remoteChainSelector;
+      if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
-    emit DefaultFinalityRateLimitConfigured(remoteChainSelector, outboundConfig, inboundConfig);
+      RateLimiter._validateTokenBucketConfig(configArgs.outboundRateLimiterConfig);
+      s_outboundRateLimiterConfig[remoteChainSelector]._setTokenBucketConfig(configArgs.outboundRateLimiterConfig);
+
+      RateLimiter._validateTokenBucketConfig(configArgs.inboundRateLimiterConfig);
+      s_inboundRateLimiterConfig[remoteChainSelector]._setTokenBucketConfig(configArgs.inboundRateLimiterConfig);
+
+      emit CustomBlockConfirmationRateLimitConfigured(
+        remoteChainSelector, configArgs.outboundRateLimiterConfig, configArgs.inboundRateLimiterConfig
+      );
+    }
   }
 
   // ================================================================
@@ -813,55 +819,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       revert Unauthorized(msg.sender);
     }
   }
-
-  // ================================================================
-  // │              Custom Block Confirmation Config                │
-  // ================================================================
-
-  /// @notice Sets the custom block confirmation based rate limit configurations for specified remote chains.
-  /// @param rateLimitConfigArgs Array of structs containing remote chain selectors and their rate limiter configs.
-  function setCustomBlockConfirmationRateLimitConfig(
-    CustomBlockConfirmationRateLimitConfigArgs[] calldata rateLimitConfigArgs
-  ) external virtual {
-    _onlyOwnerOrRateLimitAdmin();
-
-    for (uint256 i = 0; i < rateLimitConfigArgs.length; ++i) {
-      CustomBlockConfirmationRateLimitConfigArgs calldata configArgs = rateLimitConfigArgs[i];
-
-      uint64 remoteChainSelector = configArgs.remoteChainSelector;
-      if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
-
-      RateLimiter._validateTokenBucketConfig(configArgs.outboundRateLimiterConfig);
-      RateLimiter.TokenBucket storage outboundBucket = s_outboundRateLimiterConfig[remoteChainSelector];
-
-      bool outboundUninitialized = outboundBucket.lastUpdated == 0 && outboundBucket.capacity == 0
-        && outboundBucket.rate == 0 && outboundBucket.tokens == 0 && !outboundBucket.isEnabled;
-      if (outboundUninitialized && configArgs.outboundRateLimiterConfig.isEnabled) {
-        outboundBucket.tokens = configArgs.outboundRateLimiterConfig.capacity;
-        outboundBucket.lastUpdated = uint32(block.timestamp);
-      }
-      outboundBucket._setTokenBucketConfig(configArgs.outboundRateLimiterConfig);
-
-      RateLimiter._validateTokenBucketConfig(configArgs.inboundRateLimiterConfig);
-      RateLimiter.TokenBucket storage inboundBucket = s_inboundRateLimiterConfig[remoteChainSelector];
-
-      bool inboundUninitialized = inboundBucket.lastUpdated == 0 && inboundBucket.capacity == 0
-        && inboundBucket.rate == 0 && inboundBucket.tokens == 0 && !inboundBucket.isEnabled;
-      if (inboundUninitialized && configArgs.inboundRateLimiterConfig.isEnabled) {
-        inboundBucket.tokens = configArgs.inboundRateLimiterConfig.capacity;
-        inboundBucket.lastUpdated = uint32(block.timestamp);
-      }
-      inboundBucket._setTokenBucketConfig(configArgs.inboundRateLimiterConfig);
-
-      emit CustomBlockConfirmationRateLimitConfigured(
-        remoteChainSelector, configArgs.outboundRateLimiterConfig, configArgs.inboundRateLimiterConfig
-      );
-    }
-  }
-
-  // ================================================================
-  // │                          CCV                                 │
-  // ================================================================
 
   /// @notice Returns the set of required CCVs for transfers in a specific direction.
   /// @dev This function delegates to AdvancedPoolHooks if configured, otherwise returns an empty array.
