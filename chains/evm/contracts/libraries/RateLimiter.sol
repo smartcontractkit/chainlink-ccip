@@ -88,17 +88,6 @@ library RateLimiter {
   /// @param s_bucket The token bucket.
   /// @param config The new config.
   function _setTokenBucketConfig(TokenBucket storage s_bucket, Config memory config) internal {
-    s_bucket.isEnabled = config.isEnabled;
-    s_bucket.tokens = config.capacity;
-    s_bucket.capacity = config.capacity;
-    s_bucket.rate = config.rate;
-    s_bucket.lastUpdated = uint32(block.timestamp);
-  }
-
-  /// @notice Validates the token bucket config.
-  function _validateTokenBucketConfig(
-    Config memory config
-  ) internal pure {
     if (config.isEnabled) {
       if (config.rate > config.capacity) {
         revert InvalidRateLimitRate(config);
@@ -108,6 +97,12 @@ library RateLimiter {
         revert DisabledNonZeroRateLimit(config);
       }
     }
+
+    s_bucket.isEnabled = config.isEnabled;
+    s_bucket.tokens = config.capacity;
+    s_bucket.capacity = config.capacity;
+    s_bucket.rate = config.rate;
+    s_bucket.lastUpdated = uint32(block.timestamp);
   }
 
   /// @notice Calculate refilled tokens.

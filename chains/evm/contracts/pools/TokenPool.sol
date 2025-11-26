@@ -586,10 +586,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       }
 
       RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[newChain.remoteChainSelector];
-      RateLimiter._validateTokenBucketConfig(newChain.outboundRateLimiterConfig);
       remoteChainConfig.outboundRateLimiterConfig._setTokenBucketConfig(newChain.outboundRateLimiterConfig);
-
-      RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig);
       remoteChainConfig.inboundRateLimiterConfig._setTokenBucketConfig(newChain.inboundRateLimiterConfig);
 
       remoteChainConfig.remoteTokenAddress = newChain.remoteTokenAddress;
@@ -748,10 +745,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       uint64 remoteChainSelector = remoteChainSelectors[i];
       if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
-      RateLimiter._validateTokenBucketConfig(outboundConfigs[i]);
       s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfigs[i]);
-
-      RateLimiter._validateTokenBucketConfig(inboundConfigs[i]);
       s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfigs[i]);
 
       emit DefaultFinalityRateLimitConfigured(remoteChainSelector, outboundConfigs[i], inboundConfigs[i]);
@@ -771,10 +765,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       uint64 remoteChainSelector = configArgs.remoteChainSelector;
       if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
-      RateLimiter._validateTokenBucketConfig(configArgs.outboundRateLimiterConfig);
       s_outboundRateLimiterConfig[remoteChainSelector]._setTokenBucketConfig(configArgs.outboundRateLimiterConfig);
-
-      RateLimiter._validateTokenBucketConfig(configArgs.inboundRateLimiterConfig);
       s_inboundRateLimiterConfig[remoteChainSelector]._setTokenBucketConfig(configArgs.inboundRateLimiterConfig);
 
       emit CustomBlockConfirmationRateLimitConfigured(
