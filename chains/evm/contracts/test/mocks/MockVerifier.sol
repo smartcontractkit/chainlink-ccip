@@ -46,7 +46,7 @@ contract MockVerifier is ICrossChainVerifierResolver, ICrossChainVerifierV1 {
   function verifyMessage(
     MessageV1Codec.MessageV1 memory, // message
     bytes32 messageId, // messageId
-    bytes memory ccvData // ccvData
+    bytes memory verifierResults // verifierResults
   ) external {}
 
   function getStorageLocation() external pure override returns (string memory) {
@@ -54,7 +54,7 @@ contract MockVerifier is ICrossChainVerifierResolver, ICrossChainVerifierV1 {
   }
 
   function getInboundImplementation(
-    bytes calldata // ccvData
+    bytes calldata // verifierResults
   ) external view returns (address) {
     return address(this);
   }
