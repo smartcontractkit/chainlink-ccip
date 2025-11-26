@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
-import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
 
 contract TokenPoolV2_getRequiredCCVsOutbound is TokenPoolV2Setup {

@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import {IPoolV1} from "./IPool.sol";
 
-import {Client} from "../libraries/Client.sol";
 import {Pool} from "../libraries/Pool.sol";
 
 /// @notice Shared public interface for multiple V2 pool types.
