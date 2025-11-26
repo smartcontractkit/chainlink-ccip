@@ -37,7 +37,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
-  error InvalidCCVDataLength(uint256 expected, uint256 got);
+  error InvalidVerifierResultsLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
@@ -48,7 +48,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
   error InvalidOnRamp(bytes expected, bytes got);
-  error InboundImplementationNotFound(address ccvAddress, bytes ccvData);
+  error InboundImplementationNotFound(address ccvAddress, bytes verifierResults);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -169,8 +169,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @notice Executes a message from a source chain.
   /// @param encodedMessage The message that is being executed, encoded as bytes.
   /// @param ccvs CCVs that attested to the message. Must match the CCVs specified by the receiver and token pool.
-  /// @param ccvData CCV-specific data used to verify the message. Must be same length as ccvs array.
-  function execute(bytes calldata encodedMessage, address[] calldata ccvs, bytes[] calldata ccvData) external {
+  /// @param verifierResults CCV-specific data used to verify the message. Must be same length as ccvs array.
+  function execute(bytes calldata encodedMessage, address[] calldata ccvs, bytes[] calldata verifierResults) external {
     if (s_reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_reentrancyGuardEntered = true;
 
@@ -191,8 +191,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (message.destChainSelector != i_chainSelector) {
       revert InvalidMessageDestChainSelector(message.destChainSelector);
     }
-    if (ccvs.length != ccvData.length) {
-      revert InvalidCCVDataLength(ccvs.length, ccvData.length);
+    if (ccvs.length != verifierResults.length) {
+      revert InvalidVerifierResultsLength(ccvs.length, verifierResults.length);
     }
     if (message.receiver.length != 20) {
       revert Internal.InvalidEVMAddress(message.receiver);
@@ -223,7 +223,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     s_executionStates[executionStateKey] = Internal.MessageExecutionState.IN_PROGRESS;
 
     (bool success, bytes memory err) =
-      _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, ccvData)));
+      _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, verifierResults)));
     Internal.MessageExecutionState newState =
       success ? Internal.MessageExecutionState.SUCCESS : Internal.MessageExecutionState.FAILURE;
 
@@ -273,7 +273,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     MessageV1Codec.MessageV1 calldata message,
     bytes32 messageId,
     address[] calldata ccvs,
-    bytes[] calldata ccvData
+    bytes[] calldata verifierResults
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
@@ -281,19 +281,19 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address receiver = address(bytes20(message.receiver));
 
     {
-      (address[] memory ccvsToQuery, uint256[] memory ccvDataIndex) =
+      (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) =
         _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         address implAddress =
-          ICrossChainVerifierResolver(ccvsToQuery[i]).getInboundImplementation(ccvData[ccvDataIndex[i]]);
+          ICrossChainVerifierResolver(ccvsToQuery[i]).getInboundImplementation(verifierResults[verifierResultsIndex[i]]);
         if (implAddress == address(0)) {
-          revert InboundImplementationNotFound(ccvsToQuery[i], ccvData[ccvDataIndex[i]]);
+          revert InboundImplementationNotFound(ccvsToQuery[i], verifierResults[verifierResultsIndex[i]]);
         }
         ICrossChainVerifierV1(implAddress).verifyMessage({
           message: message,
           messageId: messageId,
-          ccvData: ccvData[ccvDataIndex[i]]
+          verifierResults: verifierResults[verifierResultsIndex[i]]
         });
       }
     }

@@ -10,12 +10,12 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 
 /// @notice Resolves and returns the appropriate verifier contract for the given outbound / inbound traffic.
 /// @dev On source, the destChainSelector of a message is used to determine the verifier implementation to apply.
-/// On destination, we must use the verifier version was applied on source, parsing this version from the ccvData.
+/// On destination, we must use the verifier version was applied on source, parsing this version from the verifierResults.
 contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
-  error InvalidCCVDataLength();
+  error InvalidVerifierResultsLength();
   error InvalidDestChainSelector(uint64 destChainSelector);
   error InvalidVersion(bytes4 version);
 
@@ -47,12 +47,12 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
 
   /// @inheritdoc ICrossChainVerifierResolver
   function getInboundImplementation(
-    bytes calldata ccvData
+    bytes calldata verifierResults
   ) external view returns (address) {
-    if (ccvData.length < 4) {
-      revert InvalidCCVDataLength();
+    if (verifierResults.length < 4) {
+      revert InvalidVerifierResultsLength();
     }
-    return s_versionToInboundImplementation[bytes4(ccvData[:4])];
+    return s_versionToInboundImplementation[bytes4(verifierResults[:4])];
   }
 
   /// @notice Returns all inbound implementations.
