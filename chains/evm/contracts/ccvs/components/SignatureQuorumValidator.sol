@@ -126,9 +126,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     return (sourceChainSelectors, signerSets, thresholds);
   }
 
-  /// @notice Applies multiple signers updates, and removes source chain selectors.
-  /// @dev Apply new signer updates first, then remove signers, in the off chance that there are source chain selectors shared between
-  /// the two inputs, removals take priority.
+  /// @notice Removes source chain selectors, and applies multiple signers updates.
   /// @dev Last signers update wins. If a source chain selector is repeated in `signersUpdates` then the last one will be the state set.
   /// @param sourceChainSelectorsToRemove The selectors that should have their signer configuration cleared.
   /// @param signersUpdates The desired signer configuration updates to apply per source chain selector.
@@ -136,7 +134,24 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     uint64[] calldata sourceChainSelectorsToRemove,
     SignersUpdate[] calldata signersUpdates
   ) external onlyOwner {
-    // Handle signerUpdates first.
+    // Handle removals first.
+    for (uint256 i = 0; i < sourceChainSelectorsToRemove.length; ++i) {
+      if (s_configuredChains.contains(sourceChainSelectorsToRemove[i])) {
+        SignerConfig storage cfg = s_signerConfigs[sourceChainSelectorsToRemove[i]];
+
+        //Remove all signers.
+        while (cfg.signers.length() > 0) {
+          cfg.signers.remove(cfg.signers.at(0));
+        }
+
+        cfg.threshold = 0;
+        s_configuredChains.remove(sourceChainSelectorsToRemove[i]);
+
+        emit SignatureConfigSet(sourceChainSelectorsToRemove[i], new address[](0), 0);
+      } // else noop
+    }
+
+    // Now handle signerUpdates.
     for (uint256 i = 0; i < signersUpdates.length; ++i) {
       SignersUpdate memory update = signersUpdates[i];
 
@@ -165,22 +180,6 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
       s_configuredChains.add(update.sourceChainSelector);
 
       emit SignatureConfigSet(update.sourceChainSelector, update.signers, update.threshold);
-    }
-
-    for (uint256 i = 0; i < sourceChainSelectorsToRemove.length; ++i) {
-      if (s_configuredChains.contains(sourceChainSelectorsToRemove[i])) {
-        SignerConfig storage cfg = s_signerConfigs[sourceChainSelectorsToRemove[i]];
-
-        //Remove all signers.
-        while (cfg.signers.length() > 0) {
-          cfg.signers.remove(cfg.signers.at(0));
-        }
-
-        cfg.threshold = 0;
-        s_configuredChains.remove(sourceChainSelectorsToRemove[i]);
-
-        emit SignatureConfigSet(sourceChainSelectorsToRemove[i], new address[](0), 0);
-      } // else noop
     }
   }
 }

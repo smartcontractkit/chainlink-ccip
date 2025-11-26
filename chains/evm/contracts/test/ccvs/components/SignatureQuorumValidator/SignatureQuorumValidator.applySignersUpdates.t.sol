@@ -140,28 +140,38 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     assertEq(actualSigners[0], signers[0]);
   }
 
-  function test_applySignersUpdates_RemovalTakesPriorityWithinOneCall() public {
+  function test_applySignersUpdates_UpdatesTakePriorityWithinOneCall() public {
     uint64 selector = 555;
-    address[] memory signers = new address[](2);
-    signers[0] = makeAddr("selector555-signer1");
-    signers[1] = makeAddr("selector555-signer2");
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(selector, signers, 2);
+    // Pre-configure the selector so the removal emits and clears state first.
+    address[] memory initialSigners = new address[](1);
+    initialSigners[0] = makeAddr("selector555-initial");
+    SignatureQuorumValidator.SignersUpdate[] memory initialUpdate = _createUpdate(selector, initialSigners, 1);
+    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), initialUpdate);
+
+    address[] memory newSigners = new address[](2);
+    newSigners[0] = makeAddr("selector555-signer1");
+    newSigners[1] = makeAddr("selector555-signer2");
+
+    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(selector, newSigners, 2);
 
     uint64[] memory removals = new uint64[](1);
     removals[0] = selector;
 
     vm.expectEmit();
-    emit SignatureQuorumValidator.SignatureConfigSet(selector, signers, 2);
+    emit SignatureQuorumValidator.SignatureConfigSet(selector, new address[](0), 0);
 
     vm.expectEmit();
-    emit SignatureQuorumValidator.SignatureConfigSet(selector, new address[](0), 0);
+    emit SignatureQuorumValidator.SignatureConfigSet(selector, newSigners, 2);
 
     s_sigQuorumVerifier.applySignersUpdates(removals, updates);
 
     (address[] memory actualSigners, uint8 threshold) = s_sigQuorumVerifier.getSignatureConfig(selector);
-    assertEq(actualSigners.length, 0);
-    assertEq(threshold, 0);
+    assertEq(actualSigners.length, newSigners.length);
+    assertEq(threshold, 2);
+    for (uint256 i = 0; i < newSigners.length; ++i) {
+      assertEq(actualSigners[i], newSigners[i]);
+    }
   }
 
   function test_applySignersUpdates_AllowsNoops() public {
