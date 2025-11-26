@@ -28,6 +28,9 @@ jobs:
           filters: |
             run_deployment:
               - 'deployment/**'
+            run_ccv_evm_deployment:
+              - 'ccv/chains/evm/gobindings/generated/**'
+              - 'ccv/chains/evm/deployment/**'
             run_evm_deployment:
               - 'chains/evm/gobindings/generated/**'
               - 'chains/evm/deployment/**'
@@ -58,6 +61,18 @@ jobs:
     defaults:
       run:
         working-directory: chains/evm/deployment
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: go test ./...
+
+  test-ccv-evm-deployments:
+    needs: [detect_deployments_changes, setup-go]
+    if: ${{ needs.detect_deployments_changes.outputs.run_ccv_evm_deployment == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ccv/chains/evm/deployment
     steps:
       - uses: actions/checkout@v4
       - name: Run tests
