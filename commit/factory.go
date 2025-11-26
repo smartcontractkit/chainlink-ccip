@@ -230,6 +230,9 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
 	}
 
+	// Track LOOPP enablement status via Beholder
+	metricsReporter.TrackLooppProviderSupported(p.looppCCIPProviderSupported)
+
 	reportBuilder, err := builder.NewReportBuilder(
 		offchainConfig.RMNEnabled,
 		offchainConfig.MaxMerkleRootsPerReport,
