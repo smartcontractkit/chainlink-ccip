@@ -236,9 +236,9 @@ contract TokenPoolFactory is ITypeAndVersion {
     // LockRelease pools need lockBox, BurnMint pools don't.
     bytes memory tokenPoolInitArgs;
     if (localPoolType == PoolType.LOCK_RELEASE) {
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, new address[](0), i_rmnProxy, i_ccipRouter, i_lockBox);
+      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter, i_lockBox);
     } else {
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, new address[](0), i_rmnProxy, i_ccipRouter);
+      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter);
     }
 
     // Construct the deployment code from the initCode and the initArgs and then deploy.
@@ -272,21 +272,21 @@ contract TokenPoolFactory is ITypeAndVersion {
 
     // LockRelease pools have an additional lockBox parameter.
     if (poolType == PoolType.LOCK_RELEASE) {
-      // constructor(address token, uint8 localTokenDecimals, address[] allowlist, address rmnProxy, address router, address lockBox).
+      // constructor(address token, uint8 localTokenDecimals, address advancedPoolHooks, address rmnProxy, address router, address lockBox).
       constructorParams = abi.encode(
         remoteTokenAddress,
         remoteChainConfig.remoteTokenDecimals,
-        new address[](0),
+        address(0),
         remoteChainConfig.remoteRMNProxy,
         remoteChainConfig.remoteRouter,
         remoteChainConfig.remoteLockBox
       );
     } else {
-      // constructor(address token, uint8 localTokenDecimals, address[] allowlist, address rmnProxy, address router).
+      // constructor(address token, uint8 localTokenDecimals, address advancedPoolHooks, address rmnProxy, address router).
       constructorParams = abi.encode(
         remoteTokenAddress,
         remoteChainConfig.remoteTokenDecimals,
-        new address[](0),
+        address(0),
         remoteChainConfig.remoteRMNProxy,
         remoteChainConfig.remoteRouter
       );
