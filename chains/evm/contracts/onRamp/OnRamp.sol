@@ -251,6 +251,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // Populate receipts for verifiers, pool and executor in that order.
     (eventData.receipts, newMessage.executionGasLimit,) = _getReceipts(destChainSelector, message, resolvedExtraArgs);
 
+    // We don't need to check for feeTokenAmount < receiptsFeeTokenAmount here as that is done in getFee called by the router.
+    _distributeFees(message, eventData.receipts);
+
     // 4. lockOrBurn.
 
     if (message.tokenAmounts.length != 0) {
@@ -298,6 +301,29 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     s_dynamicConfig.reentrancyGuardEntered = false;
 
     return messageId;
+  }
+
+  /// @notice Distributes the fee token to each receipt issuer.
+  /// @dev Token pool receipt payments are routed to the pool only if it supports IPoolV2 interface.
+  function _distributeFees(Client.EVM2AnyMessage calldata message, Receipt[] memory receipts) internal {
+    IERC20 feeToken = IERC20(message.feeToken);
+    uint256 tokenReceiptIndex = type(uint256).max;
+    if (message.tokenAmounts.length > 0) {
+      tokenReceiptIndex = receipts.length - 2;
+      address tokenPool = receipts[tokenReceiptIndex].issuer;
+      // In case the token pool supports the IPoolV2 interface, the pool receive the fee share as fee handling logic built in.
+      // V1 pools intentionally leave the balance sitting on the OnRamp so it can be withdrawn later.
+      if (IERC165(tokenPool).supportsInterface(type(IPoolV2).interfaceId)) {
+        feeToken.safeTransfer(address(tokenPool), receipts[tokenReceiptIndex].feeTokenAmount);
+      }
+    }
+
+    for (uint256 i = 0; i < receipts.length; ++i) {
+      uint256 receiptFee = receipts[i].feeTokenAmount;
+      // We skip fee distribution if the fee is zero or if this is the token receipt (handled separately before the loop).
+      if (receiptFee == 0 || i == tokenReceiptIndex) continue;
+      feeToken.safeTransfer(receipts[i].issuer, receiptFee);
+    }
   }
 
   /// @notice Merges lane mandated and pool required CCVs with user-provided CCVs.
@@ -789,10 +815,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // Since the ordering is known, we can directly calculate the index for the pool receipt.
       uint256 poolReceiptIndex = extraArgs.ccvs.length;
 
-      // issuer is set to the token address, fee distribution logic will resolve token → pool and distribute fees
-      // according to the pool version.
+      // issuer is set to the token pool address.
       receipts[poolReceiptIndex] = Receipt({
-        issuer: message.tokenAmounts[0].token,
+        issuer: address(pool),
         destGasLimit: 0,
         destBytesOverhead: 0,
         feeTokenAmount: 0,
@@ -835,30 +860,34 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     gasLimitSum += receipts[executorIndex].destGasLimit;
     bytesOverheadSum += receipts[executorIndex].destBytesOverhead;
 
-    uint256 execCostInUSDCents;
-    (gasLimitSum, execCostInUSDCents) =
-      IFeeQuoter(s_dynamicConfig.feeQuoter).quoteGasForExec(destChainSelector, gasLimitSum, bytesOverheadSum);
+    (uint32 updatedGasLimitSum, uint256 execCostInUSDCents, uint256 feeTokenPrice, uint256 percentMultiplier) =
+    IFeeQuoter(s_dynamicConfig.feeQuoter).quoteGasForExec(
+      destChainSelector, gasLimitSum, bytesOverheadSum, message.feeToken
+    );
 
-    // Update the fee of the executor to include execution costs.
-    if (extraArgs.executor != Client.NO_EXECUTION_ADDRESS) {
-      receipts[executorIndex].feeTokenAmount += execCostInUSDCents;
-    }
-
-    // The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
-    uint256 feeTokenPrice = IFeeQuoter(s_dynamicConfig.feeQuoter).getValidatedTokenPrice(message.feeToken);
-
-    // Transform the USD based fees into fee token amounts & sum them.
+    // Transform the USD based fees into fee token amounts & sum them. For the executor, if the executor isn't
+    // NO_EXECUTION_ADDRESS we also add the execution cost.
     for (uint256 i = 0; i < receipts.length; ++i) {
       // Example:
-      // feeTokenPrice = $15 = 15e18
-      // usdFeeCents = $1.50 = 150
-      // feeTokenAmount = 150 * 1e34 / 15e18 = 1e17 (0.1 tokens of the fee token)
-      // Normally we'd multiple by 1e36, but since usdFeeCents has 2 decimals, we use 1e34 here.
-      receipts[i].feeTokenAmount = receipts[i].feeTokenAmount * 1e34 / feeTokenPrice;
+      // - feeTokenPrice = $15 = 15e18
+      // - usdFeeCents = $1.50 = 150
+      // - feeTokenAmount = 150 * 1e34 / 15e18 = 1e17 (0.1 tokens of the fee token)
+      // Normally we'd multiple by 1e36, but since usdFeeCents has 2 decimals and bpsMultiplier has 2 decimals, we use
+      // 1e32 here.
+      receipts[i].feeTokenAmount *= percentMultiplier * 1e32 / feeTokenPrice;
+
+      if (i == executorIndex) {
+        // Update the fee of the executor to include execution costs.
+        if (extraArgs.executor != Client.NO_EXECUTION_ADDRESS) {
+          // Add execution cost to the executor's fee. Execution cost should not be multiplied by bpsMultiplier.
+          receipts[i].feeTokenAmount += execCostInUSDCents * 1e34 / feeTokenPrice;
+        }
+      }
+
       feeTokenAmount += receipts[i].feeTokenAmount;
     }
 
-    return (receipts, gasLimitSum, feeTokenAmount);
+    return (receipts, updatedGasLimitSum, feeTokenAmount);
   }
 
   /// @notice Gets the execution fee receipt. Takes into account specifying the NO_EXECUTION_ADDRESS.

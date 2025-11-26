@@ -8,8 +8,10 @@ echo " └───────────────────────�
 
 # The offRamp uses a specific lower optimization runs value. All other contracts use the default value
 # as specified in the foundry.toml.
-OPTIMIZE_RUNS_LARGE_TOKEN_POOL=5000
-OPTIMIZE_RUNS_TOKEN_POOL=5000
+OPTIMIZE_RUNS_LARGE_TOKEN_POOL=500
+OPTIMIZE_RUNS_TOKEN_POOL=500
+OPTIMIZE_RUNS_ONRAMP=20000
+
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
@@ -58,6 +60,9 @@ function getOptimizations() {
       "HybridLockReleaseUSDCTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
         ;;
+      "OnRamp")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_ONRAMP"
+        ;;
     esac
 
     echo "$optimize_runs_override"
@@ -67,6 +72,7 @@ function getOptimizations() {
 compileContract Proxy
 compileContract CREATE2Factory
 compileContract ccvs/CommitteeVerifier
+compileContract ccvs/CCTPVerifier
 compileContract ccvs/VersionedVerifierResolver
 compileContract onRamp/OnRamp
 compileContract executor/Executor

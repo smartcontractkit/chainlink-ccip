@@ -23,8 +23,6 @@ type DestChainConfigArgs struct {
 	DestChainConfig   adapters.FeeQuoterDestChainConfig
 }
 
-type FeeTokenArgs = fee_quoter.FeeQuoterFeeTokenArgs
-
 type TokenTransferFeeConfigArgs = fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
 
 type TokenTransferFeeConfigRemoveArgs = fee_quoter.FeeQuoterTokenTransferFeeConfigRemoveArgs
@@ -32,13 +30,13 @@ type TokenTransferFeeConfigRemoveArgs = fee_quoter.FeeQuoterTokenTransferFeeConf
 type ConstructorArgs struct {
 	StaticConfig               StaticConfig
 	PriceUpdaters              []common.Address
-	FeeTokens                  []FeeTokenArgs
+	FeeTokens                  []common.Address
 	TokenTransferFeeConfigArgs []TokenTransferFeeConfigArgs
 	DestChainConfigArgs        []DestChainConfigArgs
 }
 
 type ApplyFeeTokensUpdatesArgs struct {
-	FeeTokensToAdd    []FeeTokenArgs
+	FeeTokensToAdd    []common.Address
 	FeeTokensToRemove []common.Address
 }
 
@@ -165,6 +163,7 @@ func transformDestChainConfigArgs(args []DestChainConfigArgs) []fee_quoter.FeeQu
 				DefaultTokenDestGasOverhead: arg.DestChainConfig.DefaultTokenDestGasOverhead,
 				DefaultTxGasLimit:           arg.DestChainConfig.DefaultTxGasLimit,
 				NetworkFeeUSDCents:          arg.DestChainConfig.NetworkFeeUSDCents,
+				LinkFeeMultiplierPercent:    arg.DestChainConfig.LinkFeeMultiplierPercent,
 			},
 		})
 	}
