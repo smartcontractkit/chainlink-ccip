@@ -40,7 +40,11 @@ contract BaseVerifierTestHelper is BaseVerifier {
     return "";
   }
 
-  function verifyMessage(MessageV1Codec.MessageV1 memory message, bytes32 messageId, bytes memory ccvData) external {}
+  function verifyMessage(
+    MessageV1Codec.MessageV1 memory message,
+    bytes32 messageId,
+    bytes memory verifierResults
+  ) external {}
 
   function typeAndVersion() external pure override returns (string memory) {
     return "BaseVerifierTestHelper 1.0.0";

@@ -5,8 +5,8 @@ import {VersionedVerifierResolver} from "../../../ccvs/VersionedVerifierResolver
 import {VersionedVerifierResolverSetup} from "./VersionedVerifierResolverSetup.t.sol";
 
 contract VersionedVerifierResolver_getInboundImplementation is VersionedVerifierResolverSetup {
-  function test_getInboundImplementation_RevertWhen_InvalidCCVDataLength() public {
-    vm.expectRevert(VersionedVerifierResolver.InvalidCCVDataLength.selector);
+  function test_getInboundImplementation_RevertWhen_InvalidVerifierResultsLength() public {
+    vm.expectRevert(VersionedVerifierResolver.InvalidVerifierResultsLength.selector);
     s_versionedVerifierResolver.getInboundImplementation("");
   }
 }
