@@ -11,11 +11,9 @@ import (
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-var ContractType cldf_deployment.ContractType = "FeeQuoter"
-var Version *semver.Version = semver.MustParse("1.6.3")
+var Version *semver.Version = semver.MustParse("1.6.0")
 
 type AddDONOpInput struct {
 	Nodes                    [][32]byte
@@ -67,9 +65,9 @@ type ApplyChainConfigUpdatesOpInput struct {
 }
 
 var ApplyChainConfigUpdates = contract.NewWrite(contract.WriteParams[ApplyChainConfigUpdatesOpInput, *ccip_home.CCIPHome]{
-	Name:            "capabilities-registry:update-don",
+	Name:            "ccip-home:apply-chain-config-updates",
 	Version:         Version,
-	Description:     "Updates an existing DON in the CapabilitiesRegistry",
+	Description:     "Applies chain config updates to the CCIPHome contract",
 	ContractType:    utils.CCIPHome,
 	ContractABI:     ccip_home.CCIPHomeABI,
 	NewContract:     ccip_home.NewCCIPHome,

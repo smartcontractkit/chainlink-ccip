@@ -2,6 +2,7 @@ package ccip_evm
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -38,6 +40,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -480,7 +483,7 @@ func (m *CCIP16EVM) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (s
 	), nil
 }
 
-func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64) (datastore.DataStore, error) {
+func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Configuring contracts for selector")
 	l.Info().Any("Selector", selector).Msg("Deploying for chain selectors")
@@ -523,6 +526,11 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 	if err != nil {
 		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
 	}
+	bootstrapNode := nodeClients[0]
+	bootstrapKeys, err := bootstrapNode.MustReadOCR2Keys()
+	if err != nil {
+		return nil, fmt.Errorf("reading bootstrap node OCR keys: %w", err)
+	}
 	// bootstrap is 0
 	workerNodes := nodeClients[1:]
 	if selector == ccipHomeSelector {
@@ -549,9 +557,43 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 					nodeP2PIDsPerNodeOpAdmin[node.Config.URL], peerID,
 				)
 			}
+			ocrKeys, err := node.MustReadOCR2Keys()
+			if err != nil {
+				return nil, fmt.Errorf("reading worker node OCR keys: %w", err)
+			}
+			l.Info().Str("OCRKeys", fmt.Sprintf("%+v", ocrKeys)).Msg("Read OCR keys for worker node")
+			raw, err := NewCCIPSpecToml(SpecArgs{
+				P2PV2Bootstrappers:     []string{bootstrapKeys.Data[0].ID},
+				CapabilityVersion:      "v1.0.0",
+				CapabilityLabelledName: "ccip",
+				OCRKeyBundleIDs: map[string]string{
+					"evm": ocrKeys.Data[0].ID,
+				},
+				P2PKeyID:     nodeP2PIds.Data[0].Attributes.PeerID,
+				RelayConfigs: nil,
+				PluginConfig: map[string]any{},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("creating CCIP job spec: %w", err)
+			}
+			l.Info().Str("RawSpec", raw).Msg("Creating CCIP job on worker node")
+			job, _, err := node.CreateJobRaw(raw)
+			if err != nil {
+				return nil, fmt.Errorf("creating CCIP job: %w", err)
+			}
+			l.Info().Str("Node", node.Config.URL).Any("Job", job).Msg("Created CCIP job")
 		}
+		// crAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+		// 	ChainSelector: selector,
+		// 	Type:          datastore.ContractType(utils.CapabilitiesRegistry),
+		// 	Version:       semver.MustParse("1.6.0"),
+		// }, selector, datastore_utils.FullRef)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed to find CapabilitiesRegistry address in datastore: %w", err)
+		// }
 		ccipHomeOut, err := changesets.DeployHomeChain.Apply(*env, sequences.DeployHomeChainConfig{
 			HomeChainSel: selector,
+			CapReg:       common.HexToAddress(crAddr),
 			RMNStaticConfig: rmn_home.RMNHomeStaticConfig{
 				Nodes:          []rmn_home.RMNHomeNode{},
 				OffchainConfig: []byte("static config"),
@@ -567,7 +609,39 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 			return nil, fmt.Errorf("failed to deploy home chain contracts: %w", err)
 		}
 		out.DataStore.Merge(ccipHomeOut.DataStore.Seal())
+		out.DataStore.Addresses().Add(
+			datastore.AddressRef{
+				ChainSelector: selector,
+				Type:          datastore.ContractType(utils.CapabilitiesRegistry),
+				Version:       semver.MustParse("1.6.0"),
+				Address:       crAddr,
+			},
+		)
 	}
+	bootstrapP2PKeys, err := bootstrapNode.MustReadP2PKeys()
+	if err != nil {
+		return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
+	}
+	raw, err := NewCCIPSpecToml(SpecArgs{
+		P2PV2Bootstrappers:     []string{},
+		CapabilityVersion:      "v1.0.0",
+		CapabilityLabelledName: "ccip",
+		OCRKeyBundleIDs: map[string]string{
+			"evm": bootstrapKeys.Data[0].ID,
+		},
+		P2PKeyID:     bootstrapP2PKeys.Data[0].Attributes.PeerID,
+		RelayConfigs: nil,
+		PluginConfig: map[string]any{},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating CCIP job spec: %w", err)
+	}
+	l.Info().Str("RawSpec", raw).Msg("Creating CCIP job on bootstrap node")
+	job, _, err := bootstrapNode.CreateJobRaw(raw)
+	if err != nil {
+		return nil, fmt.Errorf("creating CCIP job: %w", err)
+	}
+	l.Info().Str("Node", bootstrapNode.Config.URL).Any("Job", job).Msg("Created CCIP job")
 	env.DataStore = out.DataStore.Seal()
 	runningDS.Merge(env.DataStore)
 
@@ -789,4 +863,56 @@ func GetContractAddrForSelector(addresses []string, selector uint64, contractTyp
 		}
 	}
 	return contractAddr, nil
+}
+
+type SpecArgs struct {
+	P2PV2Bootstrappers     []string          `toml:"p2pV2Bootstrappers"`
+	CapabilityVersion      string            `toml:"capabilityVersion"`
+	CapabilityLabelledName string            `toml:"capabilityLabelledName"`
+	OCRKeyBundleIDs        map[string]string `toml:"ocrKeyBundleIDs"`
+	P2PKeyID               string            `toml:"p2pKeyID"`
+	RelayConfigs           map[string]any    `toml:"relayConfigs"`
+	PluginConfig           map[string]any    `toml:"pluginConfig"`
+}
+
+// NewCCIPSpecToml creates a new CCIP spec in toml format from the given spec args.
+func NewCCIPSpecToml(spec SpecArgs) (string, error) {
+	type fullSpec struct {
+		SpecArgs
+		Type          string `toml:"type"`
+		SchemaVersion uint64 `toml:"schemaVersion"`
+		Name          string `toml:"name"`
+		ExternalJobID string `toml:"externalJobID"`
+	}
+	extJobID, err := ExternalJobID(spec)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate external job id: %w", err)
+	}
+	marshaled, err := toml.Marshal(fullSpec{
+		SpecArgs:      spec,
+		Type:          "ccip",
+		SchemaVersion: 1,
+		Name:          fmt.Sprintf("%s-%s", "ccip", extJobID),
+		ExternalJobID: extJobID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal spec into toml: %w", err)
+	}
+
+	return string(marshaled), nil
+}
+
+func ExternalJobID(spec SpecArgs) (string, error) {
+	in := fmt.Appendf(nil, "%s%s%s", spec.CapabilityLabelledName, spec.CapabilityVersion, spec.P2PKeyID)
+	sha256Hash := sha256.New()
+	sha256Hash.Write(in)
+	in = sha256Hash.Sum(nil)[:16]
+	// tag as valid UUID v4 https://github.com/google/uuid/blob/0f11ee6918f41a04c201eceeadf612a377bc7fbc/version4.go#L53-L54
+	in[6] = (in[6] & 0x0f) | 0x40 // Version 4
+	in[8] = (in[8] & 0x3f) | 0x80 // Variant is 10
+	id, err := uuid.FromBytes(in)
+	if err != nil {
+		return "", err
+	}
+	return id.String(), nil
 }

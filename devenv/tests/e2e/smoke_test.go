@@ -67,7 +67,7 @@ func TestE2ESmoke(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Logf("Testing CCIP message from chain %d to chain %d", tc.fromSelector, tc.toSelector)
 				tc.implOne.SendMessage(t.Context(), tc.fromSelector, tc.toSelector, nil, nil)
-				tc.implOne.WaitOneSentEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 5*time.Minute)
+				tc.implOne.WaitOneSentEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 4*time.Minute)
 				// tc.implOne.WaitOneExecEventBySeqNo()
 				// tc.implTwo.SendMessage(..)
 			})

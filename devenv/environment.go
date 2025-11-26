@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
@@ -22,8 +23,8 @@ import (
 
 var Plog = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.DebugLevel).With().Fields(map[string]any{"component": "ccip"}).Logger()
 
-const (
-	CommonCLNodesConfig = `
+func getCommonNodeConfig(capRegAddr string) string {
+	return fmt.Sprintf(`
 			[Log]
 			JSONConsole = true
 			Level = 'debug'
@@ -56,8 +57,12 @@ const (
 			[P2P.V2]
 			Enabled = true
 			ListenAddresses = ['0.0.0.0:6690']
-`
-)
+			[Capabilities.ExternalRegistry]
+			Address = '%s'
+			NetworkID = 'evm'
+			ChainID = '1337'
+`, capRegAddr)
+}
 
 type Cfg struct {
 	CLDF               CLDF                `toml:"cldf"                  validate:"required"`
@@ -110,10 +115,32 @@ func NewEnvironment() (*Cfg, error) {
 		}
 	}
 
+	// initialize CLDF framework
+	in.CLDF.Init()
+	selectors, e, err := NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
+	if err != nil {
+		return nil, fmt.Errorf("creating CLDF operations environment: %w", err)
+	}
+	L.Info().Any("Selectors", selectors).Msg("Deploying for chain selectors")
+	ds := datastore.NewMemoryDataStore()
+
+	// Deploy Capabilities Registry
+	crAddr, tx, _, err := capabilities_registry.DeployCapabilitiesRegistry(
+		e.BlockChains.EVMChains()[CCIPHomeChain].DeployerKey,
+		e.BlockChains.EVMChains()[CCIPHomeChain].Client,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("deploying capabilities registry: %w", err)
+	}
+	_, err = e.BlockChains.EVMChains()[CCIPHomeChain].Confirm(tx)
+	if err != nil {
+		return nil, fmt.Errorf("confirming capabilities registry deployment: %w", err)
+	}
+
 	tr.Record("[infra] deploying blockchains")
 
 	clChainConfigs := make([]string, 0)
-	clChainConfigs = append(clChainConfigs, CommonCLNodesConfig)
+	clChainConfigs = append(clChainConfigs, getCommonNodeConfig(crAddr.String()))
 	for i, impl := range impls {
 		clChainConfig, err := impl.ConfigureNodes(ctx, in.Blockchains[i])
 		if err != nil {
@@ -140,15 +167,6 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("failed to create new shared db node set: %w", err)
 	}
 
-	// initialize CLDF framework
-	in.CLDF.Init()
-	selectors, e, err := NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
-	if err != nil {
-		return nil, fmt.Errorf("creating CLDF operations environment: %w", err)
-	}
-	L.Info().Any("Selectors", selectors).Msg("Deploying for chain selectors")
-	ds := datastore.NewMemoryDataStore()
-
 	// deploy all the contracts
 	for i, impl := range impls {
 		if err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], big.NewInt(1), big.NewInt(5)); err != nil {
@@ -159,7 +177,7 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, err
 		}
 		L.Info().Uint64("Selector", networkInfo.ChainSelector).Msg("Deployed chain selector")
-		dsi, err := impl.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain)
+		dsi, err := impl.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
 		if err != nil {
 			return nil, err
 		}

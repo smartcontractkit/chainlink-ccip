@@ -12,6 +12,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
@@ -77,6 +78,7 @@ type DeployHomeChainConfig struct {
 	HomeChainSel             uint64
 	RMNStaticConfig          rmn_home.RMNHomeStaticConfig
 	RMNDynamicConfig         rmn_home.RMNHomeDynamicConfig
+	CapReg                   common.Address
 	NodeOperators            []capabilities_registry.CapabilitiesRegistryNodeOperator
 	NodeP2PIDsPerNodeOpAdmin map[string][][32]byte
 }
@@ -95,30 +97,16 @@ var DeployHomeChain = cldf_ops.NewSequence(
 		addresses := make([]datastore.AddressRef, 0)
 		chain := chains.EVMChains()[input.HomeChainSel]
 
-		// Deploy Capabilities Registry
-		crAddr, tx, capReg, err := capabilities_registry.DeployCapabilitiesRegistry(
-			chain.DeployerKey,
-			chain.Client,
-		)
+		cr, err := capabilities_registry.NewCapabilitiesRegistry(input.CapReg, chain.Client)
 		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		addresses = append(addresses, datastore.AddressRef{
-			ChainSelector: input.HomeChainSel,
-			Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-			Version:       &Version,
-			Address:       crAddr.String(),
-		})
-		_, err = chain.Confirm(tx)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate CapabilitiesRegistry contract: %w", err)
 		}
 
 		// Deploy CCIPHome
 		ccAddr, tx, _, err := ccip_home.DeployCCIPHome(
 			chain.DeployerKey,
 			chain.Client,
-			crAddr,
+			input.CapReg,
 		)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
@@ -216,7 +204,7 @@ var DeployHomeChain = cldf_ops.NewSequence(
 			b.Logger.Infow("Promoted candidate and revoked active on RMNHome", "chain", chain.String())
 		}
 		// check if ccip capability exists in cap reg
-		capabilities, err := capReg.GetCapabilities(nil)
+		capabilities, err := cr.GetCapabilities(nil)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get capabilities: %w", err)
 		}
@@ -238,7 +226,7 @@ var DeployHomeChain = cldf_ops.NewSequence(
 		}
 		// Add the capability to the CapabilitiesRegistry contract only if it does not exist
 		if addCapability {
-			tx, err := capReg.AddCapabilities(
+			tx, err := cr.AddCapabilities(
 				chain.DeployerKey, []capabilities_registry.CapabilitiesRegistryCapability{
 					capabilityToAdd,
 				})
@@ -250,7 +238,7 @@ var DeployHomeChain = cldf_ops.NewSequence(
 				"labelledName", capabilityToAdd.LabelledName, "version", capabilityToAdd.Version)
 		}
 
-		existingNodeOps, err := capReg.GetNodeOperators(nil)
+		existingNodeOps, err := cr.GetNodeOperators(nil)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get existing node operators: %w", err)
 		}
@@ -271,13 +259,13 @@ var DeployHomeChain = cldf_ops.NewSequence(
 		// Need to fetch nodeoperators ids to be able to add nodes for corresponding node operators
 		p2pIDsByNodeOpID := make(map[uint32][][32]byte)
 		if len(nodeOpsToAdd) > 0 {
-			tx, err := capReg.AddNodeOperators(chain.DeployerKey, input.NodeOperators)
+			tx, err := cr.AddNodeOperators(chain.DeployerKey, input.NodeOperators)
 			txBlockNum, err := cldf.ConfirmIfNoErrorWithABI(chain, tx, capabilities_registry.CapabilitiesRegistryABI, err)
 			if err != nil {
 				b.Logger.Errorw("Failed to add node operators", "chain", chain.String(), "err", err)
 				return sequences.OnChainOutput{}, err
 			}
-			addedEvent, err := capReg.FilterNodeOperatorAdded(&bind.FilterOpts{
+			addedEvent, err := cr.FilterNodeOperatorAdded(&bind.FilterOpts{
 				Start:   txBlockNum,
 				Context: context.Background(),
 			}, nil, nil)
@@ -309,7 +297,7 @@ var DeployHomeChain = cldf_ops.NewSequence(
 					if foundNopID[nopID] {
 						continue
 					}
-					nodeOp, err := capReg.GetNodeOperator(nil, nopID)
+					nodeOp, err := cr.GetNodeOperator(nil, nopID)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to get node operator %d: %w", nopID, err)
 					}
@@ -326,7 +314,7 @@ var DeployHomeChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, errors.New("failed to add all node operators")
 		}
 		// Adds initial set of nodes to CR, who all have the CCIP capability
-		if err := addNodes(b.Logger, capReg, chain, p2pIDsByNodeOpID); err != nil {
+		if err := addNodes(b.Logger, cr, chain, p2pIDsByNodeOpID); err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 
