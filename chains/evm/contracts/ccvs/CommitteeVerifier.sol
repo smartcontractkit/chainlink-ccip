@@ -150,9 +150,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   function updateStorageLocation(
     string memory newLocation
   ) external onlyOwner {
-    emit BaseVerifier.StorageLocationUpdated(s_storageLocation, newLocation);
-
-    s_storageLocation = newLocation;
+    _setStorageLocation(newLocation);
   }
 
   /// @notice Exposes the version tag.
