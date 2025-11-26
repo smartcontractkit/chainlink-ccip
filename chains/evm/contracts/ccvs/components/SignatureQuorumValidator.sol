@@ -131,8 +131,8 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
   /// the two inputs, removals take priority.
   /// @dev Last signers update wins. If a source chain selector is repeated in `signersUpdates` then the last one will be the state set.
   function applySignersUpdates(
-    uint64[] memory sourceChainSelectorsToRemove,
-    SignersUpdate[] memory signersUpdates
+    uint64[] calldata sourceChainSelectorsToRemove,
+    SignersUpdate[] calldata signersUpdates
   ) external onlyOwner {
     // Handle signerUpdates first.
     for (uint256 i = 0; i < signersUpdates.length; ++i) {

@@ -19,8 +19,6 @@ contract SignatureValidatorSetup is BaseTest {
 
   bytes32 internal constant DEFAULT_CONFIG_DIGEST = keccak256(abi.encode("defaultConfigDigest"));
 
-  SignatureQuorumValidator.SignersUpdate[] internal defaultUpdates;
-
   bytes internal constant REPORT = abi.encode("testReport");
   SignatureQuorumValidatorHelper internal s_sigQuorumVerifier;
 
@@ -59,6 +57,35 @@ contract SignatureValidatorSetup is BaseTest {
     updates[0].sourceChainSelector = sourceChainSelector;
     updates[0].signers = signers;
     updates[0].threshold = threshold;
+
+    return updates;
+  }
+
+  function _assertAddressArraysEqual(address[] memory expected, address[] memory actual) internal pure {
+    require(expected.length == actual.length, "length mismatch");
+    for (uint256 i; i < expected.length; ++i) {
+      require(expected[i] == actual[i], "signer mismatch");
+    }
+  }
+
+  function _assertConfigPresent(
+    uint64[] memory selectors,
+    address[][] memory signerSets,
+    uint8[] memory thresholds,
+    uint64 selector,
+    address[] memory expectedSigners,
+    uint8 expectedThreshold
+  ) internal pure {
+    bool found;
+    for (uint256 i; i < selectors.length; ++i) {
+      if (selectors[i] == selector) {
+        found = true;
+        require(thresholds[i] == expectedThreshold, "threshold mismatch");
+        _assertAddressArraysEqual(expectedSigners, signerSets[i]);
+        break;
+      }
+    }
+    require(found, "selector not found");
   }
 
   function _sortSignersByAddress() internal {

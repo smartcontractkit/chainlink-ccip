@@ -323,33 +323,6 @@ contract SignatureQuorumValidator_setSignatureConfigs is SignatureValidatorSetup
     assertEq(thresholds.length, 0);
   }
 
-  function _assertAddressArraysEqual(address[] memory expected, address[] memory actual) internal pure {
-    require(expected.length == actual.length, "length mismatch");
-    for (uint256 i; i < expected.length; ++i) {
-      require(expected[i] == actual[i], "signer mismatch");
-    }
-  }
-
-  function _assertConfigPresent(
-    uint64[] memory selectors,
-    address[][] memory signerSets,
-    uint8[] memory thresholds,
-    uint64 selector,
-    address[] memory expectedSigners,
-    uint8 expectedThreshold
-  ) internal pure {
-    bool found;
-    for (uint256 i; i < selectors.length; ++i) {
-      if (selectors[i] == selector) {
-        found = true;
-        require(thresholds[i] == expectedThreshold, "threshold mismatch");
-        _assertAddressArraysEqual(expectedSigners, signerSets[i]);
-        break;
-      }
-    }
-    require(found, "selector not found");
-  }
-
   // Reverts
 
   function test_setSignatureConfig_RevertWhen_CallerNotOwner() public {
