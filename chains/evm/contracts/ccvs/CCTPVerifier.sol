@@ -129,7 +129,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   uint256 private constant VERIFIER_VERSION_SIZE = 4;
   /// @notice Total Verifier Results bytes = VERIFIER_VERSION_SIZE + CCTP_MESSAGE_SIZE + 65 (ECDSA signature with recovery byte).
   /// CCTP message transmitter requires a minimum signature threshold of 1, so we account for at least one signature here.
-  uint256 private constant MINIMUM_CCV_DATA_SIZE = VERIFIER_VERSION_SIZE + CCTP_MESSAGE_SIZE + 65;
+  uint256 private constant MINIMUM_VERIFIER_RESULT_SIZE = VERIFIER_VERSION_SIZE + CCTP_MESSAGE_SIZE + 65;
   /// @notice The starting index of the messageSender in the Verifier Results.
   uint256 private constant MESSAGE_SENDER_START = VERIFIER_VERSION_SIZE + 148 + 100;
   /// @notice The starting index of the verifier version (hook data location) in the Verifier Results.
@@ -289,7 +289,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     bytes32 messageHash,
     bytes calldata verifierResults
   ) external {
-    if (verifierResults.length < MINIMUM_CCV_DATA_SIZE) revert InvalidVerifierResults();
+    if (verifierResults.length < MINIMUM_VERIFIER_RESULT_SIZE) revert InvalidVerifierResults();
 
     bytes4 versionPrefix = bytes4(verifierResults[:VERIFIER_VERSION_SIZE]);
     if (versionPrefix != VERSION_TAG_V1_7_0) revert InvalidCCVVersion(VERSION_TAG_V1_7_0, versionPrefix);

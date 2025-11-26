@@ -21,7 +21,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
   error WrongNumberOfSignatures();
   error UnauthorizedSigner();
   error NonOrderedOrNonUniqueSignatures();
-  error OracleCannotBeZeroAddress();
+  error SignerCannotBeZeroAddress();
 
   /// @dev Struct that contains the signer configuration
   struct SignerConfig {
@@ -95,7 +95,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     }
   }
 
-  /// @notice Returns the signer set, and threshold.
+  /// @notice Returns the signer set and threshold.
   function getSignatureConfig(
     uint64 sourceChainSelector
   ) external view returns (address[] memory, uint8) {
@@ -115,7 +115,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     thresholds = new uint8[](sourceChainSelectorSet.length);
 
     for (uint256 i; i < sourceChainSelectorSet.length; ++i) {
-      // Okay to cast down without checking as set is populated using uint64 sourceChainSelector input in `setSignatureConfig`.
+      // Okay to cast down without checking as set is populated using uint64 sourceChainSelector input in `applySignersUpdates`.
       uint64 sourceChainSelector = uint64(sourceChainSelectorSet[i]);
       sourceChainSelectors[i] = sourceChainSelector;
       SignerConfig storage cfg = s_signerConfigs[sourceChainSelector];
@@ -130,6 +130,8 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
   /// @dev Apply new signer updates first, then remove signers, in the off chance that there are source chain selectors shared between
   /// the two inputs, removals take priority.
   /// @dev Last signers update wins. If a source chain selector is repeated in `signersUpdates` then the last one will be the state set.
+  /// @param sourceChainSelectorsToRemove The selectors that should have their signer configuration cleared.
+  /// @param signersUpdates The desired signer configuration updates to apply per source chain selector.
   function applySignersUpdates(
     uint64[] calldata sourceChainSelectorsToRemove,
     SignersUpdate[] calldata signersUpdates
@@ -151,7 +153,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
 
       // Add new signers.
       for (uint256 signerIndex = 0; signerIndex < update.signers.length; ++signerIndex) {
-        if (update.signers[signerIndex] == address(0)) revert OracleCannotBeZeroAddress();
+        if (update.signers[signerIndex] == address(0)) revert SignerCannotBeZeroAddress();
 
         // This checks for duplicates.
         if (!cfg.signers.add(update.signers[signerIndex])) {

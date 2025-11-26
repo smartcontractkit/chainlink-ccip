@@ -5,8 +5,8 @@ import {SignatureQuorumValidator} from "../../../../ccvs/components/SignatureQuo
 import {SignatureValidatorSetup} from "./SignatureValidatorSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract SignatureQuorumValidator_setSignatureConfigs is SignatureValidatorSetup {
-  function test_setSignatureConfig() public {
+contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup {
+  function test_applySignersUpdates() public {
     address[] memory newSigners = new address[](3);
     newSigners[0] = makeAddr("signer1");
     newSigners[1] = makeAddr("signer2");
@@ -32,7 +32,7 @@ contract SignatureQuorumValidator_setSignatureConfigs is SignatureValidatorSetup
     }
   }
 
-  function test_setSignatureConfigIsPerSource() public {
+  function test_applySignersUpdates_IsPerSource() public {
     uint64 sourceChainSelector0 = 77;
     address[] memory newSignersSource0 = new address[](3);
     newSignersSource0[0] = makeAddr("signer.77.1");
@@ -89,7 +89,7 @@ contract SignatureQuorumValidator_setSignatureConfigs is SignatureValidatorSetup
     }
   }
 
-  function test_setSignatureConfig_UpdatesExistingConfig() public {
+  function test_applySignersUpdates_UpdatesExistingConfig() public {
     uint64 sourceChainSelector = 1;
     // First set initial config.
     address[] memory initialSigners = new address[](2);
@@ -123,7 +123,7 @@ contract SignatureQuorumValidator_setSignatureConfigs is SignatureValidatorSetup
     }
   }
 
-  function test_setSignatureConfig_SingleSignerThresholdOne() public {
+  function test_applySignersUpdates_SingleSignerThresholdOne() public {
     address[] memory signers = new address[](1);
     signers[0] = makeAddr("soloSigner");
     uint8 threshold = 1;
@@ -325,7 +325,7 @@ contract SignatureQuorumValidator_setSignatureConfigs is SignatureValidatorSetup
 
   // Reverts
 
-  function test_setSignatureConfig_RevertWhen_CallerNotOwner() public {
+  function test_applySignersUpdates_RevertWhen_CallerNotOwner() public {
     SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, new address[](0), 1);
     vm.startPrank(makeAddr("notOwner"));
 
@@ -333,25 +333,25 @@ contract SignatureQuorumValidator_setSignatureConfigs is SignatureValidatorSetup
     s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
   }
 
-  function test_setSignatureConfig_RevertWhen_ThresholdZero() public {
+  function test_applySignersUpdates_RevertWhen_ThresholdZero() public {
     SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, new address[](0), 0);
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
     s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
   }
 
-  function test_setSignatureConfig_RevertWhen_ThresholdExceedsSignerCount() public {
+  function test_applySignersUpdates_RevertWhen_ThresholdExceedsSignerCount() public {
     SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, new address[](0), 3);
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
     s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates); // threshold > signers.length
   }
 
-  function test_setSignatureConfig_RevertWhen_ZeroAddressSigner() public {
+  function test_applySignersUpdates_RevertWhen_ZeroAddressSigner() public {
     SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, new address[](1), 1);
-    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.OracleCannotBeZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.SignerCannotBeZeroAddress.selector));
     s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
   }
 
-  function test_setSignatureConfig_RevertWhen_DuplicateSigners() public {
+  function test_applySignersUpdates_RevertWhen_DuplicateSigners() public {
     address duplicateAddress = makeAddr("duplicate");
     address[] memory signers = new address[](3);
     signers[0] = makeAddr("signer1");
@@ -364,7 +364,7 @@ contract SignatureQuorumValidator_setSignatureConfigs is SignatureValidatorSetup
     s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
   }
 
-  function test_setSignatureConfig_RevertWhen_EmptySignerArray() public {
+  function test_applySignersUpdates_RevertWhen_EmptySignerArray() public {
     address[] memory signers = new address[](0);
     SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, signers, 1);
 
