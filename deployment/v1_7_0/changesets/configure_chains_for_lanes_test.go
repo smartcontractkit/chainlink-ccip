@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -293,6 +294,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 									DefaultTokenDestGasOverhead: 10000,
 									DefaultTxGasLimit:           200000,
 									NetworkFeeUSDCents:          100,
+									LinkFeeMultiplierPercent:    90,
+									USDPerUnitGas:               big.NewInt(1e6),
 								},
 								ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{
 									USDCentsFee: 20,
