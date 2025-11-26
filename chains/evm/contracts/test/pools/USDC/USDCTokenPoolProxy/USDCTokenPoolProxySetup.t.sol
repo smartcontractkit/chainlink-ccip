@@ -10,6 +10,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
   address internal s_legacyCctpV1Pool = makeAddr("legacyCctpV1Pool");
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
+  address internal s_cctpV2PoolWithCCV = makeAddr("cctpV2PoolWithCCV");
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
   address internal s_mockTransmitterProxy = makeAddr("mockTransmitterProxy");
   uint64 internal s_remoteLockReleaseChainSelector = 12345;
@@ -32,7 +33,8 @@ contract USDCTokenPoolProxySetup is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: s_cctpV2Pool
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
       }),
       address(s_router)
     );

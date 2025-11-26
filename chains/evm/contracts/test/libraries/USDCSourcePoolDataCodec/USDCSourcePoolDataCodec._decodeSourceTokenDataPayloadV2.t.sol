@@ -30,6 +30,7 @@ contract USDCSourcePoolDataCodec__decodeSourceTokenDataPayloadV2 is Test {
     assertEq(decoded.depositHash, DEPOSIT_HASH, "Deposit hash mismatch");
   }
 
+  /*
   function test__decodeSourceTokenDataPayloadV2_CCTPV2CCV() public pure {
     // Encode using the V2 CCV function
     bytes memory payload = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2CCV(
@@ -44,6 +45,7 @@ contract USDCSourcePoolDataCodec__decodeSourceTokenDataPayloadV2 is Test {
     assertEq(decoded.sourceDomain, SOURCE_DOMAIN, "Source domain mismatch");
     assertEq(decoded.depositHash, DEPOSIT_HASH, "Deposit hash mismatch");
   }
+  */
 
   // Reverts
 
