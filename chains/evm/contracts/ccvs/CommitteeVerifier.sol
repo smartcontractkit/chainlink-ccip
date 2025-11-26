@@ -13,7 +13,7 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 /// @dev Source and destination responsibilities are combined to enable a single proxy address for a CCV on each chain.
 contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, SignatureQuorumValidator, BaseVerifier {
   error InvalidConfig();
-  error InvalidCCVData();
+  error InvalidVerifierResults();
   error InvalidCCVVersion(bytes4 verifierVersion);
   error OnlyCallableByOwnerOrAllowlistAdmin();
 
@@ -31,7 +31,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   bytes4 internal constant VERSION_TAG_V1_7_0 = 0x49ff34ed;
   /// @dev The number of bytes allocated to encoding the verifier version.
   uint256 internal constant VERIFIER_VERSION_BYTES = 4;
-  /// @dev The number of bytes allocated to encoding the signature length within the ccvData.
+  /// @dev The number of bytes allocated to encoding the signature length within the verifierResults.
   uint256 internal constant SIGNATURE_LENGTH_BYTES = 2;
 
   // DYNAMIC CONFIG
@@ -61,32 +61,32 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   function verifyMessage(
     MessageV1Codec.MessageV1 calldata, // message
     bytes32 messageHash,
-    bytes calldata ccvData
+    bytes calldata verifierResults
   ) external view {
-    if (ccvData.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES) {
-      revert InvalidCCVData();
+    if (verifierResults.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES) {
+      revert InvalidVerifierResults();
     }
 
-    // Any ccvData submitted to this verifier should have the expected version.
-    bytes4 verifierVersion = bytes4(ccvData[:VERIFIER_VERSION_BYTES]);
+    // Any verifierResults submitted to this verifier should have the expected version.
+    bytes4 verifierVersion = bytes4(verifierResults[:VERIFIER_VERSION_BYTES]);
     if (verifierVersion != VERSION_TAG_V1_7_0) {
       revert InvalidCCVVersion(verifierVersion);
     }
 
     uint256 signatureLength =
-      uint16(bytes2(ccvData[VERIFIER_VERSION_BYTES:VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES]));
-    if (ccvData.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength) {
-      revert InvalidCCVData();
+      uint16(bytes2(verifierResults[VERIFIER_VERSION_BYTES:VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES]));
+    if (verifierResults.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength) {
+      revert InvalidVerifierResults();
     }
 
-    // Even though the current version of this contract only expects verifier version and signatures to be included in the ccvData,
+    // Even though the current version of this contract only expects verifier version and signatures to be included in the verifierResults,
     // bounding it to the given length allows potential forward compatibility with future formats that supply more data.
     _validateSignatures(
       // Verifiers sign a concatenation of the verifier version and the message hash.
       // The version is included so that a resolver can return the correct verifier implementation on destination.
       // The version must be signed, otherwise any version could be inserted post-signatures.
       keccak256(bytes.concat(verifierVersion, messageHash)),
-      ccvData[
+      verifierResults[
         VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES:
           VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength
       ]
