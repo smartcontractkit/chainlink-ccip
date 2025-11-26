@@ -2,7 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {BaseTest} from "../../../BaseTest.t.sol";
-import {SignatureQuorumValidatorHelper} from "../../../helpers/SignatureQuorumValidatorHelper.sol";
+import {
+  SignatureQuorumValidator, SignatureQuorumValidatorHelper
+} from "../../../helpers/SignatureQuorumValidatorHelper.sol";
 
 contract SignatureValidatorSetup is BaseTest {
   // 4 hardcoded private keys that are chosen to work with v=27 ecrecover
@@ -16,6 +18,8 @@ contract SignatureValidatorSetup is BaseTest {
   uint256[] internal s_validSignerKeys;
 
   bytes32 internal constant DEFAULT_CONFIG_DIGEST = keccak256(abi.encode("defaultConfigDigest"));
+
+  SignatureQuorumValidator.SignersUpdate[] internal defaultUpdates;
 
   bytes internal constant REPORT = abi.encode("testReport");
   SignatureQuorumValidatorHelper internal s_sigQuorumVerifier;
@@ -37,11 +41,24 @@ contract SignatureValidatorSetup is BaseTest {
     s_validSigners[2] = vm.addr(PRIVATE_KEY_2);
     s_validSigners[3] = vm.addr(PRIVATE_KEY_3);
 
+    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
+
     // Sort signers and keys by address to ensure proper ordering.
     _sortSignersByAddress();
 
     s_sigQuorumVerifier = new SignatureQuorumValidatorHelper();
-    s_sigQuorumVerifier.setSignatureConfig(SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
+    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+  }
+
+  function _createUpdate(
+    uint64 sourceChainSelector,
+    address[] memory signers,
+    uint8 threshold
+  ) internal pure returns (SignatureQuorumValidator.SignersUpdate[] memory updates) {
+    updates = new SignatureQuorumValidator.SignersUpdate[](1);
+    updates[0].sourceChainSelector = sourceChainSelector;
+    updates[0].signers = signers;
+    updates[0].threshold = threshold;
   }
 
   function _sortSignersByAddress() internal {

@@ -7,6 +7,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 
 contract SignatureQuorumValidator is Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
   /// @param sourceChainSelector The selector of the source chain.
@@ -28,6 +29,12 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     uint8 threshold; // The number of signatures required for a report to be valid.
   }
 
+  struct SignersUpdate {
+    uint64 sourceChainSelector; // The source chain selector to apply the updates to.
+    uint8 threshold; // The required threshold, must be non-zero and it can not be greater than signers.length.
+    address[] signers; // The desired final set of signers for the source chain.
+  }
+
   // STATIC CONFIG
   uint256 internal constant SIGNATURE_LENGTH = 64;
   uint256 internal constant SIGNATURE_COMPONENT_LENGTH = 32;
@@ -35,6 +42,8 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
   uint256 internal immutable i_chainID;
 
   mapping(uint64 sourceChainSelector => SignerConfig cfg) private s_signerConfigs;
+
+  EnumerableSet.UintSet private s_configuredChains;
 
   constructor() {
     i_chainID = block.chainid;
@@ -86,7 +95,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     }
   }
 
-  /// @notice Returns the signer sets, and F value.
+  /// @notice Returns the signer set, and threshold.
   function getSignatureConfig(
     uint64 sourceChainSelector
   ) external view returns (address[] memory, uint8) {
@@ -94,31 +103,82 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     return (cfg.signers.values(), cfg.threshold);
   }
 
-  /// @notice Sets a new signature configuration.
-  function setSignatureConfig(uint64 sourceChainSelector, address[] memory signers, uint8 threshold) external onlyOwner {
-    if (threshold == 0 || threshold > signers.length) {
-      revert InvalidSignatureConfig();
+  /// @notice Returns all configured source chain selectors signer sets and thresholds.
+  function getAllSignatureConfigs()
+    external
+    view
+    returns (uint64[] memory sourceChainSelectors, address[][] memory signerSets, uint8[] memory thresholds)
+  {
+    uint256[] memory sourceChainSelectorSet = s_configuredChains.values();
+    sourceChainSelectors = new uint64[](sourceChainSelectorSet.length);
+    signerSets = new address[][](sourceChainSelectorSet.length);
+    thresholds = new uint8[](sourceChainSelectorSet.length);
+
+    for (uint256 i; i < sourceChainSelectorSet.length; ++i) {
+      // Okay to cast down without checking as set is populated using uint64 sourceChainSelector input in `setSignatureConfig`.
+      uint64 sourceChainSelector = uint64(sourceChainSelectorSet[i]);
+      sourceChainSelectors[i] = sourceChainSelector;
+      SignerConfig storage cfg = s_signerConfigs[sourceChainSelector];
+      signerSets[i] = cfg.signers.values();
+      thresholds[i] = cfg.threshold;
     }
 
-    SignerConfig storage cfg = s_signerConfigs[sourceChainSelector];
+    return (sourceChainSelectors, signerSets, thresholds);
+  }
 
-    // We must remove all current signers first.
-    while (cfg.signers.length() > 0) {
-      cfg.signers.remove(cfg.signers.at(0));
-    }
+  /// @notice Applies multiple signers updates, and removes source chain selectors.
+  /// @dev Apply new signer updates first, then remove signers, in the off chance that there are source chain selectors shared between
+  /// the two inputs, removals take priority.
+  /// @dev Last signers update wins. If a source chain selector is repeated in `signersUpdates` then the last one will be the state set.
+  function applySignersUpdates(
+    uint64[] memory sourceChainSelectorsToRemove,
+    SignersUpdate[] memory signersUpdates
+  ) external onlyOwner {
+    // Handle signerUpdates first.
+    for (uint256 i = 0; i < signersUpdates.length; ++i) {
+      SignersUpdate memory update = signersUpdates[i];
 
-    // Add new signers.
-    for (uint256 signerIndex = 0; signerIndex < signers.length; ++signerIndex) {
-      if (signers[signerIndex] == address(0)) revert OracleCannotBeZeroAddress();
-
-      // This checks for duplicates.
-      if (!cfg.signers.add(signers[signerIndex])) {
+      if (update.threshold == 0 || update.threshold > update.signers.length) {
         revert InvalidSignatureConfig();
       }
+
+      SignerConfig storage cfg = s_signerConfigs[update.sourceChainSelector];
+
+      // We must remove all current signers first.
+      while (cfg.signers.length() > 0) {
+        cfg.signers.remove(cfg.signers.at(0));
+      }
+
+      // Add new signers.
+      for (uint256 signerIndex = 0; signerIndex < update.signers.length; ++signerIndex) {
+        if (update.signers[signerIndex] == address(0)) revert OracleCannotBeZeroAddress();
+
+        // This checks for duplicates.
+        if (!cfg.signers.add(update.signers[signerIndex])) {
+          revert InvalidSignatureConfig();
+        }
+      }
+
+      cfg.threshold = update.threshold;
+      s_configuredChains.add(update.sourceChainSelector);
+
+      emit SignatureConfigSet(update.sourceChainSelector, update.signers, update.threshold);
     }
 
-    cfg.threshold = threshold;
+    for (uint256 i = 0; i < sourceChainSelectorsToRemove.length; ++i) {
+      if (s_configuredChains.contains(sourceChainSelectorsToRemove[i])) {
+        SignerConfig storage cfg = s_signerConfigs[sourceChainSelectorsToRemove[i]];
 
-    emit SignatureConfigSet(sourceChainSelector, signers, threshold);
+        //Remove all signers.
+        while (cfg.signers.length() > 0) {
+          cfg.signers.remove(cfg.signers.at(0));
+        }
+
+        cfg.threshold = 0;
+        s_configuredChains.remove(sourceChainSelectorsToRemove[i]);
+
+        emit SignatureConfigSet(sourceChainSelectorsToRemove[i], new address[](0), 0);
+      } // else noop
+    }
   }
 }

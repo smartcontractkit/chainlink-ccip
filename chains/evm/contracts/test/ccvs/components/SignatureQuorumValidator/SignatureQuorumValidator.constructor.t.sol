@@ -11,7 +11,8 @@ contract SignatureQuorumValidator_constructor is SignatureValidatorSetup {
 
     address[] memory testSigners = new address[](1);
     testSigners[0] = vm.addr(PRIVATE_KEY_0);
-    verifier.setSignatureConfig(SOURCE_CHAIN_SELECTOR, testSigners, 1);
+    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, testSigners, 1);
+    verifier.applySignersUpdates(new uint64[](0), updates);
 
     uint256 expectedChainId = uint128(block.chainid);
     uint256 newChainId = expectedChainId + 100000;
