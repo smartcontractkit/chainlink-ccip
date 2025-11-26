@@ -81,7 +81,7 @@ contract OffRamp_execute is OffRampSetup {
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: ON_RAMP,
-      offRampAddress: abi.encodePacked(makeAddr("offRamp")),
+      offRampAddress: abi.encodePacked(s_offRamp),
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "",
@@ -280,6 +280,15 @@ contract OffRamp_execute is OffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRamp.selector, ON_RAMP, message.onRampAddress));
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
+  }
+
+  function test_execute_RevertWhen_InvalidOffRamp() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    message.offRampAddress = abi.encodePacked(makeAddr("invalid offRamp"));
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOffRamp.selector, s_offRamp, message.offRampAddress));
+    s_offRamp.execute(encodedMessage, ccvs, ccvData);
   }
 
   function test_execute_RevertWhen_InvalidMessageDestChainSelector() public {

@@ -48,6 +48,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
   error InvalidOnRamp(bytes expected, bytes got);
+  error InvalidOffRamp(address expected, bytes got);
   error InboundImplementationNotFound(address ccvAddress, bytes verifierResults);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
@@ -187,6 +188,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     }
     if (keccak256(message.onRampAddress) != keccak256(sourceConfig.onRamp)) {
       revert InvalidOnRamp(sourceConfig.onRamp, message.onRampAddress);
+    }
+    if (message.offRampAddress.length != 20 || address(bytes20(message.offRampAddress)) != address(this)) {
+      revert InvalidOffRamp(address(this), message.offRampAddress);
     }
     if (message.destChainSelector != i_chainSelector) {
       revert InvalidMessageDestChainSelector(message.destChainSelector);
