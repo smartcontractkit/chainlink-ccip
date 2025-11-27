@@ -6,8 +6,8 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {Create2} from "@openzeppelin/contracts@5.0.2/utils/Create2.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
+import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice A contract for deploying and configuring contracts via CREATE2.
 /// @dev This contract is used to deploy static, user-facing contracts (e.g. proxies)

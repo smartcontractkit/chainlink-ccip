@@ -7,7 +7,7 @@ import {ICrossChainVerifierV1} from "../../interfaces/ICrossChainVerifierV1.sol"
 import {Client} from "../../libraries/Client.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract MockVerifier is ICrossChainVerifierResolver, ICrossChainVerifierV1 {
   bytes private s_verifierResult;

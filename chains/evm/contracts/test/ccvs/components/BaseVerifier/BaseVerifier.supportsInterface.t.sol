@@ -5,7 +5,7 @@ import {ICrossChainVerifierV1} from "../../../../interfaces/ICrossChainVerifierV
 
 import {BaseVerifierSetup} from "./BaseVerifierSetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract BaseVerifier_getStorageLocation is BaseVerifierSetup {
   function test_supportsInterface() public view {
