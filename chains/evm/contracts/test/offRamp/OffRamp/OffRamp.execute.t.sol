@@ -81,7 +81,7 @@ contract OffRamp_execute is OffRampSetup {
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: ON_RAMP,
-      offRampAddress: abi.encodePacked(makeAddr("offRamp")),
+      offRampAddress: abi.encodePacked(s_offRamp),
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "",
@@ -280,6 +280,57 @@ contract OffRamp_execute is OffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRamp.selector, ON_RAMP, message.onRampAddress));
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
+  }
+
+  function test_execute_RevertWhen_InvalidOffRamp() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    message.offRampAddress = abi.encodePacked(makeAddr("invalid offRamp"));
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOffRamp.selector, s_offRamp, message.offRampAddress));
+    s_offRamp.execute(encodedMessage, ccvs, ccvData);
+  }
+
+  function test_execute_RevertWhen_InvalidOffRamp_InvalidLengthOtherwiseCorrectRamp() public {
+    // This address has zero's in the first bytes, so if length is not checked properly,
+    // it would match the correct offRamp address after casting.
+    address offRampWithZeroBytes = 0x22222290dD7278AA3dDD389cc1E1D165cC4bAF00;
+    vm.etch(offRampWithZeroBytes, address(s_offRamp).code);
+
+    // Since etching doesn't copy state we have to set the source chain config again for this offRamp.
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = s_defaultCCV;
+
+    vm.startPrank(address(0));
+    OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
+    updates[0] = OffRamp.SourceChainConfigArgs({
+      router: s_sourceRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      isEnabled: true,
+      onRamp: ON_RAMP,
+      defaultCCV: defaultCCVs,
+      laneMandatedCCVs: new address[](0)
+    });
+    OffRamp(offRampWithZeroBytes).applySourceChainConfigUpdates(updates);
+
+    // We remove the first byte to make the offRamp address invalid, but it would still match if length wasn't checked.
+    // This is because the casting will add leading zeros to make it 20 bytes again.
+    bytes memory offRampAddress = abi.encodePacked(offRampWithZeroBytes);
+    assembly {
+      mstore(offRampAddress, 19)
+    }
+
+    // Assert casting would have the same result.
+    assertEq(address(bytes20(offRampAddress)), offRampWithZeroBytes);
+
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    message.offRampAddress = offRampAddress;
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory ccvData) = _getReportComponents(message);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRamp.InvalidOffRamp.selector, offRampWithZeroBytes, message.offRampAddress)
+    );
+    OffRamp(offRampWithZeroBytes).execute(encodedMessage, ccvs, ccvData);
   }
 
   function test_execute_RevertWhen_InvalidMessageDestChainSelector() public {
