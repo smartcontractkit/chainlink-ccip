@@ -7,8 +7,8 @@ import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 contract OffRamp__getCCVsForMessage is OffRampSetup {
   using EnumerableSet for EnumerableSet.AddressSet;
