@@ -6,7 +6,7 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract TokenPoolV2_supportsInterface is AdvancedPoolHooksSetup {
   function test_supportsInterface() public view {

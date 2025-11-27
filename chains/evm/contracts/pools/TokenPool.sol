@@ -14,8 +14,8 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice Base abstract class with common functions for all token pools.
 /// A token pool serves as isolated place for holding tokens and token specific logic
@@ -131,12 +131,12 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   IERC20 internal immutable i_token;
   /// @dev The number of decimals of the token managed by this pool.
   uint8 internal immutable i_tokenDecimals;
-  /// @dev The address of the RMN proxy
+  /// @dev The address of the RMN proxy.
   address internal immutable i_rmnProxy;
-  /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management
+  /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
   IAdvancedPoolHooks internal immutable i_advancedPoolHooks;
 
-  /// @dev The address of the router
+  /// @dev The address of the router.
   IRouter internal s_router;
   /// @dev Minimum block confirmation on the source chain, 0 means the default finality.
   uint16 internal s_minBlockConfirmation;
@@ -192,8 +192,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return i_token;
   }
 
-  /// @notice Get RMN proxy address
-  /// @return rmnProxy Address of RMN proxy
+  /// @notice Get RMN proxy address.
+  /// @return rmnProxy Address of RMN proxy.
   function getRmnProxy() public view returns (address rmnProxy) {
     return i_rmnProxy;
   }
@@ -558,12 +558,12 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   ) external virtual onlyOwner {
     for (uint256 i = 0; i < remoteChainSelectorsToRemove.length; ++i) {
       uint64 remoteChainSelectorToRemove = remoteChainSelectorsToRemove[i];
-      // If the chain doesn't exist, revert
+      // If the chain doesn't exist, revert.
       if (!s_remoteChainSelectors.remove(remoteChainSelectorToRemove)) {
         revert NonExistentChain(remoteChainSelectorToRemove);
       }
 
-      // Remove all remote pool hashes for the chain
+      // Remove all remote pool hashes for the chain.
       bytes32[] memory remotePools = s_remoteChainConfigs[remoteChainSelectorToRemove].remotePools.values();
       for (uint256 j = 0; j < remotePools.length; ++j) {
         s_remoteChainConfigs[remoteChainSelectorToRemove].remotePools.remove(remotePools[j]);

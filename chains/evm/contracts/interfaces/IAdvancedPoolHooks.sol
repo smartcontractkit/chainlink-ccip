@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Pool} from "../libraries/Pool.sol";
 import {IPoolV2} from "./IPoolV2.sol";
 
-/// @notice Interface for AdvancedPoolHooks contract
+/// @notice Interface for AdvancedPoolHooks contract.
 interface IAdvancedPoolHooks {
   /// @notice Preflight check before lock or burn operation.
   /// @param lockOrBurnIn The lock or burn input parameters.

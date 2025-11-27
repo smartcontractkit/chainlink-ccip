@@ -8,7 +8,7 @@ import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice Advanced pool hooks for additional security features like allowlists and CCV management.
 /// @dev This is a standalone contract that can optionally be used by TokenPools.
@@ -77,8 +77,8 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   // │                          Allowlist                           │
   // ================================================================
 
-  /// @notice Checks if the sender is allowed to perform an operation
-  /// @param sender The address to check
+  /// @notice Checks if the sender is allowed to perform an operation.
+  /// @param sender The address to check.
   function checkAllowList(
     address sender
   ) public view {
@@ -175,7 +175,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// @param remoteChainSelector The remote chain selector for this transfer.
   /// @param amount The amount being transferred.
   /// @param direction The direction of the transfer (Inbound or Outbound).
-  /// This implementation returns base CCVs for all transfers, and includes additional CCVs when the transfer amount
+  /// This implementation returns base CCVs for all transfers, and includes additional CCVs when the transfer amount.
   /// is above the configured threshold.
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredCCVs(
