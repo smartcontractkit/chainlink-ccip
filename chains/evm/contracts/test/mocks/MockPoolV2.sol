@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract MockPoolV2 {
   address[] internal s_requiredCCVs;

@@ -19,7 +19,7 @@ import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/Tok
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
-import {Create2} from "@openzeppelin/contracts@5.0.2/utils/Create2.sol";
+import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 
 contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
   using Create2 for bytes32;
