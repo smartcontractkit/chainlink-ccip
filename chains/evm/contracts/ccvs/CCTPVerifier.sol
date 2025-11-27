@@ -132,6 +132,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   uint256 private constant MINIMUM_CCV_DATA_SIZE = VERIFIER_VERSION_SIZE + CCTP_MESSAGE_SIZE + 65;
   /// @notice The starting index of the messageSender in the CCV data.
   uint256 private constant MESSAGE_SENDER_START = VERIFIER_VERSION_SIZE + 148 + 100;
+  /// @notice The starting index of feeExecuted in the CCV data.
+  uint256 private constant FEE_EXECUTED_START = VERIFIER_VERSION_SIZE + 148 + 164;
   /// @notice The starting index of the verifier version (hook data location) in the CCV data.
   uint256 private constant VERIFIER_VERSION_START = VERIFIER_VERSION_SIZE + 148 + 228;
   /// @notice The starting index of the message ID in the CCV data.
@@ -157,6 +159,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
   /// @notice A mapping of CCIP chain selectors to CCTP domain configurations.
   mapping(uint64 remoteChainSelector => Domain cctpDomain) private s_chainToDomain;
+  /// @notice A mapping of source chain selector to the fee charged for latest message from that source chain.
+  mapping(uint64 sourceChainSelector => uint256 fee) private s_sourceChainToLatestFee;
   /// @notice The dynamic configuration.
   DynamicConfig private s_dynamicConfig;
 
@@ -310,6 +314,11 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       revert InvalidMessageSender(sourceDomain.allowedCallerOnSource, messageSender);
     }
 
+    // Store the feeExecuted property, which allows the CCTP token pool to return the actual amount minted on destination.
+    // Assumes that the OffRamp executes verifyMessage calls before releaseOrMint calls.
+    uint256 feeExecuted = uint256(ccvData[FEE_EXECUTED_START:FEE_EXECUTED_START + 32]);
+    s_sourceChainToLatestFee[message.sourceChainSelector] = feeExecuted;
+
     // Call into CCTP via the message transmitter proxy.
     // CCTP will validate signatures against the message before minting USDC.
     // Attestation occupies all bytes following the CCTP message.
@@ -321,6 +330,15 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     ) {
       revert ReceiveMessageCallFailed();
     }
+  }
+
+  /// @notice Returns the fee charged for the latest message from a given source chain.
+  /// @param sourceChainSelector The source chain selector.
+  /// @return fee The fee charged for the latest message from the given source chain.
+  function getLatestFeeExecuted(
+    uint64 sourceChainSelector
+  ) external view returns (uint256 feeExecuted) {
+    return s_sourceChainToLatestFee[sourceChainSelector];
   }
 
   // ================================================================

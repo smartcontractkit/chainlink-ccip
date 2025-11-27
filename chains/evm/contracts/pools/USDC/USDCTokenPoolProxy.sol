@@ -191,7 +191,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   /// @inheritdoc IPoolV2
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 // blockConfirmationRequested
+    uint16 blockConfirmationRequested
   ) public virtual returns (Pool.ReleaseOrMintOutV1 memory) {
     // Since this proxy does not inherit from the TokenPool contract, it must manually validate the caller as an offRamp.
     if (!i_router.isOffRamp(releaseOrMintIn.remoteChainSelector, msg.sender)) {
@@ -210,12 +210,12 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
       return USDCTokenPool(s_pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
     }
 
-    // Both tags will route to the same CCTP V2 pool, but will allow for pools to have greater granularity in deciding
-    // the type of transfer (slow or fast) to use when depositing into CCTP.
-    if (
-      version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG || version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG
-    ) {
+    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG) {
       return USDCTokenPool(s_pools.cctpV2Pool).releaseOrMint(releaseOrMintIn);
+    }
+
+    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG) {
+      return CCTPTokenPool(s_pools.cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
     }
 
     // In previous versions of the USDC Token Pool, the sourcePoolData only contained two fields, a uint64 and uint32.

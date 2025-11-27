@@ -280,6 +280,16 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     /////// SECURITY CRITICAL CHECKS ///////
     address receiver = address(bytes20(message.receiver));
 
+    // We retrieve the local token balance of the token receivers before the verifier and pool calls.
+    // This is because the verifier may be responsible for managing token balances instead of the pool.
+    uint256[] memory preBalances = new uint256[](message.tokenTransfer.length);
+    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
+      preBalances[i] = _getBalanceOfReceiver(
+        address(bytes20(message.tokenTransfer[i].tokenReceiver)),
+        address(bytes20(message.tokenTransfer[i].destTokenAddress))
+      );
+    }
+
     {
       (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) =
         _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs);
@@ -303,6 +313,22 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       destTokenAmounts[i] = _releaseOrMintSingleToken(
         message.tokenTransfer[i], message.sender, message.sourceChainSelector, message.finality
       );
+    }
+
+    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
+      address receiver = address(bytes20(message.tokenTransfer[i].tokenReceiver));
+      // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case of a lockRelease pool.
+      if (receiver != localPoolAddress) {
+        address token = address(bytes20(message.tokenTransfer[i].destTokenAddress));
+        uint256 preBalance = preBalances[i];
+        uint256 postBalance = _getBalanceOfReceiver(receiver, token);
+
+        // First we check if the subtraction would result in an underflow to ensure we revert with a clear error.
+        if (postBalance < preBalance || postBalance - preBalance != destTokenAmounts[i].amount) {
+          revert ReleaseOrMintBalanceMismatch(destTokenAmounts[i].amount, preBalance, postBalance);
+        }
+      }
+
     }
 
     // There are three cases in which we skip calling the receiver:
@@ -646,10 +672,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert NotACompatiblePool(localPoolAddress);
     }
 
-    // We retrieve the local token balance of the receiver before the pool call.
-    uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
-    Pool.ReleaseOrMintOutV1 memory returnData;
-
     Pool.ReleaseOrMintInV1 memory releaseOrMintInput = Pool.ReleaseOrMintInV1({
       originalSender: originalSender,
       receiver: receiver,
@@ -682,17 +704,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     } else {
       // If the pool does not support the v1 interface, we revert.
       revert NotACompatiblePool(localPoolAddress);
-    }
-
-    // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
-    // of a lockRelease pool.
-    if (receiver != localPoolAddress) {
-      uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);
-
-      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error.
-      if (balancePost < balancePre || balancePost - balancePre != returnData.destinationAmount) {
-        revert ReleaseOrMintBalanceMismatch(returnData.destinationAmount, balancePre, balancePost);
-      }
     }
 
     return Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount});

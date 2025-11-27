@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
-
 import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -10,6 +9,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";
+import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {ERC165Checker} from "@openzeppelin/contracts@5.0.2/utils/introspection/ERC165Checker.sol";
@@ -22,8 +22,9 @@ import {ERC165Checker} from "@openzeppelin/contracts@5.0.2/utils/introspection/E
 contract CCTPTokenPool is TokenPool, ITypeAndVersion {
   using ERC165Checker for address;
 
-  error InboundImplementationNotFoundForVerifier(uint64 remoteChainSelector);
   error InvalidCCTPVerifier(address cctpVerifier);
+  error InboundImplementationNotFoundForVerifier(bytes4 verifierVersion);
+  error OutboundImplementationNotFoundForVerifier(uint64 remoteChainSelector);
 
   string public constant override typeAndVersion = "CCTPTokenPool 1.7.0-dev";
 
@@ -66,10 +67,15 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
       amount: destTokenAmount
     });
 
+    address verifierImpl = ICrossChainVerifierResolver(i_cctpVerifier).getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "");
+    if (verifierImpl == address(0)) {
+      revert OutboundImplementationNotFoundForVerifier(lockOrBurnIn.remoteChainSelector);
+    }
+
     return (
       Pool.LockOrBurnOutV1({
         destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-        destPoolData: abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG)
+        destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(CCTPVerifier(verifierImpl).versionTag())
       }),
       destTokenAmount
     );
@@ -92,9 +98,14 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
       amount: lockOrBurnIn.amount
     });
 
+    address verifierImpl = ICrossChainVerifierResolver(i_cctpVerifier).getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "");
+    if (verifierImpl == address(0)) {
+      revert OutboundImplementationNotFoundForVerifier(lockOrBurnIn.remoteChainSelector);
+    }
+
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG)
+      destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(CCTPVerifier(verifierImpl).versionTag())
     });
   }
 
@@ -106,17 +117,26 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationRequested);
+    (,bytes4 ccvVersionTag) = USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2WithCCV(releaseOrMintIn.sourcePoolData);
+
+    address verifierImpl = ICrossChainVerifierResolver(i_cctpVerifier).getInboundImplementation(abi.encodePacked(ccvVersionTag));
+    if (verifierImpl == address(0)) {
+      revert InboundImplementationNotFoundForVerifier(ccvVersionTag);
+    }
+
+    uint256 amountReceived = releaseOrMintIn.sourceDenominatedAmount - CCTPVerifier(verifierImpl).getLatestFeeExecuted(releaseOrMintIn.remoteChainSelector);
+
+    _validateReleaseOrMint(releaseOrMintIn, amountReceived, blockConfirmationRequested);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       token: address(i_token),
       sender: msg.sender,
       recipient: releaseOrMintIn.receiver,
-      amount: releaseOrMintIn.sourceDenominatedAmount
+      amount: amountReceived
     });
 
-    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: amountReceived});
   }
 
   /// @inheritdoc IPoolV1

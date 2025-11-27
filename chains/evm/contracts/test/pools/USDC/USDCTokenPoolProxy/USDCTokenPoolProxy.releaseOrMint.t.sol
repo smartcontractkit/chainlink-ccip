@@ -125,15 +125,13 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     vm.stopPrank();
   }
 
-  /*
   function test_releaseOrMint_CCTPV2_CCVFlag() public {
     // Arrange: Prepare test data
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2CCV(
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: 0, depositHash: bytes32(hex"deafbeef")})
-    );
+    bytes4 ccvVersionTag = 0x12345678;
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(ccvVersionTag);
     bytes memory offChainTokenData = "";
 
     // Mock the router's isOffRamp function to return true
@@ -172,7 +170,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.stopPrank();
   }
-  */
 
   function test_releaseOrMint_CCTPV2Flag() public {
     // Arrange: Prepare test data

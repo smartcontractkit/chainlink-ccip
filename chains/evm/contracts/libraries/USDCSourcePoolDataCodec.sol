@@ -68,6 +68,32 @@ library USDCSourcePoolDataCodec {
     return abi.encodePacked(CCTP_VERSION_2_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
   }
 
+  /// @notice Encodes the two required version tags, pool version tag and CCV version tag, into bytes.
+  /// @param ccvVersionTag The version tag for the CCV.
+  /// @return The encoded source token data payload.
+  function _encodeSourceTokenDataPayloadV2WithCCV(
+    bytes4 ccvVersionTag
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(CCTP_VERSION_2_CCV_TAG, ccvVersionTag);
+  }
+
+  function _decodeSourceTokenDataPayloadV2WithCCV(
+    bytes memory sourcePoolData
+  ) internal pure returns (bytes4 poolVersionTag, bytes4 ccvVersionTag) {
+    assembly {
+      // Load pool version tag.
+      // First 4 bytes of data after the 32 byte length.
+      // So, we mload 32 bytes at an offset of 4 such that the lowest 4 bytes are the pool version tag.
+      poolVersionTag := mload(add(sourcePoolData, 4))
+      // Load CCV version tag from the next 4 bytes.
+      ccvVersionTag := mload(add(sourcePoolData, 8))
+    }
+
+    if (poolVersionTag != CCTP_VERSION_2_CCV_TAG) revert InvalidVersion(poolVersionTag);
+
+    return (poolVersionTag, ccvVersionTag);
+  }
+
   /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
   /// @param sourcePoolData The source pool data to decode in raw bytes.
   /// @return sourceTokenDataPayload The decoded source token data payload.
