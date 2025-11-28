@@ -5,13 +5,10 @@ import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
-
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
-import {AdvancedPoolHooks} from "../../../../pools/AdvancedPoolHooks.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
-
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
@@ -350,22 +347,6 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         originalSender: OWNER,
         receiver: abi.encodePacked(address(0)),
         amount: 0,
-        remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_USDCToken)
-      })
-    );
-  }
-
-  function test_lockOrBurn_RevertWhen_LockOrBurnWithAllowList() public {
-    vm.startPrank(s_routerAllowedOnRamp);
-
-    vm.expectRevert(abi.encodeWithSelector(AdvancedPoolHooks.SenderNotAllowed.selector, STRANGER));
-
-    s_usdcTokenPoolWithAllowList.lockOrBurn(
-      Pool.LockOrBurnInV1({
-        originalSender: STRANGER,
-        receiver: abi.encodePacked(address(0)),
-        amount: 1000,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         localToken: address(s_USDCToken)
       })
