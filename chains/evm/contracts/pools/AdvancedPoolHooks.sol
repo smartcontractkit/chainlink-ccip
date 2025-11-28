@@ -73,6 +73,8 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
     checkAllowList(lockOrBurnIn.originalSender);
   }
 
+  function postFlightCheck(Pool.ReleaseOrMintInV1 calldata, uint256, uint16) external pure {}
+
   // ================================================================
   // │                          Allowlist                           │
   // ================================================================

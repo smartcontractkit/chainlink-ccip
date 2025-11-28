@@ -14,7 +14,13 @@ interface IAdvancedPoolHooks {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
-  ) external view;
+  ) external;
+
+  function postFlightCheck(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintOut,
+    uint256 localAmount,
+    uint16 blockConfirmationRequested
+  ) external;
 
   /// @notice Returns the set of required CCVs for transfers in a specific direction.
   /// @param remoteChainSelector The remote chain selector for this transfer.

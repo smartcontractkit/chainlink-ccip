@@ -26,9 +26,13 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
   }
 
-  function testFuzz_SetChainRateLimiterConfigs_Success(uint128 capacity, uint128 rate, uint32 newTime) public {
+  function testFuzz_SetChainRateLimiterConfigs_Success(
+    uint128 capacity,
+    uint128 rate,
+    uint32 newTime,
+    bool customBlockConfirmations
+  ) public {
     rate = uint128(bound(rate, 0, capacity));
-    // Bucket updates only work on increasing time
     newTime = uint32(bound(newTime, block.timestamp + 1, type(uint32).max));
     vm.warp(newTime);
 
@@ -36,79 +40,109 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     RateLimiter.Config memory newInboundConfig =
       RateLimiter.Config({isEnabled: true, capacity: capacity / 2, rate: rate / 2});
 
-    uint64[] memory chainSelectors = new uint64[](1);
-    chainSelectors[0] = DEST_CHAIN_SELECTOR;
-
-    RateLimiter.Config[] memory newOutboundConfigs = new RateLimiter.Config[](1);
-    newOutboundConfigs[0] = newOutboundConfig;
-
-    RateLimiter.Config[] memory newInboundConfigs = new RateLimiter.Config[](1);
-    newInboundConfigs[0] = newInboundConfig;
+    TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
+    rateLimitConfigArgs[0] = TokenPool.RateLimitConfigArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      customBlockConfirmation: customBlockConfirmations,
+      outboundRateLimiterConfig: newOutboundConfig,
+      inboundRateLimiterConfig: newInboundConfig
+    });
 
     vm.expectEmit();
-    emit TokenPool.DefaultFinalityRateLimitConfigured(DEST_CHAIN_SELECTOR, newOutboundConfig, newInboundConfig);
+    emit TokenPool.RateLimitConfigured(
+      DEST_CHAIN_SELECTOR, customBlockConfirmations, newOutboundConfig, newInboundConfig
+    );
 
-    s_tokenPool.setChainRateLimiterConfigs(chainSelectors, newOutboundConfigs, newInboundConfigs);
+    s_tokenPool.setRateLimitConfig(rateLimitConfigArgs);
 
     (RateLimiter.TokenBucket memory outboundAfter, RateLimiter.TokenBucket memory inboundAfter) =
-      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR);
-    assertEq(outboundAfter.capacity, newOutboundConfig.capacity);
-    assertEq(outboundAfter.rate, newOutboundConfig.rate);
-    assertEq(outboundAfter.tokens, newOutboundConfig.capacity);
+      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, customBlockConfirmations);
+
+    _assertRateLimiterState(outboundAfter, newOutboundConfig);
     assertEq(outboundAfter.lastUpdated, newTime);
 
-    assertEq(inboundAfter.capacity, newInboundConfig.capacity);
-    assertEq(inboundAfter.rate, newInboundConfig.rate);
-    assertEq(inboundAfter.tokens, newInboundConfig.capacity);
+    _assertRateLimiterState(inboundAfter, newInboundConfig);
     assertEq(inboundAfter.lastUpdated, newTime);
+  }
+
+  function test_setCustomBlockConfirmationRateLimitConfig() public {
+    RateLimiter.Config memory outboundConfig = RateLimiter.Config({isEnabled: true, capacity: 1e21, rate: 5e20});
+    RateLimiter.Config memory inboundConfig = RateLimiter.Config({isEnabled: true, capacity: 2e21, rate: 1e21});
+    TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
+    args[0] = TokenPool.RateLimitConfigArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      customBlockConfirmation: true,
+      outboundRateLimiterConfig: outboundConfig,
+      inboundRateLimiterConfig: inboundConfig
+    });
+
+    vm.expectEmit();
+    emit TokenPool.RateLimitConfigured(DEST_CHAIN_SELECTOR, true, outboundConfig, inboundConfig);
+
+    s_tokenPool.setRateLimitConfig(args);
+
+    (RateLimiter.TokenBucket memory outboundBucket, RateLimiter.TokenBucket memory inboundBucket) =
+      s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, true);
+
+    assertTrue(outboundBucket.isEnabled);
+    _assertRateLimiterState(outboundBucket, outboundConfig);
+    assertTrue(inboundBucket.isEnabled);
+    _assertRateLimiterState(inboundBucket, inboundConfig);
+  }
+
+  function test_setCustomBlockConfirmationRateLimitConfig_RevertWhen_InvalidRateLimitRate_Outbound() public {
+    TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
+    args[0] = TokenPool.RateLimitConfigArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      customBlockConfirmation: true,
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1, rate: 2}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1, rate: 1})
+    });
+
+    vm.expectRevert(
+      abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, args[0].outboundRateLimiterConfig)
+    );
+    s_tokenPool.setRateLimitConfig(args);
+  }
+
+  function _assertRateLimiterState(
+    RateLimiter.TokenBucket memory bucket,
+    RateLimiter.Config memory config
+  ) internal pure {
+    assertEq(bucket.capacity, config.capacity);
+    assertEq(bucket.rate, config.rate);
+    assertEq(bucket.tokens, config.capacity);
   }
 
   // Reverts
 
-  function test_RevertWhen_OnlyOwnerOrRateLimitAdmin() public {
-    uint64[] memory chainSelectors = new uint64[](1);
-    chainSelectors[0] = DEST_CHAIN_SELECTOR;
-
-    RateLimiter.Config[] memory newOutboundConfigs = new RateLimiter.Config[](1);
-    newOutboundConfigs[0] = _getOutboundRateLimiterConfig();
-
-    RateLimiter.Config[] memory newInboundConfigs = new RateLimiter.Config[](1);
-    newInboundConfigs[0] = _getInboundRateLimiterConfig();
+  function test_RevertWhen_Unauthorized_OnlyOwnerOrRateLimitAdmin() public {
+    TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
+    rateLimitConfigArgs[0] = TokenPool.RateLimitConfigArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      customBlockConfirmation: false,
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+    });
 
     vm.startPrank(STRANGER);
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.Unauthorized.selector, STRANGER));
-    s_tokenPool.setChainRateLimiterConfigs(chainSelectors, newOutboundConfigs, newInboundConfigs);
+    s_tokenPool.setRateLimitConfig(rateLimitConfigArgs);
   }
 
   function test_RevertWhen_NonExistentChain() public {
     uint64 wrongChainSelector = 9084102894;
 
-    uint64[] memory chainSelectors = new uint64[](1);
-    chainSelectors[0] = wrongChainSelector;
-
-    RateLimiter.Config[] memory newOutboundConfigs = new RateLimiter.Config[](1);
-    RateLimiter.Config[] memory newInboundConfigs = new RateLimiter.Config[](1);
+    TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
+    rateLimitConfigArgs[0] = TokenPool.RateLimitConfigArgs({
+      remoteChainSelector: wrongChainSelector,
+      customBlockConfirmation: false,
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
+    });
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, wrongChainSelector));
-    s_tokenPool.setChainRateLimiterConfigs(chainSelectors, newOutboundConfigs, newInboundConfigs);
-  }
-
-  function test_RevertWhen_MismatchedArrayLengths() public {
-    uint64[] memory chainSelectors = new uint64[](1);
-
-    RateLimiter.Config[] memory newOutboundConfigs = new RateLimiter.Config[](1);
-    RateLimiter.Config[] memory newInboundConfigs = new RateLimiter.Config[](2);
-
-    // test mismatched array lengths between rate limiters
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.MismatchedArrayLengths.selector));
-    s_tokenPool.setChainRateLimiterConfigs(chainSelectors, newOutboundConfigs, newInboundConfigs);
-
-    newInboundConfigs = new RateLimiter.Config[](1);
-    chainSelectors = new uint64[](2);
-
-    // test mismatched array lengths between chain selectors and rate limiters
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.MismatchedArrayLengths.selector));
-    s_tokenPool.setChainRateLimiterConfigs(chainSelectors, newOutboundConfigs, newInboundConfigs);
+    s_tokenPool.setRateLimitConfig(rateLimitConfigArgs);
   }
 }
