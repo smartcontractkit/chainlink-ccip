@@ -367,6 +367,21 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     }
 
+    _preFlightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+  }
+
+  /// @notice Hook for pre-flight checks on lock or burn.
+  /// @dev These hooks are optional but take up a lot of space in the contracts bytecode. To avoid this overhead when
+  /// not needed, you can override this function in the derived contract with an empty implementation. This will result
+  /// in the compiler removing the function and all related code, saving close to 1kb.
+  /// @param lockOrBurnIn The input to validate.
+  /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
+  /// @param tokenArgs Additional token arguments passed in by the sender of the message.
+  function _preFlightCheck(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes memory tokenArgs
+  ) internal virtual {
     if (address(i_advancedPoolHooks) != address(0)) {
       i_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
     }
@@ -402,6 +417,21 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
     }
 
+    _postFlightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
+  }
+
+  /// @notice Hook for post-flight checks on release or mint.
+  /// @dev These hooks are optional but take up a lot of space in the contracts bytecode. To avoid this overhead when
+  /// not needed, you can override this function in the derived contract with an empty implementation. This will result
+  /// in the compiler removing the function and all related code, saving close to 1kb.
+  /// @param releaseOrMintIn The input to validate.
+  /// @param localAmount The local amount to be released or minted.
+  /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
+  function _postFlightCheck(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint256 localAmount,
+    uint16 blockConfirmationRequested
+  ) internal virtual {
     if (address(i_advancedPoolHooks) != address(0)) {
       i_advancedPoolHooks.postFlightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
     }
