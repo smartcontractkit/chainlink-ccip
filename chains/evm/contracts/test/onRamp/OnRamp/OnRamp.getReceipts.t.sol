@@ -21,6 +21,7 @@ contract OnRamp_getReceipts is OnRampSetup {
   address internal s_pool;
   address internal s_verifier1;
   address internal s_verifier2;
+  address internal s_caller = makeAddr("s_caller");
 
   function setUp() public override {
     super.setUp();
@@ -36,6 +37,7 @@ contract OnRamp_getReceipts is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
+      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
@@ -51,6 +53,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     vm.mockCall(
       address(s_tokenAdminRegistry), abi.encodeCall(s_tokenAdminRegistry.getPool, (s_sourceToken)), abi.encode(s_pool)
     );
+    vm.startPrank(s_caller);
   }
 
   function _createMessage(
@@ -109,6 +112,10 @@ contract OnRamp_getReceipts is OnRampSetup {
     );
   }
 
+  function _expectedNetworkFee(uint256 feeTokenPrice, uint256 percentMultiplier) internal pure returns (uint256) {
+    return (uint256(NETWORK_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice;
+  }
+
   function test_getReceipts_WithTokens_PoolV2Fee() public {
     // Mock pool to support IPoolV2.
     vm.mockCall(s_pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
@@ -135,15 +142,15 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
-      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
 
     // Verify total fee matches sum of individual receipts.
-    uint256 expectedTotal =
-      receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount + receipts[3].feeTokenAmount;
+    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount
+      + receipts[3].feeTokenAmount + receipts[4].feeTokenAmount;
     assertEq(feeTokenAmount, expectedTotal);
 
-    // Should have: 2 verifiers + 1 token + 1 executor = 4 receipts.
-    assertEq(receipts.length, 4, "Should have 4 receipts");
+    // Should have: 2 verifiers + 1 token + 1 executor + 1 network fee = 5 receipts.
+    assertEq(receipts.length, 5, "Should have 5 receipts");
 
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
     uint256 expectedVerifierFee = (uint256(VERIFIER_FEE_USD_CENTS) * 1e32 * LINK_FEE_MULTIPLIER_PERCENT) / feeTokenPrice;
@@ -155,7 +162,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[1].issuer, s_verifier2, "Second receipt should be from verifier2");
     assertEq(receipts[1].feeTokenAmount, expectedVerifierFee, "Verifier2 fee should match");
 
-    assertEq(receipts[3].issuer, s_defaultExecutor, "Last receipt should be from executor");
+    assertEq(receipts[3].issuer, s_defaultExecutor, "Executor receipt");
 
     uint256 expectedPoolFee = (uint256(POOL_FEE_USD_CENTS) * 1e34) / feeTokenPrice;
     // Apply LINK discount.
@@ -165,6 +172,10 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[2].destGasLimit, POOL_GAS_OVERHEAD, "Pool gas overhead should match");
     assertEq(receipts[2].destBytesOverhead, POOL_BYTES_OVERHEAD, "Pool bytes overhead should match");
     assertEq(receipts[2].extraArgs, extraArgs.tokenArgs, "Pool extra args should match");
+
+    uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
+    assertEq(receipts[4].issuer, s_caller, "Network fee issuer");
+    assertEq(receipts[4].feeTokenAmount, expectedNetworkFee, "Network fee should match");
   }
 
   function test_getReceipts_WithTokens_FeeQuoterFallback() public {
@@ -189,17 +200,22 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
-      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
     assertGt(feeTokenAmount, 1e16);
 
-    // Should have: 1 verifier + 1 token + 1 executor = 3 receipts.
-    assertEq(receipts.length, 3, "Should have 3 receipts");
+    // Should have: 1 verifier + 1 token + 1 executor + 1 network = 4 receipts.
+    assertEq(receipts.length, 4, "Should have 4 receipts");
 
     // Check token pool receipt uses FeeQuoter values.
     assertEq(receipts[1].issuer, s_pool, "Token receipt should be second to last");
     assertGt(receipts[1].feeTokenAmount, 1e15, "Should have token amount fee");
     assertEq(receipts[1].destGasLimit, FEE_QUOTER_GAS_OVERHEAD, "Should use FeeQuoter gas overhead");
     assertEq(receipts[1].destBytesOverhead, FEE_QUOTER_BYTES_OVERHEAD, "Should use FeeQuoter bytes overhead");
+
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+    uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
+    assertEq(receipts[3].issuer, s_caller, "Network fee issuer");
+    assertEq(receipts[3].feeTokenAmount, expectedNetworkFee, "Network fee should match");
   }
 
   function test_getReceipts_WithTokens_PoolV2ReturnsZero_FallsBackToFeeQuoter() public {
@@ -227,10 +243,11 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
-      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
 
     // Verify total fee matches sum of individual receipts.
-    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
+    uint256 expectedTotal =
+      receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount + receipts[3].feeTokenAmount;
     assertEq(feeTokenAmount, expectedTotal);
 
     // Check token receipt falls back to FeeQuoter values.
@@ -242,6 +259,10 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[1].feeTokenAmount, expectedTokenFee, "Should fall back to FeeQuoter fee");
     assertEq(receipts[1].destGasLimit, FEE_QUOTER_GAS_OVERHEAD, "Should fall back to FeeQuoter gas");
     assertEq(receipts[1].destBytesOverhead, FEE_QUOTER_BYTES_OVERHEAD, "Should fall back to FeeQuoter bytes");
+
+    uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
+    assertEq(receipts[3].issuer, s_caller, "Network fee issuer");
+    assertEq(receipts[3].feeTokenAmount, expectedNetworkFee, "Network fee should match");
   }
 
   function test_getReceipts_NoTokens() public {
@@ -260,19 +281,24 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
-      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
 
     // Verify total fee matches sum of individual receipts.
-    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
+    uint256 expectedTotal =
+      receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount + receipts[3].feeTokenAmount;
     assertEq(feeTokenAmount, expectedTotal);
 
-    // Should have: 2 verifiers + 1 executor = 3 receipts (no token receipt).
-    assertEq(receipts.length, 3, "Should have 3 receipts without tokens");
+    // Should have: 2 verifiers + 1 executor + 1 network fee = 4 receipts (no token receipt).
+    assertEq(receipts.length, 4, "Should have 4 receipts without tokens");
 
     // Verify all are verifiers and executor
     assertEq(receipts[0].issuer, s_verifier1, "First should be verifier1");
     assertEq(receipts[1].issuer, s_verifier2, "Second should be verifier2");
-    assertEq(receipts[2].issuer, s_defaultExecutor, "Last should be executor");
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+    uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
+    assertEq(receipts[2].issuer, s_defaultExecutor, "Third should be executor");
+    assertEq(receipts[3].issuer, s_caller, "Fourth should be network fee issuer");
+    assertEq(receipts[3].feeTokenAmount, expectedNetworkFee, "Network fee should be scaled");
   }
 
   function test_getReceipts_NoVerifiers_WithTokens() public {
@@ -289,14 +315,14 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
-      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
 
     // Verify total fee matches sum of individual receipts.
-    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount;
+    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
     assertEq(feeTokenAmount, expectedTotal);
 
-    // Should have: 0 verifiers + 1 token + 1 executor = 2 receipts.
-    assertEq(receipts.length, 2, "Should have 2 receipts");
+    // Should have: 0 verifiers + 1 token + 1 executor + 1 network = 3 receipts.
+    assertEq(receipts.length, 3, "Should have 3 receipts");
 
     // Check receipts order.
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
@@ -305,7 +331,11 @@ contract OnRamp_getReceipts is OnRampSetup {
     expectedPoolFee = (expectedPoolFee * LINK_FEE_MULTIPLIER_PERCENT) / 100;
     assertEq(receipts[0].issuer, s_pool, "First should be token");
     assertEq(receipts[0].feeTokenAmount, expectedPoolFee, "Token fee should match");
-    assertEq(receipts[1].issuer, s_defaultExecutor, "Last should be executor");
+    assertEq(receipts[1].issuer, s_defaultExecutor, "Executor receipt");
+
+    uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
+    assertEq(receipts[2].issuer, s_caller, "Network fee issuer");
+    assertEq(receipts[2].feeTokenAmount, expectedNetworkFee, "Network fee should match");
   }
 
   function test_getReceipts_MultipleVerifiers_WithTokens_OrderIsCorrect() public {
@@ -338,22 +368,26 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
-      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
 
     // Verify total fee matches sum of individual receipts.
     uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount
-      + receipts[3].feeTokenAmount + receipts[4].feeTokenAmount;
+      + receipts[3].feeTokenAmount + receipts[4].feeTokenAmount + receipts[5].feeTokenAmount;
     assertEq(feeTokenAmount, expectedTotal);
 
-    // Should have: 3 verifiers + 1 token + 1 executor = 5 receipts.
-    assertEq(receipts.length, 5, "Should have 5 receipts");
+    // Should have: 3 verifiers + 1 token + 1 executor + 1 network = 6 receipts.
+    assertEq(receipts.length, 6, "Should have 6 receipts");
 
-    // Verify order: verifiers (0-2), token (3), executor (4).
+    // Verify order: verifiers (0-2), token (3), executor (4), network (5).
     assertEq(receipts[0].issuer, s_verifier1, "Receipt 0: verifier1");
     assertEq(receipts[1].issuer, s_verifier2, "Receipt 1: verifier2");
     assertEq(receipts[2].issuer, verifier3, "Receipt 2: verifier3");
     assertEq(receipts[3].issuer, s_pool, "Receipt 3: token pool (second to last)");
-    assertEq(receipts[4].issuer, s_defaultExecutor, "Receipt 4: executor (last)");
+    assertEq(receipts[4].issuer, s_defaultExecutor, "Receipt 4: executor");
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+    uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
+    assertEq(receipts[5].issuer, s_caller, "Receipt 5: network fee");
+    assertEq(receipts[5].feeTokenAmount, expectedNetworkFee, "Network fee");
   }
 
   function test_getReceipts_multipleCCVs() public {
@@ -391,16 +425,21 @@ contract OnRamp_getReceipts is OnRampSetup {
     });
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
-      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
 
     // Verify total fee matches sum of individual receipts.
-    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
+    uint256 expectedTotal =
+      receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount + receipts[3].feeTokenAmount;
     assertEq(feeTokenAmount, expectedTotal);
 
-    assertEq(ccvs.length + 1, receipts.length);
+    assertEq(ccvs.length + 2, receipts.length);
     assertEq(s_defaultCCV, receipts[0].issuer);
     assertEq(secondCCV, receipts[1].issuer);
     assertEq(s_defaultExecutor, receipts[2].issuer);
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+    uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
+    assertEq(s_caller, receipts[3].issuer);
+    assertEq(expectedNetworkFee, receipts[3].feeTokenAmount);
   }
 
   function test_getReceipts_TokenArgsPassedToPool() public {
@@ -428,9 +467,10 @@ contract OnRamp_getReceipts is OnRampSetup {
     extraArgs.tokenArgs = customTokenArgs;
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
-      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
 
-    uint256 expectedTotal = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
+    uint256 expectedTotal =
+      receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount + receipts[3].feeTokenAmount;
     assertEq(feeTokenAmount, expectedTotal);
 
     assertEq(receipts[1].extraArgs, customTokenArgs, "Token receipt should have custom token args");
@@ -456,15 +496,20 @@ contract OnRamp_getReceipts is OnRampSetup {
       tokenArgs: ""
     });
 
-    (OnRamp.Receipt[] memory receipts,,) = s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+    (OnRamp.Receipt[] memory receipts,,) =
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
 
-    assertEq(2, receipts.length);
+    assertEq(3, receipts.length);
 
     // The receipt should specify gas limits normally.
     assertEq(extraArgs.gasLimit + BASE_EXEC_GAS_COST, receipts[1].destGasLimit);
 
+    uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
+    uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
+    assertEq(s_caller, receipts[2].issuer);
+    assertEq(expectedNetworkFee, receipts[2].feeTokenAmount);
+
     // NO_EXECUTION_ADDRESS results in zero executor fee.
-    // Total fee may be zero if CCV fee is also zero.
     assertEq(0, receipts[1].feeTokenAmount);
   }
 
@@ -504,9 +549,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     );
 
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
-      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, message, extraArgs);
+      s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
 
-    assertEq(receipts.length, 3, "Should have 3 receipts");
+    assertEq(receipts.length, 4, "Should have 4 receipts");
 
     // USD-based fees (verifier, pool, executor flat fee) should have percentMultiplier applied.
     assertEq(
@@ -530,9 +575,13 @@ contract OnRamp_getReceipts is OnRampSetup {
       "Executor: flat fee WITH bps + gas cost WITHOUT bps"
     );
 
+    uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, percentMultiplier);
+    assertEq(receipts[3].issuer, s_caller, "Network fee issuer");
+    assertEq(receipts[3].feeTokenAmount, expectedNetworkFee, "Network fee with bps");
+
     assertEq(
       feeTokenAmount,
-      receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount,
+      receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount + receipts[3].feeTokenAmount,
       "Total matches sum"
     );
   }

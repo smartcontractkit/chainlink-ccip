@@ -11,6 +11,7 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract RouterSetup is FeeQuoterSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
+  uint16 internal constant NETWORK_FEE_USD_CENTS = 1_00;
 
   OnRamp internal s_onRamp;
   address internal s_offRamp;
@@ -39,6 +40,7 @@ contract RouterSetup is FeeQuoterSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
+      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
