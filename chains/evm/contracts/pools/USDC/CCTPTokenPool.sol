@@ -23,7 +23,6 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
   using ERC165Checker for address;
 
   error InvalidCCTPVerifier(address cctpVerifier);
-  error InboundImplementationNotFoundForVerifier(bytes4 verifierVersion);
   error OutboundImplementationNotFoundForVerifier(uint64 remoteChainSelector);
 
   string public constant override typeAndVersion = "CCTPTokenPool 1.7.0-dev";
@@ -48,51 +47,30 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
   }
 
   /// @inheritdoc IPoolV2
-  /// @dev The _validateLockOrBurn check is an essential security check.
-  /// @dev The _applyFee function deducts the fee from the amount and returns the amount after fee deduction.
-  /// @dev The call to _lockOrBurn is omitted because this pool is not responsible for token management.
-  /// LockedOrBurned is still emitted for consumers that expect it.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
-    destTokenAmount = _applyFee(lockOrBurnIn, blockConfirmationRequested);
-
-    emit LockedOrBurned({
-      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-      token: address(i_token),
-      sender: msg.sender,
-      amount: destTokenAmount
-    });
-
-    address verifierImpl =
-      ICrossChainVerifierResolver(i_cctpVerifier).getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "");
-    if (verifierImpl == address(0)) {
-      revert OutboundImplementationNotFoundForVerifier(lockOrBurnIn.remoteChainSelector);
-    }
-
-    return (
-      Pool.LockOrBurnOutV1({
-        destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-        destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(
-          CCTPVerifier(verifierImpl).versionTag()
-        )
-      }),
-      destTokenAmount
-    );
+    return (_lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs), lockOrBurnIn.amount);
   }
 
   /// @inheritdoc IPoolV1
-  /// @dev The _validateLockOrBurn check is an essential security check.
-  /// @dev _applyFee is not called in this legacy method, so the full amount is locked or burned.
-  /// @dev The call to _lockOrBurn is omitted because this pool is not responsible for token management.
-  /// LockedOrBurned is still emitted for consumers that expect it.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
+    return _lockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
+  }
+
+  /// @dev The _validateLockOrBurn check is an essential security check.
+  /// @dev The call to _lockOrBurn(amount) is omitted because this pool is not responsible for token management.
+  /// LockedOrBurned is still emitted for consumers that expect it.
+  function _lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes memory tokenArgs
+  ) internal virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
+    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,

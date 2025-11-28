@@ -84,9 +84,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   string public constant override typeAndVersion = "USDCTokenPoolProxy 1.7.0-dev";
 
   constructor(IERC20 token, PoolAddresses memory pools, address router) {
-    // Note: It is not required that every pool address be set, as this proxy may be deployed on a chain which does not
-    // support a specific version of CCTP. The same goes for the CCTP verifier.
-    // As a result only the token and router are enforced to be non-zero.
+    // Note: It is not required that every pool address be set, as this proxy may be deployed on a chain which does not support a specific version of CCTP.
+    // The same goes for the CCTP verifier. As a result only the token and router are enforced to be non-zero.
     if (address(token) == address(0) || router == address(0)) {
       revert AddressCannotBeZero();
     }
@@ -100,10 +99,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16, // blockConfirmationRequested
-    bytes calldata // tokenArgs
+    uint16 blockConfirmationRequested,
+    bytes calldata tokenArgs
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
-    return (_lockOrBurn(lockOrBurnIn), lockOrBurnIn.amount);
+    return _lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
   }
 
   /// @inheritdoc IPoolV1
@@ -111,13 +110,16 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    return _lockOrBurn(lockOrBurnIn);
+    (Pool.LockOrBurnOutV1 memory lockOrBurnOut,) = _lockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
+    return lockOrBurnOut;
   }
 
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
   function _lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) internal returns (Pool.LockOrBurnOutV1 memory) {
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes memory tokenArgs
+  ) internal returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
     // Since this contract does not inherit from the TokenPool contract, it must manually validate the caller as an onRamp.
     if (i_router.getOnRamp(lockOrBurnIn.remoteChainSelector) != msg.sender) {
       revert CallerIsNotARampOnRouter(msg.sender);
@@ -134,10 +136,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
 
     // The child pool which will perform the lock/burn operation.
     address childPool;
-    bool fundVerifier = false;
+    bool useCCV = false;
     if (mechanism == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
       childPool = pools.cctpV2PoolWithCCV;
-      fundVerifier = true;
+      useCCV = true;
     } else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
       childPool = pools.cctpV2Pool;
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
@@ -155,13 +157,15 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     // Transfer the tokens to the correct address, as this contract is only a proxy and will not perform the lock/burn itself.
     // If using the CCTP verifier, transfer funds to the verifier instead of the child pool.
     i_token.safeTransfer(
-      fundVerifier
+      useCCV
         ? ICrossChainVerifierResolver(s_cctpVerifier).getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "")
         : childPool,
       lockOrBurnIn.amount
     );
 
-    return USDCTokenPool(childPool).lockOrBurn(lockOrBurnIn);
+    return useCCV
+      ? CCTPTokenPool(childPool).lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs)
+      : (USDCTokenPool(childPool).lockOrBurn(lockOrBurnIn), lockOrBurnIn.amount);
   }
 
   /// @inheritdoc IPoolV1

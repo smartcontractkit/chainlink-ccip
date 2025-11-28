@@ -322,7 +322,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       revert InvalidToken(tokenTransfer.destTokenAddress);
     }
 
-    // Right-align and extract address (rightmost 20 bytes)
+    // Right-align and extract address (rightmost 20 bytes).
     address tokenReceiver = address(uint160(uint256(bytes32(tokenTransfer.tokenReceiver))));
     uint256 balancePre = i_usdcToken.balanceOf(tokenReceiver);
 
@@ -338,13 +338,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       revert ReceiveMessageCallFailed();
     }
 
-    // Store the feeExecuted property, which allows the CCTP token pool to return the actual amount minted on destination.
-    // Assumes that the OffRamp executes verifyMessage calls before releaseOrMint calls.
-    uint256 feeExecuted = uint256(bytes32(ccvData[FEE_EXECUTED_START:FEE_EXECUTED_START + 32]));
-
     // Ensure that the balance of the token receiver has increased by amount - feeExecuted.
     // The CCTP token pool returns a mint amount of 0, so the OffRamp isn't able to track the balance increase.
     // Therefore, we must perform this check within the scope of the verifier.
+    uint256 feeExecuted = uint256(bytes32(ccvData[FEE_EXECUTED_START:FEE_EXECUTED_START + 32]));
     uint256 balancePost = i_usdcToken.balanceOf(tokenReceiver);
     uint256 expectedAmount = tokenTransfer.amount - feeExecuted;
     if (balancePost < balancePre || balancePost - balancePre != expectedAmount) {
