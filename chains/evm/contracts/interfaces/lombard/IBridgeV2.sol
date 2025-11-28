@@ -52,7 +52,8 @@ interface IBridgeV2 {
     address sender,
     bytes32 recipient,
     uint256 amount,
-    bytes32 destinationCaller
+    bytes32 destinationCaller,
+    bytes calldata payload
   ) external payable returns (uint256, bytes32);
 
   function deposit(
