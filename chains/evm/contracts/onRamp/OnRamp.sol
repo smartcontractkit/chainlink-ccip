@@ -869,7 +869,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
     receipts[receipts.length - 1] = Receipt({
       // Network fee receipt surfaces the configured network premium.
-      issuer: address(this),
+      issuer: msg.sender,
       destGasLimit: 0,
       destBytesOverhead: 0,
       feeTokenAmount: networkFeeUSDCents,

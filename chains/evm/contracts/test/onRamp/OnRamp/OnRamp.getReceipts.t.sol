@@ -21,6 +21,7 @@ contract OnRamp_getReceipts is OnRampSetup {
   address internal s_pool;
   address internal s_verifier1;
   address internal s_verifier2;
+  address internal s_caller = makeAddr("s_caller");
 
   function setUp() public override {
     super.setUp();
@@ -52,6 +53,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     vm.mockCall(
       address(s_tokenAdminRegistry), abi.encodeCall(s_tokenAdminRegistry.getPool, (s_sourceToken)), abi.encode(s_pool)
     );
+    vm.startPrank(s_caller);
   }
 
   function _createMessage(
@@ -172,7 +174,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[2].extraArgs, extraArgs.tokenArgs, "Pool extra args should match");
 
     uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
-    assertEq(receipts[4].issuer, address(s_onRamp), "Network fee issuer");
+    assertEq(receipts[4].issuer, s_caller, "Network fee issuer");
     assertEq(receipts[4].feeTokenAmount, expectedNetworkFee, "Network fee should match");
   }
 
@@ -212,7 +214,7 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
     uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
-    assertEq(receipts[3].issuer, address(s_onRamp), "Network fee issuer");
+    assertEq(receipts[3].issuer, s_caller, "Network fee issuer");
     assertEq(receipts[3].feeTokenAmount, expectedNetworkFee, "Network fee should match");
   }
 
@@ -259,7 +261,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[1].destBytesOverhead, FEE_QUOTER_BYTES_OVERHEAD, "Should fall back to FeeQuoter bytes");
 
     uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
-    assertEq(receipts[3].issuer, address(s_onRamp), "Network fee issuer");
+    assertEq(receipts[3].issuer, s_caller, "Network fee issuer");
     assertEq(receipts[3].feeTokenAmount, expectedNetworkFee, "Network fee should match");
   }
 
@@ -295,7 +297,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
     uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
     assertEq(receipts[2].issuer, s_defaultExecutor, "Third should be executor");
-    assertEq(receipts[3].issuer, address(s_onRamp), "Fourth should be network fee issuer");
+    assertEq(receipts[3].issuer, s_caller, "Fourth should be network fee issuer");
     assertEq(receipts[3].feeTokenAmount, expectedNetworkFee, "Network fee should be scaled");
   }
 
@@ -332,7 +334,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[1].issuer, s_defaultExecutor, "Executor receipt");
 
     uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
-    assertEq(receipts[2].issuer, address(s_onRamp), "Network fee issuer");
+    assertEq(receipts[2].issuer, s_caller, "Network fee issuer");
     assertEq(receipts[2].feeTokenAmount, expectedNetworkFee, "Network fee should match");
   }
 
@@ -384,7 +386,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(receipts[4].issuer, s_defaultExecutor, "Receipt 4: executor");
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
     uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
-    assertEq(receipts[5].issuer, address(s_onRamp), "Receipt 5: network fee");
+    assertEq(receipts[5].issuer, s_caller, "Receipt 5: network fee");
     assertEq(receipts[5].feeTokenAmount, expectedNetworkFee, "Network fee");
   }
 
@@ -436,7 +438,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     assertEq(s_defaultExecutor, receipts[2].issuer);
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
     uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
-    assertEq(address(s_onRamp), receipts[3].issuer);
+    assertEq(s_caller, receipts[3].issuer);
     assertEq(expectedNetworkFee, receipts[3].feeTokenAmount);
   }
 
@@ -504,7 +506,7 @@ contract OnRamp_getReceipts is OnRampSetup {
 
     uint256 feeTokenPrice = s_feeQuoter.getValidatedTokenPrice(message.feeToken);
     uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
-    assertEq(address(s_onRamp), receipts[2].issuer);
+    assertEq(s_caller, receipts[2].issuer);
     assertEq(expectedNetworkFee, receipts[2].feeTokenAmount);
 
     // NO_EXECUTION_ADDRESS results in zero executor fee.
@@ -574,7 +576,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     );
 
     uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, percentMultiplier);
-    assertEq(receipts[3].issuer, address(s_onRamp), "Network fee issuer");
+    assertEq(receipts[3].issuer, s_caller, "Network fee issuer");
     assertEq(receipts[3].feeTokenAmount, expectedNetworkFee, "Network fee with bps");
 
     assertEq(

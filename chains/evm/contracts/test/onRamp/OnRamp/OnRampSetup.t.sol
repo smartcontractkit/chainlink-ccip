@@ -125,7 +125,6 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     // Populate token transfers
     _populateTokenTransfers(messageV1, message);
 
-    // Compute receipts
     (receipts, messageV1.executionGasLimit,) =
       s_onRamp.getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 

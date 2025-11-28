@@ -151,6 +151,7 @@ contract e2e is OnRampSetup {
       seqNum: expectedSeqNum,
       originalSender: OWNER
     });
+    receipts[receipts.length - 1].issuer = address(s_sourceRouter);
     // committeeVerifier will return its versionTag, which we add here.
     verifierBlobs[0] = abi.encodePacked(s_sourceCommitteeVerifier.versionTag());
 
