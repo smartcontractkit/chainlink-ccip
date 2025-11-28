@@ -44,7 +44,6 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     bytes32 messageId;
   }
 
-  // solhint-disable-next-line gas-struct-packing
   struct CCTPMessage {
     CCTPMessageHeader header;
     CCTPMessageBody body;
@@ -100,17 +99,17 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       })
     );
 
-    // Apply dest chain config updates.
-    CCTPVerifier.DestChainConfigArgs[] memory destChainConfigArgs = new CCTPVerifier.DestChainConfigArgs[](1);
-    destChainConfigArgs[0] = BaseVerifier.DestChainConfigArgs({
+    // Apply remote chain config updates.
+    CCTPVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new CCTPVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigArgs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: s_router,
-      destChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
-    s_cctpVerifier.applyDestChainConfigUpdates(destChainConfigArgs);
+    s_cctpVerifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
 
     // Set the domains.
     CCTPVerifier.SetDomainArgs[] memory domains = new CCTPVerifier.SetDomainArgs[](1);
@@ -153,7 +152,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     return abi.encodePacked(
       _encodeCCTPMessageHeader(cctpMessage.header),
       _encodeCCTPMessageBody(cctpMessage.body),
-      _encodeCCTPMessageHookData(cctpMessage.hookData)
+      abi.encodePacked(cctpMessage.hookData.verifierVersion, cctpMessage.hookData.messageId)
     );
   }
 
@@ -186,12 +185,6 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       body.feeExecuted,
       body.expirationBlock
     );
-  }
-
-  function _encodeCCTPMessageHookData(
-    CCTPVerifierSetup.CCTPMessageHookData memory hookData
-  ) private pure returns (bytes memory) {
-    return abi.encodePacked(hookData.verifierVersion, hookData.messageId);
   }
 
   function _createCCIPMessage(

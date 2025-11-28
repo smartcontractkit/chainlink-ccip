@@ -20,11 +20,11 @@ contract BaseVerifier_assertSenderIsAllowed is BaseVerifierSetup {
 
   function test_assertSenderIsAllowed_AllowlistEnabledWithAllowedSender() public {
     // Enable allowlist and add a sender.
-    BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
 
     vm.prank(OWNER);
-    s_baseVerifier.applyDestChainConfigUpdates(destChainConfigs);
+    s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     address allowedSender = makeAddr("allowedSender");
     address[] memory sendersToAdd = new address[](1);
@@ -53,11 +53,11 @@ contract BaseVerifier_assertSenderIsAllowed is BaseVerifierSetup {
 
   function test_assertSenderIsAllowed_RevertWhen_SenderNotAllowed() public {
     // Enable allowlist and add one sender.
-    BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
 
     vm.prank(OWNER);
-    s_baseVerifier.applyDestChainConfigUpdates(destChainConfigs);
+    s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     address allowedSender = makeAddr("allowedSender");
     address notAllowedSender = makeAddr("notAllowedSender");

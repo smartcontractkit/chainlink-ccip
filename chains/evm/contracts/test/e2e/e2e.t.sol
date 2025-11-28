@@ -35,16 +35,16 @@ contract e2e is OnRampSetup {
       CommitteeVerifier.DynamicConfig({feeAggregator: address(1), allowlistAdmin: address(0)}), ""
     );
 
-    BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
-    destChainConfigs[0] = BaseVerifier.DestChainConfigArgs({
+    BaseVerifier.RemoteChainConfigArgs[] memory destChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    destChainConfigs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: s_sourceRouter,
-      destChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
-    s_sourceCommitteeVerifier.applyDestChainConfigUpdates(destChainConfigs);
+    s_sourceCommitteeVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
 
     VersionedVerifierResolver srcVerifierResolver = new VersionedVerifierResolver();
     VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
