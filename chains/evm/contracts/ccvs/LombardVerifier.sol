@@ -14,7 +14,7 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 import {EnumerableMap} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableMap.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
-abstract contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
+contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   using EnumerableMap for EnumerableMap.AddressToAddressMap;
   using EnumerableSet for EnumerableSet.UintSet;
   using SafeERC20 for IERC20Metadata;
@@ -92,45 +92,46 @@ abstract contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     if (message.tokenTransfer.length == 0) {
       revert MustTransferTokens();
     }
-    MessageV1Codec.TokenTransferV1 memory tokenTransfer = message.tokenTransfer[0];
+    return _callDepositOnBridge(message.tokenTransfer[0], message.destChainSelector, message.sender, messageId);
+  }
 
+  function _callDepositOnBridge(
+    MessageV1Codec.TokenTransferV1 calldata tokenTransfer,
+    uint64 destChainSelector,
+    bytes calldata sender,
+    bytes32 messageId
+  ) internal returns (bytes memory) {
     // The Lombard bridge assumes addresses fit in 32 bytes and therefore only supports up to 32 byte addresses.
     if (tokenTransfer.tokenReceiver.length > 32) {
       revert InvalidReceiver(tokenTransfer.tokenReceiver);
     }
 
-    // left pad receiver to 32 bytes if not already 32 bytes.
-    bytes32 decodedReceiver =
-      bytes32(uint256(bytes32(tokenTransfer.tokenReceiver)) >> (256 - tokenTransfer.tokenReceiver.length * 8));
-    address decodedSender = address(bytes20(message.sender));
-
-    // Check if the token is supported. This CCV will only support Lombard tokens. Whether the token is supported on
-    // the destination chain is validated through the token pool.
-    address sourceToken = address(bytes20(message.tokenTransfer[0].sourceTokenAddress));
-    // Even is an adapter is used, the source token must be supported.
+    // Check if the token is supported. This CCV will only support Lombard tokens.
+    address sourceToken = address(bytes20(tokenTransfer.sourceTokenAddress));
     if (!s_supportedTokens.contains(sourceToken)) {
       revert TokenNotSupported(sourceToken);
     }
 
-    Path memory path = s_chainSelectorToPath[message.destChainSelector];
+    Path memory path = s_chainSelectorToPath[destChainSelector];
     if (path.allowedCaller == bytes32(0)) {
-      revert PathNotExist(message.destChainSelector);
+      revert PathNotExist(destChainSelector);
     }
 
-    address localAdapter = s_supportedTokens.get(sourceToken);
     // For some tokens we need to override the source token with an adapter.
+    address localAdapter = s_supportedTokens.get(sourceToken);
     if (localAdapter != address(0)) {
       sourceToken = localAdapter;
     }
 
     (, bytes32 payloadHash) = i_bridge.deposit({
-      destinationChain: path.lChainId, // Lombard chain id, not CCIP chain selector.
-      token: sourceToken, // Either the source token or the adapter token.
-      sender: decodedSender, // Sender decoded to address.
-      recipient: decodedReceiver, // Receiver decoded to bytes32.
+      destinationChain: path.lChainId,
+      token: sourceToken,
+      sender: address(bytes20(sender)),
+      // Left pad receiver to 32 bytes if not already 32 bytes.
+      recipient: bytes32(uint256(bytes32(tokenTransfer.tokenReceiver)) >> (256 - tokenTransfer.tokenReceiver.length * 8)),
       amount: tokenTransfer.amount,
       destinationCaller: path.allowedCaller,
-      payload: abi.encode(messageId) // TODO: final interface for payload
+      payload: abi.encode(messageId)
     });
 
     return abi.encode(payloadHash);
@@ -153,6 +154,15 @@ abstract contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @notice Gets the list of supported tokens for cross-chain transfers.
   function getSupportedTokens() external view returns (address[] memory) {
     return s_supportedTokens.keys();
+  }
+
+  /// @notice Checks if a token is supported for cross-chain transfers.
+  /// @param token The token address to check.
+  /// @return True if the token is supported, false otherwise.
+  function isSupportedToken(
+    address token
+  ) external view returns (bool) {
+    return s_supportedTokens.contains(token);
   }
 
   /// @notice Update the supported tokens for cross-chain transfers. When adding a token, it approves the bridge to
@@ -237,5 +247,11 @@ abstract contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
       emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller);
     }
+  }
+
+  function applyRemoteChainConfigUpdates(
+    RemoteChainConfigArgs[] calldata remoteChainConfigArgs
+  ) external onlyOwner {
+    _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }
 }

@@ -54,23 +54,6 @@ interface IMailbox {
 
   event FeeWithdrawn(address indexed treasury, uint256 amount);
 
-  function getFee(address sender, bytes calldata body) external view returns (uint256);
-
-  function getInboundMessagePath(
-    bytes32 pathId
-  ) external view returns (bytes32);
-
-  function getOutboundMessagePath(
-    bytes32 pathId
-  ) external view returns (bytes32);
-
-  function send(
-    bytes32 destinationChain,
-    bytes32 recipient,
-    bytes32 destinationCaller,
-    bytes calldata body
-  ) external payable returns (uint256, bytes32);
-
   function deliverAndHandle(
     bytes calldata rawPayload,
     bytes calldata proof
