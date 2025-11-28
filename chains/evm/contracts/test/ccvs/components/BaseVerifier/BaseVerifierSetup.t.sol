@@ -34,30 +34,29 @@ contract BaseVerifierSetup is FeeQuoterSetup {
     s_baseVerifier = new BaseVerifierTestHelper(STORAGE_LOCATION);
 
     // Set up initial destination chain config.
-    BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
-    destChainConfigs[0] = BaseVerifier.DestChainConfigArgs({
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: s_router,
-      destChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
 
-    s_baseVerifier.applyDestChainConfigUpdates(destChainConfigs);
+    s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     vm.startPrank(OWNER);
   }
 
-  /// @notice Helper to create a destination chain config.
-  function _getDestChainConfig(
+  function _getRemoteChainConfig(
     IRouter router,
-    uint64 destChainSelector,
+    uint64 remoteChainSelector,
     bool allowlistEnabled
-  ) internal pure returns (BaseVerifier.DestChainConfigArgs memory) {
-    return BaseVerifier.DestChainConfigArgs({
+  ) internal pure returns (BaseVerifier.RemoteChainConfigArgs memory) {
+    return BaseVerifier.RemoteChainConfigArgs({
       router: router,
-      destChainSelector: destChainSelector,
+      remoteChainSelector: remoteChainSelector,
       allowlistEnabled: allowlistEnabled,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
@@ -65,7 +64,6 @@ contract BaseVerifierSetup is FeeQuoterSetup {
     });
   }
 
-  /// @notice Helper to create allowlist config args.
   function _getAllowlistConfig(
     uint64 destChainSelector,
     bool allowlistEnabled,

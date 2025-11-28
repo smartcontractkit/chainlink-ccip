@@ -10,10 +10,10 @@ contract BaseVerifierTestHelper is BaseVerifier {
     string memory storageLocation
   ) BaseVerifier(storageLocation) {}
 
-  function applyDestChainConfigUpdates(
-    DestChainConfigArgs[] calldata destChainConfigArgs
+  function applyRemoteChainConfigUpdates(
+    RemoteChainConfigArgs[] calldata destChainConfigArgs
   ) external {
-    _applyDestChainConfigUpdates(destChainConfigArgs);
+    _applyRemoteChainConfigUpdates(destChainConfigArgs);
   }
 
   function applyAllowlistUpdates(
