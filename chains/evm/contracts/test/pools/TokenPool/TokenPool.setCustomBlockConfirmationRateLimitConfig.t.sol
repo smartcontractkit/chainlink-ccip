@@ -3,9 +3,9 @@ pragma solidity ^0.8.24;
 
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_setCustomBlockConfirmationRateLimitConfig is TokenPoolV2Setup {
+contract TokenPoolV2_setCustomBlockConfirmationRateLimitConfig is AdvancedPoolHooksSetup {
   function test_setCustomBlockConfirmationRateLimitConfig() public {
     RateLimiter.Config memory outboundConfig = RateLimiter.Config({isEnabled: true, capacity: 1e21, rate: 5e20});
     RateLimiter.Config memory inboundConfig = RateLimiter.Config({isEnabled: true, capacity: 2e21, rate: 1e21});

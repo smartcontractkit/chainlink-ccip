@@ -29,11 +29,11 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
   constructor(
     IBurnMintERC20 token,
     uint8 localTokenDecimals,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router,
     address burnAddress
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     i_burnAddress = burnAddress;
   }
 

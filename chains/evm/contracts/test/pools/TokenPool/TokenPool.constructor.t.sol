@@ -12,10 +12,10 @@ contract TokenPool_constructor is TokenPoolSetup {
   function test_constructor() public view {
     assertEq(address(s_token), address(s_tokenPool.getToken()));
     assertEq(address(s_mockRMNRemote), s_tokenPool.getRmnProxy());
-    assertFalse(s_tokenPool.getAllowListEnabled());
-    (address router, uint256 thresholdAmount) = s_tokenPool.getDynamicConfig();
+    (address router, uint16 minBlockConfirmations, address rateLimitAdmin) = s_tokenPool.getDynamicConfig();
     assertEq(address(s_sourceRouter), router);
-    assertEq(0, thresholdAmount);
+    assertEq(0, minBlockConfirmations);
+    assertEq(address(0), rateLimitAdmin);
     assertEq(DEFAULT_TOKEN_DECIMALS, s_tokenPool.getTokenDecimals());
   }
 
@@ -24,8 +24,7 @@ contract TokenPool_constructor is TokenPoolSetup {
 
     vm.mockCallRevert(address(s_token), abi.encodeWithSelector(IERC20Metadata.decimals.selector), "decimals fails");
 
-    s_tokenPool =
-      new TokenPoolHelper(s_token, decimals, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter));
+    s_tokenPool = new TokenPoolHelper(s_token, decimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
 
     assertEq(s_tokenPool.getTokenDecimals(), decimals);
   }
@@ -36,7 +35,7 @@ contract TokenPool_constructor is TokenPoolSetup {
     vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
 
     s_tokenPool = new TokenPoolHelper(
-      IERC20(address(0)), DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      IERC20(address(0)), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
     );
   }
 
@@ -48,6 +47,6 @@ contract TokenPool_constructor is TokenPoolSetup {
     );
 
     s_tokenPool =
-      new TokenPoolHelper(s_token, invalidDecimals, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter));
+      new TokenPoolHelper(s_token, invalidDecimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
   }
 }

@@ -15,7 +15,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
       s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
-      new address[](0),
+      address(0),
       address(s_mockRMNRemote),
       address(s_router)
     );
@@ -27,7 +27,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
       ITokenMessenger(address(0)),
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
-      new address[](0),
+      address(0),
       address(s_mockRMNRemote),
       address(s_router)
     );
@@ -40,7 +40,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
       s_mockUSDCTokenMessenger_CCTPV1,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
-      new address[](0),
+      address(0),
       address(s_mockRMNRemote),
       address(s_router)
     );
@@ -60,7 +60,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
       s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
-      new address[](0),
+      address(0),
       address(s_mockRMNRemote),
       address(s_router)
     );
@@ -80,7 +80,7 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
       s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
-      new address[](0),
+      address(0),
       address(s_mockRMNRemote),
       address(s_router)
     );

@@ -11,10 +11,10 @@ contract TokenPoolHelper is TokenPool {
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
 
   function encodeLocalDecimals() external view returns (bytes memory) {
     return _encodeLocalDecimals();
@@ -33,11 +33,15 @@ contract TokenPoolHelper is TokenPool {
   function validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) external {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
   }
 
-  function validateLockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) external {
-    _validateLockOrBurn(lockOrBurnIn, finality);
+  function validateLockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 finality,
+    bytes calldata tokenArgs
+  ) external {
+    _validateLockOrBurn(lockOrBurnIn, finality, tokenArgs);
   }
 
   function validateReleaseOrMint(
@@ -66,18 +70,18 @@ contract TokenPoolHelper is TokenPool {
   }
 
   function getCustomMinBlockConfirmation() external view returns (uint16 minBlockConfirmation) {
-    return s_customBlockConfirmationConfig.minBlockConfirmation;
+    return s_minBlockConfirmation;
   }
 
   function getFastOutboundBucket(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory bucket) {
-    return s_customBlockConfirmationConfig.outboundRateLimiterConfig[remoteChainSelector];
+    return s_outboundRateLimiterConfig[remoteChainSelector];
   }
 
   function getFastInboundBucket(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory bucket) {
-    return s_customBlockConfirmationConfig.inboundRateLimiterConfig[remoteChainSelector];
+    return s_inboundRateLimiterConfig[remoteChainSelector];
   }
 }

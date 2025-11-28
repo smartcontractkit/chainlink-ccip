@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {AdvancedPoolHooks} from "../../../../pools/AdvancedPoolHooks.sol";
 import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolHelper} from "../../../helpers/USDCTokenPoolHelper.sol";
@@ -31,7 +32,7 @@ contract USDCTokenPoolSetup is USDCSetup {
       s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
-      new address[](0),
+      address(0),
       address(s_mockRMNRemote),
       address(s_router)
     );
@@ -43,11 +44,12 @@ contract USDCTokenPoolSetup is USDCSetup {
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
 
     s_allowedList.push(vm.randomAddress());
+    AdvancedPoolHooks advancedHooks = new AdvancedPoolHooks(s_allowedList, 0);
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(
       s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
       s_USDCToken,
-      s_allowedList,
+      address(advancedHooks),
       address(s_mockRMNRemote),
       address(s_router)
     );

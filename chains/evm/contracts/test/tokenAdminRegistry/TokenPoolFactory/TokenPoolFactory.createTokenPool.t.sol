@@ -4,8 +4,6 @@ pragma solidity ^0.8.24;
 import {IOwner} from "../../../interfaces/IOwner.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
-
 import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {BurnFromMintTokenPool} from "../../../pools/BurnFromMintTokenPool.sol";
@@ -17,6 +15,7 @@ import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry
 import {FactoryBurnMintERC20} from "../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
 import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
@@ -47,7 +46,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
 
     // Create the constructor params for the predicted pool.
     bytes memory poolCreationParams =
-      abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, new address[](0), s_rmnProxy, s_sourceRouter);
+      abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, s_sourceRouter);
 
     // Predict the address of the pool before we make the tx by using the init code and the params
     bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, poolCreationParams);
@@ -145,7 +144,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       // The predictedTokenAddress is NOT abi-encoded since the raw evm-address
       // is used in the constructor params.
       bytes memory predictedPoolCreationParams =
-        abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, new address[](0), s_rmnProxy, address(s_destRouter));
+        abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter));
 
       // Take the init code and concat the destination params to it, the initCode shouldn't change.
       bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);
@@ -286,7 +285,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // The predictedTokenAddress is NOT abi-encoded since the raw evm-address
     // is used in the constructor params
     bytes memory predictedPoolCreationParams =
-      abi.encode(address(newRemoteToken), LOCAL_TOKEN_DECIMALS, new address[](0), s_rmnProxy, address(s_destRouter));
+      abi.encode(address(newRemoteToken), LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter));
 
     // Take the init code and concat the destination params to it, the initCode shouldn't change
     bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);
@@ -616,7 +615,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // The predictedTokenAddress is NOT abi-encoded since the raw evm-address
     // is used in the constructor params
     bytes memory predictedPoolCreationParams =
-      abi.encode(address(newRemoteToken), REMOTE_TOKEN_DECIMALS, new address[](0), s_rmnProxy, address(s_destRouter));
+      abi.encode(address(newRemoteToken), REMOTE_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter));
 
     // Take the init code and concat the destination params to it, the initCode shouldn't change
     bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);

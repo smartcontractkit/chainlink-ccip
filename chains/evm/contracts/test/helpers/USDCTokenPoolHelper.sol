@@ -13,10 +13,10 @@ contract USDCTokenPoolHelper is USDCTokenPool {
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy messageTransmitterProxy,
     IBurnMintERC20 token,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router
-  ) USDCTokenPool(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router, 0) {}
+  ) USDCTokenPool(tokenMessenger, messageTransmitterProxy, token, advancedPoolHooks, rmnProxy, router, 0) {}
 
   function validateMessage(
     bytes memory usdcMessage,
