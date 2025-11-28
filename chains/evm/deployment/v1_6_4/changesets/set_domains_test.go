@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -94,7 +93,7 @@ func TestSetDomainsSequence(t *testing.T) {
 
 	// Deploy USDC Token Pool with placeholder addresses for dependencies
 	usdcTokenPoolRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, usdc_token_pool.Deploy, evmChain, contract.DeployInput[usdc_token_pool.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool.ContractType, *semver.MustParse("1.6.4")),
+		TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool.ContractType, *usdc_token_pool.Version),
 		ChainSelector:  chainSelector,
 		Args: usdc_token_pool.ConstructorArgs{
 			TokenMessenger:              mockTokenMessengerAddress,
@@ -110,17 +109,19 @@ func TestSetDomainsSequence(t *testing.T) {
 	require.NoError(t, err, "Failed to deploy USDCTokenPool")
 	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 		Type:          datastore.ContractType(usdc_token_pool.ContractType),
-		Version:       semver.MustParse("1.6.4"),
+		Version:       usdc_token_pool.Version,
 		ChainSelector: chainSelector,
 		Address:       usdcTokenPoolRef.Address,
 	}))
+
+	// update env datastore from the ds datastore
+	e.DataStore = ds.Seal()
 
 	// Create the input to the changeset
 	setDomainsInput := changesets.SetDomainsInput{
 		ChainInputs: []changesets.SetDomainsPerChainInput{
 			{
 				ChainSelector: chainSelector,
-				Address:       common.HexToAddress(usdcTokenPoolRef.Address),
 				Domains: []usdc_token_pool.DomainUpdate{
 					{
 						AllowedCaller:                 [32]byte{1},

@@ -79,13 +79,20 @@ func TestUpdateLockOrBurnMechanismChangeset(t *testing.T) {
 		},
 	}, nil)
 
-	require.NoError(t, err, "Failed to deploy ERC20LockBox")
+	// Add the USDCTokenPoolProxy address to the datastore so that it can be used in the changeset
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(usdc_token_pool_proxy.ContractType),
+		Version:       semver.MustParse("1.6.4"),
+		Address:       common.HexToAddress(usdc_token_pool_proxy_ref.Address).Hex(),
+		ChainSelector: chainSelector,
+	})
+	require.NoError(t, err, "Failed to add USDCTokenPoolProxy address to datastore")
+	e.DataStore = ds.Seal()
 
 	updateLockOrBurnMechanismInput := changesets.UpdateLockOrBurnMechanismInput{
 		ChainInputs: []changesets.UpdateLockOrBurnMechanismPerChainInput{
 			{
 				ChainSelector: chainSelector,
-				Address:       common.HexToAddress(usdc_token_pool_proxy_ref.Address),
 				Mechanisms: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
 					RemoteChainSelectors: []uint64{chainSelector},
 					Mechanisms:           []uint8{1},

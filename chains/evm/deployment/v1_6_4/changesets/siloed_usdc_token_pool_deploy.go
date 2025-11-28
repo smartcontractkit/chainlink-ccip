@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -12,16 +13,16 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	router "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	rmn_proxy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
+	erc20_lock_box "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/erc20_lock_box"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 type SiloedUSDCTokenPoolDeployInputPerChain struct {
 	ChainSelector uint64
-	Token         common.Address
 	Allowlist     []common.Address
-	RMNProxy      common.Address
-	Router        common.Address
-	LockBox       common.Address
 }
 
 type SiloedUSDCTokenPoolDeployInput struct {
@@ -40,27 +41,63 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 
 		for _, perChainInput := range input.ChainInputs {
 
-			chainFamily, err := chain_selectors.GetSelectorFamily(perChainInput.ChainSelector)
+			// Get the timelock address from the datastore based on the MCMS qualifier and chain selector
+			// Without the qualifier, the datastore will sometimes throw an error when fetching the address due to the
+			// datastore containing >1 address with the same type and version.
+			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          "RBACTimelock",
+				Version:       semver.MustParse("1.0.0"),
+				Qualifier:     input.MCMS.Qualifier,
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", perChainInput.ChainSelector, err)
-			}
-			reader, ok := mcmsRegistry.GetMCMSReader(chainFamily)
-			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no MCMSReader registered for chain family '%s'", chainFamily)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get time lock address for chain %d: %w", perChainInput.ChainSelector, err)
 			}
 
-			timelockRef, err := reader.GetTimelockRef(e, perChainInput.ChainSelector, input.MCMS)
+			erc20LockboxAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          datastore.ContractType(erc20_lock_box.ContractType),
+				Version:       erc20_lock_box.Version,
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain %d: %w", perChainInput.ChainSelector, err)
+				return cldf.ChangesetOutput{}, err
 			}
+
+			routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          datastore.ContractType(router.ContractType),
+				Version:       router.Version,
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+
+			rmnProxyAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          datastore.ContractType(rmn_proxy.ContractType),
+				Version:       semver.MustParse("1.5.0"),
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+
+			tokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          datastore.ContractType("USDCToken"),
+				Version:       semver.MustParse("1.0.0"),
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+
 			sequenceInput := sequences.SiloedUSDCTokenPoolDeploySequenceInput{
 				ChainSelector: perChainInput.ChainSelector,
-				Token:         perChainInput.Token,
+				Token:         tokenAddress,
 				Allowlist:     perChainInput.Allowlist,
-				RMNProxy:      perChainInput.RMNProxy,
-				Router:        perChainInput.Router,
-				LockBox:       perChainInput.LockBox,
-				MCMSAddress:   common.HexToAddress(timelockRef.Address),
+				RMNProxy:      rmnProxyAddress,
+				Router:        routerAddress,
+				LockBox:       erc20LockboxAddress,
+				MCMSAddress:   timeLockAddress,
 			}
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.SiloedUSDCTokenPoolDeploySequence, e.BlockChains, sequenceInput)
 			if err != nil {

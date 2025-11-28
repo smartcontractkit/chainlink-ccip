@@ -16,7 +16,7 @@ import (
 )
 
 type ApplyAuthorizedCallerUpdatesSequenceInput struct {
-	Address                        map[uint64]common.Address
+	AddressesByChain               map[uint64]common.Address
 	AuthorizedCallerUpdatesByChain map[uint64]authorized_caller_ops.AuthorizedCallerUpdateArgs
 }
 
@@ -41,7 +41,7 @@ var (
 				// AuthorizedCallerUpdateArgs for the given chain selector
 				report, err := operations.ExecuteOperation(b, authorized_caller_ops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[authorized_caller_ops.AuthorizedCallerUpdateArgs]{
 					ChainSelector: chain.Selector,
-					Address:       input.Address[chainSel],
+					Address:       input.AddressesByChain[chainSel],
 					Args:          authorizedCallerUpdate,
 				})
 				if err != nil {

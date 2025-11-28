@@ -9,8 +9,12 @@ import (
 	usdc_token_pool_proxy_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 
+	semver "github.com/Masterminds/semver/v3"
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
 type UpdateLockOrBurnMechanismInput struct {
@@ -20,10 +24,11 @@ type UpdateLockOrBurnMechanismInput struct {
 
 type UpdateLockOrBurnMechanismPerChainInput struct {
 	ChainSelector uint64
-	Address       common.Address
 	Mechanisms    usdc_token_pool_proxy_ops.UpdateLockOrBurnMechanismsArgs
 }
 
+// This changeset is use to update the mechanism to be used for outgoing USDC messages going through the USDCTokenPoolProxy contract.
+// It should only be used for the USDCTokenPoolProxy contract.
 func UpdateLockOrBurnMechanismChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateLockOrBurnMechanismInput] {
 	return cldf.CreateChangeSet(updateLockOrBurnMechanismApply(mcmsRegistry), updateLockOrBurnMechanismVerify(mcmsRegistry))
 }
@@ -36,7 +41,17 @@ func updateLockOrBurnMechanismApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 		addressByChain := make(map[uint64]common.Address)
 		mechanismsByChain := make(map[uint64]usdc_token_pool_proxy_ops.UpdateLockOrBurnMechanismsArgs)
 		for _, perChainInput := range input.ChainInputs {
-			addressByChain[perChainInput.ChainSelector] = perChainInput.Address
+
+			// Find the USDCTokenPoolProxy address for the given chain selector
+			address, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:          datastore.ContractType(usdc_token_pool_proxy_ops.ContractType),
+				Version:       semver.MustParse("1.6.4"),
+				ChainSelector: perChainInput.ChainSelector,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+			addressByChain[perChainInput.ChainSelector] = address
 			mechanismsByChain[perChainInput.ChainSelector] = perChainInput.Mechanisms
 		}
 

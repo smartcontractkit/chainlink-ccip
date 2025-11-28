@@ -40,7 +40,6 @@ var DeployUSDCTokenPoolProxySequence = operations.NewSequence(
 				usdc_token_pool_proxy.ContractType,
 				*usdc_token_pool_proxy.Version,
 			),
-			// TODO: Review and make dynamic?
 			Args: usdc_token_pool_proxy.ConstructorArgs{
 				Token:         input.Token,
 				PoolAddresses: input.PoolAddresses,

@@ -17,16 +17,18 @@ type ApplyAuthorizedCallerUpdatesInput struct {
 	MCMS        mcms.Input
 }
 
+// Note: Unlike other changesets, this input struct does require an address since many different contract types
+// implement the AuthorizedCallers interface (e.g. USDCTokenPool, SiloedUSDCTokenPool, etc.).
+// Therefore, the address is specified for each chain input.
 type ApplyAuthorizedCallerUpdatesInputPerChain struct {
 	ChainSelector           uint64
 	Address                 common.Address
 	AuthorizedCallerUpdates authorized_caller_ops.AuthorizedCallerUpdateArgs
 }
 
-// Note: This changeset is tested in the usdc_token_pool_deploy_test.go file since usdc_token_pool implements the
-// AuthorizedCallers library. Since there is no gobinding for the AuthorizedCallers library, it is being included here in its own
-// file to allow for the use of the ApplyAuthorizedCallerUpdates operation on a variety of different contracts
-// that implement the AuthorizedCallers interface (e.g. USDCTokenPool, SiloedUSDCTokenPool, etc.).
+// This changeset is used to update the authorized callers on a contract which implements the AuthorizedCallers interface.
+// It is different from the configure_allowed_callers changeset which is used for the ERC20Lockbox contract.
+// This changeset should be used for the USDCTokenPool, SiloedUSDCTokenPool, and USDCTokenPoolCCTPV2 contracts.
 func ApplyAuthorizedCallerUpdatesChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ApplyAuthorizedCallerUpdatesInput] {
 	return cldf.CreateChangeSet(applyAuthorizedCallerUpdatesApply(mcmsRegistry), applyAuthorizedCallerUpdatesVerify(mcmsRegistry))
 }
@@ -36,15 +38,15 @@ func applyAuthorizedCallerUpdatesApply(mcmsRegistry *changesets.MCMSReaderRegist
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
-		addressByChain := make(map[uint64]common.Address)
+		addressesByChain := make(map[uint64]common.Address)
 		authorizedCallerUpdatesByChain := make(map[uint64]authorized_caller_ops.AuthorizedCallerUpdateArgs)
 		for _, perChainInput := range input.ChainInputs {
-			addressByChain[perChainInput.ChainSelector] = perChainInput.Address
+			addressesByChain[perChainInput.ChainSelector] = perChainInput.Address
 			authorizedCallerUpdatesByChain[perChainInput.ChainSelector] = perChainInput.AuthorizedCallerUpdates
 		}
 
 		sequenceInput := sequences.ApplyAuthorizedCallerUpdatesSequenceInput{
-			Address:                        addressByChain,
+			AddressesByChain:               addressesByChain,
 			AuthorizedCallerUpdatesByChain: authorizedCallerUpdatesByChain,
 		}
 
