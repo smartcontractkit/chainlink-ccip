@@ -32,7 +32,6 @@ abstract contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion
   /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message
   event PathSet(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
-
   /// @param remoteChainSelector CCIP selector of destination chain
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion
   /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message
@@ -84,7 +83,7 @@ abstract contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @inheritdoc ICrossChainVerifierV1
   function forwardToVerifier(
     MessageV1Codec.MessageV1 calldata message,
-    bytes32,
+    bytes32 messageId,
     address,
     uint256,
     bytes calldata
@@ -124,14 +123,14 @@ abstract contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       sourceToken = localAdapter;
     }
 
-    // TODO call a function that takes in the message ID.
     (, bytes32 payloadHash) = i_bridge.deposit({
       destinationChain: path.lChainId, // Lombard chain id, not CCIP chain selector.
       token: sourceToken, // Either the source token or the adapter token.
-      sender: decodedSender, // Sender decoded to address
-      recipient: decodedReceiver, // Receiver decoded to bytes32
+      sender: decodedSender, // Sender decoded to address.
+      recipient: decodedReceiver, // Receiver decoded to bytes32.
       amount: tokenTransfer.amount,
-      destinationCaller: path.allowedCaller
+      destinationCaller: path.allowedCaller,
+      payload: abi.encode(messageId) // TODO: final interface for payload
     });
 
     return abi.encode(payloadHash);

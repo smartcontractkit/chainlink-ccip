@@ -5,6 +5,7 @@ import {IRouter} from "../../../interfaces/IRouter.sol";
 import {IMessageTransmitter} from "../../../pools/USDC/interfaces/IMessageTransmitter.sol";
 
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
+import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
@@ -233,5 +234,30 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     );
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.ReceiveMessageCallFailed.selector));
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+  }
+
+  function test_verifyMessage_RevertWhen_CallerIsNotOffRamp() public {
+    address invalidCaller = makeAddr("invalidCaller");
+
+    // Mock the router to return false for isOffRamp with the invalid caller. If we don't mock the call reverts because
+    // it's not a real router.
+    vm.mockCall(
+      address(s_router), abi.encodeCall(IRouter.isOffRamp, (DEST_CHAIN_SELECTOR, invalidCaller)), abi.encode(false)
+    );
+
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    vm.stopPrank();
+    vm.startPrank(invalidCaller);
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CallerIsNotARampOnRouter.selector, invalidCaller));
+    s_cctpVerifier.verifyMessage(message, messageHash, "");
   }
 }
