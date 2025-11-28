@@ -123,12 +123,12 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     emit ConfigSet(dynamicConfig);
   }
 
-  /// @notice Updates destination chains specific configs.
-  /// @param destChainConfigArgs Array of destination chain specific configs.
-  function applyDestChainConfigUpdates(
-    DestChainConfigArgs[] calldata destChainConfigArgs
+  /// @notice Updates remote chains specific configs.
+  /// @param remoteChainConfigArgs Array of remote chain specific configs.
+  function applyRemoteChainConfigUpdates(
+    RemoteChainConfigArgs[] calldata remoteChainConfigArgs
   ) external onlyOwner {
-    _applyDestChainConfigUpdates(destChainConfigArgs);
+    _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }
 
   /// @notice Updates allowlistConfig for Senders.

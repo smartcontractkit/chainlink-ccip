@@ -138,7 +138,9 @@ abstract contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc ICrossChainVerifierV1
-  function verifyMessage(MessageV1Codec.MessageV1 memory, bytes32, bytes calldata ccvData) external {
+  function verifyMessage(MessageV1Codec.MessageV1 calldata message, bytes32, bytes calldata ccvData) external {
+    _onlyOffRamp(message.sourceChainSelector);
+
     (bytes memory rawPayload, bytes memory proof) = abi.decode(ccvData, (bytes, bytes));
 
     // TODO verify message id matches payload message id.

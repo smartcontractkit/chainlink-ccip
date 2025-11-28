@@ -8,10 +8,10 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
   function setUp() public override {
     super.setUp();
 
-    // First enable allowlist for the destination chain.
-    BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
-    s_baseVerifier.applyDestChainConfigUpdates(destChainConfigs);
+    // First enable allowlist for the remote chain.
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
+    s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
   }
 
   function test_applyAllowlistUpdates() public {
@@ -27,7 +27,7 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
     s_baseVerifier.applyAllowlistUpdates(allowlistConfigs);
 
     // Verify sender was added.
-    (,, address[] memory allowedSenders) = s_baseVerifier.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    (,, address[] memory allowedSenders) = s_baseVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(allowedSenders.length, 1);
     assertEq(allowedSenders[0], senders[0]);
   }
@@ -59,7 +59,7 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
 
     s_baseVerifier.applyAllowlistUpdates(updateConfigs);
 
-    (,, address[] memory allowedSenders) = s_baseVerifier.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    (,, address[] memory allowedSenders) = s_baseVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(allowedSenders[0], newSendersToAdd[0]);
   }
 
@@ -78,7 +78,7 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
 
     s_baseVerifier.applyAllowlistUpdates(disableConfigs);
 
-    (bool allowlistEnabled,,) = s_baseVerifier.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    (bool allowlistEnabled,,) = s_baseVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
     assertFalse(allowlistEnabled);
   }
 
@@ -86,9 +86,9 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
 
   function test_applyAllowlistUpdates_RevertWhen_InvalidAllowListRequest_AddingToDisabledAllowlist() public {
     // First disable allowlist on the chain.
-    BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
-    s_baseVerifier.applyDestChainConfigUpdates(destChainConfigs);
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
+    s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     address[] memory senders = new address[](1);
     senders[0] = makeAddr("sender");

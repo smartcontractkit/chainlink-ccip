@@ -44,6 +44,7 @@ contract CCTPVerifier_setDomains is CCTPVerifierSetup {
 
   function test_setDomains_RevertWhen_OnlyCallableByOwner() public {
     vm.startPrank(STRANGER);
+
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_cctpVerifier.setDomains(new CCTPVerifier.SetDomainArgs[](0));
   }

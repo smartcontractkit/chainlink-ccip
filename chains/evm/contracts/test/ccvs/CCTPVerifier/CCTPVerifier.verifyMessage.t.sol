@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IRouter} from "../../../interfaces/IRouter.sol";
 import {IMessageTransmitter} from "../../../pools/USDC/interfaces/IMessageTransmitter.sol";
 
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
@@ -12,9 +13,13 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   CCTPVerifierSetup.CCTPMessage internal s_baseCCTPMessage;
+  address internal constant OFFRAMP = address(0x001001001001);
 
   function setUp() public virtual override {
     super.setUp();
+
+    // Mock the offRamp check.
+    vm.mockCall(address(s_router), abi.encodeCall(IRouter.isOffRamp, (DEST_CHAIN_SELECTOR, OFFRAMP)), abi.encode(true));
 
     s_baseCCTPMessage = CCTPVerifierSetup.CCTPMessage({
       header: CCTPVerifierSetup.CCTPMessageHeader({
@@ -55,6 +60,8 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
       enabled: true
     });
     s_cctpVerifier.setDomains(domainUpdates);
+
+    vm.startPrank(OFFRAMP);
   }
 
   function test_verifyMessage() public {
@@ -176,7 +183,10 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
       chainSelector: DEST_CHAIN_SELECTOR,
       enabled: false
     });
+
+    vm.startPrank(OWNER);
     s_cctpVerifier.setDomains(domainUpdates);
+    vm.startPrank(OFFRAMP);
 
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.UnknownDomain.selector, DEST_CHAIN_SELECTOR));
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);

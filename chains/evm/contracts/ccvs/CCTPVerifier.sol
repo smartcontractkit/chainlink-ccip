@@ -289,6 +289,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     bytes32 messageHash,
     bytes calldata verifierResults
   ) external {
+    _onlyOffRamp(message.sourceChainSelector);
+
     if (verifierResults.length < MINIMUM_VERIFIER_RESULT_SIZE) revert InvalidVerifierResults();
 
     bytes4 versionPrefix = bytes4(verifierResults[:VERIFIER_VERSION_SIZE]);
@@ -408,12 +410,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     emit DomainsSet(domains);
   }
 
-  /// @notice Updates destination chain configurations.
-  /// @param destChainConfigArgs Array of destination chain configurations.
-  function applyDestChainConfigUpdates(
-    DestChainConfigArgs[] calldata destChainConfigArgs
+  /// @notice Updates remote chain configurations.
+  /// @param remoteChainConfigArgs Array of destination chain configurations.
+  function applyRemoteChainConfigUpdates(
+    RemoteChainConfigArgs[] calldata remoteChainConfigArgs
   ) external onlyOwner {
-    _applyDestChainConfigUpdates(destChainConfigArgs);
+    _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }
 
   /// @notice Updates senders that are allowed to use this verifier.
