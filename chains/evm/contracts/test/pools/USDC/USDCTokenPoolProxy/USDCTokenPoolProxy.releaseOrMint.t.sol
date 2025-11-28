@@ -157,10 +157,10 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
 
-    // Expect the cctpV2Pool's releaseOrMint to be called and return expectedOut
+    // Expect the cctpV2PoolWithCCV's releaseOrMint to be called and return expectedOut
     vm.mockCall(
-      address(s_cctpV2Pool),
-      abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector, releaseOrMintIn),
+      address(s_cctpV2PoolWithCCV),
+      abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, releaseOrMintIn, 0),
       abi.encode(expectedOut)
     );
 

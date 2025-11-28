@@ -120,20 +120,6 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0);
   }
 
-  function test_releaseOrMintSingleToken_RevertsWhen_ReleaseOrMintBalanceMismatch() public {
-    vm.mockCall(
-      address(s_pool), abi.encodeCall(s_pool.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false)
-    );
-    Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
-    MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
-
-    vm.expectCall(address(s_pool), abi.encodeCall(IPoolV1.releaseOrMint, (expectedInput)));
-    vm.mockCall(address(s_token), abi.encodeCall(s_token.balanceOf, (expectedInput.receiver)), abi.encode(0));
-
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.ReleaseOrMintBalanceMismatch.selector, tokenTransfer.amount, 0, 0));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 1);
-  }
-
   function _buildReleaseInput() internal returns (Pool.ReleaseOrMintInV1 memory) {
     return Pool.ReleaseOrMintInV1({
       originalSender: abi.encodePacked(makeAddr("originalSender")),

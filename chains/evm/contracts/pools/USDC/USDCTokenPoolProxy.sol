@@ -7,7 +7,6 @@ import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {Client} from "../../libraries/Client.sol";
 import {ERC165CheckerReverting} from "../../libraries/ERC165CheckerReverting.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
@@ -451,12 +450,11 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata message,
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external view onlyWithCCVCompatiblePool returns (TokenTransferFeeConfig memory feeConfig) {
     return IPoolV2(s_pools.cctpV2PoolWithCCV).getTokenTransferFeeConfig(
-      localToken, destChainSelector, message, blockConfirmationRequested, tokenArgs
+      localToken, destChainSelector, blockConfirmationRequested, tokenArgs
     );
   }
 

@@ -36,7 +36,8 @@ contract USDCSourcePoolDataCodec__decodeSourceTokenDataPayloadV2 is Test {
     bytes memory payload = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(ccvVersionTag);
 
     // Decode the payload
-    (bytes4 poolVersionTag, bytes4 decodedCCVVersionTag) = USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2WithCCV(payload);
+    (bytes4 poolVersionTag, bytes4 decodedCCVVersionTag) =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2WithCCV(payload);
 
     // Compare individual fields
     assertEq(decodedCCVVersionTag, ccvVersionTag, "CCV version tag mismatch");

@@ -6,10 +6,10 @@ import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";
-import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/ERC165Checker.sol";
@@ -35,11 +35,11 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router,
     address cctpVerifier
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (!cctpVerifier.supportsInterface(type(ICrossChainVerifierResolver).interfaceId)) {
       revert InvalidCCTPVerifier(cctpVerifier);
     }
@@ -55,9 +55,9 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
-    bytes memory // tokenArgs
+    bytes calldata tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested);
+    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
     destTokenAmount = _applyFee(lockOrBurnIn, blockConfirmationRequested);
 
     emit LockedOrBurned({
@@ -67,7 +67,8 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
       amount: destTokenAmount
     });
 
-    address verifierImpl = ICrossChainVerifierResolver(i_cctpVerifier).getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "");
+    address verifierImpl =
+      ICrossChainVerifierResolver(i_cctpVerifier).getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "");
     if (verifierImpl == address(0)) {
       revert OutboundImplementationNotFoundForVerifier(lockOrBurnIn.remoteChainSelector);
     }
@@ -75,7 +76,9 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
     return (
       Pool.LockOrBurnOutV1({
         destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-        destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(CCTPVerifier(verifierImpl).versionTag())
+        destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(
+          CCTPVerifier(verifierImpl).versionTag()
+        )
       }),
       destTokenAmount
     );
@@ -89,7 +92,7 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -98,14 +101,17 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
       amount: lockOrBurnIn.amount
     });
 
-    address verifierImpl = ICrossChainVerifierResolver(i_cctpVerifier).getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "");
+    address verifierImpl =
+      ICrossChainVerifierResolver(i_cctpVerifier).getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "");
     if (verifierImpl == address(0)) {
       revert OutboundImplementationNotFoundForVerifier(lockOrBurnIn.remoteChainSelector);
     }
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(CCTPVerifier(verifierImpl).versionTag())
+      destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(
+        CCTPVerifier(verifierImpl).versionTag()
+      )
     });
   }
 
@@ -117,26 +123,20 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    (,bytes4 ccvVersionTag) = USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2WithCCV(releaseOrMintIn.sourcePoolData);
-
-    address verifierImpl = ICrossChainVerifierResolver(i_cctpVerifier).getInboundImplementation(abi.encodePacked(ccvVersionTag));
-    if (verifierImpl == address(0)) {
-      revert InboundImplementationNotFoundForVerifier(ccvVersionTag);
-    }
-
-    uint256 amountReceived = releaseOrMintIn.sourceDenominatedAmount - CCTPVerifier(verifierImpl).getLatestFeeExecuted(releaseOrMintIn.remoteChainSelector);
-
-    _validateReleaseOrMint(releaseOrMintIn, amountReceived, blockConfirmationRequested);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationRequested);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       token: address(i_token),
       sender: msg.sender,
       recipient: releaseOrMintIn.receiver,
-      amount: amountReceived
+      amount: releaseOrMintIn.sourceDenominatedAmount
     });
 
-    return Pool.ReleaseOrMintOutV1({destinationAmount: amountReceived});
+    // We return 0 because this pool doesn't actually mint tokens, the CCTPVerifier contract does.
+    // Returning a value here would cause the OffRamp to revert with ReleaseOrMintBalanceMismatch.
+    // The CCTPVerifier contract is responsible for validating that receiver balance has increased by the correct amount.
+    return Pool.ReleaseOrMintOutV1({destinationAmount: 0});
   }
 
   /// @inheritdoc IPoolV1
