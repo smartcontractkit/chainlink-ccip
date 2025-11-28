@@ -65,14 +65,30 @@ contract e2e is OnRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       })
     );
+    address[] memory defaultSourceCCVs = new address[](1);
+    defaultSourceCCVs[0] = s_defaultCCV;
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      laneMandatedCCVs: new address[](0),
+      defaultCCVs: defaultSourceCCVs,
+      defaultExecutor: s_defaultExecutor,
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+    destChainConfigArgs[0].offRamp = abi.encodePacked(address(s_offRamp));
+
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
 
     // On dest, we just use a mock verifier to bypass the signature requirement.
     // The mock verifier is also a resolver & always resolves to itself.
     // Eventually, we can replace with an actual committee verifier + resolver setup.
     s_destVerifier = address(new Proxy(address(new MockVerifier(""))));
 
-    address[] memory defaultCCVs = new address[](1);
-    defaultCCVs[0] = s_destVerifier;
+    address[] memory defaultDestCCVs = new address[](1);
+    defaultDestCCVs[0] = s_destVerifier;
 
     OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
     updates[0] = OffRamp.SourceChainConfigArgs({
@@ -80,7 +96,7 @@ contract e2e is OnRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamp: abi.encodePacked(s_onRamp),
-      defaultCCV: defaultCCVs,
+      defaultCCV: defaultDestCCVs,
       laneMandatedCCVs: new address[](0)
     });
     s_offRamp.applySourceChainConfigUpdates(updates);
@@ -91,7 +107,7 @@ contract e2e is OnRampSetup {
 
     // Seed existing fee recipients so ERC20 transfers reflect real deployments where
     // verifiers/executors already hold a balance (avoids the first 20k gas cold-init cost).
-    deal(s_sourceFeeToken, defaultCCVs[0], 1);
+    deal(s_sourceFeeToken, defaultDestCCVs[0], 1);
     deal(s_sourceFeeToken, s_userSpecifiedCCV, 1);
     deal(s_sourceFeeToken, s_defaultExecutor, 1);
   }

@@ -7,6 +7,7 @@ import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
+import {AdvancedPoolHooks} from "../../../../pools/AdvancedPoolHooks.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
@@ -358,7 +359,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   function test_lockOrBurn_RevertWhen_LockOrBurnWithAllowList() public {
     vm.startPrank(s_routerAllowedOnRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(AdvancedPoolHooks.SenderNotAllowed.selector, STRANGER));
 
     s_usdcTokenPoolWithAllowList.lockOrBurn(
       Pool.LockOrBurnInV1({

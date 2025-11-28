@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Client} from "../libraries/Client.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 interface ICrossChainVerifierV1 is IERC165 {
   /// @notice Verification of the message, in any way the OffRamp wants. This could be using a signature, a quorum

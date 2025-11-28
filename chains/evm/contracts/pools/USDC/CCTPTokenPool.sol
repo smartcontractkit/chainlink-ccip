@@ -12,7 +12,7 @@ import {TokenPool} from "../TokenPool.sol";
 import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {ERC165Checker} from "@openzeppelin/contracts@5.0.2/utils/introspection/ERC165Checker.sol";
+import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/ERC165Checker.sol";
 
 /// @notice CCTP token pool that delegates minting and burning responsibilities of USDC to the CCTPVerifier contract.
 /// @dev This pool does not mutate the token state. It does not actually burn USDC via TokenMessenger on source or mint via MessageTransmitter on destination.

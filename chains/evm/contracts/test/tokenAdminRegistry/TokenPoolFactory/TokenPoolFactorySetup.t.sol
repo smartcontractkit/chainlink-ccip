@@ -6,7 +6,7 @@ import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryMod
 import {FactoryBurnMintERC20} from "../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
 import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 import {TokenAdminRegistrySetup} from "../TokenAdminRegistry/TokenAdminRegistrySetup.t.sol";
-import {Create2} from "@openzeppelin/contracts@5.0.2/utils/Create2.sol";
+import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 
 contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
   using Create2 for bytes32;
@@ -43,9 +43,6 @@ contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
 
     s_poolInitCode = type(BurnMintTokenPool).creationCode;
 
-    // Create Init Args for BurnMintTokenPool with no allowlist minus the token address
-    address[] memory allowlist = new address[](1);
-    allowlist[0] = OWNER;
-    s_poolInitArgs = abi.encode(allowlist, address(0x1234), s_sourceRouter);
+    s_poolInitArgs = abi.encode(address(0), address(0x1234), s_sourceRouter);
   }
 }

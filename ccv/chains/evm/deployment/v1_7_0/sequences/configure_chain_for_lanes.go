@@ -38,6 +38,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		committeeVerifierDestConfigArgs := make([]committee_verifier.DestChainConfigArgs, 0, len(input.RemoteChains))
 		committeeVerifierAllowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
 		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, len(input.RemoteChains))
+		gasPriceUpdates := make([]fee_quoter.GasPriceUpdate, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
 		destChainSelectorsPerExecutor := make(map[common.Address][]executor.RemoteChainConfigArgs)
@@ -101,6 +102,10 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			feeQuoterArgs = append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
 				DestChainSelector: remoteSelector,
 				DestChainConfig:   remoteConfig.FeeQuoterDestChainConfig,
+			})
+			gasPriceUpdates = append(gasPriceUpdates, fee_quoter.GasPriceUpdate{
+				DestChainSelector: remoteSelector,
+				UsdPerUnitGas:     remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas,
 			})
 			onRampAdds = append(onRampAdds, router.OnRamp{
 				DestChainSelector: remoteSelector,
@@ -235,6 +240,19 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to FeeQuoter(%s) on chain %s: %w", input.FeeQuoter, chain, err)
 		}
 		writes = append(writes, feeQuoterReport.Output)
+
+		// UpdatePrices on FeeQuoter (gas prices only, as these are per dest chain)
+		feeQuoterUpdatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract.FunctionInput[fee_quoter.PriceUpdates]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(input.FeeQuoter),
+			Args: fee_quoter.PriceUpdates{
+				GasPriceUpdates: gasPriceUpdates,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to update gas prices on FeeQuoter(%s) on chain %s: %w", input.FeeQuoter, chain, err)
+		}
+		writes = append(writes, feeQuoterUpdatePricesReport.Output)
 
 		// ApplyRampUpdates on Router
 		routerReport, err := cldf_ops.ExecuteOperation(b, router.ApplyRampUpdates, chain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{

@@ -15,7 +15,7 @@ contract BurnMintTokenPoolSetup is BurnMintSetup {
     super.setUp();
 
     s_pool = new BurnMintTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
     );
     s_token.grantMintAndBurnRoles(address(s_pool));
 

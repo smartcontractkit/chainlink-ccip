@@ -3,11 +3,10 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
-import {Client} from "../../../libraries/Client.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
+contract TokenPoolV2_getTokenTransferFeeConfig is AdvancedPoolHooksSetup {
   function test_getTokenTransferFeeConfig() public {
     // Set up a fee config first.
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
@@ -27,9 +26,8 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
 
     // Test getting the config
-    Client.EVM2AnyMessage memory message;
     IPoolV2.TokenTransferFeeConfig memory returnedFeeConfig =
-      s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
+      s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, 0, "");
 
     assertEq(returnedFeeConfig.destGasOverhead, feeConfig.destGasOverhead);
     assertEq(returnedFeeConfig.destBytesOverhead, feeConfig.destBytesOverhead);
@@ -48,9 +46,8 @@ contract TokenPoolV2_getTokenTransferFeeConfig is TokenPoolV2Setup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(new TokenPool.TokenTransferFeeConfigArgs[](0), toDelete);
 
     // Test getting the deleted config
-    Client.EVM2AnyMessage memory message;
     IPoolV2.TokenTransferFeeConfig memory tokenTransferFeeConfig =
-      s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, message, 0, "");
+      s_tokenPool.getTokenTransferFeeConfig(address(s_token), DEST_CHAIN_SELECTOR, 0, "");
 
     // assert default values are returned
     assertEq(tokenTransferFeeConfig.destGasOverhead, 0);

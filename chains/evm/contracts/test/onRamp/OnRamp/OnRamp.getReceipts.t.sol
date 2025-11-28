@@ -13,7 +13,7 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract OnRamp_getReceipts is OnRampSetup {
   uint32 internal constant EXECUTOR_DEST_GAS = BASE_EXEC_GAS_COST + GAS_LIMIT;

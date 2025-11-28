@@ -15,7 +15,7 @@ contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
     super.setUp();
 
     s_pool = new BurnWithFromMintTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
     );
     s_token.grantMintAndBurnRoles(address(s_pool));
 
@@ -27,7 +27,6 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
   function test_constructor() public view {
     assertEq(address(s_token), address(s_pool.getToken()));
     assertEq(address(s_mockRMNRemote), s_pool.getRmnProxy());
-    assertEq(false, s_pool.getAllowListEnabled());
     assertEq(type(uint256).max, s_token.allowance(address(s_pool), address(s_pool)));
   }
 

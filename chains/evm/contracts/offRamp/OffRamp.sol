@@ -19,9 +19,9 @@ import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IERC20} from "@openzeppelin/contracts@5.0.2/token/ERC20/IERC20.sol";
-import {ERC165Checker} from "@openzeppelin/contracts@5.0.2/utils/introspection/ERC165Checker.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/ERC165Checker.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   using ERC165Checker for address;
@@ -48,6 +48,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
   error InvalidOnRamp(bytes expected, bytes got);
+  error InvalidOffRamp(address expected, bytes got);
   error InboundImplementationNotFound(address ccvAddress, bytes verifierResults);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
@@ -187,6 +188,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     }
     if (keccak256(message.onRampAddress) != keccak256(sourceConfig.onRamp)) {
       revert InvalidOnRamp(sourceConfig.onRamp, message.onRampAddress);
+    }
+    if (message.offRampAddress.length != 20 || address(bytes20(message.offRampAddress)) != address(this)) {
+      revert InvalidOffRamp(address(this), message.offRampAddress);
     }
     if (message.destChainSelector != i_chainSelector) {
       revert InvalidMessageDestChainSelector(message.destChainSelector);

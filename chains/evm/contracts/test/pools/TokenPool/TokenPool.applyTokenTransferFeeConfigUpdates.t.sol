@@ -5,10 +5,10 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is TokenPoolV2Setup {
+contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is AdvancedPoolHooksSetup {
   function test_applyTokenTransferFeeConfigUpdates() public {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,

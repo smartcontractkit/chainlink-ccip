@@ -8,7 +8,7 @@ import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   address internal s_newCctpV1Pool = makeAddr("newCctpV1Pool");
