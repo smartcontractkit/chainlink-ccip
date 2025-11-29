@@ -203,6 +203,45 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
   }
 
+  function test_verifyMessage_RevertWhen_InvalidTokenTransferLength() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    message.tokenTransfer = new MessageV1Codec.TokenTransferV1[](2);
+    messageHash = keccak256(abi.encode(message));
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidTokenTransferLength.selector, 2));
+    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidToken() public {
+    address invalidToken = makeAddr("invalidToken");
+
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      invalidToken,
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidToken.selector, abi.encodePacked(invalidToken)));
+    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+  }
+
   function test_verifyMessage_RevertWhen_ReceiveMessageCallFailed() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
@@ -222,6 +261,47 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
       abi.encode(false)
     );
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.ReceiveMessageCallFailed.selector));
+    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+  }
+
+  function test_verifyMessage_RevertWhen_MintBalanceMismatch() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT + 1,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    // Mock contract always mints TRANSFER_AMOUNT (1) token.
+    // We should see a mint mismatch if requested amount == TRANSFER_AMOUNT + 1.
+    vm.expectRevert(
+      abi.encodeWithSelector(CCTPVerifier.MintBalanceMismatch.selector, TRANSFER_AMOUNT + 1, 0, TRANSFER_AMOUNT)
+    );
+    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+  }
+
+  function test_verifyMessage_RevertWhen_MintBalanceMismatch_WithFeeExecuted() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    s_baseCCTPMessage.body.feeExecuted = 1;
+    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    // Expected amount == 0 because TRANSFER_AMOUNT (1) - feeExecuted (1) == 0.
+    // Mock contract always mints 1 token, we should see a mint mismatch.
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.MintBalanceMismatch.selector, 0, 0, TRANSFER_AMOUNT));
     s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
   }
 }

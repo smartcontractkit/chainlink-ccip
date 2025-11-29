@@ -32,15 +32,12 @@ contract USDCSourcePoolDataCodec__decodeSourceTokenDataPayloadV2 is Test {
 
   function test__decodeSourceTokenDataPayloadV2_CCTPV2CCV() public pure {
     // Encode using the V2 CCV function
-    bytes4 ccvVersionTag = 0x12345678;
-    bytes memory payload = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(ccvVersionTag);
+    bytes memory payload = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV();
 
     // Decode the payload
-    (bytes4 poolVersionTag, bytes4 decodedCCVVersionTag) =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2WithCCV(payload);
+    bytes4 poolVersionTag = USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2WithCCV(payload);
 
-    // Compare individual fields
-    assertEq(decodedCCVVersionTag, ccvVersionTag, "CCV version tag mismatch");
+    // Compare pool version tag
     assertEq(poolVersionTag, USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG, "Pool version tag mismatch");
   }
 

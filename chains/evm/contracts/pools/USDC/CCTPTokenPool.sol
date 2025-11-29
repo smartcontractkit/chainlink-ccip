@@ -6,7 +6,6 @@ import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";
@@ -87,9 +86,7 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(
-        CCTPVerifier(verifierImpl).versionTag()
-      )
+      destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV()
     });
   }
 
