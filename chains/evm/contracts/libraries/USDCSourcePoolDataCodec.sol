@@ -68,14 +68,26 @@ library USDCSourcePoolDataCodec {
     return abi.encodePacked(CCTP_VERSION_2_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
   }
 
-  /// @notice Encodes the source token data payload into a bytes array using the CCTP V2 CCV tag.
-  /// @param sourceTokenDataPayload The source token data payload to encode.
+  /// @notice Encodes the required version tag into bytes.
   /// @return The encoded source token data payload.
-  function _encodeSourceTokenDataPayloadV2CCV(
-    SourceTokenDataPayloadV2 memory sourceTokenDataPayload
-  ) internal pure returns (bytes memory) {
-    return
-      abi.encodePacked(CCTP_VERSION_2_CCV_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
+  function _encodeSourceTokenDataPayloadV2WithCCV() internal pure returns (bytes memory) {
+    return abi.encodePacked(CCTP_VERSION_2_CCV_TAG);
+  }
+
+  /// @notice Decodes the source pool data into its pool version tag.
+  /// @param sourcePoolData The source pool data to decode in raw bytes.
+  /// @return poolVersionTag The decoded pool version tag.
+  function _decodeSourceTokenDataPayloadV2WithCCV(
+    bytes memory sourcePoolData
+  ) internal pure returns (bytes4 poolVersionTag) {
+    assembly {
+      // Load pool version tag (4 bytes of data, offset 32 to skip the length slot)
+      poolVersionTag := mload(add(sourcePoolData, 32))
+    }
+
+    if (poolVersionTag != CCTP_VERSION_2_CCV_TAG) revert InvalidVersion(poolVersionTag);
+
+    return poolVersionTag;
   }
 
   /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
@@ -100,7 +112,7 @@ library USDCSourcePoolDataCodec {
       depositHash := mload(add(sourcePoolData, 40))
     }
 
-    if (version != CCTP_VERSION_2_TAG && version != CCTP_VERSION_2_CCV_TAG) revert InvalidVersion(version);
+    if (version != CCTP_VERSION_2_TAG) revert InvalidVersion(version);
 
     sourceTokenDataPayload.sourceDomain = sourceDomain;
     sourceTokenDataPayload.depositHash = depositHash;

@@ -60,7 +60,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   bytes internal s_tokenReceiver;
   address internal s_tokenReceiverAddress;
 
-  uint256 internal constant TRANSFER_AMOUNT = 10e6; // 10 USDC
+  uint256 internal constant TRANSFER_AMOUNT = 1; // 0.000001 USDC
   uint16 internal constant BPS_DIVIDER = 10_000;
   uint16 internal constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
 
@@ -207,7 +207,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       amount: amount,
       sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
       sourceTokenAddress: abi.encodePacked(sourceTokenAddress),
-      destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      destTokenAddress: abi.encodePacked(sourceTokenAddress),
       tokenReceiver: tokenReceiver,
       extraData: "extra data"
     });
@@ -223,7 +223,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       onRampAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
       sender: abi.encodePacked(address(0x3333333333333333333333333333333333333333)),
-      receiver: abi.encodePacked(address(0x4444444444444444444444444444444444444444)),
+      receiver: tokenReceiver,
       destBlob: "",
       tokenTransfer: tokenTransfer,
       data: ""

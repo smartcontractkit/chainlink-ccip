@@ -2,11 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV1} from "../../../../interfaces/IPool.sol";
+import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
+import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
@@ -128,9 +130,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2CCV(
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: 0, depositHash: bytes32(hex"deafbeef")})
-    );
+    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV();
     bytes memory offChainTokenData = "";
 
     // Mock the router's isOffRamp function to return true
@@ -156,10 +156,10 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
 
-    // Expect the cctpV2Pool's releaseOrMint to be called and return expectedOut
+    // Expect the cctpV2PoolWithCCV's releaseOrMint to be called and return expectedOut
     vm.mockCall(
-      address(s_cctpV2Pool),
-      abi.encodeWithSelector(USDCTokenPool.releaseOrMint.selector, releaseOrMintIn),
+      address(s_cctpV2PoolWithCCV),
+      abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, releaseOrMintIn, 0),
       abi.encode(expectedOut)
     );
 
@@ -283,11 +283,19 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory updatedPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: address(0), // Set to zero to indicate no legacy pool
       cctpV1Pool: s_cctpV1Pool,
-      cctpV2Pool: s_cctpV2Pool
+      cctpV2Pool: s_cctpV2Pool,
+      cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
     });
 
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpV2PoolWithCCV, type(IPoolV2).interfaceId);
+
+    vm.mockCall(
+      address(s_cctpV2PoolWithCCV),
+      abi.encodeWithSelector(CCTPTokenPool.getCCTPVerifier.selector),
+      abi.encode(makeAddr("cctpVerifier"))
+    );
 
     s_usdcTokenPoolProxy.updatePoolAddresses(updatedPools);
 

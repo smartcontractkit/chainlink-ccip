@@ -104,6 +104,7 @@ compileContract pools/USDC/SiloedUSDCTokenPool
 compileContract pools/USDC/USDCTokenPoolCCTPV2
 compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
+compileContract pools/USDC/CCTPTokenPool
 
 # Test helpers
 compileContract test/helpers/USDCReaderTester
