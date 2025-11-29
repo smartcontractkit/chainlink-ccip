@@ -83,7 +83,7 @@ contract OnRamp_distributeFees is OnRampSetup {
       receipts[2] =
         OnRamp.Receipt({issuer: s_executor, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 3e16, extraArgs: ""});
       receipts[3] = OnRamp.Receipt({
-        issuer: address(s_onRamp),
+        issuer: address(s_sourceRouter),
         destGasLimit: 0,
         destBytesOverhead: 0,
         feeTokenAmount: 4e16,
@@ -98,7 +98,7 @@ contract OnRamp_distributeFees is OnRampSetup {
       receipts[1] =
         OnRamp.Receipt({issuer: s_executor, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 2e17, extraArgs: ""});
       receipts[2] = OnRamp.Receipt({
-        issuer: address(s_onRamp),
+        issuer: address(s_sourceRouter),
         destGasLimit: 0,
         destBytesOverhead: 0,
         feeTokenAmount: 5e16,

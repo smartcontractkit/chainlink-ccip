@@ -99,7 +99,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
     uint64 sequenceNumber; //      │
     uint8 addressBytesLength; //   │ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
-    uint16 networkFeeUSDCents; // ─╯ Network fee in USDC cents for messages to this destination chain.
+    uint16 networkFeeUSDCents; // ─╯ Network fee in USD cents for messages to this destination chain.
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address defaultExecutor; // Default executor to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
@@ -114,7 +114,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector; // Destination chain selector.
     IRouter router; //  Source router address  that is allowed to send messages to the destination chain.
     uint8 addressBytesLength; // The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
-    uint16 networkFeeUSDCents; // Network fee in USDC cents for messages to this destination chain.
+    uint16 networkFeeUSDCents; // Network fee in USD cents for messages to this destination chain.
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
@@ -250,7 +250,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 3. getFee on all verifiers, pool and executor.
 
     CCIPMessageSentEventData memory eventData;
-    // Populate receipts for verifiers, pool/network fee (if applicable), and executor in that order.
+    // Populate receipts for verifiers, pool (if applicable), executor and network fee in that order.
     (eventData.receipts, newMessage.executionGasLimit,) =
       _getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
@@ -311,7 +311,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function _distributeFees(Client.EVM2AnyMessage calldata message, Receipt[] memory receipts) internal {
     IERC20 feeToken = IERC20(message.feeToken);
     uint256 tokenReceiptIndex = type(uint256).max;
-    uint256 networkReceiptIndex = receipts.length > 0 ? receipts.length - 1 : type(uint256).max;
+    // Network fee receipt is always the last slot; it stays on the onRamp for withdrawal by the aggregator.
+    uint256 networkFeeReceiptIndex = receipts.length - 1;
     if (message.tokenAmounts.length > 0) {
       // Layout with tokens: verifiers..., token, executor, network fee.
       tokenReceiptIndex = receipts.length - 3;
@@ -322,12 +323,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         feeToken.safeTransfer(address(tokenPool), receipts[tokenReceiptIndex].feeTokenAmount);
       }
     }
-
-    for (uint256 i = 0; i < receipts.length; ++i) {
-      uint256 receiptFee = receipts[i].feeTokenAmount;
+    for (uint256 i = 0; i < networkFeeReceiptIndex; ++i) {
       // We skip fee distribution if the fee is zero, if this is the token receipt (handled above), or if this is the
-      // network fee (remains on the onRamp for withdrawal).
-      if (receiptFee == 0 || i == tokenReceiptIndex || i == networkReceiptIndex) continue;
+      // network fee (stays on the onRamp for withdrawal).
+      if (i == tokenReceiptIndex) continue;
+      uint256 receiptFee = receipts[i].feeTokenAmount;
+      if (receiptFee == 0) continue;
       feeToken.safeTransfer(receipts[i].issuer, receiptFee);
     }
   }
@@ -867,8 +868,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // This includes the user callback gas limit.
     receipts[executorIndex] =
       _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
+    // Tag the calling router as the network fee issuer so CCIPMessageSent surfaces which router forwarded the
+    // message. Third-party verifiers can pin on the router address even though the flat network fee stays on
+    // the onRamp for later aggregation.
     receipts[receipts.length - 1] = Receipt({
-      // Network fee receipt surfaces the configured network premium.
       issuer: msg.sender,
       destGasLimit: 0,
       destBytesOverhead: 0,
