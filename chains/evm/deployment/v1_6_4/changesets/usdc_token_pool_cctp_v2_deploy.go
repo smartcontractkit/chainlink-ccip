@@ -91,9 +91,10 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 				// If the token address is provided in the input, add it to the datastore so that it can be used in the
 				// future without having to be provided in the input again.
 				err = ds.Addresses().Add(datastore.AddressRef{
-					Type:    "USDCToken",
-					Version: semver.MustParse("1.0.0"),
-					Address: perChainInput.Token.Hex(),
+					Type:          "USDCToken",
+					Version:       semver.MustParse("1.0.0"),
+					Address:       perChainInput.Token.Hex(),
+					ChainSelector: perChainInput.ChainSelector,
 				})
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add USDC token address to datastore for chain %d: %w", perChainInput.ChainSelector, err)
