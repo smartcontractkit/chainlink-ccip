@@ -16,6 +16,7 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 
+	usdc_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
 	usdc_token_pool_cctp_v2_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	usdc_token_pool_proxy_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_proxy"
 
@@ -79,8 +80,8 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 			// pool addresses to be set, and can be modified later. This also allows for parallel testing/deployment of the USDCTokenPoolProxy
 			// and the USDCTokenPool contracts on various chains.
 			cctpV1PoolAddress, _ := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    datastore.ContractType(usdc_token_pool_proxy_ops.ContractType),
-				Version: usdc_token_pool_proxy_ops.Version,
+				Type:    datastore.ContractType(usdc_token_pool_ops.ContractType),
+				Version: usdc_token_pool_ops.Version,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 
 			cctpV2PoolAddress, _ := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{

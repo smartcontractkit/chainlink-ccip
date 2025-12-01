@@ -117,7 +117,7 @@ func TestUSDCTokenPoolDeployChangeset(t *testing.T) {
 
 	err = ds.Addresses().Add(datastore.AddressRef{
 		Type:          datastore.ContractType("CCTPMessageTransmitterProxy"),
-		Version:       semver.MustParse("1.6.2"),
+		Version:       semver.MustParse("1.6.4"),
 		Address:       cctpMessageTransmitterProxyAddress.Hex(),
 		ChainSelector: uint64(chain_selectors.TEST_90000001.Selector),
 	})
