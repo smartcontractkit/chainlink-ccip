@@ -5,7 +5,6 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -15,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/erc20_lock_box"
-
 	datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
@@ -30,7 +28,7 @@ type ERC20LockboxDeploySequenceInput struct {
 
 var ERC20LockboxDeploySequence = operations.NewSequence(
 	"ERC20LockboxDeploySequence",
-	semver.MustParse("1.6.4"),
+	erc20_lock_box.Version,
 	"Deploys the ERC20Lockbox contract",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input ERC20LockboxDeploySequenceInput) (sequences.OnChainOutput, error) {
 		chain, ok := chains.EVMChains()[input.ChainSelector]

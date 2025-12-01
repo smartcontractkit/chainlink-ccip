@@ -1,7 +1,6 @@
 package changesets
 
 import (
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -42,7 +41,7 @@ func updatePoolAddressesApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 		for _, perChainInput := range input.ChainInputs {
 			address, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:    datastore.ContractType(usdc_token_pool_proxy_ops.ContractType),
-				Version: semver.MustParse("1.6.4"),
+				Version: usdc_token_pool_proxy_ops.Version,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err

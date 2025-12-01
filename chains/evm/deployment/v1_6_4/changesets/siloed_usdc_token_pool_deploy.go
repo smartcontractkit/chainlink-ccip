@@ -24,6 +24,13 @@ import (
 
 const (
 	v1_6_4_ERC20LockboxQualifier = "IOwnable" // The ERC20Lockbox contract is only compatible with the IOwnable access control mechanism.
+	RMNProxyVersion              = "1.5.0"
+	RBACTimelockVersion          = "1.0.0"
+	USDCTokenVersion             = "1.0.0"
+	USDCTokenContractType        = "USDCToken"
+	RMNProxyContractType         = "RMN"
+	RouterContractType           = "Router"
+	RouterVersion                = "1.2.0"
 )
 
 type SiloedUSDCTokenPoolDeployInputPerChain struct {
@@ -52,7 +59,7 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			// datastore containing >1 address with the same type and version.
 			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:      datastore.ContractType(utils.RBACTimelock),
-				Version:   semver.MustParse("1.0.0"),
+				Version:   semver.MustParse(RBACTimelockVersion),
 				Qualifier: input.MCMS.Qualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
@@ -81,15 +88,15 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 
 			rmnProxyAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:    datastore.ContractType(rmn_proxy.ContractType),
-				Version: semver.MustParse("1.5.0"),
+				Version: semver.MustParse(RMNProxyVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			tokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    datastore.ContractType("USDCToken"),
-				Version: semver.MustParse("1.0.0"),
+				Type:    datastore.ContractType(USDCTokenContractType),
+				Version: semver.MustParse(USDCTokenVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err

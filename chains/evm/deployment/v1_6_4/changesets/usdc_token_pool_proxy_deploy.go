@@ -16,7 +16,10 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 
+	usdc_token_pool_cctp_v2_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	usdc_token_pool_proxy_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_proxy"
+
+	utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 type DeployUSDCTokenPoolProxyInput struct {
@@ -48,8 +51,8 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 			// Without the qualifier, the datastore will sometimes throw an error when fetching the address due to the
 			// datastore containing >1 address with the same type and version.
 			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:      "RBACTimelock",
-				Version:   semver.MustParse("1.0.0"),
+				Type:      datastore.ContractType(utils.RBACTimelock),
+				Version:   semver.MustParse(RBACTimelockVersion),
 				Qualifier: input.MCMS.Qualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
@@ -57,16 +60,16 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 			}
 
 			routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    "Router",
-				Version: semver.MustParse("1.2.0"),
+				Type:    datastore.ContractType(RouterContractType),
+				Version: semver.MustParse(RouterVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			tokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    "USDCToken",
-				Version: semver.MustParse("1.0.0"),
+				Type:    datastore.ContractType(USDCTokenContractType),
+				Version: semver.MustParse(USDCTokenVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
@@ -76,13 +79,13 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 			// pool addresses to be set, and can be modified later. This also allows for parallel testing/deployment of the USDCTokenPoolProxy
 			// and the USDCTokenPool contracts on various chains.
 			cctpV1PoolAddress, _ := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    "USDCTokenPool",
-				Version: semver.MustParse("1.6.4"),
+				Type:    datastore.ContractType(usdc_token_pool_proxy_ops.ContractType),
+				Version: usdc_token_pool_proxy_ops.Version,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 
 			cctpV2PoolAddress, _ := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    "USDCTokenPoolCCTPV2",
-				Version: semver.MustParse("1.6.4"),
+				Type:    datastore.ContractType(usdc_token_pool_cctp_v2_ops.ContractType),
+				Version: usdc_token_pool_cctp_v2_ops.Version,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 
 			sequenceInput := sequences.DeployUSDCTokenPoolProxySequenceInput{

@@ -3,7 +3,6 @@ package sequences
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -23,7 +22,7 @@ type ApplyAuthorizedCallerUpdatesSequenceInput struct {
 var (
 	ApplyAuthorizedCallerUpdatesSequence = operations.NewSequence(
 		"ApplyAuthorizedCallerUpdatesSequence",
-		semver.MustParse("1.6.4"),
+		authorized_caller_ops.Version,
 		"Applies authorized caller updates to a sequence of contracts implementing the AuthorizedCallers interface on multiple chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input ApplyAuthorizedCallerUpdatesSequenceInput) (sequences.OnChainOutput, error) {
 			writes := make([]contract.WriteOutput, 0)

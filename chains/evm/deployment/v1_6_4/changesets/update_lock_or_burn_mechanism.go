@@ -9,7 +9,6 @@ import (
 	usdc_token_pool_proxy_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 
-	semver "github.com/Masterminds/semver/v3"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -45,7 +44,7 @@ func updateLockOrBurnMechanismApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			// Find the USDCTokenPoolProxy address for the given chain selector
 			address, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:    datastore.ContractType(usdc_token_pool_proxy_ops.ContractType),
-				Version: semver.MustParse("1.6.4"),
+				Version: usdc_token_pool_proxy_ops.Version,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err

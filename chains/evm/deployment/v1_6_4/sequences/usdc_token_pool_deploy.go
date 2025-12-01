@@ -3,7 +3,6 @@ package sequences
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
@@ -29,7 +28,7 @@ type USDCTokenPoolDeploySequenceInput struct {
 
 var USDCTokenPoolDeploySequence = operations.NewSequence(
 	"USDCTokenPoolDeploySequence",
-	semver.MustParse("1.6.4"),
+	usdc_token_pool_ops.Version,
 	"Deploys the USDCTokenPool contract",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input USDCTokenPoolDeploySequenceInput) (sequences.OnChainOutput, error) {
 		chain, ok := chains.EVMChains()[input.ChainSelector]

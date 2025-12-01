@@ -16,6 +16,8 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+
+	cctp_message_transmitter_proxy_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
 )
 
 type USDCTokenPoolDeployInputPerChain struct {
@@ -48,7 +50,7 @@ func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 			// datastore containing >1 address with the same type and version.
 			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:      datastore.ContractType(utils.RBACTimelock),
-				Version:   semver.MustParse("1.0.0"),
+				Version:   semver.MustParse(RBACTimelockVersion),
 				Qualifier: input.MCMS.Qualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
@@ -56,8 +58,8 @@ func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 			}
 
 			tokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    datastore.ContractType("USDCToken"),
-				Version: semver.MustParse("1.0.0"),
+				Type:    datastore.ContractType(USDCTokenContractType),
+				Version: semver.MustParse(USDCTokenVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
@@ -68,24 +70,24 @@ func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 			// where you need to deploy the CCTPMessageTransmitterProxy for CCTP V1 as V1 is being deprecated in 2026 and
 			// as such no new chains should be added that support CCTP V1.
 			cctpMessageTransmitterProxyAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    datastore.ContractType("CCTPMessageTransmitterProxy"),
-				Version: semver.MustParse("1.6.2"),
+				Type:    datastore.ContractType(cctp_message_transmitter_proxy_ops.ContractType),
+				Version: cctp_message_transmitter_proxy_ops.Version,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			rmnAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    datastore.ContractType("RMN"),
-				Version: semver.MustParse("1.5.0"),
+				Type:    datastore.ContractType(RMNProxyContractType),
+				Version: semver.MustParse(RMNProxyVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    datastore.ContractType("Router"),
-				Version: semver.MustParse("1.2.0"),
+				Type:    datastore.ContractType(RouterContractType),
+				Version: semver.MustParse(RouterVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err

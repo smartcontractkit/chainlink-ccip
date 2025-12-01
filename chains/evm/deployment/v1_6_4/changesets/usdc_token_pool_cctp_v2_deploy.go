@@ -15,6 +15,8 @@ import (
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+
+	utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 type USDCTokenPoolCCTPV2DeployInputPerChain struct {
@@ -47,8 +49,8 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			// Without the qualifier, the datastore will sometimes throw an error when fetching the address due to the
 			// datastore containing >1 address with the same type and version.
 			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:      "RBACTimelock",
-				Version:   semver.MustParse("1.0.0"),
+				Type:      datastore.ContractType(utils.RBACTimelock),
+				Version:   semver.MustParse(RBACTimelockVersion),
 				Qualifier: input.MCMS.Qualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
@@ -57,8 +59,8 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 
 			// Get the router address from the datastore based on the chain selector.
 			routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    "Router",
-				Version: semver.MustParse("1.2.0"),
+				Type:    datastore.ContractType(RouterContractType),
+				Version: semver.MustParse(RouterVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
@@ -66,8 +68,8 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 
 			// Get the RMN address from the datastore based on the chain selector.
 			rmnAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    "RMN",
-				Version: semver.MustParse("1.5.0"),
+				Type:    datastore.ContractType(RMNProxyContractType),
+				Version: semver.MustParse(RMNProxyVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
@@ -77,8 +79,8 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			// If the token address is not found in the datastore, perhaps because it is a new chain
 			// then use the token address from the input
 			retrievedTokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    "USDCToken",
-				Version: semver.MustParse("1.0.0"),
+				Type:    datastore.ContractType(USDCTokenContractType),
+				Version: semver.MustParse(USDCTokenVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			// If the error is not nil, then check if the token address was provided in the input, and if so use that,
 			// otherwise revert because the token address is required.
@@ -91,8 +93,8 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 				// If the token address is provided in the input, add it to the datastore so that it can be used in the
 				// future without having to be provided in the input again.
 				err = ds.Addresses().Add(datastore.AddressRef{
-					Type:          "USDCToken",
-					Version:       semver.MustParse("1.0.0"),
+					Type:          datastore.ContractType(USDCTokenContractType),
+					Version:       semver.MustParse(USDCTokenVersion),
 					Address:       perChainInput.Token.Hex(),
 					ChainSelector: perChainInput.ChainSelector,
 				})
