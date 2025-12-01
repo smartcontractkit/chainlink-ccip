@@ -3,7 +3,6 @@ package sequences
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -16,14 +15,14 @@ import (
 )
 
 type SetDomainsSequenceInput struct {
-	Address        common.Address
-	DomainsByChain map[uint64][]usdc_token_pool_ops.DomainUpdate
+	AddressesByChain map[uint64]common.Address
+	DomainsByChain   map[uint64][]usdc_token_pool_ops.DomainUpdate
 }
 
 var (
 	USDCTokenPoolSetDomainsSequence = operations.NewSequence(
 		"USDCTokenPoolSetDomainsSequence",
-		semver.MustParse("1.6.4"),
+		usdc_token_pool_ops.Version,
 		"Sets domains on a sequence of USDCTokenPool contracts on multiple chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input SetDomainsSequenceInput) (sequences.OnChainOutput, error) {
 
@@ -42,17 +41,15 @@ var (
 				// DomainUpdate structs, with the first and only item being the domains for the given chain selector
 				report, err := operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolSetDomains, chain, contract.FunctionInput[[]usdc_token_pool_ops.DomainUpdate]{
 					ChainSelector: chain.Selector,
-					Address:       input.Address,
+					Address:       input.AddressesByChain[chainSel],
 					Args:          domains,
 				})
-				fmt.Println("Report output in sequence: ", report.Output)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute USDCTokenPoolSetDomainsOp on %s: %w", chain, err)
 				}
 				writes = append(writes, report.Output)
 			}
 			batch, err := contract.NewBatchOperationFromWrites(writes)
-			fmt.Println("Batch: ", batch)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 			}

@@ -3,7 +3,6 @@ package sequences
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_proxy"
@@ -14,6 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	usdc_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
+
+	usdc_token_pool_proxy_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_proxy"
 )
 
 type DeployUSDCTokenPoolProxySequenceInput struct {
@@ -26,7 +27,7 @@ type DeployUSDCTokenPoolProxySequenceInput struct {
 
 var DeployUSDCTokenPoolProxySequence = operations.NewSequence(
 	"DeployUSDCTokenPoolProxySequence",
-	semver.MustParse("1.6.4"),
+	usdc_token_pool_proxy_ops.Version,
 	"Deploys the USDCTokenPoolProxy contract",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input DeployUSDCTokenPoolProxySequenceInput) (sequences.OnChainOutput, error) {
 		chain, ok := chains.EVMChains()[input.ChainSelector]
@@ -40,7 +41,6 @@ var DeployUSDCTokenPoolProxySequence = operations.NewSequence(
 				usdc_token_pool_proxy.ContractType,
 				*usdc_token_pool_proxy.Version,
 			),
-			// TODO: Review and make dynamic?
 			Args: usdc_token_pool_proxy.ConstructorArgs{
 				Token:         input.Token,
 				PoolAddresses: input.PoolAddresses,
