@@ -18,13 +18,13 @@ interface IAdvancedPoolHooks {
   ) external;
 
   /// @notice Postflight check before releasing or minting tokens.
-  /// @param releaseOrMintOut The release or mint output parameters.
+  /// @param releaseOrMintIn The release or mint output parameters.
   /// @param localAmount The local amount to be released or minted.
   /// @param blockConfirmationRequested The block confirmation requested.
   /// @dev This function may revert if the postflight check fails. This means the transaction is unexecutable until
   /// the issue is resolved.
   function postFlightCheck(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintOut,
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
     uint16 blockConfirmationRequested
   ) external;
