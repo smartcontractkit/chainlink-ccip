@@ -116,8 +116,8 @@ func TestUSDCTokenPoolDeployChangeset(t *testing.T) {
 	require.NoError(t, err, "Failed to confirm CCTPMessageTransmitterProxy deployment transaction")
 
 	err = ds.Addresses().Add(datastore.AddressRef{
-		Type:          datastore.ContractType("CCTPMessageTransmitterProxy"),
-		Version:       semver.MustParse("1.6.4"),
+		Type:          datastore.ContractType(changesets.CCTPMessageTransmitterProxyContractType),
+		Version:       semver.MustParse(changesets.CCTPMessageTransmitterProxyVersion),
 		Address:       cctpMessageTransmitterProxyAddress.Hex(),
 		ChainSelector: uint64(chain_selectors.TEST_90000001.Selector),
 	})

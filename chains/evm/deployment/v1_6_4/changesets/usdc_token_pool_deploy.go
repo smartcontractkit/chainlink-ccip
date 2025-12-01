@@ -16,8 +16,14 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+)
 
-	cctp_message_transmitter_proxy_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/cctp_message_transmitter_proxy"
+const (
+	// The CCTPMessageTransmitterProxy contract is deployed with version v1_6_2 and is used to send messages to the CCTP V1 Token Pool.
+	// It is not necessary to deploy the CCTPMessageTransmitterProxy contract for CCTP V1 as V1 is being deprecated in 2026 and
+	// as such no new chains should be added that support CCTP V1.
+	CCTPMessageTransmitterProxyContractType = "CCTPMessageTransmitterProxy"
+	CCTPMessageTransmitterProxyVersion      = "1.6.2"
 )
 
 type USDCTokenPoolDeployInputPerChain struct {
@@ -70,8 +76,8 @@ func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 			// where you need to deploy the CCTPMessageTransmitterProxy for CCTP V1 as V1 is being deprecated in 2026 and
 			// as such no new chains should be added that support CCTP V1.
 			cctpMessageTransmitterProxyAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    datastore.ContractType(cctp_message_transmitter_proxy_ops.ContractType),
-				Version: cctp_message_transmitter_proxy_ops.Version,
+				Type:    datastore.ContractType(CCTPMessageTransmitterProxyContractType),
+				Version: semver.MustParse(CCTPMessageTransmitterProxyVersion),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
