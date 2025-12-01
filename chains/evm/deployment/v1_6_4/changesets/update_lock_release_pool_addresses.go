@@ -44,9 +44,8 @@ func updateLockReleasePoolAddressesApply(mcmsRegistry *changesets.MCMSReaderRegi
 		lockReleasePoolAddressesByChain := make(map[uint64]usdc_token_pool_proxy_ops.UpdateLockReleasePoolAddressesArgs)
 		for _, perChainInput := range input.ChainInputs {
 			address, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType(usdc_token_pool_proxy_ops.ContractType),
-				Version:       semver.MustParse("1.6.4"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    datastore.ContractType(usdc_token_pool_proxy_ops.ContractType),
+				Version: semver.MustParse("1.6.4"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err

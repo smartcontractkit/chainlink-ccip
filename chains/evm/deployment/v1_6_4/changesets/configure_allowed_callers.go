@@ -43,15 +43,14 @@ func configureAllowedCallersApply(mcmsRegistry *changesets.MCMSReaderRegistry) f
 		allowedCallersByChain := make(map[uint64][]erc20_lock_box.AllowedCallerConfigArgs)
 		for _, perChainInput := range input.ChainInputs {
 
-			erc20_lock_box_address, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType(erc20_lock_box.ContractType),
-				Version:       erc20_lock_box.Version,
-				ChainSelector: perChainInput.ChainSelector,
+			erc20LockBoxAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:    datastore.ContractType(erc20_lock_box.ContractType),
+				Version: erc20_lock_box.Version,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			addressesByChain[perChainInput.ChainSelector] = erc20_lock_box_address
+			addressesByChain[perChainInput.ChainSelector] = erc20LockBoxAddress
 			allowedCallersByChain[perChainInput.ChainSelector] = perChainInput.AllowedCallers
 		}
 

@@ -74,7 +74,8 @@ var USDCTokenPoolCCTPV2DeploySequence = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy USDCTokenPoolCCTPV2 on %s: %w", chain, err)
 		}
 
-		// Configure the allowed callers for the CCTPMessageTransmitterProxy
+		// Configure the allowed callers for the CCTPMessageTransmitterProxy to allow the USDCTokenPoolCCTPV2 contract to
+		// proxy messages through it.
 		_, err = operations.ExecuteOperation(b, cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyConfigureAllowedCallers, chain, contract.FunctionInput[[]cctp_message_transmitter_proxy.AllowedCallerConfigArgs]{
 			ChainSelector: input.ChainSelector,
 			Address:       cctpProxyAddress,
@@ -90,7 +91,9 @@ var USDCTokenPoolCCTPV2DeploySequence = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure allowed callers for the CCTPMessageTransmitterProxy on %s: %w", chain, err)
 		}
 
-		// Begin transferring ownership to MCMS. A separate changeset will be used to accept ownership.
+		// Begin transferring ownership of the Message Transmitter Proxy to MCMS. A separate changeset will be used to
+		// accept ownership. It uses the same operation as the token pool but if you look, the address to be performed on
+		// is different.
 		_, err = operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
 			Address:       cctpProxyAddress,

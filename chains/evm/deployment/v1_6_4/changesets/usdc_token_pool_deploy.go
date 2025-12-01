@@ -45,19 +45,17 @@ func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 			// Without the qualifier, the datastore will sometimes throw an error when fetching the address due to the
 			// datastore containing >1 address with the same type and version.
 			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          "RBACTimelock",
-				Version:       semver.MustParse("1.0.0"),
-				Qualifier:     input.MCMS.Qualifier,
-				ChainSelector: perChainInput.ChainSelector,
+				Type:      "RBACTimelock",
+				Version:   semver.MustParse("1.0.0"),
+				Qualifier: input.MCMS.Qualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get time lock address for chain %d: %w", perChainInput.ChainSelector, err)
 			}
 
 			tokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType("USDCToken"),
-				Version:       semver.MustParse("1.0.0"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    datastore.ContractType("USDCToken"),
+				Version: semver.MustParse("1.0.0"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
@@ -68,27 +66,24 @@ func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 			// where you need to deploy the CCTPMessageTransmitterProxy for CCTP V1 as V1 is being deprecated in 2026 and
 			// as such no new chains should be added that support CCTP V1.
 			cctpMessageTransmitterProxyAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType("CCTPMessageTransmitterProxy"),
-				Version:       semver.MustParse("1.6.2"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    datastore.ContractType("CCTPMessageTransmitterProxy"),
+				Version: semver.MustParse("1.6.2"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			rmnAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType("RMN"),
-				Version:       semver.MustParse("1.5.0"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    datastore.ContractType("RMN"),
+				Version: semver.MustParse("1.5.0"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType("Router"),
-				Version:       semver.MustParse("1.2.0"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    datastore.ContractType("Router"),
+				Version: semver.MustParse("1.2.0"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err

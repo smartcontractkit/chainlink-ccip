@@ -62,7 +62,7 @@ func TestERC20LockBoxDeployChangeset(t *testing.T) {
 	require.NotNil(t, changesetOutput, "Changeset output should not be nil")
 	require.Greater(t, len(changesetOutput.Reports), 0)
 
-	erc20LockboxAddress, err := changesetOutput.DataStore.Addresses().Get(datastore.NewAddressRefKey(chainSelector, "ERC20Lockbox", semver.MustParse("1.6.4"), ""))
+	erc20LockboxAddress, err := changesetOutput.DataStore.Addresses().Get(datastore.NewAddressRefKey(chainSelector, "ERC20Lockbox", semver.MustParse("1.6.4"), "IOwnable"))
 	require.NoError(t, err, "Failed to get ERC20Lockbox address")
 
 	erc20Lockbox, err := erc20_lock_box_bindings.NewERC20LockBox(common.HexToAddress(erc20LockboxAddress.Address), evmChain.Client)

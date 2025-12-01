@@ -45,46 +45,45 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			// Without the qualifier, the datastore will sometimes throw an error when fetching the address due to the
 			// datastore containing >1 address with the same type and version.
 			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          "RBACTimelock",
-				Version:       semver.MustParse("1.0.0"),
-				Qualifier:     input.MCMS.Qualifier,
-				ChainSelector: perChainInput.ChainSelector,
+				Type:      "RBACTimelock",
+				Version:   semver.MustParse("1.0.0"),
+				Qualifier: input.MCMS.Qualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get time lock address for chain %d: %w", perChainInput.ChainSelector, err)
 			}
 
+			// Get the ERC20Lockbox address from the datastore based on the MCMS qualifier and chain selector.
+			// It is safe to use the qualifier "IOwnable" since the USDC Token Pool will always use IOwnable
+			// instead of RBAC.
 			erc20LockboxAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType(erc20_lock_box.ContractType),
-				Version:       erc20_lock_box.Version,
-				ChainSelector: perChainInput.ChainSelector,
+				Type:      datastore.ContractType(erc20_lock_box.ContractType),
+				Version:   erc20_lock_box.Version,
+				Qualifier: "IOwnable",
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType(router.ContractType),
-				Version:       router.Version,
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    datastore.ContractType(router.ContractType),
+				Version: router.Version,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			rmnProxyAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType(rmn_proxy.ContractType),
-				Version:       semver.MustParse("1.5.0"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    datastore.ContractType(rmn_proxy.ContractType),
+				Version: semver.MustParse("1.5.0"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			tokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType("USDCToken"),
-				Version:       semver.MustParse("1.0.0"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    datastore.ContractType("USDCToken"),
+				Version: semver.MustParse("1.0.0"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err

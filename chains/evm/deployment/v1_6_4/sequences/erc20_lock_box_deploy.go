@@ -3,6 +3,8 @@ package sequences
 import (
 	"fmt"
 
+	"github.com/aws/smithy-go/ptr"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -41,6 +43,10 @@ var ERC20LockboxDeploySequence = operations.NewSequence(
 			Args: erc20_lock_box.ConstructorArgs{
 				TokenAdminRegistry: input.TokenAdminRegistry,
 			},
+			// We use the qualifier "Ownable" to indicate that this lockbox is only compatible with token pools that
+			// implement IOwnable. In the future, we may want to support other access control mechanisms, such as RBAC,
+			// in which case a future changeset will use a different qualifier.
+			Qualifier: ptr.String("IOwnable"),
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute ERC20LockboxDeploy on %s: %w", chain, err)

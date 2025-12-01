@@ -52,28 +52,25 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 			// Without the qualifier, the datastore will sometimes throw an error when fetching the address due to the
 			// datastore containing >1 address with the same type and version.
 			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          "RBACTimelock",
-				Version:       semver.MustParse("1.0.0"),
-				Qualifier:     input.MCMS.Qualifier,
-				ChainSelector: perChainInput.ChainSelector,
+				Type:      "RBACTimelock",
+				Version:   semver.MustParse("1.0.0"),
+				Qualifier: input.MCMS.Qualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get time lock address for chain %d: %w", perChainInput.ChainSelector, err)
 			}
 
 			routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType("Router"),
-				Version:       semver.MustParse("1.2.0"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    "Router",
+				Version: semver.MustParse("1.2.0"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			tokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType("USDCToken"),
-				Version:       semver.MustParse("1.0.0"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    "USDCToken",
+				Version: semver.MustParse("1.0.0"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
@@ -82,15 +79,13 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 			// We actually don't need to check for the error here since if the pool is not deployed, the sequence will fail.
 			// and it is possible for a chain that the USDCTokenPool for CCTP V1 is not deployed.
 			cctpV1PoolAddress, _ := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType("USDCTokenPool"),
-				Version:       semver.MustParse("1.6.4"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    "USDCTokenPool",
+				Version: semver.MustParse("1.6.4"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 
 			cctpV2PoolAddress, _ := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType("USDCTokenPoolCCTPV2"),
-				Version:       semver.MustParse("1.6.4"),
-				ChainSelector: perChainInput.ChainSelector,
+				Type:    "USDCTokenPoolCCTPV2",
+				Version: semver.MustParse("1.6.4"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 
 			// If both of these are empty, then revert because there is neither a CCTP V1 OR a V2 pool deployed to utilize.

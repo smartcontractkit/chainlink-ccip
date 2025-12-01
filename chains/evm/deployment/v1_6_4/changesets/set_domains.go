@@ -42,15 +42,14 @@ func setDomainsApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Envi
 		for _, perChainInput := range input.ChainInputs {
 			// For Each chain input, find the USDCTokenPool address from the datastore for the given chain selector
 			// using
-			usdc_token_pool_address, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:          datastore.ContractType(usdc_token_pool.ContractType),
-				Version:       usdc_token_pool.Version,
-				ChainSelector: perChainInput.ChainSelector,
+			usdcTokenPoolAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:    datastore.ContractType(usdc_token_pool.ContractType),
+				Version: usdc_token_pool.Version,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			addressesByChain[perChainInput.ChainSelector] = usdc_token_pool_address
+			addressesByChain[perChainInput.ChainSelector] = usdcTokenPoolAddress
 			domainsByChain[perChainInput.ChainSelector] = perChainInput.Domains
 		}
 

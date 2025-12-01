@@ -70,6 +70,7 @@ func TestSiloedUSDCTokenPoolDeployChangeset(t *testing.T) {
 		Type:          datastore.ContractType("ERC20Lockbox"),
 		Version:       semver.MustParse("1.6.4"),
 		Address:       lockBoxAddress.Hex(),
+		Qualifier:     "IOwnable",
 		ChainSelector: chainSelector,
 	})
 
