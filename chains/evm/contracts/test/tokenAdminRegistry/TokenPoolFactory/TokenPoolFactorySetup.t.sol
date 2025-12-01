@@ -43,9 +43,6 @@ contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
 
     s_poolInitCode = type(BurnMintTokenPool).creationCode;
 
-    // Create Init Args for BurnMintTokenPool with no allowlist minus the token address
-    address[] memory allowlist = new address[](1);
-    allowlist[0] = OWNER;
-    s_poolInitArgs = abi.encode(allowlist, address(0x1234), s_sourceRouter);
+    s_poolInitArgs = abi.encode(address(0), address(0x1234), s_sourceRouter);
   }
 }

@@ -42,10 +42,10 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router
-  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router, 1) {}
+  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, advancedPoolHooks, rmnProxy, router, 1) {}
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurn()`.
@@ -55,7 +55,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
 
     Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);

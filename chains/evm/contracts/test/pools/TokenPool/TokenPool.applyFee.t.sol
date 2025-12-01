@@ -5,18 +5,17 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_applyFee is TokenPoolV2Setup {
+contract TokenPoolV2_applyFee is AdvancedPoolHooksSetup {
   function test_applyFee_CustomFinality() public {
     uint16 minBlockConfirmation = 5;
     uint16 defaultBlockConfirmationTransferFeeBps = 100;
     uint16 customBlockConfirmationTransferFeeBps = 500;
     uint256 amount = 1_000e18;
     vm.startPrank(OWNER);
-    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(
-      minBlockConfirmation, new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](0)
-    );
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
+
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,

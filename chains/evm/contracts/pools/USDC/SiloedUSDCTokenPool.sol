@@ -59,12 +59,12 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router,
     address lockBox
   )
-    SiloedLockReleaseTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, lockBox)
+    SiloedLockReleaseTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router, lockBox)
     AuthorizedCallers(new address[](0))
   {}
 

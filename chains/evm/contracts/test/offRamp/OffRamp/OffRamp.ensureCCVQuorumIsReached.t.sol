@@ -113,7 +113,19 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     );
     address[] memory poolRequiredCCVs = new address[](1);
     poolRequiredCCVs[0] = s_poolRequiredCCV;
-    vm.mockCall(s_destTokenPool, abi.encodeWithSelector(IPoolV2.getRequiredCCVs.selector), abi.encode(poolRequiredCCVs));
+    vm.mockCall(
+      s_destTokenPool,
+      abi.encodeWithSelector(
+        IPoolV2.getRequiredCCVs.selector,
+        s_destToken,
+        SOURCE_CHAIN_SELECTOR,
+        100,
+        FINALITY,
+        "",
+        IPoolV2.MessageDirection.Inbound
+      ),
+      abi.encode(poolRequiredCCVs)
+    );
 
     (address[] memory ccvsToQuery, uint256[] memory dataIndexes) =
       s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);

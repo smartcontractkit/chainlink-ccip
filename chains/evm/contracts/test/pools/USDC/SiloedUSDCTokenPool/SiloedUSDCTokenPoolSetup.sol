@@ -29,7 +29,7 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
     s_usdcTokenPool = new SiloedUSDCTokenPool(
       s_USDCToken,
       6, // localTokenDecimals
-      new address[](0), // allowlist
+      address(0), // allowlist
       address(s_mockRMNRemote), // rmnProxy
       address(s_router), // router
       address(s_lockBox) // lockBox
@@ -76,7 +76,7 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
     s_usdcTokenPoolTransferLiquidity = new SiloedUSDCTokenPool(
       s_USDCToken,
       6, // localTokenDecimals
-      new address[](0), // allowlist
+      address(0), // allowlist
       address(s_mockRMNRemote), // rmnProxy
       address(s_router), // router
       address(s_lockBox) // lockBox
