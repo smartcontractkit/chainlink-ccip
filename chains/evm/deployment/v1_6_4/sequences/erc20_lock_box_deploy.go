@@ -19,6 +19,10 @@ import (
 	datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
+const (
+	v1_6_4_ERC20LockboxQualifier = "IOwnable" // The ERC20Lockbox contract is only compatible with the IOwnable access control mechanism.
+)
+
 type ERC20LockboxDeploySequenceInput struct {
 	ChainSelector      uint64
 	TokenAdminRegistry common.Address
@@ -46,7 +50,7 @@ var ERC20LockboxDeploySequence = operations.NewSequence(
 			// We use the qualifier "Ownable" to indicate that this lockbox is only compatible with token pools that
 			// implement IOwnable. In the future, we may want to support other access control mechanisms, such as RBAC,
 			// in which case a future changeset will use a different qualifier.
-			Qualifier: ptr.String("IOwnable"),
+			Qualifier: ptr.String(v1_6_4_ERC20LockboxQualifier),
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute ERC20LockboxDeploy on %s: %w", chain, err)

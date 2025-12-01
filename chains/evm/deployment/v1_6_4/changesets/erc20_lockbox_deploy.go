@@ -3,7 +3,6 @@ package changesets
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -13,6 +12,8 @@ import (
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+
+	token_admin_registry "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 )
 
 type ERC20LockboxDeployInput struct {
@@ -35,8 +36,8 @@ func erc20LockboxDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(c
 
 		for _, perChainInput := range input.ChainInputs {
 			tokenAdminRegistryAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    "TokenAdminRegistry",
-				Version: semver.MustParse("1.5.0"),
+				Type:    datastore.ContractType(token_admin_registry.ContractType),
+				Version: token_admin_registry.Version,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err

@@ -18,6 +18,12 @@ import (
 	rmn_proxy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	erc20_lock_box "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/erc20_lock_box"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+
+	utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+)
+
+const (
+	v1_6_4_ERC20LockboxQualifier = "IOwnable" // The ERC20Lockbox contract is only compatible with the IOwnable access control mechanism.
 )
 
 type SiloedUSDCTokenPoolDeployInputPerChain struct {
@@ -45,7 +51,7 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			// Without the qualifier, the datastore will sometimes throw an error when fetching the address due to the
 			// datastore containing >1 address with the same type and version.
 			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:      "RBACTimelock",
+				Type:      datastore.ContractType(utils.RBACTimelock),
 				Version:   semver.MustParse("1.0.0"),
 				Qualifier: input.MCMS.Qualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
@@ -59,7 +65,7 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			erc20LockboxAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:      datastore.ContractType(erc20_lock_box.ContractType),
 				Version:   erc20_lock_box.Version,
-				Qualifier: "IOwnable",
+				Qualifier: v1_6_4_ERC20LockboxQualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err

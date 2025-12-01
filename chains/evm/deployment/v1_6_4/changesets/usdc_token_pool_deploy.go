@@ -14,6 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 type USDCTokenPoolDeployInputPerChain struct {
@@ -45,7 +47,7 @@ func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 			// Without the qualifier, the datastore will sometimes throw an error when fetching the address due to the
 			// datastore containing >1 address with the same type and version.
 			timeLockAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:      "RBACTimelock",
+				Type:      datastore.ContractType(utils.RBACTimelock),
 				Version:   semver.MustParse("1.0.0"),
 				Qualifier: input.MCMS.Qualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
