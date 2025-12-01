@@ -24,6 +24,7 @@ type ConfigureAllowedCallersInput struct {
 
 type ConfigureAllowedCallersPerChainInput struct {
 	ChainSelector  uint64
+	Qualifier      string
 	AllowedCallers []erc20_lock_box.AllowedCallerConfigArgs
 }
 
@@ -43,9 +44,12 @@ func configureAllowedCallersApply(mcmsRegistry *changesets.MCMSReaderRegistry) f
 		allowedCallersByChain := make(map[uint64][]erc20_lock_box.AllowedCallerConfigArgs)
 		for _, perChainInput := range input.ChainInputs {
 
+			// Find the ERC20Lockbox contract address, using the qualifier provided in the input to differentiate between
+			// the IOwnable and future IAccessControl lockboxes.
 			erc20LockBoxAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    datastore.ContractType(erc20_lock_box.ContractType),
-				Version: erc20_lock_box.Version,
+				Type:      datastore.ContractType(erc20_lock_box.ContractType),
+				Version:   erc20_lock_box.Version,
+				Qualifier: perChainInput.Qualifier,
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
