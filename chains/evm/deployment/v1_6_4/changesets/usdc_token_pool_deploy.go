@@ -17,7 +17,7 @@ import (
 
 	utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
-	cctp_message_transmitter_proxy_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
+	cctp_message_transmitter_proxy_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/cctp_message_transmitter_proxy"
 )
 
 type USDCTokenPoolDeployInputPerChain struct {
