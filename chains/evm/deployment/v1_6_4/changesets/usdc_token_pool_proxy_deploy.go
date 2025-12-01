@@ -76,8 +76,9 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 				return cldf.ChangesetOutput{}, err
 			}
 
-			// We actually don't need to check for the error here since if the pool is not deployed, the sequence will fail.
-			// and it is possible for a chain that the USDCTokenPool for CCTP V1 is not deployed.
+			// It is not necessar to check for the error here since the contract constructor does not require any of the
+			// pool addresses to be set, and can be modified later. This also allows for parallel deployment of the USDCTokenPoolProxy
+			// and the USDCTokenPool contracts.
 			cctpV1PoolAddress, _ := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:    "USDCTokenPool",
 				Version: semver.MustParse("1.6.4"),
@@ -87,11 +88,6 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 				Type:    "USDCTokenPoolCCTPV2",
 				Version: semver.MustParse("1.6.4"),
 			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
-
-			// If both of these are empty, then revert because there is neither a CCTP V1 OR a V2 pool deployed to utilize.
-			if cctpV1PoolAddress == (common.Address{}) && cctpV2PoolAddress == (common.Address{}) {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no USDCTokenPool for CCTP V1 or CCTP V2 found for chain %d", perChainInput.ChainSelector)
-			}
 
 			sequenceInput := sequences.DeployUSDCTokenPoolProxySequenceInput{
 				ChainSelector: perChainInput.ChainSelector,
