@@ -33,10 +33,6 @@ type DeployUSDCTokenPoolProxyPerChainInput struct {
 // Note: Since this may be deployed on a chain that already has a USDC Token Pool contract deployed,
 // the legacy pool address is the only required address to be provided in the input. This is because on a chain such as
 // Ethereum Mainnet, which is yet to be updated to CCTP V2, there will only be a V1 deployment of the USDC Token Pool.
-// and we do not want the constructor to revert. Similarly, on a new chain, such as Sonic or Linea, there will not
-// be a V1 deployment of the USDC Token Pool, and only the CCTP V2 pool will be required.
-// This changeset, as validation will attempt to find the CCTP V1 and CCTP V2 pools, will revert if both are not found.
-// If that occurs, then the user must deploy a token pool contract separately and update the datastore before deploying the USDCTokenPoolProxy.
 func DeployUSDCTokenPoolProxyChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[DeployUSDCTokenPoolProxyInput] {
 	return cldf.CreateChangeSet(deployUSDCTokenPoolProxyApply(mcmsRegistry), deployUSDCTokenPoolProxyVerify(mcmsRegistry))
 }
@@ -76,9 +72,9 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 				return cldf.ChangesetOutput{}, err
 			}
 
-			// It is not necessar to check for the error here since the contract constructor does not require any of the
-			// pool addresses to be set, and can be modified later. This also allows for parallel deployment of the USDCTokenPoolProxy
-			// and the USDCTokenPool contracts.
+			// It is not necessary to check for the error here since the contract constructor does not require any of the
+			// pool addresses to be set, and can be modified later. This also allows for parallel testing/deployment of the USDCTokenPoolProxy
+			// and the USDCTokenPool contracts on various chains.
 			cctpV1PoolAddress, _ := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:    "USDCTokenPool",
 				Version: semver.MustParse("1.6.4"),
