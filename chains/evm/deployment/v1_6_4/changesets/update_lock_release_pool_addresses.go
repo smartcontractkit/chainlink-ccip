@@ -11,6 +11,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
 type UpdateLockReleasePoolAddressesInput struct {
@@ -20,10 +24,12 @@ type UpdateLockReleasePoolAddressesInput struct {
 
 type UpdateLockReleasePoolAddressesPerChainInput struct {
 	ChainSelector        uint64
-	Address              common.Address
 	LockReleasePoolAddrs usdc_token_pool_proxy_ops.UpdateLockReleasePoolAddressesArgs
 }
 
+// This changeset is used to update the lock release pools for a given token in the USDCTokenPoolProxy contract.
+// On a given source chain, there will be different SiloedUSDCTokenPool contracts for each destination chain.
+// This changeset is used to update the lock release pool addresses for a given source chain and an associated destination chain.
 func UpdateLockReleasePoolAddressesChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateLockReleasePoolAddressesInput] {
 	return cldf.CreateChangeSet(updateLockReleasePoolAddressesApply(mcmsRegistry), updateLockReleasePoolAddressesVerify(mcmsRegistry))
 }
@@ -36,7 +42,14 @@ func updateLockReleasePoolAddressesApply(mcmsRegistry *changesets.MCMSReaderRegi
 		addressByChain := make(map[uint64]common.Address)
 		lockReleasePoolAddressesByChain := make(map[uint64]usdc_token_pool_proxy_ops.UpdateLockReleasePoolAddressesArgs)
 		for _, perChainInput := range input.ChainInputs {
-			addressByChain[perChainInput.ChainSelector] = perChainInput.Address
+			address, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:    datastore.ContractType(usdc_token_pool_proxy_ops.ContractType),
+				Version: usdc_token_pool_proxy_ops.Version,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+			addressByChain[perChainInput.ChainSelector] = address
 			lockReleasePoolAddressesByChain[perChainInput.ChainSelector] = perChainInput.LockReleasePoolAddrs
 		}
 
