@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/charmbracelet/lipgloss v1.0.0
-	github.com/go-viper/mapstructure/v2 v2.2.1
+	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250422094245-d734371d67f2
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v3 v3.0.0-beta1
