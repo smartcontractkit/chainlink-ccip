@@ -17,7 +17,7 @@ contract MessageV1CodecSetup is Test {
     return MessageV1Codec.MessageV1({
       sourceChainSelector: 1,
       destChainSelector: 2,
-      sequenceNumber: 100,
+      messageNumber: 100,
       executionGasLimit: 150000,
       ccipReceiveGasLimit: 50000,
       finality: 1000,
@@ -50,7 +50,7 @@ contract MessageV1CodecSetup is Test {
   ) internal pure {
     assertEq(expected.sourceChainSelector, actual.sourceChainSelector, "sourceChainSelector mismatch");
     assertEq(expected.destChainSelector, actual.destChainSelector, "destChainSelector mismatch");
-    assertEq(expected.sequenceNumber, actual.sequenceNumber, "sequenceNumber mismatch");
+    assertEq(expected.messageNumber, actual.messageNumber, "messageNumber mismatch");
     assertEq(expected.executionGasLimit, actual.executionGasLimit, "executionGasLimit mismatch");
     assertEq(expected.ccipReceiveGasLimit, actual.ccipReceiveGasLimit, "ccipReceiveGasLimit mismatch");
     assertEq(expected.finality, actual.finality, "finality mismatch");

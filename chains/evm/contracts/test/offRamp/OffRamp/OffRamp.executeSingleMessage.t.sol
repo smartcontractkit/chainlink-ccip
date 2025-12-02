@@ -38,7 +38,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     return MessageV1Codec.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      sequenceNumber: 1,
+      messageNumber: 1,
       executionGasLimit: 200_000,
       ccipReceiveGasLimit: 0,
       finality: 0,

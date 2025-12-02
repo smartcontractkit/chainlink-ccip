@@ -38,11 +38,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
   error InvalidVerifierResultsLength(uint256 expected, uint256 got);
-  error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
+  error InvalidNewState(uint64 sourceChainSelector, uint64 messageNumber, Internal.MessageExecutionState newState);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
   error InsufficientGasToCompleteTx(bytes4 err);
-  error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 sequenceNumber);
+  error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 messageNumber);
   error InvalidVerifierSelector(bytes4 selector);
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV);
@@ -55,7 +55,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   event StaticConfigSet(StaticConfig staticConfig);
   event ExecutionStateChanged(
     uint64 indexed sourceChainSelector,
-    uint64 indexed sequenceNumber,
+    uint64 indexed messageNumber,
     bytes32 indexed messageId,
     Internal.MessageExecutionState state,
     bytes returnData
@@ -150,21 +150,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @notice Returns the current execution state of a message.
   /// @return executionState The current execution state of the message.
   function getExecutionState(
-    uint64 sourceChainSelector,
-    uint64 sequenceNumber,
-    bytes memory sender,
-    address receiver
+    bytes32 messageId
   ) public view returns (Internal.MessageExecutionState) {
-    return s_executionStates[_calculateExecutionStateKey(sourceChainSelector, sequenceNumber, sender, receiver)];
-  }
-
-  function _calculateExecutionStateKey(
-    uint64 sourceChainSelector,
-    uint64 sequenceNumber,
-    bytes memory sender,
-    address receiver
-  ) internal pure returns (bytes32) {
-    return keccak256(abi.encode(sourceChainSelector, sequenceNumber, sender, receiver));
+    return s_executionStates[messageId];
   }
 
   /// @notice Executes a message from a source chain.
@@ -177,7 +165,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     MessageV1Codec.MessageV1 memory message =
       _beforeExecuteSingleMessage(MessageV1Codec._decodeMessageV1(encodedMessage));
-    bytes32 messageId = keccak256(encodedMessage);
 
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
@@ -204,11 +191,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     /////// Original state checks ///////
 
-    bytes32 executionStateKey = _calculateExecutionStateKey(
-      message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
-    );
+    bytes32 messageId = keccak256(encodedMessage);
 
-    Internal.MessageExecutionState originalState = s_executionStates[executionStateKey];
+    Internal.MessageExecutionState originalState = s_executionStates[messageId];
 
     // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
     // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
@@ -219,21 +204,21 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
           || originalState == Internal.MessageExecutionState.FAILURE
       )
     ) {
-      revert SkippedAlreadyExecutedMessage(messageId, message.sourceChainSelector, message.sequenceNumber);
+      revert SkippedAlreadyExecutedMessage(messageId, message.sourceChainSelector, message.messageNumber);
     }
 
     /////// Execution ///////
 
-    s_executionStates[executionStateKey] = Internal.MessageExecutionState.IN_PROGRESS;
+    s_executionStates[messageId] = Internal.MessageExecutionState.IN_PROGRESS;
 
     (bool success, bytes memory err) =
       _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, verifierResults)));
     Internal.MessageExecutionState newState =
       success ? Internal.MessageExecutionState.SUCCESS : Internal.MessageExecutionState.FAILURE;
 
-    s_executionStates[executionStateKey] = newState;
+    s_executionStates[messageId] = newState;
 
-    emit ExecutionStateChanged(message.sourceChainSelector, message.sequenceNumber, messageId, newState, err);
+    emit ExecutionStateChanged(message.sourceChainSelector, message.messageNumber, messageId, newState, err);
     s_reentrancyGuardEntered = false;
   }
 
