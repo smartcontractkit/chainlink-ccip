@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {Pool} from "../libraries/Pool.sol";
-import {TokenPool} from "./TokenPool.sol";
+import {Pool} from "../../libraries/Pool.sol";
+import {TokenPool} from "../TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
@@ -13,8 +13,8 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 /// @notice Lombard CCIP token pool.
 /// For v2 flows, token movement (burn/mint or bridging) is handled by the Lombard verifier,
 /// the pool performs validation, rate limiting, accounting and event emission.
-/// IPoolV2.lockOrBurn forwards tokens to the verifier. IPoolV2.releaseOrMint does not move tokens; it validates,
-/// consumes rate limits, and emits the event while the verifier delivers funds.
+/// IPoolV2.lockOrBurn forwards tokens to the verifier with _lockOrBurn.
+/// IPoolV2.releaseOrMint does not move tokens; it validates, consumes rate limits, and emits the event while the verifier delivers funds.
 /// TODO: Add explicit V1 support/backwards compatibility.
 contract LombardTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
