@@ -373,7 +373,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Hook for pre-flight checks on lock or burn.
   /// @dev These hooks are optional but take up a lot of space in the contracts bytecode. To avoid this overhead when
   /// not needed, you can override this function in the derived contract with an empty implementation. This will result
-  /// in the compiler removing the function and all related code, saving close to 1kb.
+  /// in the compiler removing the function and all related code, saving close to 1KB.
   /// @param lockOrBurnIn The input to validate.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
   /// @param tokenArgs Additional token arguments passed in by the sender of the message.
@@ -423,7 +423,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Hook for post-flight checks on release or mint.
   /// @dev These hooks are optional but take up a lot of space in the contracts bytecode. To avoid this overhead when
   /// not needed, you can override this function in the derived contract with an empty implementation. This will result
-  /// in the compiler removing the function and all related code, saving close to 1kb.
+  /// in the compiler removing the function and all related code, saving close to 1KB.
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.

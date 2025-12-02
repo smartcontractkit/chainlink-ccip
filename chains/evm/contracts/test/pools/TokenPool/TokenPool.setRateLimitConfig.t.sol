@@ -26,7 +26,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
   }
 
-  function testFuzz_SetChainRateLimiterConfigs_Success(
+  function testFuzz_setRateLimitConfig(
     uint128 capacity,
     uint128 rate,
     uint32 newTime,
@@ -65,7 +65,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     assertEq(inboundAfter.lastUpdated, newTime);
   }
 
-  function test_setCustomBlockConfirmationRateLimitConfig() public {
+  function test_setRateLimitConfig_customBlockConfs() public {
     RateLimiter.Config memory outboundConfig = RateLimiter.Config({isEnabled: true, capacity: 1e21, rate: 5e20});
     RateLimiter.Config memory inboundConfig = RateLimiter.Config({isEnabled: true, capacity: 2e21, rate: 1e21});
     TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
@@ -90,7 +90,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     _assertRateLimiterState(inboundBucket, inboundConfig);
   }
 
-  function test_setCustomBlockConfirmationRateLimitConfig_RevertWhen_InvalidRateLimitRate_Outbound() public {
+  function test_setRateLimitConfig_RevertWhen_InvalidRateLimitRate_Outbound() public {
     TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
     args[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -116,7 +116,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
 
   // Reverts
 
-  function test_RevertWhen_Unauthorized_OnlyOwnerOrRateLimitAdmin() public {
+  function test_setRateLimitConfig_RevertWhen_Unauthorized_OnlyOwnerOrRateLimitAdmin() public {
     TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitConfigArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -131,7 +131,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     s_tokenPool.setRateLimitConfig(rateLimitConfigArgs);
   }
 
-  function test_RevertWhen_NonExistentChain() public {
+  function test_setRateLimitConfig_RevertWhen_NonExistentChain() public {
     uint64 wrongChainSelector = 9084102894;
 
     TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
