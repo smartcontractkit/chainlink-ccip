@@ -15,6 +15,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensio
 
 contract OnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
+  uint16 internal constant NETWORK_FEE_USD_CENTS = 1_00; // $1.00
   uint32 internal constant POOL_FEE_USD_CENTS = 100; // $1.00
   uint32 internal constant POOL_GAS_OVERHEAD = 50000;
   uint32 internal constant POOL_BYTES_OVERHEAD = 128;
@@ -59,6 +60,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
+      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
@@ -123,14 +125,14 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     // Populate token transfers
     _populateTokenTransfers(messageV1, message);
 
-    // Compute receipts
-    (receipts, messageV1.executionGasLimit,) = s_onRamp.getReceipts(destChainSelector, message, resolvedExtraArgs);
+    (receipts, messageV1.executionGasLimit,) =
+      s_onRamp.getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
       MessageV1Codec._encodeMessageV1(messageV1),
       receipts,
-      new bytes[](receipts.length - message.tokenAmounts.length - 1)
+      new bytes[](resolvedExtraArgs.ccvs.length)
     );
   }
 
