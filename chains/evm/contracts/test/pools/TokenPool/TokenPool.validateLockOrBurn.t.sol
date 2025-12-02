@@ -21,16 +21,16 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
     uint16 minBlockConfirmation = 5;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
-    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.CustomBlockConfirmationRateLimitConfigArgs({
+    TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
+      customBlockConfirmation: true,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
     vm.startPrank(OWNER);
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
-    s_tokenPool.setCustomBlockConfirmationRateLimitConfig(rateLimitArgs);
+    s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
@@ -42,8 +42,7 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, type(uint16).max, "");
 
-    (RateLimiter.TokenBucket memory outboundBucket,) =
-      s_tokenPool.getCurrentCustomBlockConfirmationRateLimiterState(DEST_CHAIN_SELECTOR);
+    (RateLimiter.TokenBucket memory outboundBucket,) = s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, true);
     assertEq(outboundBucket.tokens, outboundFastConfig.capacity - lockOrBurnIn.amount);
   }
 

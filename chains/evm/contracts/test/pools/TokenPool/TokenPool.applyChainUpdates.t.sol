@@ -35,7 +35,7 @@ contract TokenPool_applyChainUpdates is BaseTest {
     for (uint256 i = 0; i < chainUpdates.length; ++i) {
       assertTrue(s_tokenPool.isSupportedChain(chainUpdates[i].remoteChainSelector));
       (RateLimiter.TokenBucket memory outboundState, RateLimiter.TokenBucket memory inboundState) =
-        s_tokenPool.getCurrentRateLimiterState(chainUpdates[i].remoteChainSelector);
+        s_tokenPool.getCurrentRateLimiterState(chainUpdates[i].remoteChainSelector, false);
       assertEq(outboundState.capacity, chainUpdates[i].outboundRateLimiterConfig.capacity);
       assertEq(outboundState.rate, chainUpdates[i].outboundRateLimiterConfig.rate);
       assertEq(outboundState.isEnabled, chainUpdates[i].outboundRateLimiterConfig.isEnabled);
