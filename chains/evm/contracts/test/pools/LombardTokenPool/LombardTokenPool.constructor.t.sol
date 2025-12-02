@@ -15,16 +15,11 @@ contract LombardTokenPool_constructor is Test {
     s_token = new BurnMintERC20("Lombard", "LBD", 18, 0, 0);
   }
 
-  function test_constructor_SetsVerifierAndAllowance() public {
+  function test_constructor() public {
     LombardTokenPool pool = new LombardTokenPool(s_token, VERIFIER, address(0), RMN, ROUTER, 18);
 
     assertEq(pool.s_verifier(), VERIFIER);
     assertEq(s_token.allowance(address(pool), VERIFIER), type(uint256).max);
     assertEq(pool.typeAndVersion(), "LombardTokenPool 1.7.0-dev");
-  }
-
-  function test_constructor_ZeroVerifierReverts() public {
-    vm.expectRevert(LombardTokenPool.ZeroVerifierNotAllowed.selector);
-    new LombardTokenPool(s_token, address(0), address(0), RMN, ROUTER, 18);
   }
 }

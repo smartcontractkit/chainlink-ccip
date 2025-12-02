@@ -14,7 +14,7 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 /// For v2 flows, token movement (burn/mint or bridging) is handled by the Lombard verifier,
 /// the pool performs validation, rate limiting, accounting and event emission.
 /// IPoolV2.lockOrBurn forwards tokens to the verifier with _lockOrBurn.
-/// IPoolV2.releaseOrMint does not move tokens; it validates, consumes rate limits, and emits the event while the verifier delivers funds.
+/// IPoolV2.releaseOrMint does not move tokens, _releaseOrMint is a no-op.
 /// TODO: Add explicit V1 support/backwards compatibility.
 contract LombardTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
