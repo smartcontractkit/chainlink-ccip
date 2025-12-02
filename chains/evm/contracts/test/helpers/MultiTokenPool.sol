@@ -264,8 +264,6 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
   function applyChainUpdates(address token, ChainUpdate[] calldata chains) external virtual onlyOwner {
     for (uint256 i = 0; i < chains.length; ++i) {
       ChainUpdate memory update = chains[i];
-      RateLimiter._validateTokenBucketConfig(update.outboundRateLimiterConfig);
-      RateLimiter._validateTokenBucketConfig(update.inboundRateLimiterConfig);
 
       if (update.allowed) {
         // If the chain already exists, revert
@@ -358,10 +356,10 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
     RateLimiter.Config memory inboundConfig
   ) internal {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
-    RateLimiter._validateTokenBucketConfig(outboundConfig);
+
     s_remoteChainConfigs[token][remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
-    RateLimiter._validateTokenBucketConfig(inboundConfig);
     s_remoteChainConfigs[token][remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
+
     emit DefaultFinalityRateLimitConfigured(remoteChainSelector, outboundConfig, inboundConfig);
   }
 
