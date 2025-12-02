@@ -1,6 +1,8 @@
 package changesets
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -67,6 +69,12 @@ func applyAuthorizedCallerUpdatesApply() func(cldf.Environment, ApplyAuthorizedC
 
 func applyAuthorizedCallerUpdatesVerify() func(cldf.Environment, ApplyAuthorizedCallerUpdatesInput) error {
 	return func(e cldf.Environment, input ApplyAuthorizedCallerUpdatesInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			// Verify that a valid address was provided for each chain selector
+			if perChainInput.Address == (common.Address{}) {
+				return fmt.Errorf("address must not be zero for chain selector %d", perChainInput.ChainSelector)
+			}
+		}
 		return nil
 	}
 }

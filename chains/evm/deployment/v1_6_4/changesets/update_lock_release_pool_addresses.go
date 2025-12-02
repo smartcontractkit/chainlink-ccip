@@ -1,6 +1,9 @@
 package changesets
 
 import (
+	"fmt"
+	"slices"
+
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -75,6 +78,21 @@ func updateLockReleasePoolAddressesApply() func(cldf.Environment, UpdateLockRele
 
 func updateLockReleasePoolAddressesVerify() func(cldf.Environment, UpdateLockReleasePoolAddressesInput) error {
 	return func(e cldf.Environment, input UpdateLockReleasePoolAddressesInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+
+			// Check that the number of lock release pool addresses is the same as the number of remote chain selectors
+			if len(perChainInput.LockReleasePoolAddrs.LockReleasePools) != len(perChainInput.LockReleasePoolAddrs.RemoteChainSelectors) {
+				return fmt.Errorf("lock release pool addresses and remote chain selectors must be the same length for chain selector %d", perChainInput.ChainSelector)
+			}
+
+			// Check that the lock release pool addresses are not zero addresses for any of the chain selectors
+			if slices.Contains(perChainInput.LockReleasePoolAddrs.LockReleasePools, common.Address{}) {
+				return fmt.Errorf("lock release pool address cannot be zero for chain selector %d", perChainInput.ChainSelector)
+			}
+		}
 		return nil
 	}
 }

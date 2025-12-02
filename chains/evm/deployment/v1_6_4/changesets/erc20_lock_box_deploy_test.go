@@ -44,7 +44,10 @@ func TestERC20LockBoxDeployChangeset(t *testing.T) {
 		},
 	}
 
-	changesetOutput, err := changesets.ERC20LockboxDeployChangeset().Apply(*e, changesetInput)
+	changeset := changesets.ERC20LockboxDeployChangeset()
+	validate := changeset.VerifyPreconditions(*e, changesetInput)
+	require.NoError(t, validate, "Failed to validate ERC20LockboxDeployChangeset")
+	changesetOutput, err := changeset.Apply(*e, changesetInput)
 	require.NoError(t, err, "Failed to apply ERC20LockboxDeployChangeset")
 	require.NotNil(t, changesetOutput, "Changeset output should not be nil")
 	require.Greater(t, len(changesetOutput.Reports), 0)

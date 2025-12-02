@@ -98,6 +98,9 @@ func TestUpdateLockOrBurnMechanismChangeset(t *testing.T) {
 	}
 
 	updateLockOrBurnMechanismChangeset := changesets.UpdateLockOrBurnMechanismChangeset()
+	validate := updateLockOrBurnMechanismChangeset.VerifyPreconditions(*e, updateLockOrBurnMechanismInput)
+	require.NoError(t, validate, "Failed to validate UpdateLockOrBurnMechanismChangeset")
+
 	output, err := updateLockOrBurnMechanismChangeset.Apply(*e, updateLockOrBurnMechanismInput)
 	require.NoError(t, err, "UpdateLockOrBurnMechanismChangeset should not error")
 	require.Greater(t, len(output.Reports), 0)

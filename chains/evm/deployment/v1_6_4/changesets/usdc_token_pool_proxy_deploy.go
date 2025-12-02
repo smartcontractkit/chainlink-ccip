@@ -125,6 +125,15 @@ func deployUSDCTokenPoolProxyApply() func(cldf.Environment, DeployUSDCTokenPoolP
 
 func deployUSDCTokenPoolProxyVerify() func(cldf.Environment, DeployUSDCTokenPoolProxyInput) error {
 	return func(e cldf.Environment, input DeployUSDCTokenPoolProxyInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+		}
+
+		// Note: The legacy pool address is not being validated as it is not always required to be set
+		// for a new token pool proxy deployment.
+
 		return nil
 	}
 }

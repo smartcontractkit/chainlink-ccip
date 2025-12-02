@@ -535,6 +535,9 @@ func TestUSDCTokenPoolCCTPV2DeployChangeset_InvalidTokenAddress(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	deployChangeset := changesets.USDCTokenPoolCCTPV2DeployChangeset()
+	validate := deployChangeset.VerifyPreconditions(*e, deployInput)
+	require.NoError(t, validate, "Failed to validate USDCTokenPoolCCTPV2DeployChangeset")
+
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "USDCTokenPoolCCTPV2DeployChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)

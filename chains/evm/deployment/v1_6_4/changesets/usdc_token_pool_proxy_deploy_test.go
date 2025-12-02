@@ -387,6 +387,10 @@ func TestDeployUSDCTokenPoolProxyChangeset_OnlyCCTPV1PoolDeployed(t *testing.T) 
 	e.DataStore = ds.Seal()
 
 	deployChangeset := changesets.DeployUSDCTokenPoolProxyChangeset()
+
+	validate := deployChangeset.VerifyPreconditions(*e, deployInput)
+	require.NoError(t, validate, "Failed to validate DeployUSDCTokenPoolProxyChangeset")
+
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "DeployUSDCTokenPoolProxyChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)

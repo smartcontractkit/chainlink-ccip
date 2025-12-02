@@ -135,6 +135,10 @@ func TestSetDomainsSequence(t *testing.T) {
 	}
 
 	setDomainsChangeset := changesets.SetDomainsChangeset()
+
+	validate := setDomainsChangeset.VerifyPreconditions(*e, setDomainsInput)
+	require.NoError(t, validate, "Failed to validate SetDomainsChangeset")
+
 	output, err := setDomainsChangeset.Apply(*e, setDomainsInput)
 	require.NoError(t, err, "SetDomainsChangeset should not error")
 	require.Greater(t, len(output.Reports), 0)

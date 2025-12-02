@@ -1,6 +1,8 @@
 package changesets
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -65,6 +67,15 @@ func setDomainsApply() func(cldf.Environment, SetDomainsInput) (cldf.ChangesetOu
 
 func setDomainsVerify() func(cldf.Environment, SetDomainsInput) error {
 	return func(e cldf.Environment, input SetDomainsInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if perChainInput.ChainSelector == 0 {
+				return fmt.Errorf("chain selector must be provided for each chain input")
+			}
+
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+		}
 		return nil
 	}
 }

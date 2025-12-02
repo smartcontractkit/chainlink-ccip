@@ -16,8 +16,11 @@ import (
 	token_admin_registry "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 )
 
+// The MCMS input is not used anywhere in this changeset, but is included here to ensure parity with other changesets
+// in this package, and to better support the outputBuilder pattern as part of the Apply() function.
 type ERC20LockboxDeployInput struct {
 	ChainInputs []ERC20LockboxDeployInputPerChain
+	MCMS        mcms.Input
 }
 
 type ERC20LockboxDeployInputPerChain struct {
@@ -57,15 +60,25 @@ func erc20LockboxDeployApply() func(cldf.Environment, ERC20LockboxDeployInput) (
 				}
 			}
 		}
+
 		return changesets.NewOutputBuilder(e, nil).
 			WithReports(reports).
 			WithDataStore(ds).
-			Build(mcms.Input{})
+			Build(input.MCMS)
 	}
 }
 
 func erc20LockboxDeployVerify() func(cldf.Environment, ERC20LockboxDeployInput) error {
 	return func(e cldf.Environment, input ERC20LockboxDeployInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if perChainInput.ChainSelector == 0 {
+				return fmt.Errorf("chain selector must be provided for each chain input")
+			}
+
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+		}
 		return nil
 	}
 }

@@ -144,6 +144,10 @@ func TestConfigureAllowedCallersSequence(t *testing.T) {
 	}
 
 	configureAllowedCallersChangeset := changesets.ConfigureAllowedCallersChangeset()
+
+	validate := configureAllowedCallersChangeset.VerifyPreconditions(*e, configureAllowedCallersInput)
+	require.NoError(t, validate, "Failed to validate ConfigureAllowedCallersChangeset")
+
 	output, err := configureAllowedCallersChangeset.Apply(*e, configureAllowedCallersInput)
 	require.NoError(t, err, "ConfigureAllowedCallersChangeset should not error")
 	require.Greater(t, len(output.Reports), 0)

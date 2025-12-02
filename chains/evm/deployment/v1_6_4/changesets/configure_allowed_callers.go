@@ -1,6 +1,8 @@
 package changesets
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -82,6 +84,18 @@ func configureAllowedCallersApply() func(cldf.Environment, ConfigureAllowedCalle
 
 func configureAllowedCallersVerify() func(cldf.Environment, ConfigureAllowedCallersInput) error {
 	return func(e cldf.Environment, input ConfigureAllowedCallersInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+
+			for _, allowedCaller := range perChainInput.AllowedCallers {
+				if allowedCaller.Caller == (common.Address{}) {
+					return fmt.Errorf("caller address cannot be zero for chain selector %d", perChainInput.ChainSelector)
+				}
+			}
+
+		}
 		return nil
 	}
 }

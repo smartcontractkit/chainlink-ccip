@@ -244,6 +244,9 @@ func TestUSDCTokenPoolDeployChangeset(t *testing.T) {
 		},
 	}
 	applyAuthorizedCallerUpdatesChangeset := changesets.ApplyAuthorizedCallerUpdatesChangeset()
+	validate := applyAuthorizedCallerUpdatesChangeset.VerifyPreconditions(*e, applyAuthorizedCallerUpdatesInput)
+	require.NoError(t, validate, "Failed to validate ApplyAuthorizedCallerUpdatesChangeset")
+
 	applyAuthorizedCallerUpdatesChangesetOutput, err := applyAuthorizedCallerUpdatesChangeset.Apply(*e, applyAuthorizedCallerUpdatesInput)
 	require.NoError(t, err, "ApplyAuthorizedCallerUpdatesChangeset should not error")
 	require.Greater(t, len(applyAuthorizedCallerUpdatesChangesetOutput.Reports), 0)

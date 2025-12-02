@@ -1,6 +1,8 @@
 package changesets
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -72,6 +74,12 @@ func updatePoolAddressesApply() func(cldf.Environment, UpdatePoolAddressesInput)
 
 func updatePoolAddressesVerify() func(cldf.Environment, UpdatePoolAddressesInput) error {
 	return func(e cldf.Environment, input UpdatePoolAddressesInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+		}
+
 		return nil
 	}
 }

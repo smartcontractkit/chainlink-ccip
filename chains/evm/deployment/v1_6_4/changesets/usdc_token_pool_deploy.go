@@ -131,6 +131,16 @@ func usdcTokenPoolDeployApply() func(cldf.Environment, USDCTokenPoolDeployInput)
 
 func usdcTokenPoolDeployVerify() func(cldf.Environment, USDCTokenPoolDeployInput) error {
 	return func(e cldf.Environment, input USDCTokenPoolDeployInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+
+			if perChainInput.TokenMessenger == (common.Address{}) {
+				return fmt.Errorf("token messenger address cannot be zero for chain selector %d", perChainInput.ChainSelector)
+			}
+
+		}
 		return nil
 	}
 }

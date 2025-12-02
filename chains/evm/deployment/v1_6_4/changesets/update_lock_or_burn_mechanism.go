@@ -1,6 +1,8 @@
 package changesets
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -75,6 +77,15 @@ func updateLockOrBurnMechanismApply() func(cldf.Environment, UpdateLockOrBurnMec
 
 func updateLockOrBurnMechanismVerify() func(cldf.Environment, UpdateLockOrBurnMechanismInput) error {
 	return func(e cldf.Environment, input UpdateLockOrBurnMechanismInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+		}
+
+		// Note: The Mechanism are not being validated as what is considered a valid mechanism is subject to change
+		// over time, and any validation mechanisms would need to be updated to reflect the changes.
+
 		return nil
 	}
 }

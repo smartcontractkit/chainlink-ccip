@@ -152,6 +152,10 @@ func TestUpdatePoolAddressesChangeset(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	updatePoolAddressesChangeset := changesets.UpdatePoolAddressesChangeset()
+
+	validate := updatePoolAddressesChangeset.VerifyPreconditions(*e, updatePoolAddressesInput)
+	require.NoError(t, validate, "Failed to validate UpdatePoolAddressesChangeset")
+
 	deployChangesetOutput, err := updatePoolAddressesChangeset.Apply(*e, updatePoolAddressesInput)
 	require.NoError(t, err, "UpdatePoolAddressesChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)

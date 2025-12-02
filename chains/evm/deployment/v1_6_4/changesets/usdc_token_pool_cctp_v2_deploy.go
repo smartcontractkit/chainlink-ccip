@@ -135,6 +135,12 @@ func usdcTokenPoolCCTPV2DeployApply() func(cldf.Environment, USDCTokenPoolCCTPV2
 
 func usdcTokenPoolCCTPV2DeployVerify() func(cldf.Environment, USDCTokenPoolCCTPV2DeployInput) error {
 	return func(e cldf.Environment, input USDCTokenPoolCCTPV2DeployInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+		}
+
 		return nil
 	}
 }
