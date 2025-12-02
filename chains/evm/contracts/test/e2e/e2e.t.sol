@@ -160,6 +160,7 @@ contract e2e is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: expectedSeqNum,
       messageId: messageId,
+      feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs

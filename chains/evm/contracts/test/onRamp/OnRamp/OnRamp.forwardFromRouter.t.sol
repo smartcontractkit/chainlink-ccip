@@ -26,6 +26,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: 1,
       messageId: messageId,
+      feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs
@@ -58,6 +59,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: destConfig.sequenceNumber,
       messageId: messageIdExpected,
+      feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs
@@ -78,6 +80,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: destConfig.sequenceNumber,
       messageId: messageIdExpected,
+      feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs

@@ -64,6 +64,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 indexed destChainSelector,
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
+    address feeToken,
     bytes encodedMessage,
     Receipt[] receipts,
     bytes[] verifierBlobs
@@ -292,14 +293,15 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     // 7. emit event.
-    emit CCIPMessageSent(
-      destChainSelector,
-      newMessage.sequenceNumber,
-      messageId,
-      eventData.encodedMessage,
-      eventData.receipts,
-      eventData.verifierBlobs
-    );
+    emit CCIPMessageSent({
+      destChainSelector: destChainSelector,
+      sequenceNumber: newMessage.sequenceNumber,
+      messageId: messageId,
+      feeToken: message.feeToken,
+      encodedMessage: eventData.encodedMessage,
+      receipts: eventData.receipts,
+      verifierBlobs: eventData.verifierBlobs
+    });
 
     s_dynamicConfig.reentrancyGuardEntered = false;
 
