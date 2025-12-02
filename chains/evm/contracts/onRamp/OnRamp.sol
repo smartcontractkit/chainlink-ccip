@@ -313,8 +313,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function _distributeFees(Client.EVM2AnyMessage calldata message, Receipt[] memory receipts) internal {
     IERC20 feeToken = IERC20(message.feeToken);
     uint256 tokenReceiptIndex = type(uint256).max;
-    // Network fee receipt is always the last slot; it stays on the onRamp for withdrawal by the aggregator.
-    uint256 networkFeeReceiptIndex = receipts.length - 1;
     if (message.tokenAmounts.length > 0) {
       // Layout with tokens: verifiers..., token, executor, network fee.
       tokenReceiptIndex = receipts.length - 3;
@@ -325,9 +323,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         feeToken.safeTransfer(address(tokenPool), receipts[tokenReceiptIndex].feeTokenAmount);
       }
     }
-    for (uint256 i = 0; i < networkFeeReceiptIndex; ++i) {
-      // We skip fee distribution if the fee is zero, if this is the token receipt (handled above), or if this is the
-      // network fee (stays on the onRamp for withdrawal).
+    // We iterate up to receipts.length - 1 to skip the network fee receipt which must remain in the onRamp.
+    for (uint256 i = 0; i < receipts.length - 1; ++i) {
+      // We skip fee distribution if:
+      // - The fee is 0.
+      // - The receipt is the token receipt as that's handled above.
+      // - The network fee receipt, as explained above.
       if (i == tokenReceiptIndex) continue;
       uint256 receiptFee = receipts[i].feeTokenAmount;
       if (receiptFee == 0) continue;
