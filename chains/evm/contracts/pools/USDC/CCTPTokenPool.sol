@@ -9,6 +9,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";
+import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/ERC165Checker.sol";
@@ -21,6 +22,7 @@ import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/E
 contract CCTPTokenPool is TokenPool, ITypeAndVersion {
   using ERC165Checker for address;
 
+  error InboundImplementationNotFoundForVerifier(bytes4 ccvVersionTag);
   error InvalidCCTPVerifier(address cctpVerifier);
   error OutboundImplementationNotFoundForVerifier(uint64 remoteChainSelector);
 
@@ -86,7 +88,7 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV()
+      destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV(CCTPVerifier(verifierImpl).versionTag())
     });
   }
 
@@ -98,26 +100,33 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationRequested);
+    (,bytes4 ccvVersionTag) = USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2WithCCV(releaseOrMintIn.sourcePoolData);
+
+    address verifierImpl = ICrossChainVerifierResolver(i_cctpVerifier).getInboundImplementation(abi.encodePacked(ccvVersionTag));
+    if (verifierImpl = address(0) {
+      return InboundImplementationNotFoundForVerifier(ccvVersionTag);
+    })
+
+    // Subtract the feeExecuted value for the CCTP message associated with this mint.
+    // Assumes that verifyMessage gets called and stores the feeExecuted value before releaseOrMint.
+    uint256 feeExecuted = CCTPVerifier(verifierImpl).getLatestFeeExecuted();
+    uint256 amountReceived = releaseOrMintIn.sourceDenominatedAmount - feeExecuted;
+
+    _validateReleaseOrMint(releaseOrMintIn, amountReceived, blockConfirmationRequested);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       token: address(i_token),
       sender: msg.sender,
       recipient: releaseOrMintIn.receiver,
-      amount: releaseOrMintIn.sourceDenominatedAmount
+      amount: amountReceived
     });
 
-    // We return 0 because this pool doesn't actually mint tokens, the CCTPVerifier contract does.
-    // Returning a value here would cause the OffRamp to revert with ReleaseOrMintBalanceMismatch.
-    // The CCTPVerifier contract is responsible for validating that receiver balance has increased by the correct amount.
-    return Pool.ReleaseOrMintOutV1({destinationAmount: 0});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: amountReceived});
   }
 
   /// @inheritdoc IPoolV1
-  /// @dev calls IPoolV2.releaseOrMint with default finality.
-  /// @dev The call to _releaseOrMint is omitted because this pool is not responsible for token management.
-  /// ReleasedOrMinted is still emitted for consumers that expect it.
+  /// @dev Calls IPoolV2.releaseOrMint with default finality.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {

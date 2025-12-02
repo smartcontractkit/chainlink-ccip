@@ -162,6 +162,9 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   mapping(uint64 remoteChainSelector => Domain cctpDomain) private s_chainToDomain;
   /// @notice The dynamic configuration.
   DynamicConfig private s_dynamicConfig;
+  /// @notice The feeExecuted value of the latest message.
+  /// @dev Used by the CCTP token pool to compute the amount designated for the intended receiver (i.e. amount - feeExecuted).
+  uint256 private s_latestFeeExecuted;
 
   constructor(
     ITokenMessenger tokenMessenger,
@@ -326,6 +329,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     address tokenReceiver = address(uint160(uint256(bytes32(tokenTransfer.tokenReceiver))));
     uint256 balancePre = i_usdcToken.balanceOf(tokenReceiver);
 
+    // Store the feeExecuted value so the CCTP token pool can use it to compute the total amount received.
+    // Assumes that the OffRamp calls verifyMessage before releaseOrMint.
+    s_latestFeeExecuted = uint256(bytes32(ccvData[FEE_EXECUTED_START:FEE_EXECUTED_START + 32]));
+
     // Call into CCTP via the message transmitter proxy.
     // CCTP will validate signatures against the message before minting USDC.
     // Attestation occupies all bytes following the CCTP message.
@@ -337,16 +344,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     ) {
       revert ReceiveMessageCallFailed();
     }
+  }
 
-    // Ensure that the balance of the token receiver has increased by amount - feeExecuted.
-    // The CCTP token pool returns a mint amount of 0, so the OffRamp isn't able to track the balance increase.
-    // Therefore, we must perform this check within the scope of the verifier.
-    uint256 feeExecuted = uint256(bytes32(ccvData[FEE_EXECUTED_START:FEE_EXECUTED_START + 32]));
-    uint256 balancePost = i_usdcToken.balanceOf(tokenReceiver);
-    uint256 expectedAmount = tokenTransfer.amount - feeExecuted;
-    if (balancePost < balancePre || balancePost - balancePre != expectedAmount) {
-      revert MintBalanceMismatch(expectedAmount, balancePre, balancePost);
-    }
+  /// @notice Returns the feeExecuted value of the latest CCTP message processed.
+  /// @dev Used by the CCTP token pool to compute the total amount designated for the receiver.
+  function getLatestFeeExecuted() external view returns (uint256) {
+    return s_latestFeeExecuted
   }
 
   // ================================================================

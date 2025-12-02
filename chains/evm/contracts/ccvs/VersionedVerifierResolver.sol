@@ -2,16 +2,18 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../interfaces/ICrossChainVerifierResolver.sol";
+import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice Resolves and returns the appropriate verifier contract for the given outbound / inbound traffic.
 /// @dev On source, the destChainSelector of a message is used to determine the verifier implementation to apply.
 /// On destination, we must use the verifier version was applied on source, parsing this version from the verifierResults.
-contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersion, Ownable2StepMsgSender {
+contract VersionedVerifierResolver is IERC165, ICrossChainVerifierResolver, ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
@@ -131,5 +133,14 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
       s_supportedDestChains.add(implementation.destChainSelector);
       emit OutboundImplementationUpdated(implementation.destChainSelector, previous, implementation.verifier);
     }
+  }
+
+  /// @inheritdoc IERC165
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public view virtual returns (bool) {
+    return interfaceId == type(ICrossChainVerifierResolver).interfaceId
+      || interfaceId == type(ITypeAndVersion).interfaceId || interfaceId == type(IERC165).interfaceId
+      || interfaceId == type(IOwnable).interfaceId;
   }
 }

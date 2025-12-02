@@ -19,7 +19,7 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
 
 /// @notice A token pool proxy for USDC that allows for routing of messages to the correct pool based on the correct
-/// lock or burn mechanism. This includes CCTP v1, CCTP v2, and lock release.
+/// lock or burn mechanism. This includes CCTP v1, CCTP v2, CCTP v2 with CCV, and lock release.
 /// @dev This contract will be listed in the Token Admin Registry as a token pool. All of the child pools which
 /// receive the messages should have this contract set as an authorized caller. It does not inherit from the base
 /// TokenPool contract but still implements the IPoolV2 interface.
@@ -32,6 +32,7 @@ import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165
 ///     ├──→ LegacyCCTPV1Pool → CCTPV1
 ///     ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
 ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
+///     ├──→ CCTPV2WithCCVPool → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
 contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   using SafeERC20 for IERC20;
@@ -72,10 +73,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   mapping(uint64 remoteChainSelector => LockOrBurnMechanism mechanism) internal s_lockOrBurnMechanism;
   mapping(uint64 remoteChainSelector => address lockReleasePool) internal s_lockReleasePools;
 
-  /// @dev The legacy CCTP V1, CCTP V1, and CCTP V2 pools which interact with CCTP contracts.
+  /// @dev The legacy CCTP V1, CCTP V1, CCTP V2, and CCTP V2 with CCV pools.
   PoolAddresses internal s_pools;
   /// @notice The CCTP verifier contract.
-  /// @dev Not immutable because it gets set when cctpV2PoolWithCCV is added.
+  /// @dev Not immutable because it gets updated when cctpV2PoolWithCCV is updated.
   address internal s_cctpVerifier;
 
   /// @dev Constant representing the default finality.
