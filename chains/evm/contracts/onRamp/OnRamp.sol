@@ -324,7 +324,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
     }
     // We iterate up to receipts.length - 1 to skip the network fee receipt which must remain in the onRamp.
-    for (uint256 i = 0; i < receipts.length - 1; ++i) {
+    uint256 networkFeeReceiptIndex = receipts.length - 1;
+    for (uint256 i = 0; i < networkFeeReceiptIndex; ++i) {
       // We skip fee distribution if:
       // - The fee is 0.
       // - The receipt is the token receipt as that's handled above.
