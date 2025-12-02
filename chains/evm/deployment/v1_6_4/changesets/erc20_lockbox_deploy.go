@@ -18,18 +18,17 @@ import (
 
 type ERC20LockboxDeployInput struct {
 	ChainInputs []ERC20LockboxDeployInputPerChain
-	MCMS        mcms.Input
 }
 
 type ERC20LockboxDeployInputPerChain struct {
 	ChainSelector uint64
 }
 
-func ERC20LockboxDeployChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ERC20LockboxDeployInput] {
-	return cldf.CreateChangeSet(erc20LockboxDeployApply(mcmsRegistry), erc20LockboxDeployVerify(mcmsRegistry))
+func ERC20LockboxDeployChangeset() cldf.ChangeSetV2[ERC20LockboxDeployInput] {
+	return cldf.CreateChangeSet(erc20LockboxDeployApply(), erc20LockboxDeployVerify())
 }
 
-func erc20LockboxDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ERC20LockboxDeployInput) (cldf.ChangesetOutput, error) {
+func erc20LockboxDeployApply() func(cldf.Environment, ERC20LockboxDeployInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input ERC20LockboxDeployInput) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
@@ -61,11 +60,11 @@ func erc20LockboxDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(c
 		return changesets.NewOutputBuilder(e, nil).
 			WithReports(reports).
 			WithDataStore(ds).
-			Build(input.MCMS)
+			Build(mcms.Input{})
 	}
 }
 
-func erc20LockboxDeployVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ERC20LockboxDeployInput) error {
+func erc20LockboxDeployVerify() func(cldf.Environment, ERC20LockboxDeployInput) error {
 	return func(e cldf.Environment, input ERC20LockboxDeployInput) error {
 		return nil
 	}

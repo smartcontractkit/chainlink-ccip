@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -18,9 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_usdc_token_transmitter"
 
 	changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -122,6 +119,7 @@ func TestSetDomainsSequence(t *testing.T) {
 		ChainInputs: []changesets.SetDomainsPerChainInput{
 			{
 				ChainSelector: chainSelector,
+				Address:       common.HexToAddress(usdcTokenPoolRef.Address),
 				Domains: []usdc_token_pool.DomainUpdate{
 					{
 						AllowedCaller:                 [32]byte{1},
@@ -134,19 +132,9 @@ func TestSetDomainsSequence(t *testing.T) {
 				},
 			},
 		},
-		MCMS: mcms.Input{
-			OverridePreviousRoot: false,
-			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
-			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
-			Description:          "Set domains on USDCTokenPool",
-		},
 	}
 
-	// Create the changeset. No adapter is needed here because the changeset is using the MCMSReaderRegistry only
-	mcmsRegistry := changesets_utils.GetRegistry()
-	setDomainsChangeset := changesets.SetDomainsChangeset(mcmsRegistry)
+	setDomainsChangeset := changesets.SetDomainsChangeset()
 	output, err := setDomainsChangeset.Apply(*e, setDomainsInput)
 	require.NoError(t, err, "SetDomainsChangeset should not error")
 	require.Greater(t, len(output.Reports), 0)

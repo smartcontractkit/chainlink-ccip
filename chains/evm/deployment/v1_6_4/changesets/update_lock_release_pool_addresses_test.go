@@ -29,8 +29,6 @@ import (
 	mcms "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-
 	burn_mint_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 )
 
@@ -157,12 +155,7 @@ func TestUpdateLockReleasePoolAddressesChangeset(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
-
-	updateLockReleasePoolAddressesChangeset := changesets.UpdateLockReleasePoolAddressesChangeset(mcmsRegistry)
+	updateLockReleasePoolAddressesChangeset := changesets.UpdateLockReleasePoolAddressesChangeset()
 	deployChangesetOutput, err := updateLockReleasePoolAddressesChangeset.Apply(*e, updateLockReleasePoolAddressesInput)
 	require.NoError(t, err, "UpdateLockReleasePoolAddressesChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)

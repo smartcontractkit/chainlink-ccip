@@ -43,11 +43,11 @@ type SiloedUSDCTokenPoolDeployInput struct {
 	MCMS        mcms.Input
 }
 
-func SiloedUSDCTokenPoolDeployChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) deployment.ChangeSetV2[SiloedUSDCTokenPoolDeployInput] {
-	return cldf.CreateChangeSet(siloedUSDCTokenPoolDeployApply(mcmsRegistry), siloedUSDCTokenPoolDeployVerify(mcmsRegistry))
+func SiloedUSDCTokenPoolDeployChangeset() deployment.ChangeSetV2[SiloedUSDCTokenPoolDeployInput] {
+	return cldf.CreateChangeSet(siloedUSDCTokenPoolDeployApply(), siloedUSDCTokenPoolDeployVerify())
 }
 
-func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
+func siloedUSDCTokenPoolDeployApply() func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input SiloedUSDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
@@ -129,7 +129,7 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 	}
 }
 
-func siloedUSDCTokenPoolDeployVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) error {
+func siloedUSDCTokenPoolDeployVerify() func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) error {
 	return func(e cldf.Environment, input SiloedUSDCTokenPoolDeployInput) error {
 		return nil
 	}

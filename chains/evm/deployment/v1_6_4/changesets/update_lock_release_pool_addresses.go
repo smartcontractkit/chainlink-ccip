@@ -30,11 +30,11 @@ type UpdateLockReleasePoolAddressesPerChainInput struct {
 // This changeset is used to update the lock release pools for a given token in the USDCTokenPoolProxy contract.
 // On a given source chain, there will be different SiloedUSDCTokenPool contracts for each destination chain.
 // This changeset is used to update the lock release pool addresses for a given source chain and an associated destination chain.
-func UpdateLockReleasePoolAddressesChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateLockReleasePoolAddressesInput] {
-	return cldf.CreateChangeSet(updateLockReleasePoolAddressesApply(mcmsRegistry), updateLockReleasePoolAddressesVerify(mcmsRegistry))
+func UpdateLockReleasePoolAddressesChangeset() cldf.ChangeSetV2[UpdateLockReleasePoolAddressesInput] {
+	return cldf.CreateChangeSet(updateLockReleasePoolAddressesApply(), updateLockReleasePoolAddressesVerify())
 }
 
-func updateLockReleasePoolAddressesApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateLockReleasePoolAddressesInput) (cldf.ChangesetOutput, error) {
+func updateLockReleasePoolAddressesApply() func(cldf.Environment, UpdateLockReleasePoolAddressesInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input UpdateLockReleasePoolAddressesInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
@@ -66,18 +66,15 @@ func updateLockReleasePoolAddressesApply(mcmsRegistry *changesets.MCMSReaderRegi
 		batchOps = append(batchOps, report.Output.BatchOps...)
 		reports = append(reports, report.ExecutionReports...)
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		return changesets.NewOutputBuilder(e, nil).
 			WithReports(reports).
 			WithBatchOps(batchOps).
 			Build(input.MCMS)
 	}
 }
 
-func updateLockReleasePoolAddressesVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateLockReleasePoolAddressesInput) error {
+func updateLockReleasePoolAddressesVerify() func(cldf.Environment, UpdateLockReleasePoolAddressesInput) error {
 	return func(e cldf.Environment, input UpdateLockReleasePoolAddressesInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
-		}
 		return nil
 	}
 }

@@ -27,11 +27,11 @@ type UpdatePoolAddressesPerChainInput struct {
 	PoolAddresses usdc_token_pool_proxy_ops.PoolAddresses
 }
 
-func UpdatePoolAddressesChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdatePoolAddressesInput] {
-	return cldf.CreateChangeSet(updatePoolAddressesApply(mcmsRegistry), updatePoolAddressesVerify(mcmsRegistry))
+func UpdatePoolAddressesChangeset() cldf.ChangeSetV2[UpdatePoolAddressesInput] {
+	return cldf.CreateChangeSet(updatePoolAddressesApply(), updatePoolAddressesVerify())
 }
 
-func updatePoolAddressesApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdatePoolAddressesInput) (cldf.ChangesetOutput, error) {
+func updatePoolAddressesApply() func(cldf.Environment, UpdatePoolAddressesInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input UpdatePoolAddressesInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
@@ -63,18 +63,15 @@ func updatePoolAddressesApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 		batchOps = append(batchOps, report.Output.BatchOps...)
 		reports = append(reports, report.ExecutionReports...)
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		return changesets.NewOutputBuilder(e, nil).
 			WithReports(reports).
 			WithBatchOps(batchOps).
 			Build(input.MCMS)
 	}
 }
 
-func updatePoolAddressesVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdatePoolAddressesInput) error {
+func updatePoolAddressesVerify() func(cldf.Environment, UpdatePoolAddressesInput) error {
 	return func(e cldf.Environment, input UpdatePoolAddressesInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
-		}
 		return nil
 	}
 }

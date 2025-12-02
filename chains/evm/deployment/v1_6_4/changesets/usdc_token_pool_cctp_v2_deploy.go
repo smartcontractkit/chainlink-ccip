@@ -35,11 +35,11 @@ type USDCTokenPoolCCTPV2DeployInput struct {
 // Note: In addition to deploying the USDCTokenPoolCCTPV2 contract, this changeset will also deploy the CCTPMessageTransmitterProxy contract,
 // configure the allowed callers for the CCTPMessageTransmitterProxy contract, and then begin the ownership transfer to MCMS.
 // A separate changeset will be used to accept ownership of the USDCTokenPoolCCTPV2 contract.
-func USDCTokenPoolCCTPV2DeployChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) deployment.ChangeSetV2[USDCTokenPoolCCTPV2DeployInput] {
-	return cldf.CreateChangeSet(usdcTokenPoolCCTPV2DeployApply(mcmsRegistry), usdcTokenPoolCCTPV2DeployVerify(mcmsRegistry))
+func USDCTokenPoolCCTPV2DeployChangeset() deployment.ChangeSetV2[USDCTokenPoolCCTPV2DeployInput] {
+	return cldf.CreateChangeSet(usdcTokenPoolCCTPV2DeployApply(), usdcTokenPoolCCTPV2DeployVerify())
 }
 
-func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, USDCTokenPoolCCTPV2DeployInput) (cldf.ChangesetOutput, error) {
+func usdcTokenPoolCCTPV2DeployApply() func(cldf.Environment, USDCTokenPoolCCTPV2DeployInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input USDCTokenPoolCCTPV2DeployInput) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
@@ -102,7 +102,7 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add USDC token address to datastore for chain %d: %w", perChainInput.ChainSelector, err)
 				}
 
-			} else if err == nil {
+			} else {
 				TokenAddress = retrievedTokenAddress
 			}
 
@@ -133,11 +133,8 @@ func usdcTokenPoolCCTPV2DeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 	}
 }
 
-func usdcTokenPoolCCTPV2DeployVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, USDCTokenPoolCCTPV2DeployInput) error {
+func usdcTokenPoolCCTPV2DeployVerify() func(cldf.Environment, USDCTokenPoolCCTPV2DeployInput) error {
 	return func(e cldf.Environment, input USDCTokenPoolCCTPV2DeployInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
-		}
 		return nil
 	}
 }

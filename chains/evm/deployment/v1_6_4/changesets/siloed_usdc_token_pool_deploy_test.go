@@ -23,8 +23,6 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	factory_burn_mint_erc20_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
-
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 )
 
 func TestSiloedUSDCTokenPoolDeployChangeset(t *testing.T) {
@@ -138,11 +136,7 @@ func TestSiloedUSDCTokenPoolDeployChangeset(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
-	deployChangesetOutput, err := changesets.SiloedUSDCTokenPoolDeployChangeset(mcmsRegistry).Apply(*e, changesetInput)
+	deployChangesetOutput, err := changesets.SiloedUSDCTokenPoolDeployChangeset().Apply(*e, changesetInput)
 	require.NoError(t, err, "Failed to apply SiloedUSDCTokenPoolDeployChangeset")
 	require.NotNil(t, deployChangesetOutput, "Changeset output should not be nil")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)

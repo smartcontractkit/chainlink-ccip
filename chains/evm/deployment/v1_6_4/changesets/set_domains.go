@@ -2,7 +2,6 @@ package changesets
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -11,9 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-
-	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 type SetDomainsInput struct {
@@ -23,15 +19,16 @@ type SetDomainsInput struct {
 
 type SetDomainsPerChainInput struct {
 	ChainSelector uint64
+	Address       common.Address
 	Domains       []usdc_token_pool.DomainUpdate
 }
 
 // This changeset is used to set the domains for a given token in the USDCTokenPool contract.
-func SetDomainsChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[SetDomainsInput] {
-	return cldf.CreateChangeSet(setDomainsApply(mcmsRegistry), setDomainsVerify(mcmsRegistry))
+func SetDomainsChangeset() cldf.ChangeSetV2[SetDomainsInput] {
+	return cldf.CreateChangeSet(setDomainsApply(), setDomainsVerify())
 }
 
-func setDomainsApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SetDomainsInput) (cldf.ChangesetOutput, error) {
+func setDomainsApply() func(cldf.Environment, SetDomainsInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input SetDomainsInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
@@ -40,16 +37,8 @@ func setDomainsApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Envi
 		addressesByChain := make(map[uint64]common.Address)
 		domainsByChain := make(map[uint64][]usdc_token_pool.DomainUpdate)
 		for _, perChainInput := range input.ChainInputs {
-			// For Each chain input, find the USDCTokenPool address from the datastore for the given chain selector
-			// using
-			usdcTokenPoolAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				Type:    datastore.ContractType(usdc_token_pool.ContractType),
-				Version: usdc_token_pool.Version,
-			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
-			if err != nil {
-				return cldf.ChangesetOutput{}, err
-			}
-			addressesByChain[perChainInput.ChainSelector] = usdcTokenPoolAddress
+			// Since the Token Pool may be of type CCTP V1 or CCTP V2, the address must be specified for each chain input.
+			addressesByChain[perChainInput.ChainSelector] = perChainInput.Address
 			domainsByChain[perChainInput.ChainSelector] = perChainInput.Domains
 		}
 
@@ -67,18 +56,15 @@ func setDomainsApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Envi
 		batchOps = append(batchOps, report.Output.BatchOps...)
 		reports = append(reports, report.ExecutionReports...)
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		return changesets.NewOutputBuilder(e, nil).
 			WithReports(reports).
 			WithBatchOps(batchOps).
 			Build(input.MCMS)
 	}
 }
 
-func setDomainsVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SetDomainsInput) error {
+func setDomainsVerify() func(cldf.Environment, SetDomainsInput) error {
 	return func(e cldf.Environment, input SetDomainsInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
-		}
 		return nil
 	}
 }

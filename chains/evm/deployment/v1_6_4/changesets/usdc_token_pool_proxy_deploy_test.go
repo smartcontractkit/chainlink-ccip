@@ -134,7 +134,7 @@ func TestDeployUSDCTokenPoolProxyChangeset_BothPoolsDeployed(t *testing.T) {
 	evmMCMSReader := &adapters.EVMMCMSReader{}
 	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
 
-	deployChangeset := changesets.DeployUSDCTokenPoolProxyChangeset(mcmsRegistry)
+	deployChangeset := changesets.DeployUSDCTokenPoolProxyChangeset()
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "DeployUSDCTokenPoolProxyChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)
@@ -260,12 +260,7 @@ func TestDeployUSDCTokenPoolProxyChangeset_OnlyCCTPV2PoolDeployed(t *testing.T) 
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
-
-	deployChangeset := changesets.DeployUSDCTokenPoolProxyChangeset(mcmsRegistry)
+	deployChangeset := changesets.DeployUSDCTokenPoolProxyChangeset()
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "DeployUSDCTokenPoolProxyChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)
@@ -391,12 +386,7 @@ func TestDeployUSDCTokenPoolProxyChangeset_OnlyCCTPV1PoolDeployed(t *testing.T) 
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
-
-	deployChangeset := changesets.DeployUSDCTokenPoolProxyChangeset(mcmsRegistry)
+	deployChangeset := changesets.DeployUSDCTokenPoolProxyChangeset()
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "DeployUSDCTokenPoolProxyChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)
@@ -511,12 +501,7 @@ func TestDeployUSDCTokenPoolProxyChangeset_NoPoolsDeployed(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
-
-	deployChangeset := changesets.DeployUSDCTokenPoolProxyChangeset(mcmsRegistry)
+	deployChangeset := changesets.DeployUSDCTokenPoolProxyChangeset()
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "DeployUSDCTokenPoolProxyChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)

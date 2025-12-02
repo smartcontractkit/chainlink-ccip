@@ -40,11 +40,11 @@ type USDCTokenPoolDeployInput struct {
 // This changeset is used to deploy the USDCTokenPool contract on a given chain.
 // Note: Unlike the changset for the CCTP V2 Token Pool, this changeset will NOT deploy the CCTPMessageTransmitterProxy contract.
 // That must be performed with a separate changeset in v1_6_2 for the CCTPMessageTransmitterProxy contract.
-func USDCTokenPoolDeployChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) deployment.ChangeSetV2[USDCTokenPoolDeployInput] {
-	return cldf.CreateChangeSet(usdcTokenPoolDeployApply(mcmsRegistry), usdcTokenPoolDeployVerify(mcmsRegistry))
+func USDCTokenPoolDeployChangeset() deployment.ChangeSetV2[USDCTokenPoolDeployInput] {
+	return cldf.CreateChangeSet(usdcTokenPoolDeployApply(), usdcTokenPoolDeployVerify())
 }
 
-func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, USDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
+func usdcTokenPoolDeployApply() func(cldf.Environment, USDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input USDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
@@ -129,11 +129,8 @@ func usdcTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(
 	}
 }
 
-func usdcTokenPoolDeployVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, USDCTokenPoolDeployInput) error {
+func usdcTokenPoolDeployVerify() func(cldf.Environment, USDCTokenPoolDeployInput) error {
 	return func(e cldf.Environment, input USDCTokenPoolDeployInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
-		}
 		return nil
 	}
 }
