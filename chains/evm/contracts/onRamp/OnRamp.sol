@@ -119,7 +119,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
-    address defaultExecutor;
+    address defaultExecutor; // If no executor is specified in the extraArgs, this executor will be used.
     bytes offRamp; // Destination OffRamp address, NOT abi encoded but raw bytes.
   }
 

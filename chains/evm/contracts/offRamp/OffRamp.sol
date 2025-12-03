@@ -119,7 +119,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @notice SourceChainConfig per source chain selector.
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
 
-  /// @notice Set of allowed onRamp address hashes per source chain selector.
+  /// @notice Set of allowed onRamp address hashes per source chain selector. We hash the onRamp addresses to save on
+  /// gas during retrieval. These sets are duplicated in the source chain config in their raw form to enable lookups.
   mapping(uint64 sourceChainSelector => EnumerableSet.Bytes32Set allowedOnRampHashes) private s_allowedOnRampHashes;
 
   // STATE
@@ -724,7 +725,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @return sourceChainConfig The config for the source chain.
   function getSourceChainConfig(
     uint64 sourceChainSelector
-  ) public view returns (SourceChainConfig memory) {
+  ) external view returns (SourceChainConfig memory) {
     return s_sourceChainConfigs[sourceChainSelector];
   }
 
@@ -765,6 +766,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
           revert ZeroAddressNotAllowed();
         }
       }
+      CCVConfigValidation._validateDefaultAndMandatedCCVs(configUpdate.defaultCCV, configUpdate.laneMandatedCCVs);
 
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[configUpdate.sourceChainSelector];
       EnumerableSet.Bytes32Set storage allowedOnRampHashes = s_allowedOnRampHashes[configUpdate.sourceChainSelector];
@@ -772,7 +774,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       // Remove all current onRamps.
       allowedOnRampHashes.clear();
 
-      // Populate allowed onRamps.
+      // Populate allowed onRamps. This list could be empty, which would mean no onRamps are allowed and the lane is
+      // disabled, even for existing messages.
       for (uint256 j = 0; j < configUpdate.onRamps.length; ++j) {
         bytes memory onRamp = configUpdate.onRamps[j];
         bytes32 onRampHash = keccak256(onRamp);
@@ -781,10 +784,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         }
         allowedOnRampHashes.add(onRampHash);
       }
+
       currentConfig.onRamps = configUpdate.onRamps;
-
-      CCVConfigValidation._validateDefaultAndMandatedCCVs(configUpdate.defaultCCV, configUpdate.laneMandatedCCVs);
-
       currentConfig.isEnabled = configUpdate.isEnabled;
       currentConfig.router = configUpdate.router;
       currentConfig.defaultCCVs = configUpdate.defaultCCV;
