@@ -526,71 +526,21 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 	if err != nil {
 		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
 	}
-	bootstrapNode := nodeClients[0]
-	bootstrapKeys, err := bootstrapNode.MustReadOCR2Keys()
-	if err != nil {
-		return nil, fmt.Errorf("reading bootstrap node OCR keys: %w", err)
-	}
 	// bootstrap is 0
 	workerNodes := nodeClients[1:]
 	if selector == ccipHomeSelector {
-		var nodeOperators []capabilities_registry.CapabilitiesRegistryNodeOperator
-		var nodeP2PIDsPerNodeOpAdmin = make(map[string][][32]byte)
+		var readers [][32]byte
 		for _, node := range workerNodes {
 			nodeP2PIds, err := node.MustReadP2PKeys()
 			if err != nil {
 				return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
 			}
-			nodeTransmitterAddress, err := node.PrimaryEthAddress()
-			if err != nil {
-				return nil, fmt.Errorf("reading worker node transmitter address: %w", err)
-			}
-			nodeP2PIDsPerNodeOpAdmin[node.Config.URL] = make([][32]byte, 0)
-			for _, id := range nodeP2PIds.Data {
-				nodeOperators = append(nodeOperators, capabilities_registry.CapabilitiesRegistryNodeOperator{
-					Admin: common.HexToAddress(nodeTransmitterAddress),
-					Name:  string(node.Config.URL),
-				})
-				var peerID [32]byte
-				copy(peerID[:], []byte(id.Attributes.PeerID))
-				nodeP2PIDsPerNodeOpAdmin[node.Config.URL] = append(
-					nodeP2PIDsPerNodeOpAdmin[node.Config.URL], peerID,
-				)
-			}
-			ocrKeys, err := node.MustReadOCR2Keys()
-			if err != nil {
-				return nil, fmt.Errorf("reading worker node OCR keys: %w", err)
-			}
-			l.Info().Str("OCRKeys", fmt.Sprintf("%+v", ocrKeys)).Msg("Read OCR keys for worker node")
-			raw, err := NewCCIPSpecToml(SpecArgs{
-				P2PV2Bootstrappers:     []string{bootstrapKeys.Data[0].ID},
-				CapabilityVersion:      "v1.0.0",
-				CapabilityLabelledName: "ccip",
-				OCRKeyBundleIDs: map[string]string{
-					"evm": ocrKeys.Data[0].ID,
-				},
-				P2PKeyID:     nodeP2PIds.Data[0].Attributes.PeerID,
-				RelayConfigs: nil,
-				PluginConfig: map[string]any{},
-			})
-			if err != nil {
-				return nil, fmt.Errorf("creating CCIP job spec: %w", err)
-			}
-			l.Info().Str("RawSpec", raw).Msg("Creating CCIP job on worker node")
-			job, _, err := node.CreateJobRaw(raw)
-			if err != nil {
-				return nil, fmt.Errorf("creating CCIP job: %w", err)
-			}
-			l.Info().Str("Node", node.Config.URL).Any("Job", job).Msg("Created CCIP job")
+			l.Info().Str("Node", node.Config.URL).Str("PeerID", nodeP2PIds.Data[0].Attributes.PeerID).Msg("Adding reader peer ID")
+			id := changesets.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+			readers = append(readers, id)
+			l.Info().Msgf("peerID: %+v", id)
+			l.Info().Msgf("peer ID from bytes: %s", id.Raw())
 		}
-		// crAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-		// 	ChainSelector: selector,
-		// 	Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-		// 	Version:       semver.MustParse("1.6.0"),
-		// }, selector, datastore_utils.FullRef)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("failed to find CapabilitiesRegistry address in datastore: %w", err)
-		// }
 		ccipHomeOut, err := changesets.DeployHomeChain.Apply(*env, sequences.DeployHomeChainConfig{
 			HomeChainSel: selector,
 			CapReg:       common.HexToAddress(crAddr),
@@ -602,8 +552,13 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 				SourceChains:   []rmn_home.RMNHomeSourceChain{},
 				OffchainConfig: []byte("dynamic config"),
 			},
-			NodeOperators:            nodeOperators,
-			NodeP2PIDsPerNodeOpAdmin: nodeP2PIDsPerNodeOpAdmin,
+			NodeOperators: []capabilities_registry.CapabilitiesRegistryNodeOperator{
+				{
+					Admin: chain.DeployerKey.From,
+					Name:  "NodeOperator",
+				},
+			},
+			NodeP2PIDsPerNodeOpAdmin: map[string][][32]byte{"NodeOperator": readers},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to deploy home chain contracts: %w", err)
@@ -618,30 +573,7 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 			},
 		)
 	}
-	bootstrapP2PKeys, err := bootstrapNode.MustReadP2PKeys()
-	if err != nil {
-		return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
-	}
-	raw, err := NewCCIPSpecToml(SpecArgs{
-		P2PV2Bootstrappers:     []string{},
-		CapabilityVersion:      "v1.0.0",
-		CapabilityLabelledName: "ccip",
-		OCRKeyBundleIDs: map[string]string{
-			"evm": bootstrapKeys.Data[0].ID,
-		},
-		P2PKeyID:     bootstrapP2PKeys.Data[0].Attributes.PeerID,
-		RelayConfigs: nil,
-		PluginConfig: map[string]any{},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("creating CCIP job spec: %w", err)
-	}
-	l.Info().Str("RawSpec", raw).Msg("Creating CCIP job on bootstrap node")
-	job, _, err := bootstrapNode.CreateJobRaw(raw)
-	if err != nil {
-		return nil, fmt.Errorf("creating CCIP job: %w", err)
-	}
-	l.Info().Str("Node", bootstrapNode.Config.URL).Any("Job", job).Msg("Created CCIP job")
+
 	env.DataStore = out.DataStore.Seal()
 	runningDS.Merge(env.DataStore)
 
@@ -690,7 +622,6 @@ func (m *CCIP16EVM) ConnectContractsWithSelectors(ctx context.Context, e *deploy
 			return fmt.Errorf("connecting chains %d and %d: %w", chainA.Selector, chainB.Selector, err)
 		}
 	}
-
 	return nil
 }
 
@@ -720,11 +651,9 @@ func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deplo
 		if err != nil {
 			return fmt.Errorf("reading worker node P2P keys: %w", err)
 		}
-		for _, id := range nodeP2PIds.Data {
-			var peerID [32]byte
-			copy(peerID[:], []byte(id.Attributes.PeerID))
-			readers = append(readers, peerID)
-		}
+		l.Info().Str("Node", node.Config.URL).Str("PeerID", nodeP2PIds.Data[0].Attributes.PeerID).Msg("Adding reader peer ID")
+		id := changesets.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+		readers = append(readers, id)
 	}
 	for _, chain := range remoteSelectors {
 		ocrOverride := func(ocrParams changesets.CCIPOCRParams) changesets.CCIPOCRParams {

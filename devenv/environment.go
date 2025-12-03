@@ -2,6 +2,7 @@ package ccip
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,11 +10,15 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 
@@ -219,6 +224,81 @@ func NewEnvironment() (*Cfg, error) {
 		}
 	}
 
+	nodeClients, err := clclient.New(in.NodeSets[0].Out.CLNodes)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
+	}
+	bootstrapNode := nodeClients[0]
+	bootstrapKeys, err := bootstrapNode.MustReadOCR2Keys()
+	if err != nil {
+		return nil, fmt.Errorf("reading bootstrap node OCR keys: %w", err)
+	}
+	// bootstrap is 0
+	workerNodes := nodeClients[1:]
+
+	// create jobs post-deployment for home chain
+	bootstrapP2PKeys, err := bootstrapNode.MustReadP2PKeys()
+	if err != nil {
+		return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
+	}
+	bootstrapId := changesets.MustPeerIDFromString(bootstrapP2PKeys.Data[0].Attributes.PeerID)
+	raw, err := NewCCIPSpecToml(SpecArgs{
+		P2PV2Bootstrappers:     []string{},
+		CapabilityVersion:      "v1.0.0",
+		CapabilityLabelledName: "ccip",
+		OCRKeyBundleIDs: map[string]string{
+			"evm": bootstrapKeys.Data[0].ID,
+		},
+		P2PKeyID:     bootstrapId.String(),
+		RelayConfigs: nil,
+		PluginConfig: map[string]any{},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating CCIP job spec: %w", err)
+	}
+	L.Info().Str("RawSpec", raw).Msg("Creating CCIP job on bootstrap node")
+	job, _, err := bootstrapNode.CreateJobRaw(raw)
+	if err != nil {
+		return nil, fmt.Errorf("creating CCIP job: %w", err)
+	}
+	L.Info().Str("Node", bootstrapNode.Config.URL).Any("Job", job).Msg("Created CCIP job")
+	for _, node := range workerNodes {
+		nodeP2PIds, err := node.MustReadP2PKeys()
+		if err != nil {
+			return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
+		}
+		ocrKeys, err := node.MustReadOCR2Keys()
+		if err != nil {
+			return nil, fmt.Errorf("reading worker node OCR keys: %w", err)
+		}
+		L.Info().Str("OCRKeys", fmt.Sprintf("%+v", ocrKeys)).Msg("Read OCR keys for worker node")
+		L.Info().Str("BootstrapPeerID", bootstrapId.String()).Str("BootstrapIP", bootstrapNode.InternalIP()).Msg("Preparing CCIP job spec for worker node")
+		L.Info().Str("WorkerPeerID", nodeP2PIds.Data[0].Attributes.PeerID).Str("WorkerNode", node.Config.URL).Msg("Preparing CCIP job spec for worker node")
+		id := changesets.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+		raw, err := NewCCIPSpecToml(SpecArgs{
+			P2PV2Bootstrappers: []string{
+				fmt.Sprintf("%s@%s", strings.TrimPrefix(bootstrapId.String(), "p2p_"), "don-node0:6688"),
+			},
+			CapabilityVersion:      "v1.0.0",
+			CapabilityLabelledName: "ccip",
+			OCRKeyBundleIDs: map[string]string{
+				"evm": ocrKeys.Data[0].ID,
+			},
+			P2PKeyID:     id.String(),
+			RelayConfigs: nil,
+			PluginConfig: map[string]any{},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("creating CCIP job spec: %w", err)
+		}
+		L.Info().Str("RawSpec", raw).Msg("Creating CCIP job on worker node")
+		job, _, err := node.CreateJobRaw(raw)
+		if err != nil {
+			return nil, fmt.Errorf("creating CCIP job: %w", err)
+		}
+		L.Info().Str("Node", node.Config.URL).Any("Job", job).Msg("Created CCIP job")
+	}
+
 	tr.Record("[infra] deployed CL nodes")
 	tr.Record("[changeset] deployed product contracts")
 
@@ -232,4 +312,56 @@ func NewEnvironment() (*Cfg, error) {
 	}
 	tr.Print()
 	return in, Store(in)
+}
+
+type SpecArgs struct {
+	P2PV2Bootstrappers     []string          `toml:"p2pV2Bootstrappers"`
+	CapabilityVersion      string            `toml:"capabilityVersion"`
+	CapabilityLabelledName string            `toml:"capabilityLabelledName"`
+	OCRKeyBundleIDs        map[string]string `toml:"ocrKeyBundleIDs"`
+	P2PKeyID               string            `toml:"p2pKeyID"`
+	RelayConfigs           map[string]any    `toml:"relayConfigs"`
+	PluginConfig           map[string]any    `toml:"pluginConfig"`
+}
+
+// NewCCIPSpecToml creates a new CCIP spec in toml format from the given spec args.
+func NewCCIPSpecToml(spec SpecArgs) (string, error) {
+	type fullSpec struct {
+		SpecArgs
+		Type          string `toml:"type"`
+		SchemaVersion uint64 `toml:"schemaVersion"`
+		Name          string `toml:"name"`
+		ExternalJobID string `toml:"externalJobID"`
+	}
+	extJobID, err := ExternalJobID(spec)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate external job id: %w", err)
+	}
+	marshaled, err := toml.Marshal(fullSpec{
+		SpecArgs:      spec,
+		Type:          "ccip",
+		SchemaVersion: 1,
+		Name:          fmt.Sprintf("%s-%s", "ccip", extJobID),
+		ExternalJobID: extJobID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal spec into toml: %w", err)
+	}
+
+	return string(marshaled), nil
+}
+
+func ExternalJobID(spec SpecArgs) (string, error) {
+	in := fmt.Appendf(nil, "%s%s%s", spec.CapabilityLabelledName, spec.CapabilityVersion, spec.P2PKeyID)
+	sha256Hash := sha256.New()
+	sha256Hash.Write(in)
+	in = sha256Hash.Sum(nil)[:16]
+	// tag as valid UUID v4 https://github.com/google/uuid/blob/0f11ee6918f41a04c201eceeadf612a377bc7fbc/version4.go#L53-L54
+	in[6] = (in[6] & 0x0f) | 0x40 // Version 4
+	in[8] = (in[8] & 0x3f) | 0x80 // Variant is 10
+	id, err := uuid.FromBytes(in)
+	if err != nil {
+		return "", err
+	}
+	return id.String(), nil
 }

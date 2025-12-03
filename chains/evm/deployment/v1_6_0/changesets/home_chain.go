@@ -202,11 +202,8 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to read p2p keys from node %s: %w", node.URL(), err)
 		}
-		for _, id := range nodeP2PIds.Data {
-			var peerID [32]byte
-			copy(peerID[:], []byte(id.Attributes.PeerID))
-			readers = append(readers, peerID)
-		}
+		id := MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+		readers = append(readers, id)
 	}
 
 	dons := make([]sequences.DONAddition, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
@@ -282,7 +279,7 @@ func BuildOCR3ConfigForCCIPHome(
 	// }
 
 	// var p2pIDs [][32]byte
-	schedule, oracles, err := getOracleIdentities(nodes)
+	schedule, oracles, err := getOracleIdentities(nodes, destSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -475,10 +472,9 @@ func BuildOCR3ConfigForCCIPHome(
 
 		var ocrNodes []ccip_home.CCIPHomeOCR3Node
 		for i := range nodes {
-			var p2pID [32]byte
-			copy(p2pID[:], []byte(oracles[i].OracleIdentity.PeerID))
+			id := MustPeerIDFromString(oracles[i].OracleIdentity.PeerID)
 			ocrNodes = append(ocrNodes, ccip_home.CCIPHomeOCR3Node{
-				P2pId:          p2pID,
+				P2pId:          id,
 				SignerKey:      signersBytes[i],
 				TransmitterKey: transmittersBytes[i],
 			})
@@ -512,14 +508,18 @@ func BuildOCR3ConfigForCCIPHome(
 	return ocr3Configs, nil
 }
 
-func getOracleIdentities(clClients []*clclient.ChainlinkClient) ([]int, []confighelper.OracleIdentityExtra, error) { //nolint:gocritic
+func getOracleIdentities(clClients []*clclient.ChainlinkClient, destSelector uint64) ([]int, []confighelper.OracleIdentityExtra, error) { //nolint:gocritic
 	s := make([]int, len(clClients))
 	oracleIdentities := make([]confighelper.OracleIdentityExtra, len(clClients))
 	sharedSecretEncryptionPublicKeys := make([]ocrtypes.ConfigEncryptionPublicKey, len(clClients))
 	eg := &errgroup.Group{}
 	for i, cl := range clClients {
 		eg.Go(func() error {
-			addresses, err := cl.EthAddresses()
+			destId, err := chain_selectors.GetChainIDFromSelector(destSelector)
+			if err != nil {
+				return err
+			}
+			addrSrc, err := cl.ReadPrimaryETHKey(destId)
 			if err != nil {
 				return err
 			}
@@ -539,7 +539,7 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient) ([]int, []config
 			if err != nil {
 				return err
 			}
-			p2pKeyID := keys.Data[0].Attributes.PeerID
+			id := MustPeerIDFromString(keys.Data[0].Attributes.PeerID)
 
 			offchainPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.OffChainPublicKey, "ocr2off_evm_"))
 			if err != nil {
@@ -568,8 +568,8 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient) ([]int, []config
 				OracleIdentity: confighelper.OracleIdentity{
 					OnchainPublicKey:  onchainPkBytes,
 					OffchainPublicKey: offchainPkBytesFixed,
-					PeerID:            p2pKeyID,
-					TransmitAccount:   ocrtypes.Account(addresses[0]),
+					PeerID:            id.Raw(),
+					TransmitAccount:   ocrtypes.Account(addrSrc.Attributes.Address),
 				},
 				ConfigEncryptionPublicKey: configPkBytesFixed,
 			}
@@ -662,11 +662,8 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to read p2p keys from node %s: %w", node.URL(), err)
 		}
-		for _, id := range nodeP2PIds.Data {
-			var peerID [32]byte
-			copy(peerID[:], []byte(id.Attributes.PeerID))
-			readers = append(readers, peerID)
-		}
+		id := MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+		readers = append(readers, id)
 	}
 
 	for _, plugin := range cfg.PluginInfo {
@@ -862,11 +859,8 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to read p2p keys from node %s: %w", node.URL(), err)
 		}
-		for _, id := range nodeP2PIds.Data {
-			var peerID [32]byte
-			copy(peerID[:], []byte(id.Attributes.PeerID))
-			readers = append(readers, peerID)
-		}
+		id := MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+		readers = append(readers, id)
 	}
 	for _, plugin := range cfg.PluginInfo {
 		for _, donID := range donIDs {
