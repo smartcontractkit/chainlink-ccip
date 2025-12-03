@@ -82,6 +82,24 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     assertEq(s_usdcTokenPoolProxy.getPools().cctpV2Pool, s_newCctpV2Pool);
   }
 
+  function test_updatePoolAddresses_RevertWhen_CCTPV2PoolWithCCVDoesNotSupportIPoolV2() public {
+    USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
+      legacyCctpV1Pool: address(0),
+      cctpV1Pool: address(0),
+      cctpV2Pool: address(0),
+      cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV
+    });
+
+    changePrank(OWNER);
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV2PoolWithCCV));
+    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+
+    _enableERC165InterfaceChecks(s_newCctpV2PoolWithCCV, type(IPoolV2).interfaceId);
+
+    changePrank(OWNER);
+    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+  }
+
   function test_updatePoolAddresses_RevertWhen_LegacyPoolDoesNotSupportIPoolV1() public {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,

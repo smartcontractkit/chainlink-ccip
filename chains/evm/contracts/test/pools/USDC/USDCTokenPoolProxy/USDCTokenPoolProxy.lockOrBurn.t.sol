@@ -267,6 +267,37 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     );
   }
 
+  function test_lockOrBurn_CCTPV2WithCCV_RevertWhen_ChainNotSupportedByVerifier() public {
+    uint256 amount = 100;
+    bytes memory tokenArgs = abi.encode(abi.encode(1, 2, 3));
+    uint16 blockConfirmationRequested = 1;
+    address verifierImpl = address(0);
+
+    vm.mockCall(
+      address(s_cctpVerifier),
+      abi.encodeWithSelector(
+        ICrossChainVerifierResolver.getOutboundImplementation.selector, s_chainSelForCCV, tokenArgs
+      ),
+      abi.encode(verifierImpl)
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.ChainNotSupportedByVerifier.selector, s_chainSelForCCV));
+
+    vm.startPrank(s_routerAllowedOnRamp);
+    s_usdcTokenPoolProxy.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        receiver: abi.encode(s_receiver),
+        remoteChainSelector: s_chainSelForCCV,
+        originalSender: s_sender,
+        amount: amount,
+        localToken: address(s_USDCToken)
+      }),
+      blockConfirmationRequested,
+      tokenArgs
+    );
+    vm.stopPrank();
+  }
+
   function test_lockOrBurn_RevertWhen_InvalidLockOrBurnMechanism() public {
     uint64 testChainSelector = 99999;
     uint256 amount = 100;
