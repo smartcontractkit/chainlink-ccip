@@ -52,7 +52,7 @@ CCTPVerifier_forwardToVerifier:test_forwardToVerifier_CustomFinality() (gas: 115
 CCTPVerifier_forwardToVerifier:test_forwardToVerifier_MintRecipientFromDomain() (gas: 145356)
 CCTPVerifier_forwardToVerifier:test_forwardToVerifier_MintRecipientFromMessage() (gas: 112962)
 CCTPVerifier_setDomains:test_setDomains() (gas: 50196)
-CCTPVerifier_setDynamicConfig:test_setDynamicConfig() (gas: 31889)
+CCTPVerifier_setDynamicConfig:test_setDynamicConfig() (gas: 31933)
 CCTPVerifier_updateStorageLocation:test_updateStorageLocation() (gas: 23701)
 CCTPVerifier_verifyMessage:test_verifyMessage() (gas: 195103)
 CCTPVerifier_withdrawFeeTokens:test_withdrawFeeTokens() (gas: 216308)
