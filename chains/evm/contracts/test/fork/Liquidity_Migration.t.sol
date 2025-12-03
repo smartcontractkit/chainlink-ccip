@@ -21,30 +21,26 @@ contract LiquidityMigration is MCMSForkTest {
   uint256 private s_transferAmount;
 
   function setUp() public {
-    // Skip test if required env vars are not set (e.g., in CI without .env)
+    // Skip test if RPC_URL is not set (e.g., in CI without .env)
     string memory rpcUrl = vm.envOr("RPC_URL", string(""));
-    uint256 payloadCount = vm.envOr("PAYLOAD_COUNT", uint256(0));
-    s_transferAmount = vm.envOr("TRANSFER_AMOUNT", uint256(0));
-    s_oldPoolAddress = vm.envOr("OLD_POOL_ADDRESS", address(0));
-    s_newPoolAddress = vm.envOr("NEW_POOL_ADDRESS", address(0));
-    s_tokenAddress = vm.envOr("TOKEN_ADDRESS", address(0));
-    s_tokenAdminRegistryAddress = vm.envOr("TOKEN_ADMIN_REGISTRY_ADDRESS", address(0));
-    s_rebalancerAddress = vm.envOr("REBALANCER_ADDRESS", address(0));
-    s_timelockAddress = vm.envOr("TIMELOCK_ADDRESS", address(0));
-
-    // Skip if any required env var is missing
-    bool shouldSkip = bytes(rpcUrl).length == 0 || payloadCount == 0 || s_transferAmount == 0
-      || s_oldPoolAddress == address(0) || s_newPoolAddress == address(0) || s_tokenAddress == address(0)
-      || s_tokenAdminRegistryAddress == address(0) || s_rebalancerAddress == address(0) || s_timelockAddress == address(0);
-    vm.skip(shouldSkip);
+    vm.skip(bytes(rpcUrl).length == 0);
 
     s_forkId = vm.createFork(rpcUrl);
 
     // Load payloads dynamically based on PAYLOAD_COUNT
+    uint256 payloadCount = vm.envUint("PAYLOAD_COUNT");
     s_payloads = new bytes[](payloadCount);
     for (uint256 i = 0; i < payloadCount; i++) {
       s_payloads[i] = vm.envBytes(string.concat("PAYLOAD_", vm.toString(i + 1)));
     }
+
+    s_transferAmount = vm.envUint("TRANSFER_AMOUNT");
+    s_oldPoolAddress = vm.envAddress("OLD_POOL_ADDRESS");
+    s_newPoolAddress = vm.envAddress("NEW_POOL_ADDRESS");
+    s_tokenAddress = vm.envAddress("TOKEN_ADDRESS");
+    s_tokenAdminRegistryAddress = vm.envAddress("TOKEN_ADMIN_REGISTRY_ADDRESS");
+    s_rebalancerAddress = vm.envAddress("REBALANCER_ADDRESS");
+    s_timelockAddress = vm.envAddress("TIMELOCK_ADDRESS");
   }
 
   function testMigration() public {
