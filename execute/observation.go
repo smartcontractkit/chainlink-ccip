@@ -60,10 +60,10 @@ func (p *Plugin) Observation(
 	if previousOutcome.State == exectypes.Filter {
 		// the lane is invalid due to a config digest mismatch, skip updating
 		// the inflight cache so that messages will retry immediately when the digest is valid again.
-		if err := p.checkConfigDigest(); err != nil {
-			p.lggr.Errorw("skipping marking messages inflight due to config digest mismatch", "err", err)
-			return types.Observation{}, fmt.Errorf("skipping observation: %w", err)
-		}
+		// if err := p.checkConfigDigest(); err != nil {
+		// 	p.lggr.Errorw("skipping marking messages inflight due to config digest mismatch", "err", err)
+		// 	return types.Observation{}, fmt.Errorf("skipping observation: %w", err)
+		// }
 		for _, execReport := range previousOutcome.Reports {
 			for _, chainReport := range execReport.ChainReports {
 				for _, message := range chainReport.Messages {
