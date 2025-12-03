@@ -3,7 +3,6 @@ package sequences
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -23,7 +22,7 @@ type UpdatePoolAddressesSequenceInput struct {
 var (
 	USDCTokenPoolProxyUpdatePoolAddressesSequence = operations.NewSequence(
 		"USDCTokenPoolProxyUpdatePoolAddressesSequence",
-		semver.MustParse("1.6.4"),
+		usdc_token_pool_proxy_ops.Version,
 		"Updates pool addresses on a sequence of USDCTokenPoolProxy contracts on multiple chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input UpdatePoolAddressesSequenceInput) (sequences.OnChainOutput, error) {
 			writes := make([]contract.WriteOutput, 0)

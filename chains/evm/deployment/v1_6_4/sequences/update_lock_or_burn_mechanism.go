@@ -1,7 +1,6 @@
 package sequences
 
 import (
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
 	"fmt"
@@ -21,7 +20,7 @@ type UpdateLockOrBurnMechanismSequenceInput struct {
 
 var USDCTokenPoolProxyUpdateLockOrBurnMechanismSequence = operations.NewSequence(
 	"USDCTokenPoolProxyUpdateLockOrBurnMechanismSequence",
-	semver.MustParse("1.6.4"),
+	usdc_token_pool_proxy_ops.Version,
 	"Updates the lock or burn mechanisms on a sequence of USDCTokenPoolProxy contracts on multiple chains",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input UpdateLockOrBurnMechanismSequenceInput) (sequences.OnChainOutput, error) {
 		writes := make([]contract_utils.WriteOutput, 0)

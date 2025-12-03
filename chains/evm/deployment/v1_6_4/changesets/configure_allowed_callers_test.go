@@ -102,6 +102,7 @@ func TestConfigureAllowedCallersSequence(t *testing.T) {
 		Type:          datastore.ContractType(erc20_lock_box.ContractType),
 		Version:       semver.MustParse("1.6.4"),
 		ChainSelector: chainSelector,
+		Qualifier:     "IOwnable",
 		Address:       erc20LockBoxRef.Address,
 	}))
 	e.DataStore = ds.Seal()
@@ -132,7 +133,7 @@ func TestConfigureAllowedCallersSequence(t *testing.T) {
 		ChainInputs: []changesets.ConfigureAllowedCallersPerChainInput{
 			{
 				ChainSelector: chainSelector,
-				Address:       common.HexToAddress(erc20LockBoxRef.Address),
+				Qualifier:     "IOwnable",
 				AllowedCallers: []erc20_lock_box.AllowedCallerConfigArgs{
 					{
 						Token:   tokenAddress,
