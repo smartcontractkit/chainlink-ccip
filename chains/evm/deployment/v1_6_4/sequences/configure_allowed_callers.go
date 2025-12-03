@@ -3,7 +3,6 @@ package sequences
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -16,21 +15,21 @@ import (
 )
 
 type ConfigureAllowedCallersSequenceInput struct {
-	Address                        map[uint64]common.Address
+	AddressesByChain               map[uint64]common.Address
 	ConfigureAllowedCallersByChain map[uint64][]erc20_lock_box_ops.AllowedCallerConfigArgs
 }
 
 var (
 	ERC20LockboxConfigureAllowedCallersSequence = operations.NewSequence(
 		"ERC20LockboxConfigureAllowedCallersSequence",
-		semver.MustParse("1.6.4"),
+		erc20_lock_box_ops.Version,
 		"Configures allowed callers on a sequence of ERC20Lockbox contracts on multiple chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input ConfigureAllowedCallersSequenceInput) (sequences.OnChainOutput, error) {
 			writes := make([]contract.WriteOutput, 0)
 
 			// Iterate over each chain selector in the input
 			for chainSel, allowedCallers := range input.ConfigureAllowedCallersByChain {
-				address, ok := input.Address[chainSel]
+				address, ok := input.AddressesByChain[chainSel]
 				if !ok {
 					return sequences.OnChainOutput{}, fmt.Errorf("address not found for chain selector %d", chainSel)
 				}

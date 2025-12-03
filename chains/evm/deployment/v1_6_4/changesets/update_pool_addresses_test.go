@@ -4,37 +4,32 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/aws/smithy-go/ptr"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
-	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-
 	"github.com/Masterminds/semver/v3"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_proxy"
+	burn_mint_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
+	usdc_token_pool_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/usdc_token_pool_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
+	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-
-	datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/stretchr/testify/require"
-
-	changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
-	usdc_token_pool_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/usdc_token_pool_proxy"
-	mcms "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	mcms_types "github.com/smartcontractkit/mcms/types"
-
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-
-	burn_mint_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
+	"github.com/stretchr/testify/require"
 )
 
-func TestUpdateLockReleasePoolAddressesChangeset(t *testing.T) {
+func TestUpdatePoolAddressesChangeset(t *testing.T) {
 	chainSelector := uint64(chain_selectors.TEST_90000001.Selector)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -68,7 +63,6 @@ func TestUpdateLockReleasePoolAddressesChangeset(t *testing.T) {
 	routerAddress := common.Address{1}
 
 	// Deploy ERC20LockBox using the deploy operation
-
 	usdc_token_pool_proxy_ref, err := contract_utils.MaybeDeployContract(e.OperationsBundle, usdc_token_pool_proxy.Deploy, evmChain, contract.DeployInput[usdc_token_pool_proxy.ConstructorArgs]{
 		TypeAndVersion: cldf_deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *semver.MustParse("1.6.4")),
 		ChainSelector:  chainSelector,
@@ -107,13 +101,14 @@ func TestUpdateLockReleasePoolAddressesChangeset(t *testing.T) {
 	_, err = evmChain.Confirm(tx)
 	require.NoError(t, err, "Failed to confirm BurnMintTokenPool contract deployment")
 
-	updateLockReleasePoolAddressesInput := changesets.UpdateLockReleasePoolAddressesInput{
-		ChainInputs: []changesets.UpdateLockReleasePoolAddressesPerChainInput{
+	updatePoolAddressesInput := changesets.UpdatePoolAddressesInput{
+		ChainInputs: []changesets.UpdatePoolAddressesPerChainInput{
 			{
 				ChainSelector: chainSelector,
-				LockReleasePoolAddrs: usdc_token_pool_proxy.UpdateLockReleasePoolAddressesArgs{
-					RemoteChainSelectors: []uint64{chainSelector},
-					LockReleasePools:     []common.Address{burnMintTokenPoolAddress},
+				PoolAddresses: usdc_token_pool_proxy.PoolAddresses{
+					LegacyCctpV1Pool: common.Address{0},
+					CctpV1Pool:       common.Address{0},
+					CctpV2Pool:       burnMintTokenPoolAddress,
 				},
 			},
 		},
@@ -123,7 +118,7 @@ func TestUpdateLockReleasePoolAddressesChangeset(t *testing.T) {
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
 			Qualifier:            "test",
-			Description:          "Update lock release pool addresses",
+			Description:          "Update pool addresses",
 		},
 	}
 
@@ -162,15 +157,15 @@ func TestUpdateLockReleasePoolAddressesChangeset(t *testing.T) {
 	evmMCMSReader := &adapters.EVMMCMSReader{}
 	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
 
-	updateLockReleasePoolAddressesChangeset := changesets.UpdateLockReleasePoolAddressesChangeset(mcmsRegistry)
-	deployChangesetOutput, err := updateLockReleasePoolAddressesChangeset.Apply(*e, updateLockReleasePoolAddressesInput)
-	require.NoError(t, err, "UpdateLockReleasePoolAddressesChangeset should not error")
+	updatePoolAddressesChangeset := changesets.UpdatePoolAddressesChangeset(mcmsRegistry)
+	deployChangesetOutput, err := updatePoolAddressesChangeset.Apply(*e, updatePoolAddressesInput)
+	require.NoError(t, err, "UpdatePoolAddressesChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)
 
-	// Verify the lock release pool address
+	// Verify the pool addresses
 	usdcTokenPoolProxy, err := usdc_token_pool_proxy_bindings.NewUSDCTokenPoolProxy(common.HexToAddress(usdc_token_pool_proxy_ref.Address), evmChain.Client)
 	require.NoError(t, err, "Failed to create USDCTokenPoolProxy")
-	lockReleasePoolAddr, err := usdcTokenPoolProxy.GetLockReleasePoolAddress(&bind.CallOpts{Context: t.Context()}, chainSelector)
-	require.NoError(t, err, "Failed to get lock release pool address")
-	require.Equal(t, lockReleasePoolAddr, burnMintTokenPoolAddress, "Lock release pool address should match")
+	poolAddresses, err := usdcTokenPoolProxy.GetPools(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err, "Failed to get pool addresses")
+	require.Equal(t, updatePoolAddressesInput.ChainInputs[0].PoolAddresses.CctpV2Pool, poolAddresses.CctpV2Pool)
 }

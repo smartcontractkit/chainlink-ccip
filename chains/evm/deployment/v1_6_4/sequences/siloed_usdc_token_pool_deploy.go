@@ -3,12 +3,12 @@ package sequences
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/siloed_usdc_token_pool"
-
 	usdc_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
+
+	siloed_usdc_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -28,7 +28,7 @@ type SiloedUSDCTokenPoolDeploySequenceInput struct {
 
 var SiloedUSDCTokenPoolDeploySequence = operations.NewSequence(
 	"SiloedUSDCTokenPoolDeploySequence",
-	semver.MustParse("1.6.4"),
+	siloed_usdc_token_pool_ops.Version,
 	"Deploys the SiloedUSDCTokenPool contract",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input SiloedUSDCTokenPoolDeploySequenceInput) (sequences.OnChainOutput, error) {
 		chain, ok := chains.EVMChains()[input.ChainSelector]

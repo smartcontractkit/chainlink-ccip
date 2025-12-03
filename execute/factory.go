@@ -151,6 +151,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 		p.addrCodec,
+		offchainConfig.PopulateTxHashEnabled,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create ccip reader: %w", err)
@@ -177,6 +178,9 @@ func (p PluginFactory) NewReportingPlugin(
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
 	}
+
+	// Track LOOPP enablement status via Beholder
+	metricsReporter.TrackLooppProviderSupported(p.looppCCIPProviderSupported)
 
 	return NewPlugin(
 			p.donID,
