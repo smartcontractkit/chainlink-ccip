@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 
@@ -12,9 +12,9 @@ import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensio
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice Lombard CCIP token pool.
-/// For v2 flows, token movement (burn/mint or bridging) is handled by the Lombard verifier,
+/// For v2 flows, token movement (burn/mint) is handled by the Lombard verifier,
 /// the pool performs validation, rate limiting, accounting and event emission.
-/// IPoolV2.lockOrBurn forwards tokens to the verifier with _lockOrBurn.
+/// IPoolV2.lockOrBurn forwards tokens to the verifier.
 /// IPoolV2.releaseOrMint does not move tokens, _releaseOrMint is a no-op.
 /// TODO: Add explicit V1 support/backwards compatibility.
 contract LombardTokenPool is TokenPool, ITypeAndVersion {
@@ -26,7 +26,6 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
 
   event LombardVerifierSet(address indexed verifier);
 
-  /// @notice CCIP contract type and version.
   string public constant override typeAndVersion = "LombardTokenPool 1.7.0-dev";
 
   /// @notice Lombard verifier proxy / resolver address. lockOrBurn fetches the outbound implementation and forwards tokens to it.
@@ -51,27 +50,21 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   // │                        Lock or Burn                          │
   // ================================================================
 
-  /// @notice For IPoolV2.lockOrBurn call, this contract only overrides _lockOrBurn to forward tokens to the verifier
-  /// after validation/fee handling in the base class.
+  /// @notice For IPoolV2.lockOrBurn call, this contract only forwards tokens to the verifier.
   /// @dev Forward the net amount to the verifier; actual burn/bridge is done there.
-  function _lockOrBurn(
-    uint256 amount
-  ) internal virtual override {
-    uint64 remoteChainSelector;
-    // Calldata layout for lockOrBurn((bytes,uint64,address,uint256,address),uint16,bytes):
-    // - 0x00-0x03: function selector
-    // - 0x04: offset to the tuple (expected 0x60)
-    // Within the tuple, remoteChainSelector is the second element at tupleOffset + 0x20.
-    assembly {
-      let tuplePtr := add(0x04, calldataload(0x04))
-      remoteChainSelector := calldataload(add(tuplePtr, 0x20))
-    }
-    address verifierImpl =
-      ICrossChainVerifierResolver(i_lombardVerifierResolver).getOutboundImplementation(remoteChainSelector, "");
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes calldata tokenArgs
+  ) public override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
+    address verifierImpl = ICrossChainVerifierResolver(i_lombardVerifierResolver).getOutboundImplementation(
+      lockOrBurnIn.remoteChainSelector, ""
+    );
     if (verifierImpl == address(0)) {
       revert OutboundImplementationNotFoundForVerifier();
     }
-    i_token.safeTransfer(verifierImpl, amount);
+    i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
+    return super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
   }
 
   function lockOrBurn(
