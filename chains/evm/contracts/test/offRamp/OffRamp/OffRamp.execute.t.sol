@@ -263,7 +263,7 @@ contract OffRamp_execute is OffRampSetup {
 
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRamp.selector, ON_RAMP, message.onRampAddress));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRamp.selector, message.onRampAddress));
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
   }
 
@@ -287,12 +287,15 @@ contract OffRamp_execute is OffRampSetup {
     defaultCCVs[0] = s_defaultCCV;
 
     vm.startPrank(address(0));
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = ON_RAMP;
+
     OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
     updates[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
-      onRamp: ON_RAMP,
+      onRamps: onRamps,
       defaultCCV: defaultCCVs,
       laneMandatedCCVs: new address[](0)
     });

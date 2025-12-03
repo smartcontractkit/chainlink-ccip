@@ -26,6 +26,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   using ERC165Checker for address;
   using EnumerableSet for EnumerableSet.UintSet;
+  using EnumerableSet for EnumerableSet.Bytes32Set;
 
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes err);
@@ -47,7 +48,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);
-  error InvalidOnRamp(bytes expected, bytes got);
+  error InvalidOnRamp(bytes got);
   error InvalidOffRamp(address expected, bytes got);
   error InboundImplementationNotFound(address ccvAddress, bytes verifierResults);
 
@@ -60,7 +61,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     Internal.MessageExecutionState state,
     bytes returnData
   );
-  event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
+  event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfigArgs sourceConfig);
 
   // 5k for updating the state + 5k for the event and misc costs.
   uint256 internal constant MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
@@ -78,7 +79,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   struct SourceChainConfig {
     IRouter router; // ─╮ Local router to use for messages coming from this source chain.
     bool isEnabled; // ─╯ Flag whether the source chain is enabled or not.
-    bytes onRamp; // OnRamp address on the source chain.
+    bytes[] onRamps; // OnRamp address on the source chain.
     address[] defaultCCVs; // Default CCVs to use for messages from this source chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages from this source chain.
   }
@@ -90,7 +91,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     IRouter router; // ────────────╮ Local router to use for messages coming from this source chain.
     uint64 sourceChainSelector; // │ Source chain selector of the config to update.
     bool isEnabled; // ────────────╯ Flag whether the source chain is enabled or not.
-    bytes onRamp; // OnRamp address on the source chain.
+    bytes[] onRamps; // OnRamp address on the source chain.
     address[] defaultCCV; // Default CCV to use for messages from this source chain.
     address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
   }
@@ -117,6 +118,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice SourceChainConfig per source chain selector.
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
+
+  /// @notice Set of allowed onRamp address hashes per source chain selector.
+  mapping(uint64 sourceChainSelector => EnumerableSet.Bytes32Set allowedOnRampHashes) private s_allowedOnRampHashes;
 
   // STATE
 
@@ -173,8 +177,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (!sourceConfig.isEnabled) {
       revert SourceChainNotEnabled(message.sourceChainSelector);
     }
-    if (keccak256(message.onRampAddress) != keccak256(sourceConfig.onRamp)) {
-      revert InvalidOnRamp(sourceConfig.onRamp, message.onRampAddress);
+    if (!s_allowedOnRampHashes[message.sourceChainSelector].contains(keccak256(message.onRampAddress))) {
+      revert InvalidOnRamp(message.onRampAddress);
     }
     if (message.offRampAddress.length != 20 || address(bytes20(message.offRampAddress)) != address(this)) {
       revert InvalidOffRamp(address(this), message.offRampAddress);
@@ -547,8 +551,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    SourceChainConfig memory sourceConfig = s_sourceChainConfigs[sourceChainSelector];
-
     // If the receiver is a contract
     if (receiver.code.length != 0) {
       // And the contract implements the IAny2EVMMessageReceiverV2 interface.
@@ -566,7 +568,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         }
       }
     }
-    return (sourceConfig.defaultCCVs, new address[](0), 0);
+    return (s_sourceChainConfigs[sourceChainSelector].defaultCCVs, new address[](0), 0);
   }
 
   /// @notice Retrieves the required CCVs from a pool. If the pool does not specify any CCVs, we fall back to the
@@ -722,7 +724,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @return sourceChainConfig The config for the source chain.
   function getSourceChainConfig(
     uint64 sourceChainSelector
-  ) external view returns (SourceChainConfig memory) {
+  ) public view returns (SourceChainConfig memory) {
     return s_sourceChainConfigs[sourceChainSelector];
   }
 
@@ -764,26 +766,34 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         }
       }
 
-      // OnRamp can never be zero.
-      if (configUpdate.onRamp.length == 0 || keccak256(configUpdate.onRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
-        revert ZeroAddressNotAllowed();
+      SourceChainConfig storage currentConfig = s_sourceChainConfigs[configUpdate.sourceChainSelector];
+      EnumerableSet.Bytes32Set storage allowedOnRampHashes = s_allowedOnRampHashes[configUpdate.sourceChainSelector];
+
+      // Remove all current onRamps.
+      allowedOnRampHashes.clear();
+
+      // Populate allowed onRamps.
+      for (uint256 j = 0; j < configUpdate.onRamps.length; ++j) {
+        bytes memory onRamp = configUpdate.onRamps[j];
+        bytes32 onRampHash = keccak256(onRamp);
+        if (onRamp.length == 0 || onRampHash == EMPTY_ENCODED_ADDRESS_HASH) {
+          revert ZeroAddressNotAllowed();
+        }
+        allowedOnRampHashes.add(onRampHash);
       }
+      currentConfig.onRamps = configUpdate.onRamps;
 
       CCVConfigValidation._validateDefaultAndMandatedCCVs(configUpdate.defaultCCV, configUpdate.laneMandatedCCVs);
 
-      // TODO check replay protection if onRamp changes
-      SourceChainConfig storage currentConfig = s_sourceChainConfigs[configUpdate.sourceChainSelector];
-
       currentConfig.isEnabled = configUpdate.isEnabled;
       currentConfig.router = configUpdate.router;
-      currentConfig.onRamp = configUpdate.onRamp;
       currentConfig.defaultCCVs = configUpdate.defaultCCV;
       currentConfig.laneMandatedCCVs = configUpdate.laneMandatedCCVs;
 
       // We don't need to check the return value, as inserting the item twice has no effect.
       s_sourceChainSelectors.add(configUpdate.sourceChainSelector);
 
-      emit SourceChainConfigSet(configUpdate.sourceChainSelector, currentConfig);
+      emit SourceChainConfigSet(configUpdate.sourceChainSelector, configUpdate);
     }
   }
 

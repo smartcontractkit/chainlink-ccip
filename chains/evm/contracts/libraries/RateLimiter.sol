@@ -58,6 +58,10 @@ library RateLimiter {
     }
     if (tokens < requestTokens) {
       uint256 rate = s_bucket.rate;
+      if (rate == 0) {
+        // No tokens will ever be refilled. Check is required to avoid division by zero later.
+        revert TokenRateLimitReached(type(uint256).max, tokens, tokenAddress);
+      }
       // Wait required until the bucket is refilled enough to accept this value, round up to next higher second.
       // Consume is not guaranteed to succeed after wait time passes if there is competing traffic.
       // This acts as a lower bound of wait time.

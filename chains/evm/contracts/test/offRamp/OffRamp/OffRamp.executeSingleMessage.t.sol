@@ -134,12 +134,15 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     address laneMandatedCCV = makeAddr("laneMandatedCCV");
 
     // Configure source chain with lane mandated CCV.
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp"));
+
     OffRamp.SourceChainConfigArgs[] memory sourceChainConfigArgs = new OffRamp.SourceChainConfigArgs[](1);
     sourceChainConfigArgs[0] = OffRamp.SourceChainConfigArgs({
       router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp")),
+      onRamps: onRamps,
       defaultCCV: _arrayOf(s_defaultCCV),
       laneMandatedCCVs: _arrayOf(laneMandatedCCV)
     });
