@@ -8,8 +8,6 @@ import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
-
 contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   address internal s_newCctpV1Pool = makeAddr("newCctpV1Pool");
   address internal s_newCctpV2Pool = makeAddr("newCctpV2Pool");
@@ -116,17 +114,5 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
 
     assertEq(s_usdcTokenPoolProxy.getPools().legacyCctpV1Pool, s_legacyCctpV1Pool);
-  }
-
-  function _enableERC165InterfaceChecks(address pool, bytes4 interfaceId) internal {
-    vm.mockCall(
-      address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
-    );
-
-    vm.mockCall(
-      address(pool),
-      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
-      abi.encode(true)
-    );
   }
 }
