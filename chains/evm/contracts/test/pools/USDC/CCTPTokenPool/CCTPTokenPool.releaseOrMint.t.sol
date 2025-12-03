@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Pool} from "../../../../libraries/Pool.sol";
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
+import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
 import {CCTPTokenPoolSetup} from "./CCTPTokenPoolSetup.t.sol";
-import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
-import {Pool} from "../../../../libraries/Pool.sol";
-import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
@@ -21,7 +21,8 @@ contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
       offchainTokenData: ""
     });
 
-    Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
+    Pool.ReleaseOrMintOutV1 memory expectedOut =
+      Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
 
     vm.expectEmit();
     emit TokenPool.ReleasedOrMinted({
@@ -50,7 +51,8 @@ contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
       offchainTokenData: ""
     });
 
-    Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
+    Pool.ReleaseOrMintOutV1 memory expectedOut =
+      Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
 
     vm.expectEmit();
     emit TokenPool.ReleasedOrMinted({

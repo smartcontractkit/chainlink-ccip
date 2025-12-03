@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Pool} from "../../../../libraries/Pool.sol";
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
+import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
 import {CCTPTokenPoolSetup} from "./CCTPTokenPoolSetup.t.sol";
-import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
-import {Pool} from "../../../../libraries/Pool.sol";
-import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract CCTPTokenPool_lockOrBurn is CCTPTokenPoolSetup {
@@ -51,7 +51,8 @@ contract CCTPTokenPool_lockOrBurn is CCTPTokenPoolSetup {
     });
 
     vm.startPrank(ALLOWED_CALLER);
-    (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) = s_cctpTokenPool.lockOrBurn(lockOrBurnIn, 0, "");
+    (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) =
+      s_cctpTokenPool.lockOrBurn(lockOrBurnIn, 0, "");
 
     assertEq(destTokenAmount, lockOrBurnIn.amount);
     assertEq(lockOrBurnOut.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));

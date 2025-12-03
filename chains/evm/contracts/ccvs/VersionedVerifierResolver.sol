@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../interfaces/ICrossChainVerifierResolver.sol";
-import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";

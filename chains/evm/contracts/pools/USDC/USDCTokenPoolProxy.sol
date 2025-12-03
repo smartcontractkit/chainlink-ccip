@@ -17,7 +17,6 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
 import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/ERC165Checker.sol";
 
-
 /// @notice A token pool proxy for USDC that allows for routing of messages to the correct pool based on the correct
 /// lock or burn mechanism. This includes CCTP v1, CCTP v2, CCTP v2 with CCV, and lock release.
 /// @dev This contract will be listed in the Token Admin Registry as a token pool. All of the child pools which
@@ -76,7 +75,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   /// @dev The legacy CCTP V1, CCTP V1, CCTP V2, and CCTP V2 with CCV pools.
   PoolAddresses internal s_pools;
   /// @notice The CCTP verifier contract.
-  address internal i_cctpVerifier;
+  address private immutable i_cctpVerifier;
 
   /// @dev Constant representing the default finality.
   uint16 internal constant WAIT_FOR_FINALITY = 0;
@@ -286,10 +285,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     }
 
     // If the legacy CCTP V1 Pool is being used, then it must support the IPoolV1 interface. If it is not, don't check it.
-    if (
-      pools.legacyCctpV1Pool != address(0)
-        && !pools.legacyCctpV1Pool.supportsInterface(type(IPoolV1).interfaceId)
-    ) {
+    if (pools.legacyCctpV1Pool != address(0) && !pools.legacyCctpV1Pool.supportsInterface(type(IPoolV1).interfaceId)) {
       revert TokenPoolUnsupported(pools.legacyCctpV1Pool);
     }
 
@@ -346,9 +342,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
       // If the token pool is being added, ensure that it supports the token pool v1 interface. If the pool is the zero address,
       // then it is being removed, as a migration from L/R to CCTP, and therefore no check is needed, as it was
       // already performed when originally added.
-      if (
-        lockReleasePools[i] != address(0) && !lockReleasePools[i].supportsInterface(type(IPoolV1).interfaceId)
-      ) {
+      if (lockReleasePools[i] != address(0) && !lockReleasePools[i].supportsInterface(type(IPoolV1).interfaceId)) {
         revert TokenPoolUnsupported(lockReleasePools[i]);
       }
 

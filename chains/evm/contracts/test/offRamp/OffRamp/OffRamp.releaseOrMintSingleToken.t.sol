@@ -57,7 +57,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     vm.expectCall(address(s_pool), abi.encodeCall(IPoolV2.releaseOrMint, (expectedInput, finality)));
 
     Client.EVMTokenAmount memory dest =
-      s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, finality);
+      s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, finality, 0);
 
     assertEq(dest.token, address(s_token));
     assertEq(dest.amount, tokenTransfer.amount);
@@ -75,7 +75,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     vm.expectCall(address(s_pool), abi.encodeCall(IPoolV1.releaseOrMint, (expectedInput)));
 
     Client.EVMTokenAmount memory dest =
-      s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 0);
+      s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 0, 0);
 
     assertEq(dest.token, address(s_token));
     assertEq(dest.amount, tokenTransfer.amount);
@@ -92,7 +92,27 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     vm.mockCallRevert(address(s_pool), callData, poolRevertData);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, address(s_token), poolRevertData));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 2);
+    s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 2, 0);
+  }
+
+  function test_releaseOrMintSingleToken_UsesBalancePreVerification() public {
+    Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
+    MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
+
+    // Increase balance of receiver to simulate a verifier releasing or minting the token.
+    deal(address(s_token), s_receiver, tokenTransfer.amount);
+    assertEq(s_token.balanceOf(s_receiver), tokenTransfer.amount);
+
+    vm.mockCall(
+      address(s_pool),
+      abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, expectedInput, uint16(2)),
+      abi.encode(Pool.ReleaseOrMintOutV1({destinationAmount: tokenTransfer.amount}))
+    );
+    Client.EVMTokenAmount memory amount =
+      s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 2, 1);
+
+    assertEq(amount.token, address(s_token));
+    assertEq(amount.amount, tokenTransfer.amount - 1); // This will indicate that the pre verification balance was taken into account.
   }
 
   function test_releaseOrMintSingleToken_RevertWhen_NotACompatiblePool_PoolAddressZero() public {
@@ -105,7 +125,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(0)));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0);
+    s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0, 0);
   }
 
   function test_releaseOrMintSingleToken_RevertWhen_NotACompatiblePool_UnsupportedInterface() public {
@@ -117,7 +137,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(s_pool)));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0);
+    s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0, 0);
   }
 
   function _buildReleaseInput() internal returns (Pool.ReleaseOrMintInV1 memory) {

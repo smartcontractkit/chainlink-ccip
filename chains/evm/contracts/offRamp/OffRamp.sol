@@ -285,6 +285,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     uint256[] memory balancesPreVerification = new uint256[](message.tokenTransfer.length);
     for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
+      if (message.tokenTransfer[i].destTokenAddress.length != 20) {
+        revert Internal.InvalidEVMAddress(message.tokenTransfer[i].destTokenAddress);
+      }
       balancesPreVerification[i] = _getBalanceOfReceiver(
         address(bytes20(message.tokenTransfer[i].tokenReceiver)),
         address(bytes20(message.tokenTransfer[i].destTokenAddress))
@@ -312,7 +315,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
     for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
       destTokenAmounts[i] = _releaseOrMintSingleToken(
-        message.tokenTransfer[i], message.sender, message.sourceChainSelector, message.finality, balancesPreVerification[i]
+        message.tokenTransfer[i],
+        message.sender,
+        message.sourceChainSelector,
+        message.finality,
+        balancesPreVerification[i]
       );
     }
 
@@ -361,6 +368,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes calldata encodedMessage
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
+    if (message.tokenTransfer.length > 0) {
+      if (message.tokenTransfer[0].destTokenAddress.length != 20) {
+        revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
+      }
+    }
 
     return _getCCVsForMessage(
       message.sourceChainSelector, address(bytes20(message.receiver)), message.tokenTransfer, message.finality
@@ -390,10 +402,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (tokenTransfer.length > 0) {
       if (tokenTransfer.length != 1) {
         revert InvalidNumberOfTokens(tokenTransfer.length);
-      }
-
-      if (tokenTransfer[0].destTokenAddress.length != 20) {
-        revert Internal.InvalidEVMAddress(tokenTransfer[0].destTokenAddress);
       }
       address localTokenAddress = address(bytes20(tokenTransfer[0].destTokenAddress));
 
@@ -661,6 +669,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     // We retrieve the local token balance of the receiver before the pool call.
     uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
+    Pool.ReleaseOrMintOutV1 memory returnData;
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintInput = Pool.ReleaseOrMintInV1({
       originalSender: originalSender,
@@ -678,18 +687,28 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     });
 
     if (localPoolAddress.supportsInterface(type(IPoolV2).interfaceId)) {
-      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationRequested) {
+      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationRequested) returns (
+        Pool.ReleaseOrMintOutV1 memory result
+      ) {
+        returnData = result;
       } catch (bytes memory err) {
         revert TokenHandlingError(localToken, err);
       }
     } else if (localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
-      try IPoolV1(localPoolAddress).releaseOrMint(releaseOrMintInput) {
+      try IPoolV1(localPoolAddress).releaseOrMint(releaseOrMintInput) returns (Pool.ReleaseOrMintOutV1 memory result) {
+        returnData = result;
       } catch (bytes memory err) {
         revert TokenHandlingError(localToken, err);
       }
     } else {
       // If the pool does not support the v1 interface, we revert.
       revert NotACompatiblePool(localPoolAddress);
+    }
+
+    // If the pool is lock-release, balancePost - balancePre would always return 0.
+    // Therefore, if the receiver is the token pool, we trust the value returned by the pool.
+    if (receiver == localPoolAddress) {
+      return Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount});
     }
 
     uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);

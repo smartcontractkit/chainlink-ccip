@@ -13,6 +13,7 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract OffRamp_executeSingleMessage is OffRampSetup {
@@ -122,6 +123,10 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       ),
       abi.encode(_arrayOf(poolRequiredCCV))
     );
+    // Mock token receiver balance check.
+    vm.mockCall(
+      address(token), abi.encodeWithSelector(IERC20.balanceOf.selector, tokenReceiver), abi.encode(tokenAmount)
+    );
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, poolRequiredCCV));
 
@@ -209,6 +214,9 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
   function test_executeSingleMessage_RevertWhen_InvalidNumberOfTokens() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
 
+    address destToken = makeAddr("destToken");
+    address tokenReceiver = makeAddr("tokenReceiver");
+
     // Create message with multiple token transfers (invalid) - but we need to manually set this
     // since encoding would fail. We'll create a valid single token transfer first, then modify the array.
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
@@ -216,8 +224,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       amount: 100,
       sourcePoolAddress: abi.encodePacked(makeAddr("pool1")),
       sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken1")),
-      destTokenAddress: abi.encodePacked(makeAddr("token1")),
-      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
+      destTokenAddress: abi.encodePacked(destToken),
+      tokenReceiver: abi.encodePacked(tokenReceiver),
       extraData: ""
     });
     message.tokenTransfer = tokenAmounts;
@@ -235,6 +243,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     bytes[] memory verifierResults = new bytes[](1);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidNumberOfTokens.selector, invalidTokenAmounts.length));
+    vm.mockCall(address(destToken), abi.encodeWithSelector(IERC20.balanceOf.selector, tokenReceiver), abi.encode(100));
 
     s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
   }
