@@ -7,10 +7,9 @@ import {LombardTokenPoolSetup} from "./LombardTokenPoolSetup.t.sol";
 contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
   function test_lockOrBurn_ForwardsToVerifier() public {
     uint256 amount = 1e18;
-    vm.prank(OWNER);
-    s_token.transfer(address(s_pool), amount);
+    deal(address(s_token), address(s_pool), amount);
 
-    vm.prank(s_allowedOnRamp);
+    vm.startPrank(s_allowedOnRamp);
     (Pool.LockOrBurnOutV1 memory out, uint256 destAmount) = s_pool.lockOrBurn(
       Pool.LockOrBurnInV1({
         receiver: abi.encodePacked(address(0xDEAD)),
@@ -26,7 +25,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     assertEq(destAmount, amount);
     assertEq(out.destTokenAddress, abi.encode(s_remoteToken));
     assertEq(out.destPoolData, abi.encode(uint8(DEFAULT_TOKEN_DECIMALS)));
-    assertEq(s_token.balanceOf(VERIFIER), amount);
+    assertEq(s_token.balanceOf(VERIFIER_IMPL), amount);
     assertEq(s_token.balanceOf(address(s_pool)), 0);
   }
 }
