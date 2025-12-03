@@ -36,7 +36,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidSetDomainArgs(SetDomainArgs args);
   error UnknownDomain(uint64 chainSelector);
   error UnsupportedFinality(uint32 finality);
-  error MintBalanceMismatch(uint256 amountMintedToReceiver, uint256 balancePre, uint256 balancePost);
   error ZeroAddressNotAllowed();
 
   event DomainsSet(SetDomainArgs[] domains);
@@ -315,19 +314,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     if (messageSender != sourceDomain.allowedCallerOnSource) {
       revert InvalidMessageSender(sourceDomain.allowedCallerOnSource, messageSender);
     }
-
-    // We expect exactly one token transfer per message.
-    if (message.tokenTransfer.length != 1) revert InvalidTokenTransferLength(message.tokenTransfer.length);
-
-    MessageV1Codec.TokenTransferV1 memory tokenTransfer = message.tokenTransfer[0];
-    // The address of the token transferred must correspond to USDC.
-    if (address(bytes20(tokenTransfer.destTokenAddress)) != address(i_usdcToken)) {
-      revert InvalidToken(tokenTransfer.destTokenAddress);
-    }
-
-    // Right-align and extract address (rightmost 20 bytes).
-    address tokenReceiver = address(uint160(uint256(bytes32(tokenTransfer.tokenReceiver))));
-    uint256 balancePre = i_usdcToken.balanceOf(tokenReceiver);
 
     // Store the feeExecuted value so the CCTP token pool can use it to compute the total amount received.
     // Assumes that the OffRamp calls verifyMessage before releaseOrMint.
