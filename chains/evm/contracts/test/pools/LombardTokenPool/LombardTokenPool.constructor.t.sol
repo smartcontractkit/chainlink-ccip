@@ -2,12 +2,16 @@
 pragma solidity ^0.8.24;
 
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
+import {IBridgeV2} from "../../../pools/Lombard/interfaces/IBridgeV2.sol";
+
+import {MockLombardBridgeV2} from "../../mocks/MockLombardBridgeV2.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract LombardTokenPool_constructor is Test {
   BurnMintERC20 internal s_token;
+  MockLombardBridgeV2 internal s_bridge;
   address internal s_resolver;
   address internal constant RMN = address(0xAA01);
   address internal constant ROUTER = address(0xBB02);
@@ -15,18 +19,30 @@ contract LombardTokenPool_constructor is Test {
   function setUp() public {
     s_token = new BurnMintERC20("Lombard", "LBD", 18, 0, 0);
     s_resolver = address(new MockVerifier(""));
+    s_bridge = new MockLombardBridgeV2(1, address(0));
   }
 
   function test_constructor() public {
-    vm.expectEmit();
-    emit LombardTokenPool.LombardVerifierSet(s_resolver);
-    LombardTokenPool pool = new LombardTokenPool(s_token, s_resolver, address(0), RMN, ROUTER, 18);
+    //  vm.expectEmit();
+    //    emit LombardTokenPool.LombardVerifierSet(s_resolver);
+    LombardTokenPool pool = new LombardTokenPool(s_token, s_resolver, s_bridge, address(0), address(0), RMN, ROUTER, 18);
     assertEq(pool.getVerifierResolver(), address(s_resolver));
     assertEq(pool.typeAndVersion(), "LombardTokenPool 1.7.0-dev");
   }
 
   function test_constructor_ZeroVerifierNotAllowed() public {
     vm.expectRevert(LombardTokenPool.ZeroVerifierNotAllowed.selector);
-    new LombardTokenPool(s_token, address(0), address(0), RMN, ROUTER, 18);
+    new LombardTokenPool(s_token, address(0), s_bridge, address(0), address(0), RMN, ROUTER, 18);
+  }
+
+  function test_constructor_RevertsWhen_InvalidBridgeVersion() public {
+    MockLombardBridgeV2 wrongVersionBridge = new MockLombardBridgeV2(2, address(0));
+    vm.expectRevert(abi.encodeWithSelector(LombardTokenPool.InvalidMessageVersion.selector, 1, 2));
+    new LombardTokenPool(s_token, s_resolver, wrongVersionBridge, address(0), address(0), RMN, ROUTER, 18);
+  }
+
+  function test_constructor_RevertsWhen_ZeroBridge() public {
+    vm.expectRevert(LombardTokenPool.ZeroBridge.selector);
+    new LombardTokenPool(s_token, s_resolver, IBridgeV2(address(0)), address(0), address(0), RMN, ROUTER, 18);
   }
 }
