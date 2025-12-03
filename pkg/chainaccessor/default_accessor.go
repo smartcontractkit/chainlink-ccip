@@ -89,7 +89,7 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 	var configRequests contractreader.ExtendedBatchGetLatestValuesRequest
 	var standardOffRampRequestCount int
 	if l.chainSelector == destChainSelector {
-		lggr.Debugw("getting ChainConfigSnapshot and and OffRamp SourceChainConfigs for destination chain")
+		lggr.Debugw("getting ChainConfigSnapshot and OffRamp SourceChainConfigs for destination chain")
 		configRequests, standardOffRampRequestCount = prepareDestChainRequest(sourceChainSelectors)
 	} else {
 		lggr.Debugw("getting ChainConfigSnapshot for a source chain")
