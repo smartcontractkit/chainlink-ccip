@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {ERC165CheckerReverting} from "../../libraries/ERC165CheckerReverting.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {CCTPTokenPool} from "./CCTPTokenPool.sol";
@@ -38,7 +36,6 @@ import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/E
 ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
 contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   using SafeERC20 for IERC20;
-  using ERC165CheckerReverting for address;
   using ERC165Checker for address;
 
   error AddressCannotBeZero();
@@ -46,7 +43,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(bytes4 version);
   error InvalidMessageLength(uint256 length);
-  error InvalidCCTPVerifier(address cctpVerifier);
   error MismatchedArrayLengths();
   error NoLockOrBurnMechanismSet(uint64 remoteChainSelector);
   error CallerIsNotARampOnRouter(address caller);
@@ -92,10 +88,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     // As a result only the token, router, and cctpVerifier are enforced to be non-zero.
     if (address(token) == address(0) || router == address(0) || cctpVerifier == address(0)) {
       revert AddressCannotBeZero();
-    }
-
-    if (!cctpVerifier.supportsInterface(type(ICrossChainVerifierResolver).interfaceId)) {
-      revert InvalidCCTPVerifier(cctpVerifier);
     }
 
     i_token = token;
@@ -145,10 +137,14 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
 
     // The child pool which will perform the lock/burn operation.
     address childPool;
-    bool useCCV = false;
     if (mechanism == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
-      childPool = pools.cctpV2PoolWithCCV;
-      useCCV = true;
+      // CCV-compatible lockOrBurn path is completed within this if statement to avoid redundant checks.
+      if (pools.cctpV2PoolWithCCV == address(0)) {
+        revert NoLockOrBurnMechanismSet(lockOrBurnIn.remoteChainSelector);
+      }
+      // If using the CCTP verifier, transfer funds to the verifier instead of the pool.
+      i_token.safeTransfer(i_cctpVerifier, lockOrBurnIn.amount);
+      return CCTPTokenPool(pools.cctpV2PoolWithCCV).lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
     } else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
       childPool = pools.cctpV2Pool;
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
@@ -164,17 +160,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     }
 
     // Transfer the tokens to the correct address, as this contract is only a proxy and will not perform the lock/burn itself.
-    // If using the CCTP verifier, transfer funds to the verifier instead of the child pool.
-    i_token.safeTransfer(
-      useCCV
-        ? ICrossChainVerifierResolver(i_cctpVerifier).getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "")
-        : childPool,
-      lockOrBurnIn.amount
-    );
+    i_token.safeTransfer(childPool, lockOrBurnIn.amount);
 
-    return useCCV
-      ? CCTPTokenPool(childPool).lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs)
-      : (USDCTokenPool(childPool).lockOrBurn(lockOrBurnIn), lockOrBurnIn.amount);
+    return (USDCTokenPool(childPool).lockOrBurn(lockOrBurnIn), lockOrBurnIn.amount);
   }
 
   /// @inheritdoc IPoolV1
@@ -283,16 +271,16 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   function updatePoolAddresses(
     PoolAddresses calldata pools
   ) external onlyOwner {
-    if (pools.cctpV1Pool != address(0) && !pools.cctpV1Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)) {
+    if (pools.cctpV1Pool != address(0) && !pools.cctpV1Pool.supportsInterface(type(IPoolV1).interfaceId)) {
       revert TokenPoolUnsupported(pools.cctpV1Pool);
     }
 
-    if (pools.cctpV2Pool != address(0) && !pools.cctpV2Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)) {
+    if (pools.cctpV2Pool != address(0) && !pools.cctpV2Pool.supportsInterface(type(IPoolV1).interfaceId)) {
       revert TokenPoolUnsupported(pools.cctpV2Pool);
     }
 
     if (pools.cctpV2PoolWithCCV != address(0)) {
-      if (!pools.cctpV2PoolWithCCV._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
+      if (!pools.cctpV2PoolWithCCV.supportsInterface(type(IPoolV2).interfaceId)) {
         revert TokenPoolUnsupported(pools.cctpV2PoolWithCCV);
       }
     }
@@ -300,7 +288,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     // If the legacy CCTP V1 Pool is being used, then it must support the IPoolV1 interface. If it is not, don't check it.
     if (
       pools.legacyCctpV1Pool != address(0)
-        && !pools.legacyCctpV1Pool._supportsInterfaceReverting(type(IPoolV1).interfaceId)
+        && !pools.legacyCctpV1Pool.supportsInterface(type(IPoolV1).interfaceId)
     ) {
       revert TokenPoolUnsupported(pools.legacyCctpV1Pool);
     }
@@ -359,7 +347,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
       // then it is being removed, as a migration from L/R to CCTP, and therefore no check is needed, as it was
       // already performed when originally added.
       if (
-        lockReleasePools[i] != address(0) && !lockReleasePools[i]._supportsInterfaceReverting(type(IPoolV1).interfaceId)
+        lockReleasePools[i] != address(0) && !lockReleasePools[i].supportsInterface(type(IPoolV1).interfaceId)
       ) {
         revert TokenPoolUnsupported(lockReleasePools[i]);
       }
@@ -490,9 +478,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   }
 
   /// @notice Ensures that a CCV-compatible pool is set.
-  /// @dev We can just check i_cctpVerifier because it gets cached when the CCV-compatible pool is set.
   modifier onlyWithCCVCompatiblePool() {
-    if (i_cctpVerifier == address(0)) {
+    if (s_pools.cctpV2PoolWithCCV == address(0)) {
       revert CCVCompatiblePoolNotSet();
     }
     _;

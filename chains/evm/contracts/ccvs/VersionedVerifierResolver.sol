@@ -139,8 +139,6 @@ contract VersionedVerifierResolver is IERC165, ICrossChainVerifierResolver, ITyp
   function supportsInterface(
     bytes4 interfaceId
   ) public view virtual returns (bool) {
-    return interfaceId == type(ICrossChainVerifierResolver).interfaceId
-      || interfaceId == type(ITypeAndVersion).interfaceId || interfaceId == type(IERC165).interfaceId
-      || interfaceId == type(IOwnable).interfaceId;
+    return interfaceId == type(ICrossChainVerifierResolver).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 }
