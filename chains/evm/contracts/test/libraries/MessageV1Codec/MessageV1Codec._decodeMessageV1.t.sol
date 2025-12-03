@@ -9,7 +9,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: 5,
       destChainSelector: 10,
-      sequenceNumber: 200,
+      messageNumber: 200,
       executionGasLimit: 300000,
       ccipReceiveGasLimit: 90_000,
       finality: 1000,
@@ -42,7 +42,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: 123,
       destChainSelector: 456,
-      sequenceNumber: 789,
+      messageNumber: 789,
       executionGasLimit: 400000,
       ccipReceiveGasLimit: 120_000,
       finality: 2000,
@@ -88,7 +88,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: type(uint64).max,
       destChainSelector: type(uint64).max,
-      sequenceNumber: type(uint64).max,
+      messageNumber: type(uint64).max,
       executionGasLimit: type(uint32).max,
       ccipReceiveGasLimit: type(uint32).max,
       finality: type(uint16).max,
@@ -112,7 +112,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: 1,
       destChainSelector: 2,
-      sequenceNumber: 3,
+      messageNumber: 3,
       executionGasLimit: 0,
       ccipReceiveGasLimit: 0,
       finality: 0,
@@ -202,7 +202,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     bytes memory encoded = s_helper.encodeMessageV1(message);
 
     // Truncate right after onRampAddress length byte to cause content error
-    // version(1) + sourceChain(8) + destChain(8) + seqNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + onRampLen(1) = 68
+    // version(1) + sourceChain(8) + destChain(8) + msgNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + onRampLen(1) = 68
     uint256 truncatePoint = 68;
     bytes memory truncated = new bytes(truncatePoint + 12); // Not enough for the 20-byte address
     for (uint256 i = 0; i < truncated.length; i++) {
@@ -222,7 +222,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     bytes memory encoded = s_helper.encodeMessageV1(message);
 
     // Truncate right at offRampAddress length byte position
-    // version(1) + sourceChain(8) + destChain(8) + seqNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + onRampLen(1) + onRampAddr(20) = 88
+    // version(1) + sourceChain(8) + destChain(8) + msgNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + onRampLen(1) + onRampAddr(20) = 88
     uint256 truncatePoint = 88;
     bytes memory truncated = new bytes(truncatePoint); // Missing offRampAddress length byte
     for (uint256 i = 0; i < truncated.length; i++) {
@@ -262,7 +262,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     bytes memory encoded = s_helper.encodeMessageV1(message);
 
     // Truncate right before sender length byte
-    // version(1) + sourceChain(8) + destChain(8) + seqNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + onRampLen(1) + onRampAddr(20) + offRampLen(1) + offRampAddr(20) = 109
+    // version(1) + sourceChain(8) + destChain(8) + msgNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + onRampLen(1) + onRampAddr(20) + offRampLen(1) + offRampAddr(20) = 109
     uint256 truncatePoint = 109;
     bytes memory truncated = new bytes(truncatePoint); // Missing sender length
     for (uint256 i = 0; i < truncated.length; i++) {
@@ -385,7 +385,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     bytes memory encoded = s_helper.encodeMessageV1(message);
 
     // Find the off-ramp address length byte and truncate after it
-    // version(1) + sourceChain(8) + destChain(8) + seqNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) = 67
+    // version(1) + sourceChain(8) + destChain(8) + msgNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) = 67
     uint256 offset = 67;
     offset += 1 + message.onRampAddress.length; // onRamp length + content
     uint8 offRampLength = uint8(encoded[offset]); // off-ramp length byte
@@ -415,7 +415,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     bytes memory encoded = s_helper.encodeMessageV1(message);
 
     // Find the receiver address length byte and truncate after it
-    // version(1) + sourceChain(8) + destChain(8) + seqNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) = 67
+    // version(1) + sourceChain(8) + destChain(8) + msgNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) = 67
     uint256 offset = 67;
     offset += 1 + message.onRampAddress.length; // onRamp length + content
     offset += 1 + message.offRampAddress.length; // offRamp length + content
@@ -446,7 +446,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     bytes memory encoded = s_helper.encodeMessageV1(message);
 
     // Find the dest blob length bytes and truncate after them
-    // version(1) + sourceChain(8) + destChain(8) + seqNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) = 67
+    // version(1) + sourceChain(8) + destChain(8) + msgNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) = 67
     uint256 offset = 67;
     offset += 1 + message.onRampAddress.length; // onRamp length + content
     offset += 1 + message.offRampAddress.length; // offRamp length + content
@@ -470,11 +470,11 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     bytes memory encoded
   ) private pure returns (uint256) {
     // Parse through the encoded message to find the token transfer version byte
-    // Wire format: version(1) + sourceChain(8) + destChain(8) + seqNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + ...
+    // Wire format: version(1) + sourceChain(8) + destChain(8) + msgNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + ...
     uint256 offset = 1; // Skip message version
 
     // Skip fixed header fields
-    offset += 8 + 8 + 8; // sourceChainSelector + destChainSelector + sequenceNumber
+    offset += 8 + 8 + 8; // sourceChainSelector + destChainSelector + messageNumber
     offset += 4 + 4; // executionGasLimit + ccipReceiveGasLimit
     offset += 2; // finality
     offset += 32; // ccvAndExecutorHash

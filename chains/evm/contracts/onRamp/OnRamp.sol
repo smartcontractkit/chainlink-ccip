@@ -52,7 +52,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
     uint64 indexed destChainSelector,
-    uint64 sequenceNumber,
+    uint64 messageNumber,
     IRouter router,
     address[] defaultCCVs,
     address[] laneMandatedCCVs,
@@ -62,7 +62,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   event CCIPMessageSent(
     uint64 indexed destChainSelector,
-    uint64 indexed sequenceNumber,
+    uint64 indexed messageNumber,
     bytes32 indexed messageId,
     address feeToken,
     bytes encodedMessage,
@@ -96,9 +96,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev Struct to hold the configs for a single destination chain.
   struct DestChainConfig {
     IRouter router; // ────────────╮ Local router address  that is allowed to send messages to the destination chain.
-    // The last used sequence number. This is zero in the case where no messages have yet been sent.
-    // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
-    uint64 sequenceNumber; //      │
+    // The last used message number. This is zero in the case where no messages have yet been sent.
+    // 0 is not a valid message number for any real transaction as this value will be incremented before use.
+    uint64 messageNumber; //       │
     uint8 addressBytesLength; //   │ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
     uint16 networkFeeUSDCents; // ─╯ Network fee in USD cents for messages to this destination chain.
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
@@ -119,7 +119,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
-    address defaultExecutor;
+    address defaultExecutor; // If no executor is specified in the extraArgs, this executor will be used.
     bytes offRamp; // Destination OffRamp address, NOT abi encoded but raw bytes.
   }
 
@@ -175,13 +175,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   // │                          Messaging                           │
   // ================================================================
 
-  /// @notice Gets the next sequence number to be used in the onRamp.
+  /// @notice Gets the next message number to be used in the onRamp.
   /// @param destChainSelector The destination chain selector.
-  /// @return nextSequenceNumber The next sequence number to be used.
-  function getExpectedNextSequenceNumber(
+  /// @return nextMessageNumber The next message number to be used.
+  function getExpectedNextMessageNumber(
     uint64 destChainSelector
   ) external view returns (uint64) {
-    return s_destChainConfigs[destChainSelector].sequenceNumber + 1;
+    return s_destChainConfigs[destChainSelector].messageNumber + 1;
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
@@ -215,7 +215,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
-      sequenceNumber: ++destChainConfig.sequenceNumber,
+      messageNumber: ++destChainConfig.messageNumber,
       executionGasLimit: 0, // Populated after getting receipts.
       ccipReceiveGasLimit: resolvedExtraArgs.gasLimit,
       finality: resolvedExtraArgs.blockConfirmations,
@@ -300,7 +300,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 7. emit event.
     emit CCIPMessageSent({
       destChainSelector: destChainSelector,
-      sequenceNumber: newMessage.sequenceNumber,
+      messageNumber: newMessage.messageNumber,
       messageId: messageId,
       feeToken: message.feeToken,
       encodedMessage: eventData.encodedMessage,
@@ -579,7 +579,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
       emit DestChainConfigSet(
         destChainSelector,
-        destChainConfig.sequenceNumber,
+        destChainConfig.messageNumber,
         destChainConfigArg.router,
         destChainConfigArg.defaultCCVs,
         destChainConfigArg.laneMandatedCCVs,

@@ -91,12 +91,15 @@ contract e2e is OnRampSetup {
     address[] memory defaultDestCCVs = new address[](1);
     defaultDestCCVs[0] = s_destVerifier;
 
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encodePacked(s_onRamp);
+
     OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
     updates[0] = OffRamp.SourceChainConfigArgs({
       router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
-      onRamp: abi.encodePacked(s_onRamp),
+      onRamps: onRamps,
       defaultCCV: defaultDestCCVs,
       laneMandatedCCVs: new address[](0)
     });
@@ -115,7 +118,7 @@ contract e2e is OnRampSetup {
 
   function test_e2e() public {
     vm.pauseGasMetering();
-    uint64 expectedSeqNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber + 1;
+    uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
 
     IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
 
@@ -148,7 +151,7 @@ contract e2e is OnRampSetup {
     _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      seqNum: expectedSeqNum,
+      msgNum: expectedMsgNum,
       originalSender: OWNER
     });
     receipts[receipts.length - 1].issuer = address(s_sourceRouter);
@@ -158,7 +161,7 @@ contract e2e is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      sequenceNumber: expectedSeqNum,
+      messageNumber: expectedMsgNum,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -170,7 +173,7 @@ contract e2e is OnRampSetup {
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
-    assertEq(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).sequenceNumber, expectedSeqNum);
+    assertEq(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber, expectedMsgNum);
 
     address[] memory ccvAddresses = new address[](1);
     ccvAddresses[0] = s_destVerifier;
@@ -178,7 +181,7 @@ contract e2e is OnRampSetup {
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      sequenceNumber: expectedSeqNum,
+      messageNumber: expectedMsgNum,
       messageId: messageId,
       state: Internal.MessageExecutionState.SUCCESS,
       returnData: ""

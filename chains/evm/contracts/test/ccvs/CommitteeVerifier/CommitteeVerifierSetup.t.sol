@@ -56,7 +56,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec.MessageV1({
       sourceChainSelector: 1,
       destChainSelector: 2,
-      sequenceNumber: 1,
+      messageNumber: 1,
       executionGasLimit: 400_000,
       ccipReceiveGasLimit: 200_000,
       finality: 100,

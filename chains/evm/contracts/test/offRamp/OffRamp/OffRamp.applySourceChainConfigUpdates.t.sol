@@ -11,12 +11,18 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     uint64 chain1 = SOURCE_CHAIN_SELECTOR + 1;
     uint64 chain2 = SOURCE_CHAIN_SELECTOR + 2;
 
+    bytes[] memory onRamps1 = new bytes[](1);
+    onRamps1[0] = abi.encode(makeAddr("onRamp1"));
+
+    bytes[] memory onRamps2 = new bytes[](1);
+    onRamps2[0] = abi.encode(makeAddr("onRamp2"));
+
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](2);
     configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: chain1,
       isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp1")),
+      onRamps: onRamps1,
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
@@ -26,7 +32,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       router: s_sourceRouter,
       sourceChainSelector: chain2,
       isEnabled: false,
-      onRamp: abi.encode(makeAddr("onRamp2")),
+      onRamps: onRamps2,
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](2)
     });
@@ -35,16 +41,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     configs[1].laneMandatedCCVs[1] = makeAddr("mandatedCCV2");
 
     vm.expectEmit();
-    emit OffRamp.SourceChainConfigSet(
-      chain1,
-      OffRamp.SourceChainConfig({
-        router: configs[0].router,
-        isEnabled: configs[0].isEnabled,
-        onRamp: configs[0].onRamp,
-        defaultCCVs: configs[0].defaultCCV,
-        laneMandatedCCVs: configs[0].laneMandatedCCVs
-      })
-    );
+    emit OffRamp.SourceChainConfigSet(chain1, configs[0]);
 
     s_offRamp.applySourceChainConfigUpdates(configs);
 
@@ -59,8 +56,8 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
 
     assertEq(chain1, configs[0].sourceChainSelector);
     assertEq(chain2, configs[1].sourceChainSelector);
-    assertEq(config1.onRamp, configs[0].onRamp);
-    assertEq(config2.onRamp, configs[1].onRamp);
+    assertEq(config1.onRamps[0], configs[0].onRamps[0]);
+    assertEq(config2.onRamps[0], configs[1].onRamps[0]);
 
     assertEq(config1.defaultCCVs[0], configs[0].defaultCCV[0]);
     assertEq(config2.defaultCCVs[0], configs[1].defaultCCV[0]);
@@ -72,12 +69,15 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
   }
 
   function test_applySourceChainConfigUpdates_updateExistingChain() public {
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp"));
+
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: false,
-      onRamp: abi.encode(makeAddr("onRamp")),
+      onRamps: onRamps,
       defaultCCV: new address[](2),
       laneMandatedCCVs: new address[](1)
     });
@@ -94,12 +94,15 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroChainSelectorNotAllowed() public {
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp"));
+
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: 0,
       isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp")),
+      onRamps: onRamps,
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
@@ -110,12 +113,15 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_Router() public {
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp"));
+
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
       router: IRouter(address(0)),
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp")),
+      onRamps: onRamps,
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
@@ -126,12 +132,15 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_DefaultCCV() public {
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp"));
+
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp")),
+      onRamps: onRamps,
       defaultCCV: new address[](0),
       laneMandatedCCVs: new address[](0)
     });
@@ -141,12 +150,15 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_OnRamp() public {
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = "";
+
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
-      onRamp: "",
+      onRamps: onRamps,
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](0)
     });

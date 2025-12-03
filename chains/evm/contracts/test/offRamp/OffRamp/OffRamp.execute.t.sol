@@ -75,7 +75,7 @@ contract OffRamp_execute is OffRampSetup {
     return MessageV1Codec.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      sequenceNumber: 1,
+      messageNumber: 1,
       executionGasLimit: 200_000,
       ccipReceiveGasLimit: 0,
       finality: 0,
@@ -106,7 +106,7 @@ contract OffRamp_execute is OffRampSetup {
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
-      message.sequenceNumber,
+      message.messageNumber,
       keccak256(encodedMessage),
       Internal.MessageExecutionState.SUCCESS,
       ""
@@ -116,12 +116,7 @@ contract OffRamp_execute is OffRampSetup {
 
     // Verify final state is SUCCESS.
     assertEq(
-      uint256(Internal.MessageExecutionState.SUCCESS),
-      uint256(
-        s_offRamp.getExecutionState(
-          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
-        )
-      )
+      uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(keccak256(encodedMessage)))
     );
   }
 
@@ -140,7 +135,7 @@ contract OffRamp_execute is OffRampSetup {
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
-      message.sequenceNumber,
+      message.messageNumber,
       keccak256(encodedMessage),
       Internal.MessageExecutionState.SUCCESS,
       ""
@@ -150,12 +145,7 @@ contract OffRamp_execute is OffRampSetup {
 
     // Verify final state is SUCCESS.
     assertEq(
-      uint256(Internal.MessageExecutionState.SUCCESS),
-      uint256(
-        s_offRamp.getExecutionState(
-          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
-        )
-      )
+      uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(keccak256(encodedMessage)))
     );
   }
 
@@ -167,12 +157,7 @@ contract OffRamp_execute is OffRampSetup {
 
     // Verify final state is FAILURE.
     assertEq(
-      uint256(Internal.MessageExecutionState.FAILURE),
-      uint256(
-        s_offRamp.getExecutionState(
-          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
-        )
-      )
+      uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(keccak256(encodedMessage)))
     );
   }
 
@@ -194,7 +179,7 @@ contract OffRamp_execute is OffRampSetup {
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
-      message.sequenceNumber,
+      message.messageNumber,
       keccak256(encodedMessage),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(OffRamp.ReentrancyGuardReentrantCall.selector)
@@ -230,7 +215,7 @@ contract OffRamp_execute is OffRampSetup {
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
-      message.sequenceNumber,
+      message.messageNumber,
       keccak256(encodedMessage),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
@@ -278,7 +263,7 @@ contract OffRamp_execute is OffRampSetup {
 
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRamp.selector, ON_RAMP, message.onRampAddress));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRamp.selector, message.onRampAddress));
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
   }
 
@@ -302,12 +287,15 @@ contract OffRamp_execute is OffRampSetup {
     defaultCCVs[0] = s_defaultCCV;
 
     vm.startPrank(address(0));
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = ON_RAMP;
+
     OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
     updates[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
-      onRamp: ON_RAMP,
+      onRamps: onRamps,
       defaultCCV: defaultCCVs,
       laneMandatedCCVs: new address[](0)
     });
@@ -371,15 +359,10 @@ contract OffRamp_execute is OffRampSetup {
     // Execute the message successfully first time.
     s_offRamp.execute(encodedMessage, ccvs, verifierResults);
 
+    bytes32 messageId = keccak256(encodedMessage);
+
     // Verify it's in SUCCESS state.
-    assertEq(
-      uint256(Internal.MessageExecutionState.SUCCESS),
-      uint256(
-        s_offRamp.getExecutionState(
-          message.sourceChainSelector, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
-        )
-      )
-    );
+    assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(messageId)));
 
     // Try to execute the same message again - should revert.
     vm.expectRevert(
@@ -387,7 +370,7 @@ contract OffRamp_execute is OffRampSetup {
         OffRamp.SkippedAlreadyExecutedMessage.selector,
         keccak256(encodedMessage),
         SOURCE_CHAIN_SELECTOR,
-        message.sequenceNumber
+        message.messageNumber
       )
     );
     s_offRamp.execute(encodedMessage, ccvs, verifierResults);
@@ -404,7 +387,7 @@ contract OffRamp_execute is OffRampSetup {
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
-      message.sequenceNumber,
+      message.messageNumber,
       keccak256(encodedMessage),
       Internal.MessageExecutionState.FAILURE,
       revertReason
@@ -416,12 +399,7 @@ contract OffRamp_execute is OffRampSetup {
 
     // Verify message state changed to FAILURE
     assertEq(
-      uint256(Internal.MessageExecutionState.FAILURE),
-      uint256(
-        s_offRamp.getExecutionState(
-          SOURCE_CHAIN_SELECTOR, message.sequenceNumber, message.sender, address(bytes20(message.receiver))
-        )
-      )
+      uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(keccak256(encodedMessage)))
     );
   }
 }

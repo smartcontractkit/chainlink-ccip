@@ -74,7 +74,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   function _evmMessageToEvent(
     Client.EVM2AnyMessage memory message,
     uint64 destChainSelector,
-    uint64 seqNum,
+    uint64 msgNum,
     address originalSender
   )
     internal
@@ -108,7 +108,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     MessageV1Codec.MessageV1 memory messageV1 = MessageV1Codec.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: destChainSelector,
-      sequenceNumber: seqNum,
+      messageNumber: msgNum,
       executionGasLimit: 0, // populated below.
       ccipReceiveGasLimit: GAS_LIMIT,
       finality: 0,

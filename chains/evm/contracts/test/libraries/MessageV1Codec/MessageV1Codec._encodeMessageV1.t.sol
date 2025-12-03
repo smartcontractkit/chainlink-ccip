@@ -9,7 +9,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: 5,
       destChainSelector: 10,
-      sequenceNumber: 200,
+      messageNumber: 200,
       executionGasLimit: 300000,
       ccipReceiveGasLimit: 0,
       finality: 1000,
@@ -43,7 +43,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: 123,
       destChainSelector: 456,
-      sequenceNumber: 789,
+      messageNumber: 789,
       executionGasLimit: 400000,
       ccipReceiveGasLimit: 0,
       finality: 2000,
@@ -90,7 +90,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: type(uint64).max,
       destChainSelector: type(uint64).max,
-      sequenceNumber: type(uint64).max,
+      messageNumber: type(uint64).max,
       executionGasLimit: type(uint32).max,
       ccipReceiveGasLimit: 0,
       finality: type(uint16).max,
@@ -114,7 +114,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: 0,
       destChainSelector: 0,
-      sequenceNumber: 0,
+      messageNumber: 0,
       executionGasLimit: 0,
       ccipReceiveGasLimit: 0,
       finality: 0,
@@ -139,7 +139,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.MessageV1 memory originalMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: 0,
       destChainSelector: 0,
-      sequenceNumber: 0,
+      messageNumber: 0,
       executionGasLimit: 0,
       ccipReceiveGasLimit: 0,
       finality: 0,
