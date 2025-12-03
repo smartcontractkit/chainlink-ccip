@@ -25,7 +25,7 @@ contract OnRamp_distributeFees is OnRampSetup {
     IERC20 feeToken = IERC20(s_sourceFeeToken);
     assertEq(feeToken.balanceOf(s_verifier), receipts[0].feeTokenAmount);
     assertEq(feeToken.balanceOf(s_executor), receipts[1].feeTokenAmount);
-    assertEq(feeToken.balanceOf(address(s_onRamp)), 0);
+    assertEq(feeToken.balanceOf(address(s_onRamp)), receipts[2].feeTokenAmount);
   }
 
   function test_distributeFees_TokenPoolV2ReceivesShare() public {
@@ -41,7 +41,7 @@ contract OnRamp_distributeFees is OnRampSetup {
     assertEq(feeToken.balanceOf(s_verifier), receipts[0].feeTokenAmount);
     assertEq(feeToken.balanceOf(s_executor), receipts[2].feeTokenAmount);
     assertEq(feeToken.balanceOf(s_sourcePoolByToken[token]), receipts[1].feeTokenAmount);
-    assertEq(feeToken.balanceOf(address(s_onRamp)), 0);
+    assertEq(feeToken.balanceOf(address(s_onRamp)), receipts[3].feeTokenAmount);
   }
 
   function test_distributeFees_TokenPoolV1RetainsInOnRamp() public {
@@ -62,14 +62,15 @@ contract OnRamp_distributeFees is OnRampSetup {
     assertEq(feeToken.balanceOf(s_verifier), receipts[0].feeTokenAmount);
     assertEq(feeToken.balanceOf(s_executor), receipts[2].feeTokenAmount);
     assertEq(feeToken.balanceOf(pool), 0);
-    assertEq(feeToken.balanceOf(address(s_onRamp)), receipts[1].feeTokenAmount);
+    // OnRamp balance should accumulate both token pool and network fee.
+    assertEq(feeToken.balanceOf(address(s_onRamp)), receipts[1].feeTokenAmount + receipts[3].feeTokenAmount);
   }
 
   function _buildReceipts(
     bool withToken
   ) internal view returns (OnRamp.Receipt[] memory receipts, uint256 totalFee) {
     if (withToken) {
-      receipts = new OnRamp.Receipt[](3);
+      receipts = new OnRamp.Receipt[](4);
       receipts[0] =
         OnRamp.Receipt({issuer: s_verifier, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 1e16, extraArgs: ""});
       receipts[1] = OnRamp.Receipt({
@@ -81,14 +82,29 @@ contract OnRamp_distributeFees is OnRampSetup {
       });
       receipts[2] =
         OnRamp.Receipt({issuer: s_executor, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 3e16, extraArgs: ""});
-      totalFee = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
+      receipts[3] = OnRamp.Receipt({
+        issuer: address(s_sourceRouter),
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        feeTokenAmount: 4e16,
+        extraArgs: ""
+      });
+      totalFee = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount
+        + receipts[3].feeTokenAmount;
     } else {
-      receipts = new OnRamp.Receipt[](2);
+      receipts = new OnRamp.Receipt[](3);
       receipts[0] =
         OnRamp.Receipt({issuer: s_verifier, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 1e17, extraArgs: ""});
       receipts[1] =
         OnRamp.Receipt({issuer: s_executor, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 2e17, extraArgs: ""});
-      totalFee = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount;
+      receipts[2] = OnRamp.Receipt({
+        issuer: address(s_sourceRouter),
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        feeTokenAmount: 5e16,
+        extraArgs: ""
+      });
+      totalFee = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
     }
     return (receipts, totalFee);
   }

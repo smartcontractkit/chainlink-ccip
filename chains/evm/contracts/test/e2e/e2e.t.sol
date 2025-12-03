@@ -72,6 +72,7 @@ contract e2e is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
+      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultSourceCCVs,
@@ -150,6 +151,7 @@ contract e2e is OnRampSetup {
       seqNum: expectedSeqNum,
       originalSender: OWNER
     });
+    receipts[receipts.length - 1].issuer = address(s_sourceRouter);
     // committeeVerifier will return its versionTag, which we add here.
     verifierBlobs[0] = abi.encodePacked(s_sourceCommitteeVerifier.versionTag());
 
@@ -158,6 +160,7 @@ contract e2e is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: expectedSeqNum,
       messageId: messageId,
+      feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs
