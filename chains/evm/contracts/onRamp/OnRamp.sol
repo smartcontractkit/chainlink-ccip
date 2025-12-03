@@ -123,7 +123,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     bytes offRamp; // Destination OffRamp address, NOT abi encoded but raw bytes.
   }
 
-  /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
+  /// @notice Receipt structure used to record gas limits and fees for message processing.
+  /// @dev The ordering of receipts in a message is as follows:
+  /// - Verifier receipts in the order of the CCV list.
+  /// - Token transfer receipt (if any tokens are being transferred).
+  /// - Executor receipt.
+  /// - Network fee receipt.
   struct Receipt {
     // The address of the entity that issued the receipt. For token receipts this is the token address, not the pool.
     // for verifiers and executors, this is the user specified value, even if the call is ultimately handled by some
