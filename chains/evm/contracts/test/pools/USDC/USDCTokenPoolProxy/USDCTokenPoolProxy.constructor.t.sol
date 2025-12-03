@@ -15,6 +15,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
   address internal s_cctpV2PoolWithCCV = makeAddr("cctpV2PoolWithCCV");
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
+  address internal s_cctpVerifier = makeAddr("cctpVerifier");
 
   function test_constructor() public {
     // Arrange: Define test constants
@@ -26,7 +27,8 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
         cctpV2Pool: s_cctpV2Pool,
         cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
       }),
-      address(s_router)
+      address(s_router),
+      address(s_cctpVerifier)
     );
 
     USDCTokenPoolProxy.PoolAddresses memory pools = proxy.getPools();
@@ -50,7 +52,8 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
         cctpV2Pool: s_cctpV2Pool,
         cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
       }),
-      address(s_router)
+      address(s_router),
+      address(s_cctpVerifier)
     );
   }
 
@@ -64,7 +67,8 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
         cctpV2Pool: s_cctpV2Pool,
         cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
       }),
-      address(0) // Router
+      address(0), // Router
+      address(s_cctpVerifier)
     );
   }
 }

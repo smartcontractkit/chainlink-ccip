@@ -14,6 +14,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
   address internal s_mockTransmitterProxy = makeAddr("mockTransmitterProxy");
   uint64 internal s_remoteLockReleaseChainSelector = 12345;
+  address internal s_cctpVerifier = makeAddr("cctpVerifier");
 
   USDCTokenPoolProxyHelper internal s_usdcTokenPoolProxy;
 
@@ -36,7 +37,8 @@ contract USDCTokenPoolProxySetup is USDCSetup {
         cctpV2Pool: s_cctpV2Pool,
         cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
       }),
-      address(s_router)
+      address(s_router),
+      address(s_cctpVerifier)
     );
 
     // Deal some tokens to the proxy to test the transfer to the destination pool

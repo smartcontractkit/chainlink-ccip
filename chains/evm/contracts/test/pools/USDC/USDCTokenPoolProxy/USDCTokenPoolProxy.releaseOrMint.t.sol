@@ -291,12 +291,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2PoolWithCCV, type(IPoolV2).interfaceId);
 
-    vm.mockCall(
-      address(s_cctpV2PoolWithCCV),
-      abi.encodeWithSelector(CCTPTokenPool.getCCTPVerifier.selector),
-      abi.encode(makeAddr("cctpVerifier"))
-    );
-
     s_usdcTokenPoolProxy.updatePoolAddresses(updatedPools);
 
     // Arrange: Prepare test data for legacy format (64 bytes)

@@ -50,7 +50,7 @@ contract OffRampHelper is OffRamp {
     uint64 sourceChainSelector,
     uint16 finality
   ) external returns (Client.EVMTokenAmount memory) {
-    return _releaseOrMintSingleToken(sourceTokenAmount, originalSender, sourceChainSelector, finality);
+    return _releaseOrMintSingleToken(sourceTokenAmount, originalSender, sourceChainSelector, finality, 0);
   }
 
   function getBalanceOfReceiver(address receiver, address token) external view returns (uint256) {

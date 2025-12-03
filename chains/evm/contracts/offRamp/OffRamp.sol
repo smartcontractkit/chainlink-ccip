@@ -34,7 +34,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
   error TokenHandlingError(address target, bytes err);
-  error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
   error InvalidVerifierResultsLength(uint256 expected, uint256 got);
@@ -284,6 +283,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     /////// SECURITY CRITICAL CHECKS ///////
     address receiver = address(bytes20(message.receiver));
 
+    uint256[] memory balancesPreVerification = new uint256[](message.tokenTransfer.length);
+    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
+      balancesPreVerification[i] = _getBalanceOfReceiver(
+        address(bytes20(message.tokenTransfer[i].tokenReceiver)),
+        address(bytes20(message.tokenTransfer[i].destTokenAddress))
+      );
+    }
+
     {
       (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) =
         _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs);
@@ -305,7 +312,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
     for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
       destTokenAmounts[i] = _releaseOrMintSingleToken(
-        message.tokenTransfer[i], message.sender, message.sourceChainSelector, message.finality
+        message.tokenTransfer[i], message.sender, message.sourceChainSelector, message.finality, balancesPreVerification[i]
       );
     }
 
@@ -630,12 +637,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param originalSender The message sender on the source chain.
   /// @param sourceChainSelector The remote source chain selector
   /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param balancePreVerification The balance of the receiver prior to calling verifyMessage against each CCV.
   /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
     uint64 sourceChainSelector,
-    uint16 blockConfirmationRequested
+    uint16 blockConfirmationRequested,
+    uint256 balancePreVerification
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
     address receiver = address(bytes20(sourceTokenAmount.tokenReceiver));
 
@@ -652,7 +661,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     // We retrieve the local token balance of the receiver before the pool call.
     uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
-    Pool.ReleaseOrMintOutV1 memory returnData;
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintInput = Pool.ReleaseOrMintInV1({
       originalSender: originalSender,
@@ -670,16 +678,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     });
 
     if (localPoolAddress.supportsInterface(type(IPoolV2).interfaceId)) {
-      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationRequested) returns (
-        Pool.ReleaseOrMintOutV1 memory result
-      ) {
-        returnData = result;
+      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationRequested) {
       } catch (bytes memory err) {
         revert TokenHandlingError(localToken, err);
       }
     } else if (localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
-      try IPoolV1(localPoolAddress).releaseOrMint(releaseOrMintInput) returns (Pool.ReleaseOrMintOutV1 memory result) {
-        returnData = result;
+      try IPoolV1(localPoolAddress).releaseOrMint(releaseOrMintInput) {
       } catch (bytes memory err) {
         revert TokenHandlingError(localToken, err);
       }
@@ -688,18 +692,17 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert NotACompatiblePool(localPoolAddress);
     }
 
-    // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
-    // of a lockRelease pool.
-    if (receiver != localPoolAddress) {
-      uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);
+    uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);
 
-      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error.
-      if (balancePost < balancePre || balancePost - balancePre != returnData.destinationAmount) {
-        revert ReleaseOrMintBalanceMismatch(returnData.destinationAmount, balancePre, balancePost);
-      }
+    // If releaseOrMint did not impact the receiver balance, then we assume that a verifier was responsible for releasing or minting the token.
+    // Doing so enables us to compare the destinationAmount returned by the token pool to what the verifier released or minted.
+    // A transfer amount of 0 could also trigger this condition, but in this case it doesn't matter which pre-balance we use.
+    // Therefore, we simply omit the check.
+    if (balancePost == balancePre) {
+      balancePre = balancePreVerification;
     }
 
-    return Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount});
+    return Client.EVMTokenAmount({token: localToken, amount: balancePost - balancePre});
   }
 
   /// @notice Retrieves the balance of a receiver address for a given token.

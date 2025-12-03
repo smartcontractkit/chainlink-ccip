@@ -31,12 +31,6 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     _enableERC165InterfaceChecks(s_legacyCctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_newCctpV2PoolWithCCV, type(IPoolV2).interfaceId);
 
-    vm.mockCall(
-      address(s_newCctpV2PoolWithCCV),
-      abi.encodeWithSelector(CCTPTokenPool.getCCTPVerifier.selector),
-      abi.encode(makeAddr("cctpVerifier"))
-    );
-
     // Act: Update pool addresses as owner
     changePrank(OWNER);
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
@@ -102,12 +96,6 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     _enableERC165InterfaceChecks(s_newCctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_newCctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_newCctpV2PoolWithCCV, type(IPoolV2).interfaceId);
-
-    vm.mockCall(
-      address(s_newCctpV2PoolWithCCV),
-      abi.encodeWithSelector(CCTPTokenPool.getCCTPVerifier.selector),
-      abi.encode(makeAddr("cctpVerifier"))
-    );
 
     // Should revert because the legacy pool does not support the IPoolV1 interface even though the V1 and V2 pools do
     changePrank(OWNER);

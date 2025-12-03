@@ -132,8 +132,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   uint256 private constant MINIMUM_CCV_DATA_SIZE = VERIFIER_VERSION_SIZE + CCTP_MESSAGE_SIZE + 65;
   /// @notice The starting index of the messageSender in the CCV data.
   uint256 private constant MESSAGE_SENDER_START = VERIFIER_VERSION_SIZE + 148 + 100;
-  /// @notice The starting index of feeExecuted in the CCV data.
-  uint256 private constant FEE_EXECUTED_START = VERIFIER_VERSION_SIZE + 148 + 164;
   /// @notice The starting index of the verifier version (hook data location) in the CCV data.
   uint256 private constant VERIFIER_VERSION_START = VERIFIER_VERSION_SIZE + 148 + 228;
   /// @notice The starting index of the message ID in the CCV data.
@@ -315,10 +313,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       revert InvalidMessageSender(sourceDomain.allowedCallerOnSource, messageSender);
     }
 
-    // Store the feeExecuted value so the CCTP token pool can use it to compute the total amount received.
-    // Assumes that the OffRamp calls verifyMessage before releaseOrMint.
-    s_latestFeeExecuted = uint256(bytes32(ccvData[FEE_EXECUTED_START:FEE_EXECUTED_START + 32]));
-
     // Call into CCTP via the message transmitter proxy.
     // CCTP will validate signatures against the message before minting USDC.
     // Attestation occupies all bytes following the CCTP message.
@@ -330,12 +324,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     ) {
       revert ReceiveMessageCallFailed();
     }
-  }
-
-  /// @notice Returns the feeExecuted value of the latest CCTP message processed.
-  /// @dev Used by the CCTP token pool to compute the total amount designated for the receiver.
-  function getLatestFeeExecuted() external view returns (uint256) {
-    return s_latestFeeExecuted
   }
 
   // ================================================================
