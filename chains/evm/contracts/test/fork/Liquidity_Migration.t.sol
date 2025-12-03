@@ -43,7 +43,7 @@ contract LiquidityMigration is MCMSForkTest {
     s_timelockAddress = vm.envAddress("TIMELOCK_ADDRESS");
   }
 
-  function testMigration() public {
+  function testFork_Migration() public {
     vm.selectFork(s_forkId);
 
     // Get the token balance for the old pool
