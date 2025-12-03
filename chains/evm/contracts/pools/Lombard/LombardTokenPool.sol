@@ -22,7 +22,6 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20Metadata;
 
   error ZeroVerifierNotAllowed();
-  error V1FunctionDisabled();
   error OutboundImplementationNotFoundForVerifier();
 
   event LombardVerifierSet(address indexed verifier);

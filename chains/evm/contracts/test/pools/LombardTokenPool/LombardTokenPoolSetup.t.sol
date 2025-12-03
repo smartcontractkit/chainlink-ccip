@@ -4,13 +4,12 @@ pragma solidity ^0.8.24;
 import {Router} from "../../../Router.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
-
+import {MockVerifier} from "../../mocks/MockVerifier.sol";
 import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
-import {MockVerifierResolver} from "./MockVerifierResolver.sol";
 
 contract LombardTokenPoolSetup is TokenPoolSetup {
   LombardTokenPoolHelper internal s_pool;
-  MockVerifierResolver internal s_verifierResolver;
+  MockVerifier internal s_verifierResolver;
   address internal constant VERIFIER_IMPL = address(0x2345);
   address internal s_remotePool = makeAddr("remotePool");
   address internal s_remoteToken = makeAddr("remoteToken");
@@ -18,7 +17,7 @@ contract LombardTokenPoolSetup is TokenPoolSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_verifierResolver = new MockVerifierResolver();
+    s_verifierResolver = new MockVerifier("");
 
     s_pool = new LombardTokenPoolHelper(
       s_token, address(s_verifierResolver), address(s_mockRMNRemote), address(s_sourceRouter), DEFAULT_TOKEN_DECIMALS
@@ -45,7 +44,5 @@ contract LombardTokenPoolSetup is TokenPoolSetup {
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: DEST_CHAIN_SELECTOR, offRamp: s_allowedOffRamp});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
-
-    s_verifierResolver.setOutbound(DEST_CHAIN_SELECTOR, VERIFIER_IMPL);
   }
 }
