@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
@@ -39,6 +40,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
 
   error AddressCannotBeZero();
   error CCVCompatiblePoolNotSet();
+  error ChainNotSupportedByVerifier(uint64 remoteChainSelector);
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(bytes4 version);
   error InvalidMessageLength(uint256 length);
@@ -68,14 +70,13 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
 
   IERC20 internal immutable i_token;
   IRouter internal immutable i_router;
+  ICrossChainVerifierResolver private immutable i_cctpVerifier;
 
   mapping(uint64 remoteChainSelector => LockOrBurnMechanism mechanism) internal s_lockOrBurnMechanism;
   mapping(uint64 remoteChainSelector => address lockReleasePool) internal s_lockReleasePools;
 
   /// @dev The legacy CCTP V1, CCTP V1, CCTP V2, and CCTP V2 with CCV pools.
   PoolAddresses internal s_pools;
-  /// @notice The CCTP verifier contract.
-  address private immutable i_cctpVerifier;
 
   /// @dev Constant representing the default finality.
   uint16 internal constant WAIT_FOR_FINALITY = 0;
@@ -92,7 +93,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     i_token = token;
     s_pools = pools;
     i_router = IRouter(router);
-    i_cctpVerifier = cctpVerifier;
+    i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
   }
 
   /// @inheritdoc IPoolV2
@@ -142,7 +143,12 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
         revert NoLockOrBurnMechanismSet(lockOrBurnIn.remoteChainSelector);
       }
       // If using the CCTP verifier, transfer funds to the verifier instead of the pool.
-      i_token.safeTransfer(i_cctpVerifier, lockOrBurnIn.amount);
+      // First ensure that the chain is supported by the verifier.
+      address verifierImpl = i_cctpVerifier.getOutboundImplementation(lockOrBurnIn.remoteChainSelector, tokenArgs);
+      if (verifierImpl == address(0)) {
+        revert ChainNotSupportedByVerifier(lockOrBurnIn.remoteChainSelector);
+      }
+      i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
       return CCTPTokenPool(pools.cctpV2PoolWithCCV).lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
     } else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
       childPool = pools.cctpV2Pool;

@@ -49,13 +49,15 @@ contract USDCTokenPoolProxySetup is USDCSetup {
 
     // Configure allowed callers for the CCTP message transmitter proxy
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
-      new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](3);
+      new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](4);
     allowedCallerParams[0] =
       CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_cctpV1Pool), allowed: true});
     allowedCallerParams[1] =
       CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_cctpV2Pool), allowed: true});
     allowedCallerParams[2] =
       CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_lockReleasePool), allowed: true});
+    allowedCallerParams[3] =
+      CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_cctpV2PoolWithCCV), allowed: true});
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
   }
 }

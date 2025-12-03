@@ -71,4 +71,19 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       address(s_cctpVerifier)
     );
   }
+
+  function test_constructor_RevertWhen_CCTPVerifierAddressIsZero() public {
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
+    new USDCTokenPoolProxy(
+      IERC20(s_USDCToken), // Token
+      USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: s_legacyCctpV1Pool,
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
+      }),
+      address(s_router),
+      address(0) // CCTP Verifier
+    );
+  }
 }
