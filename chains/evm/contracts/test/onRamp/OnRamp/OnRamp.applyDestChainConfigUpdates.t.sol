@@ -44,7 +44,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
     OnRamp.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR);
     assertEq(address(cfg.router), address(router));
     assertEq(cfg.defaultExecutor, args[0].defaultExecutor);
-    assertEq(cfg.sequenceNumber, 0);
+    assertEq(cfg.messageNumber, 0);
     assertEq(cfg.addressBytesLength, args[0].addressBytesLength);
     assertEq(cfg.baseExecutionGasCost, args[0].baseExecutionGasCost);
     assertEq(cfg.networkFeeUSDCents, args[0].networkFeeUSDCents);

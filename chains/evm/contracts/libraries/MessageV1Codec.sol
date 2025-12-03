@@ -12,7 +12,7 @@ library MessageV1Codec {
 
   uint256 public constant MAX_NUMBER_OF_TOKENS = 1;
   // Base size of a MessageV1 without variable length fields.
-  // 1 (version) + 8 (sourceChain) + 8 (destChain) + 8 (seqNum) + 4 (executionGasLimit) +
+  // 1 (version) + 8 (sourceChain) + 8 (destChain) + 8 (msgNum) + 4 (executionGasLimit) +
   // 4 (ccipReceiveGasLimit) + 2 (finality) + 32 (ccvAndExecutorHash) + 1 (onRampLen) + 1 (offRampLen) +
   // 1 (senderLen) + 1 (receiverLen) + 2 (destBlobLen) + 2 (tokenTransferLen) + 2 (dataLen) = 77.
   uint256 public constant MESSAGE_V1_BASE_SIZE = 1 + 8 + 8 + 8 + 4 + 4 + 2 + 32 + 1 + 1 + 1 + 1 + 2 + 2 + 2;
@@ -87,9 +87,9 @@ library MessageV1Codec {
   ///   uint8 version;              Version, for future use and backwards compatibility.
   ///   uint64 sourceChainSelector; Source Chain Selector.
   ///   uint64 destChainSelector;   Destination Chain Selector.
-  ///   uint64 sequenceNumber;      Auto-incrementing sequence number for the message.
+  ///   uint64 messageNumber;       Auto-incrementing number for the message.
   ///   uint32 executionGasLimit;   Gas limit for message execution on the destination chain.
-  ///   uint32 ccipReceiveGasLimit;    Gas limit for the user callback on the destination chain.
+  ///   uint32 ccipReceiveGasLimit; Gas limit for the user callback on the destination chain.
   ///   uint16 finality;            Configurable per-message finality value.
   ///   bytes32 ccvAndExecutorHash; Hash of the verifiers and executor addresses.
   ///
@@ -121,10 +121,10 @@ library MessageV1Codec {
     uint64 sourceChainSelector;
     /// @notice Destination Chain Selector.
     uint64 destChainSelector;
-    /// @notice Per-lane-unique sequence number for the message. When faster-than-finality is used the guarantee that
-    /// this value is unique no longer holds. After a re-org, a message could end up with a different sequence number.
-    /// Messages that are older than the chain finality delay should all have unique per-lane sequence numbers.
-    uint64 sequenceNumber;
+    /// @notice Per-lane-unique number for the message. When faster-than-finality is used the guarantee that
+    /// this value is unique no longer holds. After a re-org, a message could end up with a different message number.
+    /// Messages that are older than the chain finality delay should all have unique per-lane message numbers.
+    uint64 messageNumber;
     // Gas limit for message execution on the destination chain.
     uint32 executionGasLimit;
     // Gas limit for the user callback on the destination chain.
@@ -347,7 +347,7 @@ library MessageV1Codec {
       uint8(1), // version.
       message.sourceChainSelector,
       message.destChainSelector,
-      message.sequenceNumber,
+      message.messageNumber,
       message.executionGasLimit,
       message.ccipReceiveGasLimit,
       message.finality,
@@ -405,8 +405,8 @@ library MessageV1Codec {
       // destChainSelector (8 bytes, big endian).
       message.destChainSelector = uint64(bytes8(encoded[9:17]));
 
-      // sequenceNumber (8 bytes, big endian).
-      message.sequenceNumber = uint64(bytes8(encoded[17:25]));
+      // messageNumber (8 bytes, big endian).
+      message.messageNumber = uint64(bytes8(encoded[17:25]));
 
       // executionGasLimit (4 bytes, big endian).
       message.executionGasLimit = uint32(bytes4(encoded[25:29]));

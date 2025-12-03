@@ -41,12 +41,15 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     s_destTokenPool = makeAddr("destTokenPool");
 
     // Configure source chain with lane mandated CCVs.
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp"));
+
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp")),
+      onRamps: onRamps,
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](1)
     });

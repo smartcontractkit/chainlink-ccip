@@ -21,12 +21,15 @@ contract OffRamp_getAllSourceChainConfigs is OffRampSetup {
   function test_getAllSourceChainConfigs_ReturnsMultipleChains() public {
     // Add a second source chain.
     uint64 chain2 = SOURCE_CHAIN_SELECTOR + 1;
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp2"));
+
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: chain2,
       isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp2")),
+      onRamps: onRamps,
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](0)
     });

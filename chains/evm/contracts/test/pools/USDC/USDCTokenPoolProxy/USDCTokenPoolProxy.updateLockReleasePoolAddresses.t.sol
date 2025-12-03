@@ -6,8 +6,6 @@ import {IPoolV1} from "../../../../interfaces/IPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
-
 contract USDCTokenPoolProxy_updateLockReleasePoolAddresses is USDCTokenPoolProxySetup {
   address internal s_newLockReleasePool1 = makeAddr("newLockReleasePool1");
   address internal s_newLockReleasePool2 = makeAddr("newLockReleasePool2");

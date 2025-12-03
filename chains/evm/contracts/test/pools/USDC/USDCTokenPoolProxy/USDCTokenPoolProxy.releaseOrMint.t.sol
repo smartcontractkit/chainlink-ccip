@@ -8,12 +8,9 @@ import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
-import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
-
-import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   address internal s_sender = makeAddr("sender");

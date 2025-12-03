@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
-import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
 import {CCTPTokenPoolSetup} from "./CCTPTokenPoolSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
@@ -28,12 +27,12 @@ contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
     emit TokenPool.ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       token: address(s_USDCToken),
-      sender: address(ALLOWED_CALLER),
+      sender: address(s_allowedCaller),
       recipient: releaseOrMintIn.receiver,
       amount: releaseOrMintIn.sourceDenominatedAmount
     });
 
-    vm.startPrank(ALLOWED_CALLER);
+    vm.startPrank(s_allowedCaller);
     Pool.ReleaseOrMintOutV1 memory actualOut = s_cctpTokenPool.releaseOrMint(releaseOrMintIn);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
@@ -58,12 +57,12 @@ contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
     emit TokenPool.ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       token: address(s_USDCToken),
-      sender: address(ALLOWED_CALLER),
+      sender: address(s_allowedCaller),
       recipient: releaseOrMintIn.receiver,
       amount: releaseOrMintIn.sourceDenominatedAmount
     });
 
-    vm.startPrank(ALLOWED_CALLER);
+    vm.startPrank(s_allowedCaller);
     Pool.ReleaseOrMintOutV1 memory actualOut = s_cctpTokenPool.releaseOrMint(releaseOrMintIn, 0);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
@@ -102,7 +101,7 @@ contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
       offchainTokenData: ""
     });
 
-    vm.startPrank(ALLOWED_CALLER);
+    vm.startPrank(s_allowedCaller);
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainSelector));
     s_cctpTokenPool.releaseOrMint(releaseOrMintIn);
   }
