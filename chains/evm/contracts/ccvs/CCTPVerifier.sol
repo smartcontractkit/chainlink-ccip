@@ -159,9 +159,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   mapping(uint64 remoteChainSelector => Domain cctpDomain) private s_chainToDomain;
   /// @notice The dynamic configuration.
   DynamicConfig private s_dynamicConfig;
-  /// @notice The feeExecuted value of the latest message.
-  /// @dev Used by the CCTP token pool to compute the amount designated for the intended receiver (i.e. amount - feeExecuted).
-  uint256 private s_latestFeeExecuted;
 
   constructor(
     ITokenMessenger tokenMessenger,

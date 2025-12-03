@@ -60,7 +60,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   bytes internal s_tokenReceiver;
   address internal s_tokenReceiverAddress;
 
-  uint256 internal constant TRANSFER_AMOUNT = 1; // 0.000001 USDC
+  uint256 internal constant TRANSFER_AMOUNT = 10e6; // 10 USDC
   uint16 internal constant BPS_DIVIDER = 10_000;
   uint16 internal constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
 

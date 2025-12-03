@@ -8,6 +8,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
@@ -16,10 +17,7 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 /// It remains responsible for rate limiting and other validations while outsourcing token management to the CCTPVerfier contract.
 /// This token pool should never have a balance of USDC at any point during a transaction, otherwise funds will be lost.
 /// The caller of lockOrBurn is responsible for sending USDC to the CCTPVerifier contract instead.
-contract CCTPTokenPool is TokenPool, ITypeAndVersion {
-  error InboundImplementationNotFoundForVerifier(bytes4 ccvVersionTag);
-  error OutboundImplementationNotFoundForVerifier(uint64 remoteChainSelector);
-
+contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   string public constant override typeAndVersion = "CCTPTokenPool 1.7.0-dev";
 
   constructor(
@@ -27,8 +25,9 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
     uint8 localTokenDecimals,
     address advancedPoolHooks,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
+    address router,
+    address[] memory allowedCallers
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) AuthorizedCallers(allowedCallers) {}
 
   /// @inheritdoc IPoolV2
   function lockOrBurn(
@@ -100,5 +99,25 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
+  }
+
+  /// @notice Validates the caller of lockOrBurn against a set of allowed callers.
+  /// @dev Overrides the default behavior of _onlyOnRamp because this contract may be invoked by a proxy contract.
+  /// @param remoteChainSelector The remote chain selector to validate the caller against.
+  function _onlyOnRamp(
+    uint64 remoteChainSelector
+  ) internal view virtual override {
+    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+    _validateCaller();
+  }
+
+  /// @notice Validates the caller of releaseOrMint against a set of allowed callers.
+  /// @dev Overrides the default behavior of _onlyOffRamp because this contract may be invoked by a proxy contract.
+  /// @param remoteChainSelector The remote chain selector to validate the caller against.
+  function _onlyOffRamp(
+    uint64 remoteChainSelector
+  ) internal view virtual override {
+    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+    _validateCaller();
   }
 }

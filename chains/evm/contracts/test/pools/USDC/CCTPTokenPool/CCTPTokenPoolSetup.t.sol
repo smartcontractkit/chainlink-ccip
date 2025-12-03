@@ -7,12 +7,17 @@ import {USDCSetup} from "../USDCSetup.t.sol";
 
 contract CCTPTokenPoolSetup is USDCSetup {
   CCTPTokenPool internal s_cctpTokenPool;
-  address internal s_rmnProxy = makeAddr("rmnProxy");
+  address internal ALLOWED_CALLER = makeAddr("allowedCaller");
 
   function setUp() public virtual override {
     super.setUp();
 
+    address[] memory allowedCallers = new address[](1);
+    allowedCallers[0] = ALLOWED_CALLER;
+
     s_cctpTokenPool =
-      new CCTPTokenPool(s_USDCToken, 6, address(0), address(s_rmnProxy), address(s_router));
+      new CCTPTokenPool(s_USDCToken, 6, address(0), address(s_mockRMNRemote), address(s_router), allowedCallers);
+
+    _poolApplyChainUpdates(address(s_cctpTokenPool));
   }
 }

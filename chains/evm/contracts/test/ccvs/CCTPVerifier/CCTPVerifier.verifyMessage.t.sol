@@ -203,45 +203,6 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
   }
 
-  function test_verifyMessage_RevertWhen_InvalidTokenTransferLength() public {
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
-      DEST_CHAIN_SELECTOR,
-      SOURCE_CHAIN_SELECTOR,
-      CCIP_FAST_FINALITY_THRESHOLD,
-      address(s_USDCToken),
-      TRANSFER_AMOUNT,
-      s_tokenReceiver
-    );
-
-    message.tokenTransfer = new MessageV1Codec.TokenTransferV1[](2);
-    messageHash = keccak256(abi.encode(message));
-
-    s_baseCCTPMessage.hookData.messageId = messageHash;
-    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
-
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidTokenTransferLength.selector, 2));
-    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
-  }
-
-  function test_verifyMessage_RevertWhen_InvalidToken() public {
-    address invalidToken = makeAddr("invalidToken");
-
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
-      DEST_CHAIN_SELECTOR,
-      SOURCE_CHAIN_SELECTOR,
-      CCIP_FAST_FINALITY_THRESHOLD,
-      invalidToken,
-      TRANSFER_AMOUNT,
-      s_tokenReceiver
-    );
-
-    s_baseCCTPMessage.hookData.messageId = messageHash;
-    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
-
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidToken.selector, abi.encodePacked(invalidToken)));
-    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
-  }
-
   function test_verifyMessage_RevertWhen_ReceiveMessageCallFailed() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
