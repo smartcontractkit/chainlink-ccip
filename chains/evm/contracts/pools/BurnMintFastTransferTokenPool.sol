@@ -5,16 +5,14 @@ import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/I
 
 import {FastTransferTokenPoolAbstract} from "./FastTransferTokenPoolAbstract.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice A token pool that supports burn-mint operations and fast transfers
 contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
   using SafeERC20 for IERC20;
 
-  string public constant override typeAndVersion = "BurnMintFastTransferTokenPool 1.6.3-dev";
+  string public constant override typeAndVersion = "BurnMintFastTransferTokenPool 1.6.x-dev";
 
   constructor(
     IBurnMintERC20 token,

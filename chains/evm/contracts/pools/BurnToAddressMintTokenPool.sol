@@ -7,10 +7,8 @@ import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/I
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 import {TokenPool} from "./TokenPool.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice This pool mints and burns a 3rd-party token by sending tokens to an address which is unrecoverable.
 /// @dev The pool is designed to have an immutable burn address. If the tokens at the burn address become recoverable,
@@ -19,7 +17,7 @@ import {SafeERC20} from
 contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  string public constant override typeAndVersion = "BurnToAddressTokenPool 1.6.3-dev";
+  string public constant override typeAndVersion = "BurnToAddressTokenPool 1.6.x-dev";
 
   /// @notice The address where tokens are sent during a call to lockOrBurn, functionally burning but without decreasing
   /// total supply. This address is expected to have no ability to recover the tokens sent to it, and will thus be locked forever.

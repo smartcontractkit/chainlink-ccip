@@ -2,14 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../libraries/Pool.sol";
+import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {EnumerableSet} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
 
 /// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
 /// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
@@ -72,7 +71,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "SiloedUSDCTokenPool 1.6.3-dev";
+    return "SiloedUSDCTokenPool 1.6.4";
   }
 
   /// @inheritdoc SiloedLockReleaseTokenPool
@@ -92,7 +91,9 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // No excluded tokens is the common path, as it means no migration has occured yet, and any released
     // tokens should come from the stored token balance of previously deposited tokens.
     if (excludedTokens == 0) {
-      if (localAmount > remoteConfig.tokenBalance) revert InsufficientLiquidity(remoteConfig.tokenBalance, localAmount);
+      if (localAmount > remoteConfig.tokenBalance) {
+        revert InsufficientLiquidity(remoteConfig.tokenBalance, localAmount);
+      }
 
       remoteConfig.tokenBalance -= localAmount;
 
@@ -115,6 +116,22 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+  }
+
+  /// @inheritdoc SiloedLockReleaseTokenPool
+  /// @dev This function is overridden to encode the LOCK_RELEASE_FLAG into the destPoolData, as the destination pool.
+  /// will be a BurnMintWithLockReleaseFlagTokenPool and may need to be processed by a proxy first.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
+    // Call the parent contract's lockOrBurn function to get the base output. All functionality of this child
+    // is inherited from the parent contract except for the overwritten destPoolData.
+    Pool.LockOrBurnOutV1 memory baseOutput = super.lockOrBurn(lockOrBurnIn);
+
+    // Encode the LOCK_RELEASE_FLAG into the destPoolData using encodePacked to save space.
+    baseOutput.destPoolData = abi.encodePacked(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
+
+    return baseOutput;
   }
 
   /// @dev This function is overridden to prevent providing liquidity to a chain that has already been migrated, and thus should use CCTP-proper instead of a Lock/Release mechanism.

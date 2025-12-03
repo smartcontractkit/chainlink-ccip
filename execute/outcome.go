@@ -97,8 +97,8 @@ func (p *Plugin) Outcome(
 		}
 		return nil, nil
 	}
-
-	p.observer.TrackOutcome(outcome, state)
+	p.observer.TrackOutcome(outcome,
+		state, outctx.Round) //nolint:staticcheck // we rely on Round for OTI metrics compatibility
 	lggr.Infow("generated outcome",
 		"outcomeWithoutMsgData", outcome.ToLogFormat(),
 		"numCommitReports", len(outcome.CommitReports),
@@ -188,8 +188,6 @@ func (p *Plugin) getFilterOutcome(
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces, p.addrCodec)),
-		//TODO: remove as we already check it in GetMessages phase
-		report.WithExtraMessageCheck(report.CheckIfInflight(p.inflightMessageCache.IsInflight)),
 		report.WithMaxMessages(p.offchainCfg.MaxReportMessages),
 		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),
 	)

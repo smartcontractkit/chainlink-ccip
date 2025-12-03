@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"iter"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -20,7 +22,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -97,7 +98,7 @@ func Test_getSeqNrRangesBySource(t *testing.T) {
 		for _, msg := range chainReport.Messages {
 			expectedSet[msg.Header.SequenceNumber] = struct{}{}
 		}
-		expectedSetSlice := maps.Keys(expectedSet)
+		expectedSetSlice := slices.Collect(maps.Keys(expectedSet))
 		actualSetSlice := seqNrRange.ToSlice()
 		sort.Slice(expectedSetSlice, func(i, j int) bool {
 			return expectedSetSlice[i] < expectedSetSlice[j]
@@ -126,7 +127,11 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
 
 				// map key order is undefined, but we can select any random one
-				sourceSel := maps.Keys(snRangeSetPairBySource)[0]
+				iterator := maps.Keys(snRangeSetPairBySource)
+				valFunc, _ := iter.Pull(iterator)
+				val, valid := valFunc()
+				require.True(t, valid)
+				sourceSel := val
 				ccipReaderMock.
 					EXPECT().
 					ExecutedMessages(
@@ -150,7 +155,11 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
 
 				// map key order is undefined, but we can select any random one
-				sourceSel := maps.Keys(snRangeSetPairBySource)[0]
+				iterator := maps.Keys(snRangeSetPairBySource)
+				valFunc, _ := iter.Pull(iterator)
+				val, valid := valFunc()
+				require.True(t, valid)
+				sourceSel := val
 				fullRange := snRangeSetPairBySource[sourceSel][0].ToSlice()
 				ccipReaderMock.
 					EXPECT().

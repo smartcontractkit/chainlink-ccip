@@ -1,5 +1,0 @@
-run:
-    docker run --rm -it -p 9111:9111 ccip-fakes
-
-build:
-    docker build -t ccip-fakes:local .

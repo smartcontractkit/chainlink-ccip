@@ -2,7 +2,9 @@ package chainfee
 
 import (
 	"fmt"
+	"maps"
 	"math/big"
+	"slices"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -10,8 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-
-	"golang.org/x/exp/maps"
 )
 
 func (p *processor) ValidateObservation(
@@ -112,7 +112,10 @@ func validateObservedChains(
 		return fmt.Errorf("fee components and native token prices have different observed chains")
 	}
 
-	observedChains := append(maps.Keys(obs.FeeComponents), maps.Keys(obs.NativeTokenPrices)...)
+	observedChains := append(
+		slices.Collect(maps.Keys(obs.FeeComponents)),
+		slices.Collect(maps.Keys(obs.NativeTokenPrices))...,
+	)
 	if len(obs.ChainFeeUpdates) > 0 {
 		// chainFeeUpdates are read from the destination chain, if the oracle observed any chain fee updates
 		// it should support the destination chain.

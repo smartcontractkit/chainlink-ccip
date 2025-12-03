@@ -4,8 +4,7 @@ pragma solidity ^0.8.24;
 import {IPoolV1} from "../../../../interfaces/IPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract USDCTokenPool_supportsInterface is USDCTokenPoolSetup {
   function test_SupportsInterface() public view {

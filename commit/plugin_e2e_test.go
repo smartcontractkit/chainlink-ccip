@@ -75,12 +75,12 @@ var (
 
 	decimals18 = uint8(18)
 
-	arbInfo = pluginconfig.TokenInfo{
+	arbInfo = ccipocr3.TokenInfo{
 		AggregatorAddress: arbAggregatorAddr,
 		DeviationPPB:      ccipocr3.NewBigInt(big.NewInt(1e5)),
 		Decimals:          decimals18,
 	}
-	ethInfo = pluginconfig.TokenInfo{
+	ethInfo = ccipocr3.TokenInfo{
 		AggregatorAddress: ethAggregatorAddr,
 		DeviationPPB:      ccipocr3.NewBigInt(big.NewInt(1e5)),
 		Decimals:          decimals18,
@@ -998,7 +998,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		NewMsgScanBatchSize:                100,
 		MaxReportTransmissionCheckAttempts: 2,
 		TokenPriceBatchWriteFrequency:      writeFrequency,
-		TokenInfo: map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo{
+		TokenInfo: map[ccipocr3.UnknownEncodedAddress]ccipocr3.TokenInfo{
 			arbAddr: arbInfo,
 			ethAddr: ethInfo,
 		},

@@ -89,6 +89,7 @@ func NewCCIPChainReader(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
+	populateTxHashEnabled bool,
 ) (CCIPReader, error) {
 	reader, err := newCCIPChainReaderInternal(
 		ctx,
@@ -99,6 +100,7 @@ func NewCCIPChainReader(
 		destChain,
 		offrampAddress,
 		addrCodec,
+		populateTxHashEnabled,
 	)
 	if err != nil {
 		return nil, err
@@ -131,6 +133,7 @@ func NewCCIPReaderWithExtendedContractReaders(
 		destChain,
 		offrampAddress,
 		addrCodec,
+		false, // populateTxHashEnabled - default to false for deprecated test function
 	)
 	if err != nil {
 		// Panic here since right now this is only called from tests in core

@@ -259,7 +259,6 @@ func (p *Plugin) Observation(
 
 	var discoveryObs dt.Observation
 	var err error
-
 	if p.discoveryProcessor != nil {
 		tStart := time.Now()
 		discoveryObs, err = p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
@@ -328,7 +327,8 @@ func (p *Plugin) Observation(
 		obs.TokenPriceObs, obs.ChainFeeObs = p.getPriceObservations(ctx, lggr, prevOutcome, decodedQ)
 	}
 
-	p.metricsReporter.TrackObservation(obs)
+	p.metricsReporter.TrackObservation(
+		obs, outCtx.Round) //nolint:staticcheck // we rely on Round for OTI metrics compatibility
 
 	encoded, err := p.ocrTypeCodec.EncodeObservation(obs)
 	if err != nil {
@@ -541,7 +541,9 @@ func (p *Plugin) Outcome(
 		ChainFeeOutcome:   chainFeeOutcome,
 		MainOutcome:       mainOutcome,
 	}
-	p.metricsReporter.TrackOutcome(out)
+
+	p.metricsReporter.TrackOutcome(
+		out, outCtx.Round) //nolint:staticcheck // we rely on Round for OTI metrics compatibility
 
 	lggr.Infow("Commit plugin finished outcome", "outcome", out)
 	return p.ocrTypeCodec.EncodeOutcome(out)

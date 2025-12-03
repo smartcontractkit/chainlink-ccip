@@ -5,10 +5,8 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {TokenPool} from "./TokenPool.sol";
 
-import {IERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice Token pool used for tokens on their native chain. This uses a lock and release mechanism.
 /// Because of lock/unlock requiring liquidity, this pool contract also has function to add and remove
@@ -24,7 +22,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   event LiquidityRemoved(address indexed provider, uint256 indexed amount);
   event RebalancerSet(address oldRebalancer, address newRebalancer);
 
-  string public constant override typeAndVersion = "LockReleaseTokenPool 1.6.3-dev";
+  string public constant override typeAndVersion = "LockReleaseTokenPool 1.6.x-dev";
 
   /// @notice The address of the rebalancer.
   address internal s_rebalancer;

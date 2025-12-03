@@ -6,8 +6,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {Client} from "../../../libraries/Client.sol";
 
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 /// @dev A contract that logs the data of a CCIP message received
 contract LogMessageDataReceiver is IAny2EVMMessageReceiver, ITypeAndVersion, IERC165 {

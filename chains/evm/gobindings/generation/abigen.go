@@ -170,10 +170,6 @@ func ImproveAbigenOutput(path string, abiPath string) {
 
 	fset, fileNode := parseFile(bs)
 	logNames := getLogNames(fileNode)
-	if len(logNames) > 0 {
-		astutil.AddImport(fset, fileNode, "fmt")
-		astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated")
-	}
 	contractName := getContractName(fileNode)
 	fileNode = addContractStructFields(contractName, fileNode)
 	fileNode = replaceAnonymousStructs(contractName, fileNode)
@@ -188,6 +184,7 @@ func ImproveAbigenOutput(path string, abiPath string) {
 	fileNode = writeInterface(contractName, fileNode)
 	bs = generateCode(fset, fileNode)
 	bs = addHeader(bs)
+	bs = fixABIInternalTypes(bs)
 
 	err = os.WriteFile(path, bs, 0600)
 	if err != nil {
@@ -459,26 +456,6 @@ func replaceAnonymousStructs(contractName string, fileNode *ast.File) *ast.File 
 }
 
 func writeAdditionalMethods(contractName string, logNames []string, abi abi.ABI, bs []byte) []byte {
-	// Write the ParseLog method
-	if len(logNames) > 0 {
-		var logSwitchBody string
-		for _, logName := range logNames {
-			logSwitchBody += fmt.Sprintf(`case _%v.abi.Events["%v"].ID:
-        return _%v.Parse%v(log)
-`, contractName, logName, contractName, logName)
-		}
-
-		bs = append(bs, []byte(fmt.Sprintf(`
-func (_%v *%v) ParseLog(log types.Log) (generated.AbigenLog, error) {
-    switch log.Topics[0] {
-    %v
-    default:
-        return nil, fmt.Errorf("abigen wrapper received unknown log topic: %%v", log.Topics[0])
-    }
-}
-`, contractName, contractName, logSwitchBody))...)
-	}
-
 	// Write the Topic method
 	for _, logName := range logNames {
 		bs = append(bs, []byte(fmt.Sprintf(`
@@ -547,6 +524,20 @@ func writeInterface(contractName string, fileNode *ast.File) *ast.File {
 
 func addHeader(code []byte) []byte {
 	return ConcatBytes([]byte(headerComment), code)
+}
+
+// fixABIInternalTypes fixes malformed internalType fields in embedded ABI JSON strings.
+// When abigen compacts the JSON, it removes spaces after colons, causing "contract IERC20"
+// to become "contractIERC20". This function restores the proper spacing.
+func fixABIInternalTypes(code []byte) []byte {
+	// Pattern matches: internalType":"<keyword><CapitalLetter>
+	// where keyword is "contract", "struct", or "enum"
+	// This regex finds cases where there's no space between the keyword and the type name
+	pattern := regexp.MustCompile(`(internalType\\":\\")(contract|struct|enum)([A-Z])`)
+
+	// Replace with a space between the keyword and the type name
+	// $1 = 'internalType":"', $2 = keyword (contract/struct/enum), $3 = capital letter
+	return pattern.ReplaceAll(code, []byte(`${1}${2} ${3}`))
 }
 
 func ConcatBytes(bufs ...[]byte) []byte {

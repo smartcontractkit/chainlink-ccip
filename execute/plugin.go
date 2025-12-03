@@ -1,19 +1,17 @@
 package execute
 
 import (
-	"bytes"
 	"cmp"
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -40,7 +38,6 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -611,7 +608,7 @@ func (p *Plugin) Reports(
 
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
 		p.chainSupport,
-		maps.Keys(p.oracleIDToP2pID),
+		slices.Collect(maps.Keys(p.oracleIDToP2pID)),
 		p.offchainCfg.TransmissionDelayMultiplier,
 	)
 	if err != nil {
@@ -691,20 +688,13 @@ func (p *Plugin) validateReport(
 		return cciptypes.ExecutePluginReport{},
 			plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
-
-	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeExecute)
-	if err != nil {
+	if err := p.checkConfigDigest(); err != nil {
+		if errors.Is(err, errOffRampConfigMismatch) {
+			return cciptypes.ExecutePluginReport{},
+				plugincommon.NewErrInvalidReport(err.Error())
+		}
 		return cciptypes.ExecutePluginReport{},
-			plugincommon.NewErrValidatingReport(fmt.Errorf("get offramp config digest: %w", err))
-	}
-
-	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
-		lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting/transmitting report",
-			"myConfigDigest", p.reportingCfg.ConfigDigest,
-			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
-		)
-		return cciptypes.ExecutePluginReport{},
-			plugincommon.NewErrInvalidReport("offramp config digest mismatch")
+			plugincommon.NewErrValidatingReport(err)
 	}
 
 	// check that the messages in the report are not already executed onchain.

@@ -277,6 +277,8 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		it.dstSelector,
 		it.tokenObserverConfig,
 		testhelpers.TokenDataEncoderInstance,
+		make(map[string]bool),
+		make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor),
 		it.tokenChainReader,
 		mockAddrCodec,
 	)

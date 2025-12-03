@@ -55,6 +55,9 @@ library Client {
     bool allowOutOfOrderExecution;
   }
 
+  // Extra args tag for chains that use the Sui VM.
+  bytes4 public constant SUI_EXTRA_ARGS_V1_TAG = 0x21ea4ca9;
+
   // Extra args tag for chains that use the Solana VM.
   bytes4 public constant SVM_EXTRA_ARGS_V1_TAG = 0x1f3b3aba;
 
@@ -92,6 +95,31 @@ library Client {
   /// @dev The size of each SVM account address in bytes.
   uint256 public constant SVM_ACCOUNT_BYTE_SIZE = 32;
 
+  struct SuiExtraArgsV1 {
+    uint256 gasLimit;
+    bool allowOutOfOrderExecution;
+    bytes32 tokenReceiver;
+    bytes32[] receiverObjectIds;
+  }
+
+  /// @dev The expected static payload size of a token transfer when BCS encoded and submitted to SUI.
+  /// TokenPool extra data and offchain data sizes are dynamic, and should be accounted for separately.
+  uint256 public constant SUI_TOKEN_TRANSFER_DATA_OVERHEAD = (4 + 32) // source_pool, 4 bytes for length, 32 bytes for address
+    + 32 // dest_token_address
+    + 4 // dest_gas_amount
+    + 4 // extra_data length, the contents are calculated separately
+    + 32; // amount
+
+  /// @dev Number of overhead accounts needed for message execution on SUI.
+  /// @dev This is the message.receiver.
+  uint256 public constant SUI_MESSAGING_ACCOUNTS_OVERHEAD = 1;
+
+  /// @dev The maximum number of receiver object ids that can be passed in SuiExtraArgs.
+  uint256 public constant SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS = 64;
+
+  /// @dev The size of each SUI account address in bytes.
+  uint256 public constant SUI_ACCOUNT_BYTE_SIZE = 32;
+
   function _argsToBytes(
     GenericExtraArgsV2 memory extraArgs
   ) internal pure returns (bytes memory bts) {
@@ -104,37 +132,9 @@ library Client {
     return abi.encodeWithSelector(SVM_EXTRA_ARGS_V1_TAG, extraArgs);
   }
 
-  // ================================================================
-  // │                           ModSec                             │
-  // ================================================================
-
-  /// @notice The CCV struct is used to represent a cross-chain verifier.
-  struct CCV {
-    /// @param The ccvAddress is the address of the verifier contract on the source chain
-    address ccvAddress;
-    /// @param args The args are the arguments that the verifier contract expects. They are opaque to CCIP and are only
-    /// used in the CCV.
-    bytes args;
-  }
-
-  bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
-
-  struct EVMExtraArgsV3 {
-    CCV[] requiredCCV;
-    CCV[] optionalCCV;
-    uint8 optionalThreshold;
-    /// @notice The finality config, 0 means the default finality that the CCV considers final. Any non-zero value means
-    /// a block depth.
-    uint32 finalityConfig;
-    address executor;
-    bytes executorArgs;
-    bytes tokenArgs;
-  }
-
-  // TODO milestone 2
-  struct TokenPoolSettings {
-    CCV[] requiredVerifiers; // Token pool can only add required verifiers.
-    uint256 gasLimit; // Token pool gas limit on dest.
-    uint64 destBytesOverhead; // Token pool calldata size on dest.
+  function _suiArgsToBytes(
+    SuiExtraArgsV1 memory extraArgs
+  ) internal pure returns (bytes memory bts) {
+    return abi.encodeWithSelector(SUI_EXTRA_ARGS_V1_TAG, extraArgs);
   }
 }

@@ -344,15 +344,15 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     assertEq(s_token.balanceOf(OWNER), balanceBefore - SOURCE_AMOUNT);
   }
 
-  function test_ccipSendToken_RevertWhen_ReceiverIsEmptyBytes() public {
+  function test_ccipSendToken_RevertWhen_InvalidEncodedAddress_ReceiverIsEmpty() public {
     // Setup: Empty receiver address
     bytes memory emptyReceiver = "";
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, emptyReceiver));
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidEncodedAddress.selector, emptyReceiver));
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, emptyReceiver, address(0), "");
   }
 
-  function test_ccipSendToken_RevertWhen_ReceiverExceedsMaxLength() public {
+  function test_ccipSendToken_RevertWhen_InvalidEncodedAddress_ReceiverExceedsMaxLength() public {
     // Setup: Receiver longer than 64 bytes (65 bytes)
     bytes memory oversizedReceiver = new bytes(65);
     // Fill with non-zero data to ensure it's not rejected for being all zeros
@@ -360,34 +360,44 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
       oversizedReceiver[i] = bytes1(uint8(i + 1));
     }
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, oversizedReceiver));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidEncodedAddress.selector, oversizedReceiver)
+    );
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, oversizedReceiver, address(0), "");
   }
 
-  function test_ccipSendToken_RevertWhen_ReceiverIsAllZeros() public {
+  function test_ccipSendToken_RevertWhen_InvalidEncodedAddress_ReceiverIsAllZeros() public {
     // Setup: 20-byte receiver address filled with zeros (typical Ethereum address length)
     bytes memory zeroReceiver20 = new bytes(20);
     // bytes constructor already initializes to zeros
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, zeroReceiver20));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidEncodedAddress.selector, zeroReceiver20)
+    );
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, zeroReceiver20, address(0), "");
 
     // Setup: 32-byte receiver address filled with zeros (one full word)
     bytes memory zeroReceiver32 = new bytes(32);
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, zeroReceiver32));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidEncodedAddress.selector, zeroReceiver32)
+    );
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, zeroReceiver32, address(0), "");
 
     // Setup: 40-byte receiver address filled with zeros
     bytes memory zeroReceiver40 = new bytes(40);
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, zeroReceiver40));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidEncodedAddress.selector, zeroReceiver40)
+    );
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, zeroReceiver40, address(0), "");
 
     // Setup: 64-byte receiver address filled with zeros (maximum allowed length)
     bytes memory zeroReceiver64 = new bytes(64);
 
-    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidReceiver.selector, zeroReceiver64));
+    vm.expectRevert(
+      abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidEncodedAddress.selector, zeroReceiver64)
+    );
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, 1 ether, zeroReceiver64, address(0), "");
   }
 

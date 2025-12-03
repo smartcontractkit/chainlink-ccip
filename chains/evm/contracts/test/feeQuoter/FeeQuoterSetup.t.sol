@@ -369,6 +369,24 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
     });
   }
 
+  // Used to generate a message with a specific extraArgs tag for Sui
+  function _generateEmptyMessage2Sui() public view returns (Client.EVM2AnyMessage memory) {
+    return Client.EVM2AnyMessage({
+      receiver: abi.encode(OWNER),
+      data: "",
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._suiArgsToBytes(
+        Client.SuiExtraArgsV1({
+          gasLimit: GAS_LIMIT,
+          allowOutOfOrderExecution: true,
+          tokenReceiver: bytes32(0),
+          receiverObjectIds: new bytes32[](0)
+        })
+      )
+    });
+  }
+
   function _generateSingleTokenMessage(
     address token,
     uint256 amount
@@ -411,5 +429,12 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
     uint256 usdCent
   ) internal pure returns (uint256) {
     return usdCent * 1e16;
+  }
+
+  function _makeObjectIdsForSui() internal pure returns (bytes32[] memory) {
+    bytes32[] memory ids = new bytes32[](2);
+    ids[0] = bytes32(uint256(6)); // receiver obj ID
+    ids[1] = bytes32(uint256(0xd0e37ba6)); // random Sui pkg or contract obj
+    return ids;
   }
 }

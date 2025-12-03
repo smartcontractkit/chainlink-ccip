@@ -1,201 +1,117 @@
 package fee_quoter
 
 import (
-	"fmt"
+	"errors"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-var ContractType cldf_deployment.ContractType = "FeeQuoter"
-
-type StaticConfig = fee_quoter.FeeQuoterStaticConfig
-
-type DestChainConfig = fee_quoter.FeeQuoterDestChainConfig
-
-type DestChainConfigArgs struct {
-	DestChainSelector uint64
-	DestChainConfig   DestChainConfig
-}
-
-type PremiumMultiplierWeiPerEthArgs = fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs
-
-type TokenTransferFeeConfigArgs = fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
-
-type TokenTransferFeeConfigRemoveArgs = fee_quoter.FeeQuoterTokenTransferFeeConfigRemoveArgs
-
-type TokenPriceFeedUpdate = fee_quoter.FeeQuoterTokenPriceFeedUpdate
+var (
+	ContractType cldf_deployment.ContractType = "FeeQuoter"
+	Version      *semver.Version              = semver.MustParse("1.6.3")
+)
 
 type ConstructorArgs struct {
-	StaticConfig                   StaticConfig
+	StaticConfig                   fee_quoter.FeeQuoterStaticConfig
 	PriceUpdaters                  []common.Address
 	FeeTokens                      []common.Address
-	TokenPriceFeeds                []TokenPriceFeedUpdate
-	TokenTransferFeeConfigArgs     []TokenTransferFeeConfigArgs
-	PremiumMultiplierWeiPerEthArgs []PremiumMultiplierWeiPerEthArgs
-	DestChainConfigArgs            []DestChainConfigArgs
+	TokenPriceFeedUpdates          []fee_quoter.FeeQuoterTokenPriceFeedUpdate
+	TokenTransferFeeConfigArgs     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
+	MorePremiumMultiplierWeiPerEth []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs
+	DestChainConfigArgs            []fee_quoter.FeeQuoterDestChainConfigArgs
 }
 
-type ApplyFeeTokensUpdatesArgs struct {
-	FeeTokensToAdd    []common.Address
-	FeeTokensToRemove []common.Address
-}
-
-type AuthorizedCallerArgs = fee_quoter.AuthorizedCallersAuthorizedCallerArgs
-
-type ApplyTokenTransferFeeConfigUpdatesArgs struct {
-	TokenTransferFeeConfigArgs   []TokenTransferFeeConfigArgs
-	TokensToUseDefaultFeeConfigs []TokenTransferFeeConfigRemoveArgs
-}
-
-type InternalPriceUpdates = fee_quoter.InternalPriceUpdates
-
-var Deploy = deployment.New(
-	"fee-quoter:deploy",
-	semver.MustParse("1.7.0"),
-	"Deploys the FeeQuoter contract",
-	ContractType,
-	fee_quoter.FeeQuoterABI,
-	func(ConstructorArgs) error { return nil },
-	deployment.VMDeployers[ConstructorArgs]{
-		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := fee_quoter.DeployFeeQuoter(
-				opts,
-				backend,
-				args.StaticConfig,
-				args.PriceUpdaters,
-				args.FeeTokens,
-				args.TokenPriceFeeds,
-				args.TokenTransferFeeConfigArgs,
-				args.PremiumMultiplierWeiPerEthArgs,
-				transformDestChainConfigArgs(args.DestChainConfigArgs),
-			)
-			return address, tx, err
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "fee-quoter:deploy",
+	Version:          Version,
+	Description:      "Deploys the FeeQuoter contract",
+	ContractMetadata: fee_quoter.FeeQuoterMetaData,
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
+			EVM: common.FromHex(fee_quoter.FeeQuoterBin),
 		},
-		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)
 	},
-)
+	Validate: func(ConstructorArgs) error { return nil },
+})
 
-var ApplyAuthorizedCallerUpdates = call.NewWrite(
-	"fee-quoter:apply-authorized-caller-updates",
-	semver.MustParse("1.7.0"),
-	"Updates authorized price updaters on the FeeQuoter contract",
-	ContractType,
-	fee_quoter.FeeQuoterABI,
-	fee_quoter.NewFeeQuoter,
-	call.OnlyOwner,
-	func(AuthorizedCallerArgs) error { return nil },
-	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
-		return feeQuoter.ApplyAuthorizedCallerUpdates(opts, args)
+var FeeQuoterApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]fee_quoter.FeeQuoterDestChainConfigArgs, *fee_quoter.FeeQuoter]{
+	Name:            "fee-quoter:apply-dest-chain-config-updates",
+	Version:         Version,
+	Description:     "Applies updates to destination chain configs on the FeeQuoter 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     fee_quoter.FeeQuoterABI,
+	NewContract:     fee_quoter.NewFeeQuoter,
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, []fee_quoter.FeeQuoterDestChainConfigArgs],
+	Validate:        func([]fee_quoter.FeeQuoterDestChainConfigArgs) error { return nil },
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args []fee_quoter.FeeQuoterDestChainConfigArgs) (*types.Transaction, error) {
+		return feeQuoter.ApplyDestChainConfigUpdates(opts, args)
 	},
-)
+})
 
-var ApplyDestChainConfigUpdates = call.NewWrite(
-	"fee-quoter:apply-dest-chain-config-updates",
-	semver.MustParse("1.7.0"),
-	"Applies updates to destination chain configurations on the FeeQuoter",
-	ContractType,
-	fee_quoter.FeeQuoterABI,
-	fee_quoter.NewFeeQuoter,
-	call.OnlyOwner,
-	func([]DestChainConfigArgs) error { return nil },
-	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
-		return feeQuoter.ApplyDestChainConfigUpdates(opts, transformDestChainConfigArgs(args))
-	},
-)
-
-var ApplyFeeTokensUpdates = call.NewWrite(
-	"fee-quoter:apply-fee-tokens-updates",
-	semver.MustParse("1.7.0"),
-	"Applies updates to the fee tokens supported by the FeeQuoter",
-	ContractType,
-	fee_quoter.FeeQuoterABI,
-	fee_quoter.NewFeeQuoter,
-	call.OnlyOwner,
-	func(ApplyFeeTokensUpdatesArgs) error { return nil },
-	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args ApplyFeeTokensUpdatesArgs) (*types.Transaction, error) {
-		return feeQuoter.ApplyFeeTokensUpdates(opts, args.FeeTokensToRemove, args.FeeTokensToAdd)
-	},
-)
-
-var ApplyPremiumMultiplierWeiPerEthUpdates = call.NewWrite(
-	"fee-quoter:apply-premium-multiplier-wei-per-eth-updates",
-	semver.MustParse("1.7.0"),
-	"Applies updates to the premium multiplier (in wei per ETH) for various tokens on the FeeQuoter",
-	ContractType,
-	fee_quoter.FeeQuoterABI,
-	fee_quoter.NewFeeQuoter,
-	call.OnlyOwner,
-	func([]PremiumMultiplierWeiPerEthArgs) error { return nil },
-	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args []PremiumMultiplierWeiPerEthArgs) (*types.Transaction, error) {
-		return feeQuoter.ApplyPremiumMultiplierWeiPerEthUpdates(opts, args)
-	},
-)
-
-var ApplyTokenTransferFeeConfigUpdates = call.NewWrite(
-	"fee-quoter:apply-token-transfer-fee-config-updates",
-	semver.MustParse("1.7.0"),
-	"Applies updates to the token transfer fee configurations on the FeeQuoter",
-	ContractType,
-	fee_quoter.FeeQuoterABI,
-	fee_quoter.NewFeeQuoter,
-	call.OnlyOwner,
-	func(ApplyTokenTransferFeeConfigUpdatesArgs) error { return nil },
-	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesArgs) (*types.Transaction, error) {
-		return feeQuoter.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
-	},
-)
-
-var UpdatePrices = call.NewWrite(
-	"fee-quoter:update-prices",
-	semver.MustParse("1.7.0"),
-	"Updates token prices on the FeeQuoter",
-	ContractType,
-	fee_quoter.FeeQuoterABI,
-	fee_quoter.NewFeeQuoter,
-	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts) ([]common.Address, error) {
-		priceUpdaters, err := feeQuoter.GetAllAuthorizedCallers(opts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get authorized callers from FeeQuoter (%s): %w", feeQuoter.Address(), err)
-		}
-		return priceUpdaters, nil
-	},
-	func(InternalPriceUpdates) error { return nil },
-	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args InternalPriceUpdates) (*types.Transaction, error) {
+var FeeQuoterUpdatePrices = contract.NewWrite(contract.WriteParams[fee_quoter.InternalPriceUpdates, *fee_quoter.FeeQuoter]{
+	Name:            "fee-quoter:update-prices",
+	Version:         Version,
+	Description:     "Updates prices on the FeeQuoter 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     fee_quoter.FeeQuoterABI,
+	NewContract:     fee_quoter.NewFeeQuoter,
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, fee_quoter.InternalPriceUpdates],
+	Validate:        func(fee_quoter.InternalPriceUpdates) error { return nil },
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args fee_quoter.InternalPriceUpdates) (*types.Transaction, error) {
 		return feeQuoter.UpdatePrices(opts, args)
 	},
-)
+})
 
-var UpdateTokenPriceFeeds = call.NewWrite(
-	"fee-quoter:update-token-price-feeds",
-	semver.MustParse("1.7.0"),
-	"Updates the token price feeds on the FeeQuoter",
-	ContractType,
-	fee_quoter.FeeQuoterABI,
-	fee_quoter.NewFeeQuoter,
-	call.OnlyOwner,
-	func([]TokenPriceFeedUpdate) error { return nil },
-	func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args []TokenPriceFeedUpdate) (*types.Transaction, error) {
-		return feeQuoter.UpdateTokenPriceFeeds(opts, args)
-	},
-)
-
-func transformDestChainConfigArgs(args []DestChainConfigArgs) []fee_quoter.FeeQuoterDestChainConfigArgs {
-	// The reason we avoid exposing fee_quoter.FeeQuoterDestChainConfigArgs directly
-	// is so that consumers do not need to import the gobindings package.
-	argsTransformed := make([]fee_quoter.FeeQuoterDestChainConfigArgs, 0, len(args))
-	for _, arg := range args {
-		argsTransformed = append(argsTransformed, fee_quoter.FeeQuoterDestChainConfigArgs{
-			DestChainSelector: arg.DestChainSelector,
-			DestChainConfig:   arg.DestChainConfig,
-		})
-	}
-
-	return argsTransformed
+type FeeQuoterParams struct {
+	MaxFeeJuelsPerMsg              *big.Int
+	TokenPriceStalenessThreshold   uint32
+	LinkPremiumMultiplierWeiPerEth uint64
+	WethPremiumMultiplierWeiPerEth uint64
+	MorePremiumMultiplierWeiPerEth []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs
+	TokenPriceFeedUpdates          []fee_quoter.FeeQuoterTokenPriceFeedUpdate
+	TokenTransferFeeConfigArgs     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
+	DestChainConfigArgs            []fee_quoter.FeeQuoterDestChainConfigArgs
 }
+
+func (c FeeQuoterParams) Validate() error {
+	if c.MaxFeeJuelsPerMsg == nil {
+		return errors.New("MaxFeeJuelsPerMsg is nil")
+	}
+	if c.MaxFeeJuelsPerMsg.Cmp(big.NewInt(0)) <= 0 {
+		return errors.New("MaxFeeJuelsPerMsg must be positive")
+	}
+	if c.TokenPriceStalenessThreshold == 0 {
+		return errors.New("TokenPriceStalenessThreshold can't be 0")
+	}
+	return nil
+}
+
+type ApplyTokenTransferFeeConfigUpdatesInput struct {
+	TokenTransferFeeConfigArgs   []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
+	TokensToUseDefaultFeeConfigs []fee_quoter.FeeQuoterTokenTransferFeeConfigRemoveArgs
+}
+
+// FeeQuoterApplyTokenTransferFeeConfigUpdates applies updates to token transfer fee configs on the FeeQuoter contract.
+// https://etherscan.io/address/0x40858070814a57FdF33a613ae84fE0a8b4a874f7#code#F1#L836
+var FeeQuoterApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[ApplyTokenTransferFeeConfigUpdatesInput, *fee_quoter.FeeQuoter]{
+	Name:            "fee-quoter:apply-token-transfer-fee-config-updates",
+	Version:         Version,
+	Description:     "Applies updates to token transfer fee configs on the FeeQuoter 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     fee_quoter.FeeQuoterABI,
+	NewContract:     fee_quoter.NewFeeQuoter,
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, ApplyTokenTransferFeeConfigUpdatesInput],
+	Validate:        func(args ApplyTokenTransferFeeConfigUpdatesInput) error { return nil },
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesInput) (*types.Transaction, error) {
+		return feeQuoter.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
+	},
+})

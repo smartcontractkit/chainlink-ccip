@@ -35,14 +35,14 @@ func (inst *TokenInstruction) ProgramID() solana.PublicKey {
 
 // NOTE: functions in this file are mainly wrapped version of the versions that exist in `solana-go` but these allow specifying the token program
 func CreateToken(ctx context.Context, program, mint, admin solana.PublicKey, decimals uint8, client *rpc.Client, commitment rpc.CommitmentType) ([]solana.Instruction, error) {
-	return CreateTokenWith(ctx, program, mint, admin, decimals, client, commitment, false)
+	return CreateTokenWith(ctx, program, mint, admin, admin, decimals, client, commitment, false)
 }
 
 func CreateTokenFrom(ctx context.Context, newToken TokenPool, admin solana.PublicKey, decimals uint8, client *rpc.Client, commitment rpc.CommitmentType) ([]solana.Instruction, error) {
-	return CreateTokenWith(ctx, newToken.Program, newToken.Mint, admin, decimals, client, commitment, newToken.WithTokenExtensions)
+	return CreateTokenWith(ctx, newToken.Program, newToken.Mint, admin, admin, decimals, client, commitment, newToken.WithTokenExtensions)
 }
 
-func CreateTokenWith(ctx context.Context, program, mint, admin solana.PublicKey, decimals uint8, client *rpc.Client, commitment rpc.CommitmentType, createWithExtensions bool) ([]solana.Instruction, error) {
+func CreateTokenWith(ctx context.Context, program, mint, mintAuthority, freezeAuthority solana.PublicKey, decimals uint8, client *rpc.Client, commitment rpc.CommitmentType, createWithExtensions bool) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
 
 	// initialize mint account
@@ -57,7 +57,7 @@ func CreateTokenWith(ctx context.Context, program, mint, admin solana.PublicKey,
 		return nil, err
 	}
 
-	initI, err := system.NewCreateAccountInstruction(lamports, uint64(mintSize), program, admin, mint).ValidateAndBuild() //nolint:gosec
+	initI, err := system.NewCreateAccountInstruction(lamports, uint64(mintSize), program, mintAuthority, mint).ValidateAndBuild() //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func CreateTokenWith(ctx context.Context, program, mint, admin solana.PublicKey,
 	ixs = append(ixs, initI)
 
 	if program == config.Token2022Program && createWithExtensions {
-		closeMintExtensionI, closeMintErr := NewInitializeMintCloseAuthorityIx(mint, &admin, &program)
+		closeMintExtensionI, closeMintErr := NewInitializeMintCloseAuthorityIx(mint, &mintAuthority, &program)
 		if closeMintErr != nil {
 			return nil, closeMintErr
 		}
@@ -73,7 +73,7 @@ func CreateTokenWith(ctx context.Context, program, mint, admin solana.PublicKey,
 	}
 
 	// initialize mint
-	mintI, err := token.NewInitializeMintInstruction(decimals, admin, admin, mint, solana.SysVarRentPubkey).ValidateAndBuild()
+	mintI, err := token.NewInitializeMintInstruction(decimals, mintAuthority, freezeAuthority, mint, solana.SysVarRentPubkey).ValidateAndBuild()
 	if err != nil {
 		return nil, err
 	}

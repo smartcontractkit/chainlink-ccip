@@ -112,3 +112,12 @@ issues:
       text: "^G404:"
       linters:
         - gosec
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/smartcontractkit/chainlink-ccip
+  exclusions:
+    generated: lax

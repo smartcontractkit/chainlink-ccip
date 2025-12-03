@@ -88,8 +88,37 @@ func CalculateUsdPerUnitGas(
 		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
 		return new(big.Int).Div(tmp, big.NewInt(1e18)), nil
 
+	case chainsel.FamilySui:
+		// In Sui, sourceGasPrice is denoted in mist/gas unit or 1e-9 SUI/gas.
+		// SUI has 9 decimals, usdPerFeeCoin represents 1e18 USD * 1e9 = 1e27 USD per full SUI.
+
+		// usdPerFeeCoin is 1e18 USD per 1e18 smallest token unit by convention.
+		// When the token has 9 decimals (SUI), 1e18 smallest token units = 1e9 whole tokens.
+		// Therefore, usdPerFeeCoin represents 1e18 USD * 1e9 = 1e27 USD per SUI.
+
+		//   = (mist / gas) * (1e18 USD * 1e9 / mist) / 1e18
+		//   = (sourceGasPrice * usdPerFeeCoin) / 1e18
+
+		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+		return new(big.Int).Div(tmp, big.NewInt(1e18)), nil
+
+	case chainsel.FamilyTon:
+		// In TON, gas limits are expressed in nanoTON (not abstract gas units).
+		// Therefore, sourceGasPrice is always 1 (1 nanoTON per "gas unit" = 1 nanoTON per nanoTON).
+		// See: chainlink-ton/pkg/ccip/chainaccessor/ton_accessor.go GetChainFeeComponents()
+
+		// usdPerFeeCoin is 1e18 USD per 1e18 smallest token unit by convention.
+		// TON has 9 decimals, so 1e18 nanoTON = 1e9 TON.
+		// Therefore, usdPerFeeCoin represents 1e18 USD * 1e9 = 1e27 USD per full TON.
+
+		// Result is USD per nanoTON (i.e., USD per gas unit) in 1e18 precision:
+		//   = sourceGasPrice * usdPerFeeCoin / 1e18
+		//   = 1 * usdPerFeeCoin / 1e18
+
+		tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+		return new(big.Int).Div(tmp, big.NewInt(1e18)), nil
+
 	default:
 		return nil, fmt.Errorf("unsupported family %s", family)
 	}
-
 }

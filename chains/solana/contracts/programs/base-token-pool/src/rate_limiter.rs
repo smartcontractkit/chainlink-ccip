@@ -54,6 +54,7 @@ impl RateLimitTokenBucket {
 
         if self.tokens < request_tokens {
             let rate = self.cfg.rate;
+            require_neq!(rate, 0, CcipTokenPoolError::RLRateLimitReached);
             // Wait required until the bucket is refilled enough to accept this value, round up to next higher second
             // Consume is not guaranteed to succeed after wait time passes if there is competing traffic.
             // This acts as a lower bound of wait time.
@@ -106,7 +107,7 @@ impl RateLimitTokenBucket {
 fn validate_token_bucket_config(cfg: &RateLimitConfig) -> Result<()> {
     if cfg.enabled {
         require!(
-            cfg.rate < cfg.capacity && cfg.rate != 0,
+            cfg.rate <= cfg.capacity, // allow setting rate and capacity to 0
             CcipTokenPoolError::RLInvalidRateLimitRate
         );
     } else {

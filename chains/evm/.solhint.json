@@ -19,6 +19,7 @@
 		"not-rely-on-time": "off",
 		"no-empty-blocks": "off",
 		"no-unused-import": "error",
+        "import-path-check": "off",
 		"func-visibility": [
 			"error",
 			{

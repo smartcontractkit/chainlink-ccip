@@ -3,7 +3,9 @@ pragma solidity ^0.8.24;
 
 import {Internal} from "../../../libraries/Internal.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
+
 import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSetup {
   uint64 internal constant NEW_CHAIN_SELECTOR = 12345;
@@ -70,7 +72,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     assertEq(config.maxFillAmountPerRequest, NEW_FILL_AMOUNT_MAX);
   }
 
-  function test_RevertWhen_InvalidFastFeeBps() public {
+  function test_updateDestChainConfig_RevertWhen_InvalidFastFeeBps() public {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
@@ -88,7 +90,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
   }
 
-  function test_RevertWhen_InvalidPoolFeeBps() public {
+  function test_updateDestChainConfig_RevertWhen_InvalidPoolFeeBps() public {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
@@ -106,12 +108,12 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
   }
 
-  function test_RevertWhen_NotOwners() public {
+  function test_updateDestChainConfig_RevertWhen_NotOwners() public {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs;
 
     vm.stopPrank();
 
-    vm.expectRevert();
+    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
   }
 
@@ -193,7 +195,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     assertEq(config.maxFillAmountPerRequest, NEW_FILL_AMOUNT_MAX);
   }
 
-  function test_updateDestChainConfig_RevertWhen_TotalFeesExactly100Percent() public {
+  function test_updateDestChainConfig_RevertWhen_InvalidDestChainConfig_TotalFeesExactly100Percent() public {
     uint16 fillerFee = 3_000; // 30%
     uint16 poolFee = 7_000; // 70% -> Total exactly 100%
 
@@ -214,7 +216,7 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
   }
 
-  function test_RevertWhen_TotalFeesExceed100Percent() public {
+  function test_updateDestChainConfigRevertWhen_InvalidDestChainConfig_TotalFeesExceed100Percent() public {
     FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
       .DestChainConfigUpdateArgs({
       remoteChainSelector: NEW_CHAIN_SELECTOR,
@@ -229,6 +231,33 @@ contract FastTransferTokenPool_updateDestChainConfig is FastTransferTokenPoolSet
     });
 
     vm.expectRevert(FastTransferTokenPoolAbstract.InvalidDestChainConfig.selector);
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
+  }
+
+  function test_updateDestChainConfig_RevertWhen_EmptyOrZeroDestinationPool() public {
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
+      .DestChainConfigUpdateArgs({
+      remoteChainSelector: NEW_CHAIN_SELECTOR,
+      fastTransferFillerFeeBps: NEW_FAST_FEE_FILLER_BPS,
+      fastTransferPoolFeeBps: 0, // No pool fee for this test
+      fillerAllowlistEnabled: true,
+      destinationPool: "", // Empty
+      maxFillAmountPerRequest: NEW_FILL_AMOUNT_MAX,
+      settlementOverheadGas: NEW_SETTLEMENT_GAS_OVERHEAD,
+      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+      customExtraArgs: ""
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(FastTransferTokenPoolAbstract.InvalidEncodedAddress.selector, ""));
+    s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
+
+    laneConfigArgs.destinationPool = abi.encode(address(0)); // Zero address
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FastTransferTokenPoolAbstract.InvalidEncodedAddress.selector, laneConfigArgs.destinationPool
+      )
+    );
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
   }
 }

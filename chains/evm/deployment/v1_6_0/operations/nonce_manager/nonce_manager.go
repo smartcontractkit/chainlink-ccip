@@ -5,13 +5,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/call"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 var ContractType cldf_deployment.ContractType = "NonceManager"
+var Version *semver.Version = semver.MustParse("1.6.0")
 
 type ConstructorArgs struct {
 	AuthorizedCallers []common.Address
@@ -21,46 +21,43 @@ type AuthorizedCallerArgs = nonce_manager.AuthorizedCallersAuthorizedCallerArgs
 
 type PreviousRampsArgs = nonce_manager.NonceManagerPreviousRampsArgs
 
-var Deploy = deployment.New(
-	"nonce-manager:deploy",
-	semver.MustParse("1.6.0"),
-	"Deploys the NonceManager contract",
-	ContractType,
-	nonce_manager.NonceManagerABI,
-	func(ConstructorArgs) error { return nil },
-	deployment.VMDeployers[ConstructorArgs]{
-		DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, args ConstructorArgs) (common.Address, *types.Transaction, error) {
-			address, tx, _, err := nonce_manager.DeployNonceManager(opts, backend, args.AuthorizedCallers)
-			return address, tx, err
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "nonce-manager:deploy",
+	Version:          semver.MustParse("1.6.0"),
+	Description:      "Deploys the NonceManager contract",
+	ContractMetadata: nonce_manager.NonceManagerMetaData,
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.6.0")).String(): {
+			EVM: common.FromHex(nonce_manager.NonceManagerBin),
 		},
-		// DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ConstructorArgs) (common.Address, error)
 	},
-)
+	Validate: func(ConstructorArgs) error { return nil },
+})
 
-var ApplyAuthorizedCallerUpdates = call.NewWrite(
-	"nonce-manager:apply-authorized-caller-updates",
-	semver.MustParse("1.6.0"),
-	"Applies updates to the list of authorized callers on the NonceManager",
-	ContractType,
-	nonce_manager.NonceManagerABI,
-	nonce_manager.NewNonceManager,
-	call.OnlyOwner,
-	func(AuthorizedCallerArgs) error { return nil },
-	func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
+var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *nonce_manager.NonceManager]{
+	Name:            "nonce-manager:apply-authorized-caller-updates",
+	Version:         semver.MustParse("1.6.0"),
+	Description:     "Applies updates to the list of authorized callers on the NonceManager",
+	ContractType:    ContractType,
+	ContractABI:     nonce_manager.NonceManagerABI,
+	NewContract:     nonce_manager.NewNonceManager,
+	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, AuthorizedCallerArgs],
+	Validate:        func(AuthorizedCallerArgs) error { return nil },
+	CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return nonceManager.ApplyAuthorizedCallerUpdates(opts, args)
 	},
-)
+})
 
-var ApplyPreviousRampUpdates = call.NewWrite(
-	"nonce-manager:apply-previous-ramp-updates",
-	semver.MustParse("1.6.0"),
-	"Applies updates to the list of previous ramps on the NonceManager",
-	ContractType,
-	nonce_manager.NonceManagerABI,
-	nonce_manager.NewNonceManager,
-	call.OnlyOwner,
-	func([]PreviousRampsArgs) error { return nil },
-	func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args []PreviousRampsArgs) (*types.Transaction, error) {
+var ApplyPreviousRampUpdates = contract.NewWrite(contract.WriteParams[[]PreviousRampsArgs, *nonce_manager.NonceManager]{
+	Name:            "nonce-manager:apply-previous-ramp-updates",
+	Version:         semver.MustParse("1.6.0"),
+	Description:     "Applies updates to the list of previous ramps on the NonceManager",
+	ContractType:    ContractType,
+	ContractABI:     nonce_manager.NonceManagerABI,
+	NewContract:     nonce_manager.NewNonceManager,
+	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, []PreviousRampsArgs],
+	Validate:        func([]PreviousRampsArgs) error { return nil },
+	CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args []PreviousRampsArgs) (*types.Transaction, error) {
 		return nonceManager.ApplyPreviousRampsUpdates(opts, args)
 	},
-)
+})

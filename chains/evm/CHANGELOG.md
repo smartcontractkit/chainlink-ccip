@@ -1,4 +1,73 @@
-[NOTES.md](../../../chainlink/contracts/release/ccip/NOTES.md)# @chainlink/contracts-ccip
+## 1.6.4
+
+CCIP 1.6.4 is a minor release that overhauls the USDC Token Pool to add support for CCTP V2 and enable easier future
+upgradability of USDC and Lock/Release Token Pools.
+
+### New Features
+
+Key Improvements include:
+
+- [#1115](https://github.com/smartcontractkit/chainlink-ccip/pull/1115) - **ERC20Lockbox** - To better support token pools 
+which hold tokens, a new contract has been created which will hold the tokens for the token pool instead. This allows users 
+which utilize Lock/Release pools to upgrade their token pool without having to engage in liquidity migrations. Instead only a 
+simple configuration call is needed. The SiloedLockReleaseTokenPool has also been modified to support the lockbox.
+
+- [#1133](https://github.com/smartcontractkit/chainlink-ccip/pull/1133) - **USDCTokenPoolCCTPV2** - A modified version of
+the USDC Token Pool which is capable of supporting Circle's CCTP V2. As CCTP V1 is being phased out, all existing USDC 
+Token Pools will be migrated to this in the near future.
+
+- [#1134](https://github.com/smartcontractkit/chainlink-ccip/pull/1134) - **USDCTokenPoolProxy** - A versatile new dispatcher
+contract which allows USDC to be sent using different mechanisms based on the destination chain including CCTP V1, CCTP V2, and Lock/Mint.
+
+## 1.6.3
+
+CCIP 1.6.3 is a minor release that adds support for Sui to the FeeQuoter. No other contracts are in scope.
+
+
+### New features
+This release will start including compiled bytecode for the contracts that are in scope for each release. 
+
+### Minor Changes
+
+- [#1217](https://github.com/smartcontractkit/chainlink-ccip/pull/1217) - Adds Sui support to the FeeQuoter contract.
+
+
+## 1.6.2
+
+CCIP 1.6.2 is a minor release that focuses on adding support for new networks in miscellaneous token pools and deployable
+ERC20-tokens.
+
+Key improvements include: 
+- **USDC Token Pool Support for Solana** - To enable sending USDC to and from Solana the USDC token pool has added a 
+  `mintRecipientOverride` field for its CCTP messages. Since the PDA on Solana which will be the recipient of the minted
+  USDC will not be the final recipient of the tokens, this field enables better support with CCTP for the Solana-CCIP 
+  contracts
+
+- **Hyperliquid Support for FactoryBurnMintERC20** - Tokens which are deployed using the Chainlink Token Manager interface
+and associated contracts are now able to be deployed on Hyperliquid by adding support for the spot balance precompile 
+system on Hypercore.
+
+### Patch Changes
+
+- [#1212](https://github.com/smartcontractkit/chainlink-ccip/pull/1212) - Fixes a bug in the FactoryBurnMintERC20 constructor
+that prevents using a `preMint` and a `maxSupply` of `0`
+
+- [#1072](https://github.com/smartcontractkit/chainlink-ccip/pull/1072) - Adds the CCTP Message Transmitter Proxy gobindings
+wrapper
+
+- [#1116](https://github.com/smartcontractkit/chainlink-ccip/pull/1116) - Removes the granting of mint and burn permissions from the FactoryBurnMintERC20 constructor to save gas on deplotyment.
+
+### Minor Changes
+
+- [#1145](https://github.com/smartcontractkit/chainlink-ccip/pull/1145) [`4f2c735`](https://github.com/smartcontractkit/chainlink-ccip/commit/4f2c735bf252ec69be1424647671b956dd159c55) - Add a new BurnMintERC20 compatible with Hyperliquid and changes to the FactoryBurnMintERC20:
+  - Adds a check to the constructor that the `preMint` is less than the `maxSupply` 
+
+- [#1009](https://github.com/smartcontractkit/chainlink-ccip/pull/1009) [`d22a78e`](https://github.com/smartcontractkit/chainlink-ccip/pull/1009/commits/d22a78e6de780b6bb1f8259a6ea7753ed92892ce) - Adds support for USDC messages on Solana using a mint-recipient
+override field for CCTP messages.
+
+### Fixes
+
+- Fixed an issue that prevented ABIs from being included in the NPM package.
 
 ## 1.6.1
 

@@ -2,11 +2,12 @@ package chainfee
 
 import (
 	"context"
+	"maps"
 	"math/big"
+	"slices"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -62,13 +63,13 @@ func (p *processor) Observation(
 	asynclib.WaitForAllNoErrOperations(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
 	now := time.Now().UTC()
 
-	chainsWithNativeTokenPrices := mapset.NewSet(maps.Keys(feeComponents)...).
+	chainsWithNativeTokenPrices := mapset.NewSet(slices.Collect(maps.Keys(feeComponents))...).
 		Intersect(
-			mapset.NewSet(maps.Keys(nativeTokenPrices)...),
+			mapset.NewSet(slices.Collect(maps.Keys(nativeTokenPrices))...),
 		)
-	chainsWithoutNativeTokenPrices := mapset.NewSet(maps.Keys(feeComponents)...).
+	chainsWithoutNativeTokenPrices := mapset.NewSet(slices.Collect(maps.Keys(feeComponents))...).
 		Difference(
-			mapset.NewSet(maps.Keys(nativeTokenPrices)...),
+			mapset.NewSet(slices.Collect(maps.Keys(nativeTokenPrices))...),
 		)
 
 	lggr.Infow("observed fee components",

@@ -13,10 +13,9 @@ import {MockE2EUSDCTransmitter} from "../../mocks/MockE2EUSDCTransmitter.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
-import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
-import {IERC165} from
-  "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
 
 contract USDCSetup is BaseTest {
   struct USDCMessage {
@@ -72,7 +71,7 @@ contract USDCSetup is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
-    BurnMintERC677 usdcToken = new BurnMintERC677("USD Coin", "USDC", 6, 0);
+    BurnMintERC20 usdcToken = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
     s_USDCToken = usdcToken;
 
     s_tokenAdminRegistry = new TokenAdminRegistry();

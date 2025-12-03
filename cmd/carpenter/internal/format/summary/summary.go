@@ -3,9 +3,8 @@ package summary
 
 import (
 	"fmt"
-	"sort"
-
-	"golang.org/x/exp/maps"
+	"maps"
+	"slices"
 
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
@@ -54,24 +53,20 @@ func (sr summaryFormatter) Format(data *parse.Data) {
 }
 
 func (sr summaryFormatter) Close() error {
-	dons := maps.Keys(sr.commits)
-	sort.Ints(dons)
+	dons := slices.Sorted(maps.Keys(sr.commits))
 	for _, donID := range dons {
 		fmt.Println("Commit Summary for DON", donID)
-		keys := maps.Keys(sr.commits[donID])
-		sort.Ints(keys)
+		keys := slices.Sorted(maps.Keys(sr.commits[donID]))
 		for _, key := range keys {
 			fmt.Println(sr.commits[donID][key].String())
 		}
 		fmt.Println()
 	}
 
-	dons = maps.Keys(sr.execs)
-	sort.Ints(dons)
+	dons = slices.Sorted(maps.Keys(sr.execs))
 	for _, donID := range dons {
 		fmt.Println("Commit logs for DON", donID)
-		keys := maps.Keys(sr.execs[donID])
-		sort.Ints(keys)
+		keys := slices.Sorted(maps.Keys(sr.execs[donID]))
 		for _, key := range keys {
 			fmt.Println(sr.execs[donID][key].String())
 		}

@@ -47,8 +47,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     // Assert: Verify the result
     assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount);
 
-    // destPoolData is the local token decimals abi-encoded to 32 bytes
-    assertEq(result.destPoolData.length, 32);
+    assertEq(result.destPoolData.length, 4);
     vm.stopPrank();
   }
 
@@ -71,8 +70,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     // Assert: Verify the locked tokens accounting is updated
     assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount);
 
-    // destPoolData is the local token decimals abi-encoded to 32 bytes
-    assertEq(result.destPoolData.length, 32);
+    assertEq(result.destPoolData.length, 4);
     vm.stopPrank();
   }
 
@@ -106,9 +104,8 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     // Assert: Verify the locked tokens accounting is updated correctly
     assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount + amount2);
 
-    // destPoolData is the local token decimals abi-encoded to 32 bytes
-    assertEq(result1.destPoolData.length, 32);
-    assertEq(result2.destPoolData.length, 32);
+    assertEq(result1.destPoolData.length, 4);
+    assertEq(result2.destPoolData.length, 4);
     vm.stopPrank();
   }
 
@@ -128,7 +125,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount);
     assertTrue(s_usdcTokenPool.isSiloed(DEST_CHAIN_SELECTOR));
 
-    assertEq(result.destPoolData.length, 32);
+    assertEq(result.destPoolData.length, 4);
     vm.stopPrank();
   }
 

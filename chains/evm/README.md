@@ -10,7 +10,7 @@
 Chainlink-ccip relies on chainlink-evm, below are the instructions to install both.
 To find the correct version of chainlink-evm to use for any given version of chainlink-ccip, 
 please refer to the `package.json` file in `/chains/evm`.
-It contains an NPM dependency on `@chainlink/contracts-evm` with the correct version for the given version of chainlink-ccip.
+It contains an NPM dependency on `@chainlink/contracts` with the correct version for the given version of chainlink-ccip.
 
 NOTE: while other versions of chainlink-evm may work, we only test against the version specified in the `package.json` file.
 Audits are also only done against the version specified in the `package.json` file. 

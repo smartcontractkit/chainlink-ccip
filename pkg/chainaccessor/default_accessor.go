@@ -3,18 +3,17 @@ package chainaccessor
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"time"
 
-	"golang.org/x/exp/maps"
-
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -47,8 +46,10 @@ func NewDefaultAccessor(
 	if contractWriter == nil {
 		return nil, fmt.Errorf("contractWriter cannot be nil")
 	}
+
+	sLggr := logger.Sugared(lggr).Named("DefaultAccessor").Named(chainSelector.String())
 	return &DefaultAccessor{
-		lggr:           lggr,
+		lggr:           sLggr,
 		chainSelector:  chainSelector,
 		contractReader: contractReader,
 		contractWriter: contractWriter,
@@ -79,17 +80,19 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 	destChainSelector cciptypes.ChainSelector,
 	sourceChainSelectors []cciptypes.ChainSelector,
 ) (cciptypes.ChainConfigSnapshot, map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
-	lggr := logutil.WithContextValues(ctx, l.lggr)
+	lggr := logger.With(
+		l.lggr,
+		"destChainSelector", destChainSelector,
+		"sourceChainSelector", l.chainSelector,
+	)
 
 	var configRequests contractreader.ExtendedBatchGetLatestValuesRequest
 	var standardOffRampRequestCount int
 	if l.chainSelector == destChainSelector {
-		lggr.Debugw("getting ChainConfigSnapshot and and OffRamp SourceChainConfigs for destination chain",
-			"chainSelector", l.chainSelector)
+		lggr.Debugw("getting ChainConfigSnapshot and and OffRamp SourceChainConfigs for destination chain")
 		configRequests, standardOffRampRequestCount = prepareDestChainRequest(sourceChainSelectors)
 	} else {
-		lggr.Debugw("getting ChainConfigSnapshot for a source chain",
-			"chainSelector", l.chainSelector)
+		lggr.Debugw("getting ChainConfigSnapshot for a source chain")
 		configRequests = prepareSourceChainRequest(destChainSelector)
 	}
 
@@ -100,7 +103,7 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 	}
 
 	if len(skipped) > 0 {
-		lggr.Warnw("chain reader skipped some config requests", "skipped", skipped)
+		lggr.Debugw("chain reader skipped some config requests", "skipped", skipped)
 	}
 
 	// Process standard results (ChainConfigSnapshot)
@@ -289,7 +292,6 @@ func (l *DefaultAccessor) Sync(
 	contractName string,
 	contractAddress cciptypes.UnknownAddress,
 ) error {
-	lggr := logutil.WithContextValues(ctx, l.lggr)
 	addressStr, err := l.addrCodec.AddressBytesToString(contractAddress, l.chainSelector)
 	if err != nil {
 		return fmt.Errorf("unable to convert address bytes to string: %w, address: %v", err, contractAddress)
@@ -300,11 +302,8 @@ func (l *DefaultAccessor) Sync(
 		Name:    contractName,
 	}
 
-	lggr.Debugw("Binding contract",
-		"chainSelector", l.chainSelector,
-		"contractName", contractName,
-		"address", addressStr,
-	)
+	l.lggr.Debugw("Binding contract", "contractName", contractName, "address", addressStr)
+
 	// Bind the contract address to the reader.
 	// If the same address exists -> no-op
 	// If the address is changed -> updates the address, overwrites the existing one
@@ -322,6 +321,8 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 	seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
+	lggr = logger.With(lggr, "destChainSelector", destChainSelector, "seqNumRange", seqNumRange.String())
+
 	seq, err := l.contractReader.ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOnRamp,
@@ -380,6 +381,12 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		}
 
 		msg.Message.Header.OnRamp = onRampAddress
+
+		// Populate TxHash from Sequence item
+		if len(item.TxHash) > 0 {
+			msg.Message.Header.TxHash = hexutil.Encode(item.TxHash)
+		}
+
 		msgs = append(msgs, msg.Message)
 	}
 
@@ -388,11 +395,6 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		msgsWithoutDataField[i] = msg.CopyWithoutData()
 	}
 
-	lggr.Debugw("decoded messages between sequence numbers",
-		"msgsWithoutDataField", msgsWithoutDataField,
-		"sourceChainSelector", l.chainSelector,
-		"seqNumRange", seqNumRange.String(),
-	)
 	lggr.Infow("decoded message IDs between sequence numbers",
 		"seqNum.MsgID", slicelib.Map(msgsWithoutDataField, func(m cciptypes.Message) string {
 			return fmt.Sprintf("%d.%d", m.Header.SequenceNumber, m.Header.MessageID)
@@ -408,7 +410,7 @@ func (l *DefaultAccessor) LatestMessageTo(
 	ctx context.Context,
 	destChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
-	lggr := logutil.WithContextValues(ctx, l.lggr)
+	lggr := logger.With(l.lggr, "destChainSelector", destChainSelector)
 
 	seq, err := l.contractReader.ExtendedQueryKey(
 		ctx,
@@ -438,6 +440,7 @@ func (l *DefaultAccessor) LatestMessageTo(
 	lggr.Debugw("queried latest message from source",
 		"numMsgs", len(seq),
 		"sourceChainSelector", l.chainSelector,
+		"destChainSelector", destChainSelector,
 	)
 	if len(seq) > 1 {
 		return 0, fmt.Errorf("more than one message found for the latest message query")
@@ -464,6 +467,7 @@ func (l *DefaultAccessor) GetExpectedNextSequenceNumber(
 	ctx context.Context,
 	destChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
+	lggr := logger.With(l.lggr, "destChainSelector", destChainSelector)
 	var expectedNextSequenceNumber uint64
 	err := l.contractReader.ExtendedGetLatestValue(
 		ctx,
@@ -485,6 +489,9 @@ func (l *DefaultAccessor) GetExpectedNextSequenceNumber(
 			l.chainSelector, destChainSelector)
 	}
 
+	lggr.Debugw("fetched expected next sequence number",
+		"expectedNextSequenceNumber", cciptypes.SeqNum(expectedNextSequenceNumber).String(),
+	)
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
@@ -525,6 +532,7 @@ func (l *DefaultAccessor) CommitReportsGTETimestamp(
 	limit int,
 ) ([]cciptypes.CommitPluginReportWithMeta, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
+	lggr = logger.With(lggr, "ts", ts, "confidence", confidence, "limit", limit)
 
 	internalLimit := limit * 2
 	iter, err := l.contractReader.ExtendedQueryKey(
@@ -551,10 +559,7 @@ func (l *DefaultAccessor) CommitReportsGTETimestamp(
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
 	}
 
-	lggr.Debugw("queried commit reports", "numReports", len(iter),
-		"destChain", l.chainSelector,
-		"ts", ts,
-		"limit", internalLimit)
+	lggr.Debugw("queried commit reports", "numReports", len(iter), "internalLimit", internalLimit)
 
 	reports := l.processCommitReports(lggr, iter, ts, limit)
 	return reports, nil
@@ -566,6 +571,7 @@ func (l *DefaultAccessor) ExecutedMessages(
 	confidence primitives.ConfidenceLevel,
 ) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
+	lggr = logger.With(lggr, "confidence", confidence, "rangesPerChain", rangesPerChain)
 
 	// trim empty ranges from rangesPerChain
 	// otherwise we may get SQL errors from the chainreader.
@@ -615,6 +621,7 @@ func (l *DefaultAccessor) ExecutedMessages(
 			append(executed[stateChange.SourceChainSelector], stateChange.SequenceNumber)
 	}
 
+	lggr.Debugw("decoded executed message sequence numbers", "executed", executed)
 	return executed, nil
 }
 
@@ -626,8 +633,7 @@ func createExecutedMessagesKeyFilter(
 	var countSqNrs uint64
 	// final query should look like
 	// (chainA && (sqRange1 || sqRange2 || ...)) || (chainB && (sqRange1 || sqRange2 || ...))
-	sortedChains := maps.Keys(rangesPerChain)
-	slices.Sort(sortedChains)
+	sortedChains := slices.Sorted(maps.Keys(rangesPerChain))
 	for _, srcChain := range sortedChains {
 		seqNumRanges := rangesPerChain[srcChain]
 		var seqRangeExpressions []query.Expression
@@ -687,8 +693,7 @@ func (l *DefaultAccessor) Nonces(
 	lggr := logutil.WithContextValues(ctx, l.lggr)
 
 	// sort the input to ensure deterministic results
-	sortedChains := maps.Keys(addressesByChain)
-	slices.Sort(sortedChains)
+	sortedChains := slices.Sorted(maps.Keys(addressesByChain))
 
 	// create the structure that will contain our result
 	res := make(map[cciptypes.ChainSelector]map[string]uint64)
@@ -797,8 +802,9 @@ func prepareNoncesInput(
 func (l *DefaultAccessor) GetChainFeePriceUpdate(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
+) (map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
+	lggr = logger.With(lggr, "requestedSelectors", selectors)
 
 	// 1. Build Batch Request
 	contractBatch := make([]types.BatchRead, 0, len(selectors))
@@ -825,7 +831,7 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 
 	if err != nil {
 		lggr.Errorw("failed to batch get chain fee price updates", "err", err)
-		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig), nil // Return a new empty map
 	}
 
 	// 3. Find FeeQuoter Results
@@ -841,7 +847,7 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 
 	if !found {
 		lggr.Errorw("FeeQuoter results missing from batch response")
-		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig) // Return a new empty map
+		return make(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig), nil // Return a new empty map
 	}
 
 	if len(feeQuoterResults) != len(selectors) {
@@ -852,7 +858,9 @@ func (l *DefaultAccessor) GetChainFeePriceUpdate(
 	}
 
 	// 4. Process Results using helper
-	return l.processFeePriceUpdateResults(lggr, selectors, feeQuoterResults)
+	updates := l.processFeePriceUpdateResults(lggr, selectors, feeQuoterResults)
+	lggr.Debugw("updated fee price updates", "updates", updates)
+	return updates, nil
 }
 
 // processFeePriceUpdateResults iterates through batch results, validates them,
@@ -861,8 +869,8 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 	lggr logger.Logger,
 	selectors []cciptypes.ChainSelector,
 	results []types.BatchReadResult,
-) map[cciptypes.ChainSelector]cciptypes.TimestampedBig {
-	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig)
+) map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig {
+	feeUpdates := make(map[cciptypes.ChainSelector]cciptypes.TimestampedUnixBig)
 
 	for i, chain := range selectors {
 		if i >= len(results) {
@@ -902,13 +910,13 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 		}
 
 		// Add valid update to the map
-		feeUpdates[chain] = cciptypes.TimeStampedBigFromUnix(*update)
+		feeUpdates[chain] = *update
 	}
 
 	return feeUpdates
 }
 
-func (l *DefaultAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
+func (l *DefaultAccessor) GetLatestPriceSeqNr(ctx context.Context) (cciptypes.SeqNum, error) {
 	var latestSeqNr uint64
 	err := l.contractReader.ExtendedGetLatestValue(
 		ctx,
@@ -921,7 +929,7 @@ func (l *DefaultAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 	if err != nil {
 		return 0, fmt.Errorf("get latest price sequence number: %w", err)
 	}
-	return latestSeqNr, nil
+	return cciptypes.SeqNum(latestSeqNr), nil
 }
 
 func (l *DefaultAccessor) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
@@ -997,6 +1005,13 @@ func (l *DefaultAccessor) processCommitReports(
 	if len(reports) < limit {
 		return reports
 	}
+	lggr.Errorw("too many commit reports received, commit report results are truncated",
+		"numTruncatedReports", len(reports)-limit)
+	for l := limit; l < len(reports); l++ {
+		if !reports[l].Report.HasNoRoots() {
+			lggr.Warnw("dropping merkle root commit report which doesn't fit in limit", "report", reports[l])
+		}
+	}
 	return reports[:limit]
 }
 
@@ -1051,4 +1066,13 @@ func (l *DefaultAccessor) processPriceUpdates(priceUpdates PriceUpdates) (ccipty
 	}
 
 	return updates, nil
+}
+
+func (l *DefaultAccessor) MessagesByTokenID(
+	ctx context.Context,
+	source, dest cciptypes.ChainSelector,
+	tokens map[cciptypes.MessageTokenID]cciptypes.RampTokenAmount,
+) (map[cciptypes.MessageTokenID]cciptypes.Bytes, error) {
+	//TODO implement me
+	panic("implement me")
 }
