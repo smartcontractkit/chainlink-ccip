@@ -12,7 +12,7 @@ contract MCMSForkTest is Test {
 
   error TransactionReverted();
 
-  function applyPayload(address sender, bytes memory payload) internal {
+  function _applyPayload(address sender, bytes memory payload) internal {
     (MCMSForkTest.Call[] memory calls,,,) = abi.decode(payload, (MCMSForkTest.Call[], bytes32, bytes32, uint256));
     for (uint256 i = 0; i < calls.length; ++i) {
       MCMSForkTest.Call memory call = calls[i];
