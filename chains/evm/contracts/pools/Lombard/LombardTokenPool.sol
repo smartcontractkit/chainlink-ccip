@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 
@@ -21,12 +22,16 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20Metadata;
 
   error ZeroVerifierNotAllowed();
+  error V1FunctionDisabled();
+  error OutboundImplementationNotFoundForVerifier();
+
+  event LombardVerifierSet(address indexed verifier);
 
   /// @notice CCIP contract type and version.
   string public constant override typeAndVersion = "LombardTokenPool 1.7.0-dev";
 
-  /// @notice Lombard verifier that executes the cross-chain flow and handles token movement.
-  address public s_verifier;
+  /// @notice Lombard verifier proxy / resolver address. lockOrBurn fetches the outbound implementation and forwards tokens to it.
+  address private immutable i_lombardVerifierResolver;
 
   constructor(
     IERC20Metadata token,
@@ -36,7 +41,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     address router,
     uint8 fallbackDecimals
   ) TokenPool(token, _getTokenDecimals(token, fallbackDecimals), advancedPoolHooks, rmnProxy, router) {
-    _setVerifier(verifier);
+    if (verifier == address(0)) {
+      revert ZeroVerifierNotAllowed();
+    }
+    i_lombardVerifierResolver = verifier;
+    emit LombardVerifierSet(verifier);
   }
 
   // ================================================================
@@ -49,7 +58,21 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
-    i_token.safeTransfer(s_verifier, amount);
+    uint64 remoteChainSelector;
+    // Calldata layout for lockOrBurn((bytes,uint64,address,uint256,address),uint16,bytes):
+    // - 0x00-0x03: function selector
+    // - 0x04: offset to the tuple (expected 0x60)
+    // Within the tuple, remoteChainSelector is the second element at tupleOffset + 0x20.
+    assembly {
+      let tuplePtr := add(0x04, calldataload(0x04))
+      remoteChainSelector := calldataload(add(tuplePtr, 0x20))
+    }
+    address verifierImpl =
+      ICrossChainVerifierResolver(i_lombardVerifierResolver).getOutboundImplementation(remoteChainSelector, "");
+    if (verifierImpl == address(0)) {
+      revert OutboundImplementationNotFoundForVerifier();
+    }
+    i_token.safeTransfer(verifierImpl, amount);
   }
 
   function lockOrBurn(
@@ -82,30 +105,8 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     }
   }
 
-  /// @notice Updates the verifier address used for forwarding tokens.
-  /// @param verifier New verifier address.
-  function setVerifier(
-    address verifier
-  ) external onlyOwner {
-    _setVerifier(verifier);
-  }
-
-  function _setVerifier(
-    address verifier
-  ) internal {
-    if (verifier == address(0)) {
-      revert ZeroVerifierNotAllowed();
-    }
-    if (verifier == s_verifier) {
-      return;
-    }
-
-    // Revoke old allowance if set.
-    if (s_verifier != address(0)) {
-      i_token.safeApprove(s_verifier, 0);
-    }
-
-    s_verifier = verifier;
-    i_token.safeApprove(verifier, type(uint256).max);
+  /// @notice Returns the verifier resolver address.
+  function getVerifierResolver() external view returns (address) {
+    return i_lombardVerifierResolver;
   }
 }
