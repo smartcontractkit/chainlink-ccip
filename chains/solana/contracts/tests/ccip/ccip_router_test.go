@@ -40,7 +40,7 @@ import (
 )
 
 func TestCCIPRouter(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	ccip_router.SetProgramID(config.CcipRouterProgram)
 	test_ccip_receiver.SetProgramID(config.CcipLogicReceiver)
