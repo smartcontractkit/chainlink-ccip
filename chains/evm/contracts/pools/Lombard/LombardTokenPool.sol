@@ -36,8 +36,9 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   error ExecutionError();
   error HashMismatch();
 
+  /// The following events are emitted for Lombard-specific configuration updates and are utilized by Lombard.
   /// @param remoteChainSelector CCIP selector of destination chain.
-  /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
+  /// @param lChainId The chain ID according to Lombard Multi Chain ID convention.
   /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message.
   event PathSet(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
   /// @param remoteChainSelector CCIP selector of destination chain.
@@ -68,6 +69,12 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @notice Mapping of CCIP chain selector to chain specific config.
   mapping(uint64 chainSelector => Path path) internal s_chainSelectorToPath;
 
+  /// @param verifier The address of Lombard verifier resolver. Used in V2 flows to fetch the outbound
+  /// implementation that handles token burns and cross-chain attestations.
+  /// @param bridge The Lombard BridgeV2 contract that handles cross-chain token transfers.
+  /// @param adapter Optional source-chain token address override. Used for non-upgradeable tokens like BTC.b
+  /// on Avalanche where an adapter contract performs mint/burn on behalf of the actual token. When set, this
+  /// address is passed to bridge.deposit() instead of the pool's token address. Set to address(0) if not needed.
   constructor(
     IERC20Metadata token,
     address verifier,
@@ -128,6 +135,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
       revert PathNotExist(lockOrBurnIn.remoteChainSelector);
     }
 
+    // For some tokens we need to override the source token with an adapter
     address sourceTokenOrAdapter = i_tokenAdapter != address(0) ? i_tokenAdapter : address(i_token);
     // verify bridge destination token equal to pool
     bytes32 bridgeDestToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceTokenOrAdapter);
@@ -146,8 +154,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
       sender: lockOrBurnIn.originalSender,
       recipient: abi.decode(lockOrBurnIn.receiver, (bytes32)),
       amount: lockOrBurnIn.amount,
-      destinationCaller: path.allowedCaller,
-      payload: ""
+      destinationCaller: path.allowedCaller
     });
 
     emit LockedOrBurned({

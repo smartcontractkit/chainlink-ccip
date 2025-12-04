@@ -51,6 +51,18 @@ contract MockLombardBridgeV2 is IBridgeV2 {
     return (1, keccak256(abi.encodePacked(block.timestamp, token)));
   }
 
+  function deposit(
+    bytes32, // destinationChain
+    address token,
+    address, // sender
+    bytes32, // recipient
+    uint256, // amount
+    bytes32 // destinationCaller
+  ) external payable returns (uint256 nonce, bytes32 payloadHash) {
+    s_lastDepositToken = token;
+    return (1, keccak256(abi.encodePacked(block.timestamp, token)));
+  }
+
   function getAllowedDestinationToken(bytes32 destinationChain, address sourceToken) external view returns (bytes32) {
     return s_allowedDestinationTokens[destinationChain][sourceToken];
   }
