@@ -35,13 +35,29 @@ func setDomainsApply() func(cldf.Environment, SetDomainsInput) (cldf.ChangesetOu
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
-		// Build the DomainsByChain map from per-chain inputs
-		addressesByChain := make(map[uint64]common.Address)
-		domainsByChain := make(map[uint64][]usdc_token_pool.DomainUpdate)
+		// By using a mapping from chain selector to a slice of addresses and another mapping from chain selector to a mapping
+		// from address to a slice of DomainUpdate structs, we can allow for multiple contract calls on the same chain selector
+		// but to different addresses.
+
+		// On chains where there are multiple USDC Token pools of different versions, such
+		// as on Ethereum mainnet, where V1 and V2 pools will coexist, this allows for simpler invocations of this changeset
+		// across all contracts. Otherwise, this changeset would only be capable of setting domains for a single contract
+		// at a time per chain, which would require multiple invocations of this changeset to achieve the same result.
+		addressesByChain := make(map[uint64][]common.Address)
+		domainsByChain := make(map[uint64]map[common.Address][]usdc_token_pool.DomainUpdate)
+
 		for _, perChainInput := range input.ChainInputs {
-			// Since the Token Pool may be of type CCTP V1 or CCTP V2, the address must be specified for each chain input.
-			addressesByChain[perChainInput.ChainSelector] = perChainInput.Address
-			domainsByChain[perChainInput.ChainSelector] = perChainInput.Domains
+			// For each chain input, add the address to the addressesByChain map.
+			addressesByChain[perChainInput.ChainSelector] = append(addressesByChain[perChainInput.ChainSelector], perChainInput.Address)
+
+			// Initialize the map for the chain selector if it doesn't exist yet to prevent a nil pointer dereference.
+			if _, ok := domainsByChain[perChainInput.ChainSelector]; !ok {
+				domainsByChain[perChainInput.ChainSelector] = make(map[common.Address][]usdc_token_pool.DomainUpdate)
+			}
+
+			// Map the provided DomainUpdate to the given address and chain selector.
+			// By using append instead of assigning the slice directly, we can add multiple DomainUpdate structs to the same address and chain selector and allow them to all be executed at once by the sequence.
+			domainsByChain[perChainInput.ChainSelector][perChainInput.Address] = append(domainsByChain[perChainInput.ChainSelector][perChainInput.Address], perChainInput.Domains...)
 		}
 
 		sequenceInput := sequences.SetDomainsSequenceInput{

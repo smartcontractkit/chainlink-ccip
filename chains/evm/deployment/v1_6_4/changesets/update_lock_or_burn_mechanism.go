@@ -56,7 +56,7 @@ func updateLockOrBurnMechanismApply() func(cldf.Environment, UpdateLockOrBurnMec
 		}
 
 		sequenceInput := sequences.UpdateLockOrBurnMechanismSequenceInput{
-			Address:    addressByChain,
+			Addresses:  addressByChain,
 			Mechanisms: mechanismsByChain,
 		}
 
