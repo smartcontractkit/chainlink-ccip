@@ -40,11 +40,6 @@ import (
 )
 
 func TestCCIPRouter(t *testing.T) {
-	t.Parallel()
-	g := testutils.GetConcurrencyGroup("solana-test-validator", 2) // max 2 concurrent tests
-	g.Enter()
-	defer g.Leave()
-
 	ccip_router.SetProgramID(config.CcipRouterProgram)
 	test_ccip_receiver.SetProgramID(config.CcipLogicReceiver)
 	test_token_pool.SetProgramID(config.CcipTokenPoolProgram)
