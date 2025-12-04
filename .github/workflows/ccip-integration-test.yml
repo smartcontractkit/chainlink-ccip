@@ -80,6 +80,8 @@ jobs:
     name: Integration Tests (${{ matrix.type.name }})
     runs-on: ubuntu-latest
     steps:
+      - name: Free Disk Space
+        uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
       - name: Checkout the chainlink-ccip repo
         uses: actions/checkout@v4
       - name: Determine Go version
