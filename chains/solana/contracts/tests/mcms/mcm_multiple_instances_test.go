@@ -21,6 +21,10 @@ import (
 
 func TestMcmMultipleInstances(t *testing.T) {
 	t.Parallel()
+	g := testutils.GetConcurrencyGroup("solana-test-validator", 2) // max 2 concurrent tests
+	g.Enter()
+	defer g.Leave()
+
 	mcm.SetProgramID(config.McmProgram)
 
 	ctx := tests.Context(t)

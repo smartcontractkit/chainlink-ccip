@@ -41,6 +41,9 @@ import (
 
 func TestTokenPool(t *testing.T) {
 	t.Parallel()
+	g := testutils.GetConcurrencyGroup("solana-test-validator", 2) // max 2 concurrent tests
+	g.Enter()
+	defer g.Leave()
 
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
 	test_token_pool.SetProgramID(config.CcipTokenPoolProgram)

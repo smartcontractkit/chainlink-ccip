@@ -85,6 +85,9 @@ func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccoun
 // from the ping pong program to itself.
 func TestPingPong(t *testing.T) {
 	t.Parallel()
+	g := testutils.GetConcurrencyGroup("solana-test-validator", 2) // max 2 concurrent tests
+	g.Enter()
+	defer g.Leave()
 
 	// acting as "dumb" offramp, proxying calls to the receiver that are signed by PDA
 	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
