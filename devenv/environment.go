@@ -277,7 +277,7 @@ func NewEnvironment() (*Cfg, error) {
 		id := changesets.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
 		raw, err := NewCCIPSpecToml(SpecArgs{
 			P2PV2Bootstrappers: []string{
-				fmt.Sprintf("%s@%s", strings.TrimPrefix(bootstrapId.String(), "p2p_"), "don-node0:6688"),
+				fmt.Sprintf("%s@%s", strings.TrimPrefix(bootstrapId.String(), "p2p_"), "don-node0:6690"),
 			},
 			CapabilityVersion:      "v1.0.0",
 			CapabilityLabelledName: "ccip",

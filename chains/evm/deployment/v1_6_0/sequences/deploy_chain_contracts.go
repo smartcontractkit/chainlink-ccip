@@ -248,11 +248,25 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Add Authorized Caller to NonceManager
 		_, err = cldf_ops.ExecuteOperation(b, nonce_manager.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[nonce_manager.AuthorizedCallerArgs]{
 			ChainSelector: chain.Selector,
-			Address:      common.HexToAddress(nonceManagerRef.Address),
+			Address:       common.HexToAddress(nonceManagerRef.Address),
 			Args: nonce_manager.AuthorizedCallerArgs{
 				AddedCallers: []common.Address{
 					common.HexToAddress(offRampRef.Address),
 					common.HexToAddress(onRampRef.Address),
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
+		// Add Authorized Caller to FQ
+		_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fqops.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(feeQuoterRef.Address),
+			Args: fqops.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{
+					common.HexToAddress(offRampRef.Address),
 				},
 			},
 		})
