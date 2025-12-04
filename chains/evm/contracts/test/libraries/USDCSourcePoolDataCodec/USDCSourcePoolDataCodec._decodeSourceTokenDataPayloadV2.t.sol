@@ -64,4 +64,13 @@ contract USDCSourcePoolDataCodec__decodeSourceTokenDataPayloadV2 is Test {
 
     s_helper.decodeSourceTokenDataPayloadV2(invalidPayload);
   }
+
+  function test__decodeSourceTokenDataPayloadV2WithCCV_RevertWhen_InvalidVersion() public {
+    bytes4 invalidVersion = USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG;
+    bytes memory invalidPayload = abi.encodePacked(invalidVersion);
+
+    vm.expectRevert(abi.encodeWithSelector(USDCSourcePoolDataCodec.InvalidVersion.selector, invalidVersion));
+
+    s_helper.decodeSourceTokenDataPayloadV2WithCCV(invalidPayload);
+  }
 }
