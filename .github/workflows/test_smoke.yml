@@ -48,10 +48,12 @@ jobs:
         run: |
           go mod download
       - name: Run CCIP environment with config
+        env:
+          JD_IMAGE: ${{ secrets.JD_IMAGE }}
         run: |
           cd cmd/ccip && go install . && cd -
           ccip u ${{ matrix.test.config }}
-      - name: Run perf test
+      - name: Run smoke test
         working-directory: devenv/tests/e2e
         run: |
           go test -v -run ${{ matrix.test.name }} -timeout 20m
