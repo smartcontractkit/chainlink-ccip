@@ -23,10 +23,13 @@ contract LombardTokenPool_constructor is Test {
   }
 
   function test_constructor() public {
-    //  vm.expectEmit();
-    //    emit LombardTokenPool.LombardVerifierSet(s_resolver);
-    LombardTokenPool pool = new LombardTokenPool(s_token, s_resolver, s_bridge, address(0), address(0), RMN, ROUTER, 18);
-    assertEq(pool.getVerifierResolver(), address(s_resolver));
+    address adapter = makeAddr("adapter");
+    LombardTokenPool pool = new LombardTokenPool(s_token, s_resolver, s_bridge, adapter, address(0), RMN, ROUTER, 18);
+
+    (address verifierResolver, address bridge, address tokenAdapter) = pool.getLombardConfig();
+    assertEq(verifierResolver, s_resolver);
+    assertEq(bridge, address(s_bridge));
+    assertEq(tokenAdapter, adapter);
     assertEq(pool.typeAndVersion(), "LombardTokenPool 1.7.0-dev");
   }
 
