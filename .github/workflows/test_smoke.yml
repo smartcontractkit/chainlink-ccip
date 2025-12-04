@@ -1,4 +1,4 @@
-name: Smoke Tests
+name: Smoke tests (devenv)
 
 on:
   push:
@@ -8,7 +8,7 @@ defaults:
     working-directory: devenv
 
 jobs:
-  nightly-performance:
+  smoke:
     permissions:
       id-token: write
       contents: read
@@ -49,6 +49,7 @@ jobs:
           go mod download
       - name: Run CCIP environment with config
         run: |
+          cd cmd/ccip && go install . && cd -
           ccip u ${{ matrix.test.config }}
       - name: Run perf test
         working-directory: devenv/tests/e2e
