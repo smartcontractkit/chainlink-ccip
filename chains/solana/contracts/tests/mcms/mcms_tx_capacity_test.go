@@ -30,6 +30,10 @@ import (
 
 func TestMcmsCapacity(t *testing.T) {
 	t.Parallel()
+	g := testutils.GetConcurrencyGroup("solana-test-validator", 2) // max 2 concurrent tests
+	g.Enter()
+	defer g.Leave()
+	
 	ctx := tests.Context(t)
 
 	mcm.SetProgramID(config.McmProgram)
