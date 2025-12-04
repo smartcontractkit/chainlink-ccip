@@ -83,6 +83,9 @@ flowchart LR
 	chainlink-ccip/deployment --> chainlink-deployments-framework
 	chainlink-ccip/deployment --> chainlink-evm
 	click chainlink-ccip/deployment href "https://github.com/smartcontractkit/chainlink-ccip"
+	chainlink-ccip/devenv --> chainlink-ccip/chains/evm/deployment
+	chainlink-ccip/devenv --> chainlink-testing-framework/wasp
+	click chainlink-ccip/devenv href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/integration-tests --> chainlink-ccip/chains/evm/deployment
 	chainlink-ccip/integration-tests --> chainlink-ccip/chains/solana/deployment
 	click chainlink-ccip/integration-tests href "https://github.com/smartcontractkit/chainlink-ccip"
@@ -149,8 +152,15 @@ flowchart LR
 	click chainlink-sui href "https://github.com/smartcontractkit/chainlink-sui"
 	chainlink-testing-framework/framework
 	click chainlink-testing-framework/framework href "https://github.com/smartcontractkit/chainlink-testing-framework"
+	chainlink-testing-framework/lib
+	click chainlink-testing-framework/lib href "https://github.com/smartcontractkit/chainlink-testing-framework"
+	chainlink-testing-framework/lib/grafana
+	click chainlink-testing-framework/lib/grafana href "https://github.com/smartcontractkit/chainlink-testing-framework"
 	chainlink-testing-framework/seth
 	click chainlink-testing-framework/seth href "https://github.com/smartcontractkit/chainlink-testing-framework"
+	chainlink-testing-framework/wasp --> chainlink-testing-framework/lib
+	chainlink-testing-framework/wasp --> chainlink-testing-framework/lib/grafana
+	click chainlink-testing-framework/wasp href "https://github.com/smartcontractkit/chainlink-testing-framework"
 	chainlink-tron/relayer --> chainlink-common
 	chainlink-tron/relayer --> chainlink-common/pkg/values
 	click chainlink-tron/relayer href "https://github.com/smartcontractkit/chainlink-tron"
@@ -173,6 +183,7 @@ flowchart LR
 		 chainlink-ccip/chains/solana/gobindings
 		 chainlink-ccip/cmd/carpenter
 		 chainlink-ccip/deployment
+		 chainlink-ccip/devenv
 		 chainlink-ccip/integration-tests
 	end
 	click chainlink-ccip-repo href "https://github.com/smartcontractkit/chainlink-ccip"
@@ -213,7 +224,10 @@ flowchart LR
 
 	subgraph chainlink-testing-framework-repo[chainlink-testing-framework]
 		 chainlink-testing-framework/framework
+		 chainlink-testing-framework/lib
+		 chainlink-testing-framework/lib/grafana
 		 chainlink-testing-framework/seth
+		 chainlink-testing-framework/wasp
 	end
 	click chainlink-testing-framework-repo href "https://github.com/smartcontractkit/chainlink-testing-framework"
 
