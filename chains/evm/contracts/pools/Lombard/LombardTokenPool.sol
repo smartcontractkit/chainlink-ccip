@@ -36,13 +36,13 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   error ExecutionError();
   error HashMismatch();
 
-  /// @param remoteChainSelector CCIP selector of destination chain
-  /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion
-  /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message
+  /// @param remoteChainSelector CCIP selector of destination chain.
+  /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
+  /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message.
   event PathSet(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
-  /// @param remoteChainSelector CCIP selector of destination chain
-  /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion
-  /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message
+  /// @param remoteChainSelector CCIP selector of destination chain.
+  /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
+  /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message.
   event PathRemoved(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
   event LombardConfigurationSet(address indexed verifier, address indexed bridge, address indexed tokenAdapter);
 
