@@ -14,7 +14,7 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 /// @notice CCTP token pool that delegates minting and burning responsibilities of USDC to the CCTPVerifier contract.
 /// @dev This pool does not mutate the token state. It does not actually burn USDC via TokenMessenger on source or mint via MessageTransmitter on destination.
-/// It remains responsible for rate limiting and other validations while outsourcing token management to the CCTPVerfier contract.
+/// It remains responsible for rate limiting and other validations while outsourcing token management to the CCTPVerifier contract.
 /// This token pool should never have a balance of USDC at any point during a transaction, otherwise funds will be lost.
 /// The caller of lockOrBurn is responsible for sending USDC to the CCTPVerifier contract instead.
 contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {

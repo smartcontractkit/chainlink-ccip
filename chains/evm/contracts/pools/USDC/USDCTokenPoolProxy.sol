@@ -64,8 +64,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     INVALID_MECHANISM,
     CCTP_V1,
     CCTP_V2,
-    CCTP_V2_WITH_CCV,
-    LOCK_RELEASE
+    LOCK_RELEASE,
+    CCTP_V2_WITH_CCV
   }
 
   IERC20 internal immutable i_token;
@@ -190,7 +190,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   function supportsInterface(
     bytes4 interfaceId
   ) public pure override returns (bool) {
-    return interfaceId == type(IPoolV1).interfaceId || interfaceId == type(IERC165).interfaceId;
+    return interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IPoolV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   /// @inheritdoc IPoolV2
