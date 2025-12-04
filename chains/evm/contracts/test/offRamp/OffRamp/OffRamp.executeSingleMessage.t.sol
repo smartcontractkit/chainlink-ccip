@@ -246,7 +246,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     bytes[] memory verifierResults = new bytes[](1);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidNumberOfTokens.selector, invalidTokenAmounts.length));
-    vm.mockCall(address(destToken), abi.encodeWithSelector(IERC20.balanceOf.selector, tokenReceiver), abi.encode(100));
+    vm.mockCall(destToken, abi.encodeWithSelector(IERC20.balanceOf.selector, tokenReceiver), abi.encode(100));
 
     s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
   }

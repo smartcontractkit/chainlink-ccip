@@ -273,14 +273,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     /////// SECURITY CRITICAL CHECKS ///////
     address receiver = address(bytes20(message.receiver));
 
-    uint256[] memory balancesPreVerification = new uint256[](message.tokenTransfer.length);
-    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
-      if (message.tokenTransfer[i].destTokenAddress.length != 20) {
-        revert Internal.InvalidEVMAddress(message.tokenTransfer[i].destTokenAddress);
+    // We track the balance of the receiver prior to verification because a verifier may be responsible for releasing or minting the token.
+    uint256 balancePre = 0;
+    if (message.tokenTransfer.length > 0) {
+      if (message.tokenTransfer[0].destTokenAddress.length != 20) {
+        revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
       }
-      balancesPreVerification[i] = _getBalanceOfReceiver(
-        address(bytes20(message.tokenTransfer[i].tokenReceiver)),
-        address(bytes20(message.tokenTransfer[i].destTokenAddress))
+      balancePre = _getBalanceOfReceiver(
+        address(bytes20(message.tokenTransfer[0].tokenReceiver)),
+        address(bytes20(message.tokenTransfer[0].destTokenAddress))
       );
     }
 
@@ -303,14 +304,22 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
-    for (uint256 i = 0; i < message.tokenTransfer.length; ++i) {
-      destTokenAmounts[i] = _releaseOrMintSingleToken(
-        message.tokenTransfer[i],
-        message.sender,
-        message.sourceChainSelector,
-        message.finality,
-        balancesPreVerification[i]
+    if (message.tokenTransfer.length > 0) {
+      (Client.EVMTokenAmount memory destTokenAmount, address localPoolAddress) = _releaseOrMintSingleToken(
+        message.tokenTransfer[0], message.sender, message.sourceChainSelector, message.finality
       );
+
+      uint256 balancePost =
+        _getBalanceOfReceiver(address(bytes20(message.tokenTransfer[0].tokenReceiver)), destTokenAmount.token);
+
+      // If a lock-release pool is the receiver, balancePost - balancePre would not reflect the amount transferred.
+      // Therefore, if the receiver is the token pool, we trust the value returned by the pool.
+      // Otherwise, we trust balancePost - balancePre as the amount given to the receiver.
+      if (receiver == localPoolAddress) {
+        destTokenAmounts[0] = destTokenAmount;
+      } else {
+        destTokenAmounts[0] = Client.EVMTokenAmount({token: destTokenAmount.token, amount: balancePost - balancePre});
+      }
     }
 
     // There are three cases in which we skip calling the receiver:
@@ -358,11 +367,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes calldata encodedMessage
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
-    if (message.tokenTransfer.length > 0) {
-      if (message.tokenTransfer[0].destTokenAddress.length != 20) {
-        revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
-      }
-    }
 
     return _getCCVsForMessage(
       message.sourceChainSelector, address(bytes20(message.receiver)), message.tokenTransfer, message.finality
@@ -393,6 +397,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       if (tokenTransfer.length != 1) {
         revert InvalidNumberOfTokens(tokenTransfer.length);
       }
+      // Not validated because it gets validated in the executeSingleMessage function.
+      // Only other path that calls _getCCVsForMessage is getCCVsForMessage, which is a view function used by executors.
       address localTokenAddress = address(bytes20(tokenTransfer[0].destTokenAddress));
 
       // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
@@ -624,29 +630,26 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   // │                      Tokens and pools                        │
   // ================================================================
 
-  /// @notice Uses a pool to release or mint a token to a receiver address, with balance checks before and after the
-  /// transfer. This is done to ensure the exact number of tokens the pool claims to release are actually transferred.
+  /// @notice Uses a pool to release or mint a token to a receiver address.
   /// @dev The local token address is validated through the TokenAdminRegistry. If, due to some misconfiguration, the
   /// token is unknown to the registry, the offRamp will revert. The tx, and the tokens, can be retrieved by registering
   /// the token on this chain, and re-trying the msg.
+  /// @dev Returns the local pool address so that the registry doesn't have to be queried again by executeSingleMessage.
   /// @param sourceTokenAmount Amount and source data of the token to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param sourceChainSelector The remote source chain selector
   /// @param blockConfirmationRequested Requested block confirmation.
-  /// @param balancePreVerification The balance of the receiver prior to calling verifyMessage against each CCV.
-  /// @return destTokenAmount local token address with amount.
   function _releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
     bytes memory originalSender,
     uint64 sourceChainSelector,
-    uint16 blockConfirmationRequested,
-    uint256 balancePreVerification
-  ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
+    uint16 blockConfirmationRequested
+  ) internal returns (Client.EVMTokenAmount memory destTokenAmount, address localPoolAddress) {
     address receiver = address(bytes20(sourceTokenAmount.tokenReceiver));
 
     address localToken = address(bytes20(sourceTokenAmount.destTokenAddress));
     // We check with the token admin registry if the token has a pool on this chain.
-    address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
+    localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
     // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
     // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
     // The call gets a max or 30k gas per instance, of which there are three. This means offchain gas estimations should
@@ -655,8 +658,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert NotACompatiblePool(localPoolAddress);
     }
 
-    // We retrieve the local token balance of the receiver before the pool call.
-    uint256 balancePre = _getBalanceOfReceiver(receiver, localToken);
     Pool.ReleaseOrMintOutV1 memory returnData;
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintInput = Pool.ReleaseOrMintInV1({
@@ -693,23 +694,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert NotACompatiblePool(localPoolAddress);
     }
 
-    // If the pool is lock-release, balancePost - balancePre would always return 0.
-    // Therefore, if the receiver is the token pool, we trust the value returned by the pool.
-    if (receiver == localPoolAddress) {
-      return Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount});
-    }
-
-    uint256 balancePost = _getBalanceOfReceiver(receiver, localToken);
-
-    // If releaseOrMint did not impact the receiver balance, then we assume that a verifier was responsible for releasing or minting the token.
-    // Doing so enables us to compare the destinationAmount returned by the token pool to what the verifier released or minted.
-    // A transfer amount of 0 could also trigger this condition, but in this case it doesn't matter which pre-balance we use.
-    // Therefore, we simply omit the check.
-    if (balancePost == balancePre) {
-      balancePre = balancePreVerification;
-    }
-
-    return Client.EVMTokenAmount({token: localToken, amount: balancePost - balancePre});
+    return (Client.EVMTokenAmount({token: localToken, amount: returnData.destinationAmount}), localPoolAddress);
   }
 
   /// @notice Retrieves the balance of a receiver address for a given token.

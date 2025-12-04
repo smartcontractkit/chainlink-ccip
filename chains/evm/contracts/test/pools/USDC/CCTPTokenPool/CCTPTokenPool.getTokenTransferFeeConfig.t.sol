@@ -6,7 +6,6 @@ import {ICrossChainVerifierResolver} from "../../../../interfaces/ICrossChainVer
 import {CCTPVerifier} from "../../../../ccvs/CCTPVerifier.sol";
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
-import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
 import {CCTPTokenPoolSetup} from "./CCTPTokenPoolSetup.t.sol";
 
 contract CCTPTokenPool_getTokenTransferFeeConfig is CCTPTokenPoolSetup {
