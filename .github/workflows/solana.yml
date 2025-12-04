@@ -135,21 +135,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: debug info
-        run: |
-          echo '=== cgroup memory limits ==='
-          cat /sys/fs/cgroup/memory.max 2>/dev/null || echo "no memory.max"
-          cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || echo "no memory.limit_in_bytes"
-
-          echo '=== /proc/meminfo ==='
-          cat /proc/meminfo
-
-          echo '=== /tmp mount ==='
-          mount | grep ' /tmp' || echo "/tmp has no separate mount"
-          df -h /tmp || echo "df /tmp failed"
-          echo '=== /tmp listing ==='
-          ls -la /tmp || echo "ls /tmp failed"
-
       - name: Cache cargo target dir
         uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
         with:
@@ -179,22 +164,6 @@ jobs:
           sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" # always use latest stable release from solana
           echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
 
-      - name: debug info
-        run: |
-          echo '=== cgroup memory limits ==='
-          cat /sys/fs/cgroup/memory.max 2>/dev/null || echo "no memory.max"
-          cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || echo "no memory.limit_in_bytes"
-
-          echo '=== /proc/meminfo ==='
-          cat /proc/meminfo
-
-          echo '=== /tmp mount ==='
-          mount | grep ' /tmp' || echo "/tmp has no separate mount"
-          df -h /tmp || echo "df /tmp failed"
-
-          echo '=== /tmp listing ==='
-          ls -la /tmp || echo "ls /tmp failed"
-
       - name: build + test
         run: |
           set -eoux pipefail
@@ -205,6 +174,10 @@ jobs:
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
           anchor build"
+
+          TEMP="${GITHUB_WORKSPACE}/tmp"
+          mkdir -p $TEMP
+          export TMPDIR=$TEMP
 
           make go-tests
 
