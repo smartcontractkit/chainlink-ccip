@@ -17,11 +17,11 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -64,6 +64,9 @@ func applyUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfi
 		Type:          datastore.ContractType(utils.CCIPHome),
 		Version:       semver.MustParse("1.6.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CCIPHome address: %w", err)
+	}
 	ccipHome, err := ccip_home.NewCCIPHome(
 		common.HexToAddress(ccipHomeAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
@@ -161,6 +164,9 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
 		Version:       semver.MustParse("1.6.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
+	}
 	capReg, err := capabilities_registry.NewCapabilitiesRegistry(
 		common.HexToAddress(capRegAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
@@ -173,6 +179,9 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 		Type:          datastore.ContractType(utils.CCIPHome),
 		Version:       semver.MustParse("1.6.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CCIPHome address: %w", err)
+	}
 	ccipHome, err := ccip_home.NewCCIPHome(
 		common.HexToAddress(ccipHomeAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
@@ -185,6 +194,9 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 		Type:          datastore.ContractType(utils.RMNHome),
 		Version:       semver.MustParse("1.6.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding RMNHome address: %w", err)
+	}
 	rmnHome, err := rmn_home.NewRMNHome(
 		common.HexToAddress(rmnHomeAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
@@ -604,6 +616,9 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
 		Version:       semver.MustParse("1.6.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
+	}
 	capReg, err := capabilities_registry.NewCapabilitiesRegistry(
 		common.HexToAddress(capRegAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
@@ -616,6 +631,9 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 		Type:          datastore.ContractType(utils.CCIPHome),
 		Version:       semver.MustParse("1.6.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CCIPHome address: %w", err)
+	}
 	ccipHome, err := ccip_home.NewCCIPHome(
 		common.HexToAddress(ccipHomeAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
@@ -628,6 +646,9 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 		Type:          datastore.ContractType(utils.RMNHome),
 		Version:       semver.MustParse("1.6.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding RMNHome address: %w", err)
+	}
 	rmnHome, err := rmn_home.NewRMNHome(
 		common.HexToAddress(rmnHomeAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
@@ -794,6 +815,9 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
 		Version:       semver.MustParse("1.6.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
+	}
 	capReg, err := capabilities_registry.NewCapabilitiesRegistry(
 		common.HexToAddress(capRegAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
@@ -806,6 +830,9 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 		Type:          datastore.ContractType(utils.CCIPHome),
 		Version:       semver.MustParse("1.6.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CCIPHome address: %w", err)
+	}
 	ccipHome, err := ccip_home.NewCCIPHome(
 		common.HexToAddress(ccipHomeAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
