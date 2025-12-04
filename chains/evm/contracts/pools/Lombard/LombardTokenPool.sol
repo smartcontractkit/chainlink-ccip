@@ -221,7 +221,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
       revert ZeroLombardChainId();
     }
 
-    // only remote pool is expected allowed caller
+    // only remote pool is expected allowed caller.
     if (!isRemotePool(remoteChainSelector, allowedCaller)) {
       revert InvalidRemotePoolForChain(remoteChainSelector, allowedCaller);
     }
