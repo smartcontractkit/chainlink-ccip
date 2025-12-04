@@ -35,7 +35,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -44,6 +43,7 @@ import (
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/devenv/changesets"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 )
 
@@ -99,7 +99,6 @@ func updatePrices(datastore datastore.DataStore, src, dest uint64, srcChain cldf
 	if err != nil {
 		return fmt.Errorf("failed to get fee quoter address: %w", err)
 	}
-	fmt.Println("Got fee quoter address:", common.Bytes2Hex(fqAddr))
 	fq, err := fee_quoter.NewFeeQuoter(
 		common.BytesToAddress(fqAddr),
 		srcChain.Client)
@@ -111,7 +110,6 @@ func updatePrices(datastore datastore.DataStore, src, dest uint64, srcChain cldf
 		return fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
 	}
 	sender := srcChain.DeployerKey
-	fmt.Println("Got fee tokens from fee quoter:", feeTokens)
 	tx, err := fq.UpdatePrices(sender, fee_quoter.InternalPriceUpdates{
 		TokenPriceUpdates: []fee_quoter.InternalTokenPriceUpdate{
 			{
@@ -178,7 +176,6 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 		return fmt.Errorf("failed to create onramp instance: %w", err)
 	}
 	l.Info().Msg("Got contract instances, preparing to send CCIP message")
-	fmt.Println("Got contract instances, preparing to send CCIP message")
 	err = updatePrices(m.e.DataStore, src, dest, m.e.BlockChains.EVMChains()[src])
 	if err != nil {
 		return fmt.Errorf("failed to update prices: %w", err)
@@ -236,8 +233,6 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 			SequenceNumber: it.Event.SequenceNumber,
 			RawEvent:       it.Event,
 		})
-		fmt.Println("Appended CCIPMessageSent event with sequence number:", it.Event.SequenceNumber)
-		fmt.Printf("Raw event data (hex): %+v\n", it.Event)
 		m.expectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
 			ccipocr3common.SeqNum(m.msgSentEvents[0].SequenceNumber),
 			ccipocr3common.SeqNum(m.msgSentEvents[len(m.msgSentEvents)-1].SequenceNumber)}
