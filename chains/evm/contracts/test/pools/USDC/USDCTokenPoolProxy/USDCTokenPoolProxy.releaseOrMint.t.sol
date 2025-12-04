@@ -127,7 +127,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV();
+    bytes memory sourcePoolData = abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG);
     bytes memory offChainTokenData = "";
 
     // Mock the router's isOffRamp function to return true

@@ -51,7 +51,7 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     return (
       Pool.LockOrBurnOutV1({
         destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-        destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV()
+        destPoolData: abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG)
       }),
       lockOrBurnIn.amount
     );

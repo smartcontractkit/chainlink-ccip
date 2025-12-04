@@ -16,10 +16,4 @@ contract USDCSourcePoolDataCodecHelper {
   ) external pure returns (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory) {
     return USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(sourcePoolData);
   }
-
-  function decodeSourceTokenDataPayloadV2WithCCV(
-    bytes memory sourcePoolData
-  ) external pure returns (bytes4) {
-    return USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2WithCCV(sourcePoolData);
-  }
 }
