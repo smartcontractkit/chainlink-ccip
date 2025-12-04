@@ -158,10 +158,24 @@ func NewEnvironment() (*Cfg, error) {
 		nodeSpec.Node.TestConfigOverrides = allConfigs
 	}
 	Plog.Info().Msg("Nodes network configuration is generated")
+	
+	
+	prodJDImage := os.Getenv("JD_IMAGE")
 
-	_, err = jd.NewJD(in.JD)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create job distributor: %w", err)
+	if in.JD != nil {
+		if prodJDImage != "" {
+			in.JD.Image = prodJDImage
+		}
+		if len(in.JD.Image) == 0 {
+			Plog.Warn().Msg("No JD image provided, skipping JD service startup")
+		} else {
+			_, err = jd.NewJD(in.JD)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create JD service: %w", err)
+			}
+		}
+	} else {
+		Plog.Warn().Msg("No JD configuration provided, skipping JD service startup")
 	}
 
 	// connect JD to nodes here
