@@ -5,6 +5,8 @@ import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
+import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";
@@ -22,13 +24,19 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
   error IPoolV1NotSupported();
 
+  /// @notice The CCTP verifier.
+  ICrossChainVerifierResolver internal immutable i_cctpVerifier;
+
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
     address rmnProxy,
     address router,
+    address cctpVerifier,
     address[] memory allowedCallers
-  ) TokenPool(token, localTokenDecimals, address(0), rmnProxy, router) AuthorizedCallers(allowedCallers) {}
+  ) TokenPool(token, localTokenDecimals, address(0), rmnProxy, router) AuthorizedCallers(allowedCallers) {
+    i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
+  }
 
   /// @inheritdoc IPoolV2
   /// @dev The _validateLockOrBurn check is an essential security check.
@@ -96,6 +104,29 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     revert IPoolV1NotSupported();
   }
 
+  /// @inheritdoc IPoolV2
+  /// @dev Uses the CCTPVerifier to determine the bps charged by CCTP on destination.
+  /// getFee will not actually account for these bps. Otherwise users would be doubly charged, on source and destination.
+  function getTokenTransferFeeConfig(
+    address, // localToken
+    uint64 destChainSelector,
+    uint16 blockConfirmationRequested,
+    bytes calldata // tokenArgs
+  ) external view override returns (TokenTransferFeeConfig memory feeConfig) {
+    TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector];
+
+    address verifierImpl = i_cctpVerifier.getOutboundImplementation(destChainSelector, "");
+    CCTPVerifier.DynamicConfig memory dynamicConfig = CCTPVerifier(verifierImpl).getDynamicConfig();
+
+    if (blockConfirmationRequested == WAIT_FOR_FINALITY) {
+      transferFeeConfig.defaultBlockConfirmationTransferFeeBps = 0;
+    } else {
+      transferFeeConfig.customBlockConfirmationTransferFeeBps = dynamicConfig.fastFinalityBps;
+    }
+
+    return transferFeeConfig;
+  }
+
   /// @notice Validates the caller of lockOrBurn against a set of allowed callers.
   /// @dev Overrides the default behavior of _onlyOnRamp because this contract may be invoked by a proxy contract.
   /// @param remoteChainSelector The remote chain selector to validate the caller against.
@@ -114,5 +145,11 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   ) internal view virtual override {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     _validateCaller();
+  }
+
+  /// @notice Returns the CCTP verifier.
+  /// @return cctpVerifier The CCTP verifier.
+  function getCCTPVerifier() external view returns (address) {
+    return address(i_cctpVerifier);
   }
 }
