@@ -12,7 +12,7 @@ import (
 
 type TokenPoolAdapter interface {
 	// TODO: Should ds datastore.DataStore be passed in?
-	OnboardTokenPoolForSelfServe() *cldf_ops.Sequence[ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	ManualRegistration() *cldf_ops.Sequence[ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 type TokenPoolAdapterID string

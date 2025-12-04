@@ -15,7 +15,7 @@ import (
 var TokenAdminRegistryVersion = *semver.MustParse("1.6.0")
 
 // ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
-func OnboardTokenPoolForSelfServe(tokenRegistry *TokenPoolAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ManualRegistrationInput] {
+func ManualRegistration(tokenRegistry *TokenPoolAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ManualRegistrationInput] {
 	return cldf.CreateChangeSet(makeApply(tokenRegistry, mcmsRegistry), makeVerify(tokenRegistry, mcmsRegistry))
 }
 
