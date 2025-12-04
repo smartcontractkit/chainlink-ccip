@@ -26,6 +26,12 @@ type ApplyChainUpdatesArgs struct {
 	ChainsToAdd                  []ChainUpdate
 }
 
+type RemotePoolModification struct {
+	Operation           string
+	RemoteChainSelector uint64
+	RemotePoolAddress   []byte
+}
+
 // Note: No "Deploy" Operation for Token Pool is needed since the TokenPool contract itself is an abstract
 // contract, and will only exist as the parent of another contract to be deployed.
 
@@ -41,5 +47,33 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 	Validate:        func(args ApplyChainUpdatesArgs) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args ApplyChainUpdatesArgs) (*types.Transaction, error) {
 		return tokenPool.ApplyChainUpdates(opts, args.RemoteChainSelectorsToRemove, args.ChainsToAdd)
+	},
+})
+
+var AddRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolModification, *token_pool.TokenPool]{
+	Name:            "token-pool:add-remote-pool",
+	Version:         Version,
+	Description:     "Adds a remote pool to the TokenPool remote chain config",
+	ContractType:    "TokenPool",
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, RemotePoolModification],
+	Validate:        func(args RemotePoolModification) error { return nil },
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args RemotePoolModification) (*types.Transaction, error) {
+		return tokenPool.AddRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+	},
+})
+
+var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolModification, *token_pool.TokenPool]{
+	Name:            "token-pool:remove-remote-pool",
+	Version:         Version,
+	Description:     "Removes a remote pool from the TokenPool remote chain config",
+	ContractType:    "TokenPool",
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, RemotePoolModification],
+	Validate:        func(args RemotePoolModification) error { return nil },
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args RemotePoolModification) (*types.Transaction, error) {
+		return tokenPool.RemoveRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
 	},
 })
