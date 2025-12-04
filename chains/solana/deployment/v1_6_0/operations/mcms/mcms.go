@@ -338,10 +338,28 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error)
 
 	encodedAddress := mcms_solana.ContractAddress(in.MCM, mcms_solana.PDASeed(seed))
 
-	configurer := mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()))
+	var configurer *mcms_solana.Configurer
+	if len(ixns) > 0 {
+		configurer = mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()), mcms_solana.WithDoNotSendInstructionsOnChain())
+	} else {
+		configurer = mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()))
+	}
 	tx, err := configurer.SetConfig(b.GetContext(), encodedAddress, &in.MCMConfig, false)
 	if err != nil {
 		return MCMOutput{}, fmt.Errorf("failed to set config on mcm: %w", err)
+	}
+	if tx.Hash == "" {
+		instructions := tx.RawData.([]solana.Instruction)
+		batch, err := utils.BuildMCMSBatchOperation(
+			deps.Chain.Selector,
+			instructions,
+			in.MCM.String(),
+			in.ContractType.String(),
+		)
+		if err != nil {
+			return MCMOutput{}, fmt.Errorf("failed to build timelock initialization batch operation: %w", err)
+		}
+		batches = append(batches, batch)
 	}
 	b.Logger.Infow("called SetConfig on MCM", "transaction", tx.Hash)
 
