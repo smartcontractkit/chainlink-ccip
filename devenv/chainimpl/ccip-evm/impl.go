@@ -35,7 +35,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -94,7 +95,7 @@ func (m *CCIP16EVM) SetCLDF(e *deployment.Environment) {
 }
 
 func updatePrices(datastore datastore.DataStore, src, dest uint64, srcChain cldf_evm.Chain) error {
-	a := &sequences.EVMAdapter{}
+	a := &evmseqs.EVMAdapter{}
 	fqAddr, err := a.GetFQAddress(datastore, src)
 	if err != nil {
 		return fmt.Errorf("failed to get fee quoter address: %w", err)
@@ -141,7 +142,7 @@ func updatePrices(datastore datastore.DataStore, src, dest uint64, srcChain cldf
 func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields any, opts any) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
-	a := &sequences.EVMAdapter{}
+	a := &evmseqs.EVMAdapter{}
 	receiver := common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
 	msg := router.ClientEVM2AnyMessage{
 		Receiver:     receiver,
@@ -290,7 +291,7 @@ func (c *CommitReportTracker) allCommited(sourceChainSelector uint64) bool {
 // WaitOneSentEventBySeqNo wait and fetch strictly one CCIPMessageSent event by selector and sequence number and selector.
 func (m *CCIP16EVM) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
 	l := zerolog.Ctx(ctx)
-	a := &sequences.EVMAdapter{}
+	a := &evmseqs.EVMAdapter{}
 	offAddr, err := a.GetOffRampAddress(m.e.DataStore, to)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get off ramp address: %w", err)
@@ -407,7 +408,7 @@ func executionStateToString(state uint8) string {
 // WaitOneExecEventBySeqNo wait and fetch strictly one ExecutionStateChanged event by sequence number and selector.
 func (m *CCIP16EVM) WaitOneExecEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
 	l := zerolog.Ctx(ctx)
-	a := &sequences.EVMAdapter{}
+	a := &evmseqs.EVMAdapter{}
 	offAddr, err := a.GetOffRampAddress(m.e.DataStore, to)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get off ramp address: %w", err)

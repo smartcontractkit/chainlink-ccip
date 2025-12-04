@@ -16,7 +16,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -208,7 +209,7 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 
 	dons := make([]sequences.DONAddition, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
 	i := 0
-	a := &sequences.EVMAdapter{}
+	a := &evmseqs.EVMAdapter{}
 	for chainSelector, params := range cfg.PluginInfo.OCRConfigPerRemoteChainSelector {
 		offRampAddress, err := a.GetOffRampAddress(e.DataStore, chainSelector)
 		if err != nil {
@@ -636,7 +637,7 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 
 	pluginInfos := make([]string, 0)
 	dons := make([]sequences.DONUpdate, 0)
-	a := &sequences.EVMAdapter{}
+	a := &evmseqs.EVMAdapter{}
 	chainToDonIDs := make(map[uint64]uint32)
 	for _, plugin := range cfg.PluginInfo {
 		for chainSelector := range plugin.OCRConfigPerRemoteChainSelector {
