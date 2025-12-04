@@ -37,6 +37,13 @@ jobs:
           role-to-assume: ${{ secrets.CCIP_IAM_ROLE }}
           aws-region: us-east-1
           registry-type: public
+      - name: Authenticate to AWS ECR (JD)
+        uses: ./.github/actions/aws-ecr-auth
+        with:
+          role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
+          aws-region: us-west-2
+          registry-type: private
+          registries: ${{ secrets.JD_REGISTRY }}
       - name: Set up Go
         uses: actions/setup-go@v6 # v6
         with:
