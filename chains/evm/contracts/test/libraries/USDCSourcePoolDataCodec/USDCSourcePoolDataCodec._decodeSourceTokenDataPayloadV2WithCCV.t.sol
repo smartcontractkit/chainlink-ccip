@@ -15,24 +15,20 @@ contract USDCSourcePoolDataCodec__decodeSourceTokenDataPayloadV2 is Test {
     s_helper = new USDCSourcePoolDataCodecHelper();
   }
 
-  function test__decodeSourceTokenDataPayloadV2_CCTPV2() public pure {
-    // Encode using the V2 function
-    bytes memory payload = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: SOURCE_DOMAIN, depositHash: DEPOSIT_HASH})
-    );
+  function test__decodeSourceTokenDataPayloadV2WithCCV() public pure {
+    // Encode using the V2 CCV function
+    bytes memory payload = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV();
 
     // Decode the payload
-    USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory decoded =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2(payload);
+    bytes4 poolVersionTag = USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2WithCCV(payload);
 
-    // Compare individual fields
-    assertEq(decoded.sourceDomain, SOURCE_DOMAIN, "Source domain mismatch");
-    assertEq(decoded.depositHash, DEPOSIT_HASH, "Deposit hash mismatch");
+    // Compare pool version tag
+    assertEq(poolVersionTag, USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG, "Pool version tag mismatch");
   }
 
   // Reverts
 
-  function test__decodeSourceTokenDataPayloadV2_RevertWhen_InvalidVersionV1() public {
+  function test__decodeSourceTokenDataPayloadV2WithCCV_RevertWhen_InvalidVersionV1() public {
     bytes memory invalidPayload =
       abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG, SOURCE_DOMAIN, DEPOSIT_HASH);
 
@@ -42,15 +38,15 @@ contract USDCSourcePoolDataCodec__decodeSourceTokenDataPayloadV2 is Test {
       )
     );
 
-    s_helper.decodeSourceTokenDataPayloadV2(invalidPayload);
+    s_helper.decodeSourceTokenDataPayloadV2WithCCV(invalidPayload);
   }
 
-  function test__decodeSourceTokenDataPayloadV2_RevertWhen_InvalidVersionUnknown() public {
+  function test__decodeSourceTokenDataPayloadV2WithCCV_RevertWhen_InvalidVersionUnknown() public {
     bytes4 unknownVersion = 0x12345678;
     bytes memory invalidPayload = abi.encodePacked(unknownVersion, SOURCE_DOMAIN, DEPOSIT_HASH);
 
     vm.expectRevert(abi.encodeWithSelector(USDCSourcePoolDataCodec.InvalidVersion.selector, unknownVersion));
 
-    s_helper.decodeSourceTokenDataPayloadV2(invalidPayload);
+    s_helper.decodeSourceTokenDataPayloadV2WithCCV(invalidPayload);
   }
 }

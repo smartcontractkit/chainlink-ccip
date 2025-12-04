@@ -20,39 +20,25 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   string public constant override typeAndVersion = "CCTPTokenPool 1.7.0-dev";
 
+  error IPoolV1NotSupported();
+
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
-    address advancedPoolHooks,
     address rmnProxy,
     address router,
     address[] memory allowedCallers
-  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) AuthorizedCallers(allowedCallers) {}
+  ) TokenPool(token, localTokenDecimals, address(0), rmnProxy, router) AuthorizedCallers(allowedCallers) {}
 
   /// @inheritdoc IPoolV2
+  /// @dev The _validateLockOrBurn check is an essential security check.
+  /// @dev The call to _lockOrBurn(amount) is omitted because this pool is not responsible for token management.
+  /// LockedOrBurned is still emitted for consumers that expect it.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    return (_lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs), lockOrBurnIn.amount);
-  }
-
-  /// @inheritdoc IPoolV1
-  function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public virtual override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
-    return _lockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
-  }
-
-  /// @dev The _validateLockOrBurn check is an essential security check.
-  /// @dev The call to _lockOrBurn(amount) is omitted because this pool is not responsible for token management.
-  /// LockedOrBurned is still emitted for consumers that expect it.
-  function _lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationRequested,
-    bytes memory tokenArgs
-  ) internal virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
     _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
 
     emit LockedOrBurned({
@@ -62,10 +48,13 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       amount: lockOrBurnIn.amount
     });
 
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV()
-    });
+    return (
+      Pool.LockOrBurnOutV1({
+        destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+        destPoolData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2WithCCV()
+      }),
+      lockOrBurnIn.amount
+    );
   }
 
   /// @inheritdoc IPoolV2
@@ -94,11 +83,17 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @inheritdoc IPoolV1
-  /// @dev Calls IPoolV2.releaseOrMint with default finality.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
+    revert IPoolV1NotSupported();
+  }
+
+  /// @inheritdoc IPoolV1
   function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+    Pool.ReleaseOrMintInV1 calldata
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
+    revert IPoolV1NotSupported();
   }
 
   /// @notice Validates the caller of lockOrBurn against a set of allowed callers.
