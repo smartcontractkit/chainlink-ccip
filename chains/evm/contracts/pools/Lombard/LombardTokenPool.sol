@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {IBridgeV2} from "./interfaces/IBridgeV2.sol";
 import {IMailbox} from "./interfaces/IMailbox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
@@ -59,11 +59,12 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 1;
   /// @notice The address of bridge contract.
   IBridgeV2 public immutable i_bridge;
-  /// @notice Lombard verifier proxy / resolver address. lockOrBurn fetches the outbound implementation and forwards tokens to it.
-  address private immutable i_lombardVerifierResolver;
+  /// @notice Lombard verifier resolver address. lockOrBurn fetches the outbound implementation and forwards tokens to it.
+  address internal immutable i_lombardVerifierResolver;
+  /// @notice Optional token adapter used for chains like Avalanche BTC.b. Since each pool manages a single token,
+  /// and the adapter is a source-chain-level replacement for that token, there can only be one adapter per pool.
+  address internal immutable i_tokenAdapter;
 
-  /// @notice Optional token adapter used for chains like Avalanche BTC.b.
-  address public s_tokenAdapter;
   /// @notice Mapping of CCIP chain selector to chain specific config.
   mapping(uint64 chainSelector => Path path) internal s_chainSelectorToPath;
 
@@ -89,7 +90,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     }
     i_bridge = bridge;
     i_lombardVerifierResolver = verifier;
-    s_tokenAdapter = adapter;
+    i_tokenAdapter = adapter;
     emit LombardConfigurationSet(verifier, address(bridge), adapter);
   }
 
@@ -114,6 +115,9 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     return super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
   }
 
+  /// @notice Backwards compatible lockOrBurn for lanes using the V1 flow.
+  /// @dev Token minting is performed by the Lombard bridge's mailbox during deliverAndHandle.
+  /// This pool only validates the proof and emits events; no _lockOrBurn call is needed.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public override(TokenPool) returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut) {
@@ -124,7 +128,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
       revert PathNotExist(lockOrBurnIn.remoteChainSelector);
     }
 
-    address sourceTokenOrAdapter = s_tokenAdapter != address(0) ? s_tokenAdapter : address(i_token);
+    address sourceTokenOrAdapter = i_tokenAdapter != address(0) ? i_tokenAdapter : address(i_token);
     // verify bridge destination token equal to pool
     bytes32 bridgeDestToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceTokenOrAdapter);
     bytes32 poolDestToken = abi.decode(getRemoteToken(lockOrBurnIn.remoteChainSelector), (bytes32));
@@ -175,7 +179,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     if (!executed) {
       revert ExecutionError();
     }
-    // we know payload hash returned on source chain
+    // we know payload hash returned on source chain.
     if (payloadHash != abi.decode(releaseOrMintIn.sourcePoolData, (bytes32))) {
       revert HashMismatch();
     }
@@ -260,8 +264,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     }
   }
 
-  /// @notice Returns the verifier resolver address.
-  function getVerifierResolver() external view returns (address) {
-    return i_lombardVerifierResolver;
+  /// @notice Returns the Lombard-specific configuration for this pool.
+  /// @return verifierResolver The address of the Lombard verifier resolver.
+  /// @return bridge The address of the Lombard bridge contract.
+  /// @return tokenAdapter The optional token adapter address (address(0) if not used).
+  function getLombardConfig() external view returns (address verifierResolver, address bridge, address tokenAdapter) {
+    return (i_lombardVerifierResolver, address(i_bridge), i_tokenAdapter);
   }
 }
