@@ -9,14 +9,14 @@ type ManualRegistrationInput struct {
 	ChainSelector        uint64              `yaml:"chain-selector" json:"chainSelector"`
 	MCMS                 mcms.Input          `yaml:"mcms,omitempty" json:"mcms,omitempty"`
 	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
-	SVMExtraArgs         *SVMExtraArgs       `yaml:"svm-extra-args,omitempty" json:"svmExtraArgs,omitempty"`
 }
 
 type RegisterTokenConfig struct {
-	TokenAddress  string `yaml:"token-address" json:"tokenAddress"`
-	ProposedOwner string `yaml:"proposed-owner" json:"proposedOwner"`
-	Metadata      string `yaml:"metadata" json:"metadata"`
-	PoolType      string `yaml:"pool-type" json:"poolType"`
+	TokenAddress  string        `yaml:"token-address" json:"tokenAddress"`
+	ProposedOwner string        `yaml:"proposed-owner" json:"proposedOwner"`
+	Metadata      string        `yaml:"metadata" json:"metadata"`
+	PoolType      string        `yaml:"pool-type" json:"poolType"`
+	SVMExtraArgs  *SVMExtraArgs `yaml:"svm-extra-args,omitempty" json:"svmExtraArgs,omitempty"`
 }
 
 type SVMExtraArgs struct {
