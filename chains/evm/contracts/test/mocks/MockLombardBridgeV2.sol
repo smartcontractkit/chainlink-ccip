@@ -6,21 +6,12 @@ import {IBridgeV2} from "../../pools/Lombard/interfaces/IBridgeV2.sol";
 // solhint-disable func-name-mixedcase
 
 contract MockLombardBridgeV2 is IBridgeV2 {
-  struct DepositArgs {
-    bytes32 destinationChain;
-    address token;
-    address sender;
-    bytes32 recipient;
-    uint256 amount;
-    bytes32 destinationCaller;
-    bytes payload;
-  }
-
   uint8 internal immutable i_msgVersion;
   address internal s_mailbox;
-  uint256 internal s_nextNonce = 1;
 
-  DepositArgs public s_lastDeposit;
+  /// @dev Stores the token address from the last deposit call for test assertions.
+  address public s_lastDepositToken;
+
   mapping(bytes32 destinationChain => mapping(address sourceToken => bytes32 destinationToken)) internal
     s_allowedDestinationTokens;
 
@@ -48,28 +39,16 @@ contract MockLombardBridgeV2 is IBridgeV2 {
   }
 
   function deposit(
-    bytes32 destinationChain,
+    bytes32, // destinationChain
     address token,
-    address sender,
-    bytes32 recipient,
-    uint256 amount,
-    bytes32 destinationCaller,
-    bytes calldata payload
+    address, // sender
+    bytes32, // recipient
+    uint256, // amount
+    bytes32, // destinationCaller
+    bytes calldata // payload
   ) external payable returns (uint256 nonce, bytes32 payloadHash) {
-    s_lastDeposit = DepositArgs({
-      destinationChain: destinationChain,
-      token: token,
-      sender: sender,
-      recipient: recipient,
-      amount: amount,
-      destinationCaller: destinationCaller,
-      payload: payload
-    });
-
-    nonce = s_nextNonce++;
-    payloadHash =
-      keccak256(abi.encode(destinationChain, token, sender, recipient, amount, destinationCaller, payload, nonce));
-    return (nonce, payloadHash);
+    s_lastDepositToken = token;
+    return (1, keccak256(abi.encodePacked(block.timestamp, token)));
   }
 
   function getAllowedDestinationToken(bytes32 destinationChain, address sourceToken) external view returns (bytes32) {
