@@ -44,11 +44,11 @@ type SiloedUSDCTokenPoolDeployInput struct {
 	MCMS        mcms.Input
 }
 
-func SiloedUSDCTokenPoolDeployChangeset() deployment.ChangeSetV2[SiloedUSDCTokenPoolDeployInput] {
-	return cldf.CreateChangeSet(siloedUSDCTokenPoolDeployApply(), siloedUSDCTokenPoolDeployVerify())
+func DeploySiloedUSDCTokenPoolChangeset() deployment.ChangeSetV2[SiloedUSDCTokenPoolDeployInput] {
+	return cldf.CreateChangeSet(DeploySiloedUSDCTokenPoolApply(), DeploySiloedUSDCTokenPoolVerify())
 }
 
-func siloedUSDCTokenPoolDeployApply() func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
+func DeploySiloedUSDCTokenPoolApply() func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input SiloedUSDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
@@ -134,7 +134,7 @@ func siloedUSDCTokenPoolDeployApply() func(cldf.Environment, SiloedUSDCTokenPool
 	}
 }
 
-func siloedUSDCTokenPoolDeployVerify() func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) error {
+func DeploySiloedUSDCTokenPoolVerify() func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) error {
 	return func(e cldf.Environment, input SiloedUSDCTokenPoolDeployInput) error {
 		for _, perChainInput := range input.ChainInputs {
 			if exists := e.BlockChains.Exists(perChainInput.LocalChainSelector); !exists {

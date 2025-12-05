@@ -141,7 +141,7 @@ func TestSiloedUSDCTokenPoolDeployChangeset(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	changeset := changesets.SiloedUSDCTokenPoolDeployChangeset()
+	changeset := changesets.DeploySiloedUSDCTokenPoolChangeset()
 	validate := changeset.VerifyPreconditions(*e, changesetInput)
 	require.NoError(t, validate, "Failed to validate SiloedUSDCTokenPoolDeployChangeset")
 

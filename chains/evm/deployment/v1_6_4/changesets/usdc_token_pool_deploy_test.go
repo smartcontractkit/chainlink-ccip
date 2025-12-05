@@ -172,7 +172,7 @@ func TestUSDCTokenPoolDeployChangeset(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	deployChangeset := changesets.USDCTokenPoolDeployChangeset()
+	deployChangeset := changesets.DeployUSDCTokenPoolChangeset()
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "USDCTokenPoolDeployChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)

@@ -27,11 +27,11 @@ type ERC20LockboxDeployInputPerChain struct {
 	ChainSelector uint64
 }
 
-func ERC20LockboxDeployChangeset() cldf.ChangeSetV2[ERC20LockboxDeployInput] {
-	return cldf.CreateChangeSet(erc20LockboxDeployApply(), erc20LockboxDeployVerify())
+func DeployERC20LockboxChangeset() cldf.ChangeSetV2[ERC20LockboxDeployInput] {
+	return cldf.CreateChangeSet(deployERC20LockboxApply(), deployERC20LockboxVerify())
 }
 
-func erc20LockboxDeployApply() func(cldf.Environment, ERC20LockboxDeployInput) (cldf.ChangesetOutput, error) {
+func deployERC20LockboxApply() func(cldf.Environment, ERC20LockboxDeployInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input ERC20LockboxDeployInput) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
@@ -68,7 +68,7 @@ func erc20LockboxDeployApply() func(cldf.Environment, ERC20LockboxDeployInput) (
 	}
 }
 
-func erc20LockboxDeployVerify() func(cldf.Environment, ERC20LockboxDeployInput) error {
+func deployERC20LockboxVerify() func(cldf.Environment, ERC20LockboxDeployInput) error {
 	return func(e cldf.Environment, input ERC20LockboxDeployInput) error {
 		for _, perChainInput := range input.ChainInputs {
 			if perChainInput.ChainSelector == 0 {
