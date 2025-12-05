@@ -15,7 +15,7 @@ contract TokenPoolV2_applyFee is AdvancedPoolHooksSetup {
     uint256 amount = 1_000e18;
     vm.startPrank(OWNER);
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0));
-
+    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,

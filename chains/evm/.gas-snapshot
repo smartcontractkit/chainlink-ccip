@@ -469,7 +469,7 @@ TokenPoolFactory_createTokenPool:test_createTokenPool_RemoteTokenHasDifferentDec
 TokenPoolFactory_createTokenPool:test_createTokenPool_WithNoExistingRemoteContracts_predict() (gas: 16067166)
 TokenPoolFactory_createTokenPool:test_createTokenPool_WithNoExistingTokenOnRemoteChain() (gas: 7602045)
 TokenPoolFactory_createTokenPool:test_createTokenPool_WithRemoteTokenAndRemotePool() (gas: 7802306)
-TokenPoolV2_applyFee:test_applyFee_CustomFinality() (gas: 65765)
+TokenPoolV2_applyFee:test_applyFee_CustomFinality() (gas: 71032)
 TokenPoolV2_applyFee:test_applyFee_DefaultFinality() (gas: 55686)
 TokenPoolV2_applyTokenTransferFeeConfigUpdates:test_applyTokenTransferFeeConfigUpdates() (gas: 46106)
 TokenPoolV2_applyTokenTransferFeeConfigUpdates:test_applyTokenTransferFeeConfigUpdates_DeleteConfig() (gas: 34500)
