@@ -18,7 +18,7 @@ PROTOC_BIN ?= /usr/local/bin/protoc
 BUF_BIN := $(shell go env GOPATH)/bin/buf
 COMPARE_AGAINST_BRANCH := main
 
-build: ensure_go_version
+build: make install-linters
 	go build -v ./...
 
 # If you have a different version of protoc installed, you can use the following command to generate the protobuf files
@@ -91,7 +91,7 @@ install-custom-linters: install-safebigint
 install-linters: install-golangcilint install-custom-linters
 
 ensure_go_version:
-	@go version | grep -q 'go1.24' || (echo "Please use go1.24" && exit 1)
+	@go version | grep -q 'go1.25.3' || (echo "Please use go1.25.3" && exit 1)
 
 ensure_golangcilint:
 	@golangci-lint --version | grep -q '1.64.5' || (echo "Please use golangci-lint 1.64.5, make install-golangcilint" && exit 1)
