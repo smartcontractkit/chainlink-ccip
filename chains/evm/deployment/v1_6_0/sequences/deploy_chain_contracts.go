@@ -39,6 +39,12 @@ func (a *EVMAdapter) DeployMCMS() *cldf_ops.Sequence[deployops.MCMSDeploymentCon
 	return evmDeployer.DeployMCMS()
 }
 
+// FinalizeDeployMCMS finalizes the deployment of MCM contracts, e.g., by initializing timelock ownership
+func (a *EVMAdapter) FinalizeDeployMCMS() *cldf_ops.Sequence[deployops.MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	evmDeployer := &evm1_0_0.EVMDeployer{}
+	return evmDeployer.FinalizeDeployMCMS()
+}
+
 var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
 	semver.MustParse("1.6.0"),
