@@ -100,3 +100,63 @@ func deployMCMSApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderReg
 			Build(cfg.MCMS)
 	}
 }
+
+
+func FinalizeDeployMCMS(deployerReg *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[MCMSDeploymentConfig] {
+	return cldf.CreateChangeSet(finalizeDeployMCMSApply(deployerReg, mcmsRegistry), finalizeDeployMCMSVerify(deployerReg, mcmsRegistry))
+}
+
+func finalizeDeployMCMSVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, MCMSDeploymentConfig) error {
+	return func(e cldf.Environment, cfg MCMSDeploymentConfig) error {
+		// TODO: implement
+		if cfg.AdapterVersion == nil {
+			return fmt.Errorf("adapter version is required for MCMS deployment verification")
+		}
+		return nil
+	}
+}
+
+func finalizeDeployMCMSApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
+	return func(e cldf.Environment, cfg MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
+		reports := make([]cldf_ops.Report[any, any], 0)
+		batchOps := make([]mcms_types.BatchOperation, 0)
+		ds := datastore.NewMemoryDataStore()
+		for selector, mcmsCfg := range cfg.Chains {
+			family, err := chain_selectors.GetSelectorFamily(selector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+			deployer, exists := d.GetDeployer(family, cfg.AdapterVersion)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, cfg.AdapterVersion.String())
+			}
+			// find existing addresses for this chain from the env
+			existingAddrs := d.ExistingAddressesForChain(e, selector)
+			// create the sequence input
+			seqCfg := MCMSDeploymentConfigPerChainWithAddress{
+				MCMSDeploymentConfigPerChain: mcmsCfg,
+				ExistingAddresses:            existingAddrs,
+				ChainSelector:                selector,
+			}
+			deployReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, deployer.FinalizeDeployMCMS(), e.BlockChains,
+				seqCfg)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy MCMS on chain with selector %d: %w", selector, err)
+			}
+
+			for _, r := range deployReport.Output.Addresses {
+				if err := ds.Addresses().Add(r); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				}
+			}
+			batchOps = append(batchOps, deployReport.Output.BatchOps...)
+			reports = append(reports, deployReport.ExecutionReports...)
+		}
+
+		return changesets.NewOutputBuilder(e, mcmsRegistry).
+			WithReports(reports).
+			WithDataStore(ds).
+			WithBatchOps(batchOps).
+			Build(cfg.MCMS)
+	}
+}

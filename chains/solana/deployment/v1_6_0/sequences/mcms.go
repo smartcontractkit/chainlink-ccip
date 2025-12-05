@@ -100,6 +100,63 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 	)
 }
 
+func (d *SolanaAdapter) FinalizeDeployMCMS() *operations.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"finalize-deploy-mcms",
+		semver.MustParse("1.0.0"),
+		"Finalizes MCM deployment by initializing Timelock",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, in ccipapi.MCMSDeploymentConfigPerChainWithAddress) (output sequences.OnChainOutput, err error) {
+			chain, ok := chains.SolanaChains()[in.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
+			}
+
+			mcmProgram := datastore.GetAddressRef(
+				in.ExistingAddresses,
+				chain.ChainSelector(),
+				utils.McmProgramType,
+				common_utils.Version_1_6_0,
+				"",
+			)
+			timelockProgram := datastore.GetAddressRef(
+				in.ExistingAddresses,
+				chain.ChainSelector(),
+				utils.TimelockProgramType,
+				common_utils.Version_1_6_0,
+				"",
+			)
+
+			mcmAddress := solana.MustPublicKeyFromBase58(mcmProgram.Address)
+			timelockAddress := solana.MustPublicKeyFromBase58(timelockProgram.Address)
+
+			deps := mcmsops.Deps{
+				Chain:             chain,
+				ExistingAddresses: in.ExistingAddresses,
+				Qualifier:         *in.Qualifier,
+			}
+
+			// Assume access Controller and MCM have already been initialized
+			initTimelockRef, err := initTimelock(b, deps, in.TimelockMinDelay, timelockAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize Timelock: %w", err)
+			}
+			output.Addresses = append(output.Addresses, initTimelockRef.NewAddresses...)
+			output.BatchOps = append(output.BatchOps, initTimelockRef.BatchOps...)
+			deps.ExistingAddresses = append(deps.ExistingAddresses, initTimelockRef.NewAddresses...)
+
+			// roles
+			setupRolesOutput, err := setupRoles(b, deps, mcmAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to setup roles in Timelock: %w", err)
+			}
+			output.Addresses = append(output.Addresses, setupRolesOutput.NewAddresses...)
+			output.BatchOps = append(output.BatchOps, setupRolesOutput.BatchOps...)
+
+			return output, err
+		},
+	)
+}
+
 func initAccessController(b operations.Bundle, deps mcmsops.Deps, accessController solana.PublicKey) ([]cldf_datastore.AddressRef, error) {
 	roles := []cldf_deployment.ContractType{
 		utils.ProposerAccessControllerAccount,
