@@ -71,6 +71,21 @@ var FeeQuoterUpdatePrices = contract.NewWrite(contract.WriteParams[fee_quoter.In
 	},
 })
 
+type AuthorizedCallerArgs = fee_quoter.AuthorizedCallersAuthorizedCallerArgs
+var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *fee_quoter.FeeQuoter]{
+	Name:            "fee-quoter:apply-authorized-caller-updates",
+	Version:         semver.MustParse("1.6.0"),
+	Description:     "Applies updates to the list of authorized callers on the FeeQuoter 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     fee_quoter.FeeQuoterABI,
+	NewContract:     fee_quoter.NewFeeQuoter,
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, AuthorizedCallerArgs],
+	Validate:        func(AuthorizedCallerArgs) error { return nil },
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
+		return feeQuoter.ApplyAuthorizedCallerUpdates(opts, args)
+	},
+})
+
 type FeeQuoterParams struct {
 	MaxFeeJuelsPerMsg              *big.Int
 	TokenPriceStalenessThreshold   uint32
