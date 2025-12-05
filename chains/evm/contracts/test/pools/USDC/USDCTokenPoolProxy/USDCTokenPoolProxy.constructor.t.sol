@@ -13,7 +13,9 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   address internal s_legacyCctpV1Pool = makeAddr("legacyCctpV1Pool");
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
+  address internal s_cctpV2PoolWithCCV = makeAddr("cctpV2PoolWithCCV");
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
+  address internal s_cctpVerifier = makeAddr("cctpVerifier");
 
   function test_constructor() public {
     // Arrange: Define test constants
@@ -22,9 +24,11 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: s_cctpV2Pool
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
       }),
-      address(s_router)
+      address(s_router),
+      address(s_cctpVerifier)
     );
 
     USDCTokenPoolProxy.PoolAddresses memory pools = proxy.getPools();
@@ -45,9 +49,11 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: address(0)
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
       }),
-      address(s_router)
+      address(s_router),
+      address(s_cctpVerifier)
     );
   }
 
@@ -58,9 +64,26 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: address(0)
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
       }),
-      address(0) // Router
+      address(0), // Router
+      address(s_cctpVerifier)
+    );
+  }
+
+  function test_constructor_RevertWhen_CCTPVerifierAddressIsZero() public {
+    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
+    new USDCTokenPoolProxy(
+      IERC20(s_USDCToken), // Token
+      USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: s_legacyCctpV1Pool,
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
+      }),
+      address(s_router),
+      address(0) // CCTP Verifier
     );
   }
 }

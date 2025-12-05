@@ -49,7 +49,7 @@ contract OffRampHelper is OffRamp {
     bytes memory originalSender,
     uint64 sourceChainSelector,
     uint16 finality
-  ) external returns (Client.EVMTokenAmount memory) {
+  ) external returns (Client.EVMTokenAmount memory, address) {
     return _releaseOrMintSingleToken(sourceTokenAmount, originalSender, sourceChainSelector, finality);
   }
 

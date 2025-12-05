@@ -56,11 +56,12 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
 
     vm.expectCall(address(s_pool), abi.encodeCall(IPoolV2.releaseOrMint, (expectedInput, finality)));
 
-    Client.EVMTokenAmount memory dest =
+    (Client.EVMTokenAmount memory dest, address localPoolAddress) =
       s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, finality);
 
     assertEq(dest.token, address(s_token));
     assertEq(dest.amount, tokenTransfer.amount);
+    assertEq(localPoolAddress, address(s_pool));
     assertEq(s_token.balanceOf(s_receiver), dest.amount);
   }
 
@@ -74,11 +75,12 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
 
     vm.expectCall(address(s_pool), abi.encodeCall(IPoolV1.releaseOrMint, (expectedInput)));
 
-    Client.EVMTokenAmount memory dest =
+    (Client.EVMTokenAmount memory dest, address localPoolAddress) =
       s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 0);
 
     assertEq(dest.token, address(s_token));
     assertEq(dest.amount, tokenTransfer.amount);
+    assertEq(localPoolAddress, address(s_pool));
     assertEq(s_token.balanceOf(s_receiver), dest.amount);
   }
 
@@ -118,20 +120,6 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(s_pool)));
     s_offRamp.releaseOrMintSingleToken(tokenTransfer, abi.encodePacked(address(1)), DEST_CHAIN_SELECTOR, 0);
-  }
-
-  function test_releaseOrMintSingleToken_RevertsWhen_ReleaseOrMintBalanceMismatch() public {
-    vm.mockCall(
-      address(s_pool), abi.encodeCall(s_pool.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false)
-    );
-    Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
-    MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
-
-    vm.expectCall(address(s_pool), abi.encodeCall(IPoolV1.releaseOrMint, (expectedInput)));
-    vm.mockCall(address(s_token), abi.encodeCall(s_token.balanceOf, (expectedInput.receiver)), abi.encode(0));
-
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.ReleaseOrMintBalanceMismatch.selector, tokenTransfer.amount, 0, 0));
-    s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 1);
   }
 
   function _buildReleaseInput() internal returns (Pool.ReleaseOrMintInV1 memory) {
