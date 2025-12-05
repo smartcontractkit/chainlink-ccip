@@ -22,10 +22,6 @@ import (
 
 	changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
 	usdc_token_pool_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/usdc_token_pool_proxy"
-	mcms "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 )
 
 func TestUpdateLockOrBurnMechanismChangeset(t *testing.T) {
@@ -99,18 +95,12 @@ func TestUpdateLockOrBurnMechanismChangeset(t *testing.T) {
 				},
 			},
 		},
-		MCMS: mcms.Input{
-			OverridePreviousRoot: false,
-			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
-			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
-			Description:          "Update lock or burn mechanism",
-		},
 	}
 
-	mcmsRegistry := changesets_utils.GetRegistry()
-	updateLockOrBurnMechanismChangeset := changesets.UpdateLockOrBurnMechanismChangeset(mcmsRegistry)
+	updateLockOrBurnMechanismChangeset := changesets.UpdateLockOrBurnMechanismChangeset()
+	validate := updateLockOrBurnMechanismChangeset.VerifyPreconditions(*e, updateLockOrBurnMechanismInput)
+	require.NoError(t, validate, "Failed to validate UpdateLockOrBurnMechanismChangeset")
+
 	output, err := updateLockOrBurnMechanismChangeset.Apply(*e, updateLockOrBurnMechanismInput)
 	require.NoError(t, err, "UpdateLockOrBurnMechanismChangeset should not error")
 	require.Greater(t, len(output.Reports), 0)

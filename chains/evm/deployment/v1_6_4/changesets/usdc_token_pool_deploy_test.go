@@ -29,7 +29,6 @@ import (
 
 	usdc_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
 
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
@@ -173,12 +172,7 @@ func TestUSDCTokenPoolDeployChangeset(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
-
-	deployChangeset := changesets.USDCTokenPoolDeployChangeset(mcmsRegistry)
+	deployChangeset := changesets.DeployUSDCTokenPoolChangeset()
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "USDCTokenPoolDeployChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)
@@ -249,7 +243,10 @@ func TestUSDCTokenPoolDeployChangeset(t *testing.T) {
 			Description:          "Apply authorized caller updates",
 		},
 	}
-	applyAuthorizedCallerUpdatesChangeset := changesets.ApplyAuthorizedCallerUpdatesChangeset(mcmsRegistry)
+	applyAuthorizedCallerUpdatesChangeset := changesets.ApplyAuthorizedCallerUpdatesChangeset()
+	validate := applyAuthorizedCallerUpdatesChangeset.VerifyPreconditions(*e, applyAuthorizedCallerUpdatesInput)
+	require.NoError(t, validate, "Failed to validate ApplyAuthorizedCallerUpdatesChangeset")
+
 	applyAuthorizedCallerUpdatesChangesetOutput, err := applyAuthorizedCallerUpdatesChangeset.Apply(*e, applyAuthorizedCallerUpdatesInput)
 	require.NoError(t, err, "ApplyAuthorizedCallerUpdatesChangeset should not error")
 	require.Greater(t, len(applyAuthorizedCallerUpdatesChangesetOutput.Reports), 0)

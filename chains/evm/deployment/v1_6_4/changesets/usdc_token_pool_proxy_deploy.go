@@ -37,11 +37,11 @@ type DeployUSDCTokenPoolProxyPerChainInput struct {
 // Note: Since this may be deployed on a chain that already has a USDC Token Pool contract deployed,
 // the legacy pool address is the only required address to be provided in the input. This is because on a chain such as
 // Ethereum Mainnet, which is yet to be updated to CCTP V2, there will only be a V1 deployment of the USDC Token Pool.
-func DeployUSDCTokenPoolProxyChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[DeployUSDCTokenPoolProxyInput] {
-	return cldf.CreateChangeSet(deployUSDCTokenPoolProxyApply(mcmsRegistry), deployUSDCTokenPoolProxyVerify(mcmsRegistry))
+func DeployUSDCTokenPoolProxyChangeset() cldf.ChangeSetV2[DeployUSDCTokenPoolProxyInput] {
+	return cldf.CreateChangeSet(deployUSDCTokenPoolProxyApply(), deployUSDCTokenPoolProxyVerify())
 }
 
-func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployUSDCTokenPoolProxyInput) (cldf.ChangesetOutput, error) {
+func deployUSDCTokenPoolProxyApply() func(cldf.Environment, DeployUSDCTokenPoolProxyInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input DeployUSDCTokenPoolProxyInput) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
@@ -123,11 +123,17 @@ func deployUSDCTokenPoolProxyApply(mcmsRegistry *changesets.MCMSReaderRegistry) 
 	}
 }
 
-func deployUSDCTokenPoolProxyVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployUSDCTokenPoolProxyInput) error {
+func deployUSDCTokenPoolProxyVerify() func(cldf.Environment, DeployUSDCTokenPoolProxyInput) error {
 	return func(e cldf.Environment, input DeployUSDCTokenPoolProxyInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
 		}
+
+		// Note: The legacy pool address is not being validated as it is not always required to be set
+		// for a new token pool proxy deployment.
+
 		return nil
 	}
 }

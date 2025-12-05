@@ -20,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -152,12 +151,11 @@ func TestUpdatePoolAddressesChangeset(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
+	updatePoolAddressesChangeset := changesets.UpdatePoolAddressesChangeset()
 
-	updatePoolAddressesChangeset := changesets.UpdatePoolAddressesChangeset(mcmsRegistry)
+	validate := updatePoolAddressesChangeset.VerifyPreconditions(*e, updatePoolAddressesInput)
+	require.NoError(t, validate, "Failed to validate UpdatePoolAddressesChangeset")
+
 	deployChangesetOutput, err := updatePoolAddressesChangeset.Apply(*e, updatePoolAddressesInput)
 	require.NoError(t, err, "UpdatePoolAddressesChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)

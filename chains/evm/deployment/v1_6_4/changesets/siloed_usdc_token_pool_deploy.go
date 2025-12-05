@@ -34,8 +34,9 @@ const (
 )
 
 type SiloedUSDCTokenPoolDeployInputPerChain struct {
-	ChainSelector uint64
-	Allowlist     []common.Address
+	LocalChainSelector  uint64 // The selector for the local chain that this pool will be deployed on.
+	RemoteChainSelector uint64 // The selector for the remote non-canonical USDC Chain this pool will interact with.
+	Allowlist           []common.Address
 }
 
 type SiloedUSDCTokenPoolDeployInput struct {
@@ -43,11 +44,11 @@ type SiloedUSDCTokenPoolDeployInput struct {
 	MCMS        mcms.Input
 }
 
-func SiloedUSDCTokenPoolDeployChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) deployment.ChangeSetV2[SiloedUSDCTokenPoolDeployInput] {
-	return cldf.CreateChangeSet(siloedUSDCTokenPoolDeployApply(mcmsRegistry), siloedUSDCTokenPoolDeployVerify(mcmsRegistry))
+func DeploySiloedUSDCTokenPoolChangeset() deployment.ChangeSetV2[SiloedUSDCTokenPoolDeployInput] {
+	return cldf.CreateChangeSet(DeploySiloedUSDCTokenPoolApply(), DeploySiloedUSDCTokenPoolVerify())
 }
 
-func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
+func DeploySiloedUSDCTokenPoolApply() func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input SiloedUSDCTokenPoolDeployInput) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
@@ -61,9 +62,9 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 				Type:      datastore.ContractType(utils.RBACTimelock),
 				Version:   semver.MustParse(RBACTimelockVersion),
 				Qualifier: input.MCMS.Qualifier,
-			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			}, perChainInput.LocalChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get time lock address for chain %d: %w", perChainInput.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get time lock address for chain %d: %w", perChainInput.LocalChainSelector, err)
 			}
 
 			// Get the ERC20Lockbox address from the datastore based on the MCMS qualifier and chain selector.
@@ -73,7 +74,7 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 				Type:      datastore.ContractType(erc20_lock_box.ContractType),
 				Version:   erc20_lock_box.Version,
 				Qualifier: v1_6_4_ERC20LockboxQualifier,
-			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			}, perChainInput.LocalChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
@@ -81,7 +82,7 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			routerAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:    datastore.ContractType(router.ContractType),
 				Version: router.Version,
-			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			}, perChainInput.LocalChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
@@ -89,7 +90,7 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			rmnProxyAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:    datastore.ContractType(rmn_proxy.ContractType),
 				Version: semver.MustParse(RMNProxyVersion),
-			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			}, perChainInput.LocalChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
@@ -97,13 +98,13 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			tokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				Type:    datastore.ContractType(USDCTokenContractType),
 				Version: semver.MustParse(USDCTokenVersion),
-			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			}, perChainInput.LocalChainSelector, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 
 			sequenceInput := sequences.SiloedUSDCTokenPoolDeploySequenceInput{
-				ChainSelector: perChainInput.ChainSelector,
+				ChainSelector: perChainInput.LocalChainSelector,
 				Token:         tokenAddress,
 				Allowlist:     perChainInput.Allowlist,
 				RMNProxy:      rmnProxyAddress,
@@ -113,9 +114,13 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 			}
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.SiloedUSDCTokenPoolDeploySequence, e.BlockChains, sequenceInput)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy SiloedUSDCTokenPool on chain %d: %w", perChainInput.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy SiloedUSDCTokenPool on chain %d: %w", perChainInput.LocalChainSelector, err)
 			}
 			for _, r := range report.Output.Addresses {
+				// Add a qualifier to the address to indicate the remote chain selector that this pool will interact with.
+				// On chains such as Ethereum mainnet, there will be multiple Siloed USDC Token Pools deployed for different remote chains (Ronin, BOB, Wemix, Etc.). By Adding this qualifier, we identify which pool is deployed for which remote chain.
+				r.Qualifier = fmt.Sprintf("remoteChainSelector-%d", perChainInput.RemoteChainSelector)
+
 				if err := ds.Addresses().Add(r); err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 				}
@@ -129,8 +134,16 @@ func siloedUSDCTokenPoolDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry)
 	}
 }
 
-func siloedUSDCTokenPoolDeployVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) error {
+func DeploySiloedUSDCTokenPoolVerify() func(cldf.Environment, SiloedUSDCTokenPoolDeployInput) error {
 	return func(e cldf.Environment, input SiloedUSDCTokenPoolDeployInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.LocalChainSelector); !exists {
+				return fmt.Errorf("local chain with selector %d does not exist", perChainInput.LocalChainSelector)
+			}
+			if exists := e.BlockChains.Exists(perChainInput.RemoteChainSelector); !exists {
+				return fmt.Errorf("remote chain with selector %d does not exist", perChainInput.RemoteChainSelector)
+			}
+		}
 		return nil
 	}
 }

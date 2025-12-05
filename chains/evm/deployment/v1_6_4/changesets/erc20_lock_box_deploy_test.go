@@ -10,11 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	erc20_lock_box_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 
 	datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
@@ -46,18 +42,12 @@ func TestERC20LockBoxDeployChangeset(t *testing.T) {
 				ChainSelector: chainSelector,
 			},
 		},
-		MCMS: mcms.Input{
-			OverridePreviousRoot: false,
-			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
-			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
-			Description:          "Deploy ERC20Lockbox",
-		},
 	}
 
-	mcmsRegistry := changesets_utils.GetRegistry()
-	changesetOutput, err := changesets.ERC20LockboxDeployChangeset(mcmsRegistry).Apply(*e, changesetInput)
+	changeset := changesets.DeployERC20LockboxChangeset()
+	validate := changeset.VerifyPreconditions(*e, changesetInput)
+	require.NoError(t, validate, "Failed to validate ERC20LockboxDeployChangeset")
+	changesetOutput, err := changeset.Apply(*e, changesetInput)
 	require.NoError(t, err, "Failed to apply ERC20LockboxDeployChangeset")
 	require.NotNil(t, changesetOutput, "Changeset output should not be nil")
 	require.Greater(t, len(changesetOutput.Reports), 0)
