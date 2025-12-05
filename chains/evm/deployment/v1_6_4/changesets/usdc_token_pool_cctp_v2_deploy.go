@@ -35,7 +35,7 @@ type USDCTokenPoolCCTPV2DeployInput struct {
 // Note: In addition to deploying the USDCTokenPoolCCTPV2 contract, this changeset will also deploy the CCTPMessageTransmitterProxy contract,
 // configure the allowed callers for the CCTPMessageTransmitterProxy contract, and then begin the ownership transfer to MCMS.
 // A separate changeset will be used to accept ownership of the USDCTokenPoolCCTPV2 contract.
-func USDCTokenPoolCCTPV2DeployChangeset() deployment.ChangeSetV2[USDCTokenPoolCCTPV2DeployInput] {
+func DeployUSDCTokenPoolCCTPV2Changeset() deployment.ChangeSetV2[USDCTokenPoolCCTPV2DeployInput] {
 	return cldf.CreateChangeSet(usdcTokenPoolCCTPV2DeployApply(), usdcTokenPoolCCTPV2DeployVerify())
 }
 
