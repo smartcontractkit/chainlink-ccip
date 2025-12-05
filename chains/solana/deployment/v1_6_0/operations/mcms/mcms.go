@@ -653,10 +653,6 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
-	upgradeAuthority, err := utils.GetUpgradeAuthority(deps.Chain.Client, id)
-	if err != nil {
-		return MCMOutput{}, fmt.Errorf("failed to get upgrade authority: %w", err)
-	}
 
 	instructionBuilder := timelock.NewBatchAddAccessInstruction([32]uint8(
 		state.PDASeed([]byte(seed[:]))),
@@ -664,7 +660,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 		timelockConfigPDA,
 		solana.MustPublicKeyFromBase58(accessControllerProgram.Address),
 		solana.MustPublicKeyFromBase58(roleAccount.Address),
-		upgradeAuthority)
+		deps.Chain.DeployerKey.PublicKey())
 
 	for _, account := range in.Accounts {
 		instructionBuilder.Append(solana.Meta(account))
@@ -673,21 +669,6 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 	instruction, err := instructionBuilder.ValidateAndBuild()
 	if err != nil {
 		return MCMOutput{}, fmt.Errorf("failed to build BatchAddAccess instruction: %w", err)
-	}
-
-	if upgradeAuthority != deps.Chain.DeployerKey.PublicKey() {
-		batch, err := utils.BuildMCMSBatchOperation(
-			deps.Chain.Selector,
-			[]solana.Instruction{instruction},
-			id.String(),
-			utils.TimelockProgramType.String(),
-		)
-		if err != nil {
-			return MCMOutput{}, fmt.Errorf("failed to build timelock initialization batch operation: %w", err)
-		}
-		return MCMOutput{
-			BatchOps: []types.BatchOperation{batch},
-		}, nil
 	}
 
 	err = deps.Chain.Confirm([]solana.Instruction{instruction})
