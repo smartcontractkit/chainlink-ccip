@@ -20,6 +20,10 @@ import (
 type MCMSDeploymentConfig struct {
 	Chains         map[uint64]MCMSDeploymentConfigPerChain `json:"chains"`
 	AdapterVersion *semver.Version                         `json:"adapterVersion"`
+	// specify MCMS in case we need it to actually perform the deployment
+	// e.g. for transferring ownership post-deployment
+	// e.g. Solana initializing a new MCMS instance owned by an existing MCMS
+	MCMS mcms.Input `json:"mcms"`
 }
 
 type MCMSDeploymentConfigPerChain struct {
@@ -93,6 +97,6 @@ func deployMCMSApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderReg
 			WithReports(reports).
 			WithDataStore(ds).
 			WithBatchOps(batchOps).
-			Build(mcms.Input{}) // for deployment, we don't need an MCMS proposal
+			Build(cfg.MCMS)
 	}
 }

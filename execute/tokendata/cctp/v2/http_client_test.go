@@ -57,8 +57,8 @@ func (m *MockMetricsReporter) TrackAttestationAPILatency(
 	m.Called(sourceChain, sourceDomain, success, httpStatus, latency)
 }
 
-func (m *MockMetricsReporter) TrackObserveLatency(numRequests int, latency time.Duration) {
-	m.Called(numRequests, latency)
+func (m *MockMetricsReporter) TrackObserveLatency(latency time.Duration) {
+	m.Called(latency)
 }
 
 func (m *MockMetricsReporter) TrackDepositHashCalculationError(
