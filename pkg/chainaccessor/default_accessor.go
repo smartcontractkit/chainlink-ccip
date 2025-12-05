@@ -352,7 +352,7 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
-		&ccipocr3.SendRequestedEvent{},
+		&cciptypes.SendRequestedEvent{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
@@ -371,7 +371,7 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 
 	msgs := make([]cciptypes.Message, 0)
 	for _, item := range seq {
-		msg, ok := item.Data.(*ccipocr3.SendRequestedEvent)
+		msg, ok := item.Data.(*cciptypes.SendRequestedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
@@ -432,7 +432,7 @@ func (l *DefaultAccessor) LatestMessageTo(
 			},
 			Limit: query.Limit{Count: 1},
 		},
-		&ccipocr3.SendRequestedEvent{},
+		&cciptypes.SendRequestedEvent{},
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query onRamp: %w", err)
@@ -451,7 +451,7 @@ func (l *DefaultAccessor) LatestMessageTo(
 	}
 
 	item := seq[0]
-	msg, ok := item.Data.(*ccipocr3.SendRequestedEvent)
+	msg, ok := item.Data.(*cciptypes.SendRequestedEvent)
 	if !ok {
 		return 0, fmt.Errorf("failed to cast %v to SendRequestedEvent", item.Data)
 	}
@@ -554,7 +554,7 @@ func (l *DefaultAccessor) CommitReportsGTETimestamp(
 				Count: uint64(internalLimit),
 			},
 		},
-		&ccipocr3.CommitReportAcceptedEvent{},
+		&cciptypes.CommitReportAcceptedEvent{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
@@ -583,7 +583,7 @@ func (l *DefaultAccessor) ExecutedMessages(
 		}
 	}
 
-	dataTyp := ccipocr3.ExecutionStateChangedEvent{}
+	dataTyp := cciptypes.ExecutionStateChangedEvent{}
 	keyFilter, countSqNrs := createExecutedMessagesKeyFilter(nonEmptyRangesPerChain, confidence)
 	if countSqNrs == 0 {
 		lggr.Debugw("no sequence numbers to query", "nonEmptyRangesPerChain", nonEmptyRangesPerChain)
@@ -607,7 +607,7 @@ func (l *DefaultAccessor) ExecutedMessages(
 
 	executed := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
 	for _, item := range iter {
-		stateChange, ok := item.Data.(*ccipocr3.ExecutionStateChangedEvent)
+		stateChange, ok := item.Data.(*cciptypes.ExecutionStateChangedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %T to ExecutionStateChangedEvent", item.Data)
 		}
@@ -1017,7 +1017,7 @@ func (l *DefaultAccessor) processCommitReports(
 }
 
 func (l *DefaultAccessor) processMerkleRoots(
-	allMerkleRoots []ccipocr3.MerkleRoot, isBlessed map[cciptypes.Bytes32]bool,
+	allMerkleRoots []cciptypes.MerkleRoot, isBlessed map[cciptypes.Bytes32]bool,
 ) (blessedMerkleRoots []cciptypes.MerkleRootChain, unblessedMerkleRoots []cciptypes.MerkleRootChain) {
 	blessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0, len(isBlessed))
 	unblessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots)-len(isBlessed))
@@ -1040,7 +1040,7 @@ func (l *DefaultAccessor) processMerkleRoots(
 	return blessedMerkleRoots, unblessedMerkleRoots
 }
 
-func (l *DefaultAccessor) processPriceUpdates(priceUpdates ccipocr3.AccessorPriceUpdates) (cciptypes.PriceUpdates, error) {
+func (l *DefaultAccessor) processPriceUpdates(priceUpdates cciptypes.AccessorPriceUpdates) (cciptypes.PriceUpdates, error) {
 	lggr := l.lggr
 	updates := cciptypes.PriceUpdates{
 		TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
