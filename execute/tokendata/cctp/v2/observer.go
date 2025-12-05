@@ -115,7 +115,7 @@ func (o *CCTPv2TokenDataObserver) Observe(
 	startTime := time.Now()
 	defer func() {
 		latency := time.Since(startTime)
-		o.metricsReporter.TrackObserveLatency(cctpV2RequestParams.Cardinality(), latency)
+		o.metricsReporter.TrackObserveLatency(latency)
 	}()
 
 	// Extract the CCTPv2 API requests that need to be made
@@ -265,6 +265,11 @@ func (o *CCTPv2TokenDataObserver) convertCCTPv2MessagesToTokenData(
 
 		// Process each individual CCTP v2 message in the batch
 		for _, msg := range messages.Messages {
+			// Return immediately if context is cancelled to avoid heavy processing done by
+			// calculateDepositHashFn
+			if ctx.Err() != nil {
+				return result
+			}
 			// Calculate the deposit hash for this message
 			depositHash, err := o.calculateDepositHashFn(msg.DecodedMessage)
 			if err != nil {

@@ -41,7 +41,7 @@ var (
 			Help:    "Latency of CCTP v2 Observe() calls",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"destChainFamily", "destChainID", "numRequests"},
+		[]string{"destChainFamily", "destChainID"},
 	)
 
 	PromCCTPv2DepositHashCalculationErrorCounter = promauto.NewCounterVec(
@@ -73,7 +73,7 @@ var (
 type MetricsReporter interface {
 	TrackAttestationAPILatency(
 		sourceChain cciptypes.ChainSelector, sourceDomain uint32, success bool, httpStatus string, latency time.Duration)
-	TrackObserveLatency(numRequests int, latency time.Duration)
+	TrackObserveLatency(latency time.Duration)
 	TrackDepositHashCalculationError(sourceChain cciptypes.ChainSelector, sourceDomain uint32)
 	TrackMessageToTokenDataError(sourceChain cciptypes.ChainSelector, sourceDomain uint32)
 	TrackAssignTokenDataFailure(sourceChain cciptypes.ChainSelector, sourceDomain uint32)
@@ -92,7 +92,7 @@ type noOpMetricsReporter struct{}
 func (n *noOpMetricsReporter) TrackAttestationAPILatency(cciptypes.ChainSelector, uint32, bool, string, time.Duration) {
 }
 
-func (n *noOpMetricsReporter) TrackObserveLatency(int, time.Duration) {
+func (n *noOpMetricsReporter) TrackObserveLatency(time.Duration) {
 }
 
 func (n *noOpMetricsReporter) TrackDepositHashCalculationError(cciptypes.ChainSelector, uint32) {
@@ -136,9 +136,9 @@ func (r *MetricsReporterImpl) TrackAttestationAPILatency(
 }
 
 // TrackObserveLatency tracks the overall latency of Observe() calls
-func (r *MetricsReporterImpl) TrackObserveLatency(numRequests int, latency time.Duration) {
+func (r *MetricsReporterImpl) TrackObserveLatency(latency time.Duration) {
 	PromCCTPv2ObserveLatencyHistogram.
-		WithLabelValues(r.destChainFamily, r.destChainID, strconv.Itoa(numRequests)).
+		WithLabelValues(r.destChainFamily, r.destChainID).
 		Observe(latency.Seconds())
 }
 
