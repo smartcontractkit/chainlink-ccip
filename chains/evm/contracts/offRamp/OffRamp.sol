@@ -315,7 +315,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       // If a lock-release pool is the receiver, balancePost - balancePre would not reflect the amount transferred.
       // Therefore, if the receiver is the token pool, we trust the value returned by the pool.
       // Otherwise, we trust balancePost - balancePre as the amount given to the receiver.
-      if (receiver == localPoolAddress) {
+      if (address(bytes20(message.tokenTransfer[0].tokenReceiver)) == localPoolAddress) {
         destTokenAmounts[0] = destTokenAmount;
       } else {
         destTokenAmounts[0] = Client.EVMTokenAmount({token: destTokenAmount.token, amount: balancePost - balancePre});
