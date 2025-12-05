@@ -2,16 +2,13 @@ package ccip_evm
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -36,7 +33,6 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -45,6 +41,7 @@ import (
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 )
 
@@ -859,74 +856,4 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 		}
 	}
 	return nil
-}
-
-// GetContractAddrForSelector get contract address by type and chain selector.
-func GetContractAddrForSelector(addresses []string, selector uint64, contractType datastore.ContractType) (common.Address, error) {
-	var contractAddr common.Address
-	for _, addr := range addresses {
-		var refs []datastore.AddressRef
-		err := json.Unmarshal([]byte(addr), &refs)
-		if err != nil {
-			return common.Address{}, err
-		}
-		for _, ref := range refs {
-			if ref.ChainSelector == selector && ref.Type == contractType {
-				contractAddr = common.HexToAddress(ref.Address)
-			}
-		}
-	}
-	return contractAddr, nil
-}
-
-type SpecArgs struct {
-	P2PV2Bootstrappers     []string          `toml:"p2pV2Bootstrappers"`
-	CapabilityVersion      string            `toml:"capabilityVersion"`
-	CapabilityLabelledName string            `toml:"capabilityLabelledName"`
-	OCRKeyBundleIDs        map[string]string `toml:"ocrKeyBundleIDs"`
-	P2PKeyID               string            `toml:"p2pKeyID"`
-	RelayConfigs           map[string]any    `toml:"relayConfigs"`
-	PluginConfig           map[string]any    `toml:"pluginConfig"`
-}
-
-// NewCCIPSpecToml creates a new CCIP spec in toml format from the given spec args.
-func NewCCIPSpecToml(spec SpecArgs) (string, error) {
-	type fullSpec struct {
-		SpecArgs
-		Type          string `toml:"type"`
-		SchemaVersion uint64 `toml:"schemaVersion"`
-		Name          string `toml:"name"`
-		ExternalJobID string `toml:"externalJobID"`
-	}
-	extJobID, err := ExternalJobID(spec)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate external job id: %w", err)
-	}
-	marshaled, err := toml.Marshal(fullSpec{
-		SpecArgs:      spec,
-		Type:          "ccip",
-		SchemaVersion: 1,
-		Name:          fmt.Sprintf("%s-%s", "ccip", extJobID),
-		ExternalJobID: extJobID,
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal spec into toml: %w", err)
-	}
-
-	return string(marshaled), nil
-}
-
-func ExternalJobID(spec SpecArgs) (string, error) {
-	in := fmt.Appendf(nil, "%s%s%s", spec.CapabilityLabelledName, spec.CapabilityVersion, spec.P2PKeyID)
-	sha256Hash := sha256.New()
-	sha256Hash.Write(in)
-	in = sha256Hash.Sum(nil)[:16]
-	// tag as valid UUID v4 https://github.com/google/uuid/blob/0f11ee6918f41a04c201eceeadf612a377bc7fbc/version4.go#L53-L54
-	in[6] = (in[6] & 0x0f) | 0x40 // Version 4
-	in[8] = (in[8] & 0x3f) | 0x80 // Variant is 10
-	id, err := uuid.FromBytes(in)
-	if err != nil {
-		return "", err
-	}
-	return id.String(), nil
 }
