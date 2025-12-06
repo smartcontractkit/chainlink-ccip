@@ -82,11 +82,9 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    // Deploy mock bridge and get its mailbox.
     s_mockBridge = new MockLombardBridge();
     s_mockMailbox = MockLombardMailbox(s_mockBridge.s_mailbox());
 
-    // Deploy verifier.
     s_lombardVerifier = new LombardVerifier(IBridgeV2(address(s_mockBridge)), STORAGE_LOCATION);
 
     // Deploy test token and add it as a supported token.
@@ -96,8 +94,9 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
 
     // Set up remote chain config with the router.
-    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](2);
     remoteChainConfigs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, false);
+    remoteChainConfigs[1] = _getRemoteChainConfig(s_router, SOURCE_CHAIN_SELECTOR, false);
     s_lombardVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     // Set the path for the destination chain.
@@ -110,17 +109,18 @@ contract LombardVerifierSetup is BaseVerifierSetup {
 
     // Mock the router to return the valid onRamp.
     vm.mockCall(address(s_router), abi.encodeCall(IRouter.getOnRamp, (DEST_CHAIN_SELECTOR)), abi.encode(s_onRamp));
+    vm.mockCall(
+      address(s_router), abi.encodeCall(IRouter.isOffRamp, (SOURCE_CHAIN_SELECTOR, s_offRamp)), abi.encode(true)
+    );
   }
 
-  /// @notice Creates a MessageV1 with a token transfer for forwardToVerifier tests.
   function _createForwardMessage(
     address sourceToken,
-    uint256 amount,
     address receiver
   ) internal returns (MessageV1Codec.MessageV1 memory, bytes32) {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer = new MessageV1Codec.TokenTransferV1[](1);
     tokenTransfer[0] = MessageV1Codec.TokenTransferV1({
-      amount: amount,
+      amount: TRANSFER_AMOUNT,
       sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
       sourceTokenAddress: abi.encodePacked(sourceToken),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),

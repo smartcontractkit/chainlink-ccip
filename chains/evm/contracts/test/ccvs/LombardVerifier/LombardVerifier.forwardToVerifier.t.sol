@@ -12,8 +12,7 @@ import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/Bu
 contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
   function test_forwardToVerifier() public {
     address receiver = makeAddr("receiver");
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(address(s_testToken), TRANSFER_AMOUNT, receiver);
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createForwardMessage(address(s_testToken), receiver);
 
     vm.expectCall(
       address(s_mockBridge),
@@ -51,7 +50,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     bytes memory tooLongReceiver = new bytes(33);
 
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(address(s_testToken), TRANSFER_AMOUNT, address(0));
+      _createForwardMessage(address(s_testToken), address(0));
     message.tokenTransfer[0].tokenReceiver = tooLongReceiver;
 
     vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidReceiver.selector, tooLongReceiver));
@@ -61,7 +60,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
   function test_forwardToVerifier_RevertWhen_TokenNotSupported() public {
     address unsupportedToken = makeAddr("unsupportedToken");
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(unsupportedToken, TRANSFER_AMOUNT, makeAddr("receiver"));
+      _createForwardMessage(unsupportedToken, makeAddr("receiver"));
 
     vm.expectRevert(abi.encodeWithSelector(LombardVerifier.TokenNotSupported.selector, unsupportedToken));
     s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
@@ -72,7 +71,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     uint64 unknownChainSelector = 999999;
 
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(address(s_testToken), TRANSFER_AMOUNT, makeAddr("receiver"));
+      _createForwardMessage(address(s_testToken), makeAddr("receiver"));
     message.destChainSelector = unknownChainSelector;
 
     vm.expectRevert(abi.encodeWithSelector(LombardVerifier.PathNotExist.selector, unknownChainSelector));
@@ -89,8 +88,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
 
     address receiver = makeAddr("receiver");
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(tokenWithAdapter, TRANSFER_AMOUNT, receiver);
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createForwardMessage(tokenWithAdapter, receiver);
 
     // Should succeed - the adapter is used for the bridge deposit.
     bytes memory verifierData = s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");

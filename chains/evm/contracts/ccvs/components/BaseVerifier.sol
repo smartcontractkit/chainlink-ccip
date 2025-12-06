@@ -23,7 +23,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error InvalidAllowListRequest(uint64 destChainSelector);
   error SenderNotAllowed(address sender);
   error CallerIsNotARampOnRouter(address caller);
-  error NotSupported(uint64 remoteChainSelector);
+  error RemoteChainNotSupported(uint64 remoteChainSelector);
 
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
   event RemoteChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
@@ -144,7 +144,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   function _assertSenderIsAllowed(uint64 destChainSelector, address sender) internal view virtual {
     RemoteChainConfig storage chainConfig = _getRemoteChainConfig(destChainSelector);
     if (address(chainConfig.router) == address(0)) {
-      revert NotSupported(destChainSelector);
+      revert RemoteChainNotSupported(destChainSelector);
     }
     // CCVs should query the OnRamp address from the router, this allows for OnRamp updates without touching CCVs
     // OnRamp address may be zero intentionally to pause, which should stop all messages.
@@ -164,7 +164,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   ) internal view virtual {
     IRouter router = _getRemoteChainConfig(sourceChainSelector).router;
     if (address(router) == address(0)) {
-      revert NotSupported(sourceChainSelector);
+      revert RemoteChainNotSupported(sourceChainSelector);
     }
     // Check ensures that only a configured offRamp can call the function.
     if (!router.isOffRamp(sourceChainSelector, msg.sender)) {
@@ -219,7 +219,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     uint16 // blockConfirmations
   ) external view virtual returns (uint16 feeUSDCents, uint32 gasForVerification, uint32 payloadSizeBytes) {
     if (s_remoteChainConfigs[destChainSelector].router == IRouter(address(0))) {
-      revert NotSupported(destChainSelector);
+      revert RemoteChainNotSupported(destChainSelector);
     }
     return (
       s_remoteChainConfigs[destChainSelector].feeUSDCents,

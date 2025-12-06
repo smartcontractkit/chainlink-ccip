@@ -156,7 +156,7 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     );
 
     vm.startPrank(s_onRamp);
-    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.NotSupported.selector, unknownDestChainSelector));
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.RemoteChainNotSupported.selector, unknownDestChainSelector));
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
   }
 

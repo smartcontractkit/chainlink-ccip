@@ -10,12 +10,53 @@ import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 
 contract LombardVerifier_verifyMessage is LombardVerifierSetup {
   function test_verifyMessage() public {
-    // Create the ccvData with empty payload and proof.
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    // Proofs are not used.
     bytes memory ccvData = abi.encode("", "");
 
+    vm.startPrank(s_onRamp);
+
+    // This sets the messageId in the mock mailbox to `messageId`.
+    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+
     vm.startPrank(s_offRamp);
-    // Should not revert - the mock mailbox returns success by default.
-    s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), ccvData);
+
+    s_lombardVerifier.verifyMessage(message, messageId, ccvData);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidMessageId() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    vm.startPrank(s_onRamp);
+
+    // This sets the messageId in the mock mailbox to `messageId`.
+    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+
+    vm.startPrank(s_offRamp);
+
+    // Wrong messageId.
+    vm.expectRevert(
+      abi.encodeWithSelector(LombardVerifier.InvalidMessageId.selector, keccak256("messageId"), messageId)
+    );
+    s_lombardVerifier.verifyMessage(message, keccak256("messageId"), abi.encode("", ""));
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidMessageLength() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    bytes memory shortMessageId = new bytes(20);
+
+    // This sets the messageId in the mock mailbox to `shortMessageId`.
+    s_mockMailbox.setMessageId(shortMessageId);
+
+    vm.startPrank(s_offRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageLength.selector, 32, shortMessageId.length));
+    s_lombardVerifier.verifyMessage(message, messageId, abi.encode("", ""));
   }
 
   function test_verifyMessage_RevertWhen_CallerIsNotOffRamp() public {

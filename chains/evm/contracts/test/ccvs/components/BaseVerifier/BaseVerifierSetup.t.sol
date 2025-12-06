@@ -85,10 +85,10 @@ contract BaseVerifierSetup is FeeQuoterSetup {
   ) internal pure returns (MessageV1Codec.MessageV1 memory) {
     return MessageV1Codec.MessageV1({
       sourceChainSelector: sourceChainSelector,
-      destChainSelector: 2,
-      sequenceNumber: 1,
-      executionGasLimit: 400_000,
-      ccipReceiveGasLimit: 200_000,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      messageNumber: 1,
+      executionGasLimit: GAS_LIMIT * 2,
+      ccipReceiveGasLimit: GAS_LIMIT,
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),

@@ -28,6 +28,7 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   }
 
   function test_updateSupportedTokens_AddTokenWithAdapter() public {
+    uint256 countBefore = s_lombardVerifier.getSupportedTokens().length;
     BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
     // The adapter must be a valid ERC20 since the contract calls approve on it.
     BurnMintERC20 adapter = new BurnMintERC20("Adapter Token", "ADAPT", 18, 0, 0);
@@ -45,6 +46,9 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
     uint256 allowance =
       BurnMintERC20(adapter).allowance(address(s_lombardVerifier), address(s_lombardVerifier.i_bridge()));
     assertEq(allowance, type(uint256).max, "Allowance should be max uint256");
+
+    uint256 countAfter = s_lombardVerifier.getSupportedTokens().length;
+    assertEq(countAfter, countBefore + 1, "Supported tokens count should have increased by 1");
   }
 
   function test_updateSupportedTokens_RemoveToken() public {
