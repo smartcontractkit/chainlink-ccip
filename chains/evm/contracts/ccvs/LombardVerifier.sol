@@ -23,6 +23,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error ZeroLombardChainId();
   error PathNotExist(uint64 remoteChainSelector);
   error ExecutionError();
+  error InvalidMessageLength(uint256 expected, uint256 actual);
+  error InvalidMessageId(bytes32 messageMessageId, bytes32 bridgeMessageId);
   error InvalidReceiver(bytes);
   error InvalidMessageVersion(uint8 expected, uint8 actual);
   error TokenNotSupported(address token);
@@ -131,23 +133,28 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       recipient: bytes32(uint256(bytes32(tokenTransfer.tokenReceiver)) >> (256 - tokenTransfer.tokenReceiver.length * 8)),
       amount: tokenTransfer.amount,
       destinationCaller: path.allowedCaller,
-      payload: abi.encode(messageId)
+      optionalMessage: abi.encode(messageId)
     });
 
     return abi.encode(payloadHash);
   }
 
   /// @inheritdoc ICrossChainVerifierV1
-  function verifyMessage(MessageV1Codec.MessageV1 calldata message, bytes32, bytes calldata ccvData) external {
+  function verifyMessage(MessageV1Codec.MessageV1 calldata message, bytes32 messageId, bytes calldata ccvData) external {
     _onlyOffRamp(message.sourceChainSelector);
 
     (bytes memory rawPayload, bytes memory proof) = abi.decode(ccvData, (bytes, bytes));
 
-    // TODO verify message id matches payload message id.
-
-    (, bool executed,) = IMailbox(i_bridge.mailbox()).deliverAndHandle(rawPayload, proof);
+    (, bool executed, bytes memory bridgedMessage) = IMailbox(i_bridge.mailbox()).deliverAndHandle(rawPayload, proof);
     if (!executed) {
       revert ExecutionError();
+    }
+    if (bridgedMessage.length != 32) {
+      revert InvalidMessageLength(32, bridgedMessage.length);
+    }
+    bytes32 returnedMessageId = bytes32(bridgedMessage);
+    if (returnedMessageId != messageId) {
+      revert InvalidMessageId(messageId, returnedMessageId);
     }
   }
 

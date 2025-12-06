@@ -35,19 +35,25 @@ contract MockLombardBridge is IBridgeV2 {
     bytes32,
     uint256,
     bytes32,
-    bytes calldata
+    bytes calldata optionalMessage
   ) external payable override returns (uint256, bytes32) {
-    s_lastPayloadHash = keccak256(abi.encodePacked(block.timestamp));
-    return (0, s_lastPayloadHash);
-  }
+    s_lastPayloadHash = keccak256(abi.encode(block.timestamp, optionalMessage));
 
-  function getAllowedDestinationToken(bytes32, address) external pure override returns (bytes32) {
-    return bytes32(0);
+    MockLombardMailbox(s_mailbox).setMessageId(optionalMessage);
+
+    return (0, s_lastPayloadHash);
   }
 }
 
 contract MockLombardMailbox is IMailbox {
   bool public s_shouldSucceed = true;
+  bytes internal s_optionalMessage = abi.encode(bytes32(0));
+
+  function setMessageId(
+    bytes calldata optionalMessage
+  ) external {
+    s_optionalMessage = optionalMessage;
+  }
 
   function setShouldSucceed(
     bool shouldSucceed
@@ -59,7 +65,7 @@ contract MockLombardMailbox is IMailbox {
     bytes calldata,
     bytes calldata
   ) external view override returns (bytes32, bool, bytes memory) {
-    return (bytes32(0), s_shouldSucceed, "");
+    return (bytes32(0), s_shouldSucceed, s_optionalMessage);
   }
 }
 
@@ -126,8 +132,8 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: DEST_CHAIN_SELECTOR,
       sequenceNumber: 1,
-      executionGasLimit: 400_000,
-      ccipReceiveGasLimit: 200_000,
+      executionGasLimit: GAS_LIMIT * 2,
+      ccipReceiveGasLimit: GAS_LIMIT,
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
       onRampAddress: abi.encodePacked(s_onRamp),
