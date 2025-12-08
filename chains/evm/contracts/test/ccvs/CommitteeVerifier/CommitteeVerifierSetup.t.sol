@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {CommitteeVerifier} from "../../../ccvs/CommitteeVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {SignatureQuorumValidator} from "../../../ccvs/components/SignatureQuorumValidator.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
@@ -21,10 +22,13 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
     s_committeeVerifier = new CommitteeVerifier(_createBasicDynamicConfigArgs(), "testStorageLocation");
     s_versionTag = s_committeeVerifier.versionTag();
 
-    address[] memory validSigner = new address[](1);
-    validSigner[0] = vm.addr(PRIVATE_KEY_0);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = new SignatureQuorumValidator.SignatureConfig[](1);
+    updates[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR;
+    updates[0].signers = new address[](1);
+    updates[0].signers[0] = vm.addr(PRIVATE_KEY_0);
+    updates[0].threshold = 1;
 
-    s_committeeVerifier.setSignatureConfig(validSigner, 1);
+    s_committeeVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
     destChainConfigs[0] = BaseVerifier.DestChainConfigArgs({
