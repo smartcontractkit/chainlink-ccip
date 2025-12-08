@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type MCMSDeploymentConfig struct {
@@ -43,7 +44,16 @@ type MCMSDeploymentConfigPerChainWithAddress struct {
 }
 
 func DeployMCMS(deployerReg *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[MCMSDeploymentConfig] {
-	return cldf.CreateChangeSet(deployMCMSApply(deployerReg, mcmsRegistry), deployMCMSVerify(deployerReg, mcmsRegistry))
+	return cldf.CreateChangeSet(
+		deployMCMSApply(deployerReg, mcmsRegistry, false),
+		deployMCMSVerify(deployerReg, mcmsRegistry),
+	)
+}
+
+func FinalizeDeployMCMS(deployerReg *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[MCMSDeploymentConfig] {
+	return cldf.CreateChangeSet(
+		deployMCMSApply(deployerReg, mcmsRegistry, true),
+		deployMCMSVerify(deployerReg, mcmsRegistry))
 }
 
 func deployMCMSVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, MCMSDeploymentConfig) error {
@@ -56,7 +66,10 @@ func deployMCMSVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistry) fun
 	}
 }
 
-func deployMCMSApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
+func deployMCMSApply(
+	d *DeployerRegistry,
+	mcmsRegistry *changesets.MCMSReaderRegistry,
+	finalize bool) func(cldf.Environment, MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)
@@ -78,8 +91,14 @@ func deployMCMSApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderReg
 				ExistingAddresses:            existingAddrs,
 				ChainSelector:                selector,
 			}
-			deployReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, deployer.DeployMCMS(), e.BlockChains,
-				seqCfg)
+			var deployReport cldf_ops.SequenceReport[MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput]
+			if finalize {
+				deployReport, err = cldf_ops.ExecuteSequence(e.OperationsBundle, deployer.FinalizeDeployMCMS(), e.BlockChains,
+					seqCfg)
+			} else {
+				deployReport, err = cldf_ops.ExecuteSequence(e.OperationsBundle, deployer.DeployMCMS(), e.BlockChains,
+					seqCfg)
+			}
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy MCMS on chain with selector %d: %w", selector, err)
 			}
