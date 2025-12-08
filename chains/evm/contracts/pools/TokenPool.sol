@@ -41,6 +41,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
 
   error InvalidMinBlockConfirmation(uint16 requested, uint16 minBlockConfirmation);
+  error CustomBlockConfirmationsNotEnabled();
   error InvalidTransferFeeBps(uint256 bps);
   error InvalidTokenTransferFeeConfig(uint64 destChainSelector);
   error CallerIsNotARampOnRouter(address caller);
@@ -355,14 +356,17 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
     uint256 amount = lockOrBurnIn.amount;
+
+    // If custom block confirmations are requested, validate against the minimum and apply the custom rate limit.
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
       uint16 minBlockConfirmationConfigured = s_minBlockConfirmation;
-      if (minBlockConfirmationConfigured != 0) {
-        if (blockConfirmationRequested < minBlockConfirmationConfigured) {
-          revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
-        }
-        _consumeCustomBlockConfirmationOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
+      if (minBlockConfirmationConfigured == 0) {
+        revert CustomBlockConfirmationsNotEnabled();
       }
+      if (blockConfirmationRequested < minBlockConfirmationConfigured) {
+        revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
+      }
+      _consumeCustomBlockConfirmationOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     } else {
       _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     }
