@@ -5,9 +5,9 @@ import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_validateReleaseOrMint is TokenPoolV2Setup {
+contract TokenPoolV2_validateReleaseOrMint is AdvancedPoolHooksSetup {
   uint256 internal constant AMOUNT = 100e18;
 
   function test_validateReleaseOrMint() public {

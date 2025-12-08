@@ -17,7 +17,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     IERC20 token,
     address rmnProxy,
     address router
-  ) TokenPool(token, 18, new address[](0), rmnProxy, router) {
+  ) TokenPool(token, 18, address(0), rmnProxy, router) {
     i_facade = facade;
   }
 
@@ -25,7 +25,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16, // finality
-    bytes memory // tokenArgs
+    bytes calldata // tokenArgs
   ) public override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
     if (s_attacked) {
       return (

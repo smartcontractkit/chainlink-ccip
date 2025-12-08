@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../libraries/Pool.sol";
-
 import {ERC20LockBox} from "./ERC20LockBox.sol";
 import {TokenPool} from "./TokenPool.sol";
 
@@ -54,11 +53,11 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router,
     address lockBox
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
 
     token.safeApprove(lockBox, type(uint256).max);
@@ -378,4 +377,10 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     emit LiquidityRemoved(remoteChainSelector, msg.sender, amount);
   }
+
+  /// @notice No-op override to purge the unused code path from the contract.
+  function _postFlightCheck(Pool.ReleaseOrMintInV1 calldata, uint256, uint16) internal pure virtual override {}
+
+  /// @notice No-op override to purge the unused code path from the contract.
+  function _preFlightCheck(Pool.LockOrBurnInV1 calldata, uint16, bytes memory) internal pure virtual override {}
 }

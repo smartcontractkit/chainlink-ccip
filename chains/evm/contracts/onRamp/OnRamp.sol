@@ -23,8 +23,8 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/EnumerableSet.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 // TODO post process hooks?
 contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
@@ -52,7 +52,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
     uint64 indexed destChainSelector,
-    uint64 sequenceNumber,
+    uint64 messageNumber,
     IRouter router,
     address[] defaultCCVs,
     address[] laneMandatedCCVs,
@@ -62,8 +62,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   event CCIPMessageSent(
     uint64 indexed destChainSelector,
-    uint64 indexed sequenceNumber,
+    uint64 indexed messageNumber,
     bytes32 indexed messageId,
+    address feeToken,
     bytes encodedMessage,
     Receipt[] receipts,
     bytes[] verifierBlobs
@@ -95,10 +96,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev Struct to hold the configs for a single destination chain.
   struct DestChainConfig {
     IRouter router; // ────────────╮ Local router address  that is allowed to send messages to the destination chain.
-    // The last used sequence number. This is zero in the case where no messages have yet been sent.
-    // 0 is not a valid sequence number for any real transaction as this value will be incremented before use.
-    uint64 sequenceNumber; //      │
-    uint8 addressBytesLength; // ──╯ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+    // The last used message number. This is zero in the case where no messages have yet been sent.
+    // 0 is not a valid message number for any real transaction as this value will be incremented before use.
+    uint64 messageNumber; //       │
+    uint8 addressBytesLength; //   │ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+    uint16 networkFeeUSDCents; // ─╯ Network fee in USD cents for messages to this destination chain.
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address defaultExecutor; // Default executor to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
@@ -111,16 +113,22 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   // solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector.
-    IRouter router; // ────────────╮ Source router address  that is allowed to send messages to the destination chain.
-    uint8 addressBytesLength; // ──╯ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+    IRouter router; //  Source router address  that is allowed to send messages to the destination chain.
+    uint8 addressBytesLength; // The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+    uint16 networkFeeUSDCents; // Network fee in USD cents for messages to this destination chain.
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
-    address defaultExecutor;
+    address defaultExecutor; // If no executor is specified in the extraArgs, this executor will be used.
     bytes offRamp; // Destination OffRamp address, NOT abi encoded but raw bytes.
   }
 
-  /// @notice Receipt structure used to record gas limits and fees for verifiers, executors and token transfers.
+  /// @notice Receipt structure used to record gas limits and fees for message processing.
+  /// @dev The ordering of receipts in a message is as follows:
+  /// - Verifier receipts in the order of the CCV list.
+  /// - Token transfer receipt (if any tokens are being transferred).
+  /// - Executor receipt.
+  /// - Network fee receipt.
   struct Receipt {
     // The address of the entity that issued the receipt. For token receipts this is the token address, not the pool.
     // for verifiers and executors, this is the user specified value, even if the call is ultimately handled by some
@@ -167,13 +175,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   // │                          Messaging                           │
   // ================================================================
 
-  /// @notice Gets the next sequence number to be used in the onRamp.
+  /// @notice Gets the next message number to be used in the onRamp.
   /// @param destChainSelector The destination chain selector.
-  /// @return nextSequenceNumber The next sequence number to be used.
-  function getExpectedNextSequenceNumber(
+  /// @return nextMessageNumber The next message number to be used.
+  function getExpectedNextMessageNumber(
     uint64 destChainSelector
   ) external view returns (uint64) {
-    return s_destChainConfigs[destChainSelector].sequenceNumber + 1;
+    return s_destChainConfigs[destChainSelector].messageNumber + 1;
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
@@ -207,7 +215,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
       destChainSelector: destChainSelector,
-      sequenceNumber: ++destChainConfig.sequenceNumber,
+      messageNumber: ++destChainConfig.messageNumber,
       executionGasLimit: 0, // Populated after getting receipts.
       ccipReceiveGasLimit: resolvedExtraArgs.gasLimit,
       finality: resolvedExtraArgs.blockConfirmations,
@@ -248,8 +256,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 3. getFee on all verifiers, pool and executor.
 
     CCIPMessageSentEventData memory eventData;
-    // Populate receipts for verifiers, pool and executor in that order.
-    (eventData.receipts, newMessage.executionGasLimit,) = _getReceipts(destChainSelector, message, resolvedExtraArgs);
+    // Populate receipts for verifiers, pool (if applicable), executor and network fee in that order.
+    (eventData.receipts, newMessage.executionGasLimit,) =
+      _getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
     // We don't need to check for feeTokenAmount < receiptsFeeTokenAmount here as that is done in getFee called by the router.
     _distributeFees(message, eventData.receipts);
@@ -289,14 +298,15 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     // 7. emit event.
-    emit CCIPMessageSent(
-      destChainSelector,
-      newMessage.sequenceNumber,
-      messageId,
-      eventData.encodedMessage,
-      eventData.receipts,
-      eventData.verifierBlobs
-    );
+    emit CCIPMessageSent({
+      destChainSelector: destChainSelector,
+      messageNumber: newMessage.messageNumber,
+      messageId: messageId,
+      feeToken: message.feeToken,
+      encodedMessage: eventData.encodedMessage,
+      receipts: eventData.receipts,
+      verifierBlobs: eventData.verifierBlobs
+    });
 
     s_dynamicConfig.reentrancyGuardEntered = false;
 
@@ -309,7 +319,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     IERC20 feeToken = IERC20(message.feeToken);
     uint256 tokenReceiptIndex = type(uint256).max;
     if (message.tokenAmounts.length > 0) {
-      tokenReceiptIndex = receipts.length - 2;
+      // Layout with tokens: verifiers..., token, executor, network fee.
+      tokenReceiptIndex = receipts.length - 3;
       address tokenPool = receipts[tokenReceiptIndex].issuer;
       // In case the token pool supports the IPoolV2 interface, the pool receive the fee share as fee handling logic built in.
       // V1 pools intentionally leave the balance sitting on the OnRamp so it can be withdrawn later.
@@ -317,11 +328,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         feeToken.safeTransfer(address(tokenPool), receipts[tokenReceiptIndex].feeTokenAmount);
       }
     }
-
-    for (uint256 i = 0; i < receipts.length; ++i) {
+    // We iterate up to receipts.length - 1 to skip the network fee receipt which must remain in the onRamp.
+    uint256 networkFeeReceiptIndex = receipts.length - 1;
+    for (uint256 i = 0; i < networkFeeReceiptIndex; ++i) {
+      // We skip fee distribution if:
+      // - The fee is 0.
+      // - The receipt is the token receipt as that's handled above.
+      // - The network fee receipt, as explained above.
+      if (i == tokenReceiptIndex) continue;
       uint256 receiptFee = receipts[i].feeTokenAmount;
-      // We skip fee distribution if the fee is zero or if this is the token receipt (handled separately before the loop).
-      if (receiptFee == 0 || i == tokenReceiptIndex) continue;
+      if (receiptFee == 0) continue;
       feeToken.safeTransfer(receipts[i].issuer, receiptFee);
     }
   }
@@ -551,6 +567,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // The router can be zero to pause the destination chain.
       destChainConfig.router = destChainConfigArg.router;
       destChainConfig.addressBytesLength = destChainConfigArg.addressBytesLength;
+      destChainConfig.networkFeeUSDCents = destChainConfigArg.networkFeeUSDCents;
       destChainConfig.baseExecutionGasCost = destChainConfigArg.baseExecutionGasCost;
       destChainConfig.defaultCCVs = destChainConfigArg.defaultCCVs;
       destChainConfig.laneMandatedCCVs = destChainConfigArg.laneMandatedCCVs;
@@ -562,7 +579,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
       emit DestChainConfigSet(
         destChainSelector,
-        destChainConfig.sequenceNumber,
+        destChainConfig.messageNumber,
         destChainConfigArg.router,
         destChainConfigArg.defaultCCVs,
         destChainConfigArg.laneMandatedCCVs,
@@ -761,7 +778,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     );
 
     // We sum the fees for the verifier, executor and the pool (if any).
-    (,, feeTokenAmount) = _getReceipts(destChainSelector, message, resolvedExtraArgs);
+    (,, feeTokenAmount) =
+      _getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
     return feeTokenAmount;
   }
@@ -770,7 +788,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// - Verifier receipts in the order of the CCV list.
   /// - Token transfer receipt if any tokens are being transferred.
   /// - Executor receipt.
+  /// - Network fee receipt.
   /// @param destChainSelector The destination chain selector.
+  /// @param networkFeeUSDCents The flat network fee charged in USD cents.
   /// @param message The message being sent.
   /// @param extraArgs The extra arguments for the message.
   /// @return receipts The list of receipts for verifiers, token transfer and executor.
@@ -778,11 +798,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @return feeTokenAmount The total fee amount in fee token smallest denomination.
   function _getReceipts(
     uint64 destChainSelector,
+    uint16 networkFeeUSDCents,
     Client.EVM2AnyMessage calldata message,
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) internal view returns (Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeTokenAmount) {
-    // Already ensure there's room for the token transfer and executor receipts.
-    receipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 1);
+    // Already ensure there's room for verifiers, token transfer, executor, and network fee.
+    receipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 2);
     uint32 bytesOverheadSum = 0;
 
     for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
@@ -852,10 +873,20 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
     }
 
-    uint256 executorIndex = receipts.length - 1;
+    uint256 executorIndex = receipts.length - 2;
     // This includes the user callback gas limit.
     receipts[executorIndex] =
       _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
+    // Tag the calling router as the network fee issuer so CCIPMessageSent surfaces which router forwarded the
+    // message. Third-party verifiers can pin on the router address even though the flat network fee stays on
+    // the onRamp for later aggregation.
+    receipts[receipts.length - 1] = Receipt({
+      issuer: msg.sender,
+      destGasLimit: 0,
+      destBytesOverhead: 0,
+      feeTokenAmount: networkFeeUSDCents,
+      extraArgs: ""
+    });
 
     gasLimitSum += receipts[executorIndex].destGasLimit;
     bytesOverheadSum += receipts[executorIndex].destBytesOverhead;

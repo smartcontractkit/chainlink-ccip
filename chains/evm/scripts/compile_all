@@ -8,8 +8,9 @@ echo " └───────────────────────�
 
 # The offRamp uses a specific lower optimization runs value. All other contracts use the default value
 # as specified in the foundry.toml.
-OPTIMIZE_RUNS_LARGE_TOKEN_POOL=500
-OPTIMIZE_RUNS_TOKEN_POOL=500
+OPTIMIZE_RUNS_TOKEN_POOL=50000
+OPTIMIZE_RUNS_LARGE_TOKEN_POOL=15000
+OPTIMIZE_RUNS_USDC=2000
 OPTIMIZE_RUNS_ONRAMP=20000
 
 PROJECT="ccip"
@@ -57,8 +58,17 @@ function getOptimizations() {
     fi
 
     case $contract_name in
-      "HybridLockReleaseUSDCTokenPool")
+      "SiloedLockReleaseTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
+        ;;
+      "USDCTokenPool")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
+        ;;
+      "USDCTokenPoolCCTPV2")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
+        ;;
+      "SiloedUSDCTokenPool")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_USDC"
         ;;
       "OnRamp")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_ONRAMP"
@@ -104,6 +114,7 @@ compileContract pools/USDC/SiloedUSDCTokenPool
 compileContract pools/USDC/USDCTokenPoolCCTPV2
 compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
+compileContract pools/Lombard/LombardTokenPool
 
 # Test helpers
 compileContract test/helpers/USDCReaderTester

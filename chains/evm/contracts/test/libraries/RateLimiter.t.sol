@@ -29,30 +29,7 @@ contract RateLimiter_constructor is RateLimiterSetup {
 }
 
 contract RateLimiter_setTokenBucketConfig is RateLimiterSetup {
-  function test_SetRateLimiterConfig() public {
-    RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
-    assertEq(s_config.rate, rateLimiter.rate);
-    assertEq(s_config.capacity, rateLimiter.capacity);
-
-    s_config =
-      RateLimiter.Config({isEnabled: true, rate: uint128(rateLimiter.rate * 2), capacity: rateLimiter.capacity * 8});
-
-    vm.expectEmit();
-    emit RateLimiter.ConfigChanged(s_config);
-
-    s_helper.setTokenBucketConfig(s_config);
-
-    rateLimiter = s_helper.getRateLimiter();
-    assertEq(s_config.rate, rateLimiter.rate);
-    assertEq(s_config.capacity, rateLimiter.capacity);
-    assertEq(s_config.capacity / 8, rateLimiter.tokens);
-    assertEq(s_config.isEnabled, rateLimiter.isEnabled);
-    assertEq(BLOCK_TIME, rateLimiter.lastUpdated);
-  }
-}
-
-contract RateLimiter_currentTokenBucketState is RateLimiterSetup {
-  function test_CurrentTokenBucketState() public {
+  function test_setTokenBucketConfig_SettingConfigRefills() public {
     RateLimiter.TokenBucket memory bucket = s_helper.currentTokenBucketState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
@@ -67,42 +44,9 @@ contract RateLimiter_currentTokenBucketState is RateLimiterSetup {
     bucket = s_helper.currentTokenBucketState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
-    assertEq(s_config.capacity / 8, bucket.tokens);
-    assertEq(s_config.isEnabled, bucket.isEnabled);
-    assertEq(BLOCK_TIME, bucket.lastUpdated);
-  }
-
-  function test_Refill() public {
-    RateLimiter.TokenBucket memory bucket = s_helper.currentTokenBucketState();
-    assertEq(s_config.rate, bucket.rate);
-    assertEq(s_config.capacity, bucket.capacity);
     assertEq(s_config.capacity, bucket.tokens);
     assertEq(s_config.isEnabled, bucket.isEnabled);
     assertEq(BLOCK_TIME, bucket.lastUpdated);
-
-    s_config = RateLimiter.Config({isEnabled: true, rate: uint128(bucket.rate * 2), capacity: bucket.capacity * 8});
-
-    s_helper.setTokenBucketConfig(s_config);
-
-    bucket = s_helper.currentTokenBucketState();
-    assertEq(s_config.rate, bucket.rate);
-    assertEq(s_config.capacity, bucket.capacity);
-    assertEq(s_config.capacity / 8, bucket.tokens);
-    assertEq(s_config.isEnabled, bucket.isEnabled);
-    assertEq(BLOCK_TIME, bucket.lastUpdated);
-
-    uint256 warpTime = 4;
-    vm.warp(BLOCK_TIME + warpTime);
-
-    bucket = s_helper.currentTokenBucketState();
-
-    assertEq(s_config.capacity / 8 + warpTime * s_config.rate, bucket.tokens);
-
-    vm.warp(BLOCK_TIME + warpTime * 100);
-
-    // Bucket overflow
-    bucket = s_helper.currentTokenBucketState();
-    assertEq(s_config.capacity, bucket.tokens);
   }
 }
 
@@ -154,7 +98,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     assertEq(BLOCK_TIME + warpTime, rateLimiter.lastUpdated);
   }
 
-  function test_ConsumeUnlimited() public {
+  function test_consume_ConsumeWhenDisabled() public {
     s_helper.consume(0, address(0));
 
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
@@ -165,23 +109,13 @@ contract RateLimiter_consume is RateLimiterSetup {
 
     s_helper.setTokenBucketConfig(disableConfig);
 
+    // Should not revert when consuming any amount of tokens when disabled.
     uint256 requestTokens = 50;
     s_helper.consume(requestTokens, address(0));
 
     rateLimiter = s_helper.getRateLimiter();
     assertEq(disableConfig.capacity, rateLimiter.tokens);
     assertEq(disableConfig.isEnabled, rateLimiter.isEnabled);
-
-    s_helper.setTokenBucketConfig(s_config);
-
-    vm.expectRevert(abi.encodeWithSelector(RateLimiter.TokenRateLimitReached.selector, 10, 0, address(0)));
-    s_helper.consume(requestTokens, address(0));
-
-    rateLimiter = s_helper.getRateLimiter();
-    assertEq(s_config.rate, rateLimiter.rate);
-    assertEq(s_config.capacity, rateLimiter.capacity);
-    assertEq(0, rateLimiter.tokens);
-    assertEq(s_config.isEnabled, rateLimiter.isEnabled);
   }
 
   // Reverts

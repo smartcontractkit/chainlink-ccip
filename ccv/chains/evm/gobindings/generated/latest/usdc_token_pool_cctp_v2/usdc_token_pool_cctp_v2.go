@@ -33,19 +33,6 @@ type AuthorizedCallersAuthorizedCallerArgs struct {
 	RemovedCallers []common.Address
 }
 
-type ClientEVM2AnyMessage struct {
-	Receiver     []byte
-	Data         []byte
-	TokenAmounts []ClientEVMTokenAmount
-	FeeToken     common.Address
-	ExtraArgs    []byte
-}
-
-type ClientEVMTokenAmount struct {
-	Token  common.Address
-	Amount *big.Int
-}
-
 type IPoolV2TokenTransferFeeConfig struct {
 	DestGasOverhead                        uint32
 	DestBytesOverhead                      uint32
@@ -98,14 +85,6 @@ type RateLimiterTokenBucket struct {
 	Rate        *big.Int
 }
 
-type TokenPoolCCVConfigArg struct {
-	RemoteChainSelector             uint64
-	OutboundCCVs                    []common.Address
-	OutboundCCVsToAddAboveThreshold []common.Address
-	InboundCCVs                     []common.Address
-	InboundCCVsToAddAboveThreshold  []common.Address
-}
-
 type TokenPoolChainUpdate struct {
 	RemoteChainSelector       uint64
 	RemotePoolAddresses       [][]byte
@@ -114,8 +93,9 @@ type TokenPoolChainUpdate struct {
 	InboundRateLimiterConfig  RateLimiterConfig
 }
 
-type TokenPoolCustomBlockConfirmationRateLimitConfigArgs struct {
+type TokenPoolRateLimitConfigArgs struct {
 	RemoteChainSelector       uint64
+	CustomBlockConfirmation   bool
 	OutboundRateLimiterConfig RateLimiterConfig
 	InboundRateLimiterConfig  RateLimiterConfig
 }
@@ -143,15 +123,15 @@ type USDCTokenPoolDomainUpdate struct {
 }
 
 var USDCTokenPoolCCTPV2MetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"tokenMessenger\",\"type\":\"address\",\"internalType\":\"contract ITokenMessenger\"},{\"name\":\"cctpMessageTransmitterProxy\",\"type\":\"address\",\"internalType\":\"contract CCTPMessageTransmitterProxy\"},{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"contract IERC20\"},{\"name\":\"allowlist\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"rmnProxy\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"FINALITY_THRESHOLD\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"MAX_FEE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"MIN_USDC_MESSAGE_LENGTH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAllowListUpdates\",\"inputs\":[{\"name\":\"removes\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"adds\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAuthorizedCallerUpdates\",\"inputs\":[{\"name\":\"authorizedCallerArgs\",\"type\":\"tuple\",\"internalType\":\"struct AuthorizedCallers.AuthorizedCallerArgs\",\"components\":[{\"name\":\"addedCallers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"removedCallers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyCCVConfigUpdates\",\"inputs\":[{\"name\":\"ccvConfigArgs\",\"type\":\"tuple[]\",\"internalType\":\"struct TokenPool.CCVConfigArg[]\",\"components\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"outboundCCVs\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"outboundCCVsToAddAboveThreshold\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"inboundCCVs\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"inboundCCVsToAddAboveThreshold\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyChainUpdates\",\"inputs\":[{\"name\":\"remoteChainSelectorsToRemove\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"chainsToAdd\",\"type\":\"tuple[]\",\"internalType\":\"struct TokenPool.ChainUpdate[]\",\"components\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddresses\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"},{\"name\":\"remoteTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyCustomBlockConfirmationConfigUpdates\",\"inputs\":[{\"name\":\"minBlockConfirmation\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"rateLimitConfigArgs\",\"type\":\"tuple[]\",\"internalType\":\"struct TokenPool.CustomBlockConfirmationRateLimitConfigArgs[]\",\"components\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyTokenTransferFeeConfigUpdates\",\"inputs\":[{\"name\":\"tokenTransferFeeConfigArgs\",\"type\":\"tuple[]\",\"internalType\":\"struct TokenPool.TokenTransferFeeConfigArgs[]\",\"components\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"tokenTransferFeeConfig\",\"type\":\"tuple\",\"internalType\":\"struct IPoolV2.TokenTransferFeeConfig\",\"components\":[{\"name\":\"destGasOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destBytesOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"customBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"customBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}]},{\"name\":\"disableTokenTransferFeeConfigs\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAllAuthorizedCallers\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowList\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowListEnabled\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCurrentCustomBlockConfirmationRateLimiterState\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"outboundRateLimiterState\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterState\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCurrentRateLimiterState\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"outboundRateLimiterState\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterState\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDomain\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct USDCTokenPool.Domain\",\"components\":[{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"domainIdentifier\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"useLegacySourcePoolDataFormat\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDynamicConfig\",\"inputs\":[],\"outputs\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"thresholdAmountForAdditionalCCVs\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFee\",\"inputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"blockConfirmationRequested\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"feeUSDCents\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"destGasOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destBytesOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"tokenFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getMinBlockConfirmation\",\"inputs\":[],\"outputs\":[{\"name\":\"blockConfirmationConfigured\",\"type\":\"uint16\",\"internalType\":\"uint16\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRateLimitAdmin\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemotePools\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemoteToken\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRequiredCCVs\",\"inputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"direction\",\"type\":\"uint8\",\"internalType\":\"enum IPoolV2.MessageDirection\"}],\"outputs\":[{\"name\":\"requiredCCVs\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRmnProxy\",\"inputs\":[],\"outputs\":[{\"name\":\"rmnProxy\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getSupportedChains\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getToken\",\"inputs\":[],\"outputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"contract IERC20\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTokenDecimals\",\"inputs\":[],\"outputs\":[{\"name\":\"decimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTokenTransferFeeConfig\",\"inputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Client.EVM2AnyMessage\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"struct Client.EVMTokenAmount[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"feeToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"extraArgs\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"feeConfig\",\"type\":\"tuple\",\"internalType\":\"struct IPoolV2.TokenTransferFeeConfig\",\"components\":[{\"name\":\"destGasOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destBytesOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"customBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"customBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"i_localDomainIdentifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"i_messageTransmitterProxy\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contract CCTPMessageTransmitterProxy\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"i_supportedUSDCVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"i_tokenMessenger\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contract ITokenMessenger\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"lockOrBurn\",\"inputs\":[{\"name\":\"lockOrBurnIn\",\"type\":\"tuple\",\"internalType\":\"struct Pool.LockOrBurnInV1\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"originalSender\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Pool.LockOrBurnOutV1\",\"components\":[{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destPoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"lockOrBurn\",\"inputs\":[{\"name\":\"lockOrBurnIn\",\"type\":\"tuple\",\"internalType\":\"struct Pool.LockOrBurnInV1\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"originalSender\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"name\":\"blockConfirmationRequested\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Pool.LockOrBurnOutV1\",\"components\":[{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destPoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"destTokenAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"releaseOrMint\",\"inputs\":[{\"name\":\"releaseOrMintIn\",\"type\":\"tuple\",\"internalType\":\"struct Pool.ReleaseOrMintInV1\",\"components\":[{\"name\":\"originalSender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourceDenominatedAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offchainTokenData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Pool.ReleaseOrMintOutV1\",\"components\":[{\"name\":\"destinationAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"releaseOrMint\",\"inputs\":[{\"name\":\"releaseOrMintIn\",\"type\":\"tuple\",\"internalType\":\"struct Pool.ReleaseOrMintInV1\",\"components\":[{\"name\":\"originalSender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourceDenominatedAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offchainTokenData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"blockConfirmationRequested\",\"type\":\"uint16\",\"internalType\":\"uint16\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Pool.ReleaseOrMintOutV1\",\"components\":[{\"name\":\"destinationAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"removeRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setChainRateLimiterConfig\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"outboundConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setChainRateLimiterConfigs\",\"inputs\":[{\"name\":\"remoteChainSelectors\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"outboundConfigs\",\"type\":\"tuple[]\",\"internalType\":\"struct RateLimiter.Config[]\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundConfigs\",\"type\":\"tuple[]\",\"internalType\":\"struct RateLimiter.Config[]\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setCustomBlockConfirmationRateLimitConfig\",\"inputs\":[{\"name\":\"rateLimitConfigArgs\",\"type\":\"tuple[]\",\"internalType\":\"struct TokenPool.CustomBlockConfirmationRateLimitConfigArgs[]\",\"components\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setDomains\",\"inputs\":[{\"name\":\"domains\",\"type\":\"tuple[]\",\"internalType\":\"struct USDCTokenPool.DomainUpdate[]\",\"components\":[{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"domainIdentifier\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"useLegacySourcePoolDataFormat\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setDynamicConfig\",\"inputs\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"thresholdAmountForAdditionalCCVs\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRateLimitAdmin\",\"inputs\":[{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"withdrawFeeTokens\",\"inputs\":[{\"name\":\"feeTokens\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AllowListAdd\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowListRemove\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AuthorizedCallerAdded\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AuthorizedCallerRemoved\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCVConfigUpdated\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"outboundCCVs\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"},{\"name\":\"outboundCCVsToAddAboveThreshold\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"},{\"name\":\"inboundCCVs\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"},{\"name\":\"inboundCCVsToAddAboveThreshold\",\"type\":\"address[]\",\"indexed\":false,\"internalType\":\"address[]\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"remoteToken\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ConfigChanged\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ConfigSet\",\"inputs\":[{\"name\":\"tokenMessenger\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CustomBlockConfirmationInboundRateLimitConsumed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CustomBlockConfirmationOutboundRateLimitConsumed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CustomBlockConfirmationRateLimitConfigured\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CustomBlockConfirmationUpdated\",\"inputs\":[{\"name\":\"minBlockConfirmation\",\"type\":\"uint16\",\"indexed\":false,\"internalType\":\"uint16\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DefaultFinalityRateLimitConfigured\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DomainsSet\",\"inputs\":[{\"name\":\"\",\"type\":\"tuple[]\",\"indexed\":false,\"internalType\":\"struct USDCTokenPool.DomainUpdate[]\",\"components\":[{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"domainIdentifier\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"useLegacySourcePoolDataFormat\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DynamicConfigSet\",\"inputs\":[{\"name\":\"router\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"thresholdAmountForAdditionalCCVs\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeeTokenWithdrawn\",\"inputs\":[{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"feeToken\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"InboundRateLimitConsumed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"LockedOrBurned\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OutboundRateLimitConsumed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RateLimitAdminSet\",\"inputs\":[{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ReleasedOrMinted\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemotePoolAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemotePoolRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TokenTransferFeeConfigDeleted\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TokenTransferFeeConfigUpdated\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"tokenTransferFeeConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct IPoolV2.TokenTransferFeeConfig\",\"components\":[{\"name\":\"destGasOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destBytesOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"customBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"customBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AllowListNotEnabled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"BucketOverfilled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CallerIsNotARampOnRouter\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ChainAlreadyExists\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ChainNotAllowed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"CursedByRMN\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"DisabledNonZeroRateLimit\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]},{\"type\":\"error\",\"name\":\"DuplicateCCVNotAllowed\",\"inputs\":[{\"name\":\"ccvAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidBurnToken\",\"inputs\":[{\"name\":\"expected\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"got\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidConfig\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidDecimalArgs\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"actual\",\"type\":\"uint8\",\"internalType\":\"uint8\"}]},{\"type\":\"error\",\"name\":\"InvalidDepositHash\",\"inputs\":[{\"name\":\"expected\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"got\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"InvalidDestinationDomain\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidDomain\",\"inputs\":[{\"name\":\"domain\",\"type\":\"tuple\",\"internalType\":\"struct USDCTokenPool.DomainUpdate\",\"components\":[{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"domainIdentifier\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"useLegacySourcePoolDataFormat\",\"type\":\"bool\",\"internalType\":\"bool\"}]}]},{\"type\":\"error\",\"name\":\"InvalidExecutionFinalityThreshold\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidMessageLength\",\"inputs\":[{\"name\":\"length\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidMessageVersion\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidMinBlockConfirmation\",\"inputs\":[{\"name\":\"requested\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"minBlockConfirmation\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]},{\"type\":\"error\",\"name\":\"InvalidMinFinalityThreshold\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidNonce\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"got\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidPreviousPool\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidRateLimitRate\",\"inputs\":[{\"name\":\"rateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]},{\"type\":\"error\",\"name\":\"InvalidReceiver\",\"inputs\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidRemoteChainDecimals\",\"inputs\":[{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidRemotePoolForChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidSourceDomain\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidSourcePoolAddress\",\"inputs\":[{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidTokenMessengerVersion\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidTokenTransferFeeConfig\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidTransferFeeBps\",\"inputs\":[{\"name\":\"bps\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidTransmitterInProxy\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidVersion\",\"inputs\":[{\"name\":\"version\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}]},{\"type\":\"error\",\"name\":\"MismatchedArrayLengths\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NonExistentChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OverflowDetected\",\"inputs\":[{\"name\":\"remoteDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"localDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"remoteAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"PoolAlreadyAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"SenderNotAllowed\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenMaxCapacityExceeded\",\"inputs\":[{\"name\":\"capacity\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"requested\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"tokenAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenRateLimitReached\",\"inputs\":[{\"name\":\"minWaitInSeconds\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"available\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"tokenAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"Unauthorized\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"UnauthorizedCaller\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"UnknownDomain\",\"inputs\":[{\"name\":\"domain\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"UnlockingUSDCFailed\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressInvalid\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
-	Bin: "0x610180806040523461068457616f22803803809161001d8285610a0d565b8339810160c082820312610684578151906001600160a01b038216808303610684576020840151926001600160a01b038416908185036106845760408601516001600160a01b038116969094908786036106845760608101516001600160401b0381116106845781019180601f84011215610684578251926001600160401b038411610689578360051b9060208201946100ba6040519687610a0d565b855260208086019282010192831161068457602001905b8282106109f5575050506100f360a06100ec60808401610a30565b9201610a30565b9060209660405199610105898c610a0d565b60008b52600036813733156109e457600180546001600160a01b03191633179055801580156109d3575b80156109c2575b6109b157600492899260805260c0526040519283809263313ce56760e01b82525afa809160009161097a575b5090610956575b50600660a052600480546001600160a01b0319166001600160a01b03929092169190911790558051151560e0819052610830575b50604051926101ac8585610a0d565b60008452600036813760408051979088016001600160401b03811189821017610689576040528752838588015260005b8451811015610243576001906001600160a01b036101fa8288610a60565b51168761020682610ae1565b610213575b5050016101dc565b7fc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda7758091604051908152a1388761020b565b508493508587519260005b84518110156102bf576001600160a01b036102698287610a60565b51169081156102ae577feb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef88836102a0600195610bfd565b50604051908152a10161024e565b6342bcdf7f60e11b60005260046000fd5b5090859185600161010052841561081f57604051632c12192160e01b81528481600481895afa9081156106ef576000916107ea575b5060405163054fd4d560e41b81526001600160a01b039190911691908581600481865afa9081156106ef576000916107cd575b5063ffffffff8061010051169116908082036107b6575050604051639cdbb18160e01b815285816004818a5afa9081156106ef57600091610799575b5063ffffffff80610100511691169080820361078257505084600491604051928380926367e0ed8360e11b82525afa80156106ef578291600091610739575b506001600160a01b03160361072857600492849261012052610140526040519283809263234d8e3d60e21b82525afa9081156106ef576000916106fb575b506101605260805161012051604051636eb1769f60e11b81523060048201526001600160a01b03918216602482018190529492909116908381604481855afa9081156106ef576000916106c2575b5060001981018091116106ac57604051908482019563095ea7b360e01b87526024830152604482015260448152610466606482610a0d565b6000806040968751936104798986610a0d565b8785527f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c656488860152519082865af13d1561069f573d906001600160401b0382116106895786516104e69490926104d8601f8201601f1916890185610a0d565b83523d60008885013e610cca565b80518061060b575b847f2e902d38f15b233cbb63711add0fca4545334d3a169d60c0a616494d7eea954485858351908152a1516161879081610d9b823960805181818161050601528181610568015281816109e50152818161196201528181611ec10152818161576b015281816157fe01528181615a860152615af6015260a05181818161065b01528181611f30015281816147b10152614828015260c051818181612643015281816142a4015281816143e30152818161509c0152615182015260e051818181610e30015281816127c201526159e40152610100518181816104c2015261457401526101205181818161106d015261192001526101405181818161095b01526118090152610160518181816111fa01528181611a3701526145fa0152f35b81849181010312610684578201518015908115036106845761062e5783806104ee565b50608491519062461bcd60e51b82526004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e6044820152691bdd081cdd58d8d9595960b21b6064820152fd5b600080fd5b634e487b7160e01b600052604160045260246000fd5b916104e692606091610cca565b634e487b7160e01b600052601160045260246000fd5b90508381813d83116106e8575b6106d98183610a0d565b8101031261068457518561042e565b503d6106cf565b6040513d6000823e3d90fd5b61071b9150823d8411610721575b6107138183610a0d565b810190610a44565b836103e0565b503d610709565b632a32133b60e11b60005260046000fd5b9091508581813d831161077b575b6107518183610a0d565b810103126107775751906001600160a01b038216820361077457508190876103a2565b80fd5b5080fd5b503d610747565b633785f8f160e01b60005260045260245260446000fd5b6107b09150863d8811610721576107138183610a0d565b87610363565b63960693cd60e01b60005260045260245260446000fd5b6107e49150863d8811610721576107138183610a0d565b87610327565b90508481813d8311610818575b6108018183610a0d565b810103126106845761081290610a30565b866102f4565b503d6107f7565b6306b7c75960e31b60005260046000fd5b909194604051936108418686610a0d565b60008552600036813760e051156109455760005b85518110156108bc576001906001600160a01b036108738289610a60565b51168861087f82610c36565b61088c575b505001610855565b7f800671136ab6cfee9fbe5ed1fb7ca417811aca3cf864800d127b927adedf756691604051908152a13888610884565b50919350919460005b8451811015610939576001906001600160a01b036108e38288610a60565b5116801561093357876108f582610bbe565b610903575b50505b016108c5565b7f2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d891604051908152a138876108fa565b506108fd565b5091949092503861019d565b6335f4a7b360e01b60005260046000fd5b60ff1660068114610169576332ad3e0760e11b600052600660045260245260446000fd5b8881813d83116109aa575b61098f8183610a0d565b8101031261077757519060ff82168203610774575038610162565b503d610985565b630a64406560e11b60005260046000fd5b506001600160a01b03831615610136565b506001600160a01b0384161561012f565b639b15e16f60e01b60005260046000fd5b60208091610a0284610a30565b8152019101906100d1565b601f909101601f19168101906001600160401b0382119082101761068957604052565b51906001600160a01b038216820361068457565b90816020910312610684575163ffffffff811681036106845790565b8051821015610a745760209160051b010190565b634e487b7160e01b600052603260045260246000fd5b8054821015610a745760005260206000200190600090565b80548015610acb576000190190610ab98282610a8a565b8154906000199060031b1b1916905555565b634e487b7160e01b600052603160045260246000fd5b6000818152601160205260409020548015610b8c5760001981018181116106ac576010546000198101919082116106ac57808203610b3b575b505050610b276010610aa2565b600052601160205260006040812055600190565b610b74610b4c610b5d936010610a8a565b90549060031b1c9283926010610a8a565b819391549060031b91821b91600019901b19161790565b90556000526011602052604060002055388080610b1a565b5050600090565b805490680100000000000000008210156106895781610b5d916001610bba94018155610a8a565b9055565b80600052600360205260406000205415600014610bf757610be0816002610b93565b600254906000526003602052604060002055600190565b50600090565b80600052601160205260406000205415600014610bf757610c1f816010610b93565b601054906000526011602052604060002055600190565b6000818152600360205260409020548015610b8c5760001981018181116106ac576002546000198101919082116106ac57818103610c90575b505050610c7c6002610aa2565b600052600360205260006040812055600190565b610cb2610ca1610b5d936002610a8a565b90549060031b1c9283926002610a8a565b90556000526003602052604060002055388080610c6f565b91929015610d2c5750815115610cde575090565b3b15610ce75790565b60405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152606490fd5b825190915015610d3f5750805190602001fd5b6040519062461bcd60e51b8252602060048301528181519182602483015260005b838110610d825750508160006044809484010152601f80199101168101030190fd5b60208282018101516044878401015285935001610d6056fe6080604052600436101561001257600080fd5b60003560e01c806301ffc9a714610357578063181f5a7714610352578063212a052e1461034d57806321df0da714610348578063240028e8146103435780632451a6271461033e57806324f65ee7146103395780632c0634041461033457806337b192471461032f578063390775371461032a578063489a68f2146103255780634ac8bd5f146103205780634c5ef0ed1461031b57806354c8a4f31461031657806359152aad146103115780636155cda01461030c57806362ddd3c414610307578063698c2c66146103025780636b716b0d146102fd5780636d3d1a58146102f85780637437ff9f146102f357806379ba5097146102ee5780637d54534e146102e95780638926f54f146102e457806389720a62146102df5780638da5cb5b146102da57806391a2749a146102d5578063962d4020146102d05780639751f884146102cb57806398db9643146102c65780639a4575b9146102c1578063a42a7b8b146102bc578063a7cd63b7146102b7578063acfecf91146102b2578063b1c71c65146102ad578063b7946580146102a8578063bb6bb5a7146102a3578063bc063e1a1461029e578063c4bffe2b14610299578063c7230a6014610294578063c8c8fd191461028f578063cf7401f31461028a578063d966866b14610285578063da4b05e714610280578063dc04fa1f1461027b578063dc0bd97114610276578063ded8d95614610271578063dfadfa351461026c578063e0351e1314610267578063e8a1da1714610262578063f2fde38b1461025d5763fa41d79c1461025857600080fd5b612c1b565b612b90565b6127e7565b6127aa565b6126e1565b612667565b612623565b6125a4565b612587565b6123dc565b612336565b61225e565b612120565b612095565b612036565b611fba565b611f83565b611e28565b611d15565b611cbb565b611bd7565b611868565b6117e9565b611774565b61158b565b6114ca565b61141b565b6113aa565b61136c565b611300565b611278565b611245565b61121e565b6111dd565b611132565b6110c9565b61104d565b610fbf565b610dfe565b610d36565b610b52565b610a84565b61089d565b610802565b6106e1565b610641565b6105db565b61053b565b6104e6565b6104a5565b610442565b346103dd5760203660031901126103dd5760043563ffffffff60e01b81168091036103dd5763aff2afbf60e01b81149081156103cc575b81156103bb575b81156103aa575b506040519015158152602090f35b6301ffc9a760e01b1490503861039c565b630e64dd2960e01b81149150610395565b636e065e9b60e11b8114915061038e565b600080fd5b60009103126103dd57565b919082519283825260005b848110610419575050826000602080949584010152601f8019910116010190565b806020809284010151828286010152016103f8565b90602061043f9281815201906103ed565b90565b346103dd5760003660031901126103dd576104a160408051906104658183610c6c565b601d82527f55534443546f6b656e506f6f6c43435450563220312e372e302d6465760000006020830152519182916020835260208301906103ed565b0390f35b346103dd5760003660031901126103dd57602060405163ffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b346103dd5760003660031901126103dd5760206040516001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000168152f35b6001600160a01b038116036103dd57565b346103dd5760203660031901126103dd57602061058e60043561055d8161052a565b6001600160a01b03807f00000000000000000000000000000000000000000000000000000000000000001691161490565b6040519015158152f35b602060408183019282815284518094520192019060005b8181106105bc5750505090565b82516001600160a01b03168452602093840193909201916001016105af565b346103dd5760003660031901126103dd576040516010548082526020820190601060005260206000209060005b81811061062b576104a18561061f81870382610c6c565b60405191829182610598565b8254845260209093019260019283019201610608565b346103dd5760003660031901126103dd57602060405160ff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b6001600160401b038116036103dd57565b359061069b8261067f565b565b61ffff8116036103dd57565b359061069b8261069d565b9181601f840112156103dd578235916001600160401b0383116103dd57602083818601950101116103dd57565b346103dd5760c03660031901126103dd576106fd60043561052a565b6024356107098161067f565b61071460643561052a565b6084356107208161069d565b60a435916001600160401b0383116103dd5761ffff61075563ffffffff93849361074e8736906004016106b4565b5050612cc3565b6040805195865293909716602085015294169082015291166060820152901515608082015260a090f35b908160a09103126103dd5790565b61069b9092919260c08060e083019563ffffffff815116845263ffffffff602082015116602085015263ffffffff604082015116604085015263ffffffff606082015116606085015261ffff60808201511660808501526107f960a082015160a086019061ffff169052565b01511515910152565b346103dd5760a03660031901126103dd5761081e60043561052a565b60243561082a8161067f565b6044356001600160401b0381116103dd5761084990369060040161077f565b5061085560643561069d565b6084356001600160401b0381116103dd576104a19161087b6108829236906004016106b4565b5050612dbe565b6040519182918261078d565b90816101009103126103dd5790565b346103dd5760203660031901126103dd576004356001600160401b0381116103dd576108cd90369060040161088e565b6108d5612e8b565b5060608101356108e5818361422b565b61094d60206109026108fa60e0860186612e9e565b810190612ed0565b61092b61092461091f61091860c0890189612e9e565b3691610ce4565b6144cb565b8251614561565b805190820151604051630afd9fa560e31b815293849283929060048401612f5b565b038160006001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000165af1908115610a7f57600091610a50575b5015610a3f57817ffc5e3a5bddc11d92c2dc20fae6f7d5eb989f056be35239f7de7e86150609abc06001600160401b036109d760406109d060206104a19801612f8c565b9401612f96565b604080516001600160a01b037f000000000000000000000000000000000000000000000000000000000000000081168252336020830152929092169082015260608101859052921691608090a2610a2c610c8d565b8190526040519081529081906020820190565b635fcb4f9160e11b60005260046000fd5b610a72915060203d602011610a78575b610a6a8183610c6c565b810190612f46565b3861098c565b503d610a60565b612f80565b346103dd5760403660031901126103dd576004356001600160401b0381116103dd57610ab76104a191369060040161088e565b60243590610ac48261069d565b6000604051610ad281610bc5565b52610b04610afc6060830135610af6610af161091860c0870187612e9e565b614739565b90614825565b9283836143a5565b7ffc5e3a5bddc11d92c2dc20fae6f7d5eb989f056be35239f7de7e86150609abc06001600160401b036109d760206040850194610b41863561052a565b013593610b4d8561067f565b612f96565b346103dd5760203660031901126103dd576004356001600160401b0381116103dd57366023820112156103dd5780600401356001600160401b0381116103dd5736602460c08302840101116103dd576024610bad9201612fa0565b005b634e487b7160e01b600052604160045260246000fd5b602081019081106001600160401b03821117610be057604052565b610baf565b604081019081106001600160401b03821117610be057604052565b606081019081106001600160401b03821117610be057604052565b60a081019081106001600160401b03821117610be057604052565b60e081019081106001600160401b03821117610be057604052565b60c081019081106001600160401b03821117610be057604052565b90601f801991011681019081106001600160401b03821117610be057604052565b6040519061069b602083610c6c565b6040519061069b604083610c6c565b6040519061069b608083610c6c565b6040519061069b60a083610c6c565b6001600160401b038111610be057601f01601f191660200190565b929192610cf082610cc9565b91610cfe6040519384610c6c565b8294818452818301116103dd578281602093846000960137010152565b9080601f830112156103dd5781602061043f93359101610ce4565b346103dd5760403660031901126103dd57600435610d538161067f565b6024356001600160401b0381116103dd57602091610d7861058e923690600401610d1b565b906132e9565b9181601f840112156103dd578235916001600160401b0383116103dd576020808501948460051b0101116103dd57565b60406003198201126103dd576004356001600160401b0381116103dd5781610dd891600401610d7e565b92909291602435906001600160401b0382116103dd57610dfa91600401610d7e565b9091565b346103dd57610e26610e2e610e1236610dae565b9491610e1f9391936148f9565b3691611459565b923691611459565b7f000000000000000000000000000000000000000000000000000000000000000015610f7e5760005b8251811015610ee85780610e7d610e7060019386613615565b516001600160a01b031690565b610e9f610e9a6001600160a01b0383165b6001600160a01b031690565b615b75565b610eab575b5001610e57565b6040516001600160a01b039190911681527f800671136ab6cfee9fbe5ed1fb7ca417811aca3cf864800d127b927adedf756690602090a138610ea4565b5060005b8151811015610bad5780610f05610e7060019385613615565b6001600160a01b03811615610f7857610f2e610f296001600160a01b038316610e8e565b615dea565b610f3b575b505b01610eec565b6040516001600160a01b039190911681527f2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d890602090a183610f33565b50610f35565b6335f4a7b360e01b60005260046000fd5b9181601f840112156103dd578235916001600160401b0383116103dd5760208085019460e085020101116103dd57565b346103dd5760403660031901126103dd57600435610fdc8161069d565b6024356001600160401b0381116103dd577f303439e67d1363a21c3ecd1158164e797c51eced31b0351ec0e1f7afaf97779e9161104461ffff6110256020943690600401610f8f565b9190936110306148f9565b16928361ffff19600b541617600b556149a8565b604051908152a1005b346103dd5760003660031901126103dd5760206040516001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000168152f35b9060406003198301126103dd576004356110aa8161067f565b91602435906001600160401b0382116103dd57610dfa916004016106b4565b346103dd576110d736611091565b6110e29291926148f9565b6001600160401b038216611103816000526007602052604060002054151590565b1561111e5750610bad92611118913691610ce4565b90614ca9565b631e670e4b60e01b60005260045260246000fd5b346103dd5760403660031901126103dd5760043561114f8161052a565b60243561115a6148f9565b6001600160a01b0382169182156111cc577f78c5af2c6ab8d53b1850f16dd49fb61b0c1fef46835b922a40e3ce1f623f0238926001600160a01b03196004541617600455816005556111c760405192839283602090939291936001600160a01b0360408201951681520152565b0390a1005b630a64406560e11b60005260046000fd5b346103dd5760003660031901126103dd57602060405163ffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b346103dd5760003660031901126103dd5760206001600160a01b03600a5416604051908152f35b346103dd5760003660031901126103dd57600454600554604080516001600160a01b039093168352602083019190915290f35b346103dd5760003660031901126103dd576000546001600160a01b03811633036112ef5760015490336001600160a01b03198316176001556001600160a01b0319166000556001600160a01b033391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b63015aa1e360e11b60005260046000fd5b346103dd5760203660031901126103dd577f44676b5284b809a22248eba0da87391d79098be38bb03154be88a58bf4d0917460206001600160a01b036004356113488161052a565b6113506148f9565b16806001600160a01b0319600a541617600a55604051908152a1005b346103dd5760203660031901126103dd57602061058e6001600160401b036004356113968161067f565b166000526007602052604060002054151590565b346103dd5760c03660031901126103dd576113c660043561052a565b6024356113d28161067f565b604435906113e160643561069d565b6084356001600160401b0381116103dd576114009036906004016106b4565b505060a43560028110156103dd576104a19261061f92613345565b346103dd5760003660031901126103dd5760206001600160a01b0360015416604051908152f35b6001600160401b038111610be05760051b60200190565b92919061146581611442565b936114736040519586610c6c565b602085838152019160051b81019283116103dd57905b82821061149557505050565b6020809183356114a48161052a565b815201910190611489565b9080601f830112156103dd5781602061043f93359101611459565b346103dd5760203660031901126103dd576004356001600160401b0381116103dd57604060031982360301126103dd5760405161150681610be5565b81600401356001600160401b0381116103dd5761152990600436918501016114af565b815260248201356001600160401b0381116103dd57610bad92600461155192369201016114af565b60208201526133a1565b9181601f840112156103dd578235916001600160401b0383116103dd57602080850194606085020101116103dd57565b346103dd5760603660031901126103dd576004356001600160401b0381116103dd576115bb903690600401610d7e565b906024356001600160401b0381116103dd576115db90369060040161155b565b906044356001600160401b0381116103dd576115fb90369060040161155b565b611610610e8e600a546001600160a01b031690565b331415806116bd575b6116a45783861480159061169a575b6116895760005b86811061163857005b8061168361165161164c6001948b8b6134d6565b612f8c565b61165c8389896134e6565b61167d61167561166d86898b6134e6565b9236906122ed565b9136906122ed565b91614ebe565b0161162f565b632b477e7160e11b60005260046000fd5b5080861415611628565b63472511eb60e11b6000523360045260246000fd5b6000fd5b506116d3610e8e6001546001600160a01b031690565b331415611619565b9160a061069b929493611730816101408101976001600160801b036080809282815116855263ffffffff6020820151166020860152604081015115156040860152826060820151166060860152015116910152565b01906001600160801b036080809282815116855263ffffffff6020820151166020860152604081015115156040860152826060820151166060860152015116910152565b346103dd5760203660031901126103dd576001600160401b036004356117998161067f565b6117a16134f6565b506117aa6134f6565b5016600052600860205260406000206117d96117cd60026117d26117cd85613521565b614fde565b9301613521565b906104a1604051928392836116db565b346103dd5760003660031901126103dd5760206040516001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000168152f35b61043f91602061184683516040845260408401906103ed565b9201519060208184039101526103ed565b90602061043f92818152019061182d565b346103dd5760203660031901126103dd576004356001600160401b0381116103dd5761189890369060040161077f565b6118a0613572565b506118aa8161505c565b602081016118db6118d66118bd83612f8c565b6001600160401b03166000526012602052604060002090565b61358b565b916118f06118ec6060850151151590565b1590565b611b4f5760206119008280612e9e565b905003611b245760208301518015611b0857925b60606001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016920135926040820192611957845163ffffffff1690565b926001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016938151833b156103dd57604051630d04857b60e41b81526004810189905263ffffffff929092166024830152604482018990526001600160a01b03861660648301526084820152600060a482018190526107d060c4830152909492859060e490829084905af18015610a7f57611a8c611ad096611a6b7ff33bc26b4413b0e7f19f1ea739fdf99098c0061f1f87d954b11f5293fad9ae1094866104a19c611acb9a6001600160401b0397611aed575b50611a617f0000000000000000000000000000000000000000000000000000000000000000955163ffffffff1690565b9251928d8661524f565b611a82611a76610c9c565b63ffffffff9093168352565b60208201526152fa565b96611ac3611a9986612f8c565b604080516001600160a01b0390971687523360208801528601929092529116929081906060820190565b0390a2612f8c565b613725565b90611ad9610c9c565b918252602082015260405191829182611857565b80611afc6000611b0293610c6c565b806103e2565b38611a31565b50611b1e611b168280612e9e565b810190613606565b92611914565b80611b2e91612e9e565b60405163a3c8cf0960e01b8152918291611b4b91600484016135f5565b0390fd5b6116b9611b5b83612f8c565b636900e24560e11b6000526001600160401b0316600452602490565b602081016020825282518091526040820191602060408360051b8301019401926000915b838310611baa57505050505090565b9091929394602080611bc8600193603f1986820301875289516103ed565b97019301930191939290611b9b565b346103dd5760203660031901126103dd576001600160401b03600435611bfc8161067f565b166000526008602052611c156005604060002001615670565b805190611c2182611442565b91611c2f6040519384610c6c565b808352611c3e601f1991611442565b0160005b818110611caa57505060005b8151811015611c9c5780611c80611c7b611c6a60019486613615565b516000526009602052604060002090565b613663565b611c8a8286613615565b52611c958185613615565b5001611c4e565b604051806104a18582611b77565b806060602080938701015201611c42565b346103dd5760003660031901126103dd576040516002548082526020820190600260005260206000209060005b818110611cff576104a18561061f81870382610c6c565b8254845260209093019260019283019201611ce8565b346103dd57611d2336611091565b611d2e9291926148f9565b6001600160401b03821691611d536118ec846000526007602052604060002054151590565b611def57611d956118ec6005611d7c846001600160401b03166000526008602052604060002090565b01611d88368689610ce4565b6020815191012090615ca8565b611dd157507f52d00ee4d9bd51b40168f2afc5848837288ce258784ad914278791464b3f4d769192611dcc604051928392836135f5565b0390a2005b611b4b8492604051938493631d3c8f1f60e21b855260048501613705565b631e670e4b60e01b6000526001600160401b031660045260246000fd5b929190611e2360209160408652604086019061182d565b930152565b346103dd5760603660031901126103dd576004356001600160401b0381116103dd57611e5890369060040161077f565b602435611e648161069d565b604435906001600160401b0382116103dd57611ea7602091611e8d611f29943690600401610d1b565b50611e96613572565b50611ea18186615145565b84615338565b920135611eb38161067f565b604080516001600160a01b037f00000000000000000000000000000000000000000000000000000000000000001681523360208201529081018490526001600160401b038216907ff33bc26b4413b0e7f19f1ea739fdf99098c0061f1f87d954b11f5293fad9ae1090606090a2611acb8161067f565b60405160ff7f000000000000000000000000000000000000000000000000000000000000000016602082015260208152611f64604082610c6c565b611f6c610c9c565b91825260208201526104a160405192839283611e0c565b346103dd5760203660031901126103dd576104a1611fa6600435611acb8161067f565b6040519182916020835260208301906103ed565b346103dd5760203660031901126103dd576004356001600160401b0381116103dd57611fea903690600401610f8f565b6001600160a01b03600a541633141580612021575b61200c57610bad916149a8565b63472511eb60e11b6000523360045260246000fd5b506001600160a01b0360015416331415611fff565b346103dd5760003660031901126103dd57602060405160008152f35b602060408183019282815284518094520192019060005b8181106120765750505090565b82516001600160401b0316845260209384019390920191600101612069565b346103dd5760003660031901126103dd576120ae615625565b8051906120ba82611442565b916120c86040519384610c6c565b8083526120d7601f1991611442565b0136602084013760005b815181101561211257806001600160401b036120ff60019385613615565b511661210b8286613615565b52016120e1565b604051806104a18582612052565b346103dd5760403660031901126103dd576004356001600160401b0381116103dd57612150903690600401610d7e565b9060243561215d8161052a565b6121656148f9565b60005b83811061217157005b612185610e8e610e8e610b4d8488886134d6565b6040516370a0823160e01b81523060048201529190602090839060249082905afa8015610a7f57600192600091612230575b50806121c5575b5001612168565b6121e081856121db610e8e610b4d878c8c6134d6565b6153b9565b6121ee610b4d8388886134d6565b6040519182526001600160a01b0390811691908516907f508d7d183612c18fc339b42618912b9fa3239f631dd7ec0671f950200a0fa66e90602090a3386121be565b612251915060203d8111612257575b6122498183610c6c565b810190613746565b386121b7565b503d61223f565b346103dd5760003660031901126103dd5760206040516101188152f35b801515036103dd57565b359061069b8261227b565b6001600160801b038116036103dd57565b60609060831901126103dd57604051906122ba82610c00565b816084356122c78161227b565b815260a4356122d581612290565b6020820152604060c435916122e983612290565b0152565b91908260609103126103dd5760405161230581610c00565b604080829480356123158161227b565b8452602081013561232581612290565b60208501520135916122e983612290565b346103dd5760e03660031901126103dd576004356123538161067f565b60603660231901126103dd5760405161236b81610c00565b6024356123778161227b565b815260443561238581612290565b602082015260643561239681612290565b60408201526123a4366122a1565b906001600160a01b03600a5416331415806123c7575b61200c57610bad92614ebe565b506001600160a01b03600154163314156123ba565b346103dd5760203660031901126103dd576004356001600160401b0381116103dd5761240c903690600401610d7e565b6124146148f9565b60005b81811061242057005b80837fece8a336aec3d0587372c99a62c7158c83d7419e28f8c519094cf44763b00e7d6001600160401b0361245b61164c6001968886613755565b61257e61247661246c878a88613755565b6020810190613777565b896124916124878a838b969b613755565b6040810190613777565b6124c46124ba8c6124b26124a882888b989b613755565b6060810190613777565b969095613755565b6080810190613777565b9590946124da6124d536838f611459565b615498565b6124e86124d5368585611459565b6124f66124d5368787611459565b6125046124d5368989611459565b6125708c61251c612513610cab565b91843691611459565b8152612529368686611459565b6020820152612539368888611459565b6040820152612549368a8a611459565b606082015261256b8b6001600160401b0316600052600e602052604060002090565b613895565b604051998a99169b8961399a565b0390a201612417565b346103dd5760003660031901126103dd5760206040516107d08152f35b346103dd5760403660031901126103dd576004356001600160401b0381116103dd57366023820112156103dd578060040135906001600160401b0382116103dd573660248360081b830101116103dd57602435906001600160401b0382116103dd57610bad9261261a6024933690600401610d7e565b939092016139e6565b346103dd5760003660031901126103dd5760206040516001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000168152f35b346103dd5760203660031901126103dd576004356126848161067f565b61268c6134f6565b506126956134f6565b506117d96117cd6126c26126c76117cd6126c2866001600160401b0316600052600c602052604060002090565b613521565b936001600160401b0316600052600d602052604060002090565b346103dd5760203660031901126103dd576001600160401b036004356127068161067f565b61270e6134f6565b501660005260126020526104a1604060002060ff60026040519261273184610c1b565b8054845260018101546020850152015463ffffffff81166040840152818160201c161515606084015260281c16151560808201526040519182918291909160808060a0830194805184526020810151602085015263ffffffff604082015116604085015260608101511515606085015201511515910152565b346103dd5760003660031901126103dd5760206040517f000000000000000000000000000000000000000000000000000000000000000015158152f35b346103dd576127f536610dae565b9190926128006148f9565b6000915b808310612a5b5750505060009163ffffffff4216925b82811061282357005b612836612831828585613ee3565b613f84565b90606082016128458151615555565b60808301936128548551615555565b6040840190815151156111cc5761288c6118ec61288761287b88516001600160401b031690565b6001600160401b031690565b615e25565b612a2b5761298d6128c36128aa879a999a516001600160401b031690565b6001600160401b03166000526008602052604060002090565b6129598961295387516129436128e360408301516001600160801b031690565b916129336129056128fe60208401516001600160801b031690565b9251151590565b61292a612910610cba565b6001600160801b03851681529763ffffffff166020890152565b15156040870152565b6001600160801b03166060850152565b6001600160801b03166080830152565b82614019565b612982896129798a516129436128e360408301516001600160801b031690565b60028301614019565b6004845191016140dc565b602085019660005b885180518210156129cf57906129c96001926129c2836129bc8c516001600160401b031690565b92613615565b5190614ca9565b01612995565b50509796509490612a227f8d340f17e19058004c20453540862a9c62778504476f6756755cb33bcd6c38c29392612a0f600197516001600160401b031690565b92519351905190604051948594856141a9565b0390a10161281a565b6116b9612a3f86516001600160401b031690565b631d5ad3c560e01b6000526001600160401b0316600452602490565b909192612a6c61164c8584866134d6565b94612a826118ec6001600160401b038816615c1d565b612b7257612aae6005612aa8886001600160401b03166000526008602052604060002090565b01615670565b9360005b8551811015612af957600190612af26005612ae08b6001600160401b03166000526008602052604060002090565b01612aeb838a613615565b5190615ca8565b5001612ab2565b509350937f5204aec90a3c794d8e90fded8b46ae9c7c552803e7e832e0c1d358396d859916612b6460019397612b4a612b45826001600160401b03166000526008602052604060002090565b613e53565b6040516001600160401b0390911681529081906020820190565b0390a1019190939293612804565b631e670e4b60e01b6000526001600160401b03861660045260246000fd5b346103dd5760203660031901126103dd576001600160a01b03600435612bb58161052a565b612bbd6148f9565b16338114612c0a57806001600160a01b031960005416176000556001600160a01b03600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b636d6c4ee560e11b60005260046000fd5b346103dd5760003660031901126103dd57602061ffff600b5416604051908152f35b9061069b604051612c4d81610c36565b60c0612cbc82955463ffffffff8116845263ffffffff8160201c16602085015263ffffffff8160401c16604085015263ffffffff808260601c16166060850152612ca561ffff8260801c16608086019061ffff169052565b61ffff609082901c1660a085015260a01c60ff1690565b1515910152565b612ce3612ce8916001600160401b0316600052600f602052604060002090565b612c3d565b90612cf96118ec60c0840151151590565b612dab5761ffff81169081612d4e575050604081015163ffffffff16815163ffffffff169263ffffffff612d436080612d39602087015163ffffffff1690565b95015161ffff1690565b921693929190600190565b600b5461ffff16918211612d8d575050606081015163ffffffff16815163ffffffff169263ffffffff612d4360a0612d39602087015163ffffffff1690565b637911d95b60e01b60005261ffff9081166004521660245260446000fd5b5050600090600090600090600090600090565b6001600160401b0390600060c0604051612dd781610c36565b8281528260208201528260408201528260608201528260808201528260a0820152015216600052600f602052604060002061043f612e8260405192612e1b84610c36565b5463ffffffff8116845263ffffffff8160201c166020850152612e5063ffffffff8260401c16604086019063ffffffff169052565b612e6b606082901c63ffffffff1663ffffffff166060860152565b612ca5608082901c61ffff1661ffff166080860152565b151560c0830152565b60405190612e9882610bc5565b60008252565b903590601e19813603018212156103dd57018035906001600160401b0382116103dd576020019181360383136103dd57565b6020818303126103dd578035906001600160401b0382116103dd57016040818303126103dd5760405191612f0383610be5565b81356001600160401b0381116103dd5781612f1f918401610d1b565b835260208201356001600160401b0381116103dd57612f3e9201610d1b565b602082015290565b908160209103126103dd575161043f8161227b565b9091612f7261043f936040845260408401906103ed565b9160208184039101526103ed565b6040513d6000823e3d90fd5b3561043f8161067f565b3561043f8161052a565b612fa86148f9565b60005b828110612fea5750907fc97f93e817584952f1c1d633f93784b8430f0633d002f9dcc4de4fe2780424d091612fe56040519283928361324a565b0390a1565b612ffd612ff8828585613138565b613166565b80511580156130fe575b61309f5790613099826130946118bd60606001965193613086602082015161307d613039604085015163ffffffff1690565b6130756130496080870151151590565b9161305760a0880151151590565b94613060610cba565b9b8c5260208c015263ffffffff1660408b0152565b151588860152565b15156080870152565b01516001600160401b031690565b6131d9565b01612fab565b604080516319d7585760e01b815282516004820152602083015160248201529082015163ffffffff16604482015260608201516001600160401b0316606482015260808201511515608482015260a090910151151560a482015260c490fd5b506001600160401b0361311b60608301516001600160401b031690565b1615613007565b634e487b7160e01b600052603260045260246000fd5b91908110156131485760c0020190565b613122565b63ffffffff8116036103dd57565b359061069b8261314d565b60c0813603126103dd5760a06040519161317f83610c51565b8035835260208101356020840152604081013561319b8161314d565b604084015260608101356131ae8161067f565b606084015260808101356131c18161227b565b608084015201356131d18161227b565b60a082015290565b60026080918351815560208401516001820155019161321263ffffffff604083015116849063ffffffff1663ffffffff19825416179055565b60608101518354929091015165ffff000000001990921690151560201b64ff00000000161790151560281b65ff000000000016179055565b602080825281018390526040019160005b8181106132685750505090565b90919260c080600192863581526020870135602082015263ffffffff60408801356132928161314d565b1660408201526001600160401b0360608801356132ae8161067f565b16606082015260808701356132c28161227b565b1515608082015260a08701356132d78161227b565b151560a082015201940192910161325b565b906001600160401b0361043f92166000526008602052600560406000200190602081519101209060019160005201602052604060002054151590565b6001600160401b0361043f91166000526007602052604060002054151590565b6001600160401b0316600052600e602052604060002091600281101561338b5760011461337a5781600161043f930190614de7565b816002600361043f94019101614de7565b634e487b7160e01b600052602160045260246000fd5b6133a96148f9565b60208101519160005b835181101561342e57806133cb610e7060019387613615565b6133e56133e06001600160a01b038316610e8e565b61605e565b6133f1575b50016133b2565b6040516001600160a01b039190911681527fc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda7758090602090a1386133ea565b5091505160005b81518110156134d25761344b610e708284613615565b906001600160a01b038216156134c1577feb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef6134b88361349d613498610e8e6001976001600160a01b031690565b615e5a565b506040516001600160a01b0390911681529081906020820190565b0390a101613435565b6342bcdf7f60e11b60005260046000fd5b5050565b91908110156131485760051b0190565b9190811015613148576060020190565b6040519061350382610c1b565b60006080838281528260208201528260408201528260608201520152565b9060405161352e81610c1b565b60806001600160801b036001839560ff8154848116875263ffffffff81871c16602088015260a01c1615156040860152015481808216166060850152821c16910152565b6040519061357f82610be5565b60606020838281520152565b9060405161359881610c1b565b608060ff600283958054855260018101546020860152015463ffffffff81166040850152818160201c161515606085015260281c161515910152565b908060209392818452848401376000828201840152601f01601f1916010190565b91602061043f9381815201916135d4565b908160209103126103dd573590565b80518210156131485760209160051b010190565b90600182811c92168015613659575b602083101461364357565b634e487b7160e01b600052602260045260246000fd5b91607f1691613638565b906040519182600082549261367784613629565b80845293600181169081156136e3575060011461369c575b5061069b92500383610c6c565b90506000929192526020600020906000915b8183106136c757505090602061069b928201013861368f565b60209193508060019154838589010152019101909184926136ae565b90506020925061069b94915060ff191682840152151560051b8201013861368f565b6040906001600160401b0361043f959316815281602082015201916135d4565b6001600160401b0316600052600860205261043f6004604060002001613663565b908160209103126103dd575190565b91908110156131485760051b81013590609e19813603018212156103dd570190565b903590601e19813603018212156103dd57018035906001600160401b0382116103dd57602001918160051b360383136103dd57565b634e487b7160e01b600052601160045260246000fd5b818102929181159184041417156137d557565b6137ac565b916137f49183549060031b91821b91600019901b19161790565b9055565b818110613803575050565b600081556001016137f8565b8151916001600160401b038311610be057680100000000000000008311610be0576020908254848455808510613878575b500190600052602060002060005b83811061385b5750505050565b60019060206001600160a01b03855116940193818401550161384e565b61388f9084600052858460002091820191016137f8565b38613840565b9080518051906001600160401b038211610be057680100000000000000008211610be0576020908454838655808410613939575b500183600052602060002060005b83811061391657505050509060036060836138fc602061069b9601516001860161380f565b61390d60408201516002860161380f565b0151910161380f565b600190602061392c85516001600160a01b031690565b94019381840155016138d7565b6139509086600052848460002091820191016137f8565b386138c9565b9160209082815201919060005b8181106139705750505090565b9091926020806001926001600160a01b03873561398c8161052a565b168152019401929101613963565b9694926139d8946139bc6139ca9361043f9b999560808c5260808c0191613956565b9189830360208b0152613956565b918683036040880152613956565b926060818503910152613956565b909291926139f26148f9565b60005b818110613a735750505060005b818110613a0e57505050565b806001600160401b03613a2761164c60019486886134d6565b6000613a46826001600160401b0316600052600f602052604060002090565b55167f5479bbc0288b7eaeaf2ace0943b88016cc648964fcd42919a86fd93b15fdbee8600080a201613a02565b613a8161164c828486613bc5565b613a8c828486613bc5565b906020820191613aa16118ec60e08301613bd5565b613ba75760a08101612710613abf613ab883613bdf565b61ffff1690565b1015613b84575060c001612710613ad8613ab883613bdf565b1015613b845750613af4613aeb83613be9565b63ffffffff1690565b15613b6757907ffae1e296719dac5269c3886fb5002bb29bf17ae403060c6eb063a55abaaa10416001600160401b0383613b4d84613b48600198976001600160401b0316600052600f602052604060002090565b613bf3565b613b5e604051928392169482613d72565b0390a2016139f5565b631233226560e01b6000526001600160401b031660045260246000fd5b613b906116b991613bdf565b634af9a8bd60e11b60005261ffff16600452602490565b631233226560e01b6000526001600160401b03821660045260246000fd5b91908110156131485760081b0190565b3561043f8161227b565b3561043f8161069d565b3561043f8161314d565b613d5860c061069b93613c208135613c0a8161314d565b855463ffffffff191663ffffffff909116178555565b6020810135613c2e8161314d565b67ffffffff0000000085549160201b168067ffffffff000000001983161786556bffffffff00000000000000006040840135613c698161314d565b60401b16916bffffffffffffffff00000000191617178455613cc46060820135613c928161314d565b85546fffffffff000000000000000000000000191660609190911b6fffffffff00000000000000000000000016178555565b613d09613cd360808301613bdf565b855471ffff00000000000000000000000000000000191660809190911b71ffff0000000000000000000000000000000016178555565b613d52613d1860a08301613bdf565b855473ffff000000000000000000000000000000000000191660909190911b73ffff00000000000000000000000000000000000016178555565b01613bd5565b815460ff60a01b191690151560a01b60ff60a01b16179055565b61069b9092919260c0612cbc8160e084019663ffffffff8135613d948161314d565b16855263ffffffff6020820135613daa8161314d565b16602086015263ffffffff6040820135613dc38161314d565b166040860152613de5613dd86060830161315b565b63ffffffff166060870152565b613dff613df4608083016106a9565b61ffff166080870152565b613e19613e0e60a083016106a9565b61ffff1660a0870152565b01612285565b8054906000815581613e2f575050565b6000526020600020908101905b818110613e47575050565b60008155600101613e3c565b600561069b916000815560006001820155600060028201556000600382015560048101613e808154613629565b9081613e8f575b505001613e1f565b81601f60009311600114613ea75750555b3880613e87565b81835260208320613ec291601f01861c8101906001016137f8565b808252602082209081548360011b9084198560031b1c191617905555613ea0565b91908110156131485760051b8101359061011e19813603018212156103dd570190565b9080601f830112156103dd578135613f1d81611442565b92613f2b6040519485610c6c565b81845260208085019260051b820101918383116103dd5760208201905b838210613f5757505050505090565b81356001600160401b0381116103dd57602091613f7987848094880101610d1b565b815201910190613f48565b610120813603126103dd5760405190613f9c82610c1b565b613fa581610690565b825260208101356001600160401b0381116103dd57613fc79036908301613f06565b60208301526040810135906001600160401b0382116103dd57613ff06140119236908301610d1b565b604084015261400236606083016122ed565b606084015260c03691016122ed565b608082015290565b8151815460208401516040850151608091821b63ffffffff60801b166001600160801b0394851674ffffffffffffffffffffffffffffffffffffffffff19909416939093179290921791151560a01b60ff60a01b16919091178355606084015193810151901b6001600160801b031916921691909117600190910155565b9190601f81116140a657505050565b61069b926000526020600020906020601f840160051c830193106140d2575b601f0160051c01906137f8565b90915081906140c5565b91909182516001600160401b038111610be057614103816140fd8454613629565b84614097565b6020601f82116001146141405781906137f4939495600092614135575b50508160011b916000199060031b1c19161790565b015190503880614120565b601f1982169061415584600052602060002090565b9160005b81811061419157509583600195969710614178575b505050811b019055565b015160001960f88460031b161c1916905538808061416e565b9192602060018192868b015181550194019201614159565b6142036141d761069b959796946001600160401b0360a09516845261010060208501526101008401906103ed565b9660408301906001600160801b0360408092805115158552826020820151166020860152015116910152565b01906001600160801b0360408092805115158552826020820151166020860152015116910152565b6000608082016142406118ec61055d83612f96565b61437b57506020820191614298602061426e61425e61287b87612f8c565b60801b6001600160801b03191690565b604051632cbc26bb60e01b81526001600160801b0319909116600482015291829081906024820190565b03816001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000165afa908115610a7f57839161435c575b5061434d576142ea6142e584612f8c565b6156bb565b6142f383612f8c565b9061430c6118ec60a0830193610d786109188686612e9e565b61432657505061069b92916143219150612f8c565b615720565b6143309250612e9e565b6040516324eb47e560e01b8152918291611b4b91600484016135f5565b630a75a23b60e31b8252600482fd5b614375915060203d602011610a7857610a6a8183610c6c565b386142d4565b6143876143a291612f96565b63961c9a4f60e01b83526001600160a01b0316600452602490565b90fd5b91608083016143b96118ec61055d83612f96565b6144a3575060208301926143d7602061426e61425e61287b88612f8c565b03816001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000165afa908115610a7f57600091614484575b50614473576144256142e585612f8c565b61442e84612f8c565b906144476118ec60a0830193610d786109188686612e9e565b61432657505061ffff16156144675761446261069b92612f8c565b6157b6565b61432161069b92612f8c565b630a75a23b60e31b60005260046000fd5b61449d915060203d602011610a7857610a6a8183610c6c565b38614414565b6144af6116b991612f96565b63961c9a4f60e01b6000526001600160a01b0316600452602490565b604051906144d882610be5565b6000808352602080840191825282015160248301516028909301519260e01c907fffffffff000000000000000000000000000000000000000000000000000000001663b148ea5f60e01b81141580614550575b61453c575063ffffffff1683525290565b63a176027f60e01b60005260045260246000fd5b50630c11d61f60e21b81141561452b565b80516101188110614725575060048101517f000000000000000000000000000000000000000000000000000000000000000063ffffffff811663ffffffff831603614705575050600881015190600c81015191608c82015191609081015193609482015160b88301519360f860d8850151940151916145e4895163ffffffff1690565b63ffffffff811663ffffffff8416036146e457507f000000000000000000000000000000000000000000000000000000000000000063ffffffff811663ffffffff8616036146c357506107d063ffffffff8916036146a2576107d063ffffffff82160361468257509161465d95939160209795936152a8565b91015180820361466b575050565b633df112db60e11b60005260045260245260446000fd5b6301c4e55160e11b6000526107d060045263ffffffff1660245260446000fd5b630117081560e51b6000526107d060045263ffffffff881660245260446000fd5b633bf2401360e11b60005263ffffffff908116600452841660245260446000fd5b63e366a11760e01b60005263ffffffff908116600452821660245260446000fd5b63960693cd60e01b60005263ffffffff9081166004521660245260446000fd5b631d62c8b360e21b60005260045260246000fd5b805180156147ad576020036147885761475b6020825183010160208301613746565b9060ff821161476b575060ff1690565b60405163953576f760e01b8152908190611b4b906004830161042e565b60405163953576f760e01b815260206004820152908190611b4b9060248301906103ed565b50507f000000000000000000000000000000000000000000000000000000000000000090565b9060ff8091169116039060ff82116137d557565b60ff16604d81116137d557600a0a90565b8015614805576000190490565b634e487b7160e01b600052601260045260246000fd5b8115614805570490565b907f000000000000000000000000000000000000000000000000000000000000000060ff811660ff83168181146148f257116148c75761486582826147d3565b91604d60ff84161180156148ae575b61488d5750509061488761043f926147e7565b906137c2565b63a9cb113d60e01b60005260ff908116600452166024525060445260646000fd5b506148c06148bb846147e7565b6147f8565b8411614874565b6148d181836147d3565b91604d60ff84161161488d575050906148ec61043f926147e7565b9061481b565b5050505090565b6001600160a01b0360015416330361490d57565b6315ae3a6f60e11b60005260046000fd5b91908110156131485760e0020190565b3561043f81612290565b6001600160801b0360408092803561494f8161227b565b1515855282602082013561496281612290565b166020860152013561497381612290565b16910152565b6080906149a161069b94969593966001600160401b0360e08401981683526020830190614938565b0190614938565b919060005b8181106149ba5750509050565b6149c581838661491e565b6149ce81612f8c565b6149da6118ec82613325565b611def57817f20ae59542ddd78610f62f9d2c9dcd658f8b6a5b45a0f03e71e16614e89dda83691614b0f6020600196950192614a1e614a1936866122ed565b615555565b614a89614a3e846001600160401b0316600052600c602052604060002090565b8054614a53608082901c63ffffffff16613aeb565b159081614c64575b81614c45575b81614c33575b81614c1e575b5080614c0f575b614bdf575b614a8336876122ed565b90615826565b614b036080820191614a9e614a1936856122ed565b614abb856001600160401b0316600052600d602052604060002090565b908154614ad2613aeb8263ffffffff9060801c1690565b159081614bba575b81614b9b575b81614b89575b81614b74575b5080614b65575b614b18575b50614a8336846122ed565b60405193849384614979565b0390a1016149ad565b614b2760a0614b43920161492e565b82546001600160801b0319166001600160801b03909116178255565b805463ffffffff60801b19164260801b63ffffffff60801b1617815538614af8565b50614b6f84613bd5565b614af3565b614b83915060a01c60ff161590565b38614aec565b6001600160801b038116159150614ae6565b90506001600160801b03614bb28c85015460801c90565b161590614ae0565b90506001600160801b03614bd78c8501546001600160801b031690565b161590614ada565b614bee614b276040850161492e565b805463ffffffff60801b19164260801b63ffffffff60801b16178155614a79565b50614c1986613bd5565b614a74565b614c2d915060a01c60ff161590565b38614a6d565b6001600160801b038116159150614a67565b90506001600160801b03614c5c8b84015460801c90565b161590614a61565b90506001600160801b03614c818b8401546001600160801b031690565b161590614a5b565b6040906001600160401b0361043f949316815281602082015201906103ed565b908051156111cc57805160208201206001600160401b03831692836000526008602052614cdd826005604060002001615e8f565b15614d36575081614d257f7d628c9a1796743d365ab521a8b2a4686e419b3269919dc9145ea2ce853b54ea93614d20614d31946000526009602052604060002090565b6140dc565b6040519182918261042e565b0390a2565b604051631c9dc56960e11b815292839250611b4b9160048401614c89565b906040519182815491828252602082019060005260206000209260005b818110614d8657505061069b92500383610c6c565b84546001600160a01b0316835260019485019487945060209093019201614d71565b919082018092116137d557565b90614dbf82611442565b614dcc6040519182610c6c565b8281528092614ddd601f1991611442565b0190602036910137565b614df090614d54565b916005548015159182614eb3575b5050614e08575090565b614e1190614d54565b805180614e1d57505090565b614e2e614e33918495939451614da8565b614db5565b9060005b8451811015614e715780614e6b614e53610e7060019489613615565b614e5d8387613615565b906001600160a01b03169052565b01614e37565b509160005b8151811015614eac5780614ea6614e92610e7060019486613615565b614e5d614ea0848a51614da8565b87613615565b01614e76565b5090925050565b101590503880614dfe565b6001600160401b03166000818152600760205260409020549092919015614fad5791614faa60e092614f7f85614f147f73d6dce40db73cbddae4b9ce52576043a1644e08c2702236273d71077435fa1697615555565b846000526008602052614f2b816040600020615826565b614f3483615555565b846000526008602052614f4e836002604060002001615826565b60405194855260208501906001600160801b0360408092805115158552826020820151166020860152015116910152565b60808301906001600160801b0360408092805115158552826020820151166020860152015116910152565ba1565b82631e670e4b60e01b60005260045260246000fd5b6000198101919082116137d557565b919082039182116137d557565b614fe66134f6565b506001600160801b036060820151166001600160801b0382511690602083019163ffffffff83511642034281116137d55761502f906001600160801b03608087015116906137c2565b81018091116137d55761504c6001600160801b039291839261604c565b161682524263ffffffff16905290565b600090608081016150726118ec61055d83612f96565b61513857506020810190615090602061426e61425e61287b86612f8c565b03816001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000165afa908115610a7f578491615119575b5061510a5761069b92916060826150f06150eb60406151059601612f96565b6159e2565b6150fc6142e584612f8c565b01359250612f8c565b615a3e565b630a75a23b60e31b8352600483fd5b615132915060203d602011610a7857610a6a8183610c6c565b386150cc565b6143a26143878492612f96565b608081016151586118ec61055d83612f96565b6144a357506020810190615176602061426e61425e61287b86612f8c565b03816001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000165afa908115610a7f57600091615230575b5061447357806151ca6150eb604060609401612f96565b6151d66142e584612f8c565b01359161ffff811690811561522157600b5461ffff16918290816151fd575b505050505050565b10612d8d5750509061521161521692612f8c565b615aae565b3880808080806151f5565b50509061510561069b92612f8c565b615249915060203d602011610a7857610a6a8183610c6c565b386151b3565b949290939163ffffffff90604051958260208801981688526040870152166060850152608084015260a083015260c0820152600060e08201526107d061010082015261010081526152a261012082610c6c565b51902090565b959263ffffffff8095929693604051978260208a019a168a526040890152166060870152608086015260a085015260c0840152600060e08401521661010082015261010081526152a261012082610c6c565b602081519101516040519163b148ea5f60e01b602084015263ffffffff60e01b9060e01b16602483015260288201526028815261043f604882610c6c565b9061ffff906001600160401b0360208401356153538161067f565b16600052600f6020528161536a6040600020612c3d565b9116156153ac5760a0015161ffff165b1680156153a45761539e615396606061043f94013592836137c2565b612710900490565b90614fd1565b506060013590565b6080015161ffff1661537a565b60405163a9059cbb60e01b602082019081526001600160a01b03938416602483015260448083019590955293815261546a93909290916153fa606485610c6c565b1660008060409384519561540e8688610c6c565b602087527f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c65646020880152519082855af1903d1561548f573d61545b61545282610cc9565b94519485610c6c565b83523d6000602085013e6160e9565b805180615475575050565b8160208061548a9361069b9501019101612f46565b615d4d565b606092506160e9565b80519060005b8281106154aa57505050565b600181018082116137d5575b8381106154c6575060010161549e565b6001600160a01b036154d88385613615565b51166154ea610e8e610e708487613615565b146154f7576001016154b6565b6116b9615507610e708486613615565b630285c9b960e61b6000526001600160a01b0316600452602490565b61069b9092919260608101936001600160801b0360408092805115158552826020820151166020860152015116910152565b8051156155bc5760408101516001600160801b03166001600160801b0361559561558960208501516001600160801b031690565b6001600160801b031690565b91161161559f5750565b604051632008344960e21b8152908190611b4b9060048301615523565b6001600160801b036155d860408301516001600160801b031690565b1615801590615606575b6155e95750565b6040516335a2be7360e21b8152908190611b4b9060048301615523565b5061561e61558960208301516001600160801b031690565b15156155e2565b604051906006548083528260208101600660005260206000209260005b81811061565757505061069b92500383610c6c565b8454835260019485019487945060209093019201615642565b906040519182815491828252602082019060005260206000209260005b8181106156a257505061069b92500383610c6c565b845483526001948501948794506020909301920161568d565b6001600160401b03166156db816000526007602052604060002054151590565b1561570c5750336000526011602052604060002054156156f757565b63d86ad9cf60e01b6000523360045260246000fd5b6354c8163f60e11b60005260045260246000fd5b6001600160401b037f50f6fbee3ceedce6b7fd7eaef18244487867e6718aec7208187efb6b7908c14c9116918260005260086020528061579360026040600020016001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016928391615ec6565b604080516001600160a01b03909216825260208201929092529081908101614d31565b6001600160401b037f0ca6b6e55c811717f7cba5bdd97184f0a2d5aa61e5ea64818392da5cef6ce61591169182600052600d6020528061579360406000206001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016928391615ec6565b7f9ea3374b67bf275e6bb9c8ae68f9cae023e1c528b4b27e092f0bb209d3531c1991615936612fe592805461586e615868613aeb8363ffffffff9060801c1690565b42614fd1565b9081615942575b5050615908600161589060208601516001600160801b031690565b926158c3614b276155896001600160801b036158b385546001600160801b031690565b166001600160801b03881661604c565b6158ea6158d08751151590565b825460ff60a01b191690151560a01b60ff60a01b16178255565b019182906001600160801b03166001600160801b0319825416179055565b60408301516001600160801b031681546001600160801b031660809190911b6001600160801b031916179055565b60405191829182615523565b615589614b27916001600160801b0361599b6159a2958261599460018a0154928261598d615986615979876001600160801b031690565b996001600160801b031690565b9560801c90565b16906137c2565b9116614da8565b911661604c565b805463ffffffff60801b19164260801b63ffffffff60801b161781553880615875565b926159d091926137c2565b81018091116137d55761043f9161604c565b7f0000000000000000000000000000000000000000000000000000000000000000615a0a5750565b6001600160a01b031680600052600360205260406000205415615a2a5750565b6368692cbb60e11b60005260045260246000fd5b6001600160401b037fff0133389f9bb82d5b9385826160eaf2328039f6fa950eeb8cf0836da81789449116918260005260086020528061579360406000206001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016928391615ec6565b6001600160401b037f61b04c91cb711a3783cc99d0de694ecd7ead5c96a0a87f5c89d436ac2097932891169182600052600c6020528061579360406000206001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016928391615ec6565b80548210156131485760005260206000200190600090565b80548015615b5f576000190190615b4d8282615b1e565b8154906000199060031b1b1916905555565b634e487b7160e01b600052603160045260246000fd5b600081815260036020526040902054908115615c16576000198201908282116137d5576002546000198101939084116137d5578383600095615bd59503615bdb575b505050615bc46002615b36565b600390600052602052604060002090565b55600190565b615bc4615c0791615bfd615bf3615c0d956002615b1e565b90549060031b1c90565b9283916002615b1e565b906137da565b55388080615bb7565b5050600090565b600081815260076020526040902054908115615c16576000198201908282116137d5576006546000198101939084116137d5578383600095615bd59503615c7d575b505050615c6c6006615b36565b600790600052602052604060002090565b615c6c615c0791615c95615bf3615c9f956006615b1e565b9283916006615b1e565b55388080615c5f565b6001810191806000528260205260406000205492831515600014615d445760001984018481116137d55783546000198101949085116137d5576000958583615bd597615cfc9503615d0b575b505050615b36565b90600052602052604060002090565b615d2b615c0791615d22615bf3615d3b9588615b1e565b92839187615b1e565b8590600052602052604060002090565b55388080615cf4565b50505050600090565b15615d5457565b60405162461bcd60e51b815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e6044820152691bdd081cdd58d8d9595960b21b6064820152608490fd5b80549068010000000000000000821015610be05781615dd39160016137f494018155615b1e565b819391549060031b91821b91600019901b19161790565b600081815260036020526040902054615e1f57615e08816002615dac565b600254906000526003602052604060002055600190565b50600090565b600081815260076020526040902054615e1f57615e43816006615dac565b600654906000526007602052604060002055600190565b600081815260116020526040902054615e1f57615e78816010615dac565b601054906000526011602052604060002055600190565b6000828152600182016020526040902054615c165780615eb183600193615dac565b80549260005201602052604060002055600190565b8054939290919060ff60a086901c16158015616044575b61603d57615ef36001600160801b038616615589565b9060018401958654615f24615868613aeb615f17615589856001600160801b031690565b9460801c63ffffffff1690565b80615fe7575b5050838110615fc25750828210615f69575061069b939450615f4f9161558991614fd1565b6001600160801b03166001600160801b0319825416179055565b90615fa06116b993615f9b615f8c84615f866155898c5460801c90565b93614fd1565b615f9583614fc2565b90614da8565b61481b565b636864691d60e11b6000526004526024526001600160a01b0316604452606490565b630d3b2b9560e11b60005260045260248390526001600160a01b031660445260646000fd5b82859293951161602c576160016155896160089460801c90565b91856159c5565b845463ffffffff60801b19164260801b63ffffffff60801b16178555913880615f2a565b634b92ca1560e11b60005260046000fd5b5050509050565b508115615edd565b9080821015616059575090565b905090565b600081815260116020526040902054908115615c16576000198201908282116137d5576010546000198101939084116137d5578383615bd594600096036160be575b5050506160ad6010615b36565b601190600052602052604060002090565b6160ad615c07916160d6615bf36160e0956010615b1e565b9283916010615b1e565b553880806160a0565b9192901561614b57508151156160fd575090565b3b156161065790565b60405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152606490fd5b82519091501561615e5750805190602001fd5b60405162461bcd60e51b8152908190611b4b906004830161042e56fea164736f6c634300081a000a",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"tokenMessenger\",\"type\":\"address\",\"internalType\":\"contract ITokenMessenger\"},{\"name\":\"cctpMessageTransmitterProxy\",\"type\":\"address\",\"internalType\":\"contract CCTPMessageTransmitterProxy\"},{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"contract IERC20\"},{\"name\":\"advancedPoolHooks\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"rmnProxy\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"FINALITY_THRESHOLD\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"MAX_FEE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"MIN_USDC_MESSAGE_LENGTH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAuthorizedCallerUpdates\",\"inputs\":[{\"name\":\"authorizedCallerArgs\",\"type\":\"tuple\",\"internalType\":\"struct AuthorizedCallers.AuthorizedCallerArgs\",\"components\":[{\"name\":\"addedCallers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"removedCallers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyChainUpdates\",\"inputs\":[{\"name\":\"remoteChainSelectorsToRemove\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"chainsToAdd\",\"type\":\"tuple[]\",\"internalType\":\"struct TokenPool.ChainUpdate[]\",\"components\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddresses\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"},{\"name\":\"remoteTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyTokenTransferFeeConfigUpdates\",\"inputs\":[{\"name\":\"tokenTransferFeeConfigArgs\",\"type\":\"tuple[]\",\"internalType\":\"struct TokenPool.TokenTransferFeeConfigArgs[]\",\"components\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"tokenTransferFeeConfig\",\"type\":\"tuple\",\"internalType\":\"struct IPoolV2.TokenTransferFeeConfig\",\"components\":[{\"name\":\"destGasOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destBytesOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"customBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"customBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}]},{\"name\":\"disableTokenTransferFeeConfigs\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAllAuthorizedCallers\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCurrentRateLimiterState\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"customBlockConfirmation\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[{\"name\":\"outboundRateLimiterState\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterState\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDomain\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct USDCTokenPool.Domain\",\"components\":[{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"domainIdentifier\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"useLegacySourcePoolDataFormat\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDynamicConfig\",\"inputs\":[],\"outputs\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"minBlockConfirmations\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFee\",\"inputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"blockConfirmationRequested\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"feeUSDCents\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"destGasOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destBytesOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"tokenFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemotePools\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemoteToken\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRequiredCCVs\",\"inputs\":[{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"blockConfirmationRequested\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"extraData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"direction\",\"type\":\"uint8\",\"internalType\":\"enum IPoolV2.MessageDirection\"}],\"outputs\":[{\"name\":\"requiredCCVs\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRmnProxy\",\"inputs\":[],\"outputs\":[{\"name\":\"rmnProxy\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getSupportedChains\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getToken\",\"inputs\":[],\"outputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"contract IERC20\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTokenDecimals\",\"inputs\":[],\"outputs\":[{\"name\":\"decimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTokenTransferFeeConfig\",\"inputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"feeConfig\",\"type\":\"tuple\",\"internalType\":\"struct IPoolV2.TokenTransferFeeConfig\",\"components\":[{\"name\":\"destGasOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destBytesOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"customBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"customBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"i_localDomainIdentifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"i_messageTransmitterProxy\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contract CCTPMessageTransmitterProxy\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"i_supportedUSDCVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"i_tokenMessenger\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contract ITokenMessenger\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"lockOrBurn\",\"inputs\":[{\"name\":\"lockOrBurnIn\",\"type\":\"tuple\",\"internalType\":\"struct Pool.LockOrBurnInV1\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"originalSender\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Pool.LockOrBurnOutV1\",\"components\":[{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destPoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"lockOrBurn\",\"inputs\":[{\"name\":\"lockOrBurnIn\",\"type\":\"tuple\",\"internalType\":\"struct Pool.LockOrBurnInV1\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"originalSender\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"name\":\"blockConfirmationRequested\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"tokenArgs\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Pool.LockOrBurnOutV1\",\"components\":[{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destPoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"destTokenAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"releaseOrMint\",\"inputs\":[{\"name\":\"releaseOrMintIn\",\"type\":\"tuple\",\"internalType\":\"struct Pool.ReleaseOrMintInV1\",\"components\":[{\"name\":\"originalSender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourceDenominatedAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offchainTokenData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Pool.ReleaseOrMintOutV1\",\"components\":[{\"name\":\"destinationAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"releaseOrMint\",\"inputs\":[{\"name\":\"releaseOrMintIn\",\"type\":\"tuple\",\"internalType\":\"struct Pool.ReleaseOrMintInV1\",\"components\":[{\"name\":\"originalSender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourceDenominatedAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offchainTokenData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"blockConfirmationRequested\",\"type\":\"uint16\",\"internalType\":\"uint16\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Pool.ReleaseOrMintOutV1\",\"components\":[{\"name\":\"destinationAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"removeRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setDomains\",\"inputs\":[{\"name\":\"domains\",\"type\":\"tuple[]\",\"internalType\":\"struct USDCTokenPool.DomainUpdate[]\",\"components\":[{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"domainIdentifier\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"useLegacySourcePoolDataFormat\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setDynamicConfig\",\"inputs\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"minBlockConfirmations\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRateLimitConfig\",\"inputs\":[{\"name\":\"rateLimitConfigArgs\",\"type\":\"tuple[]\",\"internalType\":\"struct TokenPool.RateLimitConfigArgs[]\",\"components\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"customBlockConfirmation\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"withdrawFeeTokens\",\"inputs\":[{\"name\":\"feeTokens\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AuthorizedCallerAdded\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AuthorizedCallerRemoved\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"remoteToken\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ConfigSet\",\"inputs\":[{\"name\":\"tokenMessenger\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CustomBlockConfirmationInboundRateLimitConsumed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CustomBlockConfirmationOutboundRateLimitConsumed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DomainsSet\",\"inputs\":[{\"name\":\"\",\"type\":\"tuple[]\",\"indexed\":false,\"internalType\":\"struct USDCTokenPool.DomainUpdate[]\",\"components\":[{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"domainIdentifier\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"useLegacySourcePoolDataFormat\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DynamicConfigSet\",\"inputs\":[{\"name\":\"router\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"minBlockConfirmations\",\"type\":\"uint16\",\"indexed\":false,\"internalType\":\"uint16\"},{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeeTokenWithdrawn\",\"inputs\":[{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"feeToken\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"InboundRateLimitConsumed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"LockedOrBurned\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OutboundRateLimitConsumed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RateLimitConfigured\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"customBlockConfirmation\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ReleasedOrMinted\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"token\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemotePoolAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemotePoolRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TokenTransferFeeConfigDeleted\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TokenTransferFeeConfigUpdated\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"tokenTransferFeeConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"struct IPoolV2.TokenTransferFeeConfig\",\"components\":[{\"name\":\"destGasOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destBytesOverhead\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"customBlockConfirmationFeeUSDCents\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"defaultBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"customBlockConfirmationTransferFeeBps\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"BucketOverfilled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CallerIsNotARampOnRouter\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ChainAlreadyExists\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ChainNotAllowed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"CursedByRMN\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"DisabledNonZeroRateLimit\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]},{\"type\":\"error\",\"name\":\"InvalidBurnToken\",\"inputs\":[{\"name\":\"expected\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"got\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidConfig\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidDecimalArgs\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"actual\",\"type\":\"uint8\",\"internalType\":\"uint8\"}]},{\"type\":\"error\",\"name\":\"InvalidDepositHash\",\"inputs\":[{\"name\":\"expected\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"got\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"InvalidDestinationDomain\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidDomain\",\"inputs\":[{\"name\":\"domain\",\"type\":\"tuple\",\"internalType\":\"struct USDCTokenPool.DomainUpdate\",\"components\":[{\"name\":\"allowedCaller\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"mintRecipient\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"domainIdentifier\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"useLegacySourcePoolDataFormat\",\"type\":\"bool\",\"internalType\":\"bool\"}]}]},{\"type\":\"error\",\"name\":\"InvalidExecutionFinalityThreshold\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidMessageLength\",\"inputs\":[{\"name\":\"length\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidMessageVersion\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidMinBlockConfirmation\",\"inputs\":[{\"name\":\"requested\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"minBlockConfirmation\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]},{\"type\":\"error\",\"name\":\"InvalidMinFinalityThreshold\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidNonce\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"got\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidPreviousPool\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidRateLimitRate\",\"inputs\":[{\"name\":\"rateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"struct RateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]},{\"type\":\"error\",\"name\":\"InvalidReceiver\",\"inputs\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidRemoteChainDecimals\",\"inputs\":[{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidRemotePoolForChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidSourceDomain\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidSourcePoolAddress\",\"inputs\":[{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"InvalidTokenMessengerVersion\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"got\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidTokenTransferFeeConfig\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidTransferFeeBps\",\"inputs\":[{\"name\":\"bps\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidTransmitterInProxy\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidVersion\",\"inputs\":[{\"name\":\"version\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}]},{\"type\":\"error\",\"name\":\"MismatchedArrayLengths\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NonExistentChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OverflowDetected\",\"inputs\":[{\"name\":\"remoteDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"localDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"remoteAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"PoolAlreadyAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"TokenMaxCapacityExceeded\",\"inputs\":[{\"name\":\"capacity\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"requested\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"tokenAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenRateLimitReached\",\"inputs\":[{\"name\":\"minWaitInSeconds\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"available\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"tokenAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"Unauthorized\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"UnauthorizedCaller\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"UnknownDomain\",\"inputs\":[{\"name\":\"domain\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"UnlockingUSDCFailed\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressInvalid\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
+	Bin: "0x610180806040523461060d5760c08161698480380380916100208285610858565b83398101031261060d5780516001600160a01b0381169081810361060d576020830151916001600160a01b03831680840361060d5760408501516001600160a01b0381169590939086850361060d5761007b6060820161087b565b61009360a061008c6080850161087b565b930161087b565b91602096604051996100a5898c610858565b60008b526000368137331561084757600180546001600160a01b0319163317905580158015610836575b8015610825575b61081457600492899260805260c0526040519283809263313ce56760e01b82525afa80916000916107dd575b50906107b9575b50600660a0526001600160a01b0390811660e052600280546001600160a01b03191692909116919091179055604051926101438585610858565b60008452600036813760408051979088016001600160401b03811189821017610612576040528752838588015260005b84518110156101da576001906001600160a01b0361019182886108ab565b51168761019d826108ed565b6101aa575b505001610173565b7fc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda7758091604051908152a138876101a2565b508493508587519260005b8451811015610256576001600160a01b0361020082876108ab565b5116908115610245577feb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef88836102376001956109d5565b50604051908152a1016101e5565b6342bcdf7f60e11b60005260046000fd5b509085918560016101005284156107a857604051632c12192160e01b81528481600481895afa90811561067857600091610773575b5060405163054fd4d560e41b81526001600160a01b039190911691908581600481865afa90811561067857600091610756575b5063ffffffff80610100511691169080820361073f575050604051639cdbb18160e01b815285816004818a5afa90811561067857600091610722575b5063ffffffff80610100511691169080820361070b57505084600491604051928380926367e0ed8360e11b82525afa80156106785782916000916106c2575b506001600160a01b0316036106b157600492849261012052610140526040519283809263234d8e3d60e21b82525afa90811561067857600091610684575b506101605260805161012051604051636eb1769f60e11b81523060048201526001600160a01b03918216602482018190529492909116908381604481855afa9081156106785760009161064b575b50600019810180911161063557604051908482019563095ea7b360e01b875260248301526044820152604481526103fd606482610858565b6000806040968751936104108986610858565b8785527f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c656488860152519082865af13d15610628573d906001600160401b03821161061257865161047d94909261046f601f8201601f1916890185610858565b83523d60008885013e610a35565b805180610594575b847f2e902d38f15b233cbb63711add0fca4545334d3a169d60c0a616494d7eea954485858351908152a151615e7e9081610b0682396080518181816104e00152818161055c01528181610a04015281816113d301528181611ada0152818161556b01528181615619015281816156970152615715015260a051818181610770015281816149ab01528181614a3b0152614eef015260c051818181611a480152818161242e0152818161434c015281816144eb0152614ca3015260e0518161353901526101005181818161048f015261468e015261012051818181610ddf015261138401526101405181818161096c0152611247015261016051818181610ee0015281816114cf01526147140152f35b8184918101031261060d5782015180159081150361060d576105b7578380610485565b50608491519062461bcd60e51b82526004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e6044820152691bdd081cdd58d8d9595960b21b6064820152fd5b600080fd5b634e487b7160e01b600052604160045260246000fd5b9161047d92606091610a35565b634e487b7160e01b600052601160045260246000fd5b90508381813d8311610671575b6106628183610858565b8101031261060d5751856103c5565b503d610658565b6040513d6000823e3d90fd5b6106a49150823d84116106aa575b61069c8183610858565b81019061088f565b83610377565b503d610692565b632a32133b60e11b60005260046000fd5b9091508581813d8311610704575b6106da8183610858565b810103126107005751906001600160a01b03821682036106fd5750819087610339565b80fd5b5080fd5b503d6106d0565b633785f8f160e01b60005260045260245260446000fd5b6107399150863d88116106aa5761069c8183610858565b876102fa565b63960693cd60e01b60005260045260245260446000fd5b61076d9150863d88116106aa5761069c8183610858565b876102be565b90508481813d83116107a1575b61078a8183610858565b8101031261060d5761079b9061087b565b8661028b565b503d610780565b6306b7c75960e31b60005260046000fd5b60ff1660068114610109576332ad3e0760e11b600052600660045260245260446000fd5b8881813d831161080d575b6107f28183610858565b8101031261070057519060ff821682036106fd575038610102565b503d6107e8565b630a64406560e11b60005260046000fd5b506001600160a01b038316156100d6565b506001600160a01b038516156100cf565b639b15e16f60e01b60005260046000fd5b601f909101601f19168101906001600160401b0382119082101761061257604052565b51906001600160a01b038216820361060d57565b9081602091031261060d575163ffffffff8116810361060d5790565b80518210156108bf5760209160051b010190565b634e487b7160e01b600052603260045260246000fd5b80548210156108bf5760005260206000200190600090565b6000818152600c602052604090205480156109ce57600019810181811161063557600b546000198101919082116106355780820361097d575b505050600b548015610967576000190161094181600b6108d5565b8154906000199060031b1b19169055600b55600052600c60205260006040812055600190565b634e487b7160e01b600052603160045260246000fd5b6109b661098e61099f93600b6108d5565b90549060031b1c928392600b6108d5565b819391549060031b91821b91600019901b19161790565b9055600052600c602052604060002055388080610926565b5050600090565b80600052600c60205260406000205415600014610a2f57600b546801000000000000000081101561061257610a1661099f826001859401600b55600b6108d5565b9055600b5490600052600c602052604060002055600190565b50600090565b91929015610a975750815115610a49575090565b3b15610a525790565b60405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152606490fd5b825190915015610aaa5750805190602001fd5b6040519062461bcd60e51b8252602060048301528181519182602483015260005b838110610aed5750508160006044809484010152601f80199101168101030190fd5b60208282018101516044878401015285935001610acb56fe6080604052600436101561001257600080fd5b60003560e01c806301ffc9a7146102a7578063181f5a77146102a2578063212a052e1461029d57806321df0da714610298578063240028e8146102935780632422ac451461028e5780632451a6271461028957806324f65ee7146102845780632c0634041461027f578063390775371461027a578063489a68f2146102755780634ac8bd5f146102705780634c5ef0ed1461026b5780636155cda01461026657806362ddd3c4146102615780636b716b0d1461025c5780637437ff9f1461025757806379ba5097146102525780638926f54f1461024d57806389720a62146102485780638da5cb5b1461024357806391a2749a1461023e57806398db9643146102395780639a4575b914610234578063a42a7b8b1461022f578063acfecf911461022a578063b1c71c6514610225578063b794658014610220578063bc063e1a1461021b578063c4bffe2b14610216578063c7230a6014610211578063c8c8fd191461020c578063d8aa3f4014610207578063da4b05e714610202578063dc04fa1f146101fd578063dc0bd971146101f8578063dcbd41bc146101f3578063dfadfa35146101ee578063e8a1da17146101e9578063f2fde38b146101e45763fdf16875146101df57600080fd5b612b41565b612a6b565b6126e4565b61261a565b612452565b612401565b61217e565b612130565b611fe7565b611f55565b611dd7565b611d31565b611cd1565b611c9a565b6118fd565b6117b5565b6116d1565b6112b4565b61121a565b611186565b6110d3565b61105f565b611020565b610f55565b610f04565b610ec3565b610e40565b610db2565b610d69565b610b8c565b610abc565b610887565b6107d9565b610756565b6106f0565b6105c0565b610522565b6104b3565b610472565b61040f565b346103aa5760206003193601126103aa576004357fffffffff0000000000000000000000000000000000000000000000000000000081168091036103aa577faff2afbf000000000000000000000000000000000000000000000000000000008114908115610380575b8115610356575b811561032c575b506040519015158152602090f35b7f01ffc9a7000000000000000000000000000000000000000000000000000000009150143861031e565b7f0e64dd290000000000000000000000000000000000000000000000000000000081149150610317565b7f331710310000000000000000000000000000000000000000000000000000000081149150610310565b600080fd5b60009103126103aa57565b919082519283825260005b8481106103e6575050601f19601f8460006020809697860101520116010190565b806020809284010151828286010152016103c5565b90602061040c9281815201906103ba565b90565b346103aa5760006003193601126103aa5761046e60408051906104328183610cab565b601d82527f55534443546f6b656e506f6f6c43435450563220312e372e302d6465760000006020830152519182916020835260208301906103ba565b0390f35b346103aa5760006003193601126103aa57602060405163ffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b346103aa5760006003193601126103aa57602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b73ffffffffffffffffffffffffffffffffffffffff8116036103aa57565b346103aa5760206003193601126103aa57602061058260043561054481610504565b73ffffffffffffffffffffffffffffffffffffffff807f00000000000000000000000000000000000000000000000000000000000000001691161490565b6040519015158152f35b67ffffffffffffffff8116036103aa57565b35906105a98261058c565b565b801515036103aa57565b35906105a9826105ab565b346103aa5760406003193601126103aa5761014061069e6105f86004356105e68161058c565b602435906105f3826105ab565b612d24565b61064e60409392935180946fffffffffffffffffffffffffffffffff6080809282815116855263ffffffff6020820151166020860152604081015115156040860152826060820151166060860152015116910152565b60a08301906fffffffffffffffffffffffffffffffff6080809282815116855263ffffffff6020820151166020860152604081015115156040860152826060820151166060860152015116910152565bf35b602060408183019282815284518094520192019060005b8181106106c45750505090565b825173ffffffffffffffffffffffffffffffffffffffff168452602093840193909201916001016106b7565b346103aa5760006003193601126103aa57604051600b548082526020820190600b60005260206000209060005b8181106107405761046e8561073481870382610cab565b604051918291826106a0565b825484526020909301926001928301920161071d565b346103aa5760006003193601126103aa57602060405160ff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b61ffff8116036103aa57565b35906105a982610794565b9181601f840112156103aa5782359167ffffffffffffffff83116103aa57602083818601950101116103aa57565b346103aa5760c06003193601126103aa576107f5600435610504565b6024356108018161058c565b61080c606435610504565b60843561081881610794565b60a4359167ffffffffffffffff83116103aa5761ffff61084e63ffffffff9384936108478736906004016107ab565b5050612e16565b6040805195865293909716602085015294169082015291166060820152901515608082015260a090f35b90816101009103126103aa5790565b346103aa5760206003193601126103aa5760043567ffffffffffffffff81116103aa576108b8903690600401610878565b6108c0612f32565b5060608101356108d08183614300565b61095160206108ed6108e560e0860186612f3f565b810190612f90565b61091661090f61090a61090360c0890189612f3f565b3691610d17565b61459a565b825161467b565b8181519101519060405193849283927f57ecfd280000000000000000000000000000000000000000000000000000000084526004840161301e565b0381600073ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165af1908115610ab757600091610a88575b5015610a5e57817ffc5e3a5bddc11d92c2dc20fae6f7d5eb989f056be35239f7de7e86150609abc067ffffffffffffffff6109e960406109e2602061046e980161304f565b9401613059565b6040805173ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000081168252336020830152929092169082015260608101859052921691608090a2610a4b610cce565b8190526040519081529081906020820190565b7fbf969f220000000000000000000000000000000000000000000000000000000060005260046000fd5b610aaa915060203d602011610ab0575b610aa28183610cab565b810190613009565b3861099d565b503d610a98565b613043565b346103aa5760406003193601126103aa5760043567ffffffffffffffff81116103aa57610af061046e913690600401610878565b60243590610afd82610794565b6000604051610b0b81610c1a565b52610b3d610b356060830135610b2f610b2a61090360c0870187612f3f565b614902565b90614a38565b9283836144a0565b7ffc5e3a5bddc11d92c2dc20fae6f7d5eb989f056be35239f7de7e86150609abc067ffffffffffffffff6109e960206040850194610b7b8635610504565b013593610b878561058c565b613059565b346103aa5760206003193601126103aa5760043567ffffffffffffffff81116103aa57366023820112156103aa57806004013567ffffffffffffffff81116103aa5736602460c08302840101116103aa576024610be99201613063565b005b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6020810190811067ffffffffffffffff821117610c3657604052565b610beb565b6040810190811067ffffffffffffffff821117610c3657604052565b60e0810190811067ffffffffffffffff821117610c3657604052565b60a0810190811067ffffffffffffffff821117610c3657604052565b60c0810190811067ffffffffffffffff821117610c3657604052565b90601f601f19910116810190811067ffffffffffffffff821117610c3657604052565b604051906105a9602083610cab565b604051906105a9604083610cab565b604051906105a960a083610cab565b67ffffffffffffffff8111610c3657601f01601f191660200190565b929192610d2382610cfb565b91610d316040519384610cab565b8294818452818301116103aa578281602093846000960137010152565b9080601f830112156103aa5781602061040c93359101610d17565b346103aa5760406003193601126103aa57600435610d868161058c565b60243567ffffffffffffffff81116103aa57602091610dac610582923690600401610d4e565b90613417565b346103aa5760006003193601126103aa57602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b9060406003198301126103aa57600435610e1c8161058c565b916024359067ffffffffffffffff82116103aa57610e3c916004016107ab565b9091565b346103aa57610e4e36610e03565b610e59929192614b25565b67ffffffffffffffff8216610e7b816000526006602052604060002054151590565b15610e965750610be992610e90913691610d17565b90614b91565b7f1e670e4b0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b346103aa5760006003193601126103aa57602060405163ffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b346103aa5760006003193601126103aa576002546009546040805173ffffffffffffffffffffffffffffffffffffffff808516825260a09490941c61ffff1660208201529290911690820152606090f35b346103aa5760006003193601126103aa5760005473ffffffffffffffffffffffffffffffffffffffff81163303610ff6577fffffffffffffffffffffffff00000000000000000000000000000000000000006001549133828416176001551660005573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b346103aa5760206003193601126103aa57602061058267ffffffffffffffff60043561104b8161058c565b166000526006602052604060002054151590565b346103aa5760c06003193601126103aa5760043561107c81610504565b602435906110898261058c565b60443560643561109881610794565b60843567ffffffffffffffff81116103aa576110b89036906004016107ab565b9160a4359360028510156103aa5761046e966107349661351a565b346103aa5760006003193601126103aa57602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b67ffffffffffffffff8111610c365760051b60200190565b9080601f830112156103aa57813561113681611107565b926111446040519485610cab565b81845260208085019260051b8201019283116103aa57602001905b82821061116c5750505090565b60208091833561117b81610504565b81520191019061115f565b346103aa5760206003193601126103aa5760043567ffffffffffffffff81116103aa57604060031982360301126103aa576040516111c381610c3b565b816004013567ffffffffffffffff81116103aa576111e7906004369185010161111f565b8152602482013567ffffffffffffffff81116103aa57610be9926004611210923692010161111f565b6020820152613679565b346103aa5760006003193601126103aa57602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b908160a09103126103aa5790565b61040c91602061129283516040845260408401906103ba565b9201519060208184039101526103ba565b90602061040c928181520190611279565b346103aa5760206003193601126103aa5760043567ffffffffffffffff81116103aa576112e590369060040161126b565b6112ed613822565b506112f6612c8a565b5061130081614c56565b6020810161133261132d6113138361304f565b67ffffffffffffffff16600052600d602052604060002090565b61383b565b916113476113436060850151151590565b1590565b61160d5760206113578280612f3f565b9050036115c957602083015180156115ad57925b606073ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000169201359260408201926113bb845163ffffffff1690565b9273ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016938151833b156103aa576040517fd04857b00000000000000000000000000000000000000000000000000000000081526004810189905263ffffffff9290921660248301526044820189905273ffffffffffffffffffffffffffffffffffffffff861660648301526084820152600060a482018190526107d060c4830152909492859060e490829084905af18015610ab757611524611575966115037ff33bc26b4413b0e7f19f1ea739fdf99098c0061f1f87d954b11f5293fad9ae10948661046e9c6115709a67ffffffffffffffff97611592575b506114f97f0000000000000000000000000000000000000000000000000000000000000000955163ffffffff1690565b9251928d86614d4c565b61151a61150e610cdd565b63ffffffff9093168352565b6020820152614df7565b966115686115318661304f565b6040805173ffffffffffffffffffffffffffffffffffffffff90971687523360208801528601929092529116929081906060820190565b0390a261304f565b6139ec565b9061157e610cdd565b9182526020820152604051918291826112a3565b806115a160006115a793610cab565b806103af565b386114c9565b506115c36115bb8280612f3f565b810190613895565b9261136b565b806115d391612f3f565b906116096040519283927fa3c8cf0900000000000000000000000000000000000000000000000000000000845260048401613884565b0390fd5b61164f6116198361304f565b7fd201c48a0000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff16600452602490565b6000fd5b602081016020825282518091526040820191602060408360051b8301019401926000915b83831061168657505050505090565b90919293946020806116c2837fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0866001960301875289516103ba565b97019301930191939290611677565b346103aa5760206003193601126103aa5767ffffffffffffffff6004356116f78161058c565b166000526007602052611710600560406000200161542f565b805190601f1961173861172284611107565b936117306040519586610cab565b808552611107565b0160005b8181106117a457505060005b8151811015611796578061177a611775611764600194866138a4565b516000526008602052604060002090565b61390b565b61178482866138a4565b5261178f81856138a4565b5001611748565b6040518061046e8582611653565b80606060208093870101520161173c565b346103aa576117c336610e03565b6117ce929192614b25565b67ffffffffffffffff8216916117f4611343846000526006602052604060002054151590565b6118aa57611837611343600561181e8467ffffffffffffffff166000526007602052604060002090565b0161182a368689610d17565b6020815191012090615854565b61187357507f52d00ee4d9bd51b40168f2afc5848837288ce258784ad914278791464b3f4d76919261186e60405192839283613884565b0390a2005b61160984926040519384937f74f23c7c000000000000000000000000000000000000000000000000000000008552600485016139cb565b7f1e670e4b0000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff1660045260246000fd5b9291906118f8602091604086526040860190611279565b930152565b346103aa5760606003193601126103aa5760043567ffffffffffffffff81116103aa5761192e90369060040161126b565b60243561193a81610794565b60443567ffffffffffffffff81116103aa5761195d61196d9136906004016107ab565b611965613822565b503691610d17565b506080820161198161134361054483613059565b611c4c57506020820191611a2f60206119d46119ac61199f8761304f565b67ffffffffffffffff1690565b60801b7fffffffffffffffffffffffffffffffff000000000000000000000000000000001690565b6040517f2cbc26bb0000000000000000000000000000000000000000000000000000000081527fffffffffffffffffffffffffffffffff00000000000000000000000000000000909116600482015291829081906024820190565b038173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165afa908115610ab757600091611c2d575b50611c0357611a8f611a8a8461304f565b61547a565b606081013561ffff83168015611be05760025460a01c61ffff169061ffff82169081611b7e575b50505050611aca611b579261157092614e66565b92611ad48161304f565b604080517f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff16815233602082015290810186905267ffffffffffffffff91909116907ff33bc26b4413b0e7f19f1ea739fdf99098c0061f1f87d954b11f5293fad9ae10908060608101611568565b611b5f614ee8565b611b67610cdd565b918252602082015261046e604051928392836118e1565b10611ba95750611b579261157092611ba1611aca93611b9c8861304f565b6156bf565b928194611ab6565b7f7911d95b0000000000000000000000000000000000000000000000000000000060005261ffff8085166004521660245260446000fd5b50611b579261157092611bfe611aca93611bf98861304f565b615641565b614e66565b7f53ad11d80000000000000000000000000000000000000000000000000000000060005260046000fd5b611c46915060203d602011610ab057610aa28183610cab565b38611a79565b611c5861164f91613059565b7f961c9a4f0000000000000000000000000000000000000000000000000000000060005273ffffffffffffffffffffffffffffffffffffffff16600452602490565b346103aa5760206003193601126103aa5761046e611cbd6004356115708161058c565b6040519182916020835260208301906103ba565b346103aa5760006003193601126103aa57602060405160008152f35b602060408183019282815284518094520192019060005b818110611d115750505090565b825167ffffffffffffffff16845260209384019390920191600101611d04565b346103aa5760006003193601126103aa57611d4a6153e4565b805190601f19611d5c61172284611107565b0136602084013760005b8151811015611d98578067ffffffffffffffff611d85600193856138a4565b5116611d9182866138a4565b5201611d66565b6040518061046e8582611ced565b9181601f840112156103aa5782359167ffffffffffffffff83116103aa576020808501948460051b0101116103aa57565b346103aa5760406003193601126103aa5760043567ffffffffffffffff81116103aa57611e08903690600401611da6565b90602435611e1581610504565b611e1d614b25565b60005b838110611e2957005b611e56611e3d611e3d610b87848888613a0e565b73ffffffffffffffffffffffffffffffffffffffff1690565b6040517f70a082310000000000000000000000000000000000000000000000000000000081523060048201529190602090839060249082905afa8015610ab757600192600091611f27575b5080611eaf575b5001611e20565b611eca8185611ec5611e3d610b87878c8c613a0e565b614f23565b611ed8610b87838888613a0e565b60405191825273ffffffffffffffffffffffffffffffffffffffff90811691908516907f508d7d183612c18fc339b42618912b9fa3239f631dd7ec0671f950200a0fa66e90602090a338611ea8565b611f48915060203d8111611f4e575b611f408183610cab565b810190613a1e565b38611ea1565b503d611f36565b346103aa5760006003193601126103aa5760206040516101188152f35b6105a99092919260c08060e083019563ffffffff815116845263ffffffff602082015116602085015263ffffffff604082015116604085015263ffffffff606082015116606085015261ffff6080820151166080850152611fde60a082015160a086019061ffff169052565b01511515910152565b346103aa5760806003193601126103aa57612003600435610504565b60243561200f8161058c565b61201a604435610794565b6064359067ffffffffffffffff82116103aa5761204467ffffffffffffffff9236906004016107ab565b5050600060c060405161205681610c57565b8281528260208201528260408201528260608201528260808201528260a0820152015216600052600a60205261046e604060002061212461211b6040519261209d84610c57565b5463ffffffff8116845263ffffffff8160201c1660208501526120d263ffffffff8260401c16604086019063ffffffff169052565b6120ed606082901c63ffffffff1663ffffffff166060860152565b612104608082901c61ffff1661ffff166080860152565b61ffff609082901c1660a085015260a01c60ff1690565b151560c0830152565b60405191829182611f72565b346103aa5760006003193601126103aa5760206040516107d08152f35b9181601f840112156103aa5782359167ffffffffffffffff83116103aa576020808501948460081b0101116103aa57565b346103aa5760406003193601126103aa5760043567ffffffffffffffff81116103aa576121af90369060040161214d565b9060243567ffffffffffffffff81116103aa576121d0903690600401611da6565b9190926121db614b25565b60005b8181106122605750505060005b8181106121f457005b8067ffffffffffffffff61221361220e6001948688613a0e565b61304f565b60006122338267ffffffffffffffff16600052600a602052604060002090565b55167f5479bbc0288b7eaeaf2ace0943b88016cc648964fcd42919a86fd93b15fdbee8600080a2016121eb565b61226e61220e828486613a2d565b612279828486613a2d565b90602082019161228e61134360e08301613a3d565b6123c95760a081016127106122ac6122a583613a47565b61ffff1690565b101561238d575060c0016127106122c56122a583613a47565b101561238d57506122e16122d883613a51565b63ffffffff1690565b1561235657907ffae1e296719dac5269c3886fb5002bb29bf17ae403060c6eb063a55abaaa104167ffffffffffffffff8361233c846123376001989767ffffffffffffffff16600052600a602052604060002090565b613a5b565b61234d604051928392169482613c72565b0390a2016121de565b7f123322650000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff1660045260246000fd5b61239961164f91613a47565b7f95f3517a0000000000000000000000000000000000000000000000000000000060005261ffff16600452602490565b7f123322650000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff821660045260246000fd5b346103aa5760006003193601126103aa57602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b346103aa5760206003193601126103aa5760043567ffffffffffffffff81116103aa5761248390369060040161214d565b9061248c615028565b6000915b80831061249957005b6124a4838284613a2d565b926124ae8461304f565b936124bb61134386613454565b6125e2577f41f7c8f7cfdad9350aa495e6c54cbbf750a07ab38a9098aed1256e30dd1682bb67ffffffffffffffff600194959661258561256d6020860161250181613a3d565b156125905761253a6125278567ffffffffffffffff166000526003602052604060002090565b6125343660408b01613d3c565b906150db565b61256861255b8567ffffffffffffffff166000526004602052604060002090565b6125343660a08b01613d3c565b613a3d565b946040519384931695604060a0830192019084613ddc565b0390a2019190612490565b6125b16125278567ffffffffffffffff166000526007602052604060002090565b61256860026125d48667ffffffffffffffff166000526007602052604060002090565b016125343660a08b01613d3c565b7f1e670e4b0000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff851660045260246000fd5b346103aa5760206003193601126103aa5767ffffffffffffffff6004356126408161058c565b612648612c9f565b5016600052600d60205261046e604060002060ff60026040519261266b84610c73565b8054845260018101546020850152015463ffffffff81166040840152818160201c161515606084015260281c16151560808201526040519182918291909160808060a0830194805184526020810151602085015263ffffffff604082015116604085015260608101511515606085015201511515910152565b346103aa5760406003193601126103aa5760043567ffffffffffffffff81116103aa57612715903690600401611da6565b60243567ffffffffffffffff81116103aa57612735903690600401611da6565b919092612740614b25565b6000915b8083106129175750505060005b81811061275a57005b61276d612768828486613f45565b614004565b6040810191825151156128ed5761279a61134361279561199f855167ffffffffffffffff1690565b6159c2565b6128a2576127d06127b6839695965167ffffffffffffffff1690565b67ffffffffffffffff166000526007602052604060002090565b9260608301906127e18251866150db565b61280260808501956127f78751600283016150db565b6004835191016140e0565b602084019560005b87518051821015612845579061283f600192612838836128328b5167ffffffffffffffff1690565b926138a4565b5190614b91565b0161280a565b505095506128966001956128837f8d340f17e19058004c20453540862a9c62778504476f6756755cb33bcd6c38c295965167ffffffffffffffff1690565b92519351905190604051948594856141ad565b0390a101919091612751565b61164f6128b7835167ffffffffffffffff1690565b7f1d5ad3c50000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff16600452602490565b7f14c880ca0000000000000000000000000000000000000000000000000000000060005260046000fd5b90919261292861220e858486613a0e565b9461293f61134367ffffffffffffffff88166157ac565b612a335761296c60056129668867ffffffffffffffff166000526007602052604060002090565b0161542f565b9360005b85518110156129b8576001906129b1600561299f8b67ffffffffffffffff166000526007602052604060002090565b016129aa838a6138a4565b5190615854565b5001612970565b509350937f5204aec90a3c794d8e90fded8b46ae9c7c552803e7e832e0c1d358396d859916612a2560019397612a0a612a058267ffffffffffffffff166000526007602052604060002090565b613eb4565b60405167ffffffffffffffff90911681529081906020820190565b0390a1019190939293612744565b7f1e670e4b0000000000000000000000000000000000000000000000000000000060005267ffffffffffffffff861660045260246000fd5b346103aa5760206003193601126103aa5773ffffffffffffffffffffffffffffffffffffffff600435612a9d81610504565b612aa5614b25565b16338114612b1757807fffffffffffffffffffffffff0000000000000000000000000000000000000000600054161760005573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b346103aa5760606003193601126103aa57600435612b5e81610504565b602435612b6a81610794565b60443591612b7783610504565b612b7f614b25565b73ffffffffffffffffffffffffffffffffffffffff811680156128ed577fba9213054b14c2e884f779120bb196f0735cef27140498a9d26117eeab77a11793612c8591600254907fffffffffffffffffffff0000000000000000000000000000000000000000000075ffff00000000000000000000000000000000000000008760a01b169216171760025573ffffffffffffffffffffffffffffffffffffffff81167fffffffffffffffffffffffff000000000000000000000000000000000000000060095416176009556040519384938491604091949361ffff73ffffffffffffffffffffffffffffffffffffffff9283606087019816865216602085015216910152565b0390a1005b60405190612c99602083610cab565b60008252565b60405190612cac82610c73565b60006080838281528260208201528260408201528260608201520152565b90604051612cd781610c73565b60806fffffffffffffffffffffffffffffffff6001839560ff8154848116875263ffffffff81871c16602088015260a01c1615156040860152015481808216166060850152821c16910152565b67ffffffffffffffff91612d36612c9f565b50612d3f612c9f565b50612d735716600052600760205260406000209061040c612d676002612d6c612d6786612cca565b61425e565b9401612cca565b1690816000526003602052612d8e612d676040600020612cca565b91600052600460205261040c612d676040600020612cca565b906105a9604051612db781610c57565b60c0612e0f82955463ffffffff8116845263ffffffff8160201c16602085015263ffffffff8160401c16604085015263ffffffff808260601c1616606085015261210461ffff8260801c16608086019061ffff169052565b1515910152565b612e37612e3c9167ffffffffffffffff16600052600a602052604060002090565b612da7565b90612e4d61134360c0840151151590565b612f1f5761ffff81169081612ea2575050604081015163ffffffff16815163ffffffff169263ffffffff612e976080612e8d602087015163ffffffff1690565b95015161ffff1690565b921693929190600190565b60025460a01c61ffff169161ffff831611612ee8575050606081015163ffffffff16815163ffffffff169263ffffffff612e9760a0612e8d602087015163ffffffff1690565b7f7911d95b0000000000000000000000000000000000000000000000000000000060005261ffff9081166004521660245260446000fd5b5050600090600090600090600090600090565b60405190612c9982610c1a565b9035907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1813603018212156103aa570180359067ffffffffffffffff82116103aa576020019181360383136103aa57565b6020818303126103aa5780359067ffffffffffffffff82116103aa57016040818303126103aa5760405191612fc483610c3b565b813567ffffffffffffffff81116103aa5781612fe1918401610d4e565b8352602082013567ffffffffffffffff81116103aa576130019201610d4e565b602082015290565b908160209103126103aa575161040c816105ab565b909161303561040c936040845260408401906103ba565b9160208184039101526103ba565b6040513d6000823e3d90fd5b3561040c8161058c565b3561040c81610504565b61306b614b25565b60005b8281106130ad5750907fc97f93e817584952f1c1d633f93784b8430f0633d002f9dcc4de4fe2780424d0916130a860405192839283613377565b0390a1565b6130c06130bb828585613231565b61325f565b80511580156131dc575b613163579061315d826131586113136060600196519361314960208201516131406130fc604085015163ffffffff1690565b61313861310c6080870151151590565b9161311a60a0880151151590565b94613123610cec565b9b8c5260208c015263ffffffff1660408b0152565b151588860152565b15156080870152565b015167ffffffffffffffff1690565b6132d2565b0161306e565b604080517f19d7585700000000000000000000000000000000000000000000000000000000815282516004820152602083015160248201529082015163ffffffff166044820152606082015167ffffffffffffffff16606482015260808201511515608482015260a090910151151560a482015260c490fd5b5067ffffffffffffffff6131fb606083015167ffffffffffffffff1690565b16156130ca565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b91908110156132415760c0020190565b613202565b63ffffffff8116036103aa57565b35906105a982613246565b60c0813603126103aa5760a06040519161327883610c8f565b8035835260208101356020840152604081013561329481613246565b604084015260608101356132a78161058c565b606084015260808101356132ba816105ab565b608084015201356132ca816105ab565b60a082015290565b60026080918351815560208401516001820155019161332663ffffffff604083015116849063ffffffff167fffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000825416179055565b6060810151835492909101517fffffffffffffffffffffffffffffffffffffffffffffffffffff0000ffffffff90921690151560201b64ff00000000161790151560281b65ff000000000016179055565b602080825281018390526040019160005b8181106133955750505090565b90919260c080600192863581526020870135602082015263ffffffff60408801356133bf81613246565b16604082015267ffffffffffffffff60608801356133dc8161058c565b16606082015260808701356133f0816105ab565b1515608082015260a0870135613405816105ab565b151560a0820152019401929101613388565b9067ffffffffffffffff61040c92166000526007602052600560406000200190602081519101209060019160005201602052604060002054151590565b67ffffffffffffffff61040c91166000526006602052604060002054151590565b6020818303126103aa5780519067ffffffffffffffff82116103aa57019080601f830112156103aa5781516134a981611107565b926134b76040519485610cab565b81845260208085019260051b8201019283116103aa57602001905b8282106134df5750505090565b6020809183516134ee81610504565b8152019101906134d2565b601f8260209493601f19938186528686013760008582860101520116010190565b949593909592919273ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001693841561364f576135d79361ffff9167ffffffffffffffff6040519a7f89720a62000000000000000000000000000000000000000000000000000000008c5273ffffffffffffffffffffffffffffffffffffffff60048d019b168b521660208a0152604089015216606087015260c0608087015260c08601916134f9565b91600281101561362057848093819260a0600097015203915afa908115610ab757600091613603575090565b61040c91503d806000833e6136188183610cab565b810190613475565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602160045260246000fd5b50505050505050506020604051906136678183610cab565b60008252601f19810190369083013790565b613681614b25565b60208101519160005b835181101561373a57806136bd6136a3600193876138a4565b5173ffffffffffffffffffffffffffffffffffffffff1690565b6136e46136df73ffffffffffffffffffffffffffffffffffffffff8316611e3d565b615d22565b6136f0575b500161368a565b60405173ffffffffffffffffffffffffffffffffffffffff9190911681527fc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda7758090602090a1386136e9565b5091505160005b815181101561381e576137576136a382846138a4565b9073ffffffffffffffffffffffffffffffffffffffff8216156137f4577feb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef6137eb836137c36137be611e3d60019773ffffffffffffffffffffffffffffffffffffffff1690565b6159fd565b5060405173ffffffffffffffffffffffffffffffffffffffff90911681529081906020820190565b0390a101613741565b7f8579befe0000000000000000000000000000000000000000000000000000000060005260046000fd5b5050565b6040519061382f82610c3b565b60606020838281520152565b9060405161384881610c73565b608060ff600283958054855260018101546020860152015463ffffffff81166040850152818160201c161515606085015260281c161515910152565b91602061040c9381815201916134f9565b908160209103126103aa573590565b80518210156132415760209160051b010190565b90600182811c92168015613901575b60208310146138d257565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b91607f16916138c7565b906040519182600082549261391f846138b8565b808452936001811690811561398b5750600114613944575b506105a992500383610cab565b90506000929192526020600020906000915b81831061396f5750509060206105a99282010138613937565b6020919350806001915483858901015201910190918492613956565b602093506105a99592507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0091501682840152151560051b82010138613937565b60409067ffffffffffffffff61040c959316815281602082015201916134f9565b67ffffffffffffffff16600052600760205261040c600460406000200161390b565b91908110156132415760051b0190565b908160209103126103aa575190565b91908110156132415760081b0190565b3561040c816105ab565b3561040c81610794565b3561040c81613246565b613c2c60c06105a993613aa38135613a7281613246565b859063ffffffff167fffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000825416179055565b6020810135613ab181613246565b67ffffffff0000000085549160201b16807fffffffffffffffffffffffffffffffffffffffffffffffff00000000ffffffff83161786557fffffffffffffffffffffffffffffffffffffffff0000000000000000ffffffff6bffffffff00000000000000006040850135613b2481613246565b60401b16921617178455613b806060820135613b3f81613246565b85547fffffffffffffffffffffffffffffffff00000000ffffffffffffffffffffffff1660609190911b6fffffffff00000000000000000000000016178555565b613bd2613b8f60808301613a47565b85547fffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffff1660809190911b71ffff0000000000000000000000000000000016178555565b613c26613be160a08301613a47565b85547fffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff1660909190911b73ffff00000000000000000000000000000000000016178555565b01613a3d565b81547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff1690151560a01b74ff000000000000000000000000000000000000000016179055565b6105a99092919260c0612e0f8160e084019663ffffffff8135613c9481613246565b16855263ffffffff6020820135613caa81613246565b16602086015263ffffffff6040820135613cc381613246565b166040860152613ce5613cd860608301613254565b63ffffffff166060870152565b613cff613cf4608083016107a0565b61ffff166080870152565b613d19613d0e60a083016107a0565b61ffff1660a0870152565b016105b5565b35906fffffffffffffffffffffffffffffffff821682036103aa57565b91908260609103126103aa576040516060810181811067ffffffffffffffff821117610c36576040526040613d918183958035613d78816105ab565b8552613d8660208201613d1f565b602086015201613d1f565b910152565b6fffffffffffffffffffffffffffffffff613dd6604080938035613db9816105ab565b1515865283613dca60208301613d1f565b16602087015201613d1f565b16910152565b608090613dfd6105a9949695939660e0830197151583526020830190613d96565b0190613d96565b91613e1e918354906000199060031b92831b921b19161790565b9055565b818110613e2d575050565b60008155600101613e22565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b81810292918115918404141715613e7b57565b613e39565b8054906000815581613e90575050565b6000526020600020908101905b818110613ea8575050565b60008155600101613e9d565b60056105a9916000815560006001820155600060028201556000600382015560048101613ee181546138b8565b9081613ef0575b505001613e80565b81601f60009311600114613f085750555b3880613ee8565b81835260208320613f2391601f01861c810190600101613e22565b808252602082209081548360011b906000198560031b1c191617905555613f01565b91908110156132415760051b810135907ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffee1813603018212156103aa570190565b9080601f830112156103aa578135613f9c81611107565b92613faa6040519485610cab565b81845260208085019260051b820101918383116103aa5760208201905b838210613fd657505050505090565b813567ffffffffffffffff81116103aa57602091613ff987848094880101610d4e565b815201910190613fc7565b610120813603126103aa576040519061401c82610c73565b6140258161059e565b8252602081013567ffffffffffffffff81116103aa576140489036908301613f85565b602083015260408101359067ffffffffffffffff82116103aa576140726140939236908301610d4e565b60408401526140843660608301613d3c565b606084015260c0369101613d3c565b608082015290565b9190601f81116140aa57505050565b6105a9926000526020600020906020601f840160051c830193106140d6575b601f0160051c0190613e22565b90915081906140c9565b919091825167ffffffffffffffff8111610c36576141088161410284546138b8565b8461409b565b6020601f8211600114614144578190613e1e939495600092614139575b50506000198260011b9260031b1c19161790565b015190503880614125565b601f1982169061415984600052602060002090565b9160005b8181106141955750958360019596971061417c575b505050811b019055565b015160001960f88460031b161c19169055388080614172565b9192602060018192868b01518155019401920161415d565b6142116141dc6105a99597969467ffffffffffffffff60a09516845261010060208501526101008401906103ba565b9660408301906fffffffffffffffffffffffffffffffff60408092805115158552826020820151166020860152015116910152565b01906fffffffffffffffffffffffffffffffff60408092805115158552826020820151166020860152015116910152565b906000198201918211613e7b57565b91908203918211613e7b57565b614266612c9f565b506fffffffffffffffffffffffffffffffff6060820151166fffffffffffffffffffffffffffffffff82511690602083019163ffffffff8351164203428111613e7b576142ca906fffffffffffffffffffffffffffffffff60808701511690613e68565b8101809111613e7b576142f06fffffffffffffffffffffffffffffffff92918392615a69565b161682524263ffffffff16905290565b60006080820161431561134361054483613059565b6144505750602082019161433360206119d46119ac61199f8761304f565b038173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165afa908115610ab7578391614431575b506144095761438d611a8a8461304f565b6143968361304f565b906143af61134360a0830193610dac6109038686612f3f565b6143c95750506105a992916143c4915061304f565b615512565b6143d39250612f3f565b906116096040519283927f24eb47e500000000000000000000000000000000000000000000000000000000845260048401613884565b6004827f53ad11d8000000000000000000000000000000000000000000000000000000008152fd5b61444a915060203d602011610ab057610aa28183610cab565b3861437c565b61445c61449d91613059565b7f961c9a4f00000000000000000000000000000000000000000000000000000000835273ffffffffffffffffffffffffffffffffffffffff16600452602490565b90fd5b91608083016144b461134361054483613059565b611c4c575060208301926144d260206119d46119ac61199f8861304f565b038173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165afa908115610ab75760009161457b575b50611c035761452d611a8a8561304f565b6145368461304f565b9061454f61134360a0830193610dac6109038686612f3f565b6143c957505061ffff161561456f5761456a6105a99261304f565b6155c3565b6143c46105a99261304f565b614594915060203d602011610ab057610aa28183610cab565b3861451c565b604051906145a782610c3b565b6000825260208201600081526020820151917fffffffff000000000000000000000000000000000000000000000000000000006028602483015160e01c92015193167fb148ea5f0000000000000000000000000000000000000000000000000000000081141580614651575b614624575063ffffffff1683525290565b7fa176027f0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b507f3047587c00000000000000000000000000000000000000000000000000000000811415614613565b805161011881106148d5575060048101517f000000000000000000000000000000000000000000000000000000000000000063ffffffff811663ffffffff83160361489c575050600881015190600c81015191608c82015191609081015193609482015160b88301519360f860d8850151940151916146fe895163ffffffff1690565b63ffffffff811663ffffffff84160361486257507f000000000000000000000000000000000000000000000000000000000000000063ffffffff811663ffffffff86160361482857506107d063ffffffff8916036147ee576107d063ffffffff8216036147b55750916147779593916020979593614da5565b910151808203614785575050565b7f7be225b60000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b7f0389caa2000000000000000000000000000000000000000000000000000000006000526107d060045263ffffffff1660245260446000fd5b7f22e102a0000000000000000000000000000000000000000000000000000000006000526107d060045263ffffffff881660245260446000fd5b7f77e480260000000000000000000000000000000000000000000000000000000060005263ffffffff908116600452841660245260446000fd5b7fe366a1170000000000000000000000000000000000000000000000000000000060005263ffffffff908116600452821660245260446000fd5b7f960693cd0000000000000000000000000000000000000000000000000000000060005263ffffffff9081166004521660245260446000fd5b7f758b22cc0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b805180156149a75760200361496a576149246020825183010160208301613a1e565b9060ff8211614934575060ff1690565b611609906040519182917f953576f7000000000000000000000000000000000000000000000000000000008352600483016103fb565b611609906040519182917f953576f700000000000000000000000000000000000000000000000000000000835260206004840181815201906103ba565b50507f000000000000000000000000000000000000000000000000000000000000000090565b9060ff8091169116039060ff8211613e7b57565b60ff16604d8111613e7b57600a0a90565b80156149ff576000190490565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601260045260246000fd5b81156149ff570490565b907f000000000000000000000000000000000000000000000000000000000000000060ff811660ff8316818114614b1e5711614af357614a7882826149cd565b91604d60ff8416118015614ada575b614aa057505090614a9a61040c926149e1565b90613e68565b7fa9cb113d0000000000000000000000000000000000000000000000000000000060005260ff908116600452166024525060445260646000fd5b50614aec614ae7846149e1565b6149f2565b8411614a87565b614afd81836149cd565b91604d60ff841611614aa057505090614b1861040c926149e1565b90614a2e565b5050505090565b73ffffffffffffffffffffffffffffffffffffffff600154163303614b4657565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b60409067ffffffffffffffff61040c949316815281602082015201906103ba565b908051156128ed578051602082012067ffffffffffffffff831692836000526007602052614bc6826005604060002001615a32565b15614c1f575081614c0e7f7d628c9a1796743d365ab521a8b2a4686e419b3269919dc9145ea2ce853b54ea93614c09614c1a946000526008602052604060002090565b6140e0565b604051918291826103fb565b0390a2565b90506116096040519283927f393b8ad200000000000000000000000000000000000000000000000000000000845260048401614b70565b60009060808101614c6c61134361054483613059565b614d3f57506020810190614c8a60206119d46119ac61199f8661304f565b038173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165afa908115610ab7578491614d20575b50614cf857816060611bf992614cef611a8a6105a9979661304f565b0135925061304f565b6004837f53ad11d8000000000000000000000000000000000000000000000000000000008152fd5b614d39915060203d602011610ab057610aa28183610cab565b38614cd3565b61449d61445c8492613059565b949290939163ffffffff90604051958260208801981688526040870152166060850152608084015260a083015260c0820152600060e08201526107d06101008201526101008152614d9f61012082610cab565b51902090565b959263ffffffff8095929693604051978260208a019a168a526040890152166060870152608086015260a085015260c0840152600060e0840152166101008201526101008152614d9f61012082610cab565b602081519101517fffffffff00000000000000000000000000000000000000000000000000000000604051927fb148ea5f00000000000000000000000000000000000000000000000000000000602085015260e01b16602483015260288201526028815261040c604882610cab565b9061ffff9067ffffffffffffffff6020840135614e828161058c565b16600052600a60205281614e996040600020612da7565b911615614edb5760a0015161ffff165b168015614ed357614ecd614ec5606061040c9401359283613e68565b612710900490565b90614251565b506060013590565b6080015161ffff16614ea9565b60405160ff7f00000000000000000000000000000000000000000000000000000000000000001660208201526020815261040c604082610cab565b6040517fa9059cbb000000000000000000000000000000000000000000000000000000006020820190815273ffffffffffffffffffffffffffffffffffffffff9384166024830152604480830195909552938152614ffa9390929091614f8a606485610cab565b16600080604093845195614f9e8688610cab565b602087527f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c65646020880152519082855af1903d1561501f573d614feb614fe282610cfb565b94519485610cab565b83523d6000602085013e615dad565b805180615005575050565b8160208061501a936105a99501019101613009565b6158f9565b60609250615dad565b73ffffffffffffffffffffffffffffffffffffffff600954163314158061507e575b61505057565b7f8e4a23d6000000000000000000000000000000000000000000000000000000006000523360045260246000fd5b5073ffffffffffffffffffffffffffffffffffffffff6001541633141561504a565b6105a99092919260608101936fffffffffffffffffffffffffffffffff60408092805115158552826020820151166020860152015116910152565b8151919291156153155760408301516fffffffffffffffffffffffffffffffff166fffffffffffffffffffffffffffffffff61514261512d60208701516fffffffffffffffffffffffffffffffff1690565b6fffffffffffffffffffffffffffffffff1690565b9116116152e15761529e6105a992935b6151a561515f8251151590565b84547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff1690151560a01b74ff000000000000000000000000000000000000000016178455565b61525e60406151c760208401516fffffffffffffffffffffffffffffffff1690565b85547fffffffffffffffffffffffffffffffff00000000000000000000000000000000166fffffffffffffffffffffffffffffffff821617865592615247600187019485906fffffffffffffffffffffffffffffffff167fffffffffffffffffffffffffffffffff00000000000000000000000000000000825416179055565b01516fffffffffffffffffffffffffffffffff1690565b6fffffffffffffffffffffffffffffffff7fffffffffffffffffffffffffffffffff0000000000000000000000000000000083549260801b169116179055565b80547fffffffffffffffffffffffff00000000ffffffffffffffffffffffffffffffff164260801b73ffffffff0000000000000000000000000000000016179055565b6040517f8020d1240000000000000000000000000000000000000000000000000000000081528061160985600483016150a0565b6fffffffffffffffffffffffffffffffff61534360408501516fffffffffffffffffffffffffffffffff1690565b1615801590615392575b61535e5761529e6105a99293615152565b6040517fd68af9cc0000000000000000000000000000000000000000000000000000000081528061160985600483016150a0565b506153b361512d60208501516fffffffffffffffffffffffffffffffff1690565b151561534d565b91908201809211613e7b57565b926153d29192613e68565b8101809111613e7b5761040c91615a69565b604051906005548083528260208101600560005260206000209260005b8181106154165750506105a992500383610cab565b8454835260019485019487945060209093019201615401565b906040519182815491828252602082019060005260206000209260005b8181106154615750506105a992500383610cab565b845483526001948501948794506020909301920161544c565b67ffffffffffffffff1661549b816000526006602052604060002054151590565b156154e5575033600052600c602052604060002054156154b757565b7fd86ad9cf000000000000000000000000000000000000000000000000000000006000523360045260246000fd5b7fa9902c7e0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b67ffffffffffffffff7f50f6fbee3ceedce6b7fd7eaef18244487867e6718aec7208187efb6b7908c14c91169182600052600760205280615593600260406000200173ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016928391615a7b565b6040805173ffffffffffffffffffffffffffffffffffffffff909216825260208201929092529081908101614c1a565b67ffffffffffffffff7f0ca6b6e55c811717f7cba5bdd97184f0a2d5aa61e5ea64818392da5cef6ce61591169182600052600460205280615593604060002073ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016928391615a7b565b67ffffffffffffffff7fff0133389f9bb82d5b9385826160eaf2328039f6fa950eeb8cf0836da817894491169182600052600760205280615593604060002073ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016928391615a7b565b67ffffffffffffffff7f61b04c91cb711a3783cc99d0de694ecd7ead5c96a0a87f5c89d436ac2097932891169182600052600360205280615593604060002073ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016928391615a7b565b80548210156132415760005260206000200190600090565b8054801561577d57600019019061576c828261573d565b60001982549160031b1b1916905555565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b60008181526006602052604090205490811561584d57600019820190828211613e7b57600554926000198401938411613e7b57838360009561580c9503615812575b5050506157fb6005615755565b600690600052602052604060002090565b55600190565b6157fb61583e9161583461582a61584495600561573d565b90549060031b1c90565b928391600561573d565b90613e04565b553880806157ee565b5050600090565b60018101918060005282602052604060002054928315156000146158f0576000198401848111613e7b578354936000198501948511613e7b57600095858361580c976158a895036158b7575b505050615755565b90600052602052604060002090565b6158d761583e916158ce61582a6158e7958861573d565b9283918761573d565b8590600052602052604060002090565b553880806158a0565b50505050600090565b1561590057565b60846040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e60448201527f6f742073756363656564000000000000000000000000000000000000000000006064820152fd5b80549068010000000000000000821015610c3657816159ab916001613e1e9401815561573d565b81939154906000199060031b92831b921b19161790565b6000818152600660205260409020546159f7576159e0816005615984565b600554906000526006602052604060002055600190565b50600090565b6000818152600c60205260409020546159f757615a1b81600b615984565b600b5490600052600c602052604060002055600190565b600082815260018201602052604090205461584d5780615a5483600193615984565b80549260005201602052604060002055600190565b9080821015615a76575090565b905090565b909291815490615a926113438360ff9060a01c1690565b8015615d1a575b615d1357615ab86fffffffffffffffffffffffffffffffff831661512d565b9160018401908154615af8615af26122d8615ae561512d856fffffffffffffffffffffffffffffffff1690565b9460801c63ffffffff1690565b42614251565b80615c7f575b5050868110615c335750858310615b5d57505061512d6105a99394615b2292614251565b6fffffffffffffffffffffffffffffffff167fffffffffffffffffffffffffffffffff00000000000000000000000000000000825416179055565b91615b6d61512d87945460801c90565b928315615be45761164f93615b97615b8884615b9c94614251565b615b9183614242565b906153ba565b614a2e565b7fd0c8d23a0000000000000000000000000000000000000000000000000000000060005260045260245273ffffffffffffffffffffffffffffffffffffffff16604452606490565b7fd0c8d23a00000000000000000000000000000000000000000000000000000000600052600019600452602482905273ffffffffffffffffffffffffffffffffffffffff831660445260646000fd5b7f1a76572a00000000000000000000000000000000000000000000000000000000600052600452602486905273ffffffffffffffffffffffffffffffffffffffff821660445260646000fd5b828692939611615ce957615c9961512d615ca09460801c90565b91866153c7565b84547fffffffffffffffffffffffff00000000ffffffffffffffffffffffffffffffff164260801b73ffffffff0000000000000000000000000000000016178555923880615afe565b7f9725942a0000000000000000000000000000000000000000000000000000000060005260046000fd5b5050509050565b508415615a99565b6000818152600c602052604090205490811561584d57600019820190828211613e7b57600b54926000198401938411613e7b57838361580c9460009603615d82575b505050615d71600b615755565b600c90600052602052604060002090565b615d7161583e91615d9a61582a615da495600b61573d565b928391600b61573d565b55388080615d64565b91929015615e285750815115615dc1575090565b3b15615dca5790565b60646040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152fd5b825190915015615e3b5750805190602001fd5b611609906040519182917f08c379a0000000000000000000000000000000000000000000000000000000008352600483016103fb56fea164736f6c634300081a000a",
 }
 
 var USDCTokenPoolCCTPV2ABI = USDCTokenPoolCCTPV2MetaData.ABI
 
 var USDCTokenPoolCCTPV2Bin = USDCTokenPoolCCTPV2MetaData.Bin
 
-func DeployUSDCTokenPoolCCTPV2(auth *bind.TransactOpts, backend bind.ContractBackend, tokenMessenger common.Address, cctpMessageTransmitterProxy common.Address, token common.Address, allowlist []common.Address, rmnProxy common.Address, router common.Address) (common.Address, *types.Transaction, *USDCTokenPoolCCTPV2, error) {
+func DeployUSDCTokenPoolCCTPV2(auth *bind.TransactOpts, backend bind.ContractBackend, tokenMessenger common.Address, cctpMessageTransmitterProxy common.Address, token common.Address, advancedPoolHooks common.Address, rmnProxy common.Address, router common.Address) (common.Address, *types.Transaction, *USDCTokenPoolCCTPV2, error) {
 	parsed, err := USDCTokenPoolCCTPV2MetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -160,7 +140,7 @@ func DeployUSDCTokenPoolCCTPV2(auth *bind.TransactOpts, backend bind.ContractBac
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(USDCTokenPoolCCTPV2Bin), backend, tokenMessenger, cctpMessageTransmitterProxy, token, allowlist, rmnProxy, router)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(USDCTokenPoolCCTPV2Bin), backend, tokenMessenger, cctpMessageTransmitterProxy, token, advancedPoolHooks, rmnProxy, router)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -371,85 +351,11 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetAllAuthorizedCa
 	return _USDCTokenPoolCCTPV2.Contract.GetAllAuthorizedCallers(&_USDCTokenPoolCCTPV2.CallOpts)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetAllowList(opts *bind.CallOpts) ([]common.Address, error) {
-	var out []interface{}
-	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getAllowList")
-
-	if err != nil {
-		return *new([]common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
-
-	return out0, err
-
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetAllowList() ([]common.Address, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetAllowList(&_USDCTokenPoolCCTPV2.CallOpts)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetAllowList() ([]common.Address, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetAllowList(&_USDCTokenPoolCCTPV2.CallOpts)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetAllowListEnabled(opts *bind.CallOpts) (bool, error) {
-	var out []interface{}
-	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getAllowListEnabled")
-
-	if err != nil {
-		return *new(bool), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
-
-	return out0, err
-
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetAllowListEnabled() (bool, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetAllowListEnabled(&_USDCTokenPoolCCTPV2.CallOpts)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetAllowListEnabled() (bool, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetAllowListEnabled(&_USDCTokenPoolCCTPV2.CallOpts)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetCurrentCustomBlockConfirmationRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64) (GetCurrentCustomBlockConfirmationRateLimiterState,
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetCurrentRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64, customBlockConfirmation bool) (GetCurrentRateLimiterState,
 
 	error) {
 	var out []interface{}
-	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getCurrentCustomBlockConfirmationRateLimiterState", remoteChainSelector)
-
-	outstruct := new(GetCurrentCustomBlockConfirmationRateLimiterState)
-	if err != nil {
-		return *outstruct, err
-	}
-
-	outstruct.OutboundRateLimiterState = *abi.ConvertType(out[0], new(RateLimiterTokenBucket)).(*RateLimiterTokenBucket)
-	outstruct.InboundRateLimiterState = *abi.ConvertType(out[1], new(RateLimiterTokenBucket)).(*RateLimiterTokenBucket)
-
-	return *outstruct, err
-
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetCurrentCustomBlockConfirmationRateLimiterState(remoteChainSelector uint64) (GetCurrentCustomBlockConfirmationRateLimiterState,
-
-	error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetCurrentCustomBlockConfirmationRateLimiterState(&_USDCTokenPoolCCTPV2.CallOpts, remoteChainSelector)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetCurrentCustomBlockConfirmationRateLimiterState(remoteChainSelector uint64) (GetCurrentCustomBlockConfirmationRateLimiterState,
-
-	error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetCurrentCustomBlockConfirmationRateLimiterState(&_USDCTokenPoolCCTPV2.CallOpts, remoteChainSelector)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetCurrentRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64) (GetCurrentRateLimiterState,
-
-	error) {
-	var out []interface{}
-	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getCurrentRateLimiterState", remoteChainSelector)
+	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getCurrentRateLimiterState", remoteChainSelector, customBlockConfirmation)
 
 	outstruct := new(GetCurrentRateLimiterState)
 	if err != nil {
@@ -463,16 +369,16 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetCurrentRateLimiterStat
 
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetCurrentRateLimiterState(remoteChainSelector uint64) (GetCurrentRateLimiterState,
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetCurrentRateLimiterState(remoteChainSelector uint64, customBlockConfirmation bool) (GetCurrentRateLimiterState,
 
 	error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetCurrentRateLimiterState(&_USDCTokenPoolCCTPV2.CallOpts, remoteChainSelector)
+	return _USDCTokenPoolCCTPV2.Contract.GetCurrentRateLimiterState(&_USDCTokenPoolCCTPV2.CallOpts, remoteChainSelector, customBlockConfirmation)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetCurrentRateLimiterState(remoteChainSelector uint64) (GetCurrentRateLimiterState,
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetCurrentRateLimiterState(remoteChainSelector uint64, customBlockConfirmation bool) (GetCurrentRateLimiterState,
 
 	error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetCurrentRateLimiterState(&_USDCTokenPoolCCTPV2.CallOpts, remoteChainSelector)
+	return _USDCTokenPoolCCTPV2.Contract.GetCurrentRateLimiterState(&_USDCTokenPoolCCTPV2.CallOpts, remoteChainSelector, customBlockConfirmation)
 }
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetDomain(opts *bind.CallOpts, chainSelector uint64) (USDCTokenPoolDomain, error) {
@@ -509,7 +415,8 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetDynamicConfig(opts *bi
 	}
 
 	outstruct.Router = *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-	outstruct.ThresholdAmountForAdditionalCCVs = *abi.ConvertType(out[1], new(*big.Int)).(**big.Int)
+	outstruct.MinBlockConfirmations = *abi.ConvertType(out[1], new(uint16)).(*uint16)
+	outstruct.RateLimitAdmin = *abi.ConvertType(out[2], new(common.Address)).(*common.Address)
 
 	return *outstruct, err
 
@@ -560,50 +467,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetFee(arg0 common
 	return _USDCTokenPoolCCTPV2.Contract.GetFee(&_USDCTokenPoolCCTPV2.CallOpts, arg0, destChainSelector, arg2, arg3, blockConfirmationRequested, arg5)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetMinBlockConfirmation(opts *bind.CallOpts) (uint16, error) {
-	var out []interface{}
-	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getMinBlockConfirmation")
-
-	if err != nil {
-		return *new(uint16), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(uint16)).(*uint16)
-
-	return out0, err
-
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetMinBlockConfirmation() (uint16, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetMinBlockConfirmation(&_USDCTokenPoolCCTPV2.CallOpts)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetMinBlockConfirmation() (uint16, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetMinBlockConfirmation(&_USDCTokenPoolCCTPV2.CallOpts)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetRateLimitAdmin(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
-	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getRateLimitAdmin")
-
-	if err != nil {
-		return *new(common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-
-	return out0, err
-
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetRateLimitAdmin() (common.Address, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetRateLimitAdmin(&_USDCTokenPoolCCTPV2.CallOpts)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetRateLimitAdmin() (common.Address, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetRateLimitAdmin(&_USDCTokenPoolCCTPV2.CallOpts)
-}
-
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetRemotePools(opts *bind.CallOpts, remoteChainSelector uint64) ([][]byte, error) {
 	var out []interface{}
 	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getRemotePools", remoteChainSelector)
@@ -648,9 +511,9 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetRemoteToken(rem
 	return _USDCTokenPoolCCTPV2.Contract.GetRemoteToken(&_USDCTokenPoolCCTPV2.CallOpts, remoteChainSelector)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetRequiredCCVs(opts *bind.CallOpts, arg0 common.Address, remoteChainSelector uint64, amount *big.Int, arg3 uint16, arg4 []byte, direction uint8) ([]common.Address, error) {
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetRequiredCCVs(opts *bind.CallOpts, localToken common.Address, remoteChainSelector uint64, amount *big.Int, blockConfirmationRequested uint16, extraData []byte, direction uint8) ([]common.Address, error) {
 	var out []interface{}
-	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getRequiredCCVs", arg0, remoteChainSelector, amount, arg3, arg4, direction)
+	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getRequiredCCVs", localToken, remoteChainSelector, amount, blockConfirmationRequested, extraData, direction)
 
 	if err != nil {
 		return *new([]common.Address), err
@@ -662,12 +525,12 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetRequiredCCVs(opts *bin
 
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetRequiredCCVs(arg0 common.Address, remoteChainSelector uint64, amount *big.Int, arg3 uint16, arg4 []byte, direction uint8) ([]common.Address, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetRequiredCCVs(&_USDCTokenPoolCCTPV2.CallOpts, arg0, remoteChainSelector, amount, arg3, arg4, direction)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetRequiredCCVs(localToken common.Address, remoteChainSelector uint64, amount *big.Int, blockConfirmationRequested uint16, extraData []byte, direction uint8) ([]common.Address, error) {
+	return _USDCTokenPoolCCTPV2.Contract.GetRequiredCCVs(&_USDCTokenPoolCCTPV2.CallOpts, localToken, remoteChainSelector, amount, blockConfirmationRequested, extraData, direction)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetRequiredCCVs(arg0 common.Address, remoteChainSelector uint64, amount *big.Int, arg3 uint16, arg4 []byte, direction uint8) ([]common.Address, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetRequiredCCVs(&_USDCTokenPoolCCTPV2.CallOpts, arg0, remoteChainSelector, amount, arg3, arg4, direction)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetRequiredCCVs(localToken common.Address, remoteChainSelector uint64, amount *big.Int, blockConfirmationRequested uint16, extraData []byte, direction uint8) ([]common.Address, error) {
+	return _USDCTokenPoolCCTPV2.Contract.GetRequiredCCVs(&_USDCTokenPoolCCTPV2.CallOpts, localToken, remoteChainSelector, amount, blockConfirmationRequested, extraData, direction)
 }
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetRmnProxy(opts *bind.CallOpts) (common.Address, error) {
@@ -758,9 +621,9 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetTokenDecimals()
 	return _USDCTokenPoolCCTPV2.Contract.GetTokenDecimals(&_USDCTokenPoolCCTPV2.CallOpts)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetTokenTransferFeeConfig(opts *bind.CallOpts, arg0 common.Address, destChainSelector uint64, arg2 ClientEVM2AnyMessage, arg3 uint16, arg4 []byte) (IPoolV2TokenTransferFeeConfig, error) {
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetTokenTransferFeeConfig(opts *bind.CallOpts, arg0 common.Address, destChainSelector uint64, arg2 uint16, arg3 []byte) (IPoolV2TokenTransferFeeConfig, error) {
 	var out []interface{}
-	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getTokenTransferFeeConfig", arg0, destChainSelector, arg2, arg3, arg4)
+	err := _USDCTokenPoolCCTPV2.contract.Call(opts, &out, "getTokenTransferFeeConfig", arg0, destChainSelector, arg2, arg3)
 
 	if err != nil {
 		return *new(IPoolV2TokenTransferFeeConfig), err
@@ -772,12 +635,12 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) GetTokenTransferFeeConfig
 
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetTokenTransferFeeConfig(arg0 common.Address, destChainSelector uint64, arg2 ClientEVM2AnyMessage, arg3 uint16, arg4 []byte) (IPoolV2TokenTransferFeeConfig, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetTokenTransferFeeConfig(&_USDCTokenPoolCCTPV2.CallOpts, arg0, destChainSelector, arg2, arg3, arg4)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) GetTokenTransferFeeConfig(arg0 common.Address, destChainSelector uint64, arg2 uint16, arg3 []byte) (IPoolV2TokenTransferFeeConfig, error) {
+	return _USDCTokenPoolCCTPV2.Contract.GetTokenTransferFeeConfig(&_USDCTokenPoolCCTPV2.CallOpts, arg0, destChainSelector, arg2, arg3)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetTokenTransferFeeConfig(arg0 common.Address, destChainSelector uint64, arg2 ClientEVM2AnyMessage, arg3 uint16, arg4 []byte) (IPoolV2TokenTransferFeeConfig, error) {
-	return _USDCTokenPoolCCTPV2.Contract.GetTokenTransferFeeConfig(&_USDCTokenPoolCCTPV2.CallOpts, arg0, destChainSelector, arg2, arg3, arg4)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2CallerSession) GetTokenTransferFeeConfig(arg0 common.Address, destChainSelector uint64, arg2 uint16, arg3 []byte) (IPoolV2TokenTransferFeeConfig, error) {
+	return _USDCTokenPoolCCTPV2.Contract.GetTokenTransferFeeConfig(&_USDCTokenPoolCCTPV2.CallOpts, arg0, destChainSelector, arg2, arg3)
 }
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Caller) ILocalDomainIdentifier(opts *bind.CallOpts) (uint32, error) {
@@ -1024,18 +887,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) AddRemotePool(
 	return _USDCTokenPoolCCTPV2.Contract.AddRemotePool(&_USDCTokenPoolCCTPV2.TransactOpts, remoteChainSelector, remotePoolAddress)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) ApplyAllowListUpdates(opts *bind.TransactOpts, removes []common.Address, adds []common.Address) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "applyAllowListUpdates", removes, adds)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) ApplyAllowListUpdates(removes []common.Address, adds []common.Address) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.ApplyAllowListUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, removes, adds)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) ApplyAllowListUpdates(removes []common.Address, adds []common.Address) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.ApplyAllowListUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, removes, adds)
-}
-
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) ApplyAuthorizedCallerUpdates(opts *bind.TransactOpts, authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
 	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "applyAuthorizedCallerUpdates", authorizedCallerArgs)
 }
@@ -1048,18 +899,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) ApplyAuthorize
 	return _USDCTokenPoolCCTPV2.Contract.ApplyAuthorizedCallerUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, authorizedCallerArgs)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) ApplyCCVConfigUpdates(opts *bind.TransactOpts, ccvConfigArgs []TokenPoolCCVConfigArg) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "applyCCVConfigUpdates", ccvConfigArgs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) ApplyCCVConfigUpdates(ccvConfigArgs []TokenPoolCCVConfigArg) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.ApplyCCVConfigUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, ccvConfigArgs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) ApplyCCVConfigUpdates(ccvConfigArgs []TokenPoolCCVConfigArg) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.ApplyCCVConfigUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, ccvConfigArgs)
-}
-
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) ApplyChainUpdates(opts *bind.TransactOpts, remoteChainSelectorsToRemove []uint64, chainsToAdd []TokenPoolChainUpdate) (*types.Transaction, error) {
 	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "applyChainUpdates", remoteChainSelectorsToRemove, chainsToAdd)
 }
@@ -1070,18 +909,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) ApplyChainUpdates(remote
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) ApplyChainUpdates(remoteChainSelectorsToRemove []uint64, chainsToAdd []TokenPoolChainUpdate) (*types.Transaction, error) {
 	return _USDCTokenPoolCCTPV2.Contract.ApplyChainUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, remoteChainSelectorsToRemove, chainsToAdd)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) ApplyCustomBlockConfirmationConfigUpdates(opts *bind.TransactOpts, minBlockConfirmation uint16, rateLimitConfigArgs []TokenPoolCustomBlockConfirmationRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "applyCustomBlockConfirmationConfigUpdates", minBlockConfirmation, rateLimitConfigArgs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) ApplyCustomBlockConfirmationConfigUpdates(minBlockConfirmation uint16, rateLimitConfigArgs []TokenPoolCustomBlockConfirmationRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.ApplyCustomBlockConfirmationConfigUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, minBlockConfirmation, rateLimitConfigArgs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) ApplyCustomBlockConfirmationConfigUpdates(minBlockConfirmation uint16, rateLimitConfigArgs []TokenPoolCustomBlockConfirmationRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.ApplyCustomBlockConfirmationConfigUpdates(&_USDCTokenPoolCCTPV2.TransactOpts, minBlockConfirmation, rateLimitConfigArgs)
 }
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) ApplyTokenTransferFeeConfigUpdates(opts *bind.TransactOpts, tokenTransferFeeConfigArgs []TokenPoolTokenTransferFeeConfigArgs, disableTokenTransferFeeConfigs []uint64) (*types.Transaction, error) {
@@ -1108,16 +935,16 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) LockOrBurn(loc
 	return _USDCTokenPoolCCTPV2.Contract.LockOrBurn(&_USDCTokenPoolCCTPV2.TransactOpts, lockOrBurnIn)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) LockOrBurn0(opts *bind.TransactOpts, lockOrBurnIn PoolLockOrBurnInV1, blockConfirmationRequested uint16, arg2 []byte) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "lockOrBurn0", lockOrBurnIn, blockConfirmationRequested, arg2)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) LockOrBurn0(opts *bind.TransactOpts, lockOrBurnIn PoolLockOrBurnInV1, blockConfirmationRequested uint16, tokenArgs []byte) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "lockOrBurn0", lockOrBurnIn, blockConfirmationRequested, tokenArgs)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) LockOrBurn0(lockOrBurnIn PoolLockOrBurnInV1, blockConfirmationRequested uint16, arg2 []byte) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.LockOrBurn0(&_USDCTokenPoolCCTPV2.TransactOpts, lockOrBurnIn, blockConfirmationRequested, arg2)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) LockOrBurn0(lockOrBurnIn PoolLockOrBurnInV1, blockConfirmationRequested uint16, tokenArgs []byte) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.Contract.LockOrBurn0(&_USDCTokenPoolCCTPV2.TransactOpts, lockOrBurnIn, blockConfirmationRequested, tokenArgs)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) LockOrBurn0(lockOrBurnIn PoolLockOrBurnInV1, blockConfirmationRequested uint16, arg2 []byte) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.LockOrBurn0(&_USDCTokenPoolCCTPV2.TransactOpts, lockOrBurnIn, blockConfirmationRequested, arg2)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) LockOrBurn0(lockOrBurnIn PoolLockOrBurnInV1, blockConfirmationRequested uint16, tokenArgs []byte) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.Contract.LockOrBurn0(&_USDCTokenPoolCCTPV2.TransactOpts, lockOrBurnIn, blockConfirmationRequested, tokenArgs)
 }
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) ReleaseOrMint(opts *bind.TransactOpts, releaseOrMintIn PoolReleaseOrMintInV1) (*types.Transaction, error) {
@@ -1156,42 +983,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) RemoveRemotePo
 	return _USDCTokenPoolCCTPV2.Contract.RemoveRemotePool(&_USDCTokenPoolCCTPV2.TransactOpts, remoteChainSelector, remotePoolAddress)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetChainRateLimiterConfig(opts *bind.TransactOpts, remoteChainSelector uint64, outboundConfig RateLimiterConfig, inboundConfig RateLimiterConfig) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setChainRateLimiterConfig", remoteChainSelector, outboundConfig, inboundConfig)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) SetChainRateLimiterConfig(remoteChainSelector uint64, outboundConfig RateLimiterConfig, inboundConfig RateLimiterConfig) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetChainRateLimiterConfig(&_USDCTokenPoolCCTPV2.TransactOpts, remoteChainSelector, outboundConfig, inboundConfig)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetChainRateLimiterConfig(remoteChainSelector uint64, outboundConfig RateLimiterConfig, inboundConfig RateLimiterConfig) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetChainRateLimiterConfig(&_USDCTokenPoolCCTPV2.TransactOpts, remoteChainSelector, outboundConfig, inboundConfig)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetChainRateLimiterConfigs(opts *bind.TransactOpts, remoteChainSelectors []uint64, outboundConfigs []RateLimiterConfig, inboundConfigs []RateLimiterConfig) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setChainRateLimiterConfigs", remoteChainSelectors, outboundConfigs, inboundConfigs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) SetChainRateLimiterConfigs(remoteChainSelectors []uint64, outboundConfigs []RateLimiterConfig, inboundConfigs []RateLimiterConfig) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetChainRateLimiterConfigs(&_USDCTokenPoolCCTPV2.TransactOpts, remoteChainSelectors, outboundConfigs, inboundConfigs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetChainRateLimiterConfigs(remoteChainSelectors []uint64, outboundConfigs []RateLimiterConfig, inboundConfigs []RateLimiterConfig) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetChainRateLimiterConfigs(&_USDCTokenPoolCCTPV2.TransactOpts, remoteChainSelectors, outboundConfigs, inboundConfigs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetCustomBlockConfirmationRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolCustomBlockConfirmationRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setCustomBlockConfirmationRateLimitConfig", rateLimitConfigArgs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) SetCustomBlockConfirmationRateLimitConfig(rateLimitConfigArgs []TokenPoolCustomBlockConfirmationRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetCustomBlockConfirmationRateLimitConfig(&_USDCTokenPoolCCTPV2.TransactOpts, rateLimitConfigArgs)
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetCustomBlockConfirmationRateLimitConfig(rateLimitConfigArgs []TokenPoolCustomBlockConfirmationRateLimitConfigArgs) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetCustomBlockConfirmationRateLimitConfig(&_USDCTokenPoolCCTPV2.TransactOpts, rateLimitConfigArgs)
-}
-
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetDomains(opts *bind.TransactOpts, domains []USDCTokenPoolDomainUpdate) (*types.Transaction, error) {
 	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setDomains", domains)
 }
@@ -1204,28 +995,28 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetDomains(dom
 	return _USDCTokenPoolCCTPV2.Contract.SetDomains(&_USDCTokenPoolCCTPV2.TransactOpts, domains)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetDynamicConfig(opts *bind.TransactOpts, router common.Address, thresholdAmountForAdditionalCCVs *big.Int) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setDynamicConfig", router, thresholdAmountForAdditionalCCVs)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetDynamicConfig(opts *bind.TransactOpts, router common.Address, minBlockConfirmations uint16, rateLimitAdmin common.Address) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setDynamicConfig", router, minBlockConfirmations, rateLimitAdmin)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) SetDynamicConfig(router common.Address, thresholdAmountForAdditionalCCVs *big.Int) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetDynamicConfig(&_USDCTokenPoolCCTPV2.TransactOpts, router, thresholdAmountForAdditionalCCVs)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) SetDynamicConfig(router common.Address, minBlockConfirmations uint16, rateLimitAdmin common.Address) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.Contract.SetDynamicConfig(&_USDCTokenPoolCCTPV2.TransactOpts, router, minBlockConfirmations, rateLimitAdmin)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetDynamicConfig(router common.Address, thresholdAmountForAdditionalCCVs *big.Int) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetDynamicConfig(&_USDCTokenPoolCCTPV2.TransactOpts, router, thresholdAmountForAdditionalCCVs)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetDynamicConfig(router common.Address, minBlockConfirmations uint16, rateLimitAdmin common.Address) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.Contract.SetDynamicConfig(&_USDCTokenPoolCCTPV2.TransactOpts, router, minBlockConfirmations, rateLimitAdmin)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetRateLimitAdmin(opts *bind.TransactOpts, rateLimitAdmin common.Address) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setRateLimitAdmin", rateLimitAdmin)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) SetRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolRateLimitConfigArgs) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.contract.Transact(opts, "setRateLimitConfig", rateLimitConfigArgs)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) SetRateLimitAdmin(rateLimitAdmin common.Address) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetRateLimitAdmin(&_USDCTokenPoolCCTPV2.TransactOpts, rateLimitAdmin)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) SetRateLimitConfig(rateLimitConfigArgs []TokenPoolRateLimitConfigArgs) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.Contract.SetRateLimitConfig(&_USDCTokenPoolCCTPV2.TransactOpts, rateLimitConfigArgs)
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetRateLimitAdmin(rateLimitAdmin common.Address) (*types.Transaction, error) {
-	return _USDCTokenPoolCCTPV2.Contract.SetRateLimitAdmin(&_USDCTokenPoolCCTPV2.TransactOpts, rateLimitAdmin)
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) SetRateLimitConfig(rateLimitConfigArgs []TokenPoolRateLimitConfigArgs) (*types.Transaction, error) {
+	return _USDCTokenPoolCCTPV2.Contract.SetRateLimitConfig(&_USDCTokenPoolCCTPV2.TransactOpts, rateLimitConfigArgs)
 }
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Transactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
@@ -1250,240 +1041,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Session) WithdrawFeeTokens(feeTok
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2TransactorSession) WithdrawFeeTokens(feeTokens []common.Address, recipient common.Address) (*types.Transaction, error) {
 	return _USDCTokenPoolCCTPV2.Contract.WithdrawFeeTokens(&_USDCTokenPoolCCTPV2.TransactOpts, feeTokens, recipient)
-}
-
-type USDCTokenPoolCCTPV2AllowListAddIterator struct {
-	Event *USDCTokenPoolCCTPV2AllowListAdd
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *USDCTokenPoolCCTPV2AllowListAddIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(USDCTokenPoolCCTPV2AllowListAdd)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(USDCTokenPoolCCTPV2AllowListAdd)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *USDCTokenPoolCCTPV2AllowListAddIterator) Error() error {
-	return it.fail
-}
-
-func (it *USDCTokenPoolCCTPV2AllowListAddIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type USDCTokenPoolCCTPV2AllowListAdd struct {
-	Sender common.Address
-	Raw    types.Log
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterAllowListAdd(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2AllowListAddIterator, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "AllowListAdd")
-	if err != nil {
-		return nil, err
-	}
-	return &USDCTokenPoolCCTPV2AllowListAddIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "AllowListAdd", logs: logs, sub: sub}, nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchAllowListAdd(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2AllowListAdd) (event.Subscription, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "AllowListAdd")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(USDCTokenPoolCCTPV2AllowListAdd)
-				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "AllowListAdd", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseAllowListAdd(log types.Log) (*USDCTokenPoolCCTPV2AllowListAdd, error) {
-	event := new(USDCTokenPoolCCTPV2AllowListAdd)
-	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "AllowListAdd", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-type USDCTokenPoolCCTPV2AllowListRemoveIterator struct {
-	Event *USDCTokenPoolCCTPV2AllowListRemove
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *USDCTokenPoolCCTPV2AllowListRemoveIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(USDCTokenPoolCCTPV2AllowListRemove)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(USDCTokenPoolCCTPV2AllowListRemove)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *USDCTokenPoolCCTPV2AllowListRemoveIterator) Error() error {
-	return it.fail
-}
-
-func (it *USDCTokenPoolCCTPV2AllowListRemoveIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type USDCTokenPoolCCTPV2AllowListRemove struct {
-	Sender common.Address
-	Raw    types.Log
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterAllowListRemove(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2AllowListRemoveIterator, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "AllowListRemove")
-	if err != nil {
-		return nil, err
-	}
-	return &USDCTokenPoolCCTPV2AllowListRemoveIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "AllowListRemove", logs: logs, sub: sub}, nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchAllowListRemove(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2AllowListRemove) (event.Subscription, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "AllowListRemove")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(USDCTokenPoolCCTPV2AllowListRemove)
-				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "AllowListRemove", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseAllowListRemove(log types.Log) (*USDCTokenPoolCCTPV2AllowListRemove, error) {
-	event := new(USDCTokenPoolCCTPV2AllowListRemove)
-	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "AllowListRemove", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
 }
 
 type USDCTokenPoolCCTPV2AuthorizedCallerAddedIterator struct {
@@ -1714,137 +1271,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchAuthorizedCallerRe
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseAuthorizedCallerRemoved(log types.Log) (*USDCTokenPoolCCTPV2AuthorizedCallerRemoved, error) {
 	event := new(USDCTokenPoolCCTPV2AuthorizedCallerRemoved)
 	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "AuthorizedCallerRemoved", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-type USDCTokenPoolCCTPV2CCVConfigUpdatedIterator struct {
-	Event *USDCTokenPoolCCTPV2CCVConfigUpdated
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *USDCTokenPoolCCTPV2CCVConfigUpdatedIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(USDCTokenPoolCCTPV2CCVConfigUpdated)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(USDCTokenPoolCCTPV2CCVConfigUpdated)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *USDCTokenPoolCCTPV2CCVConfigUpdatedIterator) Error() error {
-	return it.fail
-}
-
-func (it *USDCTokenPoolCCTPV2CCVConfigUpdatedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type USDCTokenPoolCCTPV2CCVConfigUpdated struct {
-	RemoteChainSelector             uint64
-	OutboundCCVs                    []common.Address
-	OutboundCCVsToAddAboveThreshold []common.Address
-	InboundCCVs                     []common.Address
-	InboundCCVsToAddAboveThreshold  []common.Address
-	Raw                             types.Log
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterCCVConfigUpdated(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2CCVConfigUpdatedIterator, error) {
-
-	var remoteChainSelectorRule []interface{}
-	for _, remoteChainSelectorItem := range remoteChainSelector {
-		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
-	}
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "CCVConfigUpdated", remoteChainSelectorRule)
-	if err != nil {
-		return nil, err
-	}
-	return &USDCTokenPoolCCTPV2CCVConfigUpdatedIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "CCVConfigUpdated", logs: logs, sub: sub}, nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchCCVConfigUpdated(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CCVConfigUpdated, remoteChainSelector []uint64) (event.Subscription, error) {
-
-	var remoteChainSelectorRule []interface{}
-	for _, remoteChainSelectorItem := range remoteChainSelector {
-		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
-	}
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "CCVConfigUpdated", remoteChainSelectorRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(USDCTokenPoolCCTPV2CCVConfigUpdated)
-				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "CCVConfigUpdated", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseCCVConfigUpdated(log types.Log) (*USDCTokenPoolCCTPV2CCVConfigUpdated, error) {
-	event := new(USDCTokenPoolCCTPV2CCVConfigUpdated)
-	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "CCVConfigUpdated", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -2082,123 +1508,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchChainRemoved(opts 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseChainRemoved(log types.Log) (*USDCTokenPoolCCTPV2ChainRemoved, error) {
 	event := new(USDCTokenPoolCCTPV2ChainRemoved)
 	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "ChainRemoved", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-type USDCTokenPoolCCTPV2ConfigChangedIterator struct {
-	Event *USDCTokenPoolCCTPV2ConfigChanged
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *USDCTokenPoolCCTPV2ConfigChangedIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(USDCTokenPoolCCTPV2ConfigChanged)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(USDCTokenPoolCCTPV2ConfigChanged)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *USDCTokenPoolCCTPV2ConfigChangedIterator) Error() error {
-	return it.fail
-}
-
-func (it *USDCTokenPoolCCTPV2ConfigChangedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type USDCTokenPoolCCTPV2ConfigChanged struct {
-	Config RateLimiterConfig
-	Raw    types.Log
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterConfigChanged(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2ConfigChangedIterator, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "ConfigChanged")
-	if err != nil {
-		return nil, err
-	}
-	return &USDCTokenPoolCCTPV2ConfigChangedIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "ConfigChanged", logs: logs, sub: sub}, nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchConfigChanged(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2ConfigChanged) (event.Subscription, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "ConfigChanged")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(USDCTokenPoolCCTPV2ConfigChanged)
-				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "ConfigChanged", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseConfigChanged(log types.Log) (*USDCTokenPoolCCTPV2ConfigChanged, error) {
-	event := new(USDCTokenPoolCCTPV2ConfigChanged)
-	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "ConfigChanged", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -2580,361 +1889,6 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseCustomBlockConfirm
 	return event, nil
 }
 
-type USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfiguredIterator struct {
-	Event *USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfiguredIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfiguredIterator) Error() error {
-	return it.fail
-}
-
-func (it *USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfiguredIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured struct {
-	RemoteChainSelector       uint64
-	OutboundRateLimiterConfig RateLimiterConfig
-	InboundRateLimiterConfig  RateLimiterConfig
-	Raw                       types.Log
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterCustomBlockConfirmationRateLimitConfigured(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfiguredIterator, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "CustomBlockConfirmationRateLimitConfigured")
-	if err != nil {
-		return nil, err
-	}
-	return &USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfiguredIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "CustomBlockConfirmationRateLimitConfigured", logs: logs, sub: sub}, nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchCustomBlockConfirmationRateLimitConfigured(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured) (event.Subscription, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "CustomBlockConfirmationRateLimitConfigured")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured)
-				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "CustomBlockConfirmationRateLimitConfigured", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseCustomBlockConfirmationRateLimitConfigured(log types.Log) (*USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured, error) {
-	event := new(USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured)
-	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "CustomBlockConfirmationRateLimitConfigured", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-type USDCTokenPoolCCTPV2CustomBlockConfirmationUpdatedIterator struct {
-	Event *USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *USDCTokenPoolCCTPV2CustomBlockConfirmationUpdatedIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *USDCTokenPoolCCTPV2CustomBlockConfirmationUpdatedIterator) Error() error {
-	return it.fail
-}
-
-func (it *USDCTokenPoolCCTPV2CustomBlockConfirmationUpdatedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated struct {
-	MinBlockConfirmation uint16
-	Raw                  types.Log
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterCustomBlockConfirmationUpdated(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2CustomBlockConfirmationUpdatedIterator, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "CustomBlockConfirmationUpdated")
-	if err != nil {
-		return nil, err
-	}
-	return &USDCTokenPoolCCTPV2CustomBlockConfirmationUpdatedIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "CustomBlockConfirmationUpdated", logs: logs, sub: sub}, nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchCustomBlockConfirmationUpdated(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated) (event.Subscription, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "CustomBlockConfirmationUpdated")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated)
-				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "CustomBlockConfirmationUpdated", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseCustomBlockConfirmationUpdated(log types.Log) (*USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated, error) {
-	event := new(USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated)
-	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "CustomBlockConfirmationUpdated", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-type USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfiguredIterator struct {
-	Event *USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfiguredIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfiguredIterator) Error() error {
-	return it.fail
-}
-
-func (it *USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfiguredIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured struct {
-	RemoteChainSelector       uint64
-	OutboundRateLimiterConfig RateLimiterConfig
-	InboundRateLimiterConfig  RateLimiterConfig
-	Raw                       types.Log
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterDefaultFinalityRateLimitConfigured(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfiguredIterator, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "DefaultFinalityRateLimitConfigured")
-	if err != nil {
-		return nil, err
-	}
-	return &USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfiguredIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "DefaultFinalityRateLimitConfigured", logs: logs, sub: sub}, nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchDefaultFinalityRateLimitConfigured(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured) (event.Subscription, error) {
-
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "DefaultFinalityRateLimitConfigured")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured)
-				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "DefaultFinalityRateLimitConfigured", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseDefaultFinalityRateLimitConfigured(log types.Log) (*USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured, error) {
-	event := new(USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured)
-	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "DefaultFinalityRateLimitConfigured", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
 type USDCTokenPoolCCTPV2DomainsSetIterator struct {
 	Event *USDCTokenPoolCCTPV2DomainsSet
 
@@ -3113,9 +2067,10 @@ func (it *USDCTokenPoolCCTPV2DynamicConfigSetIterator) Close() error {
 }
 
 type USDCTokenPoolCCTPV2DynamicConfigSet struct {
-	Router                           common.Address
-	ThresholdAmountForAdditionalCCVs *big.Int
-	Raw                              types.Log
+	Router                common.Address
+	MinBlockConfirmations uint16
+	RateLimitAdmin        common.Address
+	Raw                   types.Log
 }
 
 func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterDynamicConfigSet(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2DynamicConfigSetIterator, error) {
@@ -3967,8 +2922,8 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseOwnershipTransferr
 	return event, nil
 }
 
-type USDCTokenPoolCCTPV2RateLimitAdminSetIterator struct {
-	Event *USDCTokenPoolCCTPV2RateLimitAdminSet
+type USDCTokenPoolCCTPV2RateLimitConfiguredIterator struct {
+	Event *USDCTokenPoolCCTPV2RateLimitConfigured
 
 	contract *bind.BoundContract
 	event    string
@@ -3979,7 +2934,7 @@ type USDCTokenPoolCCTPV2RateLimitAdminSetIterator struct {
 	fail error
 }
 
-func (it *USDCTokenPoolCCTPV2RateLimitAdminSetIterator) Next() bool {
+func (it *USDCTokenPoolCCTPV2RateLimitConfiguredIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -3988,7 +2943,7 @@ func (it *USDCTokenPoolCCTPV2RateLimitAdminSetIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(USDCTokenPoolCCTPV2RateLimitAdminSet)
+			it.Event = new(USDCTokenPoolCCTPV2RateLimitConfigured)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -4003,7 +2958,7 @@ func (it *USDCTokenPoolCCTPV2RateLimitAdminSetIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(USDCTokenPoolCCTPV2RateLimitAdminSet)
+		it.Event = new(USDCTokenPoolCCTPV2RateLimitConfigured)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -4018,32 +2973,45 @@ func (it *USDCTokenPoolCCTPV2RateLimitAdminSetIterator) Next() bool {
 	}
 }
 
-func (it *USDCTokenPoolCCTPV2RateLimitAdminSetIterator) Error() error {
+func (it *USDCTokenPoolCCTPV2RateLimitConfiguredIterator) Error() error {
 	return it.fail
 }
 
-func (it *USDCTokenPoolCCTPV2RateLimitAdminSetIterator) Close() error {
+func (it *USDCTokenPoolCCTPV2RateLimitConfiguredIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type USDCTokenPoolCCTPV2RateLimitAdminSet struct {
-	RateLimitAdmin common.Address
-	Raw            types.Log
+type USDCTokenPoolCCTPV2RateLimitConfigured struct {
+	RemoteChainSelector       uint64
+	CustomBlockConfirmation   bool
+	OutboundRateLimiterConfig RateLimiterConfig
+	InboundRateLimiterConfig  RateLimiterConfig
+	Raw                       types.Log
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterRateLimitAdminSet(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2RateLimitAdminSetIterator, error) {
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) FilterRateLimitConfigured(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2RateLimitConfiguredIterator, error) {
 
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "RateLimitAdminSet")
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _USDCTokenPoolCCTPV2.contract.FilterLogs(opts, "RateLimitConfigured", remoteChainSelectorRule)
 	if err != nil {
 		return nil, err
 	}
-	return &USDCTokenPoolCCTPV2RateLimitAdminSetIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "RateLimitAdminSet", logs: logs, sub: sub}, nil
+	return &USDCTokenPoolCCTPV2RateLimitConfiguredIterator{contract: _USDCTokenPoolCCTPV2.contract, event: "RateLimitConfigured", logs: logs, sub: sub}, nil
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchRateLimitAdminSet(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2RateLimitAdminSet) (event.Subscription, error) {
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchRateLimitConfigured(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2RateLimitConfigured, remoteChainSelector []uint64) (event.Subscription, error) {
 
-	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "RateLimitAdminSet")
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _USDCTokenPoolCCTPV2.contract.WatchLogs(opts, "RateLimitConfigured", remoteChainSelectorRule)
 	if err != nil {
 		return nil, err
 	}
@@ -4053,8 +3021,8 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchRateLimitAdminSet(
 			select {
 			case log := <-logs:
 
-				event := new(USDCTokenPoolCCTPV2RateLimitAdminSet)
-				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "RateLimitAdminSet", log); err != nil {
+				event := new(USDCTokenPoolCCTPV2RateLimitConfigured)
+				if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "RateLimitConfigured", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -4075,9 +3043,9 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) WatchRateLimitAdminSet(
 	}), nil
 }
 
-func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseRateLimitAdminSet(log types.Log) (*USDCTokenPoolCCTPV2RateLimitAdminSet, error) {
-	event := new(USDCTokenPoolCCTPV2RateLimitAdminSet)
-	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "RateLimitAdminSet", log); err != nil {
+func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseRateLimitConfigured(log types.Log) (*USDCTokenPoolCCTPV2RateLimitConfigured, error) {
+	event := new(USDCTokenPoolCCTPV2RateLimitConfigured)
+	if err := _USDCTokenPoolCCTPV2.contract.UnpackLog(event, "RateLimitConfigured", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -4726,17 +3694,14 @@ func (_USDCTokenPoolCCTPV2 *USDCTokenPoolCCTPV2Filterer) ParseTokenTransferFeeCo
 	return event, nil
 }
 
-type GetCurrentCustomBlockConfirmationRateLimiterState struct {
-	OutboundRateLimiterState RateLimiterTokenBucket
-	InboundRateLimiterState  RateLimiterTokenBucket
-}
 type GetCurrentRateLimiterState struct {
 	OutboundRateLimiterState RateLimiterTokenBucket
 	InboundRateLimiterState  RateLimiterTokenBucket
 }
 type GetDynamicConfig struct {
-	Router                           common.Address
-	ThresholdAmountForAdditionalCCVs *big.Int
+	Router                common.Address
+	MinBlockConfirmations uint16
+	RateLimitAdmin        common.Address
 }
 type GetFee struct {
 	FeeUSDCents       *big.Int
@@ -4744,14 +3709,6 @@ type GetFee struct {
 	DestBytesOverhead uint32
 	TokenFeeBps       uint16
 	IsEnabled         bool
-}
-
-func (USDCTokenPoolCCTPV2AllowListAdd) Topic() common.Hash {
-	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
-}
-
-func (USDCTokenPoolCCTPV2AllowListRemove) Topic() common.Hash {
-	return common.HexToHash("0x800671136ab6cfee9fbe5ed1fb7ca417811aca3cf864800d127b927adedf7566")
 }
 
 func (USDCTokenPoolCCTPV2AuthorizedCallerAdded) Topic() common.Hash {
@@ -4762,20 +3719,12 @@ func (USDCTokenPoolCCTPV2AuthorizedCallerRemoved) Topic() common.Hash {
 	return common.HexToHash("0xc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda77580")
 }
 
-func (USDCTokenPoolCCTPV2CCVConfigUpdated) Topic() common.Hash {
-	return common.HexToHash("0xece8a336aec3d0587372c99a62c7158c83d7419e28f8c519094cf44763b00e7d")
-}
-
 func (USDCTokenPoolCCTPV2ChainAdded) Topic() common.Hash {
 	return common.HexToHash("0x8d340f17e19058004c20453540862a9c62778504476f6756755cb33bcd6c38c2")
 }
 
 func (USDCTokenPoolCCTPV2ChainRemoved) Topic() common.Hash {
 	return common.HexToHash("0x5204aec90a3c794d8e90fded8b46ae9c7c552803e7e832e0c1d358396d859916")
-}
-
-func (USDCTokenPoolCCTPV2ConfigChanged) Topic() common.Hash {
-	return common.HexToHash("0x9ea3374b67bf275e6bb9c8ae68f9cae023e1c528b4b27e092f0bb209d3531c19")
 }
 
 func (USDCTokenPoolCCTPV2ConfigSet) Topic() common.Hash {
@@ -4790,24 +3739,12 @@ func (USDCTokenPoolCCTPV2CustomBlockConfirmationOutboundRateLimitConsumed) Topic
 	return common.HexToHash("0x61b04c91cb711a3783cc99d0de694ecd7ead5c96a0a87f5c89d436ac20979328")
 }
 
-func (USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured) Topic() common.Hash {
-	return common.HexToHash("0x20ae59542ddd78610f62f9d2c9dcd658f8b6a5b45a0f03e71e16614e89dda836")
-}
-
-func (USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated) Topic() common.Hash {
-	return common.HexToHash("0x303439e67d1363a21c3ecd1158164e797c51eced31b0351ec0e1f7afaf97779e")
-}
-
-func (USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured) Topic() common.Hash {
-	return common.HexToHash("0x73d6dce40db73cbddae4b9ce52576043a1644e08c2702236273d71077435fa16")
-}
-
 func (USDCTokenPoolCCTPV2DomainsSet) Topic() common.Hash {
 	return common.HexToHash("0xc97f93e817584952f1c1d633f93784b8430f0633d002f9dcc4de4fe2780424d0")
 }
 
 func (USDCTokenPoolCCTPV2DynamicConfigSet) Topic() common.Hash {
-	return common.HexToHash("0x78c5af2c6ab8d53b1850f16dd49fb61b0c1fef46835b922a40e3ce1f623f0238")
+	return common.HexToHash("0xba9213054b14c2e884f779120bb196f0735cef27140498a9d26117eeab77a117")
 }
 
 func (USDCTokenPoolCCTPV2FeeTokenWithdrawn) Topic() common.Hash {
@@ -4834,8 +3771,8 @@ func (USDCTokenPoolCCTPV2OwnershipTransferred) Topic() common.Hash {
 	return common.HexToHash("0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0")
 }
 
-func (USDCTokenPoolCCTPV2RateLimitAdminSet) Topic() common.Hash {
-	return common.HexToHash("0x44676b5284b809a22248eba0da87391d79098be38bb03154be88a58bf4d09174")
+func (USDCTokenPoolCCTPV2RateLimitConfigured) Topic() common.Hash {
+	return common.HexToHash("0x41f7c8f7cfdad9350aa495e6c54cbbf750a07ab38a9098aed1256e30dd1682bb")
 }
 
 func (USDCTokenPoolCCTPV2ReleasedOrMinted) Topic() common.Hash {
@@ -4871,15 +3808,7 @@ type USDCTokenPoolCCTPV2Interface interface {
 
 	GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error)
 
-	GetAllowList(opts *bind.CallOpts) ([]common.Address, error)
-
-	GetAllowListEnabled(opts *bind.CallOpts) (bool, error)
-
-	GetCurrentCustomBlockConfirmationRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64) (GetCurrentCustomBlockConfirmationRateLimiterState,
-
-		error)
-
-	GetCurrentRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64) (GetCurrentRateLimiterState,
+	GetCurrentRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64, customBlockConfirmation bool) (GetCurrentRateLimiterState,
 
 		error)
 
@@ -4893,15 +3822,11 @@ type USDCTokenPoolCCTPV2Interface interface {
 
 		error)
 
-	GetMinBlockConfirmation(opts *bind.CallOpts) (uint16, error)
-
-	GetRateLimitAdmin(opts *bind.CallOpts) (common.Address, error)
-
 	GetRemotePools(opts *bind.CallOpts, remoteChainSelector uint64) ([][]byte, error)
 
 	GetRemoteToken(opts *bind.CallOpts, remoteChainSelector uint64) ([]byte, error)
 
-	GetRequiredCCVs(opts *bind.CallOpts, arg0 common.Address, remoteChainSelector uint64, amount *big.Int, arg3 uint16, arg4 []byte, direction uint8) ([]common.Address, error)
+	GetRequiredCCVs(opts *bind.CallOpts, localToken common.Address, remoteChainSelector uint64, amount *big.Int, blockConfirmationRequested uint16, extraData []byte, direction uint8) ([]common.Address, error)
 
 	GetRmnProxy(opts *bind.CallOpts) (common.Address, error)
 
@@ -4911,7 +3836,7 @@ type USDCTokenPoolCCTPV2Interface interface {
 
 	GetTokenDecimals(opts *bind.CallOpts) (uint8, error)
 
-	GetTokenTransferFeeConfig(opts *bind.CallOpts, arg0 common.Address, destChainSelector uint64, arg2 ClientEVM2AnyMessage, arg3 uint16, arg4 []byte) (IPoolV2TokenTransferFeeConfig, error)
+	GetTokenTransferFeeConfig(opts *bind.CallOpts, arg0 common.Address, destChainSelector uint64, arg2 uint16, arg3 []byte) (IPoolV2TokenTransferFeeConfig, error)
 
 	ILocalDomainIdentifier(opts *bind.CallOpts) (uint32, error)
 
@@ -4937,21 +3862,15 @@ type USDCTokenPoolCCTPV2Interface interface {
 
 	AddRemotePool(opts *bind.TransactOpts, remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error)
 
-	ApplyAllowListUpdates(opts *bind.TransactOpts, removes []common.Address, adds []common.Address) (*types.Transaction, error)
-
 	ApplyAuthorizedCallerUpdates(opts *bind.TransactOpts, authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error)
 
-	ApplyCCVConfigUpdates(opts *bind.TransactOpts, ccvConfigArgs []TokenPoolCCVConfigArg) (*types.Transaction, error)
-
 	ApplyChainUpdates(opts *bind.TransactOpts, remoteChainSelectorsToRemove []uint64, chainsToAdd []TokenPoolChainUpdate) (*types.Transaction, error)
-
-	ApplyCustomBlockConfirmationConfigUpdates(opts *bind.TransactOpts, minBlockConfirmation uint16, rateLimitConfigArgs []TokenPoolCustomBlockConfirmationRateLimitConfigArgs) (*types.Transaction, error)
 
 	ApplyTokenTransferFeeConfigUpdates(opts *bind.TransactOpts, tokenTransferFeeConfigArgs []TokenPoolTokenTransferFeeConfigArgs, disableTokenTransferFeeConfigs []uint64) (*types.Transaction, error)
 
 	LockOrBurn(opts *bind.TransactOpts, lockOrBurnIn PoolLockOrBurnInV1) (*types.Transaction, error)
 
-	LockOrBurn0(opts *bind.TransactOpts, lockOrBurnIn PoolLockOrBurnInV1, blockConfirmationRequested uint16, arg2 []byte) (*types.Transaction, error)
+	LockOrBurn0(opts *bind.TransactOpts, lockOrBurnIn PoolLockOrBurnInV1, blockConfirmationRequested uint16, tokenArgs []byte) (*types.Transaction, error)
 
 	ReleaseOrMint(opts *bind.TransactOpts, releaseOrMintIn PoolReleaseOrMintInV1) (*types.Transaction, error)
 
@@ -4959,33 +3878,15 @@ type USDCTokenPoolCCTPV2Interface interface {
 
 	RemoveRemotePool(opts *bind.TransactOpts, remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error)
 
-	SetChainRateLimiterConfig(opts *bind.TransactOpts, remoteChainSelector uint64, outboundConfig RateLimiterConfig, inboundConfig RateLimiterConfig) (*types.Transaction, error)
-
-	SetChainRateLimiterConfigs(opts *bind.TransactOpts, remoteChainSelectors []uint64, outboundConfigs []RateLimiterConfig, inboundConfigs []RateLimiterConfig) (*types.Transaction, error)
-
-	SetCustomBlockConfirmationRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolCustomBlockConfirmationRateLimitConfigArgs) (*types.Transaction, error)
-
 	SetDomains(opts *bind.TransactOpts, domains []USDCTokenPoolDomainUpdate) (*types.Transaction, error)
 
-	SetDynamicConfig(opts *bind.TransactOpts, router common.Address, thresholdAmountForAdditionalCCVs *big.Int) (*types.Transaction, error)
+	SetDynamicConfig(opts *bind.TransactOpts, router common.Address, minBlockConfirmations uint16, rateLimitAdmin common.Address) (*types.Transaction, error)
 
-	SetRateLimitAdmin(opts *bind.TransactOpts, rateLimitAdmin common.Address) (*types.Transaction, error)
+	SetRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolRateLimitConfigArgs) (*types.Transaction, error)
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
 	WithdrawFeeTokens(opts *bind.TransactOpts, feeTokens []common.Address, recipient common.Address) (*types.Transaction, error)
-
-	FilterAllowListAdd(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2AllowListAddIterator, error)
-
-	WatchAllowListAdd(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2AllowListAdd) (event.Subscription, error)
-
-	ParseAllowListAdd(log types.Log) (*USDCTokenPoolCCTPV2AllowListAdd, error)
-
-	FilterAllowListRemove(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2AllowListRemoveIterator, error)
-
-	WatchAllowListRemove(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2AllowListRemove) (event.Subscription, error)
-
-	ParseAllowListRemove(log types.Log) (*USDCTokenPoolCCTPV2AllowListRemove, error)
 
 	FilterAuthorizedCallerAdded(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2AuthorizedCallerAddedIterator, error)
 
@@ -4999,12 +3900,6 @@ type USDCTokenPoolCCTPV2Interface interface {
 
 	ParseAuthorizedCallerRemoved(log types.Log) (*USDCTokenPoolCCTPV2AuthorizedCallerRemoved, error)
 
-	FilterCCVConfigUpdated(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2CCVConfigUpdatedIterator, error)
-
-	WatchCCVConfigUpdated(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CCVConfigUpdated, remoteChainSelector []uint64) (event.Subscription, error)
-
-	ParseCCVConfigUpdated(log types.Log) (*USDCTokenPoolCCTPV2CCVConfigUpdated, error)
-
 	FilterChainAdded(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2ChainAddedIterator, error)
 
 	WatchChainAdded(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2ChainAdded) (event.Subscription, error)
@@ -5016,12 +3911,6 @@ type USDCTokenPoolCCTPV2Interface interface {
 	WatchChainRemoved(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2ChainRemoved) (event.Subscription, error)
 
 	ParseChainRemoved(log types.Log) (*USDCTokenPoolCCTPV2ChainRemoved, error)
-
-	FilterConfigChanged(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2ConfigChangedIterator, error)
-
-	WatchConfigChanged(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2ConfigChanged) (event.Subscription, error)
-
-	ParseConfigChanged(log types.Log) (*USDCTokenPoolCCTPV2ConfigChanged, error)
 
 	FilterConfigSet(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2ConfigSetIterator, error)
 
@@ -5040,24 +3929,6 @@ type USDCTokenPoolCCTPV2Interface interface {
 	WatchCustomBlockConfirmationOutboundRateLimitConsumed(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CustomBlockConfirmationOutboundRateLimitConsumed, remoteChainSelector []uint64) (event.Subscription, error)
 
 	ParseCustomBlockConfirmationOutboundRateLimitConsumed(log types.Log) (*USDCTokenPoolCCTPV2CustomBlockConfirmationOutboundRateLimitConsumed, error)
-
-	FilterCustomBlockConfirmationRateLimitConfigured(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfiguredIterator, error)
-
-	WatchCustomBlockConfirmationRateLimitConfigured(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured) (event.Subscription, error)
-
-	ParseCustomBlockConfirmationRateLimitConfigured(log types.Log) (*USDCTokenPoolCCTPV2CustomBlockConfirmationRateLimitConfigured, error)
-
-	FilterCustomBlockConfirmationUpdated(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2CustomBlockConfirmationUpdatedIterator, error)
-
-	WatchCustomBlockConfirmationUpdated(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated) (event.Subscription, error)
-
-	ParseCustomBlockConfirmationUpdated(log types.Log) (*USDCTokenPoolCCTPV2CustomBlockConfirmationUpdated, error)
-
-	FilterDefaultFinalityRateLimitConfigured(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfiguredIterator, error)
-
-	WatchDefaultFinalityRateLimitConfigured(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured) (event.Subscription, error)
-
-	ParseDefaultFinalityRateLimitConfigured(log types.Log) (*USDCTokenPoolCCTPV2DefaultFinalityRateLimitConfigured, error)
 
 	FilterDomainsSet(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2DomainsSetIterator, error)
 
@@ -5107,11 +3978,11 @@ type USDCTokenPoolCCTPV2Interface interface {
 
 	ParseOwnershipTransferred(log types.Log) (*USDCTokenPoolCCTPV2OwnershipTransferred, error)
 
-	FilterRateLimitAdminSet(opts *bind.FilterOpts) (*USDCTokenPoolCCTPV2RateLimitAdminSetIterator, error)
+	FilterRateLimitConfigured(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2RateLimitConfiguredIterator, error)
 
-	WatchRateLimitAdminSet(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2RateLimitAdminSet) (event.Subscription, error)
+	WatchRateLimitConfigured(opts *bind.WatchOpts, sink chan<- *USDCTokenPoolCCTPV2RateLimitConfigured, remoteChainSelector []uint64) (event.Subscription, error)
 
-	ParseRateLimitAdminSet(log types.Log) (*USDCTokenPoolCCTPV2RateLimitAdminSet, error)
+	ParseRateLimitConfigured(log types.Log) (*USDCTokenPoolCCTPV2RateLimitConfigured, error)
 
 	FilterReleasedOrMinted(opts *bind.FilterOpts, remoteChainSelector []uint64) (*USDCTokenPoolCCTPV2ReleasedOrMintedIterator, error)
 

@@ -13,7 +13,7 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract OffRamp_executeSingleMessage is OffRampSetup {
   function setUp() public virtual override {
@@ -38,7 +38,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     return MessageV1Codec.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      sequenceNumber: 1,
+      messageNumber: 1,
       executionGasLimit: 200_000,
       ccipReceiveGasLimit: 0,
       finality: 0,
@@ -134,12 +134,15 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     address laneMandatedCCV = makeAddr("laneMandatedCCV");
 
     // Configure source chain with lane mandated CCV.
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encode(makeAddr("onRamp"));
+
     OffRamp.SourceChainConfigArgs[] memory sourceChainConfigArgs = new OffRamp.SourceChainConfigArgs[](1);
     sourceChainConfigArgs[0] = OffRamp.SourceChainConfigArgs({
       router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
-      onRamp: abi.encode(makeAddr("onRamp")),
+      onRamps: onRamps,
       defaultCCV: _arrayOf(s_defaultCCV),
       laneMandatedCCVs: _arrayOf(laneMandatedCCV)
     });

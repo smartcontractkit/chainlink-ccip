@@ -19,13 +19,14 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
-    _evmMessageToEvent({message: message, destChainSelector: DEST_CHAIN_SELECTOR, seqNum: 1, originalSender: STRANGER});
+    _evmMessageToEvent({message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: 1, originalSender: STRANGER});
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      sequenceNumber: 1,
+      messageNumber: 1,
       messageId: messageId,
+      feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs
@@ -34,13 +35,13 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
   }
 
-  function test_forwardFromRouter_SequenceNumberPersistsAndIncrements() public {
+  function test_forwardFromRouter_messageNumberPersistsAndIncrements() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
-    // Use the stored seq as a running expected value.
+    // Use the stored msgNum as a running expected value.
     OnRamp.DestChainConfig memory destConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
-    destConfig.sequenceNumber++;
-    // 1) Expect seq to increment for the first message.
+    destConfig.messageNumber++;
+    // 1) Expect msgNum to increment for the first message.
     (
       bytes32 messageIdExpected,
       bytes memory encodedMessage,
@@ -49,45 +50,47 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     ) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      seqNum: destConfig.sequenceNumber,
+      msgNum: destConfig.messageNumber,
       originalSender: STRANGER
     });
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      sequenceNumber: destConfig.sequenceNumber,
+      messageNumber: destConfig.messageNumber,
       messageId: messageIdExpected,
+      feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs
     });
     bytes32 messageId1 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
-    // 2) Expect seq to increment again for the next message.
-    destConfig.sequenceNumber++;
+    // 2) Expect msgNum to increment again for the next message.
+    destConfig.messageNumber++;
     (messageIdExpected, encodedMessage, receipts, verifierBlobs) = _evmMessageToEvent({
       message: message,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      seqNum: destConfig.sequenceNumber,
+      msgNum: destConfig.messageNumber,
       originalSender: STRANGER
     });
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      sequenceNumber: destConfig.sequenceNumber,
+      messageNumber: destConfig.messageNumber,
       messageId: messageIdExpected,
+      feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs
     });
     bytes32 messageId2 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
 
-    // Verify sequence numbers and message id are different.
+    // Verify message numbers and message id are different.
     assertTrue(messageId1 != messageId2);
     OnRamp.DestChainConfig memory finalConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
-    assertEq(finalConfig.sequenceNumber, destConfig.sequenceNumber);
+    assertEq(finalConfig.messageNumber, destConfig.messageNumber);
   }
 
   function test_forwardFromRouter_RevertWhen_RouterMustSetOriginalSender() public {

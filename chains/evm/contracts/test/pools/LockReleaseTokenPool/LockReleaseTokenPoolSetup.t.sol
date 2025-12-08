@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Router} from "../../../Router.sol";
+import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -35,20 +36,16 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
 
     s_lockReleaseTokenPool = new LockReleaseTokenPool(
-      s_token,
-      DEFAULT_TOKEN_DECIMALS,
-      new address[](0),
-      address(s_mockRMNRemote),
-      address(s_sourceRouter),
-      address(s_lockBox)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
     );
 
     s_allowedList.push(vm.randomAddress());
     s_allowedList.push(OWNER);
+    AdvancedPoolHooks advancedHooks = new AdvancedPoolHooks(s_allowedList, 0);
     s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(
       s_token,
       DEFAULT_TOKEN_DECIMALS,
-      s_allowedList,
+      address(advancedHooks),
       address(s_mockRMNRemote),
       address(s_sourceRouter),
       address(s_lockBox)

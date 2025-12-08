@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -58,6 +59,8 @@ type FeeQuoterDestChainConfig struct {
 	NetworkFeeUSDCents uint16
 	// Percent multiplier for payments in LINK token.
 	LinkFeeMultiplierPercent uint8
+	// USD per unit gas for the destination chain.
+	USDPerUnitGas *big.Int
 }
 
 // RemoteChainConfig defines the configuration for a remote chain.

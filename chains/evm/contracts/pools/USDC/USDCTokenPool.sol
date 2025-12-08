@@ -111,11 +111,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
-    address[] memory allowlist,
+    address advancedPoolHooks,
     address rmnProxy,
     address router,
     uint32 supportedUSDCVersion
-  ) TokenPool(token, 6, allowlist, rmnProxy, router) AuthorizedCallers(new address[](0)) {
+  ) TokenPool(token, 6, advancedPoolHooks, rmnProxy, router) AuthorizedCallers(new address[](0)) {
     // The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
     i_supportedUSDCVersion = supportedUSDCVersion;
 
@@ -166,7 +166,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
 
     Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
@@ -369,4 +369,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     }
     emit DomainsSet(domains);
   }
+
+  /// @notice No-op override to purge the unused code path from the contract.
+  function _postFlightCheck(Pool.ReleaseOrMintInV1 calldata, uint256, uint16) internal pure virtual override {}
+
+  /// @notice No-op override to purge the unused code path from the contract.
+  function _preFlightCheck(Pool.LockOrBurnInV1 calldata, uint16, bytes memory) internal pure virtual override {}
 }

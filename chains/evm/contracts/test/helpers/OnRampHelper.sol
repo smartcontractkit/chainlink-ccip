@@ -61,10 +61,11 @@ contract OnRampHelper is OnRamp {
 
   function getReceipts(
     uint64 destChainSelector,
+    uint16 networkFeeUSDCents,
     Client.EVM2AnyMessage calldata message,
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) external view returns (Receipt[] memory verifierReceipts, uint32 gasLimitSum, uint256 feeUSDCentsSum) {
-    return _getReceipts(destChainSelector, message, extraArgs);
+    return _getReceipts(destChainSelector, networkFeeUSDCents, message, extraArgs);
   }
 
   function distributeFees(Client.EVM2AnyMessage calldata message, Receipt[] memory receipts) external {

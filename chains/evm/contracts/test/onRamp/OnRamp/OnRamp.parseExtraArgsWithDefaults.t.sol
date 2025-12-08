@@ -40,8 +40,9 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
     s_destChainConfig = OnRamp.DestChainConfig({
       router: s_sourceRouter,
-      sequenceNumber: 0,
+      messageNumber: 0,
       addressBytesLength: EVM_ADDRESS_LENGTH,
+      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultExecutor: s_defaultExecutor,
       laneMandatedCCVs: s_laneMandatedCCVs,

@@ -11,7 +11,6 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
   function test_constructor() public view {
     assertEq(address(s_token), address(s_pool.getToken()));
     assertEq(address(s_mockRMNRemote), s_pool.getRmnProxy());
-    assertEq(false, s_pool.getAllowListEnabled());
     assertEq(type(uint256).max, s_token.allowance(address(s_pool), address(s_pool)));
   }
 

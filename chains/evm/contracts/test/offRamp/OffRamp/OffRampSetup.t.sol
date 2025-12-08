@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageReceiverV2.sol";
 
-import {IERC165} from "@openzeppelin/contracts@5.0.2/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
@@ -43,12 +43,15 @@ contract OffRampSetup is BaseTest {
     address[] memory defaultCCVs,
     address[] memory laneMandatedCCVs
   ) internal {
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = onRamp;
+
     OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
     updates[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: isEnabled,
-      onRamp: onRamp,
+      onRamps: onRamps,
       defaultCCV: defaultCCVs,
       laneMandatedCCVs: laneMandatedCCVs
     });

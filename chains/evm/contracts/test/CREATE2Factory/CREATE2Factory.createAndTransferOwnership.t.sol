@@ -4,9 +4,7 @@ pragma solidity ^0.8.24;
 import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
 
 import {CREATE2Factory} from "../../CREATE2Factory.sol";
-import {CREATE2FactorySetup} from "./CREATE2FactorySetup.t.sol";
-
-import {Create2} from "@openzeppelin/contracts@5.0.2/utils/Create2.sol";
+import {CREATE2FactorySetup, Storage} from "./CREATE2FactorySetup.t.sol";
 
 contract CREATE2Factory_createAndTransferOwnership is CREATE2FactorySetup {
   function test_createAndTransferOwnership() public {
@@ -31,9 +29,11 @@ contract CREATE2Factory_createAndTransferOwnership is CREATE2FactorySetup {
     s_create2Factory.createAndTransferOwnership(getStorageCreationCode(1), SALT, OWNER);
   }
 
-  function test_createAndTransferOwnership_RevertWhen_Create2FailedDeployment() public {
+  function test_createAndTransferOwnership_RevertWhen_Create2FailedDeployment_Storage_InvalidValue() public {
     vm.startPrank(s_allowedCaller);
-    vm.expectRevert(abi.encodeWithSelector(Create2.Create2FailedDeployment.selector));
+
+    vm.expectRevert(abi.encodeWithSelector(Storage.InvalidValue.selector));
+
     s_create2Factory.createAndTransferOwnership(getStorageCreationCode(0), SALT, OWNER);
   }
 }

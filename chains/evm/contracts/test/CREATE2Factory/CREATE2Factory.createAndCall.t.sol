@@ -6,8 +6,6 @@ import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable
 import {CREATE2Factory} from "../../CREATE2Factory.sol";
 import {CREATE2FactorySetup, Storage} from "./CREATE2FactorySetup.t.sol";
 
-import {Create2} from "@openzeppelin/contracts@5.0.2/utils/Create2.sol";
-
 contract CREATE2Factory_createAndCall is CREATE2FactorySetup {
   function test_createAndCall_NoCalls() public {
     address predictedAddress = s_create2Factory.computeAddress(getStorageCreationCode(1), SALT);
@@ -65,9 +63,11 @@ contract CREATE2Factory_createAndCall is CREATE2FactorySetup {
     s_create2Factory.createAndCall(getStorageCreationCode(1), SALT, new bytes[](0));
   }
 
-  function test_createAndCall_RevertWhen_Create2FailedDeployment() public {
+  function test_createAndCall_RevertWhen_Create2FailedDeployment_Storage_InvalidValue() public {
     vm.startPrank(s_allowedCaller);
-    vm.expectRevert(abi.encodeWithSelector(Create2.Create2FailedDeployment.selector));
+
+    vm.expectRevert(abi.encodeWithSelector(Storage.InvalidValue.selector));
+
     s_create2Factory.createAndCall(getStorageCreationCode(0), SALT, new bytes[](0));
   }
 

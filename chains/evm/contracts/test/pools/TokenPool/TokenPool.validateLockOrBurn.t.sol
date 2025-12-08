@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenPoolV2Setup} from "./TokenPoolV2Setup.t.sol";
+import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
+contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
   function test_validateLockOrBurn() public {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
@@ -14,22 +14,23 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     emit TokenPool.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
 
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0, "");
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
-    uint16 minBlockConfirmation = 8;
+    uint16 minBlockConfirmation = 5;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
-    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.CustomBlockConfirmationRateLimitConfigArgs({
+    TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
+      customBlockConfirmation: true,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
     vm.startPrank(OWNER);
-    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(minBlockConfirmation, rateLimitArgs);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
+    s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
@@ -39,40 +40,25 @@ contract TokenPoolV2_validateLockOrBurn is TokenPoolV2Setup {
     );
 
     vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, minBlockConfirmation);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, type(uint16).max, "");
 
-    (RateLimiter.TokenBucket memory outboundBucket,) =
-      s_tokenPool.getCurrentCustomBlockConfirmationRateLimiterState(DEST_CHAIN_SELECTOR);
+    (RateLimiter.TokenBucket memory outboundBucket,) = s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, true);
     assertEq(outboundBucket.tokens, outboundFastConfig.capacity - lockOrBurnIn.amount);
   }
 
   function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmation() public {
     uint16 minBlockConfirmation = 5;
-    _applyCustomBlockConfirmations(minBlockConfirmation);
+    vm.startPrank(OWNER);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
 
-    Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
+    vm.startPrank(s_allowedOnRamp);
 
     vm.expectRevert(
       abi.encodeWithSelector(
         TokenPool.InvalidMinBlockConfirmation.selector, minBlockConfirmation - 1, minBlockConfirmation
       )
     );
-    vm.startPrank(s_allowedOnRamp);
-    s_tokenPool.validateLockOrBurn(lockOrBurnIn, minBlockConfirmation - 1);
-  }
-
-  function _applyCustomBlockConfirmations(
-    uint16 minBlockConfirmation
-  ) internal {
-    TokenPool.CustomBlockConfirmationRateLimitConfigArgs[] memory rateLimitArgs =
-      new TokenPool.CustomBlockConfirmationRateLimitConfigArgs[](1);
-    rateLimitArgs[0] = TokenPool.CustomBlockConfirmationRateLimitConfigArgs({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
-      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24})
-    });
-    vm.startPrank(OWNER);
-    s_tokenPool.applyCustomBlockConfirmationConfigUpdates(minBlockConfirmation, rateLimitArgs);
+    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1000e18), minBlockConfirmation - 1, "");
   }
 
   function _buildLockOrBurnIn(

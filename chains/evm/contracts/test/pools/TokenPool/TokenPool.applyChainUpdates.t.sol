@@ -20,7 +20,7 @@ contract TokenPool_applyChainUpdates is BaseTest {
     deal(address(s_token), OWNER, type(uint256).max);
 
     s_tokenPool = new TokenPoolHelper(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
     );
   }
 
@@ -35,7 +35,7 @@ contract TokenPool_applyChainUpdates is BaseTest {
     for (uint256 i = 0; i < chainUpdates.length; ++i) {
       assertTrue(s_tokenPool.isSupportedChain(chainUpdates[i].remoteChainSelector));
       (RateLimiter.TokenBucket memory outboundState, RateLimiter.TokenBucket memory inboundState) =
-        s_tokenPool.getCurrentRateLimiterState(chainUpdates[i].remoteChainSelector);
+        s_tokenPool.getCurrentRateLimiterState(chainUpdates[i].remoteChainSelector, false);
       assertEq(outboundState.capacity, chainUpdates[i].outboundRateLimiterConfig.capacity);
       assertEq(outboundState.rate, chainUpdates[i].outboundRateLimiterConfig.rate);
       assertEq(outboundState.isEnabled, chainUpdates[i].outboundRateLimiterConfig.isEnabled);
