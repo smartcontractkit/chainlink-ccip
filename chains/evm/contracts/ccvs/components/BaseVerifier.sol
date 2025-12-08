@@ -24,6 +24,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error SenderNotAllowed(address sender);
   error CallerIsNotARampOnRouter(address caller);
   error DestinationNotSupported(uint64 destChainSelector);
+  error ZeroAddressNotAllowed();
 
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
   event DestChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
@@ -58,7 +59,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   }
 
   /// @dev The rmn contract.
-  IRMNRemote internal immutable i_rmnRemote;
+  IRMNRemote internal immutable i_rmn;
 
   /// @dev The destination chain specific configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) private s_destChainConfigs;
@@ -67,10 +68,14 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   /// implement a way to update this value if needed.
   string internal s_storageLocation;
 
-  constructor(
-    string memory storageLocation
-  ) {
+  constructor(string memory storageLocation, address rmnAddress) {
     _setStorageLocation(storageLocation);
+
+    if (rmnAddress == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
+
+    i_rmn = IRMNRemote(rmnAddress);
   }
 
   /// @notice Updates the storage location.

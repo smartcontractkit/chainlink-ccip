@@ -13,8 +13,11 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
     vm.expectEmit();
     emit CommitteeVerifier.ConfigSet(_createDynamicConfigArgs(expectedFeeAggregator, expectedAllowlistAdmin));
 
-    CommitteeVerifier committeeVerifier =
-      new CommitteeVerifier(_createDynamicConfigArgs(expectedFeeAggregator, expectedAllowlistAdmin), STORAGE_LOCATION);
+    CommitteeVerifier committeeVerifier = new CommitteeVerifier(
+      _createDynamicConfigArgs(expectedFeeAggregator, expectedAllowlistAdmin),
+      STORAGE_LOCATION,
+      address(s_mockRMNRemote)
+    );
 
     CommitteeVerifier.DynamicConfig memory dynamicConfig = committeeVerifier.getDynamicConfig();
     assertEq(dynamicConfig.feeAggregator, expectedFeeAggregator);
@@ -29,7 +32,8 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
     vm.expectRevert(CommitteeVerifier.InvalidConfig.selector);
     new CommitteeVerifier(
       _createDynamicConfigArgs(address(0), ALLOWLIST_ADMIN),
-      STORAGE_LOCATION // Zero fee aggregator address
+      STORAGE_LOCATION, // Zero fee aggregator address,
+      address(s_mockRMNRemote)
     );
   }
 }

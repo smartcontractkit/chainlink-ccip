@@ -36,7 +36,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidSetDomainArgs(SetDomainArgs args);
   error UnknownDomain(uint64 chainSelector);
   error UnsupportedFinality(uint32 finality);
-  error ZeroAddressNotAllowed();
 
   event DomainsSet(SetDomainArgs[] domains);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
@@ -165,8 +164,9 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     CCTPMessageTransmitterProxy messageTransmitterProxy,
     IERC20 usdcToken,
     string memory storageLocation,
-    DynamicConfig memory dynamicConfig
-  ) BaseVerifier(storageLocation) {
+    DynamicConfig memory dynamicConfig,
+    address rmn
+  ) BaseVerifier(storageLocation, rmn) {
     if (
       address(tokenMessenger) == address(0) || address(messageTransmitterProxy) == address(0)
         || address(usdcToken) == address(0)
