@@ -55,7 +55,6 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 
 			accessControllerAddress := solana.MustPublicKeyFromBase58(accessControllerRef.Output.Address)
 			mcmAddress := solana.MustPublicKeyFromBase58(mcmRef.Output.Address)
-			timelockAddress := solana.MustPublicKeyFromBase58(timelockRef.Output.Address)
 
 			deps := mcmsops.Deps{
 				Chain:             chain,
@@ -78,22 +77,6 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 			output.Addresses = append(output.Addresses, initMcmRef.NewAddresses...)
 			output.BatchOps = append(output.BatchOps, initMcmRef.BatchOps...)
 			deps.ExistingAddresses = append(deps.ExistingAddresses, initMcmRef.NewAddresses...)
-
-			initTimelockRef, err := initTimelock(b, deps, in.TimelockMinDelay, timelockAddress)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize Timelock: %w", err)
-			}
-			output.Addresses = append(output.Addresses, initTimelockRef.NewAddresses...)
-			output.BatchOps = append(output.BatchOps, initTimelockRef.BatchOps...)
-			deps.ExistingAddresses = append(deps.ExistingAddresses, initTimelockRef.NewAddresses...)
-
-			// roles
-			setupRolesOutput, err := setupRoles(b, deps, mcmAddress)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to setup roles in Timelock: %w", err)
-			}
-			output.Addresses = append(output.Addresses, setupRolesOutput.NewAddresses...)
-			output.BatchOps = append(output.BatchOps, setupRolesOutput.BatchOps...)
 
 			return output, err
 		},
