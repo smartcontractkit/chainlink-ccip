@@ -444,8 +444,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       }
     } else {
       // The transfer is not token-only, we query the receiver for its CCV requirements.
-      (requiredReceiverCCV, optionalCCVs, optionalThreshold) =
-        _getCCVsFromReceiver(sourceChainSelector, receiver, isTokenOnlyTransfer);
+      (requiredReceiverCCV, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
     }
 
     address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
