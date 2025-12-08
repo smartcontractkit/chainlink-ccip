@@ -321,6 +321,7 @@ OnRamp_distributeFees:test_distributeFees_TokenPoolV1RetainsInOnRamp() (gas: 254
 OnRamp_distributeFees:test_distributeFees_TokenPoolV2ReceivesShare() (gas: 276368)
 OnRamp_forwardFromRouter:test_forwardFromRouter_messageNumberPersistsAndIncrements() (gas: 432784)
 OnRamp_forwardFromRouter:test_forwardFromRouter_oldExtraArgs() (gas: 245430)
+OnRamp_forwardFromRouter:test_getExpectedNextMessageNumber_TracksDestChainCounter() (gas: 151260)
 OnRamp_getCCVsForPool:test_getCCVsForPool_PassesThroughAddressZeroSentinel() (gas: 297561)
 OnRamp_getCCVsForPool:test_getCCVsForPool_ReturnsDefaultCCVs_WhenPoolDoesNotSupportV2() (gas: 263687)
 OnRamp_getCCVsForPool:test_getCCVsForPool_ReturnsDefaultCCVs_WhenPoolReturnsEmptyArray() (gas: 221149)
