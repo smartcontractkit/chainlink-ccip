@@ -108,6 +108,7 @@ compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
 compileContract pools/USDC/USDCTokenPool
 compileContract pools/USDC/CCTPMessageTransmitterProxy
+compileContract pools/USDC/CCTPTokenMessengerProxy
 compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/ERC20LockBox
 compileContract pools/USDC/SiloedUSDCTokenPool
