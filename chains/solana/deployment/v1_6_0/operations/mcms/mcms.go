@@ -337,6 +337,10 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error)
 	}
 
 	encodedAddress := mcms_solana.ContractAddress(in.MCM, mcms_solana.PDASeed(seed))
+	upgradeAuthority, err := utils.GetUpgradeAuthority(deps.Chain.Client, in.MCM)
+	if err != nil {
+		return MCMOutput{}, fmt.Errorf("failed to get upgrade authority: %w", err)
+	}
 
 	var configurer *mcms_solana.Configurer
 	if len(ixns) > 0 {
@@ -350,6 +354,14 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error)
 	}
 	if tx.Hash == "" {
 		instructions := tx.RawData.([]solana.Instruction)
+		// override authority to upgrade authority if different from deployer
+		for _, ixn := range instructions {
+			for _, account := range ixn.Accounts() {
+				if account.PublicKey == deps.Chain.DeployerKey.PublicKey() {
+					account.PublicKey = upgradeAuthority
+				}
+			}
+		}
 		batch, err := utils.BuildMCMSBatchOperation(
 			deps.Chain.Selector,
 			instructions,
