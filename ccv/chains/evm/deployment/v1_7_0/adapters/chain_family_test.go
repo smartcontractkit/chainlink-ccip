@@ -76,8 +76,9 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 					},
 				},
 				DefaultExecutor: datastore.AddressRef{
-					Type:    datastore.ContractType(executor.ContractType),
-					Version: semver.MustParse("1.7.0"),
+					Type:      datastore.ContractType(executor.ContractType),
+					Version:   semver.MustParse("1.7.0"),
+					Qualifier: "default",
 				},
 				CommitteeVerifierDestChainConfig: testsetup.CreateBasicCommitteeVerifierDestChainConfig(),
 				FeeQuoterDestChainConfig:         testsetup.CreateBasicFeeQuoterDestChainConfig(),
