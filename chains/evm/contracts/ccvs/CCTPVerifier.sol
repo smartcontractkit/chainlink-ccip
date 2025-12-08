@@ -247,7 +247,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD
     });
 
-    uint256 maxFee;
+    uint256 maxFee = 0;
     if (params.finality != 0) {
       params.finalityThreshold = CCTP_FAST_FINALITY_THRESHOLD;
 
