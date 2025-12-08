@@ -7,21 +7,27 @@ import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol"
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
 contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
+  uint256 internal constant FEE_USD_CENTS = 1e18;
+  uint32 internal constant DEST_GAS_OVERHEAD = 200_000;
+  uint32 internal constant DEST_BYTES_OVERHEAD = 32;
+  uint16 internal constant TOKEN_FEE_BPS = 5;
+  bool internal constant IS_ENABLED = true;
+
   function test_getFee() public {
     vm.mockCall(
       address(s_cctpV2PoolWithCCV),
       abi.encodeWithSelector(IPoolV2.getFee.selector, address(0), 0, 0, address(0), 0, ""),
-      abi.encode(100, 1000, 1000, 100, true)
+      abi.encode(FEE_USD_CENTS, DEST_GAS_OVERHEAD, DEST_BYTES_OVERHEAD, TOKEN_FEE_BPS, IS_ENABLED)
     );
 
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
       s_usdcTokenPoolProxy.getFee(address(0), 0, 0, address(0), 0, "");
 
-    assertEq(usdFeeCents, 100);
-    assertEq(destGasOverhead, 1000);
-    assertEq(destBytesOverhead, 1000);
-    assertEq(tokenFeeBps, 100);
-    assertEq(isEnabled, true);
+    assertEq(usdFeeCents, FEE_USD_CENTS);
+    assertEq(destGasOverhead, DEST_GAS_OVERHEAD);
+    assertEq(destBytesOverhead, DEST_BYTES_OVERHEAD);
+    assertEq(tokenFeeBps, TOKEN_FEE_BPS);
+    assertEq(isEnabled, IS_ENABLED);
   }
 
   function test_getFee_RevertWhen_NoCCVCompatiblePoolSet() public {

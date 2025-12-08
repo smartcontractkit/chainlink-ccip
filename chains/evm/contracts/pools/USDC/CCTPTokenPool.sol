@@ -110,19 +110,14 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   function getTokenTransferFeeConfig(
     address, // localToken
     uint64 destChainSelector,
-    uint16 blockConfirmationRequested,
+    uint16, // blockConfirmationRequested,
     bytes calldata // tokenArgs
   ) external view override returns (TokenTransferFeeConfig memory feeConfig) {
     TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector];
 
     address verifierImpl = i_cctpVerifier.getOutboundImplementation(destChainSelector, "");
     CCTPVerifier.DynamicConfig memory dynamicConfig = CCTPVerifier(verifierImpl).getDynamicConfig();
-
-    if (blockConfirmationRequested == WAIT_FOR_FINALITY) {
-      transferFeeConfig.defaultBlockConfirmationTransferFeeBps = 0;
-    } else {
-      transferFeeConfig.customBlockConfirmationTransferFeeBps = dynamicConfig.fastFinalityBps;
-    }
+    transferFeeConfig.customBlockConfirmationTransferFeeBps = dynamicConfig.fastFinalityBps;
 
     return transferFeeConfig;
   }

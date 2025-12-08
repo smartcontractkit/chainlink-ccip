@@ -23,31 +23,6 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract OffRamp_executeSingleMessage is OffRampSetup {
-  struct TokenAddresses {
-    address pool;
-    address sourceToken;
-    address destToken;
-    address tokenReceiver;
-  }
-
-  struct MessageSetup {
-    MessageV1Codec.MessageV1 message;
-    bytes32 messageId;
-    address[] ccvs;
-    bytes[] verifierResults;
-    address verifierImpl;
-  }
-
-  struct PoolParams {
-    Pool.ReleaseOrMintOutV1 releaseOrMintOut;
-    Pool.ReleaseOrMintInV1 releaseOrMintIn;
-  }
-
-  struct RouterParams {
-    Client.EVMTokenAmount[] destTokenAmounts;
-    Client.Any2EVMMessage any2EVMMessage;
-  }
-
   function setUp() public virtual override {
     super.setUp();
 
@@ -90,272 +65,186 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     });
   }
 
-  function test_executeSingleMessage_PassActualTokenAmountToReceiver() public {
-    TokenAddresses memory tokenAddresses = TokenAddresses({
-      pool: makeAddr("pool"),
-      sourceToken: makeAddr("sourceToken"),
-      destToken: address(new BurnMintERC20("destToken", "destToken", 18, 0, 0)),
-      tokenReceiver: makeAddr("tokenReceiver")
-    });
+  function _setupMessageWithTokenTransfer(
+    address pool,
+    address sourceToken,
+    address destToken,
+    address tokenReceiver,
+    uint256 amount,
+    string memory data,
+    uint32 ccipReceiveGasLimit
+  )
+    internal
+    returns (
+      MessageV1Codec.MessageV1 memory message,
+      bytes32 messageId,
+      address[] memory ccvs,
+      bytes[] memory verifierResults,
+      address verifierImpl
+    )
+  {
+    message = _getMessage();
+    ccvs = _arrayOf(s_defaultCCV);
+    verifierResults = new bytes[](1);
+    verifierImpl = makeAddr("verifierImpl");
 
-    MessageSetup memory msgSetup = MessageSetup({
-      message: _getMessage(),
-      messageId: bytes32(0), // Will be set after token transfer
-      ccvs: _arrayOf(s_defaultCCV),
-      verifierResults: new bytes[](1),
-      verifierImpl: makeAddr("verifierImpl")
-    });
-
-    // Create token transfer.
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
-      amount: 100,
-      sourcePoolAddress: abi.encodePacked(tokenAddresses.pool),
-      sourceTokenAddress: abi.encodePacked(tokenAddresses.sourceToken),
-      destTokenAddress: abi.encodePacked(tokenAddresses.destToken),
-      tokenReceiver: abi.encodePacked(tokenAddresses.tokenReceiver),
+      amount: amount,
+      sourcePoolAddress: abi.encodePacked(pool),
+      sourceTokenAddress: abi.encodePacked(sourceToken),
+      destTokenAddress: abi.encodePacked(destToken),
+      tokenReceiver: abi.encodePacked(tokenReceiver),
       extraData: ""
     });
-    msgSetup.message.tokenTransfer = tokenAmounts;
-    msgSetup.message.data = "test data";
-    msgSetup.message.ccipReceiveGasLimit = 200000;
-    msgSetup.messageId = keccak256(MessageV1Codec._encodeMessageV1(msgSetup.message));
+    message.tokenTransfer = tokenAmounts;
+    message.data = bytes(data);
+    message.ccipReceiveGasLimit = ccipReceiveGasLimit;
+    messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
+  }
 
-    // Mock CCV resolver to return address(0) for inbound implementation.
+  function _mockVerifierCalls(
+    MessageV1Codec.MessageV1 memory message,
+    bytes32 messageId,
+    bytes[] memory verifierResults,
+    address verifierImpl
+  ) internal {
     vm.mockCall(
       s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierResolver.getInboundImplementation, (msgSetup.verifierResults[0])),
-      abi.encode(msgSetup.verifierImpl)
+      abi.encodeCall(ICrossChainVerifierResolver.getInboundImplementation, (verifierResults[0])),
+      abi.encode(verifierImpl)
     );
 
-    // Mock getRequiredCCVs on token pool.
     vm.mockCall(
-      tokenAddresses.pool,
+      verifierImpl,
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, verifierResults[0])),
+      abi.encode("")
+    );
+  }
+
+  function _mockPoolCalls(
+    address pool,
+    address tokenReceiver,
+    address destToken,
+    MessageV1Codec.MessageV1 memory message,
+    uint256 amount,
+    uint256 destinationAmount
+  ) internal returns (Pool.ReleaseOrMintOutV1 memory) {
+    vm.mockCall(s_tokenAdminRegistry, abi.encodeCall(ITokenAdminRegistry.getPool, (destToken)), abi.encode(pool));
+
+    vm.mockCall(pool, abi.encodeCall(IERC165.supportsInterface, (type(IERC165).interfaceId)), abi.encode(true));
+    vm.mockCall(pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
+
+    vm.mockCall(
+      pool,
       abi.encodeCall(
-        IPoolV2.getRequiredCCVs,
-        (tokenAddresses.destToken, SOURCE_CHAIN_SELECTOR, 100, 0, "", IPoolV2.MessageDirection.Inbound)
+        IPoolV2.getRequiredCCVs, (destToken, SOURCE_CHAIN_SELECTOR, amount, 0, "", IPoolV2.MessageDirection.Inbound)
       ),
       abi.encode(new address[](0))
     );
 
-    // Mock verifyMessage call.
-    vm.mockCall(
-      msgSetup.verifierImpl,
-      abi.encodeCall(
-        ICrossChainVerifierV1.verifyMessage, (msgSetup.message, msgSetup.messageId, msgSetup.verifierResults[0])
-      ),
-      abi.encode("")
-    );
-
-    // Mock token admin registry to return the pool.
-    vm.mockCall(
-      s_tokenAdminRegistry,
-      abi.encodeCall(ITokenAdminRegistry.getPool, (tokenAddresses.destToken)),
-      abi.encode(tokenAddresses.pool)
-    );
-
-    // Mock supportsInterface calls. ERC165Checker checks IERC165 first, then the specific interface.
-    vm.mockCall(
-      tokenAddresses.pool, abi.encodeCall(IERC165.supportsInterface, (type(IERC165).interfaceId)), abi.encode(true)
-    );
-    vm.mockCall(
-      tokenAddresses.pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true)
-    );
-
-    // Mock releaseOrMint call.
-    PoolParams memory poolParams = PoolParams({
-      releaseOrMintOut: Pool.ReleaseOrMintOutV1({destinationAmount: 100}),
-      releaseOrMintIn: Pool.ReleaseOrMintInV1({
-        originalSender: msgSetup.message.sender,
-        receiver: tokenAddresses.tokenReceiver,
-        sourceDenominatedAmount: msgSetup.message.tokenTransfer[0].amount,
-        localToken: tokenAddresses.destToken,
-        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-        sourcePoolAddress: abi.encode(tokenAddresses.pool),
-        sourcePoolData: msgSetup.message.tokenTransfer[0].extraData,
-        offchainTokenData: ""
-      })
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      originalSender: message.sender,
+      receiver: tokenReceiver,
+      sourceDenominatedAmount: message.tokenTransfer[0].amount,
+      localToken: destToken,
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourcePoolAddress: abi.encode(pool),
+      sourcePoolData: message.tokenTransfer[0].extraData,
+      offchainTokenData: ""
     });
-    vm.mockCall(
-      tokenAddresses.pool,
-      abi.encodeCall(IPoolV2.releaseOrMint, (poolParams.releaseOrMintIn, 0)),
-      abi.encode(poolParams.releaseOrMintOut)
-    );
 
-    // Expect that the call to the receiver is correct.
-    RouterParams memory routerParams;
-    routerParams.destTokenAmounts = new Client.EVMTokenAmount[](1);
-    // Expect the routeMessage call with amount = 0 because the balance of the receiver didn't actually change.
-    // releaseOrMint was mocked and did not actually update token state.
-    // Since the receiver is not the token pool, the actual balance diff should be passed to the receiver.
-    routerParams.destTokenAmounts[0] = Client.EVMTokenAmount({token: tokenAddresses.destToken, amount: 0});
-    routerParams.any2EVMMessage = Client.Any2EVMMessage({
-      messageId: msgSetup.messageId,
+    Pool.ReleaseOrMintOutV1 memory releaseOrMintOut = Pool.ReleaseOrMintOutV1({destinationAmount: destinationAmount});
+
+    vm.mockCall(pool, abi.encodeCall(IPoolV2.releaseOrMint, (releaseOrMintIn, 0)), abi.encode(releaseOrMintOut));
+
+    return releaseOrMintOut;
+  }
+
+  function _mockReceiverCalls(
+    address receiver
+  ) internal {
+    vm.mockCall(receiver, abi.encodeCall(IERC165.supportsInterface, (type(IERC165).interfaceId)), abi.encode(true));
+    vm.mockCall(
+      receiver, abi.encodeCall(IERC165.supportsInterface, (type(IAny2EVMMessageReceiver).interfaceId)), abi.encode(true)
+    );
+  }
+
+  function _expectRouteMessage(
+    MessageV1Codec.MessageV1 memory message,
+    bytes32 messageId,
+    address destToken,
+    uint256 tokenAmount
+  ) internal {
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+    destTokenAmounts[0] = Client.EVMTokenAmount({token: destToken, amount: tokenAmount});
+
+    Client.Any2EVMMessage memory any2EVMMessage = Client.Any2EVMMessage({
+      messageId: messageId,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      sender: msgSetup.message.sender,
-      data: msgSetup.message.data,
-      destTokenAmounts: routerParams.destTokenAmounts
+      sender: message.sender,
+      data: message.data,
+      destTokenAmounts: destTokenAmounts
     });
 
-    // Mock the supportsInterface check on the receiver.
-    vm.mockCall(
-      address(bytes20(msgSetup.message.receiver)),
-      abi.encodeCall(IERC165.supportsInterface, (type(IERC165).interfaceId)),
-      abi.encode(true)
-    );
-    vm.mockCall(
-      address(bytes20(msgSetup.message.receiver)),
-      abi.encodeCall(IERC165.supportsInterface, (type(IAny2EVMMessageReceiver).interfaceId)),
-      abi.encode(true)
-    );
     vm.expectCall(
       address(s_sourceRouter),
       abi.encodeCall(
         IRouter.routeMessage,
-        (
-          routerParams.any2EVMMessage,
-          GAS_FOR_CALL_EXACT_CHECK,
-          msgSetup.message.ccipReceiveGasLimit,
-          address(bytes20(msgSetup.message.receiver))
-        )
+        (any2EVMMessage, GAS_FOR_CALL_EXACT_CHECK, message.ccipReceiveGasLimit, address(bytes20(message.receiver)))
       )
     );
-    s_offRamp.executeSingleMessage(msgSetup.message, msgSetup.messageId, msgSetup.ccvs, msgSetup.verifierResults);
+  }
+
+  function test_executeSingleMessage_PassActualTokenAmountToReceiver() public {
+    uint256 amount = 100;
+    address pool = makeAddr("pool");
+    address sourceToken = makeAddr("sourceToken");
+    address destToken = address(new BurnMintERC20("destToken", "destToken", 18, 0, 0));
+    address tokenReceiver = makeAddr("tokenReceiver");
+
+    (
+      MessageV1Codec.MessageV1 memory message,
+      bytes32 messageId,
+      address[] memory ccvs,
+      bytes[] memory verifierResults,
+      address verifierImpl
+    ) = _setupMessageWithTokenTransfer(pool, sourceToken, destToken, tokenReceiver, amount, "test data", 200_000);
+
+    _mockVerifierCalls(message, messageId, verifierResults, verifierImpl);
+    _mockPoolCalls(pool, tokenReceiver, destToken, message, amount, amount);
+
+    // Expect the routeMessage call with amount = 0 because the balance of the receiver didn't actually change.
+    // releaseOrMint was mocked and did not actually update token state.
+    // Since the receiver is not the token pool, the actual balance diff should be passed to the receiver.
+    _mockReceiverCalls(address(bytes20(message.receiver)));
+    _expectRouteMessage(message, messageId, destToken, 0);
+
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
   }
 
   function test_executeSingleMessage_PassAmountReturnedByPoolToReceiver() public {
     address pool = makeAddr("pool");
+    uint256 amount = 100;
+    address sourceToken = makeAddr("sourceToken");
+    address destToken = address(new BurnMintERC20("destToken", "destToken", 18, 0, 0));
 
-    TokenAddresses memory tokenAddresses = TokenAddresses({
-      pool: pool,
-      sourceToken: makeAddr("sourceToken"),
-      destToken: address(new BurnMintERC20("destToken", "destToken", 18, 0, 0)),
-      tokenReceiver: pool
-    });
+    (
+      MessageV1Codec.MessageV1 memory message,
+      bytes32 messageId,
+      address[] memory ccvs,
+      bytes[] memory verifierResults,
+      address verifierImpl
+    ) = _setupMessageWithTokenTransfer(pool, sourceToken, destToken, pool, amount, "test data", 200_000);
 
-    MessageSetup memory msgSetup = MessageSetup({
-      message: _getMessage(),
-      messageId: bytes32(0), // Will be set after token transfer
-      ccvs: _arrayOf(s_defaultCCV),
-      verifierResults: new bytes[](1),
-      verifierImpl: makeAddr("verifierImpl")
-    });
-
-    // Create token transfer.
+    _mockVerifierCalls(message, messageId, verifierResults, verifierImpl);
     // Since the pool is the receiver, we expect the amount returned by the pool to be passed to the receiver.
-    MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
-    tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
-      amount: 100,
-      sourcePoolAddress: abi.encodePacked(tokenAddresses.pool),
-      sourceTokenAddress: abi.encodePacked(tokenAddresses.sourceToken),
-      destTokenAddress: abi.encodePacked(tokenAddresses.destToken),
-      tokenReceiver: abi.encodePacked(tokenAddresses.tokenReceiver),
-      extraData: ""
-    });
-    msgSetup.message.tokenTransfer = tokenAmounts;
-    msgSetup.message.data = "test data";
-    msgSetup.message.ccipReceiveGasLimit = 200000;
-    msgSetup.messageId = keccak256(MessageV1Codec._encodeMessageV1(msgSetup.message));
+    Pool.ReleaseOrMintOutV1 memory releaseOrMintOut = _mockPoolCalls(pool, pool, destToken, message, amount, amount);
 
-    // Mock CCV resolver to return address(0) for inbound implementation.
-    vm.mockCall(
-      s_defaultCCV,
-      abi.encodeCall(ICrossChainVerifierResolver.getInboundImplementation, (msgSetup.verifierResults[0])),
-      abi.encode(msgSetup.verifierImpl)
-    );
+    _mockReceiverCalls(address(bytes20(message.receiver)));
+    _expectRouteMessage(message, messageId, destToken, releaseOrMintOut.destinationAmount);
 
-    // Mock getRequiredCCVs on token pool.
-    vm.mockCall(
-      tokenAddresses.pool,
-      abi.encodeCall(
-        IPoolV2.getRequiredCCVs,
-        (tokenAddresses.destToken, SOURCE_CHAIN_SELECTOR, 100, 0, "", IPoolV2.MessageDirection.Inbound)
-      ),
-      abi.encode(new address[](0))
-    );
-
-    // Mock verifyMessage call.
-    vm.mockCall(
-      msgSetup.verifierImpl,
-      abi.encodeCall(
-        ICrossChainVerifierV1.verifyMessage, (msgSetup.message, msgSetup.messageId, msgSetup.verifierResults[0])
-      ),
-      abi.encode("")
-    );
-
-    // Mock token admin registry to return the pool.
-    vm.mockCall(
-      s_tokenAdminRegistry,
-      abi.encodeCall(ITokenAdminRegistry.getPool, (tokenAddresses.destToken)),
-      abi.encode(tokenAddresses.pool)
-    );
-
-    // Mock supportsInterface calls. ERC165Checker checks IERC165 first, then the specific interface.
-    vm.mockCall(
-      tokenAddresses.pool, abi.encodeCall(IERC165.supportsInterface, (type(IERC165).interfaceId)), abi.encode(true)
-    );
-    vm.mockCall(
-      tokenAddresses.pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true)
-    );
-
-    // Mock releaseOrMint call.
-    PoolParams memory poolParams = PoolParams({
-      releaseOrMintOut: Pool.ReleaseOrMintOutV1({destinationAmount: 100}),
-      releaseOrMintIn: Pool.ReleaseOrMintInV1({
-        originalSender: msgSetup.message.sender,
-        receiver: tokenAddresses.tokenReceiver,
-        sourceDenominatedAmount: msgSetup.message.tokenTransfer[0].amount,
-        localToken: tokenAddresses.destToken,
-        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-        sourcePoolAddress: abi.encode(tokenAddresses.pool),
-        sourcePoolData: msgSetup.message.tokenTransfer[0].extraData,
-        offchainTokenData: ""
-      })
-    });
-    vm.mockCall(
-      tokenAddresses.pool,
-      abi.encodeCall(IPoolV2.releaseOrMint, (poolParams.releaseOrMintIn, 0)),
-      abi.encode(poolParams.releaseOrMintOut)
-    );
-
-    // Expect that the call to the receiver is correct.
-    RouterParams memory routerParams;
-    routerParams.destTokenAmounts = new Client.EVMTokenAmount[](1);
-    routerParams.destTokenAmounts[0] =
-      Client.EVMTokenAmount({token: tokenAddresses.destToken, amount: poolParams.releaseOrMintOut.destinationAmount});
-    routerParams.any2EVMMessage = Client.Any2EVMMessage({
-      messageId: msgSetup.messageId,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      sender: msgSetup.message.sender,
-      data: msgSetup.message.data,
-      destTokenAmounts: routerParams.destTokenAmounts
-    });
-
-    // Mock the supportsInterface check on the receiver.
-    vm.mockCall(
-      address(bytes20(msgSetup.message.receiver)),
-      abi.encodeCall(IERC165.supportsInterface, (type(IERC165).interfaceId)),
-      abi.encode(true)
-    );
-    vm.mockCall(
-      address(bytes20(msgSetup.message.receiver)),
-      abi.encodeCall(IERC165.supportsInterface, (type(IAny2EVMMessageReceiver).interfaceId)),
-      abi.encode(true)
-    );
-
-    vm.expectCall(
-      address(s_sourceRouter),
-      abi.encodeCall(
-        IRouter.routeMessage,
-        (
-          routerParams.any2EVMMessage,
-          GAS_FOR_CALL_EXACT_CHECK,
-          msgSetup.message.ccipReceiveGasLimit,
-          address(bytes20(msgSetup.message.receiver))
-        )
-      )
-    );
-    s_offRamp.executeSingleMessage(msgSetup.message, msgSetup.messageId, msgSetup.ccvs, msgSetup.verifierResults);
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
   }
 
   function test_executeSingleMessage_RevertWhen_CanOnlySelfCall() public {
@@ -392,14 +281,14 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     address token = makeAddr("token");
     address pool = makeAddr("pool");
     address tokenReceiver = makeAddr("tokenReceiver");
-    uint256 tokenAmount = 100;
+    uint256 amount = 100;
 
     MessageV1Codec.MessageV1 memory message = _getMessage();
 
     // Modify message with token transfer.
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
-      amount: tokenAmount,
+      amount: amount,
       sourcePoolAddress: abi.encodePacked(pool),
       sourceTokenAddress: abi.encodePacked(sourceToken),
       destTokenAddress: abi.encodePacked(token),
@@ -423,14 +312,12 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     vm.mockCall(
       pool,
       abi.encodeCall(
-        IPoolV2.getRequiredCCVs, (token, SOURCE_CHAIN_SELECTOR, tokenAmount, 0, "", IPoolV2.MessageDirection.Inbound)
+        IPoolV2.getRequiredCCVs, (token, SOURCE_CHAIN_SELECTOR, amount, 0, "", IPoolV2.MessageDirection.Inbound)
       ),
       abi.encode(_arrayOf(poolRequiredCCV))
     );
     // Mock token receiver balance check.
-    vm.mockCall(
-      address(token), abi.encodeWithSelector(IERC20.balanceOf.selector, tokenReceiver), abi.encode(tokenAmount)
-    );
+    vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector, tokenReceiver), abi.encode(amount));
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, poolRequiredCCV));
 
@@ -523,12 +410,13 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
 
     address destToken = makeAddr("destToken");
     address tokenReceiver = makeAddr("tokenReceiver");
+    uint256 amount = 100;
 
     // Create message with multiple token transfers (invalid) - but we need to manually set this
     // since encoding would fail. We'll create a valid single token transfer first, then modify the array.
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
-      amount: 100,
+      amount: amount,
       sourcePoolAddress: abi.encodePacked(makeAddr("pool1")),
       sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken1")),
       destTokenAddress: abi.encodePacked(destToken),
@@ -550,18 +438,19 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     bytes[] memory verifierResults = new bytes[](1);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidNumberOfTokens.selector, invalidTokenAmounts.length));
-    vm.mockCall(destToken, abi.encodeWithSelector(IERC20.balanceOf.selector, tokenReceiver), abi.encode(100));
+    vm.mockCall(destToken, abi.encodeWithSelector(IERC20.balanceOf.selector, tokenReceiver), abi.encode(amount));
 
     s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
   }
 
   function test_executeSingleMessage_RevertWhen_InvalidEVMAddress_TokenAddress() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
+    uint256 amount = 100;
 
     // Create message with invalid token address length.
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
-      amount: 100,
+      amount: amount,
       sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
       sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
       destTokenAddress: hex"1234", // Invalid length (not 20 bytes).
