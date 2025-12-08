@@ -1,8 +1,6 @@
 package token_pool
 
 import (
-	"math/big"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -39,6 +37,7 @@ type ChainUpdate struct {
 	InboundRateLimiterConfig  tokens.RateLimiterConfig
 }
 
+// TODO: this was moved to the hooks, can probably delete, but how do we do the hook setup?
 type CCVConfigArg = token_pool.TokenPoolCCVConfigArg
 
 type ApplyChainUpdatesArgs struct {
@@ -65,8 +64,9 @@ type ApplyAllowListUpdatesArgs struct {
 }
 
 type DynamicConfigArgs struct {
-	Router                           common.Address
-	ThresholdAmountForAdditionalCCVs *big.Int
+	Router                common.Address
+	MinBlockConfirmations uint16
+	RateLimitAdmin        common.Address
 }
 
 type CustomBlockConfirmationRateLimitConfigArg struct {
@@ -133,6 +133,7 @@ var ApplyCCVConfigUpdates = contract.NewWrite(contract.WriteParams[[]CCVConfigAr
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, []CCVConfigArg],
 	Validate:        func([]CCVConfigArg) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args []CCVConfigArg) (*types.Transaction, error) {
+		// TODO: how to manage this, via a bunch of hook operations or via token pool operations?
 		return tokenPool.ApplyCCVConfigUpdates(opts, args)
 	},
 })
@@ -175,6 +176,7 @@ var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[common.Address, *
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, common.Address],
 	Validate:        func(common.Address) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		// TODO: do we keep this or just use SetDynamicConfig?
 		return tokenPool.SetRateLimitAdmin(opts, args)
 	},
 })
@@ -191,11 +193,11 @@ var SetChainRateLimiterConfigs = contract.NewWrite(contract.WriteParams[[]SetCha
 		if err != nil {
 			return false, err
 		}
-		rateLimitAdmin, err := contract.GetRateLimitAdmin(opts)
+		dynamicConfig, err := contract.GetDynamicConfig(opts)
 		if err != nil {
 			return false, err
 		}
-		return caller == owner || caller == rateLimitAdmin, nil
+		return caller == owner || caller == dynamicConfig.RateLimitAdmin, nil
 	},
 	Validate: func([]SetChainRateLimiterConfigArg) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args []SetChainRateLimiterConfigArg) (*types.Transaction, error) {
@@ -221,8 +223,9 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfigArgs,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, DynamicConfigArgs],
 	Validate:        func(DynamicConfigArgs) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args DynamicConfigArgs) (*types.Transaction, error) {
-		threshold := args.ThresholdAmountForAdditionalCCVs
-		if threshold == nil {
+		// TODO: is this check still needed?
+		minBlockConfirmations := args.MinBlockConfirmations
+		if args.MinBlockConfirmations == 0 {
 			currentConfig, err := tokenPool.GetDynamicConfig(&bind.CallOpts{
 				Context: opts.Context,
 				From:    opts.From,
@@ -230,12 +233,13 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfigArgs,
 			if err != nil {
 				return nil, err
 			}
-			threshold = currentConfig.ThresholdAmountForAdditionalCCVs
-			if threshold == nil {
-				threshold = big.NewInt(0)
+			minBlockConfirmations = currentConfig.MinBlockConfirmations
+			if minBlockConfirmations == 0 {
+				minBlockConfirmations = 0
 			}
 		}
-		return tokenPool.SetDynamicConfig(opts, args.Router, threshold)
+		// TODO: rate limit admin check?
+		return tokenPool.SetDynamicConfig(opts, args.Router, minBlockConfirmations, args.RateLimitAdmin)
 	},
 })
 
