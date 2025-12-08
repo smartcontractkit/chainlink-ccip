@@ -14,9 +14,9 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
   function setUp() public override {
     super.setUp();
 
-    // Send transfer amount to the verifier, mocking a transfer from the token pool.
-    deal(address(s_USDCToken), address(s_cctpVerifier), TRANSFER_AMOUNT);
-    assertEq(IERC20(address(s_USDCToken)).balanceOf(address(s_cctpVerifier)), TRANSFER_AMOUNT);
+    // Send transfer amount to the token messenger proxy, mocking a transfer from the token pool.
+    deal(address(s_USDCToken), address(s_mockTokenMessengerProxy), TRANSFER_AMOUNT);
+    assertEq(IERC20(address(s_USDCToken)).balanceOf(address(s_mockTokenMessengerProxy)), TRANSFER_AMOUNT);
   }
 
   function test_forwardToVerifier_MintRecipientFromMessage() public {
@@ -28,7 +28,7 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     emit ITokenMessenger.DepositForBurn(
       address(s_USDCToken),
       TRANSFER_AMOUNT,
-      address(s_cctpVerifier),
+      address(s_mockTokenMessengerProxy),
       abi.decode(s_tokenReceiver, (bytes32)),
       REMOTE_DOMAIN_IDENTIFIER,
       s_mockTokenMessenger.DESTINATION_TOKEN_MESSENGER(),
@@ -64,7 +64,7 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     emit ITokenMessenger.DepositForBurn(
       address(s_USDCToken),
       TRANSFER_AMOUNT,
-      address(s_cctpVerifier),
+      address(s_mockTokenMessengerProxy),
       customMintRecipient,
       REMOTE_DOMAIN_IDENTIFIER,
       s_mockTokenMessenger.DESTINATION_TOKEN_MESSENGER(),
@@ -93,7 +93,7 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     emit ITokenMessenger.DepositForBurn(
       address(s_USDCToken),
       TRANSFER_AMOUNT,
-      address(s_cctpVerifier),
+      address(s_mockTokenMessengerProxy),
       abi.decode(s_tokenReceiver, (bytes32)),
       REMOTE_DOMAIN_IDENTIFIER,
       s_mockTokenMessenger.DESTINATION_TOKEN_MESSENGER(),

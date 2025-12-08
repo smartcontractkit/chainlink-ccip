@@ -7,9 +7,12 @@ import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {CCTPTokenMessengerProxy} from "../../../pools/USDC/CCTPTokenMessengerProxy.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract CCTPVerifierSetup is BaseVerifierSetup {
@@ -55,6 +58,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
   MockUSDCTokenMessenger internal s_mockTokenMessenger;
   MockE2EUSDCTransmitterCCTPV2 internal s_mockMessageTransmitter;
   CCTPMessageTransmitterProxy internal s_messageTransmitterProxy;
+  CCTPTokenMessengerProxy internal s_mockTokenMessengerProxy;
   IBurnMintERC20 internal s_USDCToken;
 
   bytes internal s_tokenReceiver;
@@ -88,10 +92,12 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     s_mockTokenMessenger = new MockUSDCTokenMessenger(1, address(s_mockMessageTransmitter));
     s_messageTransmitterProxy = new CCTPMessageTransmitterProxy(s_mockTokenMessenger);
 
+    address[] memory emptyAuthorizedCallers = new address[](0);
+    s_mockTokenMessengerProxy = new CCTPTokenMessengerProxy(s_mockTokenMessenger, s_USDCToken, emptyAuthorizedCallers);
+
     s_cctpVerifier = new CCTPVerifier(
-      s_mockTokenMessenger,
+      s_mockTokenMessengerProxy,
       s_messageTransmitterProxy,
-      s_USDCToken,
       STORAGE_LOCATION,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
@@ -99,6 +105,12 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
       })
     );
+
+    // Add CCTPVerifier as an authorized caller for the token messenger proxy.
+    AuthorizedCallers.AuthorizedCallerArgs memory authorizedCallers =
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: new address[](1), removedCallers: new address[](0)});
+    authorizedCallers.addedCallers[0] = address(s_cctpVerifier);
+    s_mockTokenMessengerProxy.applyAuthorizedCallerUpdates(authorizedCallers);
 
     // Apply dest chain config updates.
     CCTPVerifier.DestChainConfigArgs[] memory destChainConfigArgs = new CCTPVerifier.DestChainConfigArgs[](1);

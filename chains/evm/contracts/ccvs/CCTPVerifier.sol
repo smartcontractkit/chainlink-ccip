@@ -3,10 +3,10 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IMessageTransmitter} from "../pools/USDC/interfaces/IMessageTransmitter.sol";
-import {ITokenMessenger} from "../pools/USDC/interfaces/ITokenMessenger.sol";
 
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {CCTPTokenMessengerProxy} from "../pools/USDC/CCTPTokenMessengerProxy.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
@@ -41,12 +41,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   event DomainsSet(SetDomainArgs[] domains);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
   event StaticConfigSet(
-    address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier
+    address tokenMessengerProxy, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier
   );
 
   /// @notice The static configuration.
   struct StaticConfig {
-    address tokenMessenger; // The address of the token messenger.
+    address tokenMessengerProxy; // The address of the token messenger proxy.
     address messageTransmitterProxy; // The address of the message transmitter proxy.
     address usdcToken; // The address of the USDC token.
     uint32 localDomainIdentifier; // The local domain identifier.
@@ -149,9 +149,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @dev Instead of calling receiveMessage directly, we use a proxy to enable upgrades to the verifier without invalidating in-flight messages.
   /// CCTP messages define an address permitted to call receiveMessage, which will always be the message transmitter proxy.
   CCTPMessageTransmitterProxy private immutable i_messageTransmitterProxy;
-  /// @notice The token messenger, which is used on source to send USDC over CCTP.
+  /// @notice The token messenger proxy, which is used on source as a non-upgradeable caller of depositForBurnWithHook.
   /// @dev The token messenger calls into the message transmitter after burning USDC and forming the app-specific message body.
-  ITokenMessenger private immutable i_tokenMessenger; // TODO: Update to TokenMessengerProxy when available.
+  /// We proxy the token messenger so that we have a static CCTP message sender on source that can be reliably validated on destination.
+  CCTPTokenMessengerProxy private immutable i_tokenMessengerProxy;
   /// @notice The local domain identifier, i.e. a CCTP-specific identifier for the chain to which this contract is deployed.
   uint32 private immutable i_localDomainIdentifier;
 
@@ -161,25 +162,23 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   DynamicConfig private s_dynamicConfig;
 
   constructor(
-    ITokenMessenger tokenMessenger,
+    CCTPTokenMessengerProxy tokenMessengerProxy,
     CCTPMessageTransmitterProxy messageTransmitterProxy,
-    IERC20 usdcToken,
     string memory storageLocation,
     DynamicConfig memory dynamicConfig
   ) BaseVerifier(storageLocation) {
-    if (
-      address(tokenMessenger) == address(0) || address(messageTransmitterProxy) == address(0)
-        || address(usdcToken) == address(0)
-    ) revert ZeroAddressNotAllowed();
+    if (address(tokenMessengerProxy) == address(0) || address(messageTransmitterProxy) == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
 
     // Ensure that the token messenger is for CCTP.
-    uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
+    uint32 tokenMessengerVersion = tokenMessengerProxy.messageBodyVersion();
     if (tokenMessengerVersion != SUPPORTED_CCTP_VERSION) {
       revert InvalidTokenMessengerVersion(SUPPORTED_CCTP_VERSION, tokenMessengerVersion);
     }
 
     // Ensure that the message transmitter is for CCTP.
-    IMessageTransmitter messageTransmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
+    IMessageTransmitter messageTransmitter = IMessageTransmitter(tokenMessengerProxy.localMessageTransmitter());
     uint32 messageTransmitterVersion = messageTransmitter.version();
     if (messageTransmitterVersion != SUPPORTED_CCTP_VERSION) {
       revert InvalidMessageTransmitterVersion(SUPPORTED_CCTP_VERSION, messageTransmitterVersion);
@@ -192,17 +191,13 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     }
 
     // Set the immutable state variables.
-    i_tokenMessenger = tokenMessenger;
+    i_tokenMessengerProxy = tokenMessengerProxy;
     i_messageTransmitterProxy = messageTransmitterProxy;
     i_localDomainIdentifier = messageTransmitter.localDomain();
-    i_usdcToken = usdcToken;
-
-    // Approve the token messenger to burn the USDC token on behalf of this contract.
-    // The USDC token pool will be responsible for forwarding USDC it receives from the router to this contract.
-    i_usdcToken.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
+    i_usdcToken = IERC20(tokenMessengerProxy.getUSDCToken());
 
     emit StaticConfigSet(
-      address(i_tokenMessenger), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier
+      address(i_tokenMessengerProxy), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier
     );
 
     _setDynamicConfig(dynamicConfig);
@@ -264,7 +259,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       if (maxFee > type(uint32).max) revert MaxFeeExceedsUint32(maxFee);
     }
 
-    i_tokenMessenger.depositForBurnWithHook(
+    i_tokenMessengerProxy.depositForBurnWithHook(
       tokenTransfer.amount,
       domain.domainIdentifier,
       decodedReceiver,
@@ -336,7 +331,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @return staticConfig The static configuration.
   function getStaticConfig() external view returns (StaticConfig memory staticConfig) {
     return StaticConfig({
-      tokenMessenger: address(i_tokenMessenger),
+      tokenMessengerProxy: address(i_tokenMessengerProxy),
       messageTransmitterProxy: address(i_messageTransmitterProxy),
       usdcToken: address(i_usdcToken),
       localDomainIdentifier: i_localDomainIdentifier

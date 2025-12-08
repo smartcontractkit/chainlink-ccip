@@ -5,6 +5,7 @@ import {ITokenMessenger} from "../../../pools/USDC/interfaces/ITokenMessenger.so
 
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {CCTPTokenMessengerProxy} from "../../../pools/USDC/CCTPTokenMessengerProxy.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -13,13 +14,15 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
   function test_constructor() public {
     vm.expectEmit();
     emit CCTPVerifier.StaticConfigSet(
-      address(s_mockTokenMessenger), address(s_messageTransmitterProxy), address(s_USDCToken), LOCAL_DOMAIN_IDENTIFIER
+      address(s_mockTokenMessengerProxy),
+      address(s_messageTransmitterProxy),
+      address(s_USDCToken),
+      LOCAL_DOMAIN_IDENTIFIER
     );
 
     new CCTPVerifier(
-      s_mockTokenMessenger,
+      s_mockTokenMessengerProxy,
       s_messageTransmitterProxy,
-      s_USDCToken,
       STORAGE_LOCATION,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
@@ -28,23 +31,19 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       })
     );
 
-    // Check allowance of the token messenger on the USDC token.
-    assertEq(s_USDCToken.allowance(address(s_cctpVerifier), address(s_mockTokenMessenger)), type(uint256).max);
-
     // Check the static configuration.
     CCTPVerifier.StaticConfig memory staticConfig = s_cctpVerifier.getStaticConfig();
-    assertEq(staticConfig.tokenMessenger, address(s_mockTokenMessenger));
+    assertEq(staticConfig.tokenMessengerProxy, address(s_mockTokenMessengerProxy));
     assertEq(staticConfig.messageTransmitterProxy, address(s_messageTransmitterProxy));
     assertEq(staticConfig.usdcToken, address(s_USDCToken));
     assertEq(staticConfig.localDomainIdentifier, LOCAL_DOMAIN_IDENTIFIER);
   }
 
-  function test_constructor_RevertWhen_ZeroAddressNotAllowed_TokenMessengerIsZero() public {
+  function test_constructor_RevertWhen_ZeroAddressNotAllowed_TokenMessengerProxyIsZero() public {
     vm.expectRevert(CCTPVerifier.ZeroAddressNotAllowed.selector);
     new CCTPVerifier(
-      ITokenMessenger(address(0)),
+      CCTPTokenMessengerProxy(address(0)),
       s_messageTransmitterProxy,
-      s_USDCToken,
       STORAGE_LOCATION,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
@@ -57,24 +56,8 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_MessageTransmitterProxyIsZero() public {
     vm.expectRevert(CCTPVerifier.ZeroAddressNotAllowed.selector);
     new CCTPVerifier(
-      s_mockTokenMessenger,
+      s_mockTokenMessengerProxy,
       CCTPMessageTransmitterProxy(address(0)),
-      s_USDCToken,
-      STORAGE_LOCATION,
-      CCTPVerifier.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
-    );
-  }
-
-  function test_constructor_RevertWhen_ZeroAddressNotAllowed_USDCTokenIsZero() public {
-    vm.expectRevert(CCTPVerifier.ZeroAddressNotAllowed.selector);
-    new CCTPVerifier(
-      s_mockTokenMessenger,
-      s_messageTransmitterProxy,
-      IERC20(address(0)),
       STORAGE_LOCATION,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
@@ -86,13 +69,14 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
 
   function test_constructor_RevertWhen_InvalidTokenMessengerVersion() public {
     vm.mockCall(
-      address(s_mockTokenMessenger), abi.encodeCall(s_mockTokenMessenger.messageBodyVersion, ()), abi.encode(0)
+      address(s_mockTokenMessengerProxy),
+      abi.encodeCall(s_mockTokenMessengerProxy.messageBodyVersion, ()),
+      abi.encode(0)
     );
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidTokenMessengerVersion.selector, 1, 0));
     new CCTPVerifier(
-      s_mockTokenMessenger,
+      s_mockTokenMessengerProxy,
       s_messageTransmitterProxy,
-      s_USDCToken,
       STORAGE_LOCATION,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
@@ -106,9 +90,8 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
     vm.mockCall(address(s_mockMessageTransmitter), abi.encodeCall(s_mockMessageTransmitter.version, ()), abi.encode(0));
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidMessageTransmitterVersion.selector, 1, 0));
     new CCTPVerifier(
-      s_mockTokenMessenger,
+      s_mockTokenMessengerProxy,
       s_messageTransmitterProxy,
-      s_USDCToken,
       STORAGE_LOCATION,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
@@ -130,9 +113,8 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       )
     );
     new CCTPVerifier(
-      s_mockTokenMessenger,
+      s_mockTokenMessengerProxy,
       s_messageTransmitterProxy,
-      s_USDCToken,
       STORAGE_LOCATION,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
