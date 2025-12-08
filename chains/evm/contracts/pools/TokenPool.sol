@@ -912,6 +912,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     virtual
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
+    uint16 minBlockConfirmationConfigured = s_minBlockConfirmation;
+    if (blockConfirmationRequested != WAIT_FOR_FINALITY && minBlockConfirmationConfigured == 0) {
+      revert CustomBlockConfirmationsNotEnabled();
+    }
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector];
 
     // If config is disabled, return zeros with isEnabled=false to signal OnRamp to use FeeQuoter defaults.
@@ -920,8 +924,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     }
 
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
-      if (blockConfirmationRequested < s_minBlockConfirmation) {
-        revert InvalidMinBlockConfirmation(blockConfirmationRequested, s_minBlockConfirmation);
+      if (blockConfirmationRequested < minBlockConfirmationConfigured) {
+        revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
       }
       return (
         feeConfig.customBlockConfirmationFeeUSDCents,
