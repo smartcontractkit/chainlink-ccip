@@ -262,12 +262,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       (eventData.receipts, newMessage.executionGasLimit, computedFeeTokenAmount) =
         _getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
-      // A CCV could theoretically return different values for getFee on every call. Without this guard, the onRamp
-      // would pay until it ran out of funds, potentially using accrued protocol fees to pay for further calls.
+      // Any third party (ccv, pool, or executor) could theoretically return different values for getFee on every call.
+      // Without this guard, the onRamp would pay until it ran out of funds, potentially using accrued protocol fees to
+      // pay for further calls.
       if (computedFeeTokenAmount > feeTokenAmount) {
         revert InsufficientFeeTokenAmount();
       }
-      // We don't need to check for feeTokenAmount < receiptsFeeTokenAmount here as that is done in getFee called by the router.
       _distributeFees(message, eventData.receipts);
     }
 

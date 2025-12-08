@@ -32,7 +32,7 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
     vm.expectRevert(CommitteeVerifier.InvalidConfig.selector);
     new CommitteeVerifier(
       _createDynamicConfigArgs(address(0), ALLOWLIST_ADMIN),
-      STORAGE_LOCATION, // Zero fee aggregator address,
+      STORAGE_LOCATION, // Zero fee aggregator address.
       address(s_mockRMNRemote)
     );
   }

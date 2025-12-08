@@ -41,7 +41,7 @@ contract BaseVerifier_applyDestChainConfigUpdates is BaseVerifierSetup {
       destChainSelector: destChainSelector,
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
-      gasForVerification: 0, // Zero gas should revert
+      gasForVerification: 0, // Zero gas should revert.
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
 
