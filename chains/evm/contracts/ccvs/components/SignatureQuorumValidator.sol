@@ -139,10 +139,8 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
       if (s_configuredChains.contains(sourceChainSelectorsToRemove[i])) {
         SignerConfig storage cfg = s_signerConfigs[sourceChainSelectorsToRemove[i]];
 
-        //Remove all signers.
-        while (cfg.signers.length() > 0) {
-          cfg.signers.remove(cfg.signers.at(0));
-        }
+        // Remove all signers.
+        cfg.signers.clear();
 
         cfg.threshold = 0;
         s_configuredChains.remove(sourceChainSelectorsToRemove[i]);
@@ -162,9 +160,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
       SignerConfig storage cfg = s_signerConfigs[update.sourceChainSelector];
 
       // We must remove all current signers first.
-      while (cfg.signers.length() > 0) {
-        cfg.signers.remove(cfg.signers.at(0));
-      }
+      cfg.signers.clear();
 
       // Add new signers.
       for (uint256 signerIndex = 0; signerIndex < update.signers.length; ++signerIndex) {
