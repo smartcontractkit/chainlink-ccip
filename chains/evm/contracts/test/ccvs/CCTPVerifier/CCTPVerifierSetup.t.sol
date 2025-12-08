@@ -137,7 +137,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     s_messageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
   }
 
-  function _createCCVData(
+  function _createVerifierResults(
     bytes4 verifierVersion,
     CCTPVerifierSetup.CCTPMessage memory cctpMessage
   ) internal pure returns (bytes memory) {

@@ -63,7 +63,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   /// @inheritdoc ICrossChainVerifierV1
   function verifyMessage(
-    MessageV1Codec.MessageV1 calldata, // message
+    MessageV1Codec.MessageV1 calldata message,
     bytes32 messageHash,
     bytes calldata verifierResults
   ) external view {
@@ -86,6 +86,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     // Even though the current version of this contract only expects verifier version and signatures to be included in the verifierResults,
     // bounding it to the given length allows potential forward compatibility with future formats that supply more data.
     _validateSignatures(
+      message.sourceChainSelector,
       // Verifiers sign a concatenation of the verifier version and the message hash.
       // The version is included so that a resolver can return the correct verifier implementation on destination.
       // The version must be signed, otherwise any version could be inserted post-signatures.

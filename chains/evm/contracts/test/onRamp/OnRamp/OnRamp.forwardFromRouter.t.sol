@@ -95,6 +95,20 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     assertEq(finalConfig.messageNumber, destConfig.messageNumber);
   }
 
+  function test_getExpectedNextMessageNumber_TracksDestChainCounter() public {
+    // Before any messages are sent, the next message number should be 1.
+    assertEq(s_onRamp.getExpectedNextMessageNumber(DEST_CHAIN_SELECTOR), 1);
+
+    // Send a message through the router.
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+
+    // After sending one message, the next expected number should increment.
+    assertEq(s_onRamp.getExpectedNextMessageNumber(DEST_CHAIN_SELECTOR), 2);
+  }
+
   function test_forwardFromRouter_RevertWhen_RouterMustSetOriginalSender() public {
     vm.expectRevert(OnRamp.RouterMustSetOriginalSender.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 1e17, address(0));
