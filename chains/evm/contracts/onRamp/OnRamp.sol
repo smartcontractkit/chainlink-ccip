@@ -871,12 +871,19 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
           receipts[poolReceiptIndex].destBytesOverhead
         ) = IFeeQuoter(s_dynamicConfig.feeQuoter).getTokenTransferFee(destChainSelector, message.tokenAmounts[0].token);
       }
+
+      gasLimitSum += receipts[poolReceiptIndex].destGasLimit;
+      bytesOverheadSum += receipts[poolReceiptIndex].destBytesOverhead;
     }
 
     uint256 executorIndex = receipts.length - 2;
     // This includes the user callback gas limit.
     receipts[executorIndex] =
       _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
+
+    gasLimitSum += receipts[executorIndex].destGasLimit;
+    bytesOverheadSum += receipts[executorIndex].destBytesOverhead;
+
     // Tag the calling router as the network fee issuer so CCIPMessageSent surfaces which router forwarded the
     // message. Third-party verifiers can pin on the router address even though the flat network fee stays on
     // the onRamp for later aggregation.
@@ -887,9 +894,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       feeTokenAmount: networkFeeUSDCents,
       extraArgs: ""
     });
-
-    gasLimitSum += receipts[executorIndex].destGasLimit;
-    bytesOverheadSum += receipts[executorIndex].destBytesOverhead;
 
     (uint32 updatedGasLimitSum, uint256 execCostInUSDCents, uint256 feeTokenPrice, uint256 percentMultiplier) =
     IFeeQuoter(s_dynamicConfig.feeQuoter).quoteGasForExec(
