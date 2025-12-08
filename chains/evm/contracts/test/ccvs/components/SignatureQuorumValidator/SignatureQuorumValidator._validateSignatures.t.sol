@@ -20,8 +20,8 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
   }
 
   function test_validateSignatures_MultipleSignatures() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 3);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 3);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     uint256[] memory signerKeys = new uint256[](3);
     signerKeys[0] = s_validSignerKeys[0];
@@ -35,8 +35,8 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
 
   function test_validateSignatures_ExtraSignatures() public {
     // Set threshold to 2 but provide 3 signatures.
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 2);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 2);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     uint256[] memory signerKeys = new uint256[](3);
     signerKeys[0] = s_validSignerKeys[0];
@@ -56,7 +56,7 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
     SignatureQuorumValidatorHelper newVerifier = new SignatureQuorumValidatorHelper();
 
     vm.expectRevert(
-      abi.encodeWithSelector(SignatureQuorumValidator.NoSignersSetForSource.selector, SOURCE_CHAIN_SELECTOR)
+      abi.encodeWithSelector(SignatureQuorumValidator.SourceNotConfigured.selector, SOURCE_CHAIN_SELECTOR)
     );
     newVerifier.validateSignatures(SOURCE_CHAIN_SELECTOR, TEST_HASH, "");
   }
@@ -69,8 +69,8 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
     bytes32 hashSourceB = keccak256("message-src-b");
 
     uint64 sourceBChainSelector = 20;
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(sourceBChainSelector, s_validSigners, 3);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(sourceBChainSelector, s_validSigners, 3);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     uint256[] memory signerKeys = new uint256[](3);
     signerKeys[0] = s_validSignerKeys[0];
@@ -85,8 +85,8 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
   }
 
   function test_validateSignatures_RevertWhen_ForkedChain() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     uint256[] memory signerKeys = new uint256[](1);
     signerKeys[0] = s_validSignerKeys[0];
@@ -102,8 +102,8 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
   }
 
   function test_validateSignatures_RevertWhen_WrongNumberOfSignatures() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 3);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 3);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     // Provide only 2 signatures when 3 are required.
     uint256[] memory signerKeys = new uint256[](2);
@@ -117,8 +117,8 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
   }
 
   function test_validateSignatures_RevertWhen_UnauthorizedSigner() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     // Use a signer key not in the valid set.
     uint256 unauthorizedKey = 0x1234567890abcdef;
@@ -132,8 +132,8 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
   }
 
   function test_validateSignatures_RevertWhen_UnorderedSignatures() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 2);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 2);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     // Get two signers and ensure they're ordered, then reverse them.
     address addr0 = vm.addr(s_validSignerKeys[0]);
@@ -158,8 +158,8 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
   }
 
   function test_validateSignatures_RevertWhen_DuplicateSignatures() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 2);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 2);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     // Create duplicate signatures manually.
     (bytes32 r, bytes32 s) = _signWithV27(s_validSignerKeys[0], TEST_HASH);
@@ -170,8 +170,8 @@ contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup 
   }
 
   function test_validateSignatures_RevertWhen_InvalidSignatureLength() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     // Create signature with wrong length (63 bytes instead of 64).
     bytes memory invalidSignature = new bytes(63);

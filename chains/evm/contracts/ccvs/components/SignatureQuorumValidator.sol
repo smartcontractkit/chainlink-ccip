@@ -16,7 +16,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
   event SignatureConfigSet(uint64 indexed sourceChainSelector, address[] signers, uint8 threshold);
 
   error InvalidSignatureConfig();
-  error NoSignersSetForSource(uint64 sourceChainSelector);
+  error SourceNotConfigured(uint64 sourceChainSelector);
   error ForkedChain(uint256 expected, uint256 actual);
   error WrongNumberOfSignatures();
   error UnauthorizedSigner();
@@ -29,7 +29,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     uint8 threshold; // The number of signatures required for a report to be valid.
   }
 
-  struct SignersUpdate {
+  struct SignatureConfig {
     uint64 sourceChainSelector; // The source chain selector to apply the updates to.
     uint8 threshold; // The required threshold, must be non-zero and it can not be greater than signers.length.
     address[] signers; // The desired final set of signers for the source chain.
@@ -60,8 +60,9 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
   /// @dev The v values are assumed to be 27 for all signatures, this can be achieved by using ECDSA malleability.
   function _validateSignatures(uint64 sourceChainSelector, bytes32 signedHash, bytes calldata signatures) internal view {
     SignerConfig storage cfg = s_signerConfigs[sourceChainSelector];
-    if (cfg.signers.length() == 0) {
-      revert NoSignersSetForSource(sourceChainSelector);
+    uint256 threshold = cfg.threshold;
+    if (threshold == 0) {
+      revert SourceNotConfigured(sourceChainSelector);
     }
 
     // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
@@ -69,8 +70,6 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
     uint256 numberOfSignatures = signatures.length / SIGNATURE_LENGTH;
-
-    uint256 threshold = cfg.threshold;
 
     // We allow more signatures than the threshold, but we will only validate up to the threshold to save gas.
     // This still preserves the security properties while adding flexibility.
@@ -103,36 +102,32 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     return (cfg.signers.values(), cfg.threshold);
   }
 
-  /// @notice Returns all configured source chain selectors signer sets and thresholds.
-  function getAllSignatureConfigs()
-    external
-    view
-    returns (uint64[] memory sourceChainSelectors, address[][] memory signerSets, uint8[] memory thresholds)
-  {
+  /// @notice Returns all configured signature configurations.
+  function getAllSignatureConfigs() external view returns (SignatureConfig[] memory configs) {
     uint256[] memory sourceChainSelectorSet = s_configuredChains.values();
-    sourceChainSelectors = new uint64[](sourceChainSelectorSet.length);
-    signerSets = new address[][](sourceChainSelectorSet.length);
-    thresholds = new uint8[](sourceChainSelectorSet.length);
+    configs = new SignatureConfig[](sourceChainSelectorSet.length);
 
     for (uint256 i; i < sourceChainSelectorSet.length; ++i) {
-      // Okay to cast down without checking as set is populated using uint64 sourceChainSelector input in `applySignersUpdates`.
+      // Okay to cast down without checking as set is populated using uint64 sourceChainSelector input in `applySignatureConfigs`.
       uint64 sourceChainSelector = uint64(sourceChainSelectorSet[i]);
-      sourceChainSelectors[i] = sourceChainSelector;
       SignerConfig storage cfg = s_signerConfigs[sourceChainSelector];
-      signerSets[i] = cfg.signers.values();
-      thresholds[i] = cfg.threshold;
+      configs[i] = SignatureConfig({
+        sourceChainSelector: sourceChainSelector,
+        threshold: cfg.threshold,
+        signers: cfg.signers.values()
+      });
     }
 
-    return (sourceChainSelectors, signerSets, thresholds);
+    return configs;
   }
 
   /// @notice Removes source chain selectors, and applies multiple signers updates.
-  /// @dev Last signers update wins. If a source chain selector is repeated in `signersUpdates` then the last one will be the state set.
+  /// @dev Last signers update wins. If a source chain selector is repeated in `signatureConfigs` then the last one will be the state set.
   /// @param sourceChainSelectorsToRemove The selectors that should have their signer configuration cleared.
-  /// @param signersUpdates The desired signer configuration updates to apply per source chain selector.
-  function applySignersUpdates(
+  /// @param signatureConfigs The desired signer configuration updates to apply per source chain selector.
+  function applySignatureConfigs(
     uint64[] calldata sourceChainSelectorsToRemove,
-    SignersUpdate[] calldata signersUpdates
+    SignatureConfig[] calldata signatureConfigs
   ) external onlyOwner {
     // Handle removals first.
     for (uint256 i = 0; i < sourceChainSelectorsToRemove.length; ++i) {
@@ -150,8 +145,8 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     }
 
     // Now handle signerUpdates.
-    for (uint256 i = 0; i < signersUpdates.length; ++i) {
-      SignersUpdate memory update = signersUpdates[i];
+    for (uint256 i = 0; i < signatureConfigs.length; ++i) {
+      SignatureConfig memory update = signatureConfigs[i];
 
       if (update.threshold == 0 || update.threshold > update.signers.length) {
         revert InvalidSignatureConfig();

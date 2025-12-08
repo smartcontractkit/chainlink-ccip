@@ -22,13 +22,13 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
     s_committeeVerifier = new CommitteeVerifier(_createBasicDynamicConfigArgs(), "testStorageLocation");
     s_versionTag = s_committeeVerifier.versionTag();
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = new SignatureQuorumValidator.SignersUpdate[](1);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = new SignatureQuorumValidator.SignatureConfig[](1);
     updates[0].sourceChainSelector = SOURCE_CHAIN_SELECTOR;
     updates[0].signers = new address[](1);
     updates[0].signers[0] = vm.addr(PRIVATE_KEY_0);
     updates[0].threshold = 1;
 
-    s_committeeVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_committeeVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
     destChainConfigs[0] = BaseVerifier.DestChainConfigArgs({

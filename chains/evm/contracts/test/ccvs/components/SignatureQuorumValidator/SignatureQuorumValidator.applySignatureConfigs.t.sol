@@ -5,8 +5,8 @@ import {SignatureQuorumValidator} from "../../../../ccvs/components/SignatureQuo
 import {SignatureValidatorSetup} from "./SignatureValidatorSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup {
-  function test_applySignersUpdates() public {
+contract SignatureQuorumValidator_applySignatureConfigs is SignatureValidatorSetup {
+  function test_applySignatureConfigs() public {
     address[] memory newSigners = new address[](3);
     newSigners[0] = makeAddr("signer1");
     newSigners[1] = makeAddr("signer2");
@@ -17,9 +17,9 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     vm.expectEmit();
     emit SignatureQuorumValidator.SignatureConfigSet(sourceChainSelector, newSigners, newThreshold);
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates =
+    SignatureQuorumValidator.SignatureConfig[] memory updates =
       _createUpdate(sourceChainSelector, newSigners, newThreshold);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     (address[] memory actualSigners, uint8 actualThreshold) =
       s_sigQuorumVerifier.getSignatureConfig(sourceChainSelector);
@@ -32,7 +32,7 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     }
   }
 
-  function test_applySignersUpdates_IsPerSource() public {
+  function test_applySignatureConfigs_IsPerSource() public {
     uint64 sourceChainSelector0 = 77;
     address[] memory newSignersSource0 = new address[](3);
     newSignersSource0[0] = makeAddr("signer.77.1");
@@ -49,15 +49,15 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     vm.expectEmit();
     emit SignatureQuorumValidator.SignatureConfigSet(sourceChainSelector0, newSignersSource0, newThreshold0);
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates =
+    SignatureQuorumValidator.SignatureConfig[] memory updates =
       _createUpdate(sourceChainSelector0, newSignersSource0, newThreshold0);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     vm.expectEmit();
     emit SignatureQuorumValidator.SignatureConfigSet(sourceChainSelector1, newSignersSource1, newThreshold1);
 
     updates = _createUpdate(sourceChainSelector1, newSignersSource1, newThreshold1);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     // Check source 0 signers.
     (address[] memory actualSigners0, uint8 actualThreshold0) =
@@ -89,14 +89,14 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     }
   }
 
-  function test_applySignersUpdates_UpdatesExistingConfig() public {
+  function test_applySignatureConfigs_UpdatesExistingConfig() public {
     uint64 sourceChainSelector = 1;
     // First set initial config.
     address[] memory initialSigners = new address[](2);
     initialSigners[0] = makeAddr("initial1");
     initialSigners[1] = makeAddr("initial2");
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(sourceChainSelector, initialSigners, 1);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(sourceChainSelector, initialSigners, 1);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     // Update with new config.
     address[] memory newSigners = new address[](3);
@@ -109,7 +109,7 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     emit SignatureQuorumValidator.SignatureConfigSet(sourceChainSelector, newSigners, newThreshold);
 
     updates = _createUpdate(sourceChainSelector, newSigners, newThreshold);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     (address[] memory actualSigners, uint8 actualThreshold) =
       s_sigQuorumVerifier.getSignatureConfig(sourceChainSelector);
@@ -123,14 +123,14 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     }
   }
 
-  function test_applySignersUpdates_SingleSignerThresholdOne() public {
+  function test_applySignatureConfigs_SingleSignerThresholdOne() public {
     address[] memory signers = new address[](1);
     signers[0] = makeAddr("soloSigner");
     uint8 threshold = 1;
     uint64 sourceChainSelector = 1;
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(1, signers, threshold);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(1, signers, threshold);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     (address[] memory actualSigners, uint8 actualThreshold) =
       s_sigQuorumVerifier.getSignatureConfig(sourceChainSelector);
@@ -140,20 +140,20 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     assertEq(actualSigners[0], signers[0]);
   }
 
-  function test_applySignersUpdates_UpdatesTakePriorityWithinOneCall() public {
+  function test_applySignatureConfigs_UpdatesTakePriorityWithinOneCall() public {
     uint64 selector = 555;
 
     // Pre-configure the selector so the removal emits and clears state first.
     address[] memory initialSigners = new address[](1);
     initialSigners[0] = makeAddr("selector555-initial");
-    SignatureQuorumValidator.SignersUpdate[] memory initialUpdate = _createUpdate(selector, initialSigners, 1);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), initialUpdate);
+    SignatureQuorumValidator.SignatureConfig[] memory initialUpdate = _createUpdate(selector, initialSigners, 1);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), initialUpdate);
 
     address[] memory newSigners = new address[](2);
     newSigners[0] = makeAddr("selector555-signer1");
     newSigners[1] = makeAddr("selector555-signer2");
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(selector, newSigners, 2);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(selector, newSigners, 2);
 
     uint64[] memory removals = new uint64[](1);
     removals[0] = selector;
@@ -164,7 +164,7 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     vm.expectEmit();
     emit SignatureQuorumValidator.SignatureConfigSet(selector, newSigners, 2);
 
-    s_sigQuorumVerifier.applySignersUpdates(removals, updates);
+    s_sigQuorumVerifier.applySignatureConfigs(removals, updates);
 
     (address[] memory actualSigners, uint8 threshold) = s_sigQuorumVerifier.getSignatureConfig(selector);
     assertEq(actualSigners.length, newSigners.length);
@@ -174,22 +174,22 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     }
   }
 
-  function test_applySignersUpdates_AllowsNoops() public {
+  function test_applySignatureConfigs_AllowsNoops() public {
     (address[] memory beforeSigners, uint8 beforeThreshold) =
       s_sigQuorumVerifier.getSignatureConfig(SOURCE_CHAIN_SELECTOR);
 
     // Pure noop: no updates and no removals.
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), new SignatureQuorumValidator.SignersUpdate[](0));
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), new SignatureQuorumValidator.SignatureConfig[](0));
 
     // Updating with the exact same config should also be a noop.
-    SignatureQuorumValidator.SignersUpdate[] memory identicalUpdate =
+    SignatureQuorumValidator.SignatureConfig[] memory identicalUpdate =
       _createUpdate(SOURCE_CHAIN_SELECTOR, beforeSigners, beforeThreshold);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), identicalUpdate);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), identicalUpdate);
 
     // Removing a selector that was never configured should be a noop.
     uint64[] memory nonexistentRemoval = new uint64[](1);
     nonexistentRemoval[0] = 999_999;
-    s_sigQuorumVerifier.applySignersUpdates(nonexistentRemoval, new SignatureQuorumValidator.SignersUpdate[](0));
+    s_sigQuorumVerifier.applySignatureConfigs(nonexistentRemoval, new SignatureQuorumValidator.SignatureConfig[](0));
 
     (address[] memory afterSigners, uint8 afterThreshold) =
       s_sigQuorumVerifier.getSignatureConfig(SOURCE_CHAIN_SELECTOR);
@@ -201,21 +201,21 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     }
   }
 
-  function test_applySignersUpdates_RemovalEmitsEventAndClearsConfig() public {
+  function test_applySignatureConfigs_RemovalEmitsEventAndClearsConfig() public {
     uint64[] memory removals = new uint64[](1);
     removals[0] = SOURCE_CHAIN_SELECTOR;
 
     vm.expectEmit();
     emit SignatureQuorumValidator.SignatureConfigSet(SOURCE_CHAIN_SELECTOR, new address[](0), 0);
 
-    s_sigQuorumVerifier.applySignersUpdates(removals, new SignatureQuorumValidator.SignersUpdate[](0));
+    s_sigQuorumVerifier.applySignatureConfigs(removals, new SignatureQuorumValidator.SignatureConfig[](0));
 
     (address[] memory signers, uint8 threshold) = s_sigQuorumVerifier.getSignatureConfig(SOURCE_CHAIN_SELECTOR);
     assertEq(signers.length, 0);
     assertEq(threshold, 0);
   }
 
-  function test_applySignersUpdates_MultipleChainsSingleCall_NoCrossPollination() public {
+  function test_applySignatureConfigs_MultipleChainsSingleCall_NoCrossPollination() public {
     uint64 selectorA = 700;
     uint64 selectorB = 900;
 
@@ -228,13 +228,13 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     signersB[0] = makeAddr("selectorB-1");
     signersB[1] = makeAddr("selectorB-2");
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = new SignatureQuorumValidator.SignersUpdate[](2);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = new SignatureQuorumValidator.SignatureConfig[](2);
     updates[0] =
-      SignatureQuorumValidator.SignersUpdate({sourceChainSelector: selectorA, signers: signersA, threshold: 3});
+      SignatureQuorumValidator.SignatureConfig({sourceChainSelector: selectorA, signers: signersA, threshold: 3});
     updates[1] =
-      SignatureQuorumValidator.SignersUpdate({sourceChainSelector: selectorB, signers: signersB, threshold: 1});
+      SignatureQuorumValidator.SignatureConfig({sourceChainSelector: selectorB, signers: signersB, threshold: 1});
 
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     (address[] memory actualSignersA, uint8 thresholdA) = s_sigQuorumVerifier.getSignatureConfig(selectorA);
     (address[] memory actualSignersB, uint8 thresholdB) = s_sigQuorumVerifier.getSignatureConfig(selectorB);
@@ -258,27 +258,24 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     address[] memory signersC = new address[](1);
     signersC[0] = makeAddr("selectorC-1");
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = new SignatureQuorumValidator.SignersUpdate[](2);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = new SignatureQuorumValidator.SignatureConfig[](2);
     updates[0] =
-      SignatureQuorumValidator.SignersUpdate({sourceChainSelector: selectorB, signers: signersB, threshold: 2});
+      SignatureQuorumValidator.SignatureConfig({sourceChainSelector: selectorB, signers: signersB, threshold: 2});
     updates[1] =
-      SignatureQuorumValidator.SignersUpdate({sourceChainSelector: selectorC, signers: signersC, threshold: 1});
+      SignatureQuorumValidator.SignatureConfig({sourceChainSelector: selectorC, signers: signersC, threshold: 1});
 
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
-    (uint64[] memory selectors, address[][] memory signerSets, uint8[] memory thresholds) =
-      s_sigQuorumVerifier.getAllSignatureConfigs();
+    SignatureQuorumValidator.SignatureConfig[] memory configs = s_sigQuorumVerifier.getAllSignatureConfigs();
 
-    assertEq(selectors.length, 3);
-    assertEq(signerSets.length, 3);
-    assertEq(thresholds.length, 3);
+    assertEq(configs.length, 3);
 
-    _assertConfigPresent(selectors, signerSets, thresholds, SOURCE_CHAIN_SELECTOR, defaultSigners, defaultThreshold);
-    _assertConfigPresent(selectors, signerSets, thresholds, selectorB, signersB, 2);
-    _assertConfigPresent(selectors, signerSets, thresholds, selectorC, signersC, 1);
+    _assertConfigPresent(configs, SOURCE_CHAIN_SELECTOR, defaultSigners, defaultThreshold);
+    _assertConfigPresent(configs, selectorB, signersB, 2);
+    _assertConfigPresent(configs, selectorC, signersC, 1);
   }
 
-  function test_applySignersUpdates_LastUpdateWinsBeforeRemoval() public {
+  function test_applySignatureConfigs_LastUpdateWinsBeforeRemoval() public {
     uint64 selector = 8080;
     address[] memory firstSigners = new address[](1);
     firstSigners[0] = makeAddr("first");
@@ -287,13 +284,13 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     secondSigners[0] = makeAddr("second1");
     secondSigners[1] = makeAddr("second2");
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = new SignatureQuorumValidator.SignersUpdate[](2);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = new SignatureQuorumValidator.SignatureConfig[](2);
     updates[0] =
-      SignatureQuorumValidator.SignersUpdate({sourceChainSelector: selector, signers: firstSigners, threshold: 1});
+      SignatureQuorumValidator.SignatureConfig({sourceChainSelector: selector, signers: firstSigners, threshold: 1});
     updates[1] =
-      SignatureQuorumValidator.SignersUpdate({sourceChainSelector: selector, signers: secondSigners, threshold: 2});
+      SignatureQuorumValidator.SignatureConfig({sourceChainSelector: selector, signers: secondSigners, threshold: 2});
 
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     (address[] memory signers, uint8 threshold) = s_sigQuorumVerifier.getSignatureConfig(selector);
     _assertAddressArraysEqual(secondSigners, signers);
@@ -305,80 +302,77 @@ contract SignatureQuorumValidator_applySignersUpdates is SignatureValidatorSetup
     uint64 selectorB = 8800;
     uint64 selectorC = 9900;
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = new SignatureQuorumValidator.SignersUpdate[](2);
-    updates[0] = SignatureQuorumValidator.SignersUpdate({
+    SignatureQuorumValidator.SignatureConfig[] memory updates = new SignatureQuorumValidator.SignatureConfig[](2);
+    updates[0] = SignatureQuorumValidator.SignatureConfig({
       sourceChainSelector: selectorB,
       signers: _arrayOf(makeAddr("bSigner")),
       threshold: 1
     });
-    updates[1] = SignatureQuorumValidator.SignersUpdate({
+    updates[1] = SignatureQuorumValidator.SignatureConfig({
       sourceChainSelector: selectorC,
       signers: _arrayOf(makeAddr("cSigner")),
       threshold: 1
     });
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     // Remove every configured selector (default + the two new ones).
     uint64[] memory removals = new uint64[](3);
     removals[0] = SOURCE_CHAIN_SELECTOR;
     removals[1] = selectorB;
     removals[2] = selectorC;
-    s_sigQuorumVerifier.applySignersUpdates(removals, new SignatureQuorumValidator.SignersUpdate[](0));
+    s_sigQuorumVerifier.applySignatureConfigs(removals, new SignatureQuorumValidator.SignatureConfig[](0));
 
-    (uint64[] memory selectors, address[][] memory signerSets, uint8[] memory thresholds) =
-      s_sigQuorumVerifier.getAllSignatureConfigs();
+    SignatureQuorumValidator.SignatureConfig[] memory configs = s_sigQuorumVerifier.getAllSignatureConfigs();
 
-    assertEq(selectors.length, 0);
-    assertEq(signerSets.length, 0);
-    assertEq(thresholds.length, 0);
+    assertEq(configs.length, 0);
   }
 
   // Reverts
 
-  function test_applySignersUpdates_RevertWhen_CallerNotOwner() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, new address[](0), 1);
+  function test_applySignatureConfigs_RevertWhen_CallerNotOwner() public {
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(0, new address[](0), 1);
     vm.startPrank(makeAddr("notOwner"));
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
   }
 
-  function test_applySignersUpdates_RevertWhen_ThresholdZero() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, new address[](0), 0);
+  function test_applySignatureConfigs_RevertWhen_ThresholdZero() public {
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(0, new address[](0), 0);
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
   }
 
-  function test_applySignersUpdates_RevertWhen_ThresholdExceedsSignerCount() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, new address[](0), 3);
+  function test_applySignatureConfigs_RevertWhen_ThresholdExceedsSignerCount() public {
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(0, new address[](0), 3);
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates); // threshold > signers.length
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates); // threshold > signers.length
   }
 
-  function test_applySignersUpdates_RevertWhen_ZeroAddressSigner() public {
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, new address[](1), 1);
+  function test_applySignatureConfigs_RevertWhen_ZeroAddressSigner() public {
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(0, new address[](1), 1);
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.SignerCannotBeZeroAddress.selector));
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
   }
 
-  function test_applySignersUpdates_RevertWhen_DuplicateSigners() public {
+  function test_applySignatureConfigs_RevertWhen_DuplicateSigners() public {
     address duplicateAddress = makeAddr("duplicate");
     address[] memory signers = new address[](3);
     signers[0] = makeAddr("signer1");
     signers[1] = duplicateAddress;
     signers[2] = duplicateAddress; // Duplicate.
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, signers, 2);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(0, signers, 2);
 
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
   }
 
-  function test_applySignersUpdates_RevertWhen_EmptySignerArray() public {
+  function test_applySignatureConfigs_RevertWhen_EmptySignerArray() public {
     address[] memory signers = new address[](0);
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(0, signers, 1);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(0, signers, 1);
 
     vm.expectRevert(abi.encodeWithSelector(SignatureQuorumValidator.InvalidSignatureConfig.selector));
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
   }
 }

@@ -39,21 +39,21 @@ contract SignatureValidatorSetup is BaseTest {
     s_validSigners[2] = vm.addr(PRIVATE_KEY_2);
     s_validSigners[3] = vm.addr(PRIVATE_KEY_3);
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, s_validSigners, 1);
 
     // Sort signers and keys by address to ensure proper ordering.
     _sortSignersByAddress();
 
     s_sigQuorumVerifier = new SignatureQuorumValidatorHelper();
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
   }
 
   function _createUpdate(
     uint64 sourceChainSelector,
     address[] memory signers,
     uint8 threshold
-  ) internal pure returns (SignatureQuorumValidator.SignersUpdate[] memory updates) {
-    updates = new SignatureQuorumValidator.SignersUpdate[](1);
+  ) internal pure returns (SignatureQuorumValidator.SignatureConfig[] memory updates) {
+    updates = new SignatureQuorumValidator.SignatureConfig[](1);
     updates[0].sourceChainSelector = sourceChainSelector;
     updates[0].signers = signers;
     updates[0].threshold = threshold;
@@ -69,19 +69,17 @@ contract SignatureValidatorSetup is BaseTest {
   }
 
   function _assertConfigPresent(
-    uint64[] memory selectors,
-    address[][] memory signerSets,
-    uint8[] memory thresholds,
+    SignatureQuorumValidator.SignatureConfig[] memory configs,
     uint64 selector,
     address[] memory expectedSigners,
     uint8 expectedThreshold
   ) internal pure {
     bool found;
-    for (uint256 i; i < selectors.length; ++i) {
-      if (selectors[i] == selector) {
+    for (uint256 i; i < configs.length; ++i) {
+      if (configs[i].sourceChainSelector == selector) {
         found = true;
-        require(thresholds[i] == expectedThreshold, "threshold mismatch");
-        _assertAddressArraysEqual(expectedSigners, signerSets[i]);
+        require(configs[i].threshold == expectedThreshold, "threshold mismatch");
+        _assertAddressArraysEqual(expectedSigners, configs[i].signers);
         break;
       }
     }

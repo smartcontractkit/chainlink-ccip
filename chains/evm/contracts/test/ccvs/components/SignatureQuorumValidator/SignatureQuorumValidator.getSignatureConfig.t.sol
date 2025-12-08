@@ -33,9 +33,9 @@ contract SignatureQuorumValidator_getSignatureConfig is SignatureValidatorSetup 
     newSigners[2] = makeAddr("newSigner3");
     uint8 newThreshold = 2;
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates =
+    SignatureQuorumValidator.SignatureConfig[] memory updates =
       _createUpdate(SOURCE_CHAIN_SELECTOR, newSigners, newThreshold);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     (address[] memory actualSigners, uint8 actualThreshold) =
       s_sigQuorumVerifier.getSignatureConfig(SOURCE_CHAIN_SELECTOR);
@@ -62,8 +62,8 @@ contract SignatureQuorumValidator_getSignatureConfig is SignatureValidatorSetup 
     address[] memory singleSigner = new address[](1);
     singleSigner[0] = makeAddr("soloSigner");
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, singleSigner, 1);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, singleSigner, 1);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     (address[] memory signers, uint8 threshold) = s_sigQuorumVerifier.getSignatureConfig(SOURCE_CHAIN_SELECTOR);
 
@@ -78,8 +78,8 @@ contract SignatureQuorumValidator_getSignatureConfig is SignatureValidatorSetup 
       largeSignerSet[i] = makeAddr(string(abi.encodePacked("signer", i)));
     }
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, largeSignerSet, 7);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, largeSignerSet, 7);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     (address[] memory signers, uint8 threshold) = s_sigQuorumVerifier.getSignatureConfig(SOURCE_CHAIN_SELECTOR);
 
@@ -97,8 +97,8 @@ contract SignatureQuorumValidator_getSignatureConfig is SignatureValidatorSetup 
     firstSigners[0] = makeAddr("first1");
     firstSigners[1] = makeAddr("first2");
 
-    SignatureQuorumValidator.SignersUpdate[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, firstSigners, 1);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    SignatureQuorumValidator.SignatureConfig[] memory updates = _createUpdate(SOURCE_CHAIN_SELECTOR, firstSigners, 1);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     (address[] memory signers1, uint8 threshold1) = s_sigQuorumVerifier.getSignatureConfig(SOURCE_CHAIN_SELECTOR);
     assertEq(signers1.length, 2);
@@ -111,7 +111,7 @@ contract SignatureQuorumValidator_getSignatureConfig is SignatureValidatorSetup 
     secondSigners[2] = makeAddr("second3");
 
     updates = _createUpdate(SOURCE_CHAIN_SELECTOR, secondSigners, 3);
-    s_sigQuorumVerifier.applySignersUpdates(new uint64[](0), updates);
+    s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 
     (address[] memory signers2, uint8 threshold2) = s_sigQuorumVerifier.getSignatureConfig(SOURCE_CHAIN_SELECTOR);
     assertEq(signers2.length, 3);
