@@ -164,7 +164,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     assertEq(actualArgs.length, expectedArgs.length, "CCV args arrays have different lengths");
     assertEq(actualAddresses.length, actualArgs.length, "CCV addresses and args have different lengths");
 
-    for (uint256 i = 0; i < actualAddresses.length; i++) {
+    for (uint256 i = 0; i < actualAddresses.length; ++i) {
       assertEq(
         actualAddresses[i], expectedAddresses[i], string.concat("CCV address mismatch at index ", vm.toString(i))
       );

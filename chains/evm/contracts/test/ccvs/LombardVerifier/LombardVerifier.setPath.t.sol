@@ -23,7 +23,7 @@ contract LombardVerifier_setPath is LombardVerifierSetup {
     // Verify chain is added to supported chains.
     uint64[] memory supportedChains = s_lombardVerifier.getSupportedChains();
     bool found = false;
-    for (uint256 i = 0; i < supportedChains.length; i++) {
+    for (uint256 i = 0; i < supportedChains.length; ++i) {
       if (supportedChains[i] == NEW_CHAIN_SELECTOR) {
         found = true;
         break;

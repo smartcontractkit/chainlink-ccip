@@ -73,11 +73,11 @@ contract RMNRemoteSetup is BaseTest {
       s_signatures.pop();
     }
 
-    for (uint256 i = 0; i < numUpdates; i++) {
+    for (uint256 i = 0; i < numUpdates; ++i) {
       s_merkleRoots.push(_generateRandomDestLaneUpdate());
     }
 
-    for (uint256 i = 0; i < numSigs; i++) {
+    for (uint256 i = 0; i < numSigs; ++i) {
       s_signatures.push(_signDestLaneUpdate(s_merkleRoots, s_signerWallets[i]));
     }
   }
@@ -131,9 +131,9 @@ contract RMNRemoteSetup is BaseTest {
     Vm.Wallet[] storage wallets
   ) private {
     bool swapped;
-    for (uint256 i = 1; i < wallets.length; i++) {
+    for (uint256 i = 1; i < wallets.length; ++i) {
       swapped = false;
-      for (uint256 j = 0; j < wallets.length - i; j++) {
+      for (uint256 j = 0; j < wallets.length - i; ++j) {
         Vm.Wallet memory next = wallets[j + 1];
         Vm.Wallet memory actual = wallets[j];
         if (next.addr < actual.addr) {

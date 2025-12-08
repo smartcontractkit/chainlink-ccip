@@ -94,6 +94,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     if (message.tokenTransfer.length == 0) {
       revert MustTransferTokens();
     }
+
+    // Casting is safe because we know the message sender must be an EVM address.
+    _assertSenderIsAllowed(message.destChainSelector, address(bytes20(message.sender)));
     return _callDepositOnBridge(message.tokenTransfer[0], message.destChainSelector, message.sender, messageId);
   }
 
@@ -190,15 +193,16 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
     for (uint256 i = 0; i < tokensToAdd.length; ++i) {
       SupportedTokenArgs memory tokenToAdd = tokensToAdd[i];
-      if (s_supportedTokens.set(tokenToAdd.localToken, tokenToAdd.localAdapter)) {
-        address entityToApprove =
-          tokenToAdd.localAdapter != address(0) ? tokenToAdd.localAdapter : tokenToAdd.localToken;
+      // No-op if the token is already supported.
+      s_supportedTokens.set(tokenToAdd.localToken, tokenToAdd.localAdapter);
 
-        // Either the token or the adapter needs to be approved for bridge spend.
-        IERC20Metadata(entityToApprove).approve(address(i_bridge), type(uint256).max);
+      address entityToApprove = tokenToAdd.localAdapter != address(0) ? tokenToAdd.localAdapter : tokenToAdd.localToken;
 
-        emit SupportedTokenAdded(tokenToAdd.localToken, tokenToAdd.localAdapter);
-      }
+      // Either the token or the adapter needs to be approved for bridge spend. Cannot use safeApprove due to potential
+      // existing non-zero allowance.
+      IERC20Metadata(entityToApprove).approve(address(i_bridge), type(uint256).max);
+
+      emit SupportedTokenAdded(tokenToAdd.localToken, tokenToAdd.localAdapter);
     }
   }
 
