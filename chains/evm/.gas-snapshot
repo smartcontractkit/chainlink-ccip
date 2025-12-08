@@ -12,7 +12,7 @@ AdvancedPoolHooks_setThresholdAmount:test_setThresholdAmount_ToZero() (gas: 1425
 BaseVerifier_applyAllowlistUpdates:test_applyAllowlistUpdates() (gas: 91998)
 BaseVerifier_applyAllowlistUpdates:test_applyAllowlistUpdates_DisableAllowlist() (gas: 96068)
 BaseVerifier_applyAllowlistUpdates:test_applyAllowlistUpdates_RemoveSenders() (gas: 118072)
-BaseVerifier_applyDestChainConfigUpdates:test_applyDestChainConfigUpdates() (gas: 45501)
+BaseVerifier_applyDestChainConfigUpdates:test_applyDestChainConfigUpdates() (gas: 45523)
 BaseVerifier_assertSenderIsAllowed:test_assertSenderIsAllowed() (gas: 18143)
 BaseVerifier_assertSenderIsAllowed:test_assertSenderIsAllowed_AllowlistEnabledWithAllowedSender() (gas: 104766)
 BaseVerifier_getDestChainConfig:test_getDestChainConfig() (gas: 17267)
