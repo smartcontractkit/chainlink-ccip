@@ -34,7 +34,7 @@ contract CCTPTokenMessengerProxy is AuthorizedCallers, ITypeAndVersion, ITokenMe
     i_usdcToken = usdcToken;
 
     // Approve the TokenMessenger to burn the USDC token on behalf of this contract.
-    // The USDC token pool will be responsible for forwarding USDC it receives from the router to this contract.
+    // The CCTP verifier is responsible for forwarding the USDC it receives from the USDC token pool to this contract.
     i_usdcToken.safeIncreaseAllowance(address(tokenMessenger), type(uint256).max);
   }
 

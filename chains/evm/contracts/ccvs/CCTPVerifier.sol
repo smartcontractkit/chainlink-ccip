@@ -259,6 +259,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       if (maxFee > type(uint32).max) revert MaxFeeExceedsUint32(maxFee);
     }
 
+    // Transfer the USDC to the token messenger proxy, which will call the TokenMessenger contract.
+    // We use a proxy so that our CCTP message sender is static, even if we upgrade the verifier contract.
+    i_usdcToken.safeTransfer(address(i_tokenMessengerProxy), tokenTransfer.amount);
+
     i_tokenMessengerProxy.depositForBurnWithHook(
       tokenTransfer.amount,
       domain.domainIdentifier,
