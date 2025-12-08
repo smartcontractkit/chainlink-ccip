@@ -5,6 +5,7 @@ import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IBridgeV2} from "../interfaces/lombard/IBridgeV2.sol";
 import {IMailbox} from "../interfaces/lombard/IMailbox.sol";
 
+import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
@@ -27,19 +28,20 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error InvalidMessageId(bytes32 messageMessageId, bytes32 bridgeMessageId);
   error InvalidReceiver(bytes);
   error InvalidMessageVersion(uint8 expected, uint8 actual);
+  error InvalidCCVVersion(bytes4 expected, bytes4 actual);
   error TokenNotSupported(address token);
   error MustTransferTokens();
 
-  /// @param remoteChainSelector CCIP selector of destination chain
-  /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion
-  /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message
+  /// @param remoteChainSelector CCIP selector of destination chain.
+  /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
+  /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message.
   event PathSet(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
-  /// @param remoteChainSelector CCIP selector of destination chain
-  /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion
-  /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message
+  /// @param remoteChainSelector CCIP selector of destination chain.
+  /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
+  /// @param allowedCaller The address that's allowed to call the bridge on the destination chain.
   event PathRemoved(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
   event SupportedTokenRemoved(address token);
-  event SupportedTokenAdded(address localToken, address localAdapter);
+  event SupportedTokenSet(address localToken, address localAdapter);
 
   struct Path {
     /// @notice The address that's allowed to call the bridge on the destination chain.
@@ -56,6 +58,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   }
 
   string public constant typeAndVersion = "LombardVerifier 1.7.0-dev";
+  /// @notice Version tag used in the verifier payload to indicate the version of this verifier.
+  bytes4 private constant VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
 
   /// @notice Supported bridge message version.
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 1;
@@ -133,10 +137,10 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       token: sourceToken,
       sender: address(bytes20(sender)),
       // Left pad receiver to 32 bytes if not already 32 bytes.
-      recipient: bytes32(uint256(bytes32(tokenTransfer.tokenReceiver)) >> (256 - tokenTransfer.tokenReceiver.length * 8)),
+      recipient: Internal._leftPadBytesToBytes32(tokenTransfer.tokenReceiver),
       amount: tokenTransfer.amount,
       destinationCaller: path.allowedCaller,
-      optionalMessage: abi.encode(messageId)
+      optionalMessage: bytes.concat(VERSION_TAG_V1_7_0, messageId)
     });
 
     return abi.encode(payloadHash);
@@ -152,10 +156,21 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     if (!executed) {
       revert ExecutionError();
     }
-    if (bridgedMessage.length != 32) {
-      revert InvalidMessageLength(32, bridgedMessage.length);
+    // The bridged message is expected to be the version tag and message id.
+    if (bridgedMessage.length != 36) {
+      revert InvalidMessageLength(36, bridgedMessage.length);
     }
-    bytes32 returnedMessageId = bytes32(bridgedMessage);
+    bytes4 version;
+    bytes32 returnedMessageId;
+    assembly {
+      // Load version from first 4 bytes.
+      version := mload(add(bridgedMessage, 0x20))
+      // Load messageId from bytes 4-36.
+      returnedMessageId := mload(add(bridgedMessage, 0x24))
+    }
+    if (version != VERSION_TAG_V1_7_0) {
+      revert InvalidCCVVersion(VERSION_TAG_V1_7_0, version);
+    }
     if (returnedMessageId != messageId) {
       revert InvalidMessageId(messageId, returnedMessageId);
     }
@@ -178,10 +193,10 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @notice Update the supported tokens for cross-chain transfers. When adding a token, it approves the bridge to
   /// spend an unlimited amount of the token. When removing a token, it resets the bridge's allowance to zero.
   /// @param tokensToRemove Array of token addresses to remove from supported tokens.
-  /// @param tokensToAdd Array of token addresses to add to supported tokens.
+  /// @param tokensToSet Array of token addresses to set to supported tokens.
   function updateSupportedTokens(
     address[] calldata tokensToRemove,
-    SupportedTokenArgs[] calldata tokensToAdd
+    SupportedTokenArgs[] calldata tokensToSet
   ) external onlyOwner {
     for (uint256 i = 0; i < tokensToRemove.length; ++i) {
       address tokenToRemove = tokensToRemove[i];
@@ -191,8 +206,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       }
     }
 
-    for (uint256 i = 0; i < tokensToAdd.length; ++i) {
-      SupportedTokenArgs memory tokenToAdd = tokensToAdd[i];
+    for (uint256 i = 0; i < tokensToSet.length; ++i) {
+      SupportedTokenArgs memory tokenToAdd = tokensToSet[i];
       // No-op if the token is already supported.
       s_supportedTokens.set(tokenToAdd.localToken, tokenToAdd.localAdapter);
 
@@ -202,7 +217,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       // existing non-zero allowance.
       IERC20Metadata(entityToApprove).approve(address(i_bridge), type(uint256).max);
 
-      emit SupportedTokenAdded(tokenToAdd.localToken, tokenToAdd.localAdapter);
+      emit SupportedTokenSet(tokenToAdd.localToken, tokenToAdd.localAdapter);
     }
   }
 

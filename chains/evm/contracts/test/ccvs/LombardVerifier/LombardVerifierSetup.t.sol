@@ -46,8 +46,10 @@ contract MockLombardBridge is IBridgeV2 {
 }
 
 contract MockLombardMailbox is IMailbox {
+  bytes4 public constant VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
+
   bool public s_shouldSucceed = true;
-  bytes internal s_optionalMessage = abi.encode(bytes32(0));
+  bytes internal s_optionalMessage = abi.encodePacked(VERSION_TAG_V1_7_0, bytes32(0));
 
   function setMessageId(
     bytes calldata optionalMessage
@@ -131,7 +133,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      sequenceNumber: 1,
+      messageNumber: 1,
       executionGasLimit: GAS_LIMIT * 2,
       ccipReceiveGasLimit: GAS_LIMIT,
       finality: 0,

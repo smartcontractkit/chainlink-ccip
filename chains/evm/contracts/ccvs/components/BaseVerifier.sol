@@ -26,27 +26,27 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error RemoteChainNotSupported(uint64 remoteChainSelector);
 
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
-  event RemoteChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
+  event RemoteChainConfigSet(uint64 indexed remoteChainSelector, address router, bool allowlistEnabled);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
   event StorageLocationUpdated(string oldLocation, string newLocation);
 
   struct RemoteChainConfig {
-    IRouter router; // ──────────╮ Local router to use for messages going to this dest chain.
-    uint16 feeUSDCents; //       │ The fee in US dollar cents for messages to this dest chain. [0, $655.35]
-    uint32 gasForVerification; //│ The gas to reserve for verification of messages on the dest chain.
-    uint32 payloadSizeBytes; //  │ The size of the verification payload on the dest chain.
+    IRouter router; // ──────────╮ Local router to use for messages to/fom this chain.
+    uint16 feeUSDCents; //       │ The fee in US dollar cents for messages to this remote chain. [0, $655.35]
+    uint32 gasForVerification; //│ The gas to reserve for verification of messages on the remote chain.
+    uint32 payloadSizeBytes; //  │ The size of the verification payload on the remote chain.
     bool allowlistEnabled; // ───╯ True if the allowlist is enabled.
     EnumerableSet.AddressSet allowedSendersList; // The list of addresses allowed to send messages.
   }
 
   struct RemoteChainConfigArgs {
-    IRouter router; // ────────────╮ Local router to use for messages going to this dest chain.
+    IRouter router; // ────────────╮ Local router to use for messages going to/from this chain.
     uint64 remoteChainSelector; // │ Remote chain selector.
     bool allowlistEnabled; //      │ True if the allowlist is enabled.
-    uint16 feeUSDCents; // ────────╯ The fee in US dollar cents for messages to this dest chain.
-    uint32 gasForVerification; // ─╮ The gas to reserve for verification of messages on the dest chain.
-    uint32 payloadSizeBytes; // ───╯ The size of the verification payload on the dest chain.
+    uint16 feeUSDCents; // ────────╯ The fee in US dollar cents for messages to this remote chain.
+    uint32 gasForVerification; // ─╮ The gas to reserve for verification of messages on the remote chain.
+    uint32 payloadSizeBytes; // ───╯ The size of the verification payload on the remote chain.
   }
 
   /// @dev Struct to hold the allowlist configuration args per dest chain.

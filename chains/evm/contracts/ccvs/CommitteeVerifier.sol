@@ -53,7 +53,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     address senderAddress = address(bytes20(message.sender));
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
-    // TODO: Process msg & return verifier data
     return abi.encodePacked(VERSION_TAG_V1_7_0);
   }
 

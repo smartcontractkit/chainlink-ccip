@@ -5,6 +5,7 @@ import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IMessageTransmitter} from "../pools/USDC/interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "../pools/USDC/interfaces/ITokenMessenger.sol";
 
+import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
@@ -242,8 +243,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     if (domain.mintRecipientOnDest != bytes32(0)) {
       decodedReceiver = domain.mintRecipientOnDest;
     } else {
-      decodedReceiver =
-        bytes32(uint256(bytes32(tokenTransfer.tokenReceiver)) >> (256 - tokenTransfer.tokenReceiver.length * 8));
+      decodedReceiver = Internal._leftPadBytesToBytes32(tokenTransfer.tokenReceiver);
     }
 
     DepositForBurnParams memory params = DepositForBurnParams({

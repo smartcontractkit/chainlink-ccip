@@ -123,7 +123,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec.MessageV1({
       sourceChainSelector: sourceChainSelector,
       destChainSelector: destChainSelector,
-      sequenceNumber: 1,
+      messageNumber: 1,
       executionGasLimit: 400_000,
       ccipReceiveGasLimit: 200_000,
       finality: finality,

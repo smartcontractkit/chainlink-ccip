@@ -16,7 +16,7 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: newToken, localAdapter: localAdapter});
 
     vm.expectEmit();
-    emit LombardVerifier.SupportedTokenAdded(newToken, localAdapter);
+    emit LombardVerifier.SupportedTokenSet(newToken, localAdapter);
 
     s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
 
@@ -37,7 +37,7 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(adapter)});
 
     vm.expectEmit();
-    emit LombardVerifier.SupportedTokenAdded(address(newToken), address(adapter));
+    emit LombardVerifier.SupportedTokenSet(address(newToken), address(adapter));
 
     s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
 

@@ -107,6 +107,19 @@ library Internal {
     }
   }
 
+  /// @notice This method left-pads a byte array to 32 bytes. If the input data is longer than 32 bytes, it will
+  /// revert with an Invalid32ByteAddress error.
+  /// @param data The byte array to left-pad.
+  /// @return The left-padded byte array.
+  function _leftPadBytesToBytes32(
+    bytes memory data
+  ) internal pure returns (bytes32) {
+    if (data.length > 32) {
+      revert Invalid32ByteAddress(data);
+    }
+    return bytes32(uint256(bytes32(data)) >> (256 - data.length * 8));
+  }
+
   /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the address is within the
   /// bounds of [minValue, uint256.max]. If it isn't it will revert with an Invalid32ByteAddress error.
   function _validate32ByteAddress(bytes memory encodedAddress, uint256 minValue) internal pure {

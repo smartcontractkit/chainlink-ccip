@@ -41,7 +41,9 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     vm.expectRevert(
       abi.encodeWithSelector(LombardVerifier.InvalidMessageId.selector, keccak256("messageId"), messageId)
     );
-    s_lombardVerifier.verifyMessage(message, keccak256("messageId"), abi.encode("", ""));
+    s_lombardVerifier.verifyMessage(
+      message, keccak256("messageId"), abi.encode(abi.encodePacked("", bytes32(uint256(0x01))), "")
+    );
   }
 
   function test_verifyMessage_RevertWhen_InvalidMessageLength() public {
@@ -55,7 +57,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     vm.startPrank(s_offRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageLength.selector, 32, shortMessageId.length));
+    vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageLength.selector, 36, shortMessageId.length));
     s_lombardVerifier.verifyMessage(message, messageId, abi.encode("", ""));
   }
 
