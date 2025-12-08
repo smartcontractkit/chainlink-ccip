@@ -20,7 +20,9 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
     assertEq(dynamicConfig.feeAggregator, expectedFeeAggregator);
     assertEq(dynamicConfig.allowlistAdmin, expectedAllowlistAdmin);
 
-    assertEq(committeeVerifier.getStorageLocation(), STORAGE_LOCATION);
+    string[] memory storageLocations = committeeVerifier.getStorageLocation();
+    assertEq(storageLocations.length, 1);
+    assertEq(storageLocations[0], STORAGE_LOCATION);
   }
 
   // Reverts

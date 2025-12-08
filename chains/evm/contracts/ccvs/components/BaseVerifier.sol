@@ -84,8 +84,10 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   }
 
   /// @inheritdoc ICrossChainVerifierV1
-  function getStorageLocation() external view virtual override returns (string memory) {
-    return s_storageLocation;
+  function getStorageLocation() external view virtual override returns (string[] memory) {
+    string[] memory storageLocations = new string[](1);
+    storageLocations[0] = s_storageLocation;
+    return storageLocations;
   }
 
   /// @notice get ChainConfig configured for the DestinationChainSelector.

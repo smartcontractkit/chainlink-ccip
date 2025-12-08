@@ -386,25 +386,25 @@ func (_CommitteeVerifier *CommitteeVerifierCallerSession) GetSignatureConfig(sou
 	return _CommitteeVerifier.Contract.GetSignatureConfig(&_CommitteeVerifier.CallOpts, sourceChainSelector)
 }
 
-func (_CommitteeVerifier *CommitteeVerifierCaller) GetStorageLocation(opts *bind.CallOpts) (string, error) {
+func (_CommitteeVerifier *CommitteeVerifierCaller) GetStorageLocation(opts *bind.CallOpts) ([]string, error) {
 	var out []interface{}
 	err := _CommitteeVerifier.contract.Call(opts, &out, "getStorageLocation")
 
 	if err != nil {
-		return *new(string), err
+		return *new([]string), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+	out0 := *abi.ConvertType(out[0], new([]string)).(*[]string)
 
 	return out0, err
 
 }
 
-func (_CommitteeVerifier *CommitteeVerifierSession) GetStorageLocation() (string, error) {
+func (_CommitteeVerifier *CommitteeVerifierSession) GetStorageLocation() ([]string, error) {
 	return _CommitteeVerifier.Contract.GetStorageLocation(&_CommitteeVerifier.CallOpts)
 }
 
-func (_CommitteeVerifier *CommitteeVerifierCallerSession) GetStorageLocation() (string, error) {
+func (_CommitteeVerifier *CommitteeVerifierCallerSession) GetStorageLocation() ([]string, error) {
 	return _CommitteeVerifier.Contract.GetStorageLocation(&_CommitteeVerifier.CallOpts)
 }
 
@@ -1838,7 +1838,7 @@ type CommitteeVerifierInterface interface {
 
 	GetSignatureConfig(opts *bind.CallOpts, sourceChainSelector uint64) ([]common.Address, uint8, error)
 
-	GetStorageLocation(opts *bind.CallOpts) (string, error)
+	GetStorageLocation(opts *bind.CallOpts) ([]string, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
 

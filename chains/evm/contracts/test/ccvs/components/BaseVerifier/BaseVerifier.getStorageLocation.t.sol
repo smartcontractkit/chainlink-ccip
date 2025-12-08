@@ -5,7 +5,8 @@ import {BaseVerifierSetup} from "./BaseVerifierSetup.t.sol";
 
 contract BaseVerifier_getStorageLocation is BaseVerifierSetup {
   function test_getStorageLocation() public view {
-    string memory storageLocation = s_baseVerifier.getStorageLocation();
-    assertEq(storageLocation, STORAGE_LOCATION);
+    string[] memory storageLocations = s_baseVerifier.getStorageLocation();
+    assertEq(storageLocations.length, 1);
+    assertEq(storageLocations[0], STORAGE_LOCATION);
   }
 }
