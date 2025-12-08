@@ -17,6 +17,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
 
   function test_forwardFromRouter_oldExtraArgs() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
     (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
     _evmMessageToEvent({message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: 1, originalSender: STRANGER});
@@ -32,11 +33,12 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       verifierBlobs: verifierBlobs
     });
 
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
   }
 
   function test_forwardFromRouter_messageNumberPersistsAndIncrements() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
     // Use the stored msgNum as a running expected value.
     OnRamp.DestChainConfig memory destConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
@@ -64,7 +66,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       receipts: receipts,
       verifierBlobs: verifierBlobs
     });
-    bytes32 messageId1 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+    bytes32 messageId1 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
 
     // 2) Expect msgNum to increment again for the next message.
     destConfig.messageNumber++;
@@ -85,7 +87,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       receipts: receipts,
       verifierBlobs: verifierBlobs
     });
-    bytes32 messageId2 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+    bytes32 messageId2 = s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
 
     // Verify message numbers and message id are different.
     assertTrue(messageId1 != messageId2);
@@ -123,5 +125,13 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.CursedByRMN.selector, DEST_CHAIN_SELECTOR));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+  }
+
+  function test_forwardFromRouter_RevertWhen_InsufficientFeeTokenAmount() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InsufficientFeeTokenAmount.selector));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee - 1, STRANGER);
   }
 }

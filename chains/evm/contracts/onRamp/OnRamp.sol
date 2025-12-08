@@ -26,7 +26,6 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
-// TODO post process hooks?
 contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
@@ -48,6 +47,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InvalidDestChainAddress(bytes destChainAddress);
   error CustomBlockConfirmationNotSupportedOnPoolV1();
   error TokenArgsNotSupportedOnPoolV1();
+  error InsufficientFeeTokenAmount();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -256,12 +256,20 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 3. getFee on all verifiers, pool and executor.
 
     CCIPMessageSentEventData memory eventData;
-    // Populate receipts for verifiers, pool (if applicable), executor and network fee in that order.
-    (eventData.receipts, newMessage.executionGasLimit,) =
-      _getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
+    {
+      uint256 computedFeeTokenAmount;
+      // Populate receipts for verifiers, pool (if applicable), executor and network fee in that order.
+      (eventData.receipts, newMessage.executionGasLimit, computedFeeTokenAmount) =
+        _getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
-    // We don't need to check for feeTokenAmount < receiptsFeeTokenAmount here as that is done in getFee called by the router.
-    _distributeFees(message, eventData.receipts);
+      // A CCV could theoretically return different values for getFee on every call. Without this guard, the onRamp
+      // would pay until it ran out of funds, potentially using accrued protocol fees to pay for further calls.
+      if (computedFeeTokenAmount > feeTokenAmount) {
+        revert InsufficientFeeTokenAmount();
+      }
+      // We don't need to check for feeTokenAmount < receiptsFeeTokenAmount here as that is done in getFee called by the router.
+      _distributeFees(message, eventData.receipts);
+    }
 
     // 4. lockOrBurn.
 
