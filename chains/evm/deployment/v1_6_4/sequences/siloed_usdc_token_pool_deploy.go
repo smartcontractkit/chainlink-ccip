@@ -17,13 +17,14 @@ import (
 )
 
 type SiloedUSDCTokenPoolDeploySequenceInput struct {
-	ChainSelector uint64
-	Token         common.Address
-	Allowlist     []common.Address
-	RMNProxy      common.Address
-	Router        common.Address
-	LockBox       common.Address
-	MCMSAddress   common.Address
+	ChainSelector       uint64
+	Token               common.Address
+	Allowlist           []common.Address
+	RMNProxy            common.Address
+	Router              common.Address
+	LockBox             common.Address
+	MCMSAddress         common.Address
+	RemoteChainSelector uint64
 }
 
 var SiloedUSDCTokenPoolDeploySequence = operations.NewSequence(

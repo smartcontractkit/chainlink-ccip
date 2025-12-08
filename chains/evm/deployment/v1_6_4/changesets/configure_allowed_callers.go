@@ -1,6 +1,8 @@
 package changesets
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -30,11 +32,11 @@ type ConfigureAllowedCallersPerChainInput struct {
 
 // This changeset is used to configure the allowed callers for a given token in the ERC20Lockbox contract.
 // It is different from the apply_authorized_caller_updates changeset which is used for the USDCTokenPool, SiloedUSDCTokenPool, and USDCTokenPoolCCTPV2 contracts.
-func ConfigureAllowedCallersChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ConfigureAllowedCallersInput] {
-	return cldf.CreateChangeSet(configureAllowedCallersApply(mcmsRegistry), configureAllowedCallersVerify(mcmsRegistry))
+func ConfigureAllowedCallersChangeset() cldf.ChangeSetV2[ConfigureAllowedCallersInput] {
+	return cldf.CreateChangeSet(configureAllowedCallersApply(), configureAllowedCallersVerify())
 }
 
-func configureAllowedCallersApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureAllowedCallersInput) (cldf.ChangesetOutput, error) {
+func configureAllowedCallersApply() func(cldf.Environment, ConfigureAllowedCallersInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input ConfigureAllowedCallersInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
@@ -72,7 +74,7 @@ func configureAllowedCallersApply(mcmsRegistry *changesets.MCMSReaderRegistry) f
 		batchOps = append(batchOps, report.Output.BatchOps...)
 		reports = append(reports, report.ExecutionReports...)
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		return changesets.NewOutputBuilder(e, nil).
 			WithReports(reports).
 			WithBatchOps(batchOps).
 			Build(input.MCMS)
@@ -80,10 +82,19 @@ func configureAllowedCallersApply(mcmsRegistry *changesets.MCMSReaderRegistry) f
 
 }
 
-func configureAllowedCallersVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureAllowedCallersInput) error {
+func configureAllowedCallersVerify() func(cldf.Environment, ConfigureAllowedCallersInput) error {
 	return func(e cldf.Environment, input ConfigureAllowedCallersInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+
+			for _, allowedCaller := range perChainInput.AllowedCallers {
+				if allowedCaller.Caller == (common.Address{}) {
+					return fmt.Errorf("caller address cannot be zero for chain selector %d", perChainInput.ChainSelector)
+				}
+			}
+
 		}
 		return nil
 	}
