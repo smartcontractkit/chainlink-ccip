@@ -77,6 +77,7 @@ type ExecutorParams struct {
 	Version       *semver.Version
 	MaxCCVsPerMsg uint8
 	DynamicConfig executor.SetDynamicConfigArgs
+	Qualifier     string
 }
 
 type ContractParams struct {
@@ -85,7 +86,7 @@ type ContractParams struct {
 	CommitteeVerifiers []CommitteeVerifierParams
 	OnRamp             OnRampParams
 	FeeQuoter          FeeQuoterParams
-	Executor           ExecutorParams
+	Executors          []ExecutorParams
 	MockReceivers      []MockReceiverParams
 }
 
@@ -304,32 +305,40 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			committeeVerifierBatchOps = append(committeeVerifierBatchOps, report.Output.BatchOps...)
 		}
 
-		// Deploy Executor
-		executorRef, err := contract_utils.MaybeDeployContract(b, executor.Deploy, chain, contract.DeployInput[executor.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(executor.ContractType, *input.ContractParams.Executor.Version),
-			ChainSelector:  chain.Selector,
-			Args: executor.ConstructorArgs{
-				MaxCCVsPerMsg: input.ContractParams.Executor.MaxCCVsPerMsg,
-				DynamicConfig: input.ContractParams.Executor.DynamicConfig,
-			},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Executor: %w", err)
-		}
-		addresses = append(addresses, executorRef)
+		// Deploy Executors
+		for _, executorParam := range input.ContractParams.Executors {
+			var qualifierPtr *string
+			if executorParam.Qualifier != "" {
+				qualifierPtr = &executorParam.Qualifier
+			}
+			executorRef, err := contract_utils.MaybeDeployContract(b, executor.Deploy, chain, contract.DeployInput[executor.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(executor.ContractType, *executorParam.Version),
+				ChainSelector:  chain.Selector,
+				Args: executor.ConstructorArgs{
+					MaxCCVsPerMsg: executorParam.MaxCCVsPerMsg,
+					DynamicConfig: executorParam.DynamicConfig,
+				},
+				Qualifier: qualifierPtr,
+			}, input.ExistingAddresses)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Executor: %w, params: %+v", err, executorParam)
+			}
+			addresses = append(addresses, executorRef)
 
-		// Deploy ExecutorProxy
-		executorProxyRef, err := contract_utils.MaybeDeployContract(b, executor.DeployProxy, chain, contract.DeployInput[executor.ProxyConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(executor.ProxyType, *semver.MustParse("1.7.0")),
-			ChainSelector:  chain.Selector,
-			Args: executor.ProxyConstructorArgs{
-				ExecutorAddress: common.HexToAddress(executorRef.Address),
-			},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ExecutorProxy: %w", err)
+			// Deploy ExecutorProxy
+			executorProxyRef, err := contract_utils.MaybeDeployContract(b, executor.DeployProxy, chain, contract.DeployInput[executor.ProxyConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(executor.ProxyType, *semver.MustParse("1.7.0")),
+				ChainSelector:  chain.Selector,
+				Args: executor.ProxyConstructorArgs{
+					ExecutorAddress: common.HexToAddress(executorRef.Address),
+				},
+				Qualifier: qualifierPtr,
+			}, input.ExistingAddresses)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ExecutorProxy: %w", err)
+			}
+			addresses = append(addresses, executorProxyRef)
 		}
-		addresses = append(addresses, executorProxyRef)
 
 		for _, mockReceiverParams := range input.ContractParams.MockReceivers {
 			requiredVerifiers, optionalVerifiers, err := getMockReceiverVerifiers(mockReceiverParams, addresses, input.ExistingAddresses)
