@@ -31,8 +31,7 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
-    vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
+    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
@@ -51,7 +50,6 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
   }
 
   function test_validateLockOrBurn_WithFastFinality_ConsumesAfterFee() public {
-    uint16 minBlockConfirmation = 5;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
@@ -63,7 +61,9 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
     });
 
     vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0));
+    // Enable custom block confirmation handling so consumption emits.
+    s_tokenPool.setMinBlockConfirmation(1);
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -136,9 +136,7 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
 
   function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmation() public {
     uint16 minBlockConfirmation = 5;
-    vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
-
+    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectRevert(
