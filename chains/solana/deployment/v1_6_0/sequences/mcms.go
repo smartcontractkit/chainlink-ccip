@@ -273,7 +273,11 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 }
 
 // assume refs are in the order returned by GetAllMCMS
-func transferAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.TransferOwnershipPerChainInput) (sequences.OnChainOutput, error) {
+func transferAllMCMS(
+	b operations.Bundle, 
+	chain cldf_solana.Chain, 
+	in deployops.TransferOwnershipPerChainInput,
+	transferAccessController bool) (sequences.OnChainOutput, error) {
 	var output sequences.OnChainOutput
 	deps := mcmsops.Deps{
 		Chain:             chain,
@@ -283,7 +287,7 @@ func transferAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.
 		CurrentOwner: solana.MustPublicKeyFromBase58(in.CurrentOwner),
 		NewOwner:     solana.MustPublicKeyFromBase58(in.ProposedOwner),
 	}
-	ownableRefs := getRefsAsOwnable(in.ContractRef)
+	ownableRefs := getRefsAsOwnable(in.ContractRef, transferAccessController)
 	for _, contractRef := range ownableRefs {
 		opIn.Contract = contractRef
 		report, err := operations.ExecuteOperation(b, mcmsops.TransferOwnershipOp, deps, opIn)
@@ -297,7 +301,7 @@ func transferAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.
 }
 
 // assume refs are in the order returned by GetAllMCMS
-func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.TransferOwnershipPerChainInput) (sequences.OnChainOutput, error) {
+func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.TransferOwnershipPerChainInput, transferAccessController bool) (sequences.OnChainOutput, error) {
 	var output sequences.OnChainOutput
 	deps := mcmsops.Deps{
 		Chain:             chain,
@@ -307,7 +311,7 @@ func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.Tr
 		CurrentOwner: solana.MustPublicKeyFromBase58(in.CurrentOwner),
 		NewOwner:     solana.MustPublicKeyFromBase58(in.ProposedOwner),
 	}
-	ownableRefs := getRefsAsOwnable(in.ContractRef)
+	ownableRefs := getRefsAsOwnable(in.ContractRef, transferAccessController)
 	for _, contractRef := range ownableRefs {
 		opIn.Contract = contractRef
 		report, err := operations.ExecuteOperation(b, mcmsops.AcceptOwnershipOp, deps, opIn)
@@ -320,6 +324,54 @@ func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.Tr
 }
 
 func getRefsAsOwnable(
+	refs []cldf_datastore.AddressRef,
+	transferAccessController bool) []mcmsops.OwnableContract {
+	if transferAccessController {
+		return getRefsAsOwnableWithAccessController(refs)
+	}
+	return getRefsAsOwnableWithoutAccessController(refs)
+}
+
+func getRefsAsOwnableWithoutAccessController(
+	refs []cldf_datastore.AddressRef) []mcmsops.OwnableContract {
+	timelockProgram := refs[0]
+	timelockID, timelockSeed, _ := mcms_solana.ParseContractAddress(timelockProgram.Address)
+	proposerMCMSAccount := refs[1]
+	cancellerMCMSAccount := refs[2]
+	bypasserMCMSAccount := refs[3]
+	mcmID, proposerSeed, _ := mcms_solana.ParseContractAddress(proposerMCMSAccount.Address)
+	_, cancellerSeed, _ := mcms_solana.ParseContractAddress(cancellerMCMSAccount.Address)
+	_, bypasserSeed, _ := mcms_solana.ParseContractAddress(bypasserMCMSAccount.Address)
+
+	return []mcmsops.OwnableContract{
+		{
+			ProgramID: mcmID,
+			Seed:      proposerSeed,
+			OwnerPDA:  state.GetMCMConfigPDA(mcmID, state.PDASeed([]byte(proposerSeed[:]))),
+			Type:      common_utils.ProposerManyChainMultisig,
+		},
+		{
+			ProgramID: mcmID,
+			Seed:      cancellerSeed,
+			OwnerPDA:  state.GetMCMConfigPDA(mcmID, state.PDASeed([]byte(cancellerSeed[:]))),
+			Type:      common_utils.CancellerManyChainMultisig,
+		},
+		{
+			ProgramID: mcmID,
+			Seed:      bypasserSeed,
+			OwnerPDA:  state.GetMCMConfigPDA(mcmID, state.PDASeed([]byte(bypasserSeed[:]))),
+			Type:      common_utils.BypasserManyChainMultisig,
+		},
+		{
+			ProgramID: timelockID,
+			Seed:      timelockSeed,
+			OwnerPDA:  state.GetTimelockConfigPDA(timelockID, state.PDASeed([]byte(timelockSeed[:]))),
+			Type:      common_utils.RBACTimelock,
+		},
+	}
+}
+
+func getRefsAsOwnableWithAccessController(
 	refs []cldf_datastore.AddressRef) []mcmsops.OwnableContract {
 	accessControllerProgram := refs[0]
 	proposerAccount := refs[1]

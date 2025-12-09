@@ -200,7 +200,14 @@ func (a *SolanaAdapter) SequenceTransferOwnershipViaMCMS() *cldf_ops.Sequence[de
 					output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
 				// assume access controller will have all MCMS refs
 				case utils.AccessControllerProgramType.String():
-					report, err := transferAllMCMS(b, chain, in)
+					report, err := transferAllMCMS(b, chain, in, true)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
+					}
+					output.BatchOps = append(output.BatchOps, report.BatchOps...)
+				// assume rbac timelock will not have all MCMS refs
+				case common_utils.RBACTimelock.String():
+					report, err := transferAllMCMS(b, chain, in, false)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
 					}
@@ -280,7 +287,14 @@ func (a *SolanaAdapter) SequenceAcceptOwnership() *cldf_ops.Sequence[deployops.T
 					output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
 				// assume access controller will have all MCMS refs
 				case utils.AccessControllerProgramType.String():
-					report, err := acceptAllMCMS(b, chain, in)
+					report, err := acceptAllMCMS(b, chain, in, true)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
+					}
+					output.BatchOps = append(output.BatchOps, report.BatchOps...)
+				// assume rbac timelock will not have all MCMS refs
+				case common_utils.RBACTimelock.String():
+					report, err := acceptAllMCMS(b, chain, in, false)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
 					}
