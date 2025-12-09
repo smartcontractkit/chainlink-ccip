@@ -16,8 +16,13 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   error InvalidVerifierResults();
   error InvalidCCVVersion(bytes4 verifierVersion);
   error OnlyCallableByOwnerOrAllowlistAdmin();
+  error StorageLocationAdminCannotBeZero();
+  error MustBeProposedStorageLocationAdmin();
+  error OnlyCallableByStorageLocationAdmin();
 
   event ConfigSet(DynamicConfig dynamicConfig);
+  event StorageLocationAdminTransferRequested(address indexed from, address indexed to);
+  event StorageLocationAdminTransferred(address indexed from, address indexed to);
 
   /// @dev Defines upgradeable configuration parameters.
   struct DynamicConfig {
@@ -37,8 +42,12 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   // DYNAMIC CONFIG
   DynamicConfig private s_dynamicConfig;
 
+  address private s_storageLocationAdmin;
+  address private s_pendingStorageLocationAdmin;
+
   constructor(DynamicConfig memory dynamicConfig, string memory storageLocation) BaseVerifier(storageLocation) {
     _setDynamicConfig(dynamicConfig);
+    s_storageLocationAdmin = msg.sender;
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -146,11 +155,52 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     _applyAllowlistUpdates(allowlistConfigArgsItems);
   }
 
+  /// @notice Returns the account currently authorized to manage the storage location.
+  /// @return storageLocationAdmin The active storage location admin.
+  function getStorageLocationAdmin() external view returns (address) {
+    return s_storageLocationAdmin;
+  }
+
+  /// @notice Returns the account that has been nominated as the next storage location admin.
+  /// @return pendingStorageLocationAdmin The address that must call acceptStorageLocationAdmin.
+  function getPendingStorageLocationAdmin() external view returns (address) {
+    return s_pendingStorageLocationAdmin;
+  }
+
+  /// @notice Initiates the two-step transfer for the storage location admin role.
+  /// @param to The address proposed to become the next admin.
+  function transferStorageLocationAdmin(
+    address to
+  ) external {
+    address currentAdmin = s_storageLocationAdmin;
+    if (msg.sender != currentAdmin) revert OnlyCallableByStorageLocationAdmin();
+    if (to == msg.sender) revert CannotTransferToSelf();
+
+    s_pendingStorageLocationAdmin = to;
+
+    emit StorageLocationAdminTransferRequested(currentAdmin, to);
+  }
+
+  /// @notice Completes the transfer of the storage location admin role.
+  /// @dev Only the nominated pending admin can call this function.
+  function acceptStorageLocationAdmin() external {
+    if (msg.sender != s_pendingStorageLocationAdmin) revert MustBeProposedStorageLocationAdmin();
+
+    address oldAdmin = s_storageLocationAdmin;
+    s_storageLocationAdmin = msg.sender;
+    s_pendingStorageLocationAdmin = address(0);
+
+    emit StorageLocationAdminTransferred(oldAdmin, msg.sender);
+  }
+
   /// @notice Updates the storage location identifier.
+  /// @dev Caller must be the storage location admin.
   /// @param newLocation The new storage location identifier.
   function updateStorageLocation(
     string memory newLocation
-  ) external onlyOwner {
+  ) external {
+    if (msg.sender != s_storageLocationAdmin) revert OnlyCallableByStorageLocationAdmin();
+
     _setStorageLocation(newLocation);
   }
 
