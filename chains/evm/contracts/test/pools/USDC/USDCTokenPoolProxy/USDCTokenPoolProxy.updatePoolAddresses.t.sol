@@ -2,14 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV1} from "../../../../interfaces/IPool.sol";
+import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
+
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
-
-import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   address internal s_newCctpV1Pool = makeAddr("newCctpV1Pool");
   address internal s_newCctpV2Pool = makeAddr("newCctpV2Pool");
+  address internal s_newCctpV2PoolWithCCV = makeAddr("newCctpV2PoolWithCCV");
   address internal s_newLockReleasePool = makeAddr("newLockReleasePool");
 
   // Test successful pool address updates by owner
@@ -18,12 +19,14 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: s_newCctpV2Pool
+      cctpV2Pool: s_newCctpV2Pool,
+      cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV
     });
 
     _enableERC165InterfaceChecks(s_newCctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_newCctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_legacyCctpV1Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_newCctpV2PoolWithCCV, type(IPoolV2).interfaceId);
 
     // Act: Update pool addresses as owner
     changePrank(OWNER);
@@ -42,7 +45,8 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: address(0),
       cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: address(0)
+      cctpV2Pool: address(0),
+      cctpV2PoolWithCCV: address(0)
     });
 
     changePrank(OWNER);
@@ -61,7 +65,8 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: address(0),
       cctpV1Pool: address(0),
-      cctpV2Pool: s_newCctpV2Pool
+      cctpV2Pool: s_newCctpV2Pool,
+      cctpV2PoolWithCCV: address(0)
     });
 
     changePrank(OWNER);
@@ -76,16 +81,36 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     assertEq(s_usdcTokenPoolProxy.getPools().cctpV2Pool, s_newCctpV2Pool);
   }
 
+  function test_updatePoolAddresses_RevertWhen_CCTPV2PoolWithCCVDoesNotSupportIPoolV2() public {
+    USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
+      legacyCctpV1Pool: address(0),
+      cctpV1Pool: address(0),
+      cctpV2Pool: address(0),
+      cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV
+    });
+
+    changePrank(OWNER);
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV2PoolWithCCV));
+    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+
+    _enableERC165InterfaceChecks(s_newCctpV2PoolWithCCV, type(IPoolV2).interfaceId);
+
+    changePrank(OWNER);
+    s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
+  }
+
   function test_updatePoolAddresses_RevertWhen_LegacyPoolDoesNotSupportIPoolV1() public {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: s_newCctpV2Pool
+      cctpV2Pool: s_newCctpV2Pool,
+      cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV
     });
 
     // Enable the V1 and V2 pools to support the IPoolV1 interface
     _enableERC165InterfaceChecks(s_newCctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_newCctpV2Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_newCctpV2PoolWithCCV, type(IPoolV2).interfaceId);
 
     // Should revert because the legacy pool does not support the IPoolV1 interface even though the V1 and V2 pools do
     changePrank(OWNER);
@@ -106,17 +131,5 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     s_usdcTokenPoolProxy.updatePoolAddresses(newPools);
 
     assertEq(s_usdcTokenPoolProxy.getPools().legacyCctpV1Pool, s_legacyCctpV1Pool);
-  }
-
-  function _enableERC165InterfaceChecks(address pool, bytes4 interfaceId) internal {
-    vm.mockCall(
-      address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
-    );
-
-    vm.mockCall(
-      address(pool),
-      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
-      abi.encode(true)
-    );
   }
 }
