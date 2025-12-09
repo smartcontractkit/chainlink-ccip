@@ -97,7 +97,7 @@ contract BaseVerifier_setStorageLocations is BaseVerifierSetup {
 
   function _expectStorageLocationEvent(string[] memory oldLocations, string[] memory newLocations) internal {
     vm.expectEmit(address(s_baseVerifier));
-    emit BaseVerifier.StorageLocationUpdated(oldLocations, newLocations);
+    emit BaseVerifier.StorageLocationsUpdated(oldLocations, newLocations);
   }
 
   function _empty() internal pure returns (string[] memory arr) {
