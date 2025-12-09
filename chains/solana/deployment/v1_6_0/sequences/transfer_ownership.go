@@ -225,11 +225,7 @@ func (a *SolanaAdapter) ShouldAcceptOwnershipWithTransferOwnership(e deployment.
 	if !ok {
 		return false, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
 	}
-	// Only accept ownership if the proposed owner is either the timelock or the deployer
-	if solana.MustPublicKeyFromBase58(in.ProposedOwner) != a.timelockAddr[in.ChainSelector] && solana.MustPublicKeyFromBase58(in.ProposedOwner) != chain.DeployerKey.PublicKey() {
-		return false, nil
-	}
-	return true, nil
+	return solana.MustPublicKeyFromBase58(in.CurrentOwner) == chain.DeployerKey.PublicKey(), nil
 }
 
 func (a *SolanaAdapter) SequenceAcceptOwnership() *cldf_ops.Sequence[deployops.TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
