@@ -55,6 +55,7 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 
 			accessControllerAddress := solana.MustPublicKeyFromBase58(accessControllerRef.Output.Address)
 			mcmAddress := solana.MustPublicKeyFromBase58(mcmRef.Output.Address)
+			timelockAddress := solana.MustPublicKeyFromBase58(timelockRef.Output.Address)
 
 			deps := mcmsops.Deps{
 				Chain:             chain,
@@ -77,6 +78,15 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 			output.Addresses = append(output.Addresses, initMcmRef.NewAddresses...)
 			output.BatchOps = append(output.BatchOps, initMcmRef.BatchOps...)
 			deps.ExistingAddresses = append(deps.ExistingAddresses, initMcmRef.NewAddresses...)
+
+			// Assume access Controller and MCM have already been initialized
+			initTimelockRef, err := initTimelock(b, deps, in.TimelockMinDelay, timelockAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize Timelock: %w", err)
+			}
+			output.Addresses = append(output.Addresses, initTimelockRef.NewAddresses...)
+			output.BatchOps = append(output.BatchOps, initTimelockRef.BatchOps...)
+			deps.ExistingAddresses = append(deps.ExistingAddresses, initTimelockRef.NewAddresses...)
 
 			return output, err
 		},
@@ -101,31 +111,14 @@ func (d *SolanaAdapter) FinalizeDeployMCMS() *operations.Sequence[ccipapi.MCMSDe
 				common_utils.Version_1_6_0,
 				"",
 			)
-			timelockProgram := datastore.GetAddressRef(
-				in.ExistingAddresses,
-				chain.ChainSelector(),
-				utils.TimelockProgramType,
-				common_utils.Version_1_6_0,
-				"",
-			)
 
 			mcmAddress := solana.MustPublicKeyFromBase58(mcmProgram.Address)
-			timelockAddress := solana.MustPublicKeyFromBase58(timelockProgram.Address)
 
 			deps := mcmsops.Deps{
 				Chain:             chain,
 				ExistingAddresses: in.ExistingAddresses,
 				Qualifier:         *in.Qualifier,
 			}
-
-			// Assume access Controller and MCM have already been initialized
-			initTimelockRef, err := initTimelock(b, deps, in.TimelockMinDelay, timelockAddress)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize Timelock: %w", err)
-			}
-			output.Addresses = append(output.Addresses, initTimelockRef.NewAddresses...)
-			output.BatchOps = append(output.BatchOps, initTimelockRef.BatchOps...)
-			deps.ExistingAddresses = append(deps.ExistingAddresses, initTimelockRef.NewAddresses...)
 
 			// roles
 			setupRolesOutput, err := setupRoles(b, deps, mcmAddress)
