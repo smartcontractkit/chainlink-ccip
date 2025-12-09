@@ -146,3 +146,13 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			return output, nil
 		})
 }
+
+func (d *EVMDeployer) FinalizeDeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"finalize-deploy-mcms",
+		semver.MustParse("1.0.0"),
+		"On EVM, finalizing MCM deployment is a no-op",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in ccipapi.MCMSDeploymentConfigPerChainWithAddress) (output sequtil.OnChainOutput, err error) {
+			return output, nil
+		})
+}

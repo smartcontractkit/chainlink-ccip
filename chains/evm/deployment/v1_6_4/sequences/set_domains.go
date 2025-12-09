@@ -15,8 +15,8 @@ import (
 )
 
 type SetDomainsSequenceInput struct {
-	AddressesByChain map[uint64]common.Address
-	DomainsByChain   map[uint64][]usdc_token_pool_ops.DomainUpdate
+	AddressesByChain map[uint64][]common.Address
+	DomainsByChain   map[uint64]map[common.Address][]usdc_token_pool_ops.DomainUpdate
 }
 
 var (
@@ -28,26 +28,30 @@ var (
 
 			writes := make([]contract.WriteOutput, 0)
 
-			// Iterate over each chain selector in the input
-			for chainSel, domains := range input.DomainsByChain {
-
+			// Iterate over each chain selector in AddressesByChain
+			for chainSelector, addresses := range input.AddressesByChain {
 				// Get the chain object based on the chain selector
-				chain, ok := chains.EVMChains()[chainSel]
+				chain, ok := chains.EVMChains()[chainSelector]
 				if !ok {
-					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSel)
+					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
 				}
 
-				// Execute the operation USDCTokenPoolSetDomains, on "chain", with the input being an array of
-				// DomainUpdate structs, with the first and only item being the domains for the given chain selector
-				report, err := operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolSetDomains, chain, contract.FunctionInput[[]usdc_token_pool_ops.DomainUpdate]{
-					ChainSelector: chain.Selector,
-					Address:       input.AddressesByChain[chainSel],
-					Args:          domains,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute USDCTokenPoolSetDomainsOp on %s: %w", chain, err)
+				// Iterate over each address for this chain selector
+				for _, address := range addresses {
+					// Get the domains for this specific address
+					domainUpdates := input.DomainsByChain[chainSelector][address]
+
+					// Execute the operation USDCTokenPoolSetDomains for this address
+					report, err := operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolSetDomains, chain, contract.FunctionInput[[]usdc_token_pool_ops.DomainUpdate]{
+						ChainSelector: chain.Selector,
+						Address:       address,
+						Args:          domainUpdates,
+					})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to execute USDCTokenPoolSetDomainsOp on %s: %w", chain, err)
+					}
+					writes = append(writes, report.Output)
 				}
-				writes = append(writes, report.Output)
 			}
 			batch, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {

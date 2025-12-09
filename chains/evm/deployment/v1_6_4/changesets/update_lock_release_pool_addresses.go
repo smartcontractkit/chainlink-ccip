@@ -1,6 +1,9 @@
 package changesets
 
 import (
+	"fmt"
+	"slices"
+
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -30,11 +33,11 @@ type UpdateLockReleasePoolAddressesPerChainInput struct {
 // This changeset is used to update the lock release pools for a given token in the USDCTokenPoolProxy contract.
 // On a given source chain, there will be different SiloedUSDCTokenPool contracts for each destination chain.
 // This changeset is used to update the lock release pool addresses for a given source chain and an associated destination chain.
-func UpdateLockReleasePoolAddressesChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateLockReleasePoolAddressesInput] {
-	return cldf.CreateChangeSet(updateLockReleasePoolAddressesApply(mcmsRegistry), updateLockReleasePoolAddressesVerify(mcmsRegistry))
+func UpdateLockReleasePoolAddressesChangeset() cldf.ChangeSetV2[UpdateLockReleasePoolAddressesInput] {
+	return cldf.CreateChangeSet(updateLockReleasePoolAddressesApply(), updateLockReleasePoolAddressesVerify())
 }
 
-func updateLockReleasePoolAddressesApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateLockReleasePoolAddressesInput) (cldf.ChangesetOutput, error) {
+func updateLockReleasePoolAddressesApply() func(cldf.Environment, UpdateLockReleasePoolAddressesInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input UpdateLockReleasePoolAddressesInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
@@ -66,17 +69,29 @@ func updateLockReleasePoolAddressesApply(mcmsRegistry *changesets.MCMSReaderRegi
 		batchOps = append(batchOps, report.Output.BatchOps...)
 		reports = append(reports, report.ExecutionReports...)
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		return changesets.NewOutputBuilder(e, nil).
 			WithReports(reports).
 			WithBatchOps(batchOps).
 			Build(input.MCMS)
 	}
 }
 
-func updateLockReleasePoolAddressesVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateLockReleasePoolAddressesInput) error {
+func updateLockReleasePoolAddressesVerify() func(cldf.Environment, UpdateLockReleasePoolAddressesInput) error {
 	return func(e cldf.Environment, input UpdateLockReleasePoolAddressesInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
+		for _, perChainInput := range input.ChainInputs {
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+
+			// Check that the number of lock release pool addresses is the same as the number of remote chain selectors
+			if len(perChainInput.LockReleasePoolAddrs.LockReleasePools) != len(perChainInput.LockReleasePoolAddrs.RemoteChainSelectors) {
+				return fmt.Errorf("lock release pool addresses and remote chain selectors must be the same length for chain selector %d", perChainInput.ChainSelector)
+			}
+
+			// Check that the lock release pool addresses are not zero addresses for any of the chain selectors
+			if slices.Contains(perChainInput.LockReleasePoolAddrs.LockReleasePools, common.Address{}) {
+				return fmt.Errorf("lock release pool address cannot be zero for chain selector %d", perChainInput.ChainSelector)
+			}
 		}
 		return nil
 	}

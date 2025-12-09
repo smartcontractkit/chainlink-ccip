@@ -43,6 +43,7 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 	dReg := mcmsapi.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	cs := mcmsapi.DeployMCMS(dReg, nil)
+	fcs := mcmsapi.FinalizeDeployMCMS(dReg, nil)
 	for _, qualifier := range qualifiers {
 		output, err := cs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
 			AdapterVersion: version,
@@ -61,6 +62,23 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 		require.Greater(t, len(output.Reports), 0)
 		require.NoError(t, output.DataStore.Merge(e.DataStore))
 		e.DataStore = output.DataStore.Seal()
+		finalizeOutput, err := fcs.Apply(*e, mcmsapi.MCMSDeploymentConfig{
+			AdapterVersion: version,
+			Chains: map[uint64]mcmsapi.MCMSDeploymentConfigPerChain{
+				selector: {
+					Canceller:        testhelpers.SingleGroupMCMS(),
+					Bypasser:         testhelpers.SingleGroupMCMS(),
+					Proposer:         testhelpers.SingleGroupMCMS(),
+					TimelockMinDelay: big.NewInt(0),
+					Qualifier:        ptr.String(qualifier),
+					TimelockAdmin:    timelockAdmin,
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Greater(t, len(finalizeOutput.Reports), 0)
+		require.NoError(t, finalizeOutput.DataStore.Merge(e.DataStore))
+		e.DataStore = finalizeOutput.DataStore.Seal()
 	}
 }
 

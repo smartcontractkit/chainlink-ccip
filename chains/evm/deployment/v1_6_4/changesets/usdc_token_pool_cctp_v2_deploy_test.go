@@ -29,8 +29,6 @@ import (
 	cctp_message_transmitter_proxy_binding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	factory_burn_mint_erc20 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
 	mcms_types "github.com/smartcontractkit/mcms/types"
-
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 )
 
 func TestUSDCTokenPoolCCTPV2DeployChangeset_ProvidedTokenAddress(t *testing.T) {
@@ -158,12 +156,7 @@ func TestUSDCTokenPoolCCTPV2DeployChangeset_ProvidedTokenAddress(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
-
-	deployChangeset := changesets.USDCTokenPoolCCTPV2DeployChangeset(mcmsRegistry)
+	deployChangeset := changesets.DeployUSDCTokenPoolCCTPV2Changeset()
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "USDCTokenPoolCCTPV2DeployChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)
@@ -352,12 +345,7 @@ func TestUSDCTokenPoolCCTPV2DeployChangeset_StoredTokenAddress(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
-
-	deployChangeset := changesets.USDCTokenPoolCCTPV2DeployChangeset(mcmsRegistry)
+	deployChangeset := changesets.DeployUSDCTokenPoolCCTPV2Changeset()
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "USDCTokenPoolCCTPV2DeployChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)
@@ -546,12 +534,10 @@ func TestUSDCTokenPoolCCTPV2DeployChangeset_InvalidTokenAddress(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
+	deployChangeset := changesets.DeployUSDCTokenPoolCCTPV2Changeset()
+	validate := deployChangeset.VerifyPreconditions(*e, deployInput)
+	require.NoError(t, validate, "Failed to validate USDCTokenPoolCCTPV2DeployChangeset")
 
-	deployChangeset := changesets.USDCTokenPoolCCTPV2DeployChangeset(mcmsRegistry)
 	deployChangesetOutput, err := deployChangeset.Apply(*e, deployInput)
 	require.NoError(t, err, "USDCTokenPoolCCTPV2DeployChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)
