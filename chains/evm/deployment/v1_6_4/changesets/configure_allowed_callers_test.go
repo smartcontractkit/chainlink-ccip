@@ -15,12 +15,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
 	token_admin_registry_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -102,6 +100,7 @@ func TestConfigureAllowedCallersSequence(t *testing.T) {
 		Type:          datastore.ContractType(erc20_lock_box.ContractType),
 		Version:       semver.MustParse("1.6.4"),
 		ChainSelector: chainSelector,
+		Qualifier:     "IOwnable",
 		Address:       erc20LockBoxRef.Address,
 	}))
 	e.DataStore = ds.Seal()
@@ -124,15 +123,12 @@ func TestConfigureAllowedCallersSequence(t *testing.T) {
 	_, err = evmChain.Confirm(setPoolTx)
 	require.NoError(t, err, "Failed to confirm set token pool transaction")
 
-	// Execute ConfigureAllowedCallers changeset
-	mcmsRegistry := changesets_utils.GetRegistry()
-
 	// Configure the input to the changeset for configure the allowed callers
 	configureAllowedCallersInput := changesets.ConfigureAllowedCallersInput{
 		ChainInputs: []changesets.ConfigureAllowedCallersPerChainInput{
 			{
 				ChainSelector: chainSelector,
-				Address:       common.HexToAddress(erc20LockBoxRef.Address),
+				Qualifier:     "IOwnable",
 				AllowedCallers: []erc20_lock_box.AllowedCallerConfigArgs{
 					{
 						Token:   tokenAddress,
@@ -143,16 +139,15 @@ func TestConfigureAllowedCallersSequence(t *testing.T) {
 			},
 		},
 		MCMS: mcms.Input{
-			OverridePreviousRoot: false,
-			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
-			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
-			Description:          "Configure allowed callers on ERC20LockBox",
+			Qualifier: "test",
 		},
 	}
 
-	configureAllowedCallersChangeset := changesets.ConfigureAllowedCallersChangeset(mcmsRegistry)
+	configureAllowedCallersChangeset := changesets.ConfigureAllowedCallersChangeset()
+
+	validate := configureAllowedCallersChangeset.VerifyPreconditions(*e, configureAllowedCallersInput)
+	require.NoError(t, validate, "Failed to validate ConfigureAllowedCallersChangeset")
+
 	output, err := configureAllowedCallersChangeset.Apply(*e, configureAllowedCallersInput)
 	require.NoError(t, err, "ConfigureAllowedCallersChangeset should not error")
 	require.Greater(t, len(output.Reports), 0)

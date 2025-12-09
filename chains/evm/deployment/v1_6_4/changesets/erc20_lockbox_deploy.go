@@ -3,39 +3,51 @@ package changesets
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+
+	token_admin_registry "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 )
 
+// The MCMS input is not used anywhere in this changeset, but is included here to ensure parity with other changesets
+// in this package, and to better support the outputBuilder pattern as part of the Apply() function.
 type ERC20LockboxDeployInput struct {
 	ChainInputs []ERC20LockboxDeployInputPerChain
 	MCMS        mcms.Input
 }
 
 type ERC20LockboxDeployInputPerChain struct {
-	ChainSelector      uint64
-	TokenAdminRegistry common.Address
+	ChainSelector uint64
 }
 
-func ERC20LockboxDeployChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ERC20LockboxDeployInput] {
-	return cldf.CreateChangeSet(erc20LockboxDeployApply(mcmsRegistry), erc20LockboxDeployVerify(mcmsRegistry))
+func DeployERC20LockboxChangeset() cldf.ChangeSetV2[ERC20LockboxDeployInput] {
+	return cldf.CreateChangeSet(deployERC20LockboxApply(), deployERC20LockboxVerify())
 }
 
-func erc20LockboxDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ERC20LockboxDeployInput) (cldf.ChangesetOutput, error) {
+func deployERC20LockboxApply() func(cldf.Environment, ERC20LockboxDeployInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input ERC20LockboxDeployInput) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
 		ds := datastore.NewMemoryDataStore()
 
 		for _, perChainInput := range input.ChainInputs {
+			tokenAdminRegistryAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				Type:    datastore.ContractType(token_admin_registry.ContractType),
+				Version: token_admin_registry.Version,
+			}, perChainInput.ChainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+
 			sequenceInput := sequences.ERC20LockboxDeploySequenceInput{
 				ChainSelector:      perChainInput.ChainSelector,
-				TokenAdminRegistry: perChainInput.TokenAdminRegistry,
+				TokenAdminRegistry: tokenAdminRegistryAddress,
 			}
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.ERC20LockboxDeploySequence, e.BlockChains, sequenceInput)
 			if err != nil {
@@ -48,6 +60,7 @@ func erc20LockboxDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(c
 				}
 			}
 		}
+
 		return changesets.NewOutputBuilder(e, nil).
 			WithReports(reports).
 			WithDataStore(ds).
@@ -55,8 +68,17 @@ func erc20LockboxDeployApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(c
 	}
 }
 
-func erc20LockboxDeployVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ERC20LockboxDeployInput) error {
+func deployERC20LockboxVerify() func(cldf.Environment, ERC20LockboxDeployInput) error {
 	return func(e cldf.Environment, input ERC20LockboxDeployInput) error {
+		for _, perChainInput := range input.ChainInputs {
+			if perChainInput.ChainSelector == 0 {
+				return fmt.Errorf("chain selector must be provided for each chain input")
+			}
+
+			if exists := e.BlockChains.Exists(perChainInput.ChainSelector); !exists {
+				return fmt.Errorf("chain with selector %d does not exist", perChainInput.ChainSelector)
+			}
+		}
 		return nil
 	}
 }

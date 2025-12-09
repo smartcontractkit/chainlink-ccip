@@ -22,10 +22,6 @@ import (
 
 	changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
 	usdc_token_pool_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/usdc_token_pool_proxy"
-	mcms "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 )
 
 func TestUpdateLockOrBurnMechanismChangeset(t *testing.T) {
@@ -79,31 +75,32 @@ func TestUpdateLockOrBurnMechanismChangeset(t *testing.T) {
 		},
 	}, nil)
 
-	require.NoError(t, err, "Failed to deploy ERC20LockBox")
+	// Add the USDCTokenPoolProxy address to the datastore so that it can be used in the changeset
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(usdc_token_pool_proxy.ContractType),
+		Version:       semver.MustParse("1.6.4"),
+		Address:       common.HexToAddress(usdc_token_pool_proxy_ref.Address).Hex(),
+		ChainSelector: chainSelector,
+	})
+	require.NoError(t, err, "Failed to add USDCTokenPoolProxy address to datastore")
+	e.DataStore = ds.Seal()
 
 	updateLockOrBurnMechanismInput := changesets.UpdateLockOrBurnMechanismInput{
 		ChainInputs: []changesets.UpdateLockOrBurnMechanismPerChainInput{
 			{
 				ChainSelector: chainSelector,
-				Address:       common.HexToAddress(usdc_token_pool_proxy_ref.Address),
 				Mechanisms: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
 					RemoteChainSelectors: []uint64{chainSelector},
 					Mechanisms:           []uint8{1},
 				},
 			},
 		},
-		MCMS: mcms.Input{
-			OverridePreviousRoot: false,
-			ValidUntil:           3759765795,
-			TimelockDelay:        mcms_types.MustParseDuration("0s"),
-			TimelockAction:       mcms_types.TimelockActionSchedule,
-			Qualifier:            "test",
-			Description:          "Update lock or burn mechanism",
-		},
 	}
 
-	mcmsRegistry := changesets_utils.GetRegistry()
-	updateLockOrBurnMechanismChangeset := changesets.UpdateLockOrBurnMechanismChangeset(mcmsRegistry)
+	updateLockOrBurnMechanismChangeset := changesets.UpdateLockOrBurnMechanismChangeset()
+	validate := updateLockOrBurnMechanismChangeset.VerifyPreconditions(*e, updateLockOrBurnMechanismInput)
+	require.NoError(t, validate, "Failed to validate UpdateLockOrBurnMechanismChangeset")
+
 	output, err := updateLockOrBurnMechanismChangeset.Apply(*e, updateLockOrBurnMechanismInput)
 	require.NoError(t, err, "UpdateLockOrBurnMechanismChangeset should not error")
 	require.Greater(t, len(output.Reports), 0)

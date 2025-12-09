@@ -44,21 +44,6 @@ func createCircleMessageWithID(uniqueID byte, status string) CCTPv2Message {
 	}
 }
 
-// Helper to create a test observer with mock client (uses mock from observer_test.go)
-func createObserverForIntegrationTest(
-	t *testing.T,
-	poolConfig map[cciptypes.ChainSelector]string,
-	mockClient *mockCCTPv2HTTPClient,
-) *CCTPv2TokenDataObserver {
-	// Create observer with mock HTTP client
-	observer := newTestCCTPv2Observer(t, mockClient, cciptypes.ChainSelector(1))
-
-	// Set pool configuration directly
-	observer.supportedPoolsBySelector = poolConfig
-
-	return observer
-}
-
 func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 	const (
 		testChain1   = cciptypes.ChainSelector(1)
@@ -136,11 +121,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 	successTokenData1Att3 := exectypes.NewSuccessTokenData(expectedData1Att3)
 
 	tests := []struct {
-		name       string
-		messages   exectypes.MessageObservations
-		poolConfig map[cciptypes.ChainSelector]string
-		setupMock  func(*mockCCTPv2HTTPClient)
-		validate   func(*testing.T, exectypes.TokenDataObservations, *mockCCTPv2HTTPClient)
+		name      string
+		messages  exectypes.MessageObservations
+		setupMock func(*mockCCTPv2HTTPClient)
+		validate  func(*testing.T, exectypes.TokenDataObservations, *mockCCTPv2HTTPClient)
 	}{
 		// ============================================================
 		// BASIC HAPPY PATH SCENARIOS
@@ -150,11 +134,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -180,13 +163,12 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash2Hex),
+						createCCTPv2Token(100, hash3Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -214,21 +196,17 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 					11: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
+						createCCTPv2Token(100, hash2Hex),
 					}),
 				},
 				testChain2: {
 					20: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 200, hash3Hex),
+						createCCTPv2Token(200, hash3Hex),
 					}),
 				},
-			},
-			poolConfig: map[cciptypes.ChainSelector]string{
-				testChain1: testPoolAddr,
-				testChain2: testPoolAddr,
 			},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
@@ -268,12 +246,11 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex), // Same hash!
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex), // Same hash!
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -298,13 +275,12 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -331,14 +307,13 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -365,15 +340,14 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 					11: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -408,13 +382,12 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash2Hex),
+						createCCTPv2Token(100, hash3Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -439,13 +412,12 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash2Hex),
+						createCCTPv2Token(100, hash3Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -472,52 +444,19 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		// MIXED TOKEN SUPPORT SCENARIOS
 		// ============================================================
 		{
-			name: "Mix of supported and unsupported tokens (wrong pool)",
-			messages: exectypes.MessageObservations{
-				testChain1: {
-					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token("0xBAD0000000000000000000000000000000000000", 100, hash2Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
-					}),
-				},
-			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
-			setupMock: func(m *mockCCTPv2HTTPClient) {
-				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
-					Messages: []CCTPv2Message{
-						msg1,
-						msg3,
-					},
-				})
-			},
-			validate: func(t *testing.T, result exectypes.TokenDataObservations, m *mockCCTPv2HTTPClient) {
-				tokenData := result[testChain1][10].TokenData
-				require.Len(t, tokenData, 3)
-
-				// Token 0 - supported and found
-				assert.Equal(t, successTokenData1, tokenData[0])
-				// Token 1 - not supported (wrong pool)
-				assert.Equal(t, notSupportedTokenData, tokenData[1])
-				// Token 2 - supported and found
-				assert.Equal(t, successTokenData3, tokenData[2])
-			},
-		},
-		{
 			name: "Mix of supported and unsupported tokens (invalid ExtraData)",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 						{
-							SourcePoolAddress: mustDecodeAddress(testPoolAddr),
+							SourcePoolAddress: testPoolAddress,
 							ExtraData:         cciptypes.Bytes{0x01, 0x02}, // Invalid - too short
 						},
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
+						createCCTPv2Token(100, hash2Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -543,12 +482,17 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token("0x0000000000000000000000000000000000000000", 100, hash1Hex),
-						createCCTPv2Token("0x0000000000000000000000000000000000000000", 100, hash2Hex),
+						{
+							SourcePoolAddress: testPoolAddress,
+							ExtraData:         cciptypes.Bytes{0x01, 0x02}, // Invalid ExtraData
+						},
+						{
+							SourcePoolAddress: testPoolAddress,
+							ExtraData:         cciptypes.Bytes{0x03, 0x04}, // Invalid ExtraData
+						},
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				// No responses needed - no API calls should be made
 			},
@@ -565,42 +509,18 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			},
 		},
 		{
-			name: "Supported token but not configured for that chain",
-			messages: exectypes.MessageObservations{
-				testChain2: {
-					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-					}),
-				},
-			},
-			poolConfig: map[cciptypes.ChainSelector]string{
-				testChain1: testPoolAddr, // Only chain1 configured, not chain2
-			},
-			setupMock: func(m *mockCCTPv2HTTPClient) {
-				// No setup needed
-			},
-			validate: func(t *testing.T, result exectypes.TokenDataObservations, m *mockCCTPv2HTTPClient) {
-				tokenData := result[testChain2][10].TokenData
-				require.Len(t, tokenData, 1)
-
-				assert.Equal(t, notSupportedTokenData, tokenData[0])
-				assert.Equal(t, 0, m.getCallCount())
-			},
-		},
-		{
 			name: "Empty ExtraData",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
 						{
-							SourcePoolAddress: mustDecodeAddress(testPoolAddr),
+							SourcePoolAddress: testPoolAddress,
 							ExtraData:         cciptypes.Bytes{},
 						},
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
-			setupMock:  func(m *mockCCTPv2HTTPClient) {},
+			setupMock: func(m *mockCCTPv2HTTPClient) {},
 			validate: func(t *testing.T, result exectypes.TokenDataObservations, m *mockCCTPv2HTTPClient) {
 				tokenData := result[testChain1][10].TokenData
 				require.Len(t, tokenData, 1)
@@ -618,11 +538,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addError(testChain1, 100, testTxHash1, fmt.Errorf("network timeout"))
 			},
@@ -639,18 +558,14 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
+						createCCTPv2Token(100, hash2Hex),
 					}),
 				},
 				testChain2: {
 					20: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 200, hash3Hex),
+						createCCTPv2Token(200, hash3Hex),
 					}),
 				},
-			},
-			poolConfig: map[cciptypes.ChainSelector]string{
-				testChain1: testPoolAddr,
-				testChain2: testPoolAddr,
 			},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addError(testChain2, 200, testTxHash2, fmt.Errorf("api error"))
@@ -672,11 +587,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				// Create a pending version of msg1 (same deposit hash but pending status)
 				pendingMsg1 := msg1
@@ -698,11 +612,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{}, // Empty
@@ -719,12 +632,11 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage("", []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
-			setupMock:  func(m *mockCCTPv2HTTPClient) {},
+			setupMock: func(m *mockCCTPv2HTTPClient) {},
 			validate: func(t *testing.T, result exectypes.TokenDataObservations, m *mockCCTPv2HTTPClient) {
 				tokenData := result[testChain1][10].TokenData
 				require.Len(t, tokenData, 1)
@@ -738,14 +650,13 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage("", []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 					11: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
+						createCCTPv2Token(100, hash2Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -767,11 +678,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				// Create message with invalid DecodedMessage that will fail deposit hash calc
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
@@ -801,12 +711,11 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 200, hash2Hex), // Different domain
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(200, hash2Hex), // Different domain
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				// Two separate API calls - different source domains
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
@@ -836,10 +745,9 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 		// EMPTY/NIL INPUT SCENARIOS
 		// ============================================================
 		{
-			name:       "Empty MessageObservations",
-			messages:   exectypes.MessageObservations{},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
-			setupMock:  func(m *mockCCTPv2HTTPClient) {},
+			name:      "Empty MessageObservations",
+			messages:  exectypes.MessageObservations{},
+			setupMock: func(m *mockCCTPv2HTTPClient) {},
 			validate: func(t *testing.T, result exectypes.TokenDataObservations, m *mockCCTPv2HTTPClient) {
 				assert.Empty(t, result)
 				assert.Equal(t, 0, m.getCallCount())
@@ -852,8 +760,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
-			setupMock:  func(m *mockCCTPv2HTTPClient) {},
+			setupMock: func(m *mockCCTPv2HTTPClient) {},
 			validate: func(t *testing.T, result exectypes.TokenDataObservations, m *mockCCTPv2HTTPClient) {
 				require.Contains(t, result, testChain1)
 				require.Contains(t, result[testChain1], cciptypes.SeqNum(10))
@@ -867,30 +774,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
-			setupMock:  func(m *mockCCTPv2HTTPClient) {},
+			setupMock: func(m *mockCCTPv2HTTPClient) {},
 			validate: func(t *testing.T, result exectypes.TokenDataObservations, m *mockCCTPv2HTTPClient) {
 				require.Contains(t, result, testChain1)
 				assert.Empty(t, result[testChain1])
-				assert.Equal(t, 0, m.getCallCount())
-			},
-		},
-		{
-			name: "Empty pool configuration",
-			messages: exectypes.MessageObservations{
-				testChain1: {
-					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-					}),
-				},
-			},
-			poolConfig: map[cciptypes.ChainSelector]string{}, // Empty
-			setupMock:  func(m *mockCCTPv2HTTPClient) {},
-			validate: func(t *testing.T, result exectypes.TokenDataObservations, m *mockCCTPv2HTTPClient) {
-				tokenData := result[testChain1][10].TokenData
-				require.Len(t, tokenData, 1)
-				// Token not supported (no pool configured)
-				assert.Equal(t, notSupportedTokenData, tokenData[0])
 				assert.Equal(t, 0, m.getCallCount())
 			},
 		},
@@ -906,8 +793,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 					},
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
-			setupMock:  func(m *mockCCTPv2HTTPClient) {},
+			setupMock: func(m *mockCCTPv2HTTPClient) {},
 			validate: func(t *testing.T, result exectypes.TokenDataObservations, m *mockCCTPv2HTTPClient) {
 				tokenData := result[testChain1][10].TokenData
 				assert.Empty(t, tokenData)
@@ -923,13 +809,12 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				// Create three different attestations for the same message (same deposit hash)
 				// to test FIFO consumption
@@ -958,17 +843,16 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 					11: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
+						createCCTPv2Token(100, hash2Hex),
 					}),
 					12: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
+						createCCTPv2Token(100, hash3Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -992,14 +876,13 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 					11: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex), // Same hash, different tx
+						createCCTPv2Token(100, hash1Hex), // Same hash, different tx
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				// Only provide data for first txHash
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
@@ -1023,15 +906,14 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex), // Duplicate hash1
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex), // Duplicate hash2
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash2Hex),
+						createCCTPv2Token(100, hash1Hex), // Duplicate hash1
+						createCCTPv2Token(100, hash3Hex),
+						createCCTPv2Token(100, hash2Hex), // Duplicate hash2
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -1066,22 +948,21 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash2Hex),
 					}),
 					20: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
+						createCCTPv2Token(100, hash3Hex),
 					}),
 				},
 				testChain2: {
 					30: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token("0x0000000000000000000000000000000000000000", 100, hash1Hex),
+						{
+							SourcePoolAddress: testPoolAddress,
+							ExtraData:         cciptypes.Bytes{0x01, 0x02}, // Invalid ExtraData
+						},
 					}),
 				},
-			},
-			poolConfig: map[cciptypes.ChainSelector]string{
-				testChain1: testPoolAddr,
-				testChain2: testPoolAddr,
 			},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
@@ -1122,17 +1003,16 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					1: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 					100: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
+						createCCTPv2Token(100, hash2Hex),
 					}),
 					9999: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
+						createCCTPv2Token(100, hash3Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -1156,17 +1036,19 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 					11: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
-						createCCTPv2Token("0x0000000000000000000000000000000000000000", 100, hash1Hex),
+						createCCTPv2Token(100, hash2Hex),
+						createCCTPv2Token(100, hash3Hex),
+						{
+							SourcePoolAddress: testPoolAddress,
+							ExtraData:         cciptypes.Bytes{0x01, 0x02}, // Invalid ExtraData
+						},
 					}),
 					12: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -1194,22 +1076,18 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash2Hex),
 					}),
 					11: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
+						createCCTPv2Token(100, hash3Hex),
 					}),
 				},
 				testChain2: {
 					20: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 200, hash1Hex),
+						createCCTPv2Token(200, hash1Hex),
 					}),
 				},
-			},
-			poolConfig: map[cciptypes.ChainSelector]string{
-				testChain1: testPoolAddr,
-				testChain2: testPoolAddr,
 			},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
@@ -1244,17 +1122,19 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex), // Will succeed
+						createCCTPv2Token(100, hash1Hex), // Will succeed
 					}),
 					11: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex), // Will fail (API error)
+						createCCTPv2Token(100, hash2Hex), // Will fail (API error)
 					}),
 					12: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token("0x0000000000000000000000000000000000000000", 100, hash3Hex), // Unsupported
+						{
+							SourcePoolAddress: testPoolAddress,
+							ExtraData:         cciptypes.Bytes{0x01, 0x02}, // Unsupported (invalid ExtraData)
+						},
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -1278,20 +1158,22 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
 						// Ready + Supported
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						// Not supported (wrong pool)
-						createCCTPv2Token("0x0000000000000000000000000000000000000000", 100, hash2Hex),
-						// Supported but data missing
-						createCCTPv2Token(testPoolAddr, 100, hash3Hex),
-						// Not supported (invalid ExtraData)
+						createCCTPv2Token(100, hash1Hex),
+						// Not supported (invalid ExtraData - too short)
 						{
-							SourcePoolAddress: mustDecodeAddress(testPoolAddr),
+							SourcePoolAddress: testPoolAddress,
+							ExtraData:         cciptypes.Bytes{0x01, 0x02},
+						},
+						// Supported but data missing
+						createCCTPv2Token(100, hash3Hex),
+						// Not supported (invalid ExtraData - different invalid format)
+						{
+							SourcePoolAddress: testPoolAddress,
 							ExtraData:         cciptypes.Bytes{0x01},
 						},
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -1307,7 +1189,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 				// Token 0: Ready and Supported
 				assert.Equal(t, successTokenData1, tokenData[0])
 
-				// Token 1: Not Supported (wrong pool)
+				// Token 1: Not Supported (invalid ExtraData)
 				assert.Equal(t, notSupportedTokenData, tokenData[1])
 
 				// Token 2: Supported but data missing
@@ -1322,22 +1204,18 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					100: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex), // Duplicate - same tx
+						createCCTPv2Token(100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex), // Duplicate - same tx
 					}),
 					101: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash2Hex),
+						createCCTPv2Token(100, hash2Hex),
 					}),
 				},
 				testChain2: {
 					200: createTestMessage(testTxHash3, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 200, hash3Hex),
+						createCCTPv2Token(200, hash3Hex),
 					}),
 				},
-			},
-			poolConfig: map[cciptypes.ChainSelector]string{
-				testChain1: testPoolAddr,
-				testChain2: testPoolAddr,
 			},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
@@ -1384,11 +1262,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				m.addResponse(testChain1, 100, testTxHash1, CCTPv2Messages{
 					Messages: []CCTPv2Message{
@@ -1407,11 +1284,10 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, hash1Hex),
+						createCCTPv2Token(100, hash1Hex),
 					}),
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			setupMock: func(m *mockCCTPv2HTTPClient) {
 				// Return error from HTTP client
 				m.addError(testChain1, 100, testTxHash1, fmt.Errorf("catastrophic failure"))
@@ -1430,7 +1306,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 			mockClient := newMockCCTPv2HTTPClient()
 			tt.setupMock(mockClient)
 
-			observer := createObserverForIntegrationTest(t, tt.poolConfig, mockClient)
+			observer := newTestCCTPv2Observer(t, mockClient, testChain1)
 
 			result, err := observer.Observe(context.Background(), tt.messages)
 			require.NoError(t, err)

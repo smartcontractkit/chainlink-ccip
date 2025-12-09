@@ -88,6 +88,10 @@ var (
 		Name: "ccip_commit_latest_round_id",
 		Help: "The latest round ID observed by the commit plugin",
 	}, []string{"source_network_name", "dest_network_name", "contract_address", "plugin"})
+	promLooppCCIPProviderSupported = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ccip_commit_loopp_ccip_provider_supported",
+		Help: "Tracks whether LOOPP CCIP provider is supported for each chain family (1 = supported, 0 = not supported)",
+	}, []string{"chain_family"})
 )
 
 type PromReporter struct {
@@ -104,12 +108,14 @@ type PromReporter struct {
 	processorErrors           *prometheus.CounterVec
 	commitLatestRound         *prometheus.GaugeVec
 	sequenceNumbers           *prometheus.GaugeVec
+	looppProviderSupported    *prometheus.GaugeVec
 	// Beholder components
 	bhProcessorLatencyHistogram metric.Int64Histogram
 	bhProcessorOutputCounter    metric.Int64Counter
 	bhProcessorErrors           metric.Int64Counter
 	bhSequenceNumbers           metric.Int64Gauge
 	bhCommitLatestRound         metric.Int64Gauge
+	bhLooppProviderSupported    metric.Int64Gauge
 }
 
 func NewPromReporter(
@@ -139,6 +145,10 @@ func NewPromReporter(
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_latest_round_id gauge: %w", err)
 	}
+	looppProviderSupported, err := bhClient.Meter.Int64Gauge("ccip_commit_loopp_ccip_provider_supported")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_loopp_ccip_provider_supported gauge: %w", err)
+	}
 
 	return &PromReporter{
 		lggr:        lggr,
@@ -149,8 +159,9 @@ func NewPromReporter(
 		merkleProcessorRmnReportHistogram: promMerkleProcessorRmnReportLatency,
 		rmnControllerRmnRequestHistogram:  promRmnControllerRmnRequestLatency,
 
-		sequenceNumbers:   promSequenceNumbers,
-		commitLatestRound: promCommitLatestRoundID,
+		sequenceNumbers:        promSequenceNumbers,
+		commitLatestRound:      promCommitLatestRoundID,
+		looppProviderSupported: promLooppCCIPProviderSupported,
 
 		processorLatencyHistogram: promProcessorLatencyHistogram,
 		processorOutputCounter:    promProcessorOutputCounter,
@@ -161,6 +172,7 @@ func NewPromReporter(
 		bhProcessorErrors:           processorErrors,
 		bhSequenceNumbers:           sequenceNumbers,
 		bhCommitLatestRound:         commitLatestRoundID,
+		bhLooppProviderSupported:    looppProviderSupported,
 	}, nil
 }
 
@@ -312,6 +324,19 @@ func (p *PromReporter) TrackProcessorOutput(
 			attribute.String("processor", processor),
 			attribute.String("method", method),
 			attribute.String("type", key),
+		))
+	}
+}
+
+func (p *PromReporter) TrackLooppProviderSupported(looppCCIPProviderSupported map[string]bool) {
+	for chainFamily, supported := range looppCCIPProviderSupported {
+		value := float64(0)
+		if supported {
+			value = 1
+		}
+		p.looppProviderSupported.WithLabelValues(chainFamily).Set(value)
+		p.bhLooppProviderSupported.Record(context.Background(), int64(value), metric.WithAttributes(
+			attribute.String("chain_family", chainFamily),
 		))
 	}
 }

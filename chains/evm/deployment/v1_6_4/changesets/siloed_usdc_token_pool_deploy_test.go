@@ -1,6 +1,7 @@
 package changesets_test
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -23,14 +24,15 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	factory_burn_mint_erc20_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
-
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 )
 
 func TestSiloedUSDCTokenPoolDeployChangeset(t *testing.T) {
 	chainSelector := uint64(chain_selectors.TEST_90000001.Selector)
+	remoteChainSelector := uint64(chain_selectors.TEST_90000002.Selector)
 	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+		// Simulate both the local and the remote chain so that the changeset verification passes when it checks
+		// that both chains exist.
+		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
 	)
 	require.NoError(t, err, "Failed to create environment")
 	require.NotNil(t, e, "Environment should be created")
@@ -53,20 +55,49 @@ func TestSiloedUSDCTokenPoolDeployChangeset(t *testing.T) {
 	_, err = evmChain.Confirm(tx)
 	require.NoError(t, err, "Failed to confirm token deployment transaction")
 
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType("USDCToken"),
+		Version:       semver.MustParse("1.0.0"),
+		Address:       tokenAddress.Hex(),
+		ChainSelector: chainSelector,
+	})
+	require.NoError(t, err, "Failed to add USDCToken address to datastore")
+
 	allowlist := []common.Address{common.Address{2}}
 	rmnProxyAddress := common.Address{3}
 	routerAddress := common.Address{4}
 	lockBoxAddress := common.Address{5}
 
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType("ERC20Lockbox"),
+		Version:       semver.MustParse("1.6.4"),
+		Address:       lockBoxAddress.Hex(),
+		Qualifier:     "IOwnable",
+		ChainSelector: chainSelector,
+	})
+
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType("Router"),
+		Version:       semver.MustParse("1.2.0"),
+		Address:       routerAddress.Hex(),
+		ChainSelector: chainSelector,
+	})
+	require.NoError(t, err, "Failed to add router address to datastore")
+
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType("RMN"),
+		Version:       semver.MustParse("1.5.0"),
+		Address:       rmnProxyAddress.Hex(),
+		ChainSelector: chainSelector,
+	})
+	require.NoError(t, err, "Failed to add RMN proxy address to datastore")
+
 	changesetInput := changesets.SiloedUSDCTokenPoolDeployInput{
 		ChainInputs: []changesets.SiloedUSDCTokenPoolDeployInputPerChain{
 			{
-				ChainSelector: chainSelector,
-				Token:         tokenAddress,
-				Allowlist:     allowlist,
-				RMNProxy:      rmnProxyAddress,
-				Router:        routerAddress,
-				LockBox:       lockBoxAddress,
+				LocalChainSelector:  chainSelector,
+				RemoteChainSelector: remoteChainSelector,
+				Allowlist:           allowlist,
 			},
 		},
 		MCMS: mcms.Input{
@@ -110,16 +141,17 @@ func TestSiloedUSDCTokenPoolDeployChangeset(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
-	deployChangesetOutput, err := changesets.SiloedUSDCTokenPoolDeployChangeset(mcmsRegistry).Apply(*e, changesetInput)
+	changeset := changesets.DeploySiloedUSDCTokenPoolChangeset()
+	validate := changeset.VerifyPreconditions(*e, changesetInput)
+	require.NoError(t, validate, "Failed to validate SiloedUSDCTokenPoolDeployChangeset")
+
+	deployChangesetOutput, err := changeset.Apply(*e, changesetInput)
 	require.NoError(t, err, "Failed to apply SiloedUSDCTokenPoolDeployChangeset")
 	require.NotNil(t, deployChangesetOutput, "Changeset output should not be nil")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)
 
-	siloedUSDCTokenPoolAddress, err := deployChangesetOutput.DataStore.Addresses().Get(datastore.NewAddressRefKey(chainSelector, "SiloedUSDCTokenPool", semver.MustParse("1.6.4"), ""))
+	// Get the SiloedUSDCTokenPool address for the remote chain using the qualifier.
+	siloedUSDCTokenPoolAddress, err := deployChangesetOutput.DataStore.Addresses().Get(datastore.NewAddressRefKey(chainSelector, "SiloedUSDCTokenPool", semver.MustParse("1.6.4"), fmt.Sprintf("remoteChainSelector-%d", remoteChainSelector)))
 	require.NoError(t, err, "Failed to get SiloedUSDCTokenPool address")
 	require.Equal(t, siloedUSDCTokenPoolAddress.Address, siloedUSDCTokenPoolAddress.Address, "Expected SiloedUSDCTokenPool address to be in changeset output")
 

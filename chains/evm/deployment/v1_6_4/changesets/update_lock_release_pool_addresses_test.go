@@ -29,8 +29,6 @@ import (
 	mcms "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	changesets_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-
 	burn_mint_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 )
 
@@ -82,8 +80,16 @@ func TestUpdateLockReleasePoolAddressesChangeset(t *testing.T) {
 			Router: routerAddress,
 		},
 	}, nil)
-
 	require.NoError(t, err, "Failed to deploy ERC20LockBox")
+
+	// Add the USDCTokenPoolProxy address to the datastore so that it can be used in the changeset
+	err = ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(usdc_token_pool_proxy.ContractType),
+		Version:       semver.MustParse("1.6.4"),
+		Address:       common.HexToAddress(usdc_token_pool_proxy_ref.Address).Hex(),
+		ChainSelector: chainSelector,
+	})
+	require.NoError(t, err, "Failed to add USDCTokenPoolProxy address to datastore")
 
 	// import binding for burn_mint_token_pool and deploy using tokenAddress
 	burnMintTokenPoolAddress, tx, _, err := burn_mint_token_pool_bindings.DeployBurnMintTokenPool(
@@ -103,7 +109,6 @@ func TestUpdateLockReleasePoolAddressesChangeset(t *testing.T) {
 		ChainInputs: []changesets.UpdateLockReleasePoolAddressesPerChainInput{
 			{
 				ChainSelector: chainSelector,
-				Address:       common.HexToAddress(usdc_token_pool_proxy_ref.Address),
 				LockReleasePoolAddrs: usdc_token_pool_proxy.UpdateLockReleasePoolAddressesArgs{
 					RemoteChainSelectors: []uint64{chainSelector},
 					LockReleasePools:     []common.Address{burnMintTokenPoolAddress},
@@ -150,12 +155,11 @@ func TestUpdateLockReleasePoolAddressesChangeset(t *testing.T) {
 	// update env datastore
 	e.DataStore = ds.Seal()
 
-	// Register the MCMS Reader
-	mcmsRegistry := changesets_utils.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, evmMCMSReader)
+	updateLockReleasePoolAddressesChangeset := changesets.UpdateLockReleasePoolAddressesChangeset()
 
-	updateLockReleasePoolAddressesChangeset := changesets.UpdateLockReleasePoolAddressesChangeset(mcmsRegistry)
+	validate := updateLockReleasePoolAddressesChangeset.VerifyPreconditions(*e, updateLockReleasePoolAddressesInput)
+	require.NoError(t, validate, "Failed to validate UpdateLockReleasePoolAddressesChangeset")
+
 	deployChangesetOutput, err := updateLockReleasePoolAddressesChangeset.Apply(*e, updateLockReleasePoolAddressesInput)
 	require.NoError(t, err, "UpdateLockReleasePoolAddressesChangeset should not error")
 	require.Greater(t, len(deployChangesetOutput.Reports), 0)
