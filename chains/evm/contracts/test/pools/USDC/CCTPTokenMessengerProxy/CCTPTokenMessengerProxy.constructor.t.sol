@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {CCTPTokenMessengerProxy} from "../../../../pools/USDC/CCTPTokenMessengerProxy.sol";
-import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger.sol";
 import {CCTPTokenMessengerProxySetup} from "./CCTPTokenMessengerProxySetup.t.sol";
 
 contract CCTPTokenMessengerProxy_constructor is CCTPTokenMessengerProxySetup {

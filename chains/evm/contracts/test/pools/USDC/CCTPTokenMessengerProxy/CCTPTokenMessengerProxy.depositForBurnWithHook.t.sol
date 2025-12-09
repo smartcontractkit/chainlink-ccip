@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger.sol";
 
-import {CCTPTokenMessengerProxy} from "../../../../pools/USDC/CCTPTokenMessengerProxy.sol";
 import {CCTPTokenMessengerProxySetup} from "./CCTPTokenMessengerProxySetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
