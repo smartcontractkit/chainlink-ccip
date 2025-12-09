@@ -68,7 +68,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     );
 
     s_baseCCTPMessage.hookData.messageId = messageHash;
-    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
 
     // Ensure that the mint recipient has no tokens yet.
     assertEq(IERC20(address(s_USDCToken)).balanceOf(s_tokenReceiverAddress), 0);
@@ -76,14 +76,14 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     vm.expectEmit();
     emit MockE2EUSDCTransmitterCCTPV2.MessageReceived(_encodeCCTPMessage(s_baseCCTPMessage), new bytes(65));
 
-    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
 
     // Ensure that the mint recipient received the tokens.
     // Mock transmitter always just mints 1 token.
     assertEq(IERC20(address(s_USDCToken)).balanceOf(s_tokenReceiverAddress), 1);
   }
 
-  function test_verifyMessage_RevertWhen_InvalidCCVData() public {
+  function test_verifyMessage_RevertWhen_InvalidVerifierResults() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
       SOURCE_CHAIN_SELECTOR,
@@ -93,7 +93,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
       s_tokenReceiver
     );
 
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidCCVData.selector));
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidVerifierResults.selector));
     s_cctpVerifier.verifyMessage(message, messageHash, "");
   }
 
@@ -109,12 +109,12 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     bytes4 invalidVersion = bytes4(uint32(0x01020304));
 
     s_baseCCTPMessage.hookData.verifierVersion = invalidVersion;
-    bytes memory ccvData = _createCCVData(invalidVersion, s_baseCCTPMessage);
+    bytes memory verifierResults = _createVerifierResults(invalidVersion, s_baseCCTPMessage);
 
     vm.expectRevert(
       abi.encodeWithSelector(CCTPVerifier.InvalidCCVVersion.selector, s_cctpVerifier.versionTag(), invalidVersion)
     );
-    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_InvalidCCVVersion_AttestedVersion() public {
@@ -129,12 +129,12 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     bytes4 invalidVersion = bytes4(uint32(0x01020304));
 
     s_baseCCTPMessage.hookData.verifierVersion = invalidVersion;
-    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
 
     vm.expectRevert(
       abi.encodeWithSelector(CCTPVerifier.InvalidCCVVersion.selector, s_cctpVerifier.versionTag(), invalidVersion)
     );
-    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_InvalidMessageId() public {
@@ -147,10 +147,10 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
       s_tokenReceiver
     );
 
-    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
 
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidMessageId.selector, messageHash, bytes32(0)));
-    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_UnknownDomain() public {
@@ -164,7 +164,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     );
 
     s_baseCCTPMessage.hookData.messageId = messageHash;
-    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
 
     // Disable domain.
     CCTPVerifier.SetDomainArgs[] memory domainUpdates = new CCTPVerifier.SetDomainArgs[](1);
@@ -179,7 +179,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     s_cctpVerifier.setDomains(domainUpdates);
 
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.UnknownDomain.selector, DEST_CHAIN_SELECTOR));
-    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_InvalidMessageSender() public {
@@ -195,12 +195,12 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
 
     s_baseCCTPMessage.hookData.messageId = messageHash;
     s_baseCCTPMessage.body.messageSender = invalidMessageSender;
-    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
 
     vm.expectRevert(
       abi.encodeWithSelector(CCTPVerifier.InvalidMessageSender.selector, ALLOWED_CALLER_ON_SOURCE, invalidMessageSender)
     );
-    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_ReceiveMessageCallFailed() public {
@@ -214,7 +214,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     );
 
     s_baseCCTPMessage.hookData.messageId = messageHash;
-    bytes memory ccvData = _createCCVData(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
 
     vm.mockCall(
       address(s_mockMessageTransmitter),
@@ -222,6 +222,6 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
       abi.encode(false)
     );
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.ReceiveMessageCallFailed.selector));
-    s_cctpVerifier.verifyMessage(message, messageHash, ccvData);
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
   }
 }
