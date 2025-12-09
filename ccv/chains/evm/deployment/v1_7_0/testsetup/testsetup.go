@@ -84,13 +84,26 @@ func CreateBasicContractParams() sequences.ContractParams {
 			Version:       semver.MustParse("1.7.0"),
 			FeeAggregator: common.HexToAddress("0x01"),
 		},
-		Executor: sequences.ExecutorParams{
-			Version:       semver.MustParse("1.7.0"),
-			MaxCCVsPerMsg: 10,
-			DynamicConfig: executor.SetDynamicConfigArgs{
-				FeeAggregator:         common.HexToAddress("0x01"),
-				MinBlockConfirmations: 1,
-				CcvAllowlistEnabled:   false,
+		Executors: []sequences.ExecutorParams{
+			{
+				Version:       semver.MustParse("1.7.0"),
+				MaxCCVsPerMsg: 10,
+				DynamicConfig: executor.SetDynamicConfigArgs{
+					FeeAggregator:         common.HexToAddress("0x01"),
+					MinBlockConfirmations: 1,
+					CcvAllowlistEnabled:   false,
+				},
+				Qualifier: "default",
+			},
+			{
+				Version:       semver.MustParse("1.7.0"),
+				MaxCCVsPerMsg: 10,
+				DynamicConfig: executor.SetDynamicConfigArgs{
+					FeeAggregator:         common.HexToAddress("0x01"),
+					MinBlockConfirmations: 1,
+					CcvAllowlistEnabled:   false,
+				},
+				Qualifier: "custom",
 			},
 		},
 		FeeQuoter: sequences.FeeQuoterParams{
