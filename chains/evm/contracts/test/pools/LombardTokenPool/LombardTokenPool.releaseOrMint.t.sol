@@ -2,10 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
-
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-
 import {MockMailbox} from "../../mocks/MockMailbox.sol";
 import {LombardTokenPoolSetup} from "./LombardTokenPoolSetup.t.sol";
 
@@ -21,16 +19,16 @@ contract LombardTokenPool_releaseOrMint is LombardTokenPoolSetup {
     MockMailbox mailbox = new MockMailbox();
     mailbox.setResult(PAYLOAD_HASH, true, "");
     s_bridge.setMailbox(address(mailbox));
-
+    bytes memory rawPayload = bytes("rawPayload");
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       originalSender: abi.encodePacked(OWNER),
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      receiver: address(0xBEEF),
+      receiver: s_releaseRecipient,
       sourceDenominatedAmount: 5e17,
       localToken: address(s_token),
       sourcePoolAddress: abi.encode(s_remotePool),
       sourcePoolData: abi.encode(PAYLOAD_HASH),
-      offchainTokenData: abi.encode(bytes("rawPayload"), bytes("proof"))
+      offchainTokenData: abi.encode(rawPayload, bytes("proof"))
     });
 
     vm.expectEmit();
@@ -45,7 +43,7 @@ contract LombardTokenPool_releaseOrMint is LombardTokenPoolSetup {
     Pool.ReleaseOrMintOutV1 memory out = s_pool.releaseOrMint(releaseOrMintIn);
 
     assertEq(out.destinationAmount, releaseOrMintIn.sourceDenominatedAmount);
-    assertEq(mailbox.s_lastRawPayload(), bytes("rawPayload"));
+    assertEq(mailbox.s_lastRawPayload(), rawPayload);
   }
 
   function test_releaseOrMint_V1_RevertWhen_ExecutionError() public {
@@ -56,7 +54,7 @@ contract LombardTokenPool_releaseOrMint is LombardTokenPoolSetup {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       originalSender: abi.encodePacked(OWNER),
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      receiver: address(0xBEEF),
+      receiver: s_releaseRecipient,
       sourceDenominatedAmount: 1,
       localToken: address(s_token),
       sourcePoolAddress: abi.encode(s_remotePool),
@@ -76,7 +74,7 @@ contract LombardTokenPool_releaseOrMint is LombardTokenPoolSetup {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       originalSender: abi.encodePacked(OWNER),
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      receiver: address(0xBEEF),
+      receiver: s_releaseRecipient,
       sourceDenominatedAmount: 1,
       localToken: address(s_token),
       sourcePoolAddress: abi.encode(s_remotePool),

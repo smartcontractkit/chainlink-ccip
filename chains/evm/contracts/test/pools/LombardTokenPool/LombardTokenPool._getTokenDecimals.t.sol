@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {BaseTest} from "../../BaseTest.t.sol";
 import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
 
-import {MockLombardBridgeV2} from "../../mocks/MockLombardBridgeV2.sol";
+import {MockLombardBridgeV1} from "../../mocks/MockLombardBridgeV1.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
@@ -14,14 +14,13 @@ contract LombardTokenPool_getTokenDecimals is BaseTest {
   BurnMintERC20 internal s_token;
   LombardTokenPoolHelper internal s_helper;
   MockVerifier internal s_resolver;
-  MockLombardBridgeV2 internal s_bridge;
-  address internal constant VERIFIER = address(0xBEEF);
+  MockLombardBridgeV1 internal s_bridge;
 
   function setUp() public override {
     super.setUp();
     s_token = new BurnMintERC20("Lombard", "LBD", 18, 0, 0);
     s_resolver = new MockVerifier("");
-    s_bridge = new MockLombardBridgeV2(1, address(0));
+    s_bridge = new MockLombardBridgeV1(1, address(0));
     s_helper = new LombardTokenPoolHelper(
       s_token,
       address(s_resolver),

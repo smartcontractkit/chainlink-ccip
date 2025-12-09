@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
-import {IBridgeV2} from "./interfaces/IBridgeV2.sol";
+import {IBridgeV1} from "./interfaces/IBridgeV1.sol";
 import {IMailbox} from "./interfaces/IMailbox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
@@ -39,11 +39,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// The following events are emitted for Lombard-specific configuration updates and are utilized by Lombard.
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain ID according to Lombard Multi Chain ID convention.
-  /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message.
+  /// @param allowedCaller The address that's allowed to call the bridge on the destination chain.
   event PathSet(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
-  /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message.
+  /// @param allowedCaller The address that's allowed to call the bridge on the destination chain.
   event PathRemoved(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
   event LombardConfigurationSet(address indexed verifier, address indexed bridge, address indexed tokenAdapter);
 
@@ -59,7 +59,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @notice Supported bridge message version.
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 1;
   /// @notice The address of bridge contract.
-  IBridgeV2 public immutable i_bridge;
+  IBridgeV1 public immutable i_bridge;
   /// @notice Lombard verifier resolver address. lockOrBurn fetches the outbound implementation and forwards tokens to it.
   address internal immutable i_lombardVerifierResolver;
   /// @notice Optional token adapter used for chains like Avalanche BTC.b. Since each pool manages a single token,
@@ -78,7 +78,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   constructor(
     IERC20Metadata token,
     address verifier,
-    IBridgeV2 bridge,
+    IBridgeV1 bridge,
     address adapter,
     address advancedPoolHooks,
     address rmnProxy,

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IBridgeV2} from "../../pools/Lombard/interfaces/IBridgeV2.sol";
+import {IBridgeV1} from "../../pools/Lombard/interfaces/IBridgeV1.sol";
 
 // solhint-disable func-name-mixedcase
 
-contract MockLombardBridgeV2 is IBridgeV2 {
+contract MockLombardBridgeV1 is IBridgeV1 {
   uint8 internal immutable i_msgVersion;
   address internal s_mailbox;
 

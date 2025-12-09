@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBridgeV2} from "../../pools/Lombard/interfaces/IBridgeV2.sol";
+import {IBridgeV1} from "../../pools/Lombard/interfaces/IBridgeV1.sol";
 
 import {LombardTokenPool} from "../../pools/Lombard/LombardTokenPool.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
@@ -10,7 +10,7 @@ contract LombardTokenPoolHelper is LombardTokenPool {
   constructor(
     IERC20Metadata token,
     address verifier,
-    IBridgeV2 bridge,
+    IBridgeV1 bridge,
     address adapter,
     address advancedPoolHooks,
     address rmnProxy,
