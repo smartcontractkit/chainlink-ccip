@@ -16,7 +16,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   error InvalidVerifierResults();
   error InvalidCCVVersion(bytes4 verifierVersion);
   error OnlyCallableByOwnerOrAllowlistAdmin();
-  error StorageLocationAdminCannotBeZero();
   error MustBeProposedStorageLocationAdmin();
   error OnlyCallableByStorageLocationAdmin();
 
@@ -42,7 +41,9 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   // DYNAMIC CONFIG
   DynamicConfig private s_dynamicConfig;
 
+  /// @dev Account capable of changing the storage location, and transferring admin.
   address private s_storageLocationAdmin;
+  /// @dev Pending storage location admin.
   address private s_pendingStorageLocationAdmin;
 
   constructor(DynamicConfig memory dynamicConfig, string memory storageLocation) BaseVerifier(storageLocation) {

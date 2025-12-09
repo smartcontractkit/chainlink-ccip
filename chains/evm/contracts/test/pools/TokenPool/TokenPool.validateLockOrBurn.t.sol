@@ -50,6 +50,55 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
     assertEq(outboundBucket.tokens, outboundFastConfig.capacity - lockOrBurnIn.amount);
   }
 
+  function test_validateLockOrBurn_WithFastFinality_ConsumesAfterFee() public {
+    uint16 minBlockConfirmation = 5;
+    RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
+    RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
+    TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
+    rateLimitArgs[0] = TokenPool.RateLimitConfigArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      customBlockConfirmation: true,
+      outboundRateLimiterConfig: outboundFastConfig,
+      inboundRateLimiterConfig: inboundFastConfig
+    });
+
+    vm.startPrank(OWNER);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
+    s_tokenPool.setRateLimitConfig(rateLimitArgs);
+
+    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
+    feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
+        destGasOverhead: 50_000,
+        destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+        defaultBlockConfirmationFeeUSDCents: 0,
+        customBlockConfirmationFeeUSDCents: 0,
+        defaultBlockConfirmationTransferFeeBps: 0,
+        customBlockConfirmationTransferFeeBps: 250, // 2.5%
+        isEnabled: true
+      })
+    });
+    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+    vm.stopPrank();
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1_000e18);
+    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, type(uint16).max);
+    uint256 expectedAmount = lockOrBurnIn.amount - fee;
+
+    vm.expectEmit();
+    emit TokenPool.CustomBlockConfirmationOutboundRateLimitConsumed(
+      DEST_CHAIN_SELECTOR, address(s_token), expectedAmount
+    );
+
+    vm.startPrank(s_allowedOnRamp);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, type(uint16).max, "", fee);
+    vm.stopPrank();
+
+    (RateLimiter.TokenBucket memory outboundBucket,) = s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, true);
+    assertEq(outboundBucket.tokens, outboundFastConfig.capacity - expectedAmount);
+  }
+
   function test_validateLockOrBurn_ConsumesRateLimitAfterFee() public {
     uint16 defaultFeeBps = 250; // 2.5%
     vm.startPrank(OWNER);
