@@ -71,7 +71,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
 
   /// @param verifier The address of Lombard verifier resolver. Used in V2 flows to fetch the outbound
   /// implementation that handles token burns and cross-chain attestations.
-  /// @param bridge The Lombard BridgeV2 contract that handles cross-chain token transfers.
+  /// @param bridge The Lombard BridgeV1 contract that handles cross-chain token transfers.
   /// @param adapter Optional source-chain token address override. Used for non-upgradeable tokens like BTC.b
   /// on Avalanche where an adapter contract performs mint/burn on behalf of the actual token. When set, this
   /// address is passed to bridge.deposit() instead of the pool's token address. Set to address(0) if not needed.
