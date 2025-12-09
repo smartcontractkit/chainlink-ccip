@@ -149,4 +149,20 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       address(s_mockRMNRemote)
     );
   }
+
+  function test_constructor_RevertWhen_ZeroAddressNotAllowed_FeeAggregatorIsZero() public {
+    vm.expectRevert(BaseVerifier.ZeroAddressNotAllowed.selector);
+    new CCTPVerifier(
+      s_mockTokenMessenger,
+      s_messageTransmitterProxy,
+      s_USDCToken,
+      STORAGE_LOCATION,
+      CCTPVerifier.DynamicConfig({
+        feeAggregator: address(0),
+        allowlistAdmin: ALLOWLIST_ADMIN,
+        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+      }),
+      address(s_mockRMNRemote)
+    );
+  }
 }

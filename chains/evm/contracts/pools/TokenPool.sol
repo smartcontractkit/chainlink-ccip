@@ -360,7 +360,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     // If custom block confirmations are requested, validate against the minimum and apply the custom rate limit.
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
       uint16 minBlockConfirmationConfigured = s_minBlockConfirmation;
-      if (minBlockConfirmationConfigured == 0) {
+      if (minBlockConfirmationConfigured == WAIT_FOR_FINALITY) {
         revert CustomBlockConfirmationsNotEnabled();
       }
       if (blockConfirmationRequested < minBlockConfirmationConfigured) {

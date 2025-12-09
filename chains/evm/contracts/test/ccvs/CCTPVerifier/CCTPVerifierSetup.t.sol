@@ -208,7 +208,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       amount: amount,
       sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
       sourceTokenAddress: abi.encodePacked(sourceTokenAddress),
-      destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      destTokenAddress: abi.encodePacked(sourceTokenAddress),
       tokenReceiver: tokenReceiver,
       extraData: "extra data"
     });
@@ -224,7 +224,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       onRampAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
       sender: abi.encodePacked(address(0x3333333333333333333333333333333333333333)),
-      receiver: abi.encodePacked(address(0x4444444444444444444444444444444444444444)),
+      receiver: tokenReceiver,
       destBlob: "",
       tokenTransfer: tokenTransfer,
       data: ""
