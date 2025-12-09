@@ -239,6 +239,7 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 	proposerPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(proposerRef.Address)))
 	cancellerPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(cancellerRef.Address)))
 	bypasserPDA := state.GetMCMSignerPDA(mcmProgram, state.PDASeed([]byte(bypasserRef.Address)))
+	b.Logger.Infow("Setting up Timelock roles for MCMS", "proposer", proposerPDA.String(), "canceller", cancellerPDA.String(), "bypasser", bypasserPDA.String())
 	roles := []struct {
 		pdas []solana.PublicKey
 		role timelock.Role
@@ -277,8 +278,8 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 
 // assume refs are in the order returned by GetAllMCMS
 func transferAllMCMS(
-	b operations.Bundle, 
-	chain cldf_solana.Chain, 
+	b operations.Bundle,
+	chain cldf_solana.Chain,
 	in deployops.TransferOwnershipPerChainInput,
 	transferAccessController bool) (sequences.OnChainOutput, error) {
 	var output sequences.OnChainOutput

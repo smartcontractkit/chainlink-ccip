@@ -645,6 +645,8 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 		id,
 		state.PDASeed([]byte(seed[:])),
 	)
+	b.Logger.Infow("got timelock config pda", "pda", timelockConfigPDA.String())
+	b.Logger.Infow("got access controller", "program", accessControllerProgram.Address)
 	var roleAccessController cldf_deployment.ContractType
 	switch in.Role {
 	case timelock.Proposer_Role:
@@ -665,6 +667,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
+	b.Logger.Infow("got role access controller account", "account", roleAccount.Address)
 
 	instructionBuilder := timelock.NewBatchAddAccessInstruction([32]uint8(
 		state.PDASeed([]byte(seed[:]))),
