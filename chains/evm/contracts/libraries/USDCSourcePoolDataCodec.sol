@@ -68,16 +68,6 @@ library USDCSourcePoolDataCodec {
     return abi.encodePacked(CCTP_VERSION_2_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
   }
 
-  /// @notice Encodes the source token data payload into a bytes array using the CCTP V2 CCV tag.
-  /// @param sourceTokenDataPayload The source token data payload to encode.
-  /// @return The encoded source token data payload.
-  function _encodeSourceTokenDataPayloadV2CCV(
-    SourceTokenDataPayloadV2 memory sourceTokenDataPayload
-  ) internal pure returns (bytes memory) {
-    return
-      abi.encodePacked(CCTP_VERSION_2_CCV_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
-  }
-
   /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
   /// @param sourcePoolData The source pool data to decode in raw bytes.
   /// @return sourceTokenDataPayload The decoded source token data payload.
@@ -100,7 +90,7 @@ library USDCSourcePoolDataCodec {
       depositHash := mload(add(sourcePoolData, 40))
     }
 
-    if (version != CCTP_VERSION_2_TAG && version != CCTP_VERSION_2_CCV_TAG) revert InvalidVersion(version);
+    if (version != CCTP_VERSION_2_TAG) revert InvalidVersion(version);
 
     sourceTokenDataPayload.sourceDomain = sourceDomain;
     sourceTokenDataPayload.depositHash = depositHash;

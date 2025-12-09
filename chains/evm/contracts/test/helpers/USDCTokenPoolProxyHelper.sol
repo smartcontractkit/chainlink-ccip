@@ -10,8 +10,9 @@ contract USDCTokenPoolProxyHelper is USDCTokenPoolProxy {
   constructor(
     IERC20 token,
     USDCTokenPoolProxy.PoolAddresses memory pools,
-    address router
-  ) USDCTokenPoolProxy(token, pools, router) {}
+    address router,
+    address cctpVerifier
+  ) USDCTokenPoolProxy(token, pools, router, cctpVerifier) {}
 
   function generateNewReleaseOrMintIn(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn

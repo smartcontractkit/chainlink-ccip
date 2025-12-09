@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ICrossChainVerifierResolver} from "../../../../interfaces/ICrossChainVerifierResolver.sol";
 import {IPoolV1} from "../../../../interfaces/IPool.sol";
+import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
+import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
@@ -15,20 +18,34 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   address internal s_sender = makeAddr("sender");
   address internal s_receiver = makeAddr("receiver");
   bytes internal s_destPoolData = abi.encode(1, 2, 3);
+  uint64 internal s_chainSelForV1 = SOURCE_CHAIN_SELECTOR;
+  uint64 internal s_chainSelForV2 = DEST_CHAIN_SELECTOR;
+  uint64 internal s_chainSelFoLockRelease = 12345;
+  uint64 internal s_chainSelForCCV = 67890;
 
   function setUp() public virtual override {
     super.setUp();
 
-    // Configure lock or burn mechanisms for different chains
-    uint64[] memory chainSelectors = new uint64[](3);
-    chainSelectors[0] = SOURCE_CHAIN_SELECTOR;
-    chainSelectors[1] = DEST_CHAIN_SELECTOR;
-    chainSelectors[2] = 12345; // Another test chain
+    // Set the OnRamp on the router for each of the chain selectors
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](4);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: s_chainSelForV1, onRamp: s_routerAllowedOnRamp});
+    onRampUpdates[1] = Router.OnRamp({destChainSelector: s_chainSelForV2, onRamp: s_routerAllowedOnRamp});
+    onRampUpdates[2] = Router.OnRamp({destChainSelector: s_chainSelFoLockRelease, onRamp: s_routerAllowedOnRamp});
+    onRampUpdates[3] = Router.OnRamp({destChainSelector: s_chainSelForCCV, onRamp: s_routerAllowedOnRamp});
+    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
-    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](3);
+    // Configure lock or burn mechanisms for different chains
+    uint64[] memory chainSelectors = new uint64[](4);
+    chainSelectors[0] = s_chainSelForV1;
+    chainSelectors[1] = s_chainSelForV2;
+    chainSelectors[2] = s_chainSelFoLockRelease;
+    chainSelectors[3] = s_chainSelForCCV;
+
+    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](4);
     mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
     mechanisms[1] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2;
     mechanisms[2] = USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE;
+    mechanisms[3] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
 
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
   }
@@ -37,16 +54,15 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     uint256 amount = 100;
     bytes memory destTokenAddress = abi.encode(address(s_USDCToken));
 
-    // Set the DEST_CHAIN_SELECTOR to use CCTP V1 using the update function
     uint64[] memory selectors = new uint64[](1);
-    selectors[0] = DEST_CHAIN_SELECTOR;
+    selectors[0] = s_chainSelForV1;
     USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechs = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
     mechs[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(selectors, mechs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(s_receiver),
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: s_chainSelForV1,
       originalSender: s_sender,
       amount: amount,
       localToken: address(s_USDCToken)
@@ -87,7 +103,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(s_receiver),
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: s_chainSelForV2,
       originalSender: s_sender,
       amount: amount,
       localToken: address(s_USDCToken)
@@ -114,7 +130,6 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   }
 
   function test_lockOrBurn_LockRelease() public {
-    uint64 testChainSelector = 12345;
     uint256 amount = 300;
     bytes memory destTokenAddress = abi.encode(address(s_USDCToken));
     bytes[] memory remotePoolAddresses = new bytes[](1);
@@ -136,20 +151,20 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     // Set the the s_lockRelease pool for the LockRelease mechanism
     uint64[] memory selectors = new uint64[](1);
-    selectors[0] = testChainSelector;
+    selectors[0] = s_chainSelFoLockRelease;
     address[] memory lockReleasePools = new address[](1);
     lockReleasePools[0] = address(s_lockReleasePool);
     s_usdcTokenPoolProxy.updateLockReleasePoolAddresses(selectors, lockReleasePools);
 
     vm.mockCall(
       address(s_router),
-      abi.encodeWithSelector(bytes4(keccak256("getOnRamp(uint64)")), uint64(testChainSelector)),
+      abi.encodeWithSelector(bytes4(keccak256("getOnRamp(uint64)")), uint64(s_chainSelFoLockRelease)),
       abi.encode(s_routerAllowedOnRamp)
     );
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(s_receiver),
-      remoteChainSelector: testChainSelector,
+      remoteChainSelector: s_chainSelFoLockRelease,
       originalSender: s_sender,
       amount: amount,
       localToken: address(s_USDCToken)
@@ -172,7 +187,116 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     assertEq(result.destPoolData, expectedOutput.destPoolData);
   }
 
+  function test_lockOrBurn_CCTPV2WithCCV() public {
+    uint256 amount = 400;
+    bytes memory tokenArgs = abi.encode(abi.encode(1, 2, 3));
+    uint16 blockConfirmationRequested = 1;
+    bytes memory destTokenAddress = abi.encode(address(s_USDCToken));
+    address verifierImpl = makeAddr("verifierImpl");
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
+      receiver: abi.encode(s_receiver),
+      remoteChainSelector: s_chainSelForCCV,
+      originalSender: s_sender,
+      amount: amount,
+      localToken: address(s_USDCToken)
+    });
+
+    Pool.LockOrBurnOutV1 memory expectedOutput =
+      Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData});
+
+    vm.mockCall(
+      address(s_cctpV2PoolWithCCV),
+      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, 1, tokenArgs),
+      abi.encode(Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData}), amount)
+    );
+
+    vm.startPrank(s_routerAllowedOnRamp);
+
+    vm.mockCall(
+      address(s_cctpVerifier),
+      abi.encodeWithSelector(
+        ICrossChainVerifierResolver.getOutboundImplementation.selector, s_chainSelForCCV, tokenArgs
+      ),
+      abi.encode(verifierImpl)
+    );
+
+    (Pool.LockOrBurnOutV1 memory result, uint256 destTokenAmount) =
+      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+    assertEq(result.destTokenAddress, expectedOutput.destTokenAddress);
+    assertEq(result.destPoolData, expectedOutput.destPoolData);
+    assertEq(destTokenAmount, amount);
+
+    // Ensure that the balance of the verifier impl has been updated
+    assertEq(IERC20(address(s_USDCToken)).balanceOf(verifierImpl), amount);
+  }
+
   // Reverts
+
+  function test_lockOrBurn_CCTPV2WithCCV_RevertWhen_NoLockOrBurnMechanismSet() public {
+    uint256 amount = 100;
+    bytes[] memory remotePoolAddresses = new bytes[](1);
+    remotePoolAddresses[0] = abi.encode(address(s_lockReleasePool));
+
+    // Remove the CCTP V2 with CCV pool from stored pools
+    USDCTokenPoolProxy.PoolAddresses memory pools = s_usdcTokenPoolProxy.getPools();
+    pools.cctpV2PoolWithCCV = address(0);
+    _enableERC165InterfaceChecks(s_cctpV2PoolWithCCV, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_legacyCctpV1Pool, type(IPoolV1).interfaceId);
+    s_usdcTokenPoolProxy.updatePoolAddresses(pools);
+
+    vm.mockCall(
+      address(s_router),
+      abi.encodeWithSelector(bytes4(keccak256("getOnRamp(uint64)")), uint64(s_chainSelForCCV)),
+      abi.encode(s_routerAllowedOnRamp)
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, s_chainSelForCCV));
+
+    vm.startPrank(s_routerAllowedOnRamp);
+    s_usdcTokenPoolProxy.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        receiver: abi.encode(s_receiver),
+        remoteChainSelector: s_chainSelForCCV,
+        originalSender: s_sender,
+        amount: amount,
+        localToken: address(s_USDCToken)
+      })
+    );
+  }
+
+  function test_lockOrBurn_CCTPV2WithCCV_RevertWhen_ChainNotSupportedByVerifier() public {
+    uint256 amount = 100;
+    bytes memory tokenArgs = abi.encode(abi.encode(1, 2, 3));
+    uint16 blockConfirmationRequested = 1;
+    address verifierImpl = address(0);
+
+    vm.mockCall(
+      address(s_cctpVerifier),
+      abi.encodeWithSelector(
+        ICrossChainVerifierResolver.getOutboundImplementation.selector, s_chainSelForCCV, tokenArgs
+      ),
+      abi.encode(verifierImpl)
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.ChainNotSupportedByVerifier.selector, s_chainSelForCCV));
+
+    vm.startPrank(s_routerAllowedOnRamp);
+    s_usdcTokenPoolProxy.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        receiver: abi.encode(s_receiver),
+        remoteChainSelector: s_chainSelForCCV,
+        originalSender: s_sender,
+        amount: amount,
+        localToken: address(s_USDCToken)
+      }),
+      blockConfirmationRequested,
+      tokenArgs
+    );
+    vm.stopPrank();
+  }
 
   function test_lockOrBurn_RevertWhen_InvalidLockOrBurnMechanism() public {
     uint64 testChainSelector = 99999;
@@ -209,7 +333,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   function test_lockOrBurn_RevertWhen_NoLockOrBurnMechanismSet() public {
     // Configure lock or burn mechanisms for different chains but do not set the lock release pool for the chain
     uint64[] memory chainSelectors = new uint64[](1);
-    chainSelectors[0] = DEST_CHAIN_SELECTOR;
+    chainSelectors[0] = s_chainSelFoLockRelease;
 
     USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
     mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE;
@@ -219,13 +343,13 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.mockCall(
       address(s_router),
-      abi.encodeWithSelector(bytes4(keccak256("getOnRamp(uint64)")), uint64(DEST_CHAIN_SELECTOR)),
+      abi.encodeWithSelector(bytes4(keccak256("getOnRamp(uint64)")), uint64(s_chainSelFoLockRelease)),
       abi.encode(s_routerAllowedOnRamp)
     );
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(s_receiver),
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: s_chainSelFoLockRelease,
       originalSender: s_sender,
       amount: 100,
       localToken: address(s_USDCToken)
@@ -233,7 +357,9 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.startPrank(s_routerAllowedOnRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, DEST_CHAIN_SELECTOR));
+    vm.expectRevert(
+      abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, s_chainSelFoLockRelease)
+    );
     s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
   }
 
@@ -244,7 +370,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(s_receiver),
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: s_chainSelForV2,
       originalSender: s_sender,
       amount: 100,
       localToken: address(s_USDCToken)
