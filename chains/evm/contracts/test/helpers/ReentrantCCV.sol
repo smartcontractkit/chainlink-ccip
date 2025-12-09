@@ -57,7 +57,7 @@ contract ReentrantCCV is ICrossChainVerifierV1, ICrossChainVerifierResolver {
     return interfaceId == type(ICrossChainVerifierV1).interfaceId;
   }
 
-  function getStorageLocation() external pure override returns (string[] memory storageLocations) {
+  function getStorageLocations() external pure override returns (string[] memory storageLocations) {
     storageLocations = new string[](1);
     storageLocations[0] = "reentrant://ccv";
     return storageLocations;

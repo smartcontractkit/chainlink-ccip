@@ -65,5 +65,5 @@ interface ICrossChainVerifierV1 is IERC165 {
   /// This can be an address, a URL, or any other identifier that makes sense for the CCV. The format of the strings is
   /// up to the CCV implementer, but it should be something that can be easily parsed and used by the integrator. This
   /// is used by the executor(s) to know where to look for the proof data that the CCV has produced.
-  function getStorageLocation() external view returns (string[] memory);
+  function getStorageLocations() external view returns (string[] memory);
 }

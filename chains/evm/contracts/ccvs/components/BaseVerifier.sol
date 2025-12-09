@@ -24,12 +24,13 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error SenderNotAllowed(address sender);
   error CallerIsNotARampOnRouter(address caller);
   error DestinationNotSupported(uint64 destChainSelector);
+  error DuplicateStorageLocations(string storageLocation, uint256 i, uint256 j);
 
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
   event DestChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
-  event StorageLocationUpdated(string oldLocation, string newLocation);
+  event StorageLocationsUpdated(string[] oldLocations, string[] newLocations);
 
   struct DestChainConfig {
     IRouter router; // ──────────╮ Local router to use for messages going to this dest chain.
@@ -63,31 +64,64 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   /// @dev The destination chain specific configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) private s_destChainConfigs;
 
-  /// @dev The storage location for off-chain components to read from. Implementations of the BaseVerifier should
+  /// @dev The storage locations for off-chain components to read from. Implementations of the BaseVerifier should
   /// implement a way to update this value if needed.
-  string internal s_storageLocation;
+  string[] internal s_storageLocations;
 
   constructor(
-    string memory storageLocation
+    string[] memory storageLocations
   ) {
-    _setStorageLocation(storageLocation);
+    _setStorageLocations(storageLocations);
   }
 
-  /// @notice Updates the storage location.
-  /// @param storageLocation The new storage location.
-  function _setStorageLocation(
-    string memory storageLocation
+  /// @notice Updates the storage locations.
+  /// @param storageLocations The new storage locations.
+  function _setStorageLocations(
+    string[] memory storageLocations
   ) internal {
-    string memory oldLocation = s_storageLocation;
-    s_storageLocation = storageLocation;
-    emit StorageLocationUpdated(oldLocation, storageLocation);
+    string[] memory oldLocations = getStorageLocations();
+    uint256 oldLength = s_storageLocations.length;
+    uint256 newLength = storageLocations.length;
+
+    // Check for duplicates.
+    for (uint256 i; i < newLength; ++i) {
+      bytes32 iHash = keccak256(abi.encodePacked(storageLocations[i]));
+      for (uint256 j; j < newLength; ++j) {
+        if (i != j) {
+          bytes32 jHash = keccak256(abi.encodePacked(storageLocations[j]));
+
+          // Check for duplicate.
+          if (iHash == jHash) {
+            revert DuplicateStorageLocations(storageLocations[i], i, j);
+          }
+        }
+      }
+    }
+
+    if (newLength > oldLength) {
+      // Push new elements on to the end of the array.
+      for (uint256 i; i < (newLength - oldLength); ++i) {
+        s_storageLocations.push(storageLocations[oldLength + i]);
+      }
+    } else if (newLength < oldLength) {
+      // Pop elements from array.
+      for (uint256 i; i < (oldLength - newLength); ++i) {
+        s_storageLocations.pop();
+      }
+    }
+
+    // Set remaining elements.
+    uint256 overlap = newLength < oldLength ? newLength : oldLength;
+    for (uint256 i; i < overlap; ++i) {
+      s_storageLocations[i] = storageLocations[i];
+    }
+
+    emit StorageLocationsUpdated(oldLocations, storageLocations);
   }
 
   /// @inheritdoc ICrossChainVerifierV1
-  function getStorageLocation() external view virtual override returns (string[] memory) {
-    string[] memory storageLocations = new string[](1);
-    storageLocations[0] = s_storageLocation;
-    return storageLocations;
+  function getStorageLocations() public view virtual override returns (string[] memory) {
+    return s_storageLocations;
   }
 
   /// @notice get ChainConfig configured for the DestinationChainSelector.

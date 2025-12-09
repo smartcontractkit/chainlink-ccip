@@ -20,7 +20,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
@@ -45,7 +45,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       ITokenMessenger(address(0)),
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
@@ -60,7 +60,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       CCTPMessageTransmitterProxy(address(0)),
       s_USDCToken,
-      STORAGE_LOCATION,
+      storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
@@ -75,7 +75,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       IERC20(address(0)),
-      STORAGE_LOCATION,
+      storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
@@ -93,7 +93,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
@@ -109,7 +109,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
@@ -133,7 +133,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
@@ -148,7 +148,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: address(0),
         allowlistAdmin: ALLOWLIST_ADMIN,

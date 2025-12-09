@@ -92,7 +92,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,

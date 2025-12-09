@@ -32,7 +32,7 @@ contract e2e is OnRampSetup {
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     s_sourceCommitteeVerifier = new CommitteeVerifier(
-      CommitteeVerifier.DynamicConfig({feeAggregator: address(1), allowlistAdmin: address(0)}), ""
+      CommitteeVerifier.DynamicConfig({feeAggregator: address(1), allowlistAdmin: address(0)}), new string[](0)
     );
 
     BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);

@@ -49,7 +49,7 @@ contract MockVerifier is ICrossChainVerifierResolver, ICrossChainVerifierV1 {
     bytes memory verifierResults // verifierResults
   ) external {}
 
-  function getStorageLocation() external pure override returns (string[] memory storageLocations) {
+  function getStorageLocations() external pure override returns (string[] memory storageLocations) {
     storageLocations = new string[](1);
     storageLocations[0] = "mock://ccv";
     return storageLocations;

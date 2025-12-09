@@ -16,12 +16,12 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   error InvalidVerifierResults();
   error InvalidCCVVersion(bytes4 verifierVersion);
   error OnlyCallableByOwnerOrAllowlistAdmin();
-  error MustBeProposedStorageLocationAdmin();
-  error OnlyCallableByStorageLocationAdmin();
+  error MustBeProposedStorageLocationsAdmin();
+  error OnlyCallableByStorageLocationsAdmin();
 
   event ConfigSet(DynamicConfig dynamicConfig);
-  event StorageLocationAdminTransferRequested(address indexed from, address indexed to);
-  event StorageLocationAdminTransferred(address indexed from, address indexed to);
+  event StorageLocationsAdminTransferRequested(address indexed from, address indexed to);
+  event StorageLocationsAdminTransferred(address indexed from, address indexed to);
 
   /// @dev Defines upgradeable configuration parameters.
   struct DynamicConfig {
@@ -42,13 +42,13 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   DynamicConfig private s_dynamicConfig;
 
   /// @dev Account capable of changing the storage location, and transferring admin.
-  address private s_storageLocationAdmin;
-  /// @dev Pending storage location admin.
-  address private s_pendingStorageLocationAdmin;
+  address private s_storageLocationsAdmin;
+  /// @dev Pending storage locations admin.
+  address private s_pendingStorageLocationsAdmin;
 
-  constructor(DynamicConfig memory dynamicConfig, string memory storageLocation) BaseVerifier(storageLocation) {
+  constructor(DynamicConfig memory dynamicConfig, string[] memory storageLocations) BaseVerifier(storageLocations) {
     _setDynamicConfig(dynamicConfig);
-    s_storageLocationAdmin = msg.sender;
+    s_storageLocationsAdmin = msg.sender;
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -157,52 +157,52 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   }
 
   /// @notice Returns the account currently authorized to manage the storage location.
-  /// @return storageLocationAdmin The active storage location admin.
-  function getStorageLocationAdmin() external view returns (address) {
-    return s_storageLocationAdmin;
+  /// @return storageLocationsAdmin The active storage locations admin.
+  function getStorageLocationsAdmin() external view returns (address) {
+    return s_storageLocationsAdmin;
   }
 
-  /// @notice Returns the account that has been nominated as the next storage location admin.
-  /// @return pendingStorageLocationAdmin The address that must call acceptStorageLocationAdmin.
-  function getPendingStorageLocationAdmin() external view returns (address) {
-    return s_pendingStorageLocationAdmin;
+  /// @notice Returns the account that has been nominated as the next storage locations admin.
+  /// @return pendingStorageLocationsAdmin The address that must call acceptStorageLocationsAdmin.
+  function getPendingStorageLocationsAdmin() external view returns (address) {
+    return s_pendingStorageLocationsAdmin;
   }
 
-  /// @notice Initiates the two-step transfer for the storage location admin role.
+  /// @notice Initiates the two-step transfer for the storage locations admin role.
   /// @param to The address proposed to become the next admin.
-  function transferStorageLocationAdmin(
+  function transferStorageLocationsAdmin(
     address to
   ) external {
-    address currentAdmin = s_storageLocationAdmin;
-    if (msg.sender != currentAdmin) revert OnlyCallableByStorageLocationAdmin();
+    address currentAdmin = s_storageLocationsAdmin;
+    if (msg.sender != currentAdmin) revert OnlyCallableByStorageLocationsAdmin();
     if (to == msg.sender) revert CannotTransferToSelf();
 
-    s_pendingStorageLocationAdmin = to;
+    s_pendingStorageLocationsAdmin = to;
 
-    emit StorageLocationAdminTransferRequested(currentAdmin, to);
+    emit StorageLocationsAdminTransferRequested(currentAdmin, to);
   }
 
-  /// @notice Completes the transfer of the storage location admin role.
+  /// @notice Completes the transfer of the storage locations admin role.
   /// @dev Only the nominated pending admin can call this function.
-  function acceptStorageLocationAdmin() external {
-    if (msg.sender != s_pendingStorageLocationAdmin) revert MustBeProposedStorageLocationAdmin();
+  function acceptStorageLocationsAdmin() external {
+    if (msg.sender != s_pendingStorageLocationsAdmin) revert MustBeProposedStorageLocationsAdmin();
 
-    address oldAdmin = s_storageLocationAdmin;
-    s_storageLocationAdmin = msg.sender;
-    s_pendingStorageLocationAdmin = address(0);
+    address oldAdmin = s_storageLocationsAdmin;
+    s_storageLocationsAdmin = msg.sender;
+    s_pendingStorageLocationsAdmin = address(0);
 
-    emit StorageLocationAdminTransferred(oldAdmin, msg.sender);
+    emit StorageLocationsAdminTransferred(oldAdmin, msg.sender);
   }
 
-  /// @notice Updates the storage location identifier.
-  /// @dev Caller must be the storage location admin.
-  /// @param newLocation The new storage location identifier.
-  function updateStorageLocation(
-    string memory newLocation
+  /// @notice Updates the storage locations identifiers.
+  /// @dev Caller must be the storage locations admin.
+  /// @param newLocations The new storage locations identifiers.
+  function updateStorageLocations(
+    string[] memory newLocations
   ) external {
-    if (msg.sender != s_storageLocationAdmin) revert OnlyCallableByStorageLocationAdmin();
+    if (msg.sender != s_storageLocationsAdmin) revert OnlyCallableByStorageLocationsAdmin();
 
-    _setStorageLocation(newLocation);
+    _setStorageLocations(newLocations);
   }
 
   /// @notice Exposes the version tag.
