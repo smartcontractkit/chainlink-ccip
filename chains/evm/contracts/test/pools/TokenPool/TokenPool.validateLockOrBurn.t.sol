@@ -28,8 +28,6 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
-    vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0));
     s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
@@ -49,8 +47,6 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
 
   function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmation() public {
     uint16 minBlockConfirmation = 5;
-    vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0));
     s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
     vm.startPrank(s_allowedOnRamp);
 

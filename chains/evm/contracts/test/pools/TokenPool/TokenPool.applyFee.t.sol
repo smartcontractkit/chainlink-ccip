@@ -13,8 +13,6 @@ contract TokenPoolV2_applyFee is AdvancedPoolHooksSetup {
     uint16 defaultBlockConfirmationTransferFeeBps = 100;
     uint16 customBlockConfirmationTransferFeeBps = 500;
     uint256 amount = 1_000e18;
-    vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0));
     s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({

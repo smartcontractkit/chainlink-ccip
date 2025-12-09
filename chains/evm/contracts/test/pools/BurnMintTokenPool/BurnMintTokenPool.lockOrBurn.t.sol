@@ -118,17 +118,12 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
   }
 
   function test_lockOrBurn_FeeNotApplied_LegacyLockOrBurn() public {
-    uint16 minBlockConfirmation = 5;
     uint16 defaultBlockConfirmationTransferFeeBps = 100;
     uint16 customBlockConfirmationTransferFeeBps = 500;
     uint256 amount = 1000e18;
 
     // Mint tokens to the pool so they can be burned
     deal(address(s_token), address(s_pool), amount);
-
-    vm.startPrank(OWNER);
-    s_pool.setDynamicConfig(address(s_sourceRouter), address(0));
-    s_pool.setMinBlockConfirmation(minBlockConfirmation);
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
