@@ -24,6 +24,9 @@ import (
 	"github.com/smartcontractkit/mcms/types"
 )
 
+const AccessControllerRefs = 4
+const MCMSRefs = 4
+
 func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"deploy-mcms",
@@ -329,6 +332,9 @@ func getRefsAsOwnable(
 	if transferAccessController {
 		return getRefsAsOwnableWithAccessController(refs)
 	}
+	if len(refs) != MCMSRefs {
+		refs = refs[len(refs)-MCMSRefs:] // skip access controller refs
+	}
 	return getRefsAsOwnableWithoutAccessController(refs)
 }
 
@@ -378,40 +384,8 @@ func getRefsAsOwnableWithAccessController(
 	executorAccount := refs[2]
 	cancellerAccount := refs[3]
 	bypasserAccount := refs[4]
-	timelockProgram := refs[5]
-	timelockID, timelockSeed, _ := mcms_solana.ParseContractAddress(timelockProgram.Address)
-	proposerMCMSAccount := refs[6]
-	cancellerMCMSAccount := refs[7]
-	bypasserMCMSAccount := refs[8]
-	mcmID, proposerSeed, _ := mcms_solana.ParseContractAddress(proposerMCMSAccount.Address)
-	_, cancellerSeed, _ := mcms_solana.ParseContractAddress(cancellerMCMSAccount.Address)
-	_, bypasserSeed, _ := mcms_solana.ParseContractAddress(bypasserMCMSAccount.Address)
 
 	return []mcmsops.OwnableContract{
-		{
-			ProgramID: mcmID,
-			Seed:      proposerSeed,
-			OwnerPDA:  state.GetMCMConfigPDA(mcmID, state.PDASeed([]byte(proposerSeed[:]))),
-			Type:      common_utils.ProposerManyChainMultisig,
-		},
-		{
-			ProgramID: mcmID,
-			Seed:      cancellerSeed,
-			OwnerPDA:  state.GetMCMConfigPDA(mcmID, state.PDASeed([]byte(cancellerSeed[:]))),
-			Type:      common_utils.CancellerManyChainMultisig,
-		},
-		{
-			ProgramID: mcmID,
-			Seed:      bypasserSeed,
-			OwnerPDA:  state.GetMCMConfigPDA(mcmID, state.PDASeed([]byte(bypasserSeed[:]))),
-			Type:      common_utils.BypasserManyChainMultisig,
-		},
-		{
-			ProgramID: timelockID,
-			Seed:      timelockSeed,
-			OwnerPDA:  state.GetTimelockConfigPDA(timelockID, state.PDASeed([]byte(timelockSeed[:]))),
-			Type:      common_utils.RBACTimelock,
-		},
 		{
 			ProgramID: solana.MustPublicKeyFromBase58(accessControllerProgram.Address),
 			OwnerPDA:  solana.MustPublicKeyFromBase58(proposerAccount.Address),

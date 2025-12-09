@@ -736,11 +736,27 @@ func acceptOwnershipTimelockSolanaOp(b operations.Bundle, deps Deps, in Transfer
 	chainSelector := solChain.ChainSelector()
 
 	contract := in.Contract
-	acceptMCMSTransaction, err := acceptMCMSTransaction(chainSelector, contract, in.NewOwner)
+	acceptInstruction, err := acceptMCMSInstruction(chainSelector, contract, in.NewOwner)
 	if err != nil {
 		return out, fmt.Errorf("failed to create accept ownership mcms transaction: %w", err)
 	}
-	out = append(out, acceptMCMSTransaction)
+	if in.NewOwner != solChain.DeployerKey.PublicKey() {
+		acceptBatch, err := utils.BuildMCMSBatchOperation(
+			chainSelector,
+			[]solana.Instruction{acceptInstruction},
+			contract.ProgramID.String(),
+			string(contract.Type),
+		)
+		if err != nil {
+			return out, fmt.Errorf("failed to build accept ownership mcms transaction: %w", err)
+		}
+		out = append(out, acceptBatch)
+	} else {
+		err = solChain.Confirm([]solana.Instruction{acceptInstruction})
+		if err != nil {
+			return out, fmt.Errorf("failed to confirm instruction: %w", err)
+		}
+	}
 
 	return out, nil
 }
@@ -765,25 +781,16 @@ func transferOwnershipInstruction(
 	return newSeededTransferOwnershipInstruction(programID, seed, proposedOwner, ownerPDA, auth)
 }
 
-func acceptMCMSTransaction(
+func acceptMCMSInstruction(
 	selector uint64,
 	contract OwnableContract,
 	authority solana.PublicKey,
-) (types.BatchOperation, error) {
+) (solana.Instruction, error) {
 	acceptInstruction, err := acceptOwnershipInstruction(contract.ProgramID, contract.Seed, contract.OwnerPDA, authority)
 	if err != nil {
-		return types.BatchOperation{}, fmt.Errorf("failed to build accept ownership instruction: %w", err)
+		return nil, fmt.Errorf("failed to build accept ownership instruction: %w", err)
 	}
-	acceptMCMSTx, err := utils.BuildMCMSBatchOperation(
-		selector,
-		[]solana.Instruction{acceptInstruction},
-		contract.ProgramID.String(),
-		string(contract.Type),
-	)
-	if err != nil {
-		return types.BatchOperation{}, fmt.Errorf("failed to build accept ownership mcms transaction: %w", err)
-	}
-	return acceptMCMSTx, nil
+	return acceptInstruction, nil
 }
 
 func acceptOwnershipInstruction(programID solana.PublicKey, seed state.PDASeed, ownerPDA, auth solana.PublicKey,
