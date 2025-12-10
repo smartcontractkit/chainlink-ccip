@@ -15,7 +15,7 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
 
     CommitteeVerifier committeeVerifier = new CommitteeVerifier(
       _createDynamicConfigArgs(expectedFeeAggregator, expectedAllowlistAdmin),
-      storageLocations,
+      s_storageLocations,
       address(s_mockRMNRemote)
     );
 
@@ -33,7 +33,7 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
   function test_constructor_RevertWhen_InvalidConfig_FeeAggregatorZeroAddress() public {
     vm.expectRevert(CommitteeVerifier.InvalidConfig.selector);
     new CommitteeVerifier(
-      _createDynamicConfigArgs(address(0), ALLOWLIST_ADMIN), storageLocations, address(s_mockRMNRemote)
+      _createDynamicConfigArgs(address(0), ALLOWLIST_ADMIN), s_storageLocations, address(s_mockRMNRemote)
     );
   }
 }

@@ -65,7 +65,7 @@ contract CommitteeVerifier_storageLocationsAdmin is CommitteeVerifierSetup {
     vm.startPrank(newAdmin);
     s_committeeVerifier.acceptStorageLocationsAdmin();
     vm.expectEmit();
-    emit BaseVerifier.StorageLocationsUpdated(storageLocations, newStorageLocations);
+    emit BaseVerifier.StorageLocationsUpdated(s_storageLocations, newStorageLocations);
 
     s_committeeVerifier.updateStorageLocations(newStorageLocations);
     vm.stopPrank();

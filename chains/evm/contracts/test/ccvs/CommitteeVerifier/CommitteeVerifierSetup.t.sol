@@ -20,7 +20,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
     super.setUp();
 
     s_committeeVerifier =
-      new CommitteeVerifier(_createBasicDynamicConfigArgs(), storageLocations, address(s_mockRMNRemote));
+      new CommitteeVerifier(_createBasicDynamicConfigArgs(), s_storageLocations, address(s_mockRMNRemote));
     s_versionTag = s_committeeVerifier.versionTag();
 
     SignatureQuorumValidator.SignatureConfig[] memory updates = new SignatureQuorumValidator.SignatureConfig[](1);

@@ -11,7 +11,7 @@ contract CCTPVerifier_updateStorageLocations is CCTPVerifierSetup {
     newStorageLocations[0] = "new/location";
 
     vm.expectEmit();
-    emit BaseVerifier.StorageLocationsUpdated(storageLocations, newStorageLocations);
+    emit BaseVerifier.StorageLocationsUpdated(s_storageLocations, newStorageLocations);
 
     s_cctpVerifier.updateStorageLocations(newStorageLocations);
   }
