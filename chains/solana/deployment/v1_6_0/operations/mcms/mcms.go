@@ -337,11 +337,41 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error)
 	}
 
 	encodedAddress := mcms_solana.ContractAddress(in.MCM, mcms_solana.PDASeed(seed))
+	upgradeAuthority, err := utils.GetUpgradeAuthority(deps.Chain.Client, in.MCM)
+	if err != nil {
+		return MCMOutput{}, fmt.Errorf("failed to get upgrade authority: %w", err)
+	}
 
-	configurer := mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()))
+	var configurer *mcms_solana.Configurer
+	if len(ixns) > 0 {
+		configurer = mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()), mcms_solana.WithDoNotSendInstructionsOnChain())
+	} else {
+		configurer = mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()))
+	}
 	tx, err := configurer.SetConfig(b.GetContext(), encodedAddress, &in.MCMConfig, false)
 	if err != nil {
 		return MCMOutput{}, fmt.Errorf("failed to set config on mcm: %w", err)
+	}
+	if tx.Hash == "" {
+		instructions := tx.RawData.([]solana.Instruction)
+		// override authority to upgrade authority if different from deployer
+		for _, ixn := range instructions {
+			for _, account := range ixn.Accounts() {
+				if account.PublicKey == deps.Chain.DeployerKey.PublicKey() {
+					account.PublicKey = upgradeAuthority
+				}
+			}
+		}
+		batch, err := utils.BuildMCMSBatchOperation(
+			deps.Chain.Selector,
+			instructions,
+			in.MCM.String(),
+			in.ContractType.String(),
+		)
+		if err != nil {
+			return MCMOutput{}, fmt.Errorf("failed to build timelock initialization batch operation: %w", err)
+		}
+		batches = append(batches, batch)
 	}
 	b.Logger.Infow("called SetConfig on MCM", "transaction", tx.Hash)
 
@@ -635,10 +665,6 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 		common_utils.Version_1_6_0,
 		in.Qualifier,
 	)
-	upgradeAuthority, err := utils.GetUpgradeAuthority(deps.Chain.Client, id)
-	if err != nil {
-		return MCMOutput{}, fmt.Errorf("failed to get upgrade authority: %w", err)
-	}
 
 	instructionBuilder := timelock.NewBatchAddAccessInstruction([32]uint8(
 		state.PDASeed([]byte(seed[:]))),
@@ -646,7 +672,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 		timelockConfigPDA,
 		solana.MustPublicKeyFromBase58(accessControllerProgram.Address),
 		solana.MustPublicKeyFromBase58(roleAccount.Address),
-		upgradeAuthority)
+		deps.Chain.DeployerKey.PublicKey())
 
 	for _, account := range in.Accounts {
 		instructionBuilder.Append(solana.Meta(account))
@@ -655,21 +681,6 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 	instruction, err := instructionBuilder.ValidateAndBuild()
 	if err != nil {
 		return MCMOutput{}, fmt.Errorf("failed to build BatchAddAccess instruction: %w", err)
-	}
-
-	if upgradeAuthority != deps.Chain.DeployerKey.PublicKey() {
-		batch, err := utils.BuildMCMSBatchOperation(
-			deps.Chain.Selector,
-			[]solana.Instruction{instruction},
-			id.String(),
-			utils.TimelockProgramType.String(),
-		)
-		if err != nil {
-			return MCMOutput{}, fmt.Errorf("failed to build timelock initialization batch operation: %w", err)
-		}
-		return MCMOutput{
-			BatchOps: []types.BatchOperation{batch},
-		}, nil
 	}
 
 	err = deps.Chain.Confirm([]solana.Instruction{instruction})
@@ -725,11 +736,27 @@ func acceptOwnershipTimelockSolanaOp(b operations.Bundle, deps Deps, in Transfer
 	chainSelector := solChain.ChainSelector()
 
 	contract := in.Contract
-	acceptMCMSTransaction, err := acceptMCMSTransaction(chainSelector, contract, in.NewOwner)
+	acceptInstruction, err := acceptMCMSInstruction(chainSelector, contract, in.NewOwner)
 	if err != nil {
 		return out, fmt.Errorf("failed to create accept ownership mcms transaction: %w", err)
 	}
-	out = append(out, acceptMCMSTransaction)
+	if in.NewOwner != solChain.DeployerKey.PublicKey() {
+		acceptBatch, err := utils.BuildMCMSBatchOperation(
+			chainSelector,
+			[]solana.Instruction{acceptInstruction},
+			contract.ProgramID.String(),
+			string(contract.Type),
+		)
+		if err != nil {
+			return out, fmt.Errorf("failed to build accept ownership mcms transaction: %w", err)
+		}
+		out = append(out, acceptBatch)
+	} else {
+		err = solChain.Confirm([]solana.Instruction{acceptInstruction})
+		if err != nil {
+			return out, fmt.Errorf("failed to confirm instruction: %w", err)
+		}
+	}
 
 	return out, nil
 }
@@ -754,25 +781,16 @@ func transferOwnershipInstruction(
 	return newSeededTransferOwnershipInstruction(programID, seed, proposedOwner, ownerPDA, auth)
 }
 
-func acceptMCMSTransaction(
+func acceptMCMSInstruction(
 	selector uint64,
 	contract OwnableContract,
 	authority solana.PublicKey,
-) (types.BatchOperation, error) {
+) (solana.Instruction, error) {
 	acceptInstruction, err := acceptOwnershipInstruction(contract.ProgramID, contract.Seed, contract.OwnerPDA, authority)
 	if err != nil {
-		return types.BatchOperation{}, fmt.Errorf("failed to build accept ownership instruction: %w", err)
+		return nil, fmt.Errorf("failed to build accept ownership instruction: %w", err)
 	}
-	acceptMCMSTx, err := utils.BuildMCMSBatchOperation(
-		selector,
-		[]solana.Instruction{acceptInstruction},
-		contract.ProgramID.String(),
-		string(contract.Type),
-	)
-	if err != nil {
-		return types.BatchOperation{}, fmt.Errorf("failed to build accept ownership mcms transaction: %w", err)
-	}
-	return acceptMCMSTx, nil
+	return acceptInstruction, nil
 }
 
 func acceptOwnershipInstruction(programID solana.PublicKey, seed state.PDASeed, ownerPDA, auth solana.PublicKey,

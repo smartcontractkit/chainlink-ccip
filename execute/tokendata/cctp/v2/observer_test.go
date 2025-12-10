@@ -17,7 +17,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 )
 
-// Test helper functions
+var testPoolAddress = func() cciptypes.UnknownAddress {
+	decoded, _ := hex.DecodeString("1234567890123456789012345678901234567890")
+	return cciptypes.UnknownAddress(decoded)
+}()
 
 // defaultTestEncoder returns a simple encoder that concatenates message and attestation for testing
 func defaultTestEncoder() AttestationEncoder {
@@ -34,7 +37,6 @@ func defaultTestEncoder() AttestationEncoder {
 // Pass 0 for chainSelector to use default (999).
 // Note: This creates the observer directly using a struct literal, bypassing the constructor.
 // This is appropriate for unit tests where we want to inject mock dependencies.
-// Tests should use the setup callback to populate supportedPoolsBySelector as needed.
 func newTestCCTPv2Observer(
 	t *testing.T,
 	httpClient CCTPv2HTTPClient,
@@ -47,14 +49,13 @@ func newTestCCTPv2Observer(
 
 	// Create observer directly using struct literal (bypassing constructor for test flexibility)
 	observer := &CCTPv2TokenDataObserver{
-		lggr:                     logger.Test(t),
-		destChainSelector:        chainSelector,
-		supportedPoolsBySelector: make(map[cciptypes.ChainSelector]string), // Tests populate this via setup callback
-		attestationEncoder:       defaultTestEncoder(),
-		httpClient:               httpClient,
-		calculateDepositHashFn:   CalculateDepositHash,
-		messageToTokenDataFn:     CCTPv2MessageToTokenData,
-		metricsReporter:          NewNoOpMetricsReporter(),
+		lggr:                   logger.Test(t),
+		destChainSelector:      chainSelector,
+		attestationEncoder:     defaultTestEncoder(),
+		httpClient:             httpClient,
+		calculateDepositHashFn: CalculateDepositHash,
+		messageToTokenDataFn:   CCTPv2MessageToTokenData,
+		metricsReporter:        NewNoOpMetricsReporter(),
 	}
 
 	return observer
@@ -74,7 +75,6 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 	tests := []struct {
 		name     string
 		messages exectypes.MessageObservations
-		setup    func(*CCTPv2TokenDataObserver)
 		validate func(*testing.T, CCTPv2TokenDataObserver, exectypes.MessageObservations)
 	}{
 		{
@@ -90,14 +90,9 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					1: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 				},
-			},
-			setup: func(observer *CCTPv2TokenDataObserver) {
-				observer.supportedPoolsBySelector = map[cciptypes.ChainSelector]string{
-					testChain1: testPoolAddr,
-				}
 			},
 			validate: func(t *testing.T, observer CCTPv2TokenDataObserver, msgs exectypes.MessageObservations) {
 				result := observer.getCCTPv2RequestParams(msgs)
@@ -116,15 +111,10 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					1: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
-						createCCTPv2Token(testPoolAddr, 100, depositHex2),
+						createCCTPv2Token(100, depositHex1),
+						createCCTPv2Token(100, depositHex2),
 					}),
 				},
-			},
-			setup: func(observer *CCTPv2TokenDataObserver) {
-				observer.supportedPoolsBySelector = map[cciptypes.ChainSelector]string{
-					testChain1: testPoolAddr,
-				}
 			},
 			validate: func(t *testing.T, observer CCTPv2TokenDataObserver, msgs exectypes.MessageObservations) {
 				result := observer.getCCTPv2RequestParams(msgs)
@@ -144,17 +134,12 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					1: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 					2: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex2),
+						createCCTPv2Token(100, depositHex2),
 					}),
 				},
-			},
-			setup: func(observer *CCTPv2TokenDataObserver) {
-				observer.supportedPoolsBySelector = map[cciptypes.ChainSelector]string{
-					testChain1: testPoolAddr,
-				}
 			},
 			validate: func(t *testing.T, observer CCTPv2TokenDataObserver, msgs exectypes.MessageObservations) {
 				result := observer.getCCTPv2RequestParams(msgs)
@@ -173,44 +158,16 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported token with wrong pool address is filtered out",
-			messages: exectypes.MessageObservations{
-				testChain1: {
-					1: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(
-							"0x9999999999999999999999999999999999999999",
-							100,
-							depositHex1,
-						),
-					}),
-				},
-			},
-			setup: func(observer *CCTPv2TokenDataObserver) {
-				observer.supportedPoolsBySelector = map[cciptypes.ChainSelector]string{
-					testChain1: testPoolAddr,
-				}
-			},
-			validate: func(t *testing.T, observer CCTPv2TokenDataObserver, msgs exectypes.MessageObservations) {
-				result := observer.getCCTPv2RequestParams(msgs)
-				assert.Equal(t, 0, result.Cardinality())
-			},
-		},
-		{
 			name: "token with invalid ExtraData is filtered out",
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					1: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
 						{
-							SourcePoolAddress: mustDecodeAddress(testPoolAddr),
+							SourcePoolAddress: testPoolAddress,
 							ExtraData:         cciptypes.Bytes{0x01, 0x02, 0x03}, // Invalid length
 						},
 					}),
 				},
-			},
-			setup: func(observer *CCTPv2TokenDataObserver) {
-				observer.supportedPoolsBySelector = map[cciptypes.ChainSelector]string{
-					testChain1: testPoolAddr,
-				}
 			},
 			validate: func(t *testing.T, observer CCTPv2TokenDataObserver, msgs exectypes.MessageObservations) {
 				result := observer.getCCTPv2RequestParams(msgs)
@@ -222,14 +179,9 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					1: createTestMessage("", []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 				},
-			},
-			setup: func(observer *CCTPv2TokenDataObserver) {
-				observer.supportedPoolsBySelector = map[cciptypes.ChainSelector]string{
-					testChain1: testPoolAddr,
-				}
 			},
 			validate: func(t *testing.T, observer CCTPv2TokenDataObserver, msgs exectypes.MessageObservations) {
 				result := observer.getCCTPv2RequestParams(msgs)
@@ -241,20 +193,14 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					1: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 				},
 				testChain2: {
 					1: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 200, depositHex2),
+						createCCTPv2Token(200, depositHex2),
 					}),
 				},
-			},
-			setup: func(observer *CCTPv2TokenDataObserver) {
-				observer.supportedPoolsBySelector = map[cciptypes.ChainSelector]string{
-					testChain1: testPoolAddr,
-					testChain2: testPoolAddr,
-				}
 			},
 			validate: func(t *testing.T, observer CCTPv2TokenDataObserver, msgs exectypes.MessageObservations) {
 				result := observer.getCCTPv2RequestParams(msgs)
@@ -277,17 +223,12 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					1: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 					2: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex2),
+						createCCTPv2Token(100, depositHex2),
 					}),
 				},
-			},
-			setup: func(observer *CCTPv2TokenDataObserver) {
-				observer.supportedPoolsBySelector = map[cciptypes.ChainSelector]string{
-					testChain1: testPoolAddr,
-				}
 			},
 			validate: func(t *testing.T, observer CCTPv2TokenDataObserver, msgs exectypes.MessageObservations) {
 				result := observer.getCCTPv2RequestParams(msgs)
@@ -300,15 +241,10 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					1: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
-						createCCTPv2Token(testPoolAddr, 200, depositHex2),
+						createCCTPv2Token(100, depositHex1),
+						createCCTPv2Token(200, depositHex2),
 					}),
 				},
-			},
-			setup: func(observer *CCTPv2TokenDataObserver) {
-				observer.supportedPoolsBySelector = map[cciptypes.ChainSelector]string{
-					testChain1: testPoolAddr,
-				}
 			},
 			validate: func(t *testing.T, observer CCTPv2TokenDataObserver, msgs exectypes.MessageObservations) {
 				result := observer.getCCTPv2RequestParams(msgs)
@@ -321,10 +257,6 @@ func TestCCTPv2TokenDataObserver_GetCCTPv2RequestParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			observer := newTestCCTPv2Observer(t, nil, 0)
-
-			if tt.setup != nil {
-				tt.setup(observer)
-			}
 
 			tt.validate(t, *observer, tt.messages)
 		})
@@ -341,8 +273,9 @@ func createTestMessage(txHash string, tokens []cciptypes.RampTokenAmount) ccipty
 	}
 }
 
-// createCCTPv2Token creates a valid CCTPv2 token with the given pool address and source domain
-func createCCTPv2Token(poolAddr string, sourceDomain uint32, depositHashHex string) cciptypes.RampTokenAmount {
+// createCCTPv2Token creates a valid CCTPv2 token with the given source domain and deposit hash.
+// Uses a constant pool address since pool address is not used for token support checking.
+func createCCTPv2Token(sourceDomain uint32, depositHashHex string) cciptypes.RampTokenAmount {
 	// Create valid CCTPv2 ExtraData: versionTag (4) + sourceDomain (4) + depositHash (32)
 	extraData := make([]byte, 40)
 
@@ -357,19 +290,9 @@ func createCCTPv2Token(poolAddr string, sourceDomain uint32, depositHashHex stri
 	copy(extraData[8:40], depositHash[:])
 
 	return cciptypes.RampTokenAmount{
-		SourcePoolAddress: mustDecodeAddress(poolAddr),
+		SourcePoolAddress: testPoolAddress,
 		ExtraData:         cciptypes.Bytes(extraData),
 	}
-}
-
-// mustDecodeAddress decodes a hex address string to UnknownAddress
-func mustDecodeAddress(hexAddr string) cciptypes.UnknownAddress {
-	hexAddr = strings.TrimPrefix(hexAddr, "0x")
-	decoded, err := hex.DecodeString(hexAddr)
-	if err != nil {
-		panic(err)
-	}
-	return cciptypes.UnknownAddress(decoded)
 }
 
 func TestCCTPv2TokenDataObserver_MakeCCTPv2Requests(t *testing.T) {
@@ -1389,35 +1312,17 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 		txHash        TxHash
 		tokenAmount   cciptypes.RampTokenAmount
 		tokenData     tokenDataMap
-		poolConfig    map[cciptypes.ChainSelector]string
 		validate      func(*testing.T, exectypes.TokenData, tokenDataMap)
 	}{
-		{
-			name:          "unsupported token - wrong pool address",
-			chainSelector: testChain1,
-			txHash:        testTxHash1,
-			tokenAmount:   createCCTPv2Token("0x9999999999999999999999999999999999999999", 100, depositHex1),
-			tokenData:     map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData{},
-			poolConfig: map[cciptypes.ChainSelector]string{
-				testChain1: testPoolAddr,
-			},
-			validate: func(t *testing.T, result exectypes.TokenData, tokenData tokenDataMap) {
-				assert.False(t, result.Ready)
-				assert.False(t, result.Supported)
-				assert.Nil(t, result.Error)
-				// tokenData not modified for unsupported tokens
-			},
-		},
 		{
 			name:          "unsupported token - invalid ExtraData",
 			chainSelector: testChain1,
 			txHash:        testTxHash1,
 			tokenAmount: cciptypes.RampTokenAmount{
-				SourcePoolAddress: mustDecodeAddress(testPoolAddr),
+				SourcePoolAddress: testPoolAddress,
 				ExtraData:         cciptypes.Bytes{0x01, 0x02, 0x03}, // Invalid length
 			},
-			tokenData:  map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData{},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
+			tokenData: map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData{},
 			validate: func(t *testing.T, result exectypes.TokenData, tokenData tokenDataMap) {
 				assert.False(t, result.Ready)
 				assert.False(t, result.Supported)
@@ -1428,7 +1333,7 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 			name:          "supported token with data found",
 			chainSelector: testChain1,
 			txHash:        testTxHash1,
-			tokenAmount:   createCCTPv2Token(testPoolAddr, 100, depositHex1),
+			tokenAmount:   createCCTPv2Token(100, depositHex1),
 			tokenData: map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData{
 				{chainSelector: testChain1, sourceDomain: 100, txHash: testTxHash1}: {
 					hash1: {
@@ -1436,7 +1341,6 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 					},
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			validate: func(t *testing.T, result exectypes.TokenData, tokenData tokenDataMap) {
 				assert.True(t, result.Ready)
 				assert.True(t, result.Supported)
@@ -1451,9 +1355,8 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 			name:          "request params not found in tokenData map",
 			chainSelector: testChain1,
 			txHash:        testTxHash1,
-			tokenAmount:   createCCTPv2Token(testPoolAddr, 100, depositHex1),
+			tokenAmount:   createCCTPv2Token(100, depositHex1),
 			tokenData:     map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData{},
-			poolConfig:    map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			validate: func(t *testing.T, result exectypes.TokenData, tokenData tokenDataMap) {
 				assert.False(t, result.Ready)
 				assert.True(t, result.Supported)
@@ -1464,7 +1367,7 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 			name:          "deposit hash not found in tokenData map",
 			chainSelector: testChain1,
 			txHash:        testTxHash1,
-			tokenAmount:   createCCTPv2Token(testPoolAddr, 100, depositHex1),
+			tokenAmount:   createCCTPv2Token(100, depositHex1),
 			tokenData: map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData{
 				{chainSelector: testChain1, sourceDomain: 100, txHash: testTxHash1}: {
 					hash2: { // Different hash
@@ -1472,7 +1375,6 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 					},
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			validate: func(t *testing.T, result exectypes.TokenData, tokenData tokenDataMap) {
 				assert.False(t, result.Ready)
 				assert.True(t, result.Supported)
@@ -1483,13 +1385,12 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 			name:          "all token data consumed (empty slice)",
 			chainSelector: testChain1,
 			txHash:        testTxHash1,
-			tokenAmount:   createCCTPv2Token(testPoolAddr, 100, depositHex1),
+			tokenAmount:   createCCTPv2Token(100, depositHex1),
 			tokenData: map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData{
 				{chainSelector: testChain1, sourceDomain: 100, txHash: testTxHash1}: {
 					hash1: {}, // Empty slice
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			validate: func(t *testing.T, result exectypes.TokenData, tokenData tokenDataMap) {
 				assert.False(t, result.Ready)
 				assert.True(t, result.Supported)
@@ -1500,7 +1401,7 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 			name:          "consumes first item and leaves second",
 			chainSelector: testChain1,
 			txHash:        testTxHash1,
-			tokenAmount:   createCCTPv2Token(testPoolAddr, 100, depositHex1),
+			tokenAmount:   createCCTPv2Token(100, depositHex1),
 			tokenData: map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData{
 				{chainSelector: testChain1, sourceDomain: 100, txHash: testTxHash1}: {
 					hash1: {
@@ -1509,7 +1410,6 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 					},
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			validate: func(t *testing.T, result exectypes.TokenData, tokenData tokenDataMap) {
 				assert.True(t, result.Ready)
 				assert.Equal(t, cciptypes.Bytes("attestation-1"), result.Data) // Gets first item
@@ -1523,7 +1423,7 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 			name:          "multiple calls consume items in order",
 			chainSelector: testChain1,
 			txHash:        testTxHash1,
-			tokenAmount:   createCCTPv2Token(testPoolAddr, 100, depositHex1),
+			tokenAmount:   createCCTPv2Token(100, depositHex1),
 			tokenData: map[CCTPv2RequestParams]map[DepositHash][]exectypes.TokenData{
 				{chainSelector: testChain1, sourceDomain: 100, txHash: testTxHash1}: {
 					hash1: {
@@ -1533,7 +1433,6 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 					},
 				},
 			},
-			poolConfig: map[cciptypes.ChainSelector]string{testChain1: testPoolAddr},
 			validate: func(t *testing.T, result exectypes.TokenData, tokenData tokenDataMap) {
 				// First call gets "first", second call gets "second", third gets "third"
 				assert.Equal(t, cciptypes.Bytes("first"), result.Data)
@@ -1546,9 +1445,8 @@ func TestCCTPv2TokenDataObserver_AssignSingleTokenData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			observer := &CCTPv2TokenDataObserver{
-				lggr:                     logger.Test(t),
-				supportedPoolsBySelector: tt.poolConfig,
-				metricsReporter:          NewNoOpMetricsReporter(),
+				lggr:            logger.Test(t),
+				metricsReporter: NewNoOpMetricsReporter(),
 			}
 
 			result := observer.assignSingleTokenData(
@@ -1596,7 +1494,7 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 				},
 			},
@@ -1620,8 +1518,8 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 				},
 			},
@@ -1648,10 +1546,10 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 					11: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex2),
+						createCCTPv2Token(100, depositHex2),
 					}),
 				},
 			},
@@ -1676,12 +1574,12 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 				},
 				testChain2: {
 					20: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex2),
+						createCCTPv2Token(100, depositHex2),
 					}),
 				},
 			},
@@ -1705,8 +1603,11 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
-						createCCTPv2Token("0x9999999999999999999999999999999999999999", 100, depositHex2),
+						createCCTPv2Token(100, depositHex1),
+						{
+							SourcePoolAddress: testPoolAddress,
+							ExtraData:         cciptypes.Bytes{0x01, 0x02, 0x03}, // Invalid ExtraData
+						},
 					}),
 				},
 			},
@@ -1731,7 +1632,7 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 				},
 			},
@@ -1751,9 +1652,9 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					10: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 				},
 			},
@@ -1783,10 +1684,10 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 			messages: exectypes.MessageObservations{
 				testChain1: {
 					100: createTestMessage(testTxHash1, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex1),
+						createCCTPv2Token(100, depositHex1),
 					}),
 					999: createTestMessage(testTxHash2, []cciptypes.RampTokenAmount{
-						createCCTPv2Token(testPoolAddr, 100, depositHex2),
+						createCCTPv2Token(100, depositHex2),
 					}),
 				},
 			},
@@ -1811,11 +1712,7 @@ func TestCCTPv2TokenDataObserver_AssignTokenData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			observer := &CCTPv2TokenDataObserver{
-				lggr: logger.Test(t),
-				supportedPoolsBySelector: map[cciptypes.ChainSelector]string{
-					testChain1: testPoolAddr,
-					testChain2: testPoolAddr,
-				},
+				lggr:            logger.Test(t),
 				metricsReporter: NewNoOpMetricsReporter(),
 			}
 
