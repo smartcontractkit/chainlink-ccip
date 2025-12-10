@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/interfaces/IERC20.sol";
@@ -101,6 +102,64 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
   }
 
   // Reverts
+
+  function test_releaseOrMint_V2_UsesCustomFinalityAndNetLiquidity() public {
+    uint256 amount = 10e18;
+    uint16 feeBps = 500;
+    uint256 expectedLockedAmount = amount - (amount * feeBps) / 10_000;
+
+    uint256 startingLockBoxBalance = s_token.balanceOf(address(s_lockBox));
+
+    _setTokenTransferFee(SOURCE_CHAIN_SELECTOR, feeBps);
+    deal(address(s_token), address(s_siloedLockReleaseTokenPool), amount);
+
+    vm.startPrank(s_allowedOnRamp);
+    (, uint256 lockedAmount) = s_siloedLockReleaseTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: STRANGER,
+        receiver: bytes(""),
+        amount: amount,
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        localToken: address(s_token)
+      }),
+      0,
+      ""
+    );
+
+    assertEq(lockedAmount, expectedLockedAmount);
+    assertEq(s_token.balanceOf(address(s_lockBox)), startingLockBoxBalance + expectedLockedAmount);
+    assertEq(s_siloedLockReleaseTokenPool.getUnsiloedLiquidity(), expectedLockedAmount);
+
+    vm.startPrank(s_allowedOffRamp);
+
+    vm.expectEmit();
+    emit TokenPool.CustomBlockConfirmationInboundRateLimitConsumed({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: expectedLockedAmount
+    });
+
+    vm.expectEmit();
+    emit IERC20.Transfer(address(s_lockBox), OWNER, expectedLockedAmount);
+
+    s_siloedLockReleaseTokenPool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: OWNER,
+        sourceDenominatedAmount: expectedLockedAmount,
+        localToken: address(s_token),
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: abi.encode(s_siloedDestPoolAddress),
+        sourcePoolData: "",
+        offchainTokenData: ""
+      }),
+      1
+    );
+
+    assertEq(s_siloedLockReleaseTokenPool.getUnsiloedLiquidity(), 0);
+    assertEq(s_token.balanceOf(address(s_lockBox)), startingLockBoxBalance);
+    assertEq(s_token.balanceOf(address(s_siloedLockReleaseTokenPool)), amount - expectedLockedAmount);
+  }
 
   function test_ReleaseOrMint_RevertsWhen_InsufficientLiquidity_SiloedChain() public {
     uint256 releaseAmount = 10e18;
