@@ -128,7 +128,8 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public override(TokenPool) returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut) {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
+    uint256 feeAmount = _getFee(lockOrBurnIn, WAIT_FOR_FINALITY);
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", feeAmount);
 
     Path memory path = s_chainSelectorToPath[lockOrBurnIn.remoteChainSelector];
     if (path.allowedCaller == bytes32(0)) {

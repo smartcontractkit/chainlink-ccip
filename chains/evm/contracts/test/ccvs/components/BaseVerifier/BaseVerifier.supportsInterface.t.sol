@@ -7,7 +7,7 @@ import {BaseVerifierSetup} from "./BaseVerifierSetup.t.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
-contract BaseVerifier_getStorageLocation is BaseVerifierSetup {
+contract BaseVerifier_supportsInterface is BaseVerifierSetup {
   function test_supportsInterface() public view {
     assertTrue(s_baseVerifier.supportsInterface(type(IERC165).interfaceId));
     assertTrue(s_baseVerifier.supportsInterface(type(ICrossChainVerifierV1).interfaceId));

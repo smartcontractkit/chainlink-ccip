@@ -18,10 +18,12 @@ contract BaseVerifierSetup is FeeQuoterSetup {
   address internal s_onRamp;
   address internal s_offRampRemote;
 
-  string internal constant STORAGE_LOCATION = "testStorageLocation";
+  string[] internal s_storageLocations;
 
   function setUp() public virtual override {
     super.setUp();
+
+    s_storageLocations.push("testStorageLocation");
 
     s_router = IRouter(makeAddr("Router"));
     s_onRamp = makeAddr("OnRamp");
@@ -31,7 +33,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
     s_offRampRemote = makeAddr("OffRampRemote");
     s_sourceFeeToken = address(new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0));
 
-    s_baseVerifier = new BaseVerifierTestHelper(STORAGE_LOCATION, address(s_mockRMNRemote));
+    s_baseVerifier = new BaseVerifierTestHelper(s_storageLocations, address(s_mockRMNRemote));
 
     // Set up initial destination chain config.
     BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);

@@ -241,14 +241,15 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @inheritdoc IPoolV2
   /// @dev The _validateLockOrBurn check is an essential security check.
-  /// @dev The _applyFee function deducts the fee from the amount and returns the amount after fee deduction.
+  /// @dev The _getFee function deducts the fee from the amount and returns the amount after fee deduction.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) public virtual returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
-    destTokenAmount = _applyFee(lockOrBurnIn, blockConfirmationRequested);
+    uint256 feeAmount = _getFee(lockOrBurnIn, blockConfirmationRequested);
+    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs, feeAmount);
+    destTokenAmount = lockOrBurnIn.amount - feeAmount;
     _lockOrBurn(destTokenAmount);
 
     emit LockedOrBurned({
@@ -269,11 +270,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @inheritdoc IPoolV1
   /// @dev The _validateLockOrBurn check is an essential security check.
-  /// @dev _applyFee is not called in this legacy method, so the full amount is locked or burned.
+  /// @dev _getFee is not called in this legacy method, so the full amount is locked or burned.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0); // feeAmount is zero
     _lockOrBurn(lockOrBurnIn.amount);
 
     emit LockedOrBurned({
@@ -355,14 +356,15 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   function _validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
-    bytes memory tokenArgs
+    bytes memory tokenArgs,
+    uint256 feeAmount
   ) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
 
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
-    uint256 amount = lockOrBurnIn.amount;
 
+    uint256 amount = lockOrBurnIn.amount - feeAmount;
     // If custom block confirmations are requested, validate against the minimum and apply the custom rate limit.
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
       uint16 minBlockConfirmationConfigured = s_minBlockConfirmation;
@@ -950,33 +952,23 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     );
   }
 
-  /// @dev Deducts the fee from the transferred amount based on the configured basis points (not added on top).
+  /// @dev Calculates the fee based on the transferred amount, and the configured basis points.
   /// @param lockOrBurnIn The original lock or burn request.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
   /// A value of zero (WAIT_FOR_FINALITY) applies default finality fees.
-  /// @return destAmount The amount after fee deduction.
-  function _applyFee(
+  /// Returns the fee amount.
+  function _getFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested
-  ) internal view virtual returns (uint256 destAmount) {
-    TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
+  ) internal view virtual returns (uint256) {
+    TokenTransferFeeConfig storage feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
 
     // Determine which fee basis points to apply based on finality type.
-    uint16 tokenFeeBps;
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
-      tokenFeeBps = feeConfig.customBlockConfirmationTransferFeeBps;
+      return (lockOrBurnIn.amount * feeConfig.customBlockConfirmationTransferFeeBps) / BPS_DIVIDER;
     } else {
-      tokenFeeBps = feeConfig.defaultBlockConfirmationTransferFeeBps;
+      return (lockOrBurnIn.amount * feeConfig.defaultBlockConfirmationTransferFeeBps) / BPS_DIVIDER;
     }
-
-    // If no percentage-based fee is configured, return the full amount.
-    if (tokenFeeBps == 0) {
-      return lockOrBurnIn.amount;
-    }
-
-    // Calculate and deduct the fee from the transfer amount.
-    uint256 feeAmount = (lockOrBurnIn.amount * tokenFeeBps) / BPS_DIVIDER;
-    return lockOrBurnIn.amount - feeAmount;
   }
 
   /// @notice Withdraws accrued fee token balances to the provided `recipient`.

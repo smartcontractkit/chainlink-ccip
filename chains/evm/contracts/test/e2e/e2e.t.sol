@@ -33,7 +33,7 @@ contract e2e is OnRampSetup {
 
     s_sourceCommitteeVerifier = new CommitteeVerifier(
       CommitteeVerifier.DynamicConfig({feeAggregator: address(1), allowlistAdmin: address(0)}),
-      "",
+      new string[](0),
       address(s_mockRMNRemote)
     );
 
