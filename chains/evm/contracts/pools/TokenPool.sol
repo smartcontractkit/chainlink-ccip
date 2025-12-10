@@ -73,7 +73,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   event ChainRemoved(uint64 remoteChainSelector);
   event RemotePoolAdded(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
-  event DynamicConfigSet(address router, uint16 minBlockConfirmations, address rateLimitAdmin);
+  event DynamicConfigSet(address router, address rateLimitAdmin);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
@@ -91,6 +91,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     RateLimiter.Config inboundRateLimiterConfig
   );
   event FeeTokenWithdrawn(address indexed recipient, address indexed feeToken, uint256 amount);
+  event MinBlockConfirmationSet(uint16 minBlockConfirmation);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector.
@@ -197,28 +198,33 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @notice Gets the pools dynamic configuration.
-  function getDynamicConfig()
-    public
-    view
-    virtual
-    returns (address router, uint16 minBlockConfirmations, address rateLimitAdmin)
-  {
-    return (address(s_router), s_minBlockConfirmation, s_rateLimitAdmin);
+  function getDynamicConfig() public view virtual returns (address router, address rateLimitAdmin) {
+    return (address(s_router), s_rateLimitAdmin);
+  }
+
+  /// @notice Gets the minimum block confirmations required for custom finality transfers.
+  function getMinBlockConfirmation() public view returns (uint16 minBlockConfirmation) {
+    return s_minBlockConfirmation;
   }
 
   /// @notice Sets the dynamic configuration for the pool.
   /// @param router The address of the router contract.
-  /// @param minBlockConfirmations The minimum block confirmations required for custom finality transfers.
   /// @param rateLimitAdmin The address of the rate limiter admin.
-  function setDynamicConfig(address router, uint16 minBlockConfirmations, address rateLimitAdmin) public onlyOwner {
+  function setDynamicConfig(address router, address rateLimitAdmin) public onlyOwner {
     if (router == address(0)) revert ZeroAddressInvalid();
-
     s_router = IRouter(router);
-    // Since 0 means default finality it is a valid value.
-    s_minBlockConfirmation = minBlockConfirmations;
     s_rateLimitAdmin = rateLimitAdmin;
+    emit DynamicConfigSet(router, rateLimitAdmin);
+  }
 
-    emit DynamicConfigSet(router, minBlockConfirmations, rateLimitAdmin);
+  /// @notice Sets the minimum block confirmations required for custom finality transfers.
+  /// @param minBlockConfirmation The minimum block confirmations required for custom finality transfers.
+  function setMinBlockConfirmation(
+    uint16 minBlockConfirmation
+  ) public onlyOwner {
+    // Since 0 means default finality it is a valid value.
+    s_minBlockConfirmation = minBlockConfirmation;
+    emit MinBlockConfirmationSet(minBlockConfirmation);
   }
 
   /// @notice Signals which version of the pool interface is supported.

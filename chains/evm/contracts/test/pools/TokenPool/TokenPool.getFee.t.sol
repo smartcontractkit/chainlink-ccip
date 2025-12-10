@@ -20,7 +20,6 @@ contract TokenPoolV2_getFee is AdvancedPoolHooksSetup {
       isEnabled: true
     });
 
-    vm.startPrank(OWNER);
     _applyFeeConfig(feeConfig);
 
     uint256 amount = 1_000e6;
@@ -49,7 +48,7 @@ contract TokenPoolV2_getFee is AdvancedPoolHooksSetup {
 
     vm.startPrank(OWNER);
     // Enable custom block confirmations by setting minBlockConfirmation > 0
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
+    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
     _applyFeeConfig(feeConfig);
 
     uint256 amount = 1_500e6;
@@ -87,9 +86,8 @@ contract TokenPoolV2_getFee is AdvancedPoolHooksSetup {
   function test_getFee_RevertWhen_InvalidMinBlockConfirmation() public {
     uint16 minBlockConfirmation = 10;
 
-    vm.startPrank(OWNER);
     // Set custom block confirmation config with minimum of 10 blocks
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
+    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
 
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
@@ -101,7 +99,6 @@ contract TokenPoolV2_getFee is AdvancedPoolHooksSetup {
       isEnabled: true
     });
     _applyFeeConfig(feeConfig);
-    vm.stopPrank();
 
     uint256 amount = 1_000e6;
     uint16 requestedBlockConfirmation = 5; // Less than minimum of 10
@@ -126,7 +123,6 @@ contract TokenPoolV2_getFee is AdvancedPoolHooksSetup {
       isEnabled: true
     });
 
-    vm.startPrank(OWNER);
     _applyFeeConfig(feeConfig);
 
     // Now disable it
@@ -150,7 +146,7 @@ contract TokenPoolV2_getFee is AdvancedPoolHooksSetup {
     uint16 minBlockConfirmation = 5;
 
     vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), minBlockConfirmation, address(0));
+    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
 
     // First enable a config
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
