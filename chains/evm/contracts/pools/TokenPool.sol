@@ -956,20 +956,12 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     TokenTransferFeeConfig storage feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
 
     // Determine which fee basis points to apply based on finality type.
-    uint16 tokenFeeBps;
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
-      tokenFeeBps = feeConfig.customBlockConfirmationTransferFeeBps;
+      feeAmount = (lockOrBurnIn.amount * feeConfig.customBlockConfirmationTransferFeeBps) / BPS_DIVIDER;
     } else {
-      tokenFeeBps = feeConfig.defaultBlockConfirmationTransferFeeBps;
+      feeAmount = (lockOrBurnIn.amount * feeConfig.defaultBlockConfirmationTransferFeeBps) / BPS_DIVIDER;
     }
 
-    // If no percentage-based fee is configured, return zero.
-    if (tokenFeeBps == 0) {
-      return 0;
-    }
-
-    // Calculate and deduct the fee from the transfer amount.
-    feeAmount = (lockOrBurnIn.amount * tokenFeeBps) / BPS_DIVIDER;
     return feeAmount;
   }
 
