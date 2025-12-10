@@ -41,6 +41,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
 
   error InvalidMinBlockConfirmation(uint16 requested, uint16 minBlockConfirmation);
+  error CustomBlockConfirmationsNotEnabled();
   error InvalidTransferFeeBps(uint256 bps);
   error InvalidTokenTransferFeeConfig(uint64 destChainSelector);
   error CallerIsNotARampOnRouter(address caller);
@@ -361,14 +362,17 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
     _onlyOnRamp(lockOrBurnIn.remoteChainSelector);
     uint256 amount = lockOrBurnIn.amount;
+
+    // If custom block confirmations are requested, validate against the minimum and apply the custom rate limit.
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
       uint16 minBlockConfirmationConfigured = s_minBlockConfirmation;
-      if (minBlockConfirmationConfigured != 0) {
-        if (blockConfirmationRequested < minBlockConfirmationConfigured) {
-          revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
-        }
-        _consumeCustomBlockConfirmationOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
+      if (minBlockConfirmationConfigured == WAIT_FOR_FINALITY) {
+        revert CustomBlockConfirmationsNotEnabled();
       }
+      if (blockConfirmationRequested < minBlockConfirmationConfigured) {
+        revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
+      }
+      _consumeCustomBlockConfirmationOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     } else {
       _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     }
@@ -914,6 +918,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     virtual
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
+    uint16 minBlockConfirmationConfigured = s_minBlockConfirmation;
+    if (blockConfirmationRequested != WAIT_FOR_FINALITY && minBlockConfirmationConfigured == 0) {
+      revert CustomBlockConfirmationsNotEnabled();
+    }
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector];
 
     // If config is disabled, return zeros with isEnabled=false to signal OnRamp to use FeeQuoter defaults.
@@ -922,8 +930,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     }
 
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
-      if (blockConfirmationRequested < s_minBlockConfirmation) {
-        revert InvalidMinBlockConfirmation(blockConfirmationRequested, s_minBlockConfirmation);
+      if (blockConfirmationRequested < minBlockConfirmationConfigured) {
+        revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
       }
       return (
         feeConfig.customBlockConfirmationFeeUSDCents,

@@ -32,4 +32,20 @@ contract BaseVerifier_applyDestChainConfigUpdates is BaseVerifierSetup {
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.InvalidDestChainConfig.selector, 0));
     s_baseVerifier.applyDestChainConfigUpdates(destChainConfigs);
   }
+
+  function test_applyDestChainConfigUpdates_RevertWhen_DestGasCannotBeZero() public {
+    uint64 destChainSelector = 12345;
+    BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
+    destChainConfigs[0] = BaseVerifier.DestChainConfigArgs({
+      router: s_router,
+      destChainSelector: destChainSelector,
+      allowlistEnabled: false,
+      feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
+      gasForVerification: 0, // Zero gas should revert.
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.DestGasCannotBeZero.selector, destChainSelector));
+    s_baseVerifier.applyDestChainConfigUpdates(destChainConfigs);
+  }
 }

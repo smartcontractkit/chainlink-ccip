@@ -58,6 +58,16 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
     s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1000e18), minBlockConfirmation - 1, "");
   }
 
+  function test_validateLockOrBurn_RevertWhen_CustomBlockConfirmationsNotEnabled() public {
+    vm.startPrank(OWNER);
+    s_tokenPool.setMinBlockConfirmation(0);
+
+    vm.startPrank(s_allowedOnRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.CustomBlockConfirmationsNotEnabled.selector));
+    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1e18), 1, "");
+  }
+
   function _buildLockOrBurnIn(
     uint256 amount
   ) internal view returns (Pool.LockOrBurnInV1 memory lockOrBurnIn) {
