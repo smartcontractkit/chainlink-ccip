@@ -76,26 +76,35 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     // super.lockOrBurn will validate the lockOrBurnIn and revert if invalid.
     out = super.lockOrBurn(lockOrBurnIn);
 
-    // The zero chain selector is used to designate unsiloed chains. remoteChainSelector is set to 0 if the token is not
-    // siloed, and overwritten if the token is being locked for a siloed chain. Since the remote chain must be passed
-    // to the lock box's deposit function, this saves gas by only updating the remoteChainSelector if necessary for a
-    // siloed chain.
-    uint64 remoteChainSelector = 0;
+    _lockOrBurnWithAccounting(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
 
-    // If funds need to be siloed, update internal accounting;
-    if (s_chainConfigs[lockOrBurnIn.remoteChainSelector].isSiloed) {
-      s_chainConfigs[lockOrBurnIn.remoteChainSelector].tokenBalance += lockOrBurnIn.amount;
-      remoteChainSelector = lockOrBurnIn.remoteChainSelector;
-    }
-    // If the messages is going to a chain without siloed funds, update state accounting accordingly.
-    else {
-      s_unsiloedTokenBalance += lockOrBurnIn.amount;
+    return out;
+  }
+
+  /// @inheritdoc TokenPool
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes calldata tokenArgs
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) {
+    // V2 flow locks the post-fee amount and keeps fee on this contract.
+    (out, destTokenAmount) = super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+
+    _lockOrBurnWithAccounting(lockOrBurnIn.remoteChainSelector, destTokenAmount);
+
+    return (out, destTokenAmount);
+  }
+
+  /// For V1 the amount = full amount. For V2 the amount = destTokenAmount (after fees), and fees remain on this contract.
+  function _lockOrBurnWithAccounting(uint64 remoteChainSelector, uint256 amount) internal {
+    if (s_chainConfigs[remoteChainSelector].isSiloed) {
+      s_chainConfigs[remoteChainSelector].tokenBalance += amount;
+    } else {
+      s_unsiloedTokenBalance += amount;
     }
 
     // Transfer the tokens to the lock box.
-    i_lockBox.deposit(address(i_token), lockOrBurnIn.amount);
-
-    return out;
+    i_lockBox.deposit(address(i_token), amount);
   }
 
   /// @notice Release tokens from the pool to the recipient
@@ -103,14 +112,29 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @dev If the releaseOrMintIn amount is greater than available liquidity, the function will revert as a security
   /// measure to prevent funds from a Silo being released by another chain.
   function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 blockConfirmationRequested
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    return _releaseOrMintWithAccounting(releaseOrMintIn, blockConfirmationRequested);
+  }
+
+  /// @inheritdoc TokenPool
+  function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    return _releaseOrMintWithAccounting(releaseOrMintIn, WAIT_FOR_FINALITY);
+  }
+
+  function _releaseOrMintWithAccounting(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 blockConfirmationRequested
+  ) internal returns (Pool.ReleaseOrMintOutV1 memory) {
     // Calculate the local amount
     uint256 localAmount = _calculateLocalAmount(
       releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
     );
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
     // Save gas by using storage instead of memory as a value may need to be updated.
     SiloConfig storage remoteConfig = s_chainConfigs[releaseOrMintIn.remoteChainSelector];
@@ -122,15 +146,9 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint256 availableLiquidity = chainIsSiloed ? remoteConfig.tokenBalance : s_unsiloedTokenBalance;
     if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
 
-    // Since a chain selector must be passed to the lock box's withdraw function, setting it as zero for an unsiloed
-    // chain saves gas since it only needs to be set if the chain is siloed, as opposed to a more complicated series
-    // of branches and checks.
-    uint64 remoteChainSelector = 0;
-
     // Deduct the amount from the correct silo balance, or the unsiloed balance.
     if (chainIsSiloed) {
       remoteConfig.tokenBalance -= localAmount;
-      remoteChainSelector = releaseOrMintIn.remoteChainSelector;
     } else {
       s_unsiloedTokenBalance -= localAmount;
     }
