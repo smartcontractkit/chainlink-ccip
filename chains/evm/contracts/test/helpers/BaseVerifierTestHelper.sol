@@ -6,9 +6,7 @@ import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
 /// @notice Test helper contract to expose BaseVerifier's internal functions for testing
 contract BaseVerifierTestHelper is BaseVerifier {
-  constructor(
-    string memory storageLocation
-  ) BaseVerifier(storageLocation) {}
+  constructor(string memory storageLocation, address rmn) BaseVerifier(storageLocation, rmn) {}
 
   function applyDestChainConfigUpdates(
     DestChainConfigArgs[] calldata destChainConfigArgs

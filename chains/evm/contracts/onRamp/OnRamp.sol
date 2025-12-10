@@ -26,7 +26,6 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
-// TODO post process hooks?
 contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
@@ -48,6 +47,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InvalidDestChainAddress(bytes destChainAddress);
   error CustomBlockConfirmationNotSupportedOnPoolV1();
   error TokenArgsNotSupportedOnPoolV1();
+  error InsufficientFeeTokenAmount();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -256,12 +256,20 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 3. getFee on all verifiers, pool and executor.
 
     CCIPMessageSentEventData memory eventData;
-    // Populate receipts for verifiers, pool (if applicable), executor and network fee in that order.
-    (eventData.receipts, newMessage.executionGasLimit,) =
-      _getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
+    {
+      uint256 computedFeeTokenAmount;
+      // Populate receipts for verifiers, pool (if applicable), executor and network fee in that order.
+      (eventData.receipts, newMessage.executionGasLimit, computedFeeTokenAmount) =
+        _getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
-    // We don't need to check for feeTokenAmount < receiptsFeeTokenAmount here as that is done in getFee called by the router.
-    _distributeFees(message, eventData.receipts);
+      // Any third party (ccv, pool, or executor) could theoretically return different values for getFee on every call.
+      // Without this guard, the onRamp would pay until it ran out of funds, potentially using accrued protocol fees to
+      // pay for further calls.
+      if (computedFeeTokenAmount > feeTokenAmount) {
+        revert InsufficientFeeTokenAmount();
+      }
+      _distributeFees(message, eventData.receipts);
+    }
 
     // 4. lockOrBurn.
 
@@ -871,12 +879,19 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
           receipts[poolReceiptIndex].destBytesOverhead
         ) = IFeeQuoter(s_dynamicConfig.feeQuoter).getTokenTransferFee(destChainSelector, message.tokenAmounts[0].token);
       }
+
+      gasLimitSum += receipts[poolReceiptIndex].destGasLimit;
+      bytesOverheadSum += receipts[poolReceiptIndex].destBytesOverhead;
     }
 
     uint256 executorIndex = receipts.length - 2;
     // This includes the user callback gas limit.
     receipts[executorIndex] =
       _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
+
+    gasLimitSum += receipts[executorIndex].destGasLimit;
+    bytesOverheadSum += receipts[executorIndex].destBytesOverhead;
+
     // Tag the calling router as the network fee issuer so CCIPMessageSent surfaces which router forwarded the
     // message. Third-party verifiers can pin on the router address even though the flat network fee stays on
     // the onRamp for later aggregation.
@@ -887,9 +902,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       feeTokenAmount: networkFeeUSDCents,
       extraArgs: ""
     });
-
-    gasLimitSum += receipts[executorIndex].destGasLimit;
-    bytesOverheadSum += receipts[executorIndex].destBytesOverhead;
 
     (uint32 updatedGasLimitSum, uint256 execCostInUSDCents, uint256 feeTokenPrice, uint256 percentMultiplier) =
     IFeeQuoter(s_dynamicConfig.feeQuoter).quoteGasForExec(

@@ -16,7 +16,6 @@ import {OnRampSetup} from "./OnRampSetup.t.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract OnRamp_getReceipts is OnRampSetup {
-  uint32 internal constant EXECUTOR_DEST_GAS = BASE_EXEC_GAS_COST + GAS_LIMIT;
   address internal s_sourceToken;
   address internal s_pool;
   address internal s_verifier1;
@@ -141,6 +140,21 @@ contract OnRamp_getReceipts is OnRampSetup {
     ccvs[1] = s_verifier2;
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
+    // Calculate the total gas limit for all expected receipts, as well as the bytes overhead.
+    OnRamp.Receipt memory execReceipt =
+      s_onRamp.getExecutionFee(DEST_CHAIN_SELECTOR, message.data.length, message.tokenAmounts.length, extraArgs);
+    uint256 totalExpectedGas = (2 * VERIFIER_GAS) + POOL_GAS_OVERHEAD + execReceipt.destGasLimit;
+    uint256 totalExpectedBytes = (2 * VERIFIER_BYTES) + POOL_BYTES_OVERHEAD + execReceipt.destBytesOverhead;
+
+    // This asserts that all the gas limits and bytes overheads are correctly being summed.
+    vm.expectCall(
+      address(s_feeQuoter),
+      abi.encodeCall(
+        IFeeQuoter.quoteGasForExec,
+        (DEST_CHAIN_SELECTOR, uint32(totalExpectedGas), uint32(totalExpectedBytes), message.feeToken)
+      )
+    );
+
     (OnRamp.Receipt[] memory receipts,, uint256 feeTokenAmount) =
       s_onRamp.getReceipts(DEST_CHAIN_SELECTOR, NETWORK_FEE_USD_CENTS, message, extraArgs);
 
@@ -176,6 +190,15 @@ contract OnRamp_getReceipts is OnRampSetup {
     uint256 expectedNetworkFee = _expectedNetworkFee(feeTokenPrice, LINK_FEE_MULTIPLIER_PERCENT);
     assertEq(receipts[4].issuer, s_caller, "Network fee issuer");
     assertEq(receipts[4].feeTokenAmount, expectedNetworkFee, "Network fee should match");
+
+    // Verify the total gas and bytes match the sum of all receipts
+    uint256 actualTotalGas =
+      receipts[0].destGasLimit + receipts[1].destGasLimit + receipts[2].destGasLimit + receipts[3].destGasLimit;
+    uint256 actualTotalBytes = receipts[0].destBytesOverhead + receipts[1].destBytesOverhead
+      + receipts[2].destBytesOverhead + receipts[3].destBytesOverhead;
+
+    assertEq(actualTotalGas, totalExpectedGas, "Total gas should match expected");
+    assertEq(actualTotalBytes, totalExpectedBytes, "Total bytes should match expected");
   }
 
   function test_getReceipts_WithTokens_FeeQuoterFallback() public {

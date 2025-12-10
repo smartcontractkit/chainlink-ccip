@@ -37,7 +37,11 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   // DYNAMIC CONFIG
   DynamicConfig private s_dynamicConfig;
 
-  constructor(DynamicConfig memory dynamicConfig, string memory storageLocation) BaseVerifier(storageLocation) {
+  constructor(
+    DynamicConfig memory dynamicConfig,
+    string memory storageLocation,
+    address rmn
+  ) BaseVerifier(storageLocation, rmn) {
     _setDynamicConfig(dynamicConfig);
   }
 
