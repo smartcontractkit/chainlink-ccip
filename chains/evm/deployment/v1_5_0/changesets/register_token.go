@@ -18,6 +18,7 @@ import (
 type RegisterTokenCfg struct {
 	ChainSel      uint64
 	TokenPool     datastore.AddressRef
+	Token         datastore.AddressRef
 	ExternalAdmin common.Address
 }
 
@@ -40,6 +41,10 @@ var RegisterToken = changesets.NewFromOnChainSequence(changesets.NewFromOnChainS
 		if err != nil {
 			return sequences.RegisterTokenInput{}, fmt.Errorf("failed to find token admin registry address: %w", err)
 		}
+		tokenAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, cfg.Token, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return sequences.RegisterTokenInput{}, fmt.Errorf("failed to find token address: %w", err)
+		}
 		tokenPoolAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, cfg.TokenPool, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
 			return sequences.RegisterTokenInput{}, fmt.Errorf("failed to find token pool address: %w", err)
@@ -48,6 +53,7 @@ var RegisterToken = changesets.NewFromOnChainSequence(changesets.NewFromOnChainS
 			ChainSelector:             cfg.ChainSel,
 			TokenPoolAddress:          tokenPoolAddress,
 			TokenAdminRegistryAddress: tokenAdminRegistryAddress,
+			TokenAddress:              tokenAddress,
 			ExternalAdmin:             cfg.ExternalAdmin,
 		}, nil
 	},
