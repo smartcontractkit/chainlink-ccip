@@ -151,12 +151,16 @@ func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) 
 			subjects := curseDetail.subjects
 			notAlreadyCursedSubjects := make([]Subject, 0)
 			for _, subject := range subjects {
+				if cfg.Force {
+					notAlreadyCursedSubjects = append(notAlreadyCursedSubjects, subject)
+					continue
+				}
 				// Only curse the subjects that are not actually cursed
 				cursed, err := adapter.IsSubjectCursedOnChain(e, selector, subject)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to check if subject %x is cursed on chain with selector %d: %w", subject, selector, err)
 				}
-				if cursed && !cfg.Force {
+				if cursed {
 					e.Logger.Infof("Subject %x is already cursed on chain with selector %d, skipping", subject, selector)
 					continue
 				}
@@ -200,11 +204,15 @@ func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry
 			subjects := curseDetail.subjects
 			alreadyCursedSubjects := make([]Subject, 0)
 			for _, subject := range subjects {
+				if cfg.Force {
+					alreadyCursedSubjects = append(alreadyCursedSubjects, subject)
+					continue
+				}
 				cursed, err := adapter.IsSubjectCursedOnChain(e, selector, subject)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to check if subject %x is cursed on chain with selector %d: %w", subject, selector, err)
 				}
-				if !cursed && !cfg.Force {
+				if !cursed {
 					e.Logger.Infof("Subject %x is not cursed on chain with selector %d, skipping", subject, selector)
 					continue
 				}
