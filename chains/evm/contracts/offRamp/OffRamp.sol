@@ -50,6 +50,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error InvalidOnRamp(bytes got);
   error InvalidOffRamp(address expected, bytes got);
   error InboundImplementationNotFound(address ccvAddress, bytes verifierResults);
+  error VerificationFailed(address ccv, address impl, uint256 verifierResultsIndex, bytes externalReason);
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -199,13 +200,17 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     Internal.MessageExecutionState originalState = s_executionStates[messageId];
 
-    // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
-    // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
+    // Three valid cases here,
+    // 1) We have never touched this message before.
+    // 2) We tried to execute and failed.
+    // 3) We tried to execute but verification failed.
+    // This check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
     // allowed to execute.
     if (
       !(
         originalState == Internal.MessageExecutionState.UNTOUCHED
           || originalState == Internal.MessageExecutionState.FAILURE
+          || originalState == Internal.MessageExecutionState.VERIFICATION_FAILED
       )
     ) {
       revert SkippedAlreadyExecutedMessage(messageId, message.sourceChainSelector, message.messageNumber);
@@ -217,8 +222,17 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     (bool success, bytes memory err) =
       _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, verifierResults)));
-    Internal.MessageExecutionState newState =
-      success ? Internal.MessageExecutionState.SUCCESS : Internal.MessageExecutionState.FAILURE;
+    Internal.MessageExecutionState newState;
+    if (success) {
+      newState = Internal.MessageExecutionState.SUCCESS;
+    } else {
+      // Execute failed, see if it failed from verification.
+      if (err.length >= 4 && bytes4(err) == VerificationFailed.selector) {
+        newState = Internal.MessageExecutionState.VERIFICATION_FAILED;
+      } else {
+        newState = Internal.MessageExecutionState.FAILURE;
+      }
+    }
 
     s_executionStates[messageId] = newState;
 
@@ -294,11 +308,18 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         if (implAddress == address(0)) {
           revert InboundImplementationNotFound(ccvsToQuery[i], verifierResults[verifierResultsIndex[i]]);
         }
-        ICrossChainVerifierV1(implAddress).verifyMessage({
+        try ICrossChainVerifierV1(implAddress).verifyMessage({
           message: message,
           messageId: messageId,
           verifierResults: verifierResults[verifierResultsIndex[i]]
-        });
+        }) {
+          // Verifiaction successful nothing to do.
+        } catch (bytes memory externalReason) {
+          // Handle all error cases: revert(), require(), panic(), assert().
+          // Return data is capped in `_callWithGasBuffer`, so externalReason is likely to be truncated, but
+          // defer to truncate in `_callWithGasBuffer` to keep it simple.
+          revert VerificationFailed(ccvsToQuery[i], implAddress, verifierResultsIndex[i], externalReason);
+        }
       }
     }
 

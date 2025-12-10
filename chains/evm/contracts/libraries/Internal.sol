@@ -141,11 +141,13 @@ library Internal {
   /// IN_PROGRESS currently being executed, used a replay protection.
   /// SUCCESS successfully executed. End state.
   /// FAILURE unsuccessfully executed, manual execution is now enabled.
+  /// VERIFICATION_FAILED call to ICrossChainVerifierV1::verifyMessage failed, manual execution is now enabled
   enum MessageExecutionState {
     UNTOUCHED,
     IN_PROGRESS,
     SUCCESS,
-    FAILURE
+    FAILURE,
+    VERIFICATION_FAILED
   }
 
   struct EVM2AnyTokenTransfer {
