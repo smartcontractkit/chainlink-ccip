@@ -20,7 +20,7 @@ foundry-zksync: ## Install foundry.
 ccip-precommit: export FOUNDRY_PROFILE=ccip
 .PHONY: ccip-precommit
 ccip-precommit:
-	forge test
+	forge test -vvvv
 	make snapshot
 	forge fmt
 	pnpm solhint

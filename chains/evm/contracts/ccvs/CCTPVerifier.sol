@@ -150,7 +150,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   CCTPMessageTransmitterProxy private immutable i_messageTransmitterProxy;
   /// @notice The token messenger, which is used on source to send USDC over CCTP.
   /// @dev The token messenger calls into the message transmitter after burning USDC and forming the app-specific message body.
-  ITokenMessenger private immutable i_tokenMessenger; // TODO: Update to TokenMessengerProxy when available.
+  ITokenMessenger private immutable i_tokenMessenger;
   /// @notice The local domain identifier, i.e. a CCTP-specific identifier for the chain to which this contract is deployed.
   uint32 private immutable i_localDomainIdentifier;
 
