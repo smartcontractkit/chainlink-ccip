@@ -82,17 +82,6 @@ contract BaseVerifier_setStorageLocations is BaseVerifierSetup {
     _assertEq(s_baseVerifier.getStorageLocations(), same);
   }
 
-  // Reverts
-  function test_setStorageLocation_RevertsIf_DuplicatesPresent() external {
-    string[] memory dupes = _two("dup", "dup");
-    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.DuplicateStorageLocations.selector, "dup", 0, 1));
-    s_baseVerifier.setStorageLocations(dupes);
-
-    dupes = _three("dup", "new", "dup");
-    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.DuplicateStorageLocations.selector, "dup", 0, 2));
-    s_baseVerifier.setStorageLocations(dupes);
-  }
-
   // Helpers
 
   function _expectStorageLocationEvent(string[] memory oldLocations, string[] memory newLocations) internal {
@@ -110,13 +99,6 @@ contract BaseVerifier_setStorageLocations is BaseVerifierSetup {
   ) internal pure returns (string[] memory arr) {
     arr = new string[](1);
     arr[0] = a;
-    return arr;
-  }
-
-  function _two(string memory a, string memory b) internal pure returns (string[] memory arr) {
-    arr = new string[](2);
-    arr[0] = a;
-    arr[1] = b;
     return arr;
   }
 

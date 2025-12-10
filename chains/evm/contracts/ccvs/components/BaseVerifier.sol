@@ -24,7 +24,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error SenderNotAllowed(address sender);
   error CallerIsNotARampOnRouter(address caller);
   error DestinationNotSupported(uint64 destChainSelector);
-  error DuplicateStorageLocations(string storageLocation, uint256 i, uint256 j);
   error ZeroAddressNotAllowed();
 
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
@@ -86,21 +85,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   ) internal {
     uint256 oldLength = s_storageLocations.length;
     uint256 newLength = storageLocations.length;
-
-    // Check for duplicates.
-    for (uint256 i; i < newLength; ++i) {
-      bytes32 iHash = keccak256(abi.encodePacked(storageLocations[i]));
-      for (uint256 j; j < newLength; ++j) {
-        if (i != j) {
-          bytes32 jHash = keccak256(abi.encodePacked(storageLocations[j]));
-
-          // Check for duplicate.
-          if (iHash == jHash) {
-            revert DuplicateStorageLocations(storageLocations[i], i, j);
-          }
-        }
-      }
-    }
 
     string[] memory oldLocations = getStorageLocations();
 
