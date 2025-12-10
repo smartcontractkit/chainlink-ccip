@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -86,10 +85,16 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 		toQualifier,
 	)
 	err = utils.FundSolanaAccounts(
-		context.Background(),
-		[]solana.PublicKey{toTimelockSigner, toMcmSigner},
+		t.Context(),
+		[]solana.PublicKey{chain.DeployerKey.PublicKey()},
 		100,
 		chain.Client,
+	)
+	require.NoError(t, err)
+	err = utils.FundFromDeployerKey(
+		chain,
+		[]solana.PublicKey{toTimelockSigner, toMcmSigner},
+		10,
 	)
 	require.NoError(t, err)
 	mcmsInput := mcmsapi.TransferOwnershipInput{
