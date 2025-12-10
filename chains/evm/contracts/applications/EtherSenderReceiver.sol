@@ -32,6 +32,7 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
   error InvalidTokenAmounts(uint256 gotAmounts);
   error InvalidToken(address gotToken, address expectedToken);
   error TokenAmountNotEqualToMsgValue(uint256 gotAmount, uint256 msgValue);
+  error InsufficientFee(uint256 providedFee, uint256 requiredFee);
 
   string public constant override typeAndVersion = "EtherSenderReceiver 1.5.0";
 
@@ -106,8 +107,12 @@ contract EtherSenderReceiver is CCIPReceiver, ITypeAndVersion {
     }
 
     // We don't want to keep any excess ether in this contract, so we send over the entire address(this).balance as the
-    // fee. CCIP will revert if the fee is insufficient, so we don't need to check here.
-    return IRouterClient(getRouter()).ccipSend{value: address(this).balance}(destinationChainSelector, validatedMessage);
+    // fee. Validate that the remaining balance after wrapping is sufficient to cover the fee.
+    uint256 remainingBalance = address(this).balance;
+    if (remainingBalance < fee) {
+      revert InsufficientFee(remainingBalance, fee);
+    }
+    return IRouterClient(getRouter()).ccipSend{value: remainingBalance}(destinationChainSelector, validatedMessage);
   }
 
   /// @notice Validate the message content.
