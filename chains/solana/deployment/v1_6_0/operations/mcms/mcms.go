@@ -645,6 +645,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 		id,
 		state.PDASeed([]byte(seed[:])),
 	)
+	timelock.SetProgramID(id)
 	var roleAccessController cldf_deployment.ContractType
 	switch in.Role {
 	case timelock.Proposer_Role:
