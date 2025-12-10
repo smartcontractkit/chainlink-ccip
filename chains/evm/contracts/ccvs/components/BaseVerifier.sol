@@ -79,7 +79,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   function _setStorageLocations(
     string[] memory storageLocations
   ) internal {
-    string[] memory oldLocations = getStorageLocations();
     uint256 oldLength = s_storageLocations.length;
     uint256 newLength = storageLocations.length;
 
@@ -98,22 +97,16 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       }
     }
 
-    if (newLength > oldLength) {
-      // Push new elements on to the end of the array.
-      for (uint256 i; i < (newLength - oldLength); ++i) {
-        s_storageLocations.push(storageLocations[oldLength + i]);
-      }
-    } else if (newLength < oldLength) {
-      // Pop elements from array.
-      for (uint256 i; i < (oldLength - newLength); ++i) {
-        s_storageLocations.pop();
-      }
+    string[] memory oldLocations = getStorageLocations();
+
+    // Clear existing array.
+    for (uint256 i; i < oldLength; ++i) {
+      s_storageLocations.pop();
     }
 
-    // Set remaining elements.
-    uint256 overlap = newLength < oldLength ? newLength : oldLength;
-    for (uint256 i; i < overlap; ++i) {
-      s_storageLocations[i] = storageLocations[i];
+    // Add new elements into array.
+    for (uint256 i; i < newLength; ++i) {
+      s_storageLocations.push(storageLocations[i]);
     }
 
     emit StorageLocationsUpdated(oldLocations, storageLocations);
