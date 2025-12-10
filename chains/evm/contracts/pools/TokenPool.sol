@@ -956,21 +956,19 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @param lockOrBurnIn The original lock or burn request.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
   /// A value of zero (WAIT_FOR_FINALITY) applies default finality fees.
-  /// @return feeAmount The fee amount.
+  /// Returns the fee amount.
   function _getFee(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested
-  ) internal view virtual returns (uint256 feeAmount) {
+  ) internal view virtual returns (uint256) {
     TokenTransferFeeConfig storage feeConfig = s_tokenTransferFeeConfig[lockOrBurnIn.remoteChainSelector];
 
     // Determine which fee basis points to apply based on finality type.
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
-      feeAmount = (lockOrBurnIn.amount * feeConfig.customBlockConfirmationTransferFeeBps) / BPS_DIVIDER;
+      return (lockOrBurnIn.amount * feeConfig.customBlockConfirmationTransferFeeBps) / BPS_DIVIDER;
     } else {
-      feeAmount = (lockOrBurnIn.amount * feeConfig.defaultBlockConfirmationTransferFeeBps) / BPS_DIVIDER;
+      return (lockOrBurnIn.amount * feeConfig.defaultBlockConfirmationTransferFeeBps) / BPS_DIVIDER;
     }
-
-    return feeAmount;
   }
 
   /// @notice Withdraws accrued fee token balances to the provided `recipient`.
