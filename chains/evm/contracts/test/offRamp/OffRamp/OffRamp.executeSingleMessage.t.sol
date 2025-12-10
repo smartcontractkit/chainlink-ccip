@@ -250,7 +250,9 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       revertReason
     );
 
-    vm.expectRevert(revertReason);
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRamp.VerificationFailed.selector, s_defaultCCV, s_defaultCCV, uint256(0), revertReason)
+    );
 
     s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
   }

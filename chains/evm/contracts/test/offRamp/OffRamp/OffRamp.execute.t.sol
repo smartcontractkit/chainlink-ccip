@@ -3,12 +3,19 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
+import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {Router} from "../../../Router.sol";
+import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {ReentrantCCV} from "../../helpers/ReentrantCCV.sol";
+
+import {
+  IAny2EVMMessageReceiver,
+  MockReceiverSpoofVerificationFailed
+} from "../../mocks/MockReceiverSpoofVerificationFailed.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
@@ -161,6 +168,51 @@ contract OffRamp_execute is OffRampSetup {
     );
   }
 
+  function test_execute_RevertWhen_InvalidReceiverLength() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    bytes memory shortReceiver = abi.encodePacked(address(bytes20(message.receiver)));
+    assembly {
+      mstore(shortReceiver, 19)
+    }
+    message.receiver = shortReceiver;
+
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
+
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, shortReceiver));
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
+  }
+
+  /// @dev This test is a bit undeterministic as the lowGas value needs to be low enough to trigger the revert, but high enough that
+  /// it consistently reverts when running forge test, and forge coverage.
+  /// Beacuse of this behavior it might not be worth it to keep this test, eventhough it is addressing missing coverage.
+  function test_execute_RevertWhen_InsufficientGasToCompleteTx_BufferCheck() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
+    bytes32 messageId = keccak256(encodedMessage);
+
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getInboundImplementation.selector, verifierResults[0]),
+      abi.encode(s_defaultCCV)
+    );
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, verifierResults[0])),
+      abi.encode(true)
+    );
+
+    // Use a gas limit that is low enough to trip the buffer check but high enough to cover call overhead.
+    uint256 lowGas = 80000; // MAX_GAS_BUFFER_TO_UPDATE_STATE is 12k
+
+    // Lower-level call so we can check the selector without depending on encoded gasleft().
+    (bool success, bytes memory err) = address(s_gasBoundedExecuteCaller).call{gas: lowGas}(
+      abi.encodeCall(GasBoundedExecuteCaller.callExecute, (encodedMessage, ccvs, verifierResults, lowGas))
+    );
+    assertFalse(success);
+    assertTrue(err.length >= 4, "no revert data");
+    assertEq(bytes4(err), OffRamp.InsufficientGasToCompleteTx.selector);
+  }
+
   function test_execute_ReentrancyGuardReentrantCall_Fails() public {
     // Create a malicious CCV that will call back into execute during validation.
     ReentrantCCV maliciousCCV = new ReentrantCCV(address(s_offRamp));
@@ -176,16 +228,21 @@ contract OffRamp_execute is OffRampSetup {
 
     _setGetCCVsReturnData(address(bytes20(message.receiver)), message.sourceChainSelector, ccvs, new address[](0), 0);
 
-    vm.expectEmit();
+    vm.expectEmit(true, true, true, false);
     emit OffRamp.ExecutionStateChanged(
       message.sourceChainSelector,
       message.messageNumber,
       keccak256(encodedMessage),
-      Internal.MessageExecutionState.FAILURE,
-      abi.encodeWithSelector(OffRamp.ReentrancyGuardReentrantCall.selector)
+      Internal.MessageExecutionState.VERIFICATION_FAILED,
+      ""
     );
 
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
+
+    assertEq(
+      uint256(Internal.MessageExecutionState.VERIFICATION_FAILED),
+      uint256(s_offRamp.getExecutionState(keccak256(encodedMessage)))
+    );
   }
 
   function test_execute_InsufficientGasToCompleteTx_setsToFailure() public {
@@ -350,6 +407,181 @@ contract OffRamp_execute is OffRampSetup {
       abi.encodeWithSelector(OffRamp.InvalidVerifierResultsLength.selector, ccvs.length, verifierResults.length)
     );
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS);
+  }
+
+  function test_execute_SetsVerificationFailedAndCanRetry() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
+    bytes32 messageId = keccak256(encodedMessage);
+
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getInboundImplementation.selector, verifierResults[0]),
+      abi.encode(s_defaultCCV)
+    );
+    bytes memory revertReason = "CCV validation failed";
+    vm.mockCallRevert(
+      s_defaultCCV,
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, verifierResults[0])),
+      revertReason
+    );
+
+    bytes memory expectedErr =
+      abi.encodeWithSelector(OffRamp.VerificationFailed.selector, s_defaultCCV, s_defaultCCV, uint256(0), revertReason);
+    if (expectedErr.length > 132) {
+      assembly {
+        mstore(expectedErr, 132)
+      }
+    }
+
+    vm.expectEmit();
+    emit OffRamp.ExecutionStateChanged(
+      message.sourceChainSelector,
+      message.messageNumber,
+      messageId,
+      Internal.MessageExecutionState.VERIFICATION_FAILED,
+      expectedErr
+    );
+
+    s_offRamp.execute(encodedMessage, ccvs, verifierResults);
+    assertEq(
+      uint256(Internal.MessageExecutionState.VERIFICATION_FAILED), uint256(s_offRamp.getExecutionState(messageId))
+    );
+
+    vm.clearMockedCalls();
+    // Re-install mocks cleared above.
+    vm.mockCall(
+      address(s_mockRMNRemote),
+      abi.encodeWithSignature("isCursed(bytes16)", bytes16(uint128(SOURCE_CHAIN_SELECTOR))),
+      abi.encode(false)
+    );
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getInboundImplementation.selector, verifierResults[0]),
+      abi.encode(s_defaultCCV)
+    );
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, verifierResults[0])),
+      abi.encode(true)
+    );
+
+    vm.expectEmit();
+    emit OffRamp.ExecutionStateChanged(
+      message.sourceChainSelector, message.messageNumber, messageId, Internal.MessageExecutionState.SUCCESS, ""
+    );
+
+    s_offRamp.execute(encodedMessage, ccvs, verifierResults);
+    assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(messageId)));
+  }
+
+  function test_execute_SpoofedVerificationFailedFromReceiverSetsFailure() public {
+    MockReceiverSpoofVerificationFailed spoofingReceiver =
+      new MockReceiverSpoofVerificationFailed(_arrayOf(s_defaultCCV), new address[](0), 0);
+
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    message.receiver = abi.encodePacked(address(spoofingReceiver));
+    message.data = "non-empty";
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
+    bytes32 messageId = keccak256(encodedMessage);
+
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getInboundImplementation.selector, verifierResults[0]),
+      abi.encode(s_defaultCCV)
+    );
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, verifierResults[0])),
+      abi.encode(true)
+    );
+
+    bytes memory spoofed =
+      abi.encodeWithSelector(OffRamp.VerificationFailed.selector, address(1), address(2), uint256(0), bytes("spoof"));
+
+    // If the router were to actually call the receiver, it would see this revert.
+    vm.mockCallRevert(
+      address(spoofingReceiver),
+      abi.encodeCall(
+        IAny2EVMMessageReceiver.ccipReceive,
+        (
+          Client.Any2EVMMessage({
+            messageId: messageId,
+            sourceChainSelector: message.sourceChainSelector,
+            sender: message.sender,
+            data: message.data,
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+          })
+        )
+      ),
+      spoofed
+    );
+
+    // Router returns the spoofed VerificationFailed payload, OffRamp should classify as ReceiverError => FAILURE.
+    vm.mockCall(
+      address(s_sourceRouter),
+      abi.encodeCall(
+        IRouter.routeMessage,
+        (
+          Client.Any2EVMMessage({
+            messageId: messageId,
+            sourceChainSelector: message.sourceChainSelector,
+            sender: message.sender,
+            data: message.data,
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+          }),
+          GAS_FOR_CALL_EXACT_CHECK,
+          message.ccipReceiveGasLimit,
+          address(bytes20(message.receiver))
+        )
+      ),
+      abi.encode(false, spoofed, uint256(0))
+    );
+
+    bytes memory expectedErr = abi.encodeWithSelector(OffRamp.ReceiverError.selector, spoofed);
+    // Truncate returned data to 132 bytes, 4 bytes + 4 words.
+    if (expectedErr.length > 132) {
+      assembly {
+        mstore(expectedErr, 132)
+      }
+    }
+
+    vm.expectEmit();
+    emit OffRamp.ExecutionStateChanged(
+      message.sourceChainSelector, message.messageNumber, messageId, Internal.MessageExecutionState.FAILURE, expectedErr
+    );
+
+    s_offRamp.execute(encodedMessage, ccvs, verifierResults);
+    assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(messageId)));
+  }
+
+  function test_execute_InboundImplementationNotFoundSetsFailureNotVerificationFailed() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
+    bytes32 messageId = keccak256(encodedMessage);
+
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getInboundImplementation.selector, verifierResults[0]),
+      abi.encode(address(0))
+    );
+
+    bytes memory expectedErr =
+      abi.encodeWithSelector(OffRamp.InboundImplementationNotFound.selector, s_defaultCCV, verifierResults[0]);
+    if (expectedErr.length > 132) {
+      assembly {
+        mstore(expectedErr, 132)
+      }
+    }
+
+    vm.expectEmit();
+    emit OffRamp.ExecutionStateChanged(
+      message.sourceChainSelector, message.messageNumber, messageId, Internal.MessageExecutionState.FAILURE, expectedErr
+    );
+
+    s_offRamp.execute(encodedMessage, ccvs, verifierResults);
+
+    assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(messageId)));
   }
 
   function test_execute_RevertWhen_SkippedAlreadyExecutedMessage() public {
