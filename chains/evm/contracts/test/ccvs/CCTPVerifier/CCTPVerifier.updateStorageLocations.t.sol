@@ -19,10 +19,7 @@ contract CCTPVerifier_updateStorageLocations is CCTPVerifierSetup {
   function test_updateStorageLocation_RevertWhen_OnlyCallableByOwner() public {
     vm.stopPrank();
 
-    string[] memory newStorageLocations = new string[](1);
-    newStorageLocations[0] = "new/location";
-
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_cctpVerifier.updateStorageLocations(newStorageLocations);
+    s_cctpVerifier.updateStorageLocations(new string[](0));
   }
 }

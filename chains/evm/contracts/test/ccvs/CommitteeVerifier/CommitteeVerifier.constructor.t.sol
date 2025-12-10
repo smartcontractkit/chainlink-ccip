@@ -29,9 +29,6 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
 
   function test_constructor_RevertWhen_InvalidConfig_FeeAggregatorZeroAddress() public {
     vm.expectRevert(CommitteeVerifier.InvalidConfig.selector);
-    new CommitteeVerifier(
-      _createDynamicConfigArgs(address(0), ALLOWLIST_ADMIN),
-      storageLocations // Zero fee aggregator address
-    );
+    new CommitteeVerifier(_createDynamicConfigArgs(address(0), ALLOWLIST_ADMIN), storageLocations);
   }
 }
