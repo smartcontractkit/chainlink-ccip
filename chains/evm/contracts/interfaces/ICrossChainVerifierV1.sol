@@ -61,9 +61,9 @@ interface ICrossChainVerifierV1 is IERC165 {
     bytes calldata verifierArgs
   ) external returns (bytes memory verifierData);
 
-  /// @notice Returns the storage location identifier for this CCV. This is a string that uniquely identifies the
-  /// storage location. This can be an address, a URL, or any other identifier that makes sense for the CCV. The format
-  /// of the string is up to the CCV implementer, but it should be something that can be easily parsed and used by the
-  /// integrator. This is used by the executor(s) to know where to look for the proof data that the CCV has produced.
-  function getStorageLocation() external view returns (string memory);
+  /// @notice Returns the storage location identifiers for this CCV. Each entry uniquely identifies a storage location.
+  /// This can be an address, a URL, or any other identifier that makes sense for the CCV. The format of the strings is
+  /// up to the CCV implementer, but it should be something that can be easily parsed and used by the integrator. This
+  /// is used by the executor(s) to know where to look for the proof data that the CCV has produced.
+  function getStorageLocations() external view returns (string[] memory);
 }
