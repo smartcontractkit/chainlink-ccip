@@ -46,7 +46,11 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   /// @dev Pending storage locations admin.
   address private s_pendingStorageLocationsAdmin;
 
-  constructor(DynamicConfig memory dynamicConfig, string[] memory storageLocations) BaseVerifier(storageLocations) {
+  constructor(
+    DynamicConfig memory dynamicConfig,
+    string[] memory storageLocations,
+    address rmn
+  ) BaseVerifier(storageLocations, rmn) {
     _setDynamicConfig(dynamicConfig);
     s_storageLocationsAdmin = msg.sender;
   }

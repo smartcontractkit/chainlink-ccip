@@ -97,7 +97,8 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
+      }),
+      address(s_mockRMNRemote)
     );
 
     // Apply dest chain config updates.

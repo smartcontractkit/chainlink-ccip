@@ -33,7 +33,7 @@ contract BaseVerifierSetup is FeeQuoterSetup {
     s_offRampRemote = makeAddr("OffRampRemote");
     s_sourceFeeToken = address(new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0));
 
-    s_baseVerifier = new BaseVerifierTestHelper(storageLocations);
+    s_baseVerifier = new BaseVerifierTestHelper(storageLocations, address(s_mockRMNRemote));
 
     // Set up initial destination chain config.
     BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
