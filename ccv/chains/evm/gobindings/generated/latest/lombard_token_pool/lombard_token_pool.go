@@ -288,8 +288,7 @@ func (_LombardTokenPool *LombardTokenPoolCaller) GetDynamicConfig(opts *bind.Cal
 	}
 
 	outstruct.Router = *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-	outstruct.MinBlockConfirmations = *abi.ConvertType(out[1], new(uint16)).(*uint16)
-	outstruct.RateLimitAdmin = *abi.ConvertType(out[2], new(common.Address)).(*common.Address)
+	outstruct.RateLimitAdmin = *abi.ConvertType(out[1], new(common.Address)).(*common.Address)
 
 	return *outstruct, err
 
@@ -843,16 +842,28 @@ func (_LombardTokenPool *LombardTokenPoolTransactorSession) RemoveRemotePool(rem
 	return _LombardTokenPool.Contract.RemoveRemotePool(&_LombardTokenPool.TransactOpts, remoteChainSelector, remotePoolAddress)
 }
 
-func (_LombardTokenPool *LombardTokenPoolTransactor) SetDynamicConfig(opts *bind.TransactOpts, router common.Address, minBlockConfirmations uint16, rateLimitAdmin common.Address) (*types.Transaction, error) {
-	return _LombardTokenPool.contract.Transact(opts, "setDynamicConfig", router, minBlockConfirmations, rateLimitAdmin)
+func (_LombardTokenPool *LombardTokenPoolTransactor) SetDynamicConfig(opts *bind.TransactOpts, router common.Address, rateLimitAdmin common.Address) (*types.Transaction, error) {
+	return _LombardTokenPool.contract.Transact(opts, "setDynamicConfig", router, rateLimitAdmin)
 }
 
-func (_LombardTokenPool *LombardTokenPoolSession) SetDynamicConfig(router common.Address, minBlockConfirmations uint16, rateLimitAdmin common.Address) (*types.Transaction, error) {
-	return _LombardTokenPool.Contract.SetDynamicConfig(&_LombardTokenPool.TransactOpts, router, minBlockConfirmations, rateLimitAdmin)
+func (_LombardTokenPool *LombardTokenPoolSession) SetDynamicConfig(router common.Address, rateLimitAdmin common.Address) (*types.Transaction, error) {
+	return _LombardTokenPool.Contract.SetDynamicConfig(&_LombardTokenPool.TransactOpts, router, rateLimitAdmin)
 }
 
-func (_LombardTokenPool *LombardTokenPoolTransactorSession) SetDynamicConfig(router common.Address, minBlockConfirmations uint16, rateLimitAdmin common.Address) (*types.Transaction, error) {
-	return _LombardTokenPool.Contract.SetDynamicConfig(&_LombardTokenPool.TransactOpts, router, minBlockConfirmations, rateLimitAdmin)
+func (_LombardTokenPool *LombardTokenPoolTransactorSession) SetDynamicConfig(router common.Address, rateLimitAdmin common.Address) (*types.Transaction, error) {
+	return _LombardTokenPool.Contract.SetDynamicConfig(&_LombardTokenPool.TransactOpts, router, rateLimitAdmin)
+}
+
+func (_LombardTokenPool *LombardTokenPoolTransactor) SetMinBlockConfirmation(opts *bind.TransactOpts, minBlockConfirmation uint16) (*types.Transaction, error) {
+	return _LombardTokenPool.contract.Transact(opts, "setMinBlockConfirmation", minBlockConfirmation)
+}
+
+func (_LombardTokenPool *LombardTokenPoolSession) SetMinBlockConfirmation(minBlockConfirmation uint16) (*types.Transaction, error) {
+	return _LombardTokenPool.Contract.SetMinBlockConfirmation(&_LombardTokenPool.TransactOpts, minBlockConfirmation)
+}
+
+func (_LombardTokenPool *LombardTokenPoolTransactorSession) SetMinBlockConfirmation(minBlockConfirmation uint16) (*types.Transaction, error) {
+	return _LombardTokenPool.Contract.SetMinBlockConfirmation(&_LombardTokenPool.TransactOpts, minBlockConfirmation)
 }
 
 func (_LombardTokenPool *LombardTokenPoolTransactor) SetPath(opts *bind.TransactOpts, remoteChainSelector uint64, lChainId [32]byte, allowedCaller []byte) (*types.Transaction, error) {
@@ -1459,10 +1470,9 @@ func (it *LombardTokenPoolDynamicConfigSetIterator) Close() error {
 }
 
 type LombardTokenPoolDynamicConfigSet struct {
-	Router                common.Address
-	MinBlockConfirmations uint16
-	RateLimitAdmin        common.Address
-	Raw                   types.Log
+	Router         common.Address
+	RateLimitAdmin common.Address
+	Raw            types.Log
 }
 
 func (_LombardTokenPool *LombardTokenPoolFilterer) FilterDynamicConfigSet(opts *bind.FilterOpts) (*LombardTokenPoolDynamicConfigSetIterator, error) {
@@ -2052,6 +2062,123 @@ func (_LombardTokenPool *LombardTokenPoolFilterer) WatchLombardConfigurationSet(
 func (_LombardTokenPool *LombardTokenPoolFilterer) ParseLombardConfigurationSet(log types.Log) (*LombardTokenPoolLombardConfigurationSet, error) {
 	event := new(LombardTokenPoolLombardConfigurationSet)
 	if err := _LombardTokenPool.contract.UnpackLog(event, "LombardConfigurationSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type LombardTokenPoolMinBlockConfirmationSetIterator struct {
+	Event *LombardTokenPoolMinBlockConfirmationSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *LombardTokenPoolMinBlockConfirmationSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LombardTokenPoolMinBlockConfirmationSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(LombardTokenPoolMinBlockConfirmationSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *LombardTokenPoolMinBlockConfirmationSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *LombardTokenPoolMinBlockConfirmationSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type LombardTokenPoolMinBlockConfirmationSet struct {
+	MinBlockConfirmation uint16
+	Raw                  types.Log
+}
+
+func (_LombardTokenPool *LombardTokenPoolFilterer) FilterMinBlockConfirmationSet(opts *bind.FilterOpts) (*LombardTokenPoolMinBlockConfirmationSetIterator, error) {
+
+	logs, sub, err := _LombardTokenPool.contract.FilterLogs(opts, "MinBlockConfirmationSet")
+	if err != nil {
+		return nil, err
+	}
+	return &LombardTokenPoolMinBlockConfirmationSetIterator{contract: _LombardTokenPool.contract, event: "MinBlockConfirmationSet", logs: logs, sub: sub}, nil
+}
+
+func (_LombardTokenPool *LombardTokenPoolFilterer) WatchMinBlockConfirmationSet(opts *bind.WatchOpts, sink chan<- *LombardTokenPoolMinBlockConfirmationSet) (event.Subscription, error) {
+
+	logs, sub, err := _LombardTokenPool.contract.WatchLogs(opts, "MinBlockConfirmationSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(LombardTokenPoolMinBlockConfirmationSet)
+				if err := _LombardTokenPool.contract.UnpackLog(event, "MinBlockConfirmationSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_LombardTokenPool *LombardTokenPoolFilterer) ParseMinBlockConfirmationSet(log types.Log) (*LombardTokenPoolMinBlockConfirmationSet, error) {
+	event := new(LombardTokenPoolMinBlockConfirmationSet)
+	if err := _LombardTokenPool.contract.UnpackLog(event, "MinBlockConfirmationSet", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -3510,9 +3637,8 @@ type GetCurrentRateLimiterState struct {
 	InboundRateLimiterState  RateLimiterTokenBucket
 }
 type GetDynamicConfig struct {
-	Router                common.Address
-	MinBlockConfirmations uint16
-	RateLimitAdmin        common.Address
+	Router         common.Address
+	RateLimitAdmin common.Address
 }
 type GetFee struct {
 	FeeUSDCents       *big.Int
@@ -3544,7 +3670,7 @@ func (LombardTokenPoolCustomBlockConfirmationOutboundRateLimitConsumed) Topic() 
 }
 
 func (LombardTokenPoolDynamicConfigSet) Topic() common.Hash {
-	return common.HexToHash("0xba9213054b14c2e884f779120bb196f0735cef27140498a9d26117eeab77a117")
+	return common.HexToHash("0x22a0dbb8195755fbfc99667a86ae684c568e9dfbb1eccf7f90084e6166447970")
 }
 
 func (LombardTokenPoolFeeTokenWithdrawn) Topic() common.Hash {
@@ -3561,6 +3687,10 @@ func (LombardTokenPoolLockedOrBurned) Topic() common.Hash {
 
 func (LombardTokenPoolLombardConfigurationSet) Topic() common.Hash {
 	return common.HexToHash("0x01d5dd7f15328f4241da3a1d9c7b310ae9ac14e8ca441203a7b6f71c7da0c49d")
+}
+
+func (LombardTokenPoolMinBlockConfirmationSet) Topic() common.Hash {
+	return common.HexToHash("0xa7f8dbba8cdb126ce4a0e7939ec58e0161b70d808b585dd651d68e59d27e11fb")
 }
 
 func (LombardTokenPoolOutboundRateLimitConsumed) Topic() common.Hash {
@@ -3680,7 +3810,9 @@ type LombardTokenPoolInterface interface {
 
 	RemoveRemotePool(opts *bind.TransactOpts, remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error)
 
-	SetDynamicConfig(opts *bind.TransactOpts, router common.Address, minBlockConfirmations uint16, rateLimitAdmin common.Address) (*types.Transaction, error)
+	SetDynamicConfig(opts *bind.TransactOpts, router common.Address, rateLimitAdmin common.Address) (*types.Transaction, error)
+
+	SetMinBlockConfirmation(opts *bind.TransactOpts, minBlockConfirmation uint16) (*types.Transaction, error)
 
 	SetPath(opts *bind.TransactOpts, remoteChainSelector uint64, lChainId [32]byte, allowedCaller []byte) (*types.Transaction, error)
 
@@ -3743,6 +3875,12 @@ type LombardTokenPoolInterface interface {
 	WatchLombardConfigurationSet(opts *bind.WatchOpts, sink chan<- *LombardTokenPoolLombardConfigurationSet, verifier []common.Address, bridge []common.Address, tokenAdapter []common.Address) (event.Subscription, error)
 
 	ParseLombardConfigurationSet(log types.Log) (*LombardTokenPoolLombardConfigurationSet, error)
+
+	FilterMinBlockConfirmationSet(opts *bind.FilterOpts) (*LombardTokenPoolMinBlockConfirmationSetIterator, error)
+
+	WatchMinBlockConfirmationSet(opts *bind.WatchOpts, sink chan<- *LombardTokenPoolMinBlockConfirmationSet) (event.Subscription, error)
+
+	ParseMinBlockConfirmationSet(log types.Log) (*LombardTokenPoolMinBlockConfirmationSet, error)
 
 	FilterOutboundRateLimitConsumed(opts *bind.FilterOpts, remoteChainSelector []uint64) (*LombardTokenPoolOutboundRateLimitConsumedIterator, error)
 
