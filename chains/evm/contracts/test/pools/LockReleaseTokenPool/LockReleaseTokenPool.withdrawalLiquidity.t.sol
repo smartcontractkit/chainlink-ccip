@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
+import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
 
@@ -32,7 +32,7 @@ contract LockReleaseTokenPool_withdrawalLiquidity is LockReleaseTokenPoolSetup {
     s_token.approve(address(s_lockReleaseTokenPool), amount);
     s_lockReleaseTokenPool.provideLiquidity(amount);
 
-    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.InsufficientBalance.selector, amount + 1, amount));
+    vm.expectRevert(LockReleaseTokenPool.InsufficientLiquidity.selector);
     s_lockReleaseTokenPool.withdrawLiquidity(amount + 1);
   }
 }

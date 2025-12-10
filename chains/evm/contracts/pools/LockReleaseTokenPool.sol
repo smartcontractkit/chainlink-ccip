@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {Pool} from "../libraries/Pool.sol";
 import {ERC20LockBox} from "./ERC20LockBox.sol";
 import {TokenPool} from "./TokenPool.sol";
 
@@ -28,6 +29,8 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @notice The address of the rebalancer.
   address internal s_rebalancer;
 
+  /// @notice Fee accrued on token transfers.
+  uint256 internal s_accruedFees;
   /// @notice The lock box for the token pool.
   ERC20LockBox internal immutable i_lockBox;
 
@@ -40,14 +43,28 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     address lockBox
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
-
     token.safeApprove(lockBox, type(uint256).max);
     i_lockBox = ERC20LockBox(lockBox);
   }
 
-  /// @notice Locks the tokens in the lockBox.
-  /// @dev The router has already transferred the full amount to this contract before calling lockOrBurn.
-  /// For V1 the amount = full amount. For V2 the amount = destTokenAmount (after fees), and fees remain on this contract.
+  /// @inheritdoc TokenPool
+  /// @notice accounts for accrued fees when token is locked.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes calldata tokenArgs
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) {
+    (out, destTokenAmount) = super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+
+    // Accrue the in-token fee (original amount minus destination amount).
+    uint256 feeAmount = lockOrBurnIn.amount - destTokenAmount;
+    if (feeAmount != 0) {
+      s_accruedFees += feeAmount;
+    }
+
+    return (out, destTokenAmount);
+  }
+
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
@@ -55,7 +72,8 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   }
 
   function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
-    // Release tokens from the lock box to the receiver.
+    uint256 availableLiquidity = _availableLiquidity();
+    if (amount > availableLiquidity) revert InsufficientLiquidity();
     i_lockBox.withdraw(address(i_token), amount, receiver);
   }
 
@@ -97,7 +115,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) external {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
-    // Withdraw the tokens directly from the lockbox to the rebalancer.
+    if (_availableLiquidity() < amount) revert InsufficientLiquidity();
     i_lockBox.withdraw(address(i_token), amount, msg.sender);
     emit LiquidityRemoved(msg.sender, amount);
   }
@@ -121,5 +139,33 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     LockReleaseTokenPool(from).withdrawLiquidity(amount);
 
     emit LiquidityTransferred(from, amount);
+  }
+
+  /// @notice Withdraw only accrued fees; user liquidity (including bridged funds) remains untouched.
+  function withdrawFeeTokens(address[] calldata feeTokens, address recipient) external override onlyOwner {
+    for (uint256 i = 0; i < feeTokens.length; ++i) {
+      address feeToken = feeTokens[i];
+      uint256 amountToWithdraw;
+      if (feeToken == address(i_token)) {
+        uint256 balance = i_token.balanceOf(address(this));
+        amountToWithdraw = s_accruedFees > balance ? balance : s_accruedFees;
+        if (amountToWithdraw != 0) {
+          s_accruedFees -= amountToWithdraw;
+          i_token.safeTransfer(recipient, amountToWithdraw);
+          emit FeeTokenWithdrawn(recipient, feeToken, amountToWithdraw);
+        }
+      } else {
+        amountToWithdraw = IERC20(feeToken).balanceOf(address(this));
+        if (amountToWithdraw != 0) {
+          IERC20(feeToken).safeTransfer(recipient, amountToWithdraw);
+          emit FeeTokenWithdrawn(recipient, feeToken, amountToWithdraw);
+        }
+      }
+    }
+  }
+
+  function _availableLiquidity() internal view returns (uint256) {
+    uint256 balance = i_token.balanceOf(address(i_lockBox));
+    return balance;
   }
 }
