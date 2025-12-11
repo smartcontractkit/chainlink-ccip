@@ -3,12 +3,15 @@ pragma solidity ^0.8.0;
 
 import {IRouter} from "../../interfaces/IRouter.sol";
 
+import {Router} from "../../Router.sol";
 import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
 import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
+import {Internal} from "../../libraries/Internal.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
+import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../../pools/USDC/CCTPMessageTransmitterProxy.sol";
@@ -25,6 +28,44 @@ import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract cctp_e2e is e2e {
+  // solhint-disable-next-line gas-struct-packing
+  struct CCTPMessageHeader {
+    uint32 version;
+    uint32 sourceDomain;
+    uint32 destinationDomain;
+    bytes32 nonce;
+    bytes32 sender;
+    bytes32 recipient;
+    bytes32 destinationCaller;
+    uint32 minFinalityThreshold;
+    uint32 finalityThresholdExecuted;
+  }
+
+  // solhint-disable-next-line gas-struct-packing
+  struct CCTPMessageBody {
+    uint32 version;
+    bytes32 burnToken;
+    bytes32 mintRecipient;
+    uint256 amount;
+    bytes32 messageSender;
+    uint256 maxFee;
+    uint256 feeExecuted;
+    uint256 expirationBlock;
+  }
+
+  // solhint-disable-next-line gas-struct-packing
+  struct CCTPMessageHookData {
+    bytes4 verifierVersion;
+    bytes32 messageId;
+  }
+
+  // solhint-disable-next-line gas-struct-packing
+  struct CCTPMessage {
+    CCTPMessageHeader header;
+    CCTPMessageBody body;
+    CCTPMessageHookData hookData;
+  }
+
   uint32 private constant CCTP_VERSION = 1;
   uint16 private constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
 
@@ -71,6 +112,11 @@ contract cctp_e2e is e2e {
     s_destPoolBySourceToken[address(s_sourceCCTPSetup.token)] = address(s_destCCTPSetup.tokenPoolProxy);
     s_extraDataByToken[address(s_sourceCCTPSetup.token)] =
       abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG);
+
+    // Apply off ramp updates on the source router.
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
+    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
   }
 
   function test_e2e() public override {
@@ -143,6 +189,52 @@ contract cctp_e2e is e2e {
     vm.resumeGasMetering();
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
+
+    assertEq(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber, expectedMsgNum);
+
+    CCTPMessage memory cctpMessage = CCTPMessage({
+      header: CCTPMessageHeader({
+        version: CCTP_VERSION,
+        sourceDomain: SOURCE_DOMAIN,
+        destinationDomain: DEST_DOMAIN,
+        nonce: bytes32(0),
+        sender: bytes32(abi.encode(s_sourceCCTPSetup.tokenMessenger)),
+        recipient: bytes32(abi.encode(address(s_destCCTPSetup.tokenMessenger))),
+        destinationCaller: bytes32(abi.encode(address(s_destCCTPSetup.messageTransmitterProxy))),
+        minFinalityThreshold: 2000,
+        finalityThresholdExecuted: 2000
+      }),
+      body: CCTPMessageBody({
+        version: CCTP_VERSION,
+        burnToken: bytes32(abi.encode(address(s_sourceCCTPSetup.token))),
+        mintRecipient: bytes32(abi.encode(OWNER)),
+        amount: amount,
+        messageSender: bytes32(abi.encode(s_sourceCCTPSetup.verifier)),
+        maxFee: 0,
+        feeExecuted: 0,
+        expirationBlock: block.number + 1000
+      }),
+      hookData: CCTPMessageHookData({verifierVersion: s_sourceCCTPSetup.verifier.versionTag(), messageId: messageId})
+    });
+    address[] memory ccvAddresses = new address[](2);
+    ccvAddresses[0] = address(s_destCCTPSetup.verifierResolver);
+    ccvAddresses[1] = address(s_destVerifier);
+    bytes[] memory verifierResults = new bytes[](2);
+    verifierResults[0] =
+      abi.encodePacked(s_sourceCCTPSetup.verifier.versionTag(), _encodeCCTPMessage(cctpMessage), new bytes(65));
+    verifierResults[1] = "";
+
+    vm.expectEmit();
+    emit OffRamp.ExecutionStateChanged({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      messageNumber: expectedMsgNum,
+      messageId: messageId,
+      state: Internal.MessageExecutionState.SUCCESS,
+      returnData: ""
+    });
+
+    vm.resumeGasMetering();
+    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults);
   }
 
   function _deployCCTPSetup(
@@ -255,7 +347,7 @@ contract cctp_e2e is e2e {
 
     // Apply chain updates on the destination token pool.
     bytes[] memory remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = abi.encode(address(s_sourceCCTPSetup.tokenPool));
+    remotePoolAddresses[0] = abi.encode(address(s_sourceCCTPSetup.tokenPoolProxy));
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
@@ -268,7 +360,7 @@ contract cctp_e2e is e2e {
 
     // Apply chain updates on the source token pool.
     remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = abi.encode(address(s_destCCTPSetup.tokenPool));
+    remotePoolAddresses[0] = abi.encode(address(s_destCCTPSetup.tokenPoolProxy));
     chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -321,5 +413,52 @@ contract cctp_e2e is e2e {
 
     // Grant burn and mint roles on the dest token to the dest message transmitter.
     BurnMintERC20(address(s_destCCTPSetup.token)).grantMintAndBurnRoles(address(s_destCCTPSetup.messageTransmitter));
+  }
+
+  function _encodeCCTPMessage(
+    CCTPMessage memory cctpMessage
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(
+      _encodeCCTPMessageHeader(cctpMessage.header),
+      _encodeCCTPMessageBody(cctpMessage.body),
+      _encodeCCTPMessageHookData(cctpMessage.hookData)
+    );
+  }
+
+  function _encodeCCTPMessageHeader(
+    CCTPMessageHeader memory header
+  ) private pure returns (bytes memory) {
+    return abi.encodePacked(
+      header.version,
+      header.sourceDomain,
+      header.destinationDomain,
+      header.nonce,
+      header.sender,
+      header.recipient,
+      header.destinationCaller,
+      header.minFinalityThreshold,
+      header.finalityThresholdExecuted
+    );
+  }
+
+  function _encodeCCTPMessageBody(
+    CCTPMessageBody memory body
+  ) private pure returns (bytes memory) {
+    return abi.encodePacked(
+      body.version,
+      body.burnToken,
+      body.mintRecipient,
+      body.amount,
+      body.messageSender,
+      body.maxFee,
+      body.feeExecuted,
+      body.expirationBlock
+    );
+  }
+
+  function _encodeCCTPMessageHookData(
+    CCTPMessageHookData memory hookData
+  ) private pure returns (bytes memory) {
+    return abi.encodePacked(hookData.verifierVersion, hookData.messageId);
   }
 }
