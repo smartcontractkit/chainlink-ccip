@@ -7,10 +7,12 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {ERC20LockBox} from "../../pools/ERC20LockBox.sol";
 import {RegistryModuleOwnerCustom} from "../RegistryModuleOwnerCustom.sol";
 import {FactoryBurnMintERC20} from "./FactoryBurnMintERC20.sol";
 
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
+import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 /// @notice A contract for deploying new tokens and token pools, and configuring them with the token admin registry.
 /// @dev At the end of the transaction, the ownership transfer process will begin, but the user must accept the
@@ -23,6 +25,7 @@ contract TokenPoolFactory is ITypeAndVersion {
   event RemoteChainConfigUpdated(uint64 indexed remoteChainSelector, RemoteChainConfig remoteChainConfig);
 
   error InvalidZeroAddress();
+  error InvalidLockBoxToken(address lockBoxToken, address poolToken);
 
   /// @notice The type of pool to deploy. Types may be expanded in future versions.
   enum PoolType {
@@ -50,42 +53,37 @@ contract TokenPoolFactory is ITypeAndVersion {
     address remotePoolFactory; // The factory contract on the remote chain which will make the deployment.
     address remoteRouter; // The router on the remote chain.
     address remoteRMNProxy; // The RMNProxy contract on the remote chain.
-    address remoteLockBox; // The lockBox contract on the remote chain (for LOCK_RELEASE pools).
     uint8 remoteTokenDecimals; // The number of decimals for the token on the remote chain.
   }
 
-  string public constant typeAndVersion = "TokenPoolFactory 1.5.1";
+  string public constant typeAndVersion = "TokenPoolFactory 1.6.0-dev";
 
   ITokenAdminRegistry private immutable i_tokenAdminRegistry;
   RegistryModuleOwnerCustom private immutable i_registryModuleOwnerCustom;
 
   address private immutable i_rmnProxy;
   address private immutable i_ccipRouter;
-  address private immutable i_lockBox;
 
   /// @notice Construct the TokenPoolFactory.
   /// @param tokenAdminRegistry The address of the token admin registry.
   /// @param tokenAdminModule The address of the token admin module which can register the token via ownership module.
   /// @param rmnProxy The address of the RMNProxy contract token pools will be deployed with.
   /// @param ccipRouter The address of the CCIPRouter contract token pools will be deployed with.
-  /// @param lockBox The address of the ERC20LockBox contract for lock/release pools.
   constructor(
     ITokenAdminRegistry tokenAdminRegistry,
     RegistryModuleOwnerCustom tokenAdminModule,
     address rmnProxy,
-    address ccipRouter,
-    address lockBox
+    address ccipRouter
   ) {
     if (
       address(tokenAdminRegistry) == address(0) || address(tokenAdminModule) == address(0) || rmnProxy == address(0)
-        || ccipRouter == address(0) || lockBox == address(0)
+        || ccipRouter == address(0)
     ) revert InvalidZeroAddress();
 
     i_tokenAdminRegistry = ITokenAdminRegistry(tokenAdminRegistry);
     i_registryModuleOwnerCustom = RegistryModuleOwnerCustom(tokenAdminModule);
     i_rmnProxy = rmnProxy;
     i_ccipRouter = ccipRouter;
-    i_lockBox = lockBox;
   }
 
   // ================================================================
@@ -122,7 +120,8 @@ contract TokenPoolFactory is ITypeAndVersion {
     address token = Create2.deploy(0, salt, tokenInitCode);
 
     // Deploy the token pool.
-    address pool = _createTokenPool(token, localTokenDecimals, localPoolType, remoteTokenPools, tokenPoolInitCode, salt);
+    address pool =
+      _createTokenPool(token, localTokenDecimals, localPoolType, remoteTokenPools, tokenPoolInitCode, salt);
 
     // Grant the mint and burn roles to the pool for the token.
     FactoryBurnMintERC20(token).grantMintAndBurnRoles(pool);
@@ -236,7 +235,8 @@ contract TokenPoolFactory is ITypeAndVersion {
     // LockRelease pools need lockBox, BurnMint pools don't.
     bytes memory tokenPoolInitArgs;
     if (localPoolType == PoolType.LOCK_RELEASE) {
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter, i_lockBox);
+      address lockBox = address(new ERC20LockBox(token));
+      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter, lockBox);
     } else {
       tokenPoolInitArgs = abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter);
     }

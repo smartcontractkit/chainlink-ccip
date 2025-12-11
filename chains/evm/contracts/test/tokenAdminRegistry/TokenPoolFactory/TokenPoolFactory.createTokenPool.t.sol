@@ -6,6 +6,7 @@ import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/I
 
 import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
+import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {BurnFromMintTokenPool} from "../../../pools/BurnFromMintTokenPool.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
@@ -87,9 +88,8 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
-    );
+    TokenPoolFactory newTokenPoolFactory =
+      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
@@ -97,7 +97,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       remotePoolFactory: address(newTokenPoolFactory),
       remoteRouter: address(s_destRouter),
       remoteRMNProxy: address(s_rmnProxy),
-      remoteLockBox: address(s_lockBox),
+      remoteLockBox: address(0),
       remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
     });
 
@@ -230,9 +230,8 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
-    );
+    TokenPoolFactory newTokenPoolFactory =
+      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
@@ -240,7 +239,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       remotePoolFactory: address(newTokenPoolFactory),
       remoteRouter: address(s_destRouter),
       remoteRMNProxy: address(s_rmnProxy),
-      remoteLockBox: address(s_lockBox),
+      remoteLockBox: address(0),
       remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
     });
 
@@ -394,25 +393,27 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
-    );
+    TokenPoolFactory newTokenPoolFactory =
+      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
-
-    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
-      remotePoolFactory: address(newTokenPoolFactory),
-      remoteRouter: address(s_destRouter),
-      remoteRMNProxy: address(s_rmnProxy),
-      remoteLockBox: address(s_lockBox),
-      remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
-    });
 
     FactoryBurnMintERC20 newLocalToken =
       new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
     FactoryBurnMintERC20 newRemoteToken =
       new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
+
+    ERC20LockBox localLockBox = new ERC20LockBox(address(newLocalToken));
+    ERC20LockBox remoteLockBox = new ERC20LockBox(address(newRemoteToken));
+
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
+      remotePoolFactory: address(newTokenPoolFactory),
+      remoteRouter: address(s_destRouter),
+      remoteRMNProxy: address(s_rmnProxy),
+      remoteLockBox: address(remoteLockBox),
+      remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
+    });
 
     // Create an array of remote pools where nothing exists yet, but we want to predict the address for
     // the new pool and token on DEST_CHAIN_SELECTOR
@@ -466,6 +467,14 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       type(LockReleaseTokenPool).creationCode, // Pool Init Code
       FAKE_SALT // Salt
     );
+
+    // Allow both pools to interact with their respective lockboxes.
+    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
+    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: poolAddress, allowed: true});
+    localLockBox.configureAllowedCallers(allowedCallers);
+
+    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: newPoolAddress, allowed: true});
+    remoteLockBox.configureAllowedCallers(allowedCallers);
 
     assertEq(
       LockReleaseTokenPool(poolAddress).getRemotePools(DEST_CHAIN_SELECTOR)[0],
@@ -560,9 +569,8 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
-    );
+    TokenPoolFactory newTokenPoolFactory =
+      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
@@ -570,7 +578,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       remotePoolFactory: address(newTokenPoolFactory),
       remoteRouter: address(s_destRouter),
       remoteRMNProxy: address(s_rmnProxy),
-      remoteLockBox: address(s_lockBox),
+      remoteLockBox: address(0),
       remoteTokenDecimals: REMOTE_TOKEN_DECIMALS
     });
 
