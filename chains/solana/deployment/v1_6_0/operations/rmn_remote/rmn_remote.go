@@ -279,11 +279,7 @@ func IsSubjectCursed(chain cldf_solana.Chain, program solana.PublicKey, subject 
 		return false, fmt.Errorf("failed to read curses account: %w", err)
 	}
 
-	globalCurse := rmn_remote.CurseSubject{Value: api.GlobalCurseSubject()}
 	for _, cursedSubject := range cursesAccount.CursedSubjects {
-		if cursedSubject == globalCurse {
-			return true, nil
-		}
 		if cursedSubject == subject {
 			return true, nil
 		}

@@ -153,6 +153,12 @@ func (cr *CurseRegistry) groupRMNSubjectBySelector(e cldf.Environment, rmnSubjec
 			}
 			continue
 		}
+		// Skip specific subjects if global curse is already set for this chain
+		if slices.ContainsFunc(grouped[s.ChainSelector].subjects, func(subj Subject) bool {
+			return IfSubjectEqual(subj, GlobalCurseSubject())
+		}) {
+			continue
+		}
 		// find if target subject is connected if not global
 		connected, err := adapter.IsChainConnectedToTargetChain(e, s.ChainSelector, s.SubjectChainSelector)
 		if err != nil {
