@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBridgeV1} from "../../../interfaces/lombard/IBridgeV1.sol";
 import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
@@ -20,7 +21,7 @@ contract LombardVerifier_constructor is LombardVerifierSetup {
     MockLombardBridge mockBridge = new MockLombardBridge();
     uint8 wrongVersion = 100;
 
-    vm.mockCall(address(mockBridge), abi.encodeWithSelector(IBridgeV2.MSG_VERSION.selector), abi.encode(wrongVersion));
+    vm.mockCall(address(mockBridge), abi.encodeWithSelector(IBridgeV1.MSG_VERSION.selector), abi.encode(wrongVersion));
 
     vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageVersion.selector, 1, wrongVersion));
     new LombardVerifier(IBridgeV2(address(mockBridge)), s_storageLocations, address(s_mockRMNRemote));

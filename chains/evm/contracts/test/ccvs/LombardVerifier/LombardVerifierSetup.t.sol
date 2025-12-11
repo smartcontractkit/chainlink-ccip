@@ -3,75 +3,19 @@ pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
 import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
-import {IMailbox} from "../../../interfaces/lombard/IMailbox.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
+import {MockLombardMailbox} from "../../mocks/MockLombardMailbox.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-contract MockLombardBridge is IBridgeV2 {
-  address public s_mailbox;
-  bytes32 public s_lastPayloadHash;
-
-  constructor() {
-    s_mailbox = address(new MockLombardMailbox());
-  }
-
-  function mailbox() external view override returns (address) {
-    return s_mailbox;
-  }
-
-  function MSG_VERSION() external pure override returns (uint8) {
-    return 1;
-  }
-
-  function deposit(
-    bytes32,
-    address,
-    address,
-    bytes32,
-    uint256,
-    bytes32,
-    bytes calldata optionalMessage
-  ) external payable override returns (uint256, bytes32) {
-    s_lastPayloadHash = keccak256(abi.encode(block.timestamp, optionalMessage));
-
-    MockLombardMailbox(s_mailbox).setMessageId(optionalMessage);
-
-    return (0, s_lastPayloadHash);
-  }
-}
-
-contract MockLombardMailbox is IMailbox {
-  bytes4 public constant VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
-
-  bool public s_shouldSucceed = true;
-  bytes internal s_optionalMessage = abi.encodePacked(VERSION_TAG_V1_7_0, bytes32(0));
-
-  function setMessageId(
-    bytes calldata optionalMessage
-  ) external {
-    s_optionalMessage = optionalMessage;
-  }
-
-  function setShouldSucceed(
-    bool shouldSucceed
-  ) external {
-    s_shouldSucceed = shouldSucceed;
-  }
-
-  function deliverAndHandle(
-    bytes calldata,
-    bytes calldata
-  ) external view override returns (bytes32, bool, bytes memory) {
-    return (bytes32(0), s_shouldSucceed, s_optionalMessage);
-  }
-}
-
 contract LombardVerifierSetup is BaseVerifierSetup {
+  bytes4 internal constant VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
+
   LombardVerifier internal s_lombardVerifier;
   MockLombardBridge internal s_mockBridge;
   MockLombardMailbox internal s_mockMailbox;
@@ -86,6 +30,8 @@ contract LombardVerifierSetup is BaseVerifierSetup {
 
     s_mockBridge = new MockLombardBridge();
     s_mockMailbox = MockLombardMailbox(s_mockBridge.s_mailbox());
+    // Set default execution result matching the version tag format.
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V1_7_0, bytes32(0)));
 
     s_lombardVerifier =
       new LombardVerifier(IBridgeV2(address(s_mockBridge)), s_storageLocations, address(s_mockRMNRemote));
