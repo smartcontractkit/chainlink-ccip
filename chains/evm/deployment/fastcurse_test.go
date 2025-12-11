@@ -597,6 +597,21 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, isCursed, "subject on chain3 should be cursed on rmnremote in chain3")
 
+	curseAdapter, ok := curseReg.GetCurseAdapter(chainsel.FamilyEVM, semver.MustParse("1.6.0"))
+	require.True(t, ok)
+	// Check that adapter does not return true for specific subjects when global curse is present
+	isCursed, err = curseAdapter.IsSubjectCursedOnChain(*env, chain3, adv1_6_0.SelectorToSubject(chain2))
+	require.NoError(t, err)
+	require.False(t, isCursed, "subject on chain2 should not be cursed on rmnremote in chain3")
+
+	isCursed, err = curseAdapter.IsSubjectCursedOnChain(*env, chain3, adv1_6_0.SelectorToSubject(chain1))
+	require.NoError(t, err)
+	require.False(t, isCursed, "subject on chain1 should not be cursed on rmnremote in chain3")
+
+	isCursed, err = curseAdapter.IsSubjectCursedOnChain(*env, chain3, fastcurse.GlobalCurseSubject())
+	require.NoError(t, err)
+	require.True(t, isCursed, "global curse on chain3 should be cursed on rmnremote in chain3")
+
 	// Now uncurse the subjects
 	// reset the operation bundle to clear any cached values
 	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
@@ -626,4 +641,61 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	isCursed, err = rmnRemoteC3.IsCursed(nil, fastcurse.GlobalCurseSubject())
 	require.NoError(t, err)
 	require.False(t, isCursed, "global curse on chain3 should be uncursed on rmnremote in chain3")
+
+	// Now do a global curse on chain1 (1.5)
+	curseCfg = fastcurse.GlobalCurseOnNetworkInput{
+		ChainSelectors: map[uint64]*semver.Version{
+			chain1: semver.MustParse("1.5.0"),
+		},
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            "test",
+			Description:          "Curse proposal for fast curse test",
+		},
+	}
+	curseChangeset = fastcurse.GloballyCurseChainChangeset(curseReg, mcmsRegistry)
+	output, err = curseChangeset.Apply(*env, curseCfg)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	curseAdapter, ok = curseReg.GetCurseAdapter(chainsel.FamilyEVM, semver.MustParse("1.5.0"))
+	require.True(t, ok)
+
+	// Check that adapter does not return true for specific subjects when global curse is present
+	isCursed, err = curseAdapter.IsSubjectCursedOnChain(*env, chain1, adv1_5_0.SelectorToSubject(chain2))
+	require.NoError(t, err)
+	require.False(t, isCursed, "subject on chain2 should not be cursed on rmn in chain1")
+
+	isCursed, err = curseAdapter.IsSubjectCursedOnChain(*env, chain1, adv1_5_0.SelectorToSubject(chain3))
+	require.NoError(t, err)
+	require.False(t, isCursed, "subject on chain3 should not be cursed on rmn in chain1")
+
+	isCursed, err = curseAdapter.IsSubjectCursedOnChain(*env, chain1, fastcurse.GlobalCurseSubject())
+	require.NoError(t, err)
+	require.True(t, isCursed, "global curse on chain1 should be cursed on rmn in chain1")
+
+	// Now uncurse the global curse
+	uncurseChangeset = fastcurse.GloballyUncurseChainChangeset(curseReg, mcmsRegistry)
+	output, err = uncurseChangeset.Apply(*env, curseCfg)
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	isCursed, err = curseAdapter.IsSubjectCursedOnChain(*env, chain1, fastcurse.GlobalCurseSubject())
+	require.NoError(t, err)
+	require.False(t, isCursed, "global curse on chain1 should be uncursed on rmn in chain1")
+
+	isCursed, err = curseAdapter.IsSubjectCursedOnChain(*env, chain1, adv1_5_0.SelectorToSubject(chain2))
+	require.NoError(t, err)
+	require.False(t, isCursed, "subject on chain2 should not be cursed on rmn in chain1")
+
+	isCursed, err = curseAdapter.IsSubjectCursedOnChain(*env, chain1, adv1_5_0.SelectorToSubject(chain3))
+	require.NoError(t, err)
+	require.False(t, isCursed, "subject on chain3 should not be cursed on rmn in chain1")
 }
