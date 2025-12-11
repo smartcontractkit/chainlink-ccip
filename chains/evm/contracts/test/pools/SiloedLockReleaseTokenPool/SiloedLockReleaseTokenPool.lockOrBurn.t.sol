@@ -89,7 +89,7 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
     emit TokenPool.OutboundRateLimitConsumed({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       token: address(s_token),
-      amount: AMOUNT
+      amount: expectedLockedAmount
     });
 
     vm.expectEmit();
