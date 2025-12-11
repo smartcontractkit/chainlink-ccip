@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {IRouter} from "../../interfaces/IRouter.sol";
+import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
 
 import {Router} from "../../Router.sol";
 import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
@@ -24,7 +25,6 @@ import {e2e} from "./e2e.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract cctp_e2e is e2e {
@@ -94,8 +94,6 @@ contract cctp_e2e is e2e {
   function setUp() public override {
     super.setUp();
 
-    // TODO: Any need to use different routers, token admin registries, or rmns for source and dest?
-    // If so, we need to set up an additional set.
     s_sourceCCTPSetup =
       _deployCCTPSetup(address(s_sourceRouter), address(s_mockRMNRemote), address(s_tokenAdminRegistry), SOURCE_DOMAIN);
     s_destCCTPSetup =
@@ -127,7 +125,7 @@ contract cctp_e2e is e2e {
     IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
     IERC20(address(s_sourceCCTPSetup.token)).approve(address(s_sourceRouter), type(uint256).max);
 
-    // Specify the CCTP verifier such that it is the only verifier included.
+    // Specify the CCTP verifier so that it is the only verifier included.
     address[] memory userCCVAddresses = new address[](1);
     userCCVAddresses[0] = address(s_sourceCCTPSetup.verifierResolver);
     bytes[] memory userCCVArgs = new bytes[](1);
@@ -216,6 +214,9 @@ contract cctp_e2e is e2e {
       }),
       hookData: CCTPMessageHookData({verifierVersion: s_sourceCCTPSetup.verifier.versionTag(), messageId: messageId})
     });
+
+    // Default CCV is applied because receiver is an EOA.
+    // Therefore, we need to include a verifier result for the mock verifier here as well.
     address[] memory ccvAddresses = new address[](2);
     ccvAddresses[0] = address(s_destCCTPSetup.verifierResolver);
     ccvAddresses[1] = address(s_destVerifier);
