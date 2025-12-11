@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"context"
 	"math/big"
 	"testing"
 
@@ -95,10 +94,16 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 		common_utils.CLLQualifier,
 	)
 	err := utils.FundSolanaAccounts(
-		context.Background(),
-		[]solana.PublicKey{timelockSigner, mcmSigner},
+		t.Context(),
+		[]solana.PublicKey{chain.DeployerKey.PublicKey()},
 		100,
 		chain.Client,
+	)
+	require.NoError(t, err)
+	err = utils.FundFromDeployerKey(
+		chain,
+		[]solana.PublicKey{timelockSigner, mcmSigner},
+		10,
 	)
 	require.NoError(t, err)
 	mcmsInput := mcmsapi.TransferOwnershipInput{
@@ -216,10 +221,16 @@ func SolanaTransferMCMSContracts(t *testing.T, e *cldf_deployment.Environment, s
 		qualifier,
 	)
 	err := utils.FundSolanaAccounts(
-		context.Background(),
-		[]solana.PublicKey{timelockSigner, mcmSigner},
+		t.Context(),
+		[]solana.PublicKey{chain.DeployerKey.PublicKey()},
 		100,
 		chain.Client,
+	)
+	require.NoError(t, err)
+	err = utils.FundFromDeployerKey(
+		chain,
+		[]solana.PublicKey{timelockSigner, mcmSigner},
+		10,
 	)
 	require.NoError(t, err)
 	mcmsRefs := utils.GetAllMCMS(
