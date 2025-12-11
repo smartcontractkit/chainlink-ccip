@@ -35,4 +35,20 @@ contract BaseVerifier_applyRemoteChainConfigUpdates is BaseVerifierSetup {
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.InvalidRemoteChainConfig.selector, 0));
     s_baseVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
   }
+
+  function test_applyDestChainConfigUpdates_RevertWhen_DestGasCannotBeZero() public {
+    uint64 remoteChainSelector = 12345;
+    BaseVerifier.RemoteChainConfigArgs[] memory destChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    destChainConfigs[0] = BaseVerifier.RemoteChainConfigArgs({
+      router: s_router,
+      remoteChainSelector: remoteChainSelector,
+      allowlistEnabled: false,
+      feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
+      gasForVerification: 0, // Zero gas should revert.
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.DestGasCannotBeZero.selector, remoteChainSelector));
+    s_baseVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
+  }
 }

@@ -19,7 +19,8 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_committeeVerifier = new CommitteeVerifier(_createBasicDynamicConfigArgs(), "testStorageLocation");
+    s_committeeVerifier =
+      new CommitteeVerifier(_createBasicDynamicConfigArgs(), s_storageLocations, address(s_mockRMNRemote));
     s_versionTag = s_committeeVerifier.versionTag();
 
     SignatureQuorumValidator.SignatureConfig[] memory updates = new SignatureQuorumValidator.SignatureConfig[](1);

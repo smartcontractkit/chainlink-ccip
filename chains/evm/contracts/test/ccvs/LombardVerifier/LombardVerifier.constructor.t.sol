@@ -13,7 +13,7 @@ contract LombardVerifier_constructor is LombardVerifierSetup {
 
   function test_constructor_RevertWhen_ZeroBridge() public {
     vm.expectRevert(LombardVerifier.ZeroBridge.selector);
-    new LombardVerifier(IBridgeV2(address(0)), STORAGE_LOCATION);
+    new LombardVerifier(IBridgeV2(address(0)), s_storageLocations, address(s_mockRMNRemote));
   }
 
   function test_constructor_RevertWhen_InvalidMessageVersion() public {
@@ -23,6 +23,6 @@ contract LombardVerifier_constructor is LombardVerifierSetup {
     vm.mockCall(address(mockBridge), abi.encodeWithSelector(IBridgeV2.MSG_VERSION.selector), abi.encode(wrongVersion));
 
     vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageVersion.selector, 1, wrongVersion));
-    new LombardVerifier(IBridgeV2(address(mockBridge)), STORAGE_LOCATION);
+    new LombardVerifier(IBridgeV2(address(mockBridge)), s_storageLocations, address(s_mockRMNRemote));
   }
 }

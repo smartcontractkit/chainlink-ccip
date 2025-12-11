@@ -74,7 +74,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @notice Mapping of CCIP chain selector to chain specific config.
   mapping(uint64 chainSelector => Path path) internal s_chainSelectorToPath;
 
-  constructor(IBridgeV2 bridge, string memory storageLocation) BaseVerifier(storageLocation) {
+  constructor(IBridgeV2 bridge, string[] memory storageLocation, address rmn) BaseVerifier(storageLocation, rmn) {
     if (address(bridge) == address(0)) {
       revert ZeroBridge();
     }

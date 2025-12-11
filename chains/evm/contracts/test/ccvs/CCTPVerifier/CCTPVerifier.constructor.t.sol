@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {ITokenMessenger} from "../../../pools/USDC/interfaces/ITokenMessenger.sol";
 
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
+import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
@@ -20,12 +21,13 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
+      }),
+      address(s_mockRMNRemote)
     );
 
     // Check allowance of the token messenger on the USDC token.
@@ -40,47 +42,50 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_TokenMessengerIsZero() public {
-    vm.expectRevert(CCTPVerifier.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(BaseVerifier.ZeroAddressNotAllowed.selector);
     new CCTPVerifier(
       ITokenMessenger(address(0)),
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
+      }),
+      address(s_mockRMNRemote)
     );
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_MessageTransmitterProxyIsZero() public {
-    vm.expectRevert(CCTPVerifier.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(BaseVerifier.ZeroAddressNotAllowed.selector);
     new CCTPVerifier(
       s_mockTokenMessenger,
       CCTPMessageTransmitterProxy(address(0)),
       s_USDCToken,
-      STORAGE_LOCATION,
+      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
+      }),
+      address(s_mockRMNRemote)
     );
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_USDCTokenIsZero() public {
-    vm.expectRevert(CCTPVerifier.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(BaseVerifier.ZeroAddressNotAllowed.selector);
     new CCTPVerifier(
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       IERC20(address(0)),
-      STORAGE_LOCATION,
+      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
+      }),
+      address(s_mockRMNRemote)
     );
   }
 
@@ -93,12 +98,13 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
+      }),
+      address(s_mockRMNRemote)
     );
   }
 
@@ -109,12 +115,13 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
+      }),
+      address(s_mockRMNRemote)
     );
   }
 
@@ -133,27 +140,29 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
+      }),
+      address(s_mockRMNRemote)
     );
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_FeeAggregatorIsZero() public {
-    vm.expectRevert(CCTPVerifier.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(BaseVerifier.ZeroAddressNotAllowed.selector);
     new CCTPVerifier(
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: address(0),
         allowlistAdmin: ALLOWLIST_ADMIN,
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
+      }),
+      address(s_mockRMNRemote)
     );
   }
 }

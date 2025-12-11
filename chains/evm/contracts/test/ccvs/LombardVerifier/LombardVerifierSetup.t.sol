@@ -87,7 +87,8 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_mockBridge = new MockLombardBridge();
     s_mockMailbox = MockLombardMailbox(s_mockBridge.s_mailbox());
 
-    s_lombardVerifier = new LombardVerifier(IBridgeV2(address(s_mockBridge)), STORAGE_LOCATION);
+    s_lombardVerifier =
+      new LombardVerifier(IBridgeV2(address(s_mockBridge)), s_storageLocations, address(s_mockRMNRemote));
 
     // Deploy test token and add it as a supported token.
     s_testToken = new BurnMintERC20("Test Token", "TEST", 18, 0, 0);

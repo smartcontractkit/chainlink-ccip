@@ -37,7 +37,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidSetDomainArgs(SetDomainArgs args);
   error UnknownDomain(uint64 chainSelector);
   error UnsupportedFinality(uint32 finality);
-  error ZeroAddressNotAllowed();
 
   event DomainsSet(SetDomainArgs[] domains);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
@@ -165,9 +164,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy messageTransmitterProxy,
     IERC20 usdcToken,
-    string memory storageLocation,
-    DynamicConfig memory dynamicConfig
-  ) BaseVerifier(storageLocation) {
+    string[] memory storageLocations,
+    DynamicConfig memory dynamicConfig,
+    address rmn
+  ) BaseVerifier(storageLocations, rmn) {
     if (
       address(tokenMessenger) == address(0) || address(messageTransmitterProxy) == address(0)
         || address(usdcToken) == address(0)
@@ -432,12 +432,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     _applyAllowlistUpdates(allowlistConfigArgsItems);
   }
 
-  /// @notice Updates the storage location identifier.
-  /// @param newLocation The new storage location identifier.
-  function updateStorageLocation(
-    string memory newLocation
+  /// @notice Updates the storage location identifiers.
+  /// @param newLocations The new storage location identifiers.
+  function updateStorageLocations(
+    string[] memory newLocations
   ) external onlyOwner {
-    _setStorageLocation(newLocation);
+    _setStorageLocations(newLocations);
   }
 
   /// @notice Exposes the version tag.
