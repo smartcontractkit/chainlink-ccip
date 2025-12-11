@@ -64,7 +64,6 @@ func (ca *CurseAdapter) Initialize(e cldf.Environment, selector uint64) error {
 }
 
 func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint64, subject api.Subject) (bool, error) {
-	// locate rmn address on chain
 	rmnAddr, ok := ca.rmnAddressCache[selector]
 	if !ok {
 		return false, fmt.Errorf("no RMN address cached for chain %d", selector)
@@ -77,9 +76,18 @@ func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint
 	if err != nil {
 		return false, fmt.Errorf("failed to instantiate RMNRemote contract at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
 	}
-	return rmnC.IsCursed(&bind.CallOpts{
+	cursedSubjects, err := rmnC.GetCursedSubjects(&bind.CallOpts{
 		Context: e.GetContext(),
-	}, subject)
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to get cursed subjects on chain %d: %w", chain.Selector, err)
+	}
+	for _, s := range cursedSubjects {
+		if s == subject {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (ca *CurseAdapter) IsChainConnectedToTargetChain(e cldf.Environment, selector uint64, targetSel uint64) (bool, error) {
