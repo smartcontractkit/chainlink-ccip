@@ -21,6 +21,7 @@ import {e2e} from "./e2e.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
+import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract cctp_e2e is e2e {
@@ -73,6 +74,8 @@ contract cctp_e2e is e2e {
   }
 
   function test_e2e() public override {
+    uint256 amount = 1e6;
+
     vm.pauseGasMetering();
     uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
     IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
@@ -101,7 +104,7 @@ contract cctp_e2e is e2e {
         })
       )
     });
-    message.tokenAmounts[0] = Client.EVMTokenAmount({token: address(s_sourceCCTPSetup.token), amount: 1e6}); // 1 USDC.
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: address(s_sourceCCTPSetup.token), amount: amount}); // 1 USDC.
 
     (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
     _evmMessageToEvent({
@@ -111,6 +114,20 @@ contract cctp_e2e is e2e {
       originalSender: OWNER
     });
     receipts[receipts.length - 1].issuer = address(s_sourceRouter);
+
+    vm.expectEmit();
+    emit ITokenMessenger.DepositForBurn(
+      address(s_sourceCCTPSetup.token),
+      amount,
+      address(s_sourceCCTPSetup.verifier),
+      bytes32(abi.encode(OWNER)),
+      DEST_DOMAIN,
+      s_sourceCCTPSetup.tokenMessenger.DESTINATION_TOKEN_MESSENGER(),
+      bytes32(abi.encode(address(s_destCCTPSetup.messageTransmitterProxy))),
+      0,
+      2000,
+      abi.encodePacked(s_sourceCCTPSetup.verifier.versionTag(), messageId)
+    );
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
