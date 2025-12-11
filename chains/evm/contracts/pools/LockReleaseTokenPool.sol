@@ -57,11 +57,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     (out, destTokenAmount) = super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
 
     // Accrue the in-token fee (original amount minus destination amount).
-    uint256 feeAmount = lockOrBurnIn.amount - destTokenAmount;
-    if (feeAmount != 0) {
-      s_accruedFees += feeAmount;
-    }
-
+    s_accruedFees += lockOrBurnIn.amount - destTokenAmount;
     return (out, destTokenAmount);
   }
 
