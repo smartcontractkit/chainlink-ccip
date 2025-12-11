@@ -440,9 +440,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // unchecked: addressBytesLength < 32 bounds all arithmetic.
     unchecked {
       uint256 len = rawAddress.length;
-      // If provided rawAddress has the correct length return it.
-      if (len == addressBytesLength) return rawAddress;
-      // Otherwise validate 32 byte rawAddress.
       if (addressBytesLength < 32 && len == 32) {
         uint256 word;
         // assembly equivalent: word = uint256(bytes32(rawAddress));
@@ -466,8 +463,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         return validatedAddress;
       }
 
-      revert InvalidDestChainAddress(rawAddress);
+      if (len != addressBytesLength) {
+        revert InvalidDestChainAddress(rawAddress);
+      }
     }
+    return rawAddress;
   }
 
   /// @notice Parses and validates extra arguments, applying defaults from destination chain configuration.
