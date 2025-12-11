@@ -22,7 +22,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, amount);
 
-    s_erc20LockBox.withdraw(address(s_token), amount, s_recipient);
+    s_erc20LockBox.withdraw(amount, s_recipient);
 
     vm.stopPrank();
 
@@ -46,12 +46,12 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     // Withdraw from first chain selector
     vm.expectEmit();
     emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, amount1);
-    s_erc20LockBox.withdraw(address(s_token), amount1, s_recipient);
+    s_erc20LockBox.withdraw(amount1, s_recipient);
 
     // Withdraw from second chain selector
     vm.expectEmit();
     emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, amount2);
-    s_erc20LockBox.withdraw(address(s_token), amount2, s_recipient);
+    s_erc20LockBox.withdraw(amount2, s_recipient);
 
     vm.stopPrank();
 
@@ -75,7 +75,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, withdrawAmount);
 
-    s_erc20LockBox.withdraw(address(s_token), withdrawAmount, s_recipient);
+    s_erc20LockBox.withdraw(withdrawAmount, s_recipient);
 
     vm.stopPrank();
 
@@ -93,7 +93,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, amount);
 
-    s_erc20LockBox.withdraw(address(s_token), amount, s_recipient);
+    s_erc20LockBox.withdraw(amount, s_recipient);
 
     vm.stopPrank();
   }
@@ -110,12 +110,12 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     // Withdraw to first recipient
     vm.expectEmit();
     emit ERC20LockBox.Withdrawal(address(s_token), recipient1, amount);
-    s_erc20LockBox.withdraw(address(s_token), amount, recipient1);
+    s_erc20LockBox.withdraw(amount, recipient1);
 
     // Withdraw to second recipient
     vm.expectEmit();
     emit ERC20LockBox.Withdrawal(address(s_token), recipient2, amount);
-    s_erc20LockBox.withdraw(address(s_token), amount, recipient2);
+    s_erc20LockBox.withdraw(amount, recipient2);
 
     vm.stopPrank();
 
@@ -135,7 +135,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.startPrank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.Unauthorized.selector, STRANGER));
 
-    s_erc20LockBox.withdraw(address(s_token), amount, s_recipient);
+    s_erc20LockBox.withdraw(amount, s_recipient);
   }
 
   function test_RevertWhen_RecipientIsZeroAddress() public {
@@ -145,7 +145,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.startPrank(s_allowedCaller);
     vm.expectRevert(ERC20LockBox.RecipientCannotBeZeroAddress.selector);
 
-    s_erc20LockBox.withdraw(address(s_token), amount, address(0));
+    s_erc20LockBox.withdraw(amount, address(0));
   }
 
   function test_RevertWhen_AmountIsZero() public {
@@ -155,17 +155,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.startPrank(s_allowedCaller);
     vm.expectRevert(ERC20LockBox.TokenAmountCannotBeZero.selector);
 
-    s_erc20LockBox.withdraw(address(s_token), 0, s_recipient);
-  }
-
-  function test_RevertWhen_TokenIsZeroAddress() public {
-    uint256 amount = 1000e18;
-    _depositTokens(amount);
-
-    vm.startPrank(s_allowedCaller);
-    vm.expectRevert(ERC20LockBox.TokenAddressCannotBeZero.selector);
-
-    s_erc20LockBox.withdraw(address(0), amount, s_recipient);
+    s_erc20LockBox.withdraw(0, s_recipient);
   }
 
   function test_RevertWhen_InsufficientBalance() public {
@@ -177,6 +167,6 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.startPrank(s_allowedCaller);
     vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.InsufficientBalance.selector, withdrawAmount, depositAmount));
 
-    s_erc20LockBox.withdraw(address(s_token), withdrawAmount, s_recipient);
+    s_erc20LockBox.withdraw(withdrawAmount, s_recipient);
   }
 }
