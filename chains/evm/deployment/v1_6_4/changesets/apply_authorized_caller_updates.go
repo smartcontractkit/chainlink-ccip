@@ -1,6 +1,8 @@
 package changesets
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -29,11 +31,11 @@ type ApplyAuthorizedCallerUpdatesInputPerChain struct {
 // This changeset is used to update the authorized callers on a contract which implements the AuthorizedCallers interface.
 // It is different from the configure_allowed_callers changeset which is used for the ERC20Lockbox contract.
 // This changeset should be used for the USDCTokenPool, SiloedUSDCTokenPool, and USDCTokenPoolCCTPV2 contracts.
-func ApplyAuthorizedCallerUpdatesChangeset(mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ApplyAuthorizedCallerUpdatesInput] {
-	return cldf.CreateChangeSet(applyAuthorizedCallerUpdatesApply(mcmsRegistry), applyAuthorizedCallerUpdatesVerify(mcmsRegistry))
+func ApplyAuthorizedCallerUpdatesChangeset() cldf.ChangeSetV2[ApplyAuthorizedCallerUpdatesInput] {
+	return cldf.CreateChangeSet(applyAuthorizedCallerUpdatesApply(), applyAuthorizedCallerUpdatesVerify())
 }
 
-func applyAuthorizedCallerUpdatesApply(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ApplyAuthorizedCallerUpdatesInput) (cldf.ChangesetOutput, error) {
+func applyAuthorizedCallerUpdatesApply() func(cldf.Environment, ApplyAuthorizedCallerUpdatesInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input ApplyAuthorizedCallerUpdatesInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
@@ -58,17 +60,20 @@ func applyAuthorizedCallerUpdatesApply(mcmsRegistry *changesets.MCMSReaderRegist
 		batchOps = append(batchOps, report.Output.BatchOps...)
 		reports = append(reports, report.ExecutionReports...)
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		return changesets.NewOutputBuilder(e, nil).
 			WithReports(reports).
 			WithBatchOps(batchOps).
 			Build(input.MCMS)
 	}
 }
 
-func applyAuthorizedCallerUpdatesVerify(mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ApplyAuthorizedCallerUpdatesInput) error {
+func applyAuthorizedCallerUpdatesVerify() func(cldf.Environment, ApplyAuthorizedCallerUpdatesInput) error {
 	return func(e cldf.Environment, input ApplyAuthorizedCallerUpdatesInput) error {
-		if err := input.MCMS.Validate(); err != nil {
-			return err
+		for _, perChainInput := range input.ChainInputs {
+			// Verify that a valid address was provided for each chain selector
+			if perChainInput.Address == (common.Address{}) {
+				return fmt.Errorf("address must not be zero for chain selector %d", perChainInput.ChainSelector)
+			}
 		}
 		return nil
 	}

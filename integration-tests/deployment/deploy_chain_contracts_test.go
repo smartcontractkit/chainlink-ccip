@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -65,7 +64,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
 
 	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier})
-	SolanaTransferMCMSContracts(t, e, chain_selectors.SOLANA_MAINNET.Selector, common_utils.CLLQualifier)
+	SolanaTransferMCMSContracts(t, e, chain_selectors.SOLANA_MAINNET.Selector, common_utils.CLLQualifier, true)
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 	// Transfer from one qualifier to another
 	fromQualifier := common_utils.CLLQualifier
@@ -86,10 +85,16 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 		toQualifier,
 	)
 	err = utils.FundSolanaAccounts(
-		context.Background(),
-		[]solana.PublicKey{toTimelockSigner, toMcmSigner},
+		t.Context(),
+		[]solana.PublicKey{chain.DeployerKey.PublicKey()},
 		100,
 		chain.Client,
+	)
+	require.NoError(t, err)
+	err = utils.FundFromDeployerKey(
+		chain,
+		[]solana.PublicKey{toTimelockSigner, toMcmSigner},
+		10,
 	)
 	require.NoError(t, err)
 	mcmsInput := mcmsapi.TransferOwnershipInput{

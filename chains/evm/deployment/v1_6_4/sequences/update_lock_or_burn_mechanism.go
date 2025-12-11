@@ -14,7 +14,7 @@ import (
 )
 
 type UpdateLockOrBurnMechanismSequenceInput struct {
-	Address    map[uint64]common.Address
+	Addresses  map[uint64]common.Address
 	Mechanisms map[uint64]usdc_token_pool_proxy_ops.UpdateLockOrBurnMechanismsArgs
 }
 
@@ -25,25 +25,24 @@ var USDCTokenPoolProxyUpdateLockOrBurnMechanismSequence = operations.NewSequence
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input UpdateLockOrBurnMechanismSequenceInput) (sequences.OnChainOutput, error) {
 		writes := make([]contract_utils.WriteOutput, 0)
 
-		for chainSel, mechanisms := range input.Mechanisms {
+		for chainSel, address := range input.Addresses {
 			chain, ok := chains.EVMChains()[chainSel]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSel)
 			}
-			address, ok := input.Address[chainSel]
-			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("address not found for chain selector %d", chainSel)
-			}
+
 			report, err := operations.ExecuteOperation(b, usdc_token_pool_proxy_ops.USDCTokenPoolProxyUpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy_ops.UpdateLockOrBurnMechanismsArgs]{
 				ChainSelector: chain.Selector,
 				Address:       address,
-				Args:          mechanisms,
+				Args:          input.Mechanisms[chainSel],
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute USDCTokenPoolProxyUpdateLockOrBurnMechanismsOp on %s: %w", chain, err)
 			}
+
 			writes = append(writes, report.Output)
 		}
+
 		batch, err := contract_utils.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)

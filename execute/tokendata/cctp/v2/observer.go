@@ -40,14 +40,13 @@ type CCTPv2RequestParams struct {
 
 // CCTPv2TokenDataObserver observes CCTPv2 USDC messages and fetches attestations from Circle's v2 API.
 type CCTPv2TokenDataObserver struct {
-	lggr                     logger.Logger
-	destChainSelector        cciptypes.ChainSelector
-	supportedPoolsBySelector map[cciptypes.ChainSelector]string
-	attestationEncoder       AttestationEncoder
-	httpClient               CCTPv2HTTPClient
-	metricsReporter          MetricsReporter
-	calculateDepositHashFn   func(CCTPv2DecodedMessage) ([32]byte, error)
-	messageToTokenDataFn     func(context.Context, logger.Logger, CCTPv2Message, AttestationEncoder) exectypes.TokenData
+	lggr                   logger.Logger
+	destChainSelector      cciptypes.ChainSelector
+	attestationEncoder     AttestationEncoder
+	httpClient             CCTPv2HTTPClient
+	metricsReporter        MetricsReporter
+	calculateDepositHashFn func(CCTPv2DecodedMessage) ([32]byte, error)
+	messageToTokenDataFn   func(context.Context, logger.Logger, CCTPv2Message, AttestationEncoder) exectypes.TokenData
 }
 
 // NewCCTPv2TokenDataObserver creates a new CCTPv2 token data observer.
@@ -75,21 +74,16 @@ func NewCCTPv2TokenDataObserver(
 		return nil, fmt.Errorf("create attestation client: %w", err)
 	}
 
-	supportedPoolsBySelector := make(map[cciptypes.ChainSelector]string)
-	for chainSelector, tokenConfig := range usdcConfig.Tokens {
-		supportedPoolsBySelector[chainSelector] = tokenConfig.SourcePoolAddress
-	}
 	lggr.Infow("Created CCTPv2 Token Data Observer")
 
 	return &CCTPv2TokenDataObserver{
-		lggr:                     lggr,
-		destChainSelector:        destChainSelector,
-		supportedPoolsBySelector: supportedPoolsBySelector,
-		attestationEncoder:       attestationEncoder,
-		httpClient:               httpClient,
-		metricsReporter:          metricsReporter,
-		calculateDepositHashFn:   CalculateDepositHash,
-		messageToTokenDataFn:     CCTPv2MessageToTokenData,
+		lggr:                   lggr,
+		destChainSelector:      destChainSelector,
+		attestationEncoder:     attestationEncoder,
+		httpClient:             httpClient,
+		metricsReporter:        metricsReporter,
+		calculateDepositHashFn: CalculateDepositHash,
+		messageToTokenDataFn:   CCTPv2MessageToTokenData,
 	}, nil
 }
 
@@ -121,7 +115,7 @@ func (o *CCTPv2TokenDataObserver) Observe(
 	startTime := time.Now()
 	defer func() {
 		latency := time.Since(startTime)
-		o.metricsReporter.TrackObserveLatency(cctpV2RequestParams.Cardinality(), latency)
+		o.metricsReporter.TrackObserveLatency(latency)
 	}()
 
 	// Extract the CCTPv2 API requests that need to be made
@@ -140,22 +134,13 @@ func (o *CCTPv2TokenDataObserver) Observe(
 }
 
 // IsTokenSupported checks if the given token is a supported CCTPv2 USDC token.
-// A token is considered supported if:
-//  1. Its source pool address matches the configured CCTPv2 pool for the chain
-//  2. Its ExtraData field contains a valid CCTPv2 payload that can be decoded
-//
-// This ensures that only tokens with both the correct pool AND valid payload
-// structure are processed as CCTPv2 tokens.
+// A token is considered supported if its ExtraData field contains a valid CCTPv2
+// payload that can be decoded.
 func (o *CCTPv2TokenDataObserver) IsTokenSupported(
 	sourceChain cciptypes.ChainSelector,
 	msgToken cciptypes.RampTokenAmount,
 ) bool {
-	// First check if the pool address matches
-	if !strings.EqualFold(o.supportedPoolsBySelector[sourceChain], msgToken.SourcePoolAddress.String()) {
-		return false
-	}
-
-	// Then verify the ExtraData can be decoded as a valid CCTPv2 payload
+	// Verify the ExtraData can be decoded as a valid CCTPv2 payload
 	_, err := DecodeSourceTokenDataPayloadV2(msgToken.ExtraData)
 	return err == nil
 }
@@ -280,6 +265,11 @@ func (o *CCTPv2TokenDataObserver) convertCCTPv2MessagesToTokenData(
 
 		// Process each individual CCTP v2 message in the batch
 		for _, msg := range messages.Messages {
+			// Return immediately if context is cancelled to avoid heavy processing done by
+			// calculateDepositHashFn
+			if ctx.Err() != nil {
+				return result
+			}
 			// Calculate the deposit hash for this message
 			depositHash, err := o.calculateDepositHashFn(msg.DecodedMessage)
 			if err != nil {
