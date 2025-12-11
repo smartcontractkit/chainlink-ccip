@@ -102,7 +102,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     }
 
     // Release to the recipient
-    i_lockBox.withdraw(address(i_token), localAmount, releaseOrMintIn.receiver);
+    i_lockBox.withdraw(localAmount, releaseOrMintIn.receiver);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -249,7 +249,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
     // from the lock box first otherwise the burn will revert.
-    i_lockBox.withdraw(address(i_token), tokensToBurn, address(this));
+    i_lockBox.withdraw(tokensToBurn, address(this));
 
     // Even though USDC is a trusted call, ensure CEI by updating state first
     delete s_chainConfigs[burnChainSelector].tokenBalance;

@@ -60,8 +60,11 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
 
+    ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
+    if (address(lockBoxContract.getToken()) != address(token)) revert InvalidToken(address(lockBoxContract.getToken()));
+
     token.safeApprove(lockBox, type(uint256).max);
-    i_lockBox = ERC20LockBox(lockBox);
+    i_lockBox = lockBoxContract;
   }
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
@@ -93,7 +96,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     // Transfer the tokens to the lock box.
-    i_lockBox.deposit(address(i_token), lockOrBurnIn.amount);
+    i_lockBox.deposit(lockOrBurnIn.amount);
 
     return out;
   }
@@ -136,7 +139,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     // Release to the recipient
-    i_lockBox.withdraw(address(i_token), localAmount, releaseOrMintIn.receiver);
+    i_lockBox.withdraw(localAmount, releaseOrMintIn.receiver);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -315,7 +318,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
-    i_lockBox.deposit(address(i_token), amount);
+    i_lockBox.deposit(amount);
 
     emit LiquidityAdded(remoteChainSelector, msg.sender, amount);
   }
@@ -373,7 +376,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     // Withdraw the tokens directly from the lockbox to the rebalancer. This saves gas by avoiding the need to transfer
     // the tokens to the contract first.
-    i_lockBox.withdraw(address(i_token), amount, msg.sender);
+    i_lockBox.withdraw(amount, msg.sender);
 
     emit LiquidityRemoved(remoteChainSelector, msg.sender, amount);
   }

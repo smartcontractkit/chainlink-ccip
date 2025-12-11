@@ -41,8 +41,11 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
 
+    ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
+    if (address(lockBoxContract.getToken()) != address(token)) revert InvalidToken(address(lockBoxContract.getToken()));
+
     token.safeApprove(lockBox, type(uint256).max);
-    i_lockBox = ERC20LockBox(lockBox);
+    i_lockBox = lockBoxContract;
   }
 
   /// @notice Locks the tokens in the lockBox.
@@ -51,12 +54,12 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
-    i_lockBox.deposit(address(i_token), amount);
+    i_lockBox.deposit(amount);
   }
 
   function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
     // Release tokens from the lock box to the receiver.
-    i_lockBox.withdraw(address(i_token), amount, receiver);
+    i_lockBox.withdraw(amount, receiver);
   }
 
   /// @notice Gets rebalancer, can be address(0) if none is configured.
@@ -86,7 +89,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
-    i_lockBox.deposit(address(i_token), amount);
+    i_lockBox.deposit(amount);
     emit LiquidityAdded(msg.sender, amount);
   }
 
@@ -98,7 +101,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     // Withdraw the tokens directly from the lockbox to the rebalancer.
-    i_lockBox.withdraw(address(i_token), amount, msg.sender);
+    i_lockBox.withdraw(amount, msg.sender);
     emit LiquidityRemoved(msg.sender, amount);
   }
 
