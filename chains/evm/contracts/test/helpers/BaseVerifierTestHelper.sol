@@ -6,9 +6,7 @@ import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
 /// @notice Test helper contract to expose BaseVerifier's internal functions for testing
 contract BaseVerifierTestHelper is BaseVerifier {
-  constructor(
-    string memory storageLocation
-  ) BaseVerifier(storageLocation) {}
+  constructor(string[] memory storageLocations, address rmn) BaseVerifier(storageLocations, rmn) {}
 
   function applyDestChainConfigUpdates(
     DestChainConfigArgs[] calldata destChainConfigArgs
@@ -48,5 +46,12 @@ contract BaseVerifierTestHelper is BaseVerifier {
 
   function typeAndVersion() external pure override returns (string memory) {
     return "BaseVerifierTestHelper 1.0.0";
+  }
+
+  /// @notice Exposes the internal storage location setter for testing.
+  function setStorageLocations(
+    string[] memory storageLocations
+  ) external {
+    _setStorageLocations(storageLocations);
   }
 }

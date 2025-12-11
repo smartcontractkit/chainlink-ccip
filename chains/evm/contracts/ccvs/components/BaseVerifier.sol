@@ -24,12 +24,13 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error SenderNotAllowed(address sender);
   error CallerIsNotARampOnRouter(address caller);
   error DestinationNotSupported(uint64 destChainSelector);
+  error ZeroAddressNotAllowed();
 
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
   event DestChainConfigSet(uint64 indexed destChainSelector, address router, bool allowlistEnabled);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
-  event StorageLocationUpdated(string oldLocation, string newLocation);
+  event StorageLocationsUpdated(string[] oldLocations, string[] newLocations);
 
   struct DestChainConfig {
     IRouter router; // ──────────╮ Local router to use for messages going to this dest chain.
@@ -58,34 +59,51 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   }
 
   /// @dev The rmn contract.
-  IRMNRemote internal immutable i_rmnRemote;
+  IRMNRemote internal immutable i_rmn;
 
   /// @dev The destination chain specific configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) private s_destChainConfigs;
 
-  /// @dev The storage location for off-chain components to read from. Implementations of the BaseVerifier should
+  /// @dev The storage locations for off-chain components to read from. Implementations of the BaseVerifier should
   /// implement a way to update this value if needed.
-  string internal s_storageLocation;
+  string[] internal s_storageLocations;
 
-  constructor(
-    string memory storageLocation
-  ) {
-    _setStorageLocation(storageLocation);
+  constructor(string[] memory storageLocations, address rmnAddress) {
+    _setStorageLocations(storageLocations);
+
+    if (rmnAddress == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
+
+    i_rmn = IRMNRemote(rmnAddress);
   }
 
-  /// @notice Updates the storage location.
-  /// @param storageLocation The new storage location.
-  function _setStorageLocation(
-    string memory storageLocation
+  /// @notice Updates the storage locations.
+  /// @param storageLocations The new storage locations.
+  function _setStorageLocations(
+    string[] memory storageLocations
   ) internal {
-    string memory oldLocation = s_storageLocation;
-    s_storageLocation = storageLocation;
-    emit StorageLocationUpdated(oldLocation, storageLocation);
+    uint256 oldLength = s_storageLocations.length;
+    uint256 newLength = storageLocations.length;
+
+    string[] memory oldLocations = getStorageLocations();
+
+    // Clear existing array.
+    for (uint256 i; i < oldLength; ++i) {
+      s_storageLocations.pop();
+    }
+
+    // Add new elements into array.
+    for (uint256 i; i < newLength; ++i) {
+      s_storageLocations.push(storageLocations[i]);
+    }
+
+    emit StorageLocationsUpdated(oldLocations, storageLocations);
   }
 
   /// @inheritdoc ICrossChainVerifierV1
-  function getStorageLocation() external view virtual override returns (string memory) {
-    return s_storageLocation;
+  function getStorageLocations() public view virtual override returns (string[] memory) {
+    return s_storageLocations;
   }
 
   /// @notice get ChainConfig configured for the DestinationChainSelector.
