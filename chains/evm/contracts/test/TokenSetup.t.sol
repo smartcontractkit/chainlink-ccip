@@ -20,7 +20,7 @@ contract TokenSetup is BaseTest {
   address internal s_destFeeToken;
 
   TokenAdminRegistry internal s_tokenAdminRegistry;
-  ERC20LockBox internal s_lockBox;
+  mapping(address token => ERC20LockBox lockBox) internal s_lockBoxes;
 
   mapping(address sourceToken => address sourcePool) internal s_sourcePoolByToken;
   mapping(address sourceToken => address destPool) internal s_destPoolBySourceToken;
@@ -47,9 +47,14 @@ contract TokenSetup is BaseTest {
       router = address(s_destRouter);
     }
 
+    ERC20LockBox lockBox = _getOrDeployLockBox(token);
+
     LockReleaseTokenPool pool = new LockReleaseTokenPool(
-      IERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router, address(s_lockBox)
+      IERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router, address(lockBox)
     );
+    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
+    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(pool), allowed: true});
+    lockBox.configureAllowedCallers(allowedCallers);
 
     if (isSourcePool) {
       s_sourcePoolByToken[address(token)] = address(pool);
@@ -87,7 +92,7 @@ contract TokenSetup is BaseTest {
     }
 
     s_tokenAdminRegistry = new TokenAdminRegistry();
-    s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
+    // lockboxes are deployed per token via _getOrDeployLockBox
 
     // Source tokens & pools
     address sourceLink = _deploySourceToken("sLINK", type(uint256).max, 18);
@@ -110,7 +115,8 @@ contract TokenSetup is BaseTest {
     s_destTokenBySourceToken[sourceEth] = destEth;
 
     // Float the dest link lock release pool with funds.
-    IERC20(destLink).transfer(address(s_lockBox), 1000 ether);
+    ERC20LockBox destLockBox = _getOrDeployLockBox(destLink);
+    IERC20(destLink).transfer(address(destLockBox), 1000 ether);
 
     // Set pools in the registry.
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
@@ -139,11 +145,15 @@ contract TokenSetup is BaseTest {
       );
     }
 
-    // Configure lockBox allowed callers for lock release pools.
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({token: sourceLink, caller: OWNER, allowed: true});
-    allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({token: destLink, caller: OWNER, allowed: true});
-    s_lockBox.configureAllowedCallers(allowedCallers);
+  }
+
+  function _getOrDeployLockBox(address token) internal returns (ERC20LockBox) {
+    ERC20LockBox lockBox = s_lockBoxes[token];
+    if (address(lockBox) == address(0)) {
+      lockBox = new ERC20LockBox(token);
+      s_lockBoxes[token] = lockBox;
+    }
+    return lockBox;
   }
 
   function _setPool(

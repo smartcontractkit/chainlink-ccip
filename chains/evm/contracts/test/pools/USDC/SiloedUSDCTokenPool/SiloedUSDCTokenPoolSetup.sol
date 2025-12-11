@@ -17,14 +17,7 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
-
-    // Mock the isAdministrator function to return true so that the owner can configure allowed callers for the lock box.
-    vm.mockCall(
-      address(s_tokenAdminRegistry),
-      abi.encodeWithSignature("isAdministrator(address,address)", address(s_USDCToken), OWNER),
-      abi.encode(true)
-    );
+    s_lockBox = new ERC20LockBox(address(s_USDCToken));
 
     s_usdcTokenPool = new SiloedUSDCTokenPool(
       s_USDCToken,
@@ -58,20 +51,6 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       abi.encode(address(s_usdcTokenPool))
     );
 
-    // Allow the router to call the releaseOrMint function for the token pool
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_USDCToken),
-      caller: address(s_routerAllowedOffRamp),
-      allowed: true
-    });
-    allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_USDCToken),
-      caller: address(s_routerAllowedOnRamp),
-      allowed: true
-    });
-    ERC20LockBox(s_lockBox).configureAllowedCallers(allowedCallers);
-
     // Allow the router to call the releaseOrMint function
     s_usdcTokenPoolTransferLiquidity = new SiloedUSDCTokenPool(
       s_USDCToken,
@@ -87,5 +66,13 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
     );
 
     _poolApplyChainUpdates(address(s_usdcTokenPoolTransferLiquidity));
+
+    // Allow both pools to interact with the shared lockbox.
+    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
+    allowedCallers[0] =
+      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
+    allowedCallers[1] =
+      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPoolTransferLiquidity), allowed: true});
+    ERC20LockBox(s_lockBox).configureAllowedCallers(allowedCallers);
   }
 }

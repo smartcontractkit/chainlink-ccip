@@ -25,15 +25,13 @@ contract LockReleaseTokenPoolSetup is BaseTest {
   address internal s_sourcePoolAddress = address(53852352095);
 
   ERC20LockBox internal s_lockBox;
-  TokenAdminRegistry internal s_tokenAdminRegistry;
 
   function setUp() public virtual override {
     super.setUp();
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_tokenAdminRegistry = new TokenAdminRegistry();
-    s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
+    s_lockBox = new ERC20LockBox(address(s_token));
 
     s_lockReleaseTokenPool = new LockReleaseTokenPool(
       s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
@@ -51,38 +49,12 @@ contract LockReleaseTokenPoolSetup is BaseTest {
       address(s_lockBox)
     );
 
-    // Mock token admin registry calls for both pools.
-    vm.mockCall(
-      address(s_tokenAdminRegistry),
-      abi.encodeWithSignature("getPool(address)", address(s_token)),
-      abi.encode(address(s_lockReleaseTokenPool))
-    );
-
-    vm.mockCall(
-      address(s_tokenAdminRegistry),
-      abi.encodeWithSignature("getTokenConfig(address)", address(s_token)),
-      abi.encode(
-        TokenAdminRegistry.TokenConfig({
-          administrator: OWNER,
-          pendingAdministrator: address(0),
-          tokenPool: address(s_lockReleaseTokenPool)
-        })
-      )
-    );
-
-    // Configure allowed callers for the lockBox - both pools and OWNER.
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](3);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({token: address(s_token), caller: OWNER, allowed: true});
-    allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_token),
-      caller: address(s_lockReleaseTokenPool),
-      allowed: true
-    });
-    allowedCallers[2] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_token),
-      caller: address(s_lockReleaseTokenPoolWithAllowList),
-      allowed: true
-    });
+    // Configure allowed callers for the lockBox - both pools.
+    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
+    allowedCallers[0] =
+      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_lockReleaseTokenPool), allowed: true});
+    allowedCallers[1] =
+      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_lockReleaseTokenPoolWithAllowList), allowed: true});
     s_lockBox.configureAllowedCallers(allowedCallers);
 
     bytes[] memory remotePoolAddresses = new bytes[](1);

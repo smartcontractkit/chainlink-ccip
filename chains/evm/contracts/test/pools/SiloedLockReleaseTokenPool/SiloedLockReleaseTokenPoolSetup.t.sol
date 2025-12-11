@@ -9,8 +9,6 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
-
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract SiloedLockReleaseTokenPoolSetup is BaseTest {
@@ -28,50 +26,21 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
   uint64 internal constant SILOED_CHAIN_SELECTOR = DEST_CHAIN_SELECTOR + 1;
 
   ERC20LockBox internal s_lockBox;
-  TokenAdminRegistry internal s_tokenAdminRegistry;
 
   function setUp() public virtual override {
     super.setUp();
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_tokenAdminRegistry = new TokenAdminRegistry();
-    s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
+    s_lockBox = new ERC20LockBox(address(s_token));
 
     s_siloedLockReleaseTokenPool = new SiloedLockReleaseTokenPool(
       s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
     );
 
-    // Mock the token pool for the token to be the siloed lock release token pool so that we can test the allowed caller configuration
-    vm.mockCall(
-      address(s_tokenAdminRegistry),
-      abi.encodeWithSignature("getPool(address)", address(s_token)),
-      abi.encode(address(s_siloedLockReleaseTokenPool))
-    );
-
-    // Mock the token config for the token to be the siloed lock release token pool so that we can test the allowed caller configuration
-    vm.mockCall(
-      address(s_tokenAdminRegistry),
-      abi.encodeWithSignature("getTokenConfig(address)", address(s_token)),
-      abi.encode(
-        TokenAdminRegistry.TokenConfig({
-          administrator: OWNER,
-          pendingAdministrator: address(0),
-          tokenPool: address(s_siloedLockReleaseTokenPool)
-        })
-      )
-    );
-
-    // Set the owner as an administrator for the token so that it can configure the allowed callers
-    vm.mockCall(
-      address(s_tokenAdminRegistry),
-      abi.encodeWithSignature("isAdministrator(address,address)", address(s_token), OWNER),
-      abi.encode(true)
-    );
-
     ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
     allowedCallers[0] =
-      ERC20LockBox.AllowedCallerConfigArgs({token: address(s_token), caller: address(OWNER), allowed: true});
+      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_siloedLockReleaseTokenPool), allowed: true});
     s_lockBox.configureAllowedCallers(allowedCallers);
 
     // Set the rebalancer for the token pool
