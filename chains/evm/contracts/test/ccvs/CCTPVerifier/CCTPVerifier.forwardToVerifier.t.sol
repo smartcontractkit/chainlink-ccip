@@ -107,6 +107,37 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
   }
 
+  function test_forwardToVerifier_CustomMaxFee() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
+      SOURCE_CHAIN_SELECTOR,
+      DEST_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    uint256 customMaxFee = 5e6; // 5 USDC
+    bytes memory verifierArgs = abi.encode(customMaxFee);
+
+    vm.expectEmit();
+    emit ITokenMessenger.DepositForBurn(
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      address(s_cctpVerifier),
+      abi.decode(s_tokenReceiver, (bytes32)),
+      REMOTE_DOMAIN_IDENTIFIER,
+      s_mockTokenMessenger.DESTINATION_TOKEN_MESSENGER(),
+      ALLOWED_CALLER_ON_DEST,
+      uint32(customMaxFee),
+      CCTP_FAST_FINALITY_THRESHOLD,
+      bytes.concat(s_cctpVerifier.versionTag(), messageId)
+    );
+
+    vm.startPrank(s_onRamp);
+    s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, verifierArgs);
+  }
+
   function test_forwardToVerifier_RevertWhen_CallerIsNotARampOnRouter() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
       SOURCE_CHAIN_SELECTOR,
@@ -251,6 +282,24 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     vm.startPrank(s_onRamp);
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidReceiver.selector, tokenReceiver));
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
+  }
+
+  function test_forwardToVerifier_RevertWhen_InvalidVerifierArgsLength() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
+      SOURCE_CHAIN_SELECTOR,
+      DEST_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    // verifierArgs is too long (64 bytes)
+    bytes memory verifierArgs = abi.encode(uint256(1), uint256(2));
+
+    vm.startPrank(s_onRamp);
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidVerifierArgsLength.selector, 64));
+    s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, verifierArgs);
   }
 
   function test_forwardToVerifier_RevertWhen_MaxFeeExceedsUint32() public {

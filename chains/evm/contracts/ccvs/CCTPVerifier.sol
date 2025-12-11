@@ -29,6 +29,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidMessageVersion(uint32 expected, uint32 got);
   error InvalidToken(bytes token);
   error InvalidTokenTransferLength(uint256 length);
+  error InvalidVerifierArgsLength(uint256 length);
   error MaxFeeExceedsUint32(uint256 maxFee);
   error OnlyCallableByOwnerOrAllowlistAdmin();
   error ReceiveMessageCallFailed();
@@ -214,7 +215,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     bytes32 messageId,
     address, // feeToken
     uint256, // feeTokenAmount
-    bytes calldata // verifierArgs
+    bytes calldata verifierArgs
   ) external returns (bytes memory verifierReturnData) {
     // For EVM, sender is expected to be 20 bytes.
     _assertSenderIsAllowed(message.destChainSelector, address(bytes20(message.sender)));
@@ -252,15 +253,27 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD
     });
 
+    // The maximum fee, taken on destination, is a portion of the total amount transferred.
     uint256 maxFee = 0;
     if (params.finality != 0) {
       params.finalityThreshold = CCTP_FAST_FINALITY_THRESHOLD;
 
-      // The maximum fee, taken on destination, is a percentage of the total amount transferred.
-      // We use bps to calculate the smallest possible value that we can set as the max fee.
-      // The bps values configured for each finality threshold on this chain must mirror those used by CCTP.
-      // CCTP defines different bps values for each chain.
-      maxFee = tokenTransfer.amount * s_dynamicConfig.fastFinalityBps / BPS_DIVIDER;
+      if (verifierArgs.length > 0) {
+        // We interpret verifierArgs as the max fee.
+        // CCTP defines bps offchain, so computing a max fee based on the API and inputting it into ccipSend
+        // is the best way to ensure that your max fee aligns with what CCTP will charge for your transfer.
+        if (verifierArgs.length != 32) revert InvalidVerifierArgsLength(verifierArgs.length);
+        maxFee = abi.decode(verifierArgs, (uint256));
+      } else {
+        // If no verifierArgs are provided, we compute the max fee according to the bps stored on this contract.
+        // The bps values stored on this contract should be kept in-sync with those used by CCTP.
+        // If out of sync, the following scenarios are possible:
+        // - If stored bps < actual bps, the user just gets a standard, free transfer.
+        // - If stored bps > actual bps, the user pays less on destination than they were expecting to.
+        // Neither scenario results in a user paying more than they were expecting to.
+        maxFee = tokenTransfer.amount * s_dynamicConfig.fastFinalityBps / BPS_DIVIDER;
+      }
+
       if (maxFee > type(uint32).max) revert MaxFeeExceedsUint32(maxFee);
     }
 
