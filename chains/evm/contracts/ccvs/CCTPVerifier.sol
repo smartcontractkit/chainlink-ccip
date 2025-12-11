@@ -54,7 +54,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @notice The arguments required to update a remote domain.
   struct SetDomainArgs {
     bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
-    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the TokenMessengerProxy).
+    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the corresponding v1.7.0 verifier).
     bytes32 mintRecipientOnDest; // Address to mint USDC to on the destination chain.
     uint64 chainSelector; // The corresponding CCIP destination chain selector for the domain.
     uint32 domainIdentifier; // Unique domain ID used across CCTP.
@@ -72,7 +72,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @dev Zero is a valid domain identifier.
   struct Domain {
     bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
-    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the TokenMessengerProxy).
+    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the corresponding v1.7.0 verifier).
     bytes32 mintRecipientOnDest; // Address to mint USDC to on the destination chain.
     uint32 domainIdentifier; // ─╮ Unique domain ID used across CCTP.
     bool enabled; // ────────────╯ Whether or not the domain is enabled.

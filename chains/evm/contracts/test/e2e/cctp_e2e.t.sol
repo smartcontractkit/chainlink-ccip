@@ -6,6 +6,10 @@ import {IRouter} from "../../interfaces/IRouter.sol";
 import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
 import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
+import {Client} from "../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
+import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
+import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {CCTPTokenPool} from "../../pools/USDC/CCTPTokenPool.sol";
@@ -14,9 +18,8 @@ import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.so
 import {MockE2EUSDCTransmitterCCTPV2} from "../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
 import {e2e} from "./e2e.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
-import {Client} from "../../libraries/Client.sol";
-import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
@@ -60,12 +63,25 @@ contract cctp_e2e is e2e {
 
     // Deal some USDC to the OWNER.
     deal(address(s_sourceCCTPSetup.token), OWNER, 1000e6); // 1000 USDC.
+
+    s_sourcePoolByToken[address(s_sourceCCTPSetup.token)] = address(s_sourceCCTPSetup.tokenPoolProxy);
+    s_destPoolByToken[address(s_destCCTPSetup.token)] = address(s_destCCTPSetup.tokenPoolProxy);
+    s_destTokenBySourceToken[address(s_sourceCCTPSetup.token)] = address(s_destCCTPSetup.token);
+    s_destPoolBySourceToken[address(s_sourceCCTPSetup.token)] = address(s_destCCTPSetup.tokenPoolProxy);
+    s_extraDataByToken[address(s_sourceCCTPSetup.token)] =
+      abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG);
   }
 
   function test_e2e() public override {
-   vm.pauseGasMetering();
-    // uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
+    vm.pauseGasMetering();
+    uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
     IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
+    IERC20(address(s_sourceCCTPSetup.token)).approve(address(s_sourceRouter), type(uint256).max);
+
+    // Specify the CCTP verifier such that it is the only verifier included.
+    address[] memory userCCVAddresses = new address[](1);
+    userCCVAddresses[0] = address(s_sourceCCTPSetup.verifierResolver);
+    bytes[] memory userCCVArgs = new bytes[](1);
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
@@ -74,8 +90,8 @@ contract cctp_e2e is e2e {
       feeToken: s_sourceFeeToken,
       extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(
         ExtraArgsCodec.GenericExtraArgsV3({
-          ccvs: new address[](0),
-          ccvArgs: new bytes[](0),
+          ccvs: userCCVAddresses,
+          ccvArgs: userCCVArgs,
           blockConfirmations: 0,
           gasLimit: GAS_LIMIT,
           executor: address(0),
@@ -87,7 +103,6 @@ contract cctp_e2e is e2e {
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: address(s_sourceCCTPSetup.token), amount: 1e6}); // 1 USDC.
 
-    /*
     (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
     _evmMessageToEvent({
       message: message,
@@ -96,8 +111,6 @@ contract cctp_e2e is e2e {
       originalSender: OWNER
     });
     receipts[receipts.length - 1].issuer = address(s_sourceRouter);
-    // committeeVerifier will return its versionTag, which we add here.
-    verifierBlobs[0] = abi.encodePacked(s_sourceCommitteeVerifier.versionTag());
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
@@ -109,7 +122,6 @@ contract cctp_e2e is e2e {
       receipts: receipts,
       verifierBlobs: verifierBlobs
     });
-    */
 
     vm.resumeGasMetering();
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
@@ -168,7 +180,7 @@ contract cctp_e2e is e2e {
       new VersionedVerifierResolver.OutboundImplementationArgs[](1);
     outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      verifier: address(s_destCCTPSetup.verifier)
+      verifier: address(s_sourceCCTPSetup.verifier)
     });
     s_sourceCCTPSetup.verifierResolver.applyOutboundImplementationUpdates(outboundImpls);
 
@@ -249,6 +261,27 @@ contract cctp_e2e is e2e {
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     s_sourceCCTPSetup.tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
+
+    // Apply authorized callers on the source token pool.
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = address(s_sourceCCTPSetup.tokenPoolProxy);
+    s_sourceCCTPSetup.tokenPool.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+    );
+
+    // Apply authorized callers on the dest token pool.
+    authorizedCallers = new address[](1);
+    authorizedCallers[0] = address(s_destCCTPSetup.tokenPoolProxy);
+    s_destCCTPSetup.tokenPool.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+    );
+
+    // Update lock or burn mechanism on the source token pool proxy.
+    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    uint64[] memory chainSelectors = new uint64[](1);
+    chainSelectors[0] = DEST_CHAIN_SELECTOR;
+    s_sourceCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
 
     // Register CCTP token pool proxy on source token admin registry.
     TokenAdminRegistry(s_sourceCCTPSetup.tokenAdminRegistry).proposeAdministrator(

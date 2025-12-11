@@ -34,6 +34,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   address internal s_defaultCCV;
   address internal s_defaultExecutor;
 
+  mapping(address token => bytes extraData) internal s_extraDataByToken;
+
   function setUp() public virtual override {
     super.setUp();
 
@@ -185,7 +187,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         sourceTokenAddress: abi.encodePacked(token),
         destTokenAddress: abi.encodePacked(s_destTokenBySourceToken[token]),
         tokenReceiver: abi.encodePacked(abi.decode(message.receiver, (address))),
-        extraData: abi.encode(IERC20Metadata(token).decimals())
+        extraData: s_extraDataByToken[token].length != 0
+          ? s_extraDataByToken[token]
+          : abi.encode(IERC20Metadata(token).decimals())
       });
     }
   }
