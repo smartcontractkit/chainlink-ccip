@@ -236,8 +236,7 @@ func (ca *CurseAdapter) ListConnectedChains(e cldf.Environment, selector uint64)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get selector family for connected chain %d: %w", offRamp.SourceChainSelector, err)
 		}
-		supported, exists := api.AdapterImplemented[family]
-		if !exists || !supported {
+		if !api.GetCurseRegistry().IsFamilyRegistered(family) {
 			continue // skip unsupported chain families
 		}
 		connectedChains = append(connectedChains, offRamp.SourceChainSelector)
