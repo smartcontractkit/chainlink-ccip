@@ -3,6 +3,19 @@ package fastcurse
 import (
 	"bytes"
 	"encoding/binary"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
+)
+
+var (
+	AdapterImplemented = map[string]bool{
+		chainsel.FamilyEVM:    true,
+		chainsel.FamilySolana: true,
+		chainsel.FamilySui:    false,
+		chainsel.FamilyAptos:  false,
+		chainsel.FamilyTon:    false,
+		chainsel.FamilyTron:   false,
+	}
 )
 
 type Subject = [16]byte

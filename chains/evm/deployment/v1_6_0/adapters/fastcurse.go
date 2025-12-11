@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -230,10 +231,14 @@ func (ca *CurseAdapter) ListConnectedChains(e cldf.Environment, selector uint64)
 		if offRamp.OffRamp == (common.Address{}) {
 			continue // skip uninitialized off-ramps
 		}
-		// if chain is non-evm, skip ( TODO: support non-evm chains later)
-		_, exists := e.BlockChains.EVMChains()[offRamp.SourceChainSelector]
-		if !exists {
-			continue
+		// get family of connected chain and check if the adapter supports it
+		family, err := chainsel.GetSelectorFamily(offRamp.SourceChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get selector family for connected chain %d: %w", offRamp.SourceChainSelector, err)
+		}
+		supported, exists := api.AdapterImplemented[family]
+		if !exists || !supported {
+			continue // skip unsupported chain families
 		}
 		connectedChains = append(connectedChains, offRamp.SourceChainSelector)
 	}
