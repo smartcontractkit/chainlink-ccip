@@ -92,12 +92,13 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       s_mockTokenMessenger,
       s_messageTransmitterProxy,
       s_USDCToken,
-      STORAGE_LOCATION,
+      s_storageLocations,
       CCTPVerifier.DynamicConfig({
         feeAggregator: FEE_AGGREGATOR,
         allowlistAdmin: ALLOWLIST_ADMIN,
         fastFinalityBps: CCTP_FAST_FINALITY_BPS
-      })
+      }),
+      address(s_mockRMNRemote)
     );
 
     // Apply dest chain config updates.

@@ -18,7 +18,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
 
     (Pool.LockOrBurnOutV1 memory out, uint256 destAmount) = s_pool.lockOrBurn(
       Pool.LockOrBurnInV1({
-        receiver: abi.encodePacked(address(0xDEAD)),
+        receiver: abi.encodePacked(s_receiver),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         originalSender: OWNER,
         amount: amount,
@@ -47,7 +47,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     vm.expectRevert(LombardTokenPool.OutboundImplementationNotFoundForVerifier.selector);
     s_pool.lockOrBurn(
       Pool.LockOrBurnInV1({
-        receiver: abi.encodePacked(address(0xDEAD)),
+        receiver: abi.encodePacked(s_receiver),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         originalSender: OWNER,
         amount: amount,

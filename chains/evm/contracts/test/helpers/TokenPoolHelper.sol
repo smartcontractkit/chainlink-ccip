@@ -33,15 +33,16 @@ contract TokenPoolHelper is TokenPool {
   function validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) external {
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
+    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0);
   }
 
   function validateLockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 finality,
-    bytes calldata tokenArgs
+    bytes calldata tokenArgs,
+    uint256 feeAmount
   ) external {
-    _validateLockOrBurn(lockOrBurnIn, finality, tokenArgs);
+    _validateLockOrBurn(lockOrBurnIn, finality, tokenArgs, feeAmount);
   }
 
   function validateReleaseOrMint(
@@ -54,7 +55,11 @@ contract TokenPoolHelper is TokenPool {
   }
 
   function applyFee(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) external view returns (uint256) {
-    return _applyFee(lockOrBurnIn, finality);
+    return lockOrBurnIn.amount - _getFee(lockOrBurnIn, finality);
+  }
+
+  function getFee(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) external view returns (uint256) {
+    return _getFee(lockOrBurnIn, finality);
   }
 
   function onlyOnRampModifier(
