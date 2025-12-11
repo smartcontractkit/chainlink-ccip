@@ -14,6 +14,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	adaptersv1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
@@ -149,10 +150,7 @@ func TestFastCurse(t *testing.T) {
 	}
 
 	// deploy mcms
-	evmDeployer := &adapters.EVMDeployer{}
-	dReg := deploy.GetRegistry()
-	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
-	cs := deploy.DeployMCMS(dReg, nil)
+	cs := deploy.DeployMCMS(deploy.GetRegistry(), nil)
 	evmChain1 := env.BlockChains.EVMChains()[chain1]
 	evmChain2 := env.BlockChains.EVMChains()[chain2]
 	output, err := cs.Apply(*env, deploy.MCMSDeploymentConfig{
@@ -225,13 +223,7 @@ func TestFastCurse(t *testing.T) {
 	}
 
 	// register chain adapter
-	cr := deploy.GetTransferOwnershipRegistry()
-	evmAdapter := &adapters.EVMTransferOwnershipAdapter{}
-	cr.RegisterAdapter(chainsel.FamilyEVM, transferOwnershipInput.AdapterVersion, evmAdapter)
-	mcmsRegistry := changesets.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, evmMCMSReader)
-	transferOwnershipChangeset := deploy.TransferOwnershipChangeset(cr, mcmsRegistry)
+	transferOwnershipChangeset := deploy.TransferOwnershipChangeset(deploy.GetTransferOwnershipRegistry(), changesets.GetRegistry())
 	output, err = transferOwnershipChangeset.Apply(*env, transferOwnershipInput)
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
@@ -264,24 +256,8 @@ func TestFastCurse(t *testing.T) {
 			Description:          "Curse proposal for fast curse test",
 		},
 	}
-	curseReg := fastcurse.GetCurseRegistry()
-	adv1_6_0 := adaptersv1_6_0.NewCurseAdapter()
-	adv1_5_0 := adaptersv1_5_0.NewCurseAdapter()
-	crInput1_6_0 := fastcurse.CurseRegistryInput{
-		CursingFamily:       chainsel.FamilyEVM,
-		CursingVersion:      semver.MustParse("1.6.0"),
-		CurseAdapter:        adaptersv1_6_0.NewCurseAdapter(),
-		CurseSubjectAdapter: adaptersv1_6_0.NewCurseAdapter(),
-	}
-	crInput1_5_0 := fastcurse.CurseRegistryInput{
-		CursingFamily:       chainsel.FamilyEVM,
-		CursingVersion:      semver.MustParse("1.5.0"),
-		CurseAdapter:        adaptersv1_5_0.NewCurseAdapter(),
-		CurseSubjectAdapter: adaptersv1_5_0.NewCurseAdapter(),
-	}
-	curseReg.RegisterNewCurse(crInput1_6_0)
-	curseReg.RegisterNewCurse(crInput1_5_0)
-	curseChangeset := fastcurse.CurseChangeset(curseReg, mcmsRegistry)
+
+	curseChangeset := fastcurse.CurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
 	output, err = curseChangeset.Apply(*env, curseCfg)
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
@@ -289,6 +265,9 @@ func TestFastCurse(t *testing.T) {
 	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 	// check that the subjects were actually cursed
+	adv1_6_0 := adaptersv1_6_0.NewCurseAdapter()
+	adv1_5_0 := adaptersv1_5_0.NewCurseAdapter()
+
 	rmnC, err := rmn_contract.NewRMNContract(rmnAddress, evmChain1.Client)
 	require.NoError(t, err)
 	isCursed, err := rmnC.IsCursed(nil, adv1_5_0.SelectorToSubject(chain2))
@@ -305,7 +284,7 @@ func TestFastCurse(t *testing.T) {
 	// Now uncurse the subjects
 	// reset the operation bundle to clear any cached values
 	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
-	uncurseChangeset := fastcurse.UncurseChangeset(curseReg, mcmsRegistry)
+	uncurseChangeset := fastcurse.UncurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
 	output, err = uncurseChangeset.Apply(*env, curseCfg)
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
