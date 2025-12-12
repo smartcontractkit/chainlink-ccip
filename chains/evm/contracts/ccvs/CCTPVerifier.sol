@@ -36,7 +36,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidFastFinalityBps(uint16 fastFinalityBps);
   error InvalidSetDomainArgs(SetDomainArgs args);
   error UnknownDomain(uint64 chainSelector);
-  error UnsupportedFinality(uint32 finality);
 
   event DomainsSet(SetDomainArgs[] domains);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
