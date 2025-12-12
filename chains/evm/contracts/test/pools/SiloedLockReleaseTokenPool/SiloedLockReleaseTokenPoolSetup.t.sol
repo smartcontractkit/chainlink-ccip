@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Router} from "../../../Router.sol";
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
+import {Router} from "../../../Router.sol";
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {BaseTest} from "../../BaseTest.t.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
@@ -135,5 +136,24 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
     assertFalse(s_siloedLockReleaseTokenPool.isSiloed(DEST_CHAIN_SELECTOR));
 
     s_siloedLockReleaseTokenPool.setSiloRebalancer(SILOED_CHAIN_SELECTOR, OWNER);
+  }
+
+  function _setTokenTransferFee(uint64 destChainSelector, uint16 feeBps) internal {
+    TokenPool.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
+      new TokenPool.TokenTransferFeeConfigArgs[](1);
+    tokenTransferFeeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
+      destChainSelector: destChainSelector,
+      tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
+        destGasOverhead: 1,
+        destBytesOverhead: 0,
+        defaultBlockConfirmationFeeUSDCents: 0,
+        customBlockConfirmationFeeUSDCents: 0,
+        defaultBlockConfirmationTransferFeeBps: feeBps,
+        customBlockConfirmationTransferFeeBps: 0,
+        isEnabled: true
+      })
+    });
+
+    s_siloedLockReleaseTokenPool.applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, new uint64[](0));
   }
 }

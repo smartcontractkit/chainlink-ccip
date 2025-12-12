@@ -64,14 +64,14 @@ contract ERC20LockBox is ITypeAndVersion {
     i_tokenAdminRegistry = TokenAdminRegistry(tokenAdminRegistry);
   }
 
-  /// @notice Deposits tokens for a specific remote chain selector. This eases the process of migrating tokens
+  /// @notice Deposits tokens into the lock box. This eases the process of migrating tokens
   /// from a legacy token pool to a new one, since only the allowedCaller needs to be changed. Without it, the tokens
   /// would need to be manually withdrawn and re-deposited into the new token pool from a legacy pool, which is a
   /// time-consuming and error-prone process.
   /// @param token The address of the ERC20 token to deposit.
   /// @param amount The amount of tokens to deposit.
   /// @dev This function does NOT support storing native tokens, as the token pool which handles native is expected to
-  /// have wrapped it into an ERC20-compatibletoken first.
+  /// have wrapped it into an ERC20-compatible token first.
   function deposit(address token, uint256 amount) external {
     _validateDepositWithdraw(token, amount);
 
@@ -80,7 +80,7 @@ contract ERC20LockBox is ITypeAndVersion {
     emit Deposit(token, msg.sender, amount);
   }
 
-  /// @notice Withdraws tokens for a specific remote chain selector.
+  /// @notice Withdraws tokens from the lock box.
   /// @param token The address of the ERC20 token to withdraw.
   /// @param amount The amount of tokens to withdraw.
   /// @param recipient The address that will receive the withdrawn tokens.
