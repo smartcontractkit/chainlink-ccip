@@ -71,7 +71,7 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
 
   function testFuzz_proposeAdministrator_Success(address[50] memory tokens, address[50] memory admins) public {
     TokenAdminRegistry cleanTokenAdminRegistry = new TokenAdminRegistry();
-    for (uint256 i = 0; i < tokens.length; i++) {
+    for (uint256 i = 0; i < tokens.length; ++i) {
       if (admins[i] == address(0)) {
         continue;
       }
@@ -82,7 +82,7 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
       s_AdminByToken[tokens[i]] = admins[i];
     }
 
-    for (uint256 i = 0; i < tokens.length; i++) {
+    for (uint256 i = 0; i < tokens.length; ++i) {
       assertEq(cleanTokenAdminRegistry.getTokenConfig(tokens[i]).pendingAdministrator, s_AdminByToken[tokens[i]]);
     }
   }

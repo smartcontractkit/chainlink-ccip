@@ -8,10 +8,10 @@ import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 contract BaseVerifierTestHelper is BaseVerifier {
   constructor(string[] memory storageLocations, address rmn) BaseVerifier(storageLocations, rmn) {}
 
-  function applyDestChainConfigUpdates(
-    DestChainConfigArgs[] calldata destChainConfigArgs
+  function applyRemoteChainConfigUpdates(
+    RemoteChainConfigArgs[] calldata destChainConfigArgs
   ) external {
-    _applyDestChainConfigUpdates(destChainConfigArgs);
+    _applyRemoteChainConfigUpdates(destChainConfigArgs);
   }
 
   function applyAllowlistUpdates(

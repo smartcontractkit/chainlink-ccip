@@ -63,11 +63,12 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     uint256, // feeTokenAmount
     bytes calldata // verifierArgs
   ) external view returns (bytes memory verifierReturnData) {
+    _assertNotCursedByRMN(message.destChainSelector);
+
     // For EVM, sender is expected to be 20 bytes.
     address senderAddress = address(bytes20(message.sender));
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
-    // TODO: Process msg & return verifier data
     return abi.encodePacked(VERSION_TAG_V1_7_0);
   }
 
@@ -77,6 +78,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     bytes32 messageHash,
     bytes calldata verifierResults
   ) external view {
+    _assertNotCursedByRMN(message.sourceChainSelector);
     if (verifierResults.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES) {
       revert InvalidVerifierResults();
     }
@@ -137,12 +139,12 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     emit ConfigSet(dynamicConfig);
   }
 
-  /// @notice Updates destination chains specific configs.
-  /// @param destChainConfigArgs Array of destination chain specific configs.
-  function applyDestChainConfigUpdates(
-    DestChainConfigArgs[] calldata destChainConfigArgs
+  /// @notice Updates remote chains specific configs.
+  /// @param remoteChainConfigArgs Array of remote chain specific configs.
+  function applyRemoteChainConfigUpdates(
+    RemoteChainConfigArgs[] calldata remoteChainConfigArgs
   ) external onlyOwner {
-    _applyDestChainConfigUpdates(destChainConfigArgs);
+    _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }
 
   /// @notice Updates allowlistConfig for Senders.

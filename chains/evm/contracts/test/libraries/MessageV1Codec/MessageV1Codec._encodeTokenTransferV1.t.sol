@@ -40,7 +40,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     uint256 sourcePoolOffset = 33;
     assertEq(tokenTransfer.sourcePoolAddress.length, uint8(encoded[sourcePoolOffset]));
     bytes memory sourcePoolAddress = new bytes(tokenTransfer.sourcePoolAddress.length);
-    for (uint256 i = 0; i < tokenTransfer.sourcePoolAddress.length; i++) {
+    for (uint256 i = 0; i < tokenTransfer.sourcePoolAddress.length; ++i) {
       sourcePoolAddress[i] = encoded[sourcePoolOffset + 1 + i];
     }
     assertEq(keccak256(tokenTransfer.sourcePoolAddress), keccak256(sourcePoolAddress));
@@ -49,7 +49,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     uint256 sourceTokenOffset = sourcePoolOffset + 1 + tokenTransfer.sourcePoolAddress.length;
     assertEq(tokenTransfer.sourceTokenAddress.length, uint8(encoded[sourceTokenOffset]));
     bytes memory sourceTokenAddress = new bytes(tokenTransfer.sourceTokenAddress.length);
-    for (uint256 i = 0; i < tokenTransfer.sourceTokenAddress.length; i++) {
+    for (uint256 i = 0; i < tokenTransfer.sourceTokenAddress.length; ++i) {
       sourceTokenAddress[i] = encoded[sourceTokenOffset + 1 + i];
     }
     assertEq(keccak256(tokenTransfer.sourceTokenAddress), keccak256(sourceTokenAddress));
@@ -58,7 +58,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     uint256 destTokenOffset = sourceTokenOffset + 1 + tokenTransfer.sourceTokenAddress.length;
     assertEq(tokenTransfer.destTokenAddress.length, uint8(encoded[destTokenOffset]));
     bytes memory destTokenAddress = new bytes(tokenTransfer.destTokenAddress.length);
-    for (uint256 i = 0; i < tokenTransfer.destTokenAddress.length; i++) {
+    for (uint256 i = 0; i < tokenTransfer.destTokenAddress.length; ++i) {
       destTokenAddress[i] = encoded[destTokenOffset + 1 + i];
     }
     assertEq(keccak256(tokenTransfer.destTokenAddress), keccak256(destTokenAddress));
@@ -67,7 +67,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
     uint256 tokenReceiverOffset = destTokenOffset + 1 + tokenTransfer.destTokenAddress.length;
     assertEq(tokenTransfer.tokenReceiver.length, uint8(encoded[tokenReceiverOffset]));
     bytes memory tokenReceiver = new bytes(tokenTransfer.tokenReceiver.length);
-    for (uint256 i = 0; i < tokenTransfer.tokenReceiver.length; i++) {
+    for (uint256 i = 0; i < tokenTransfer.tokenReceiver.length; ++i) {
       tokenReceiver[i] = encoded[tokenReceiverOffset + 1 + i];
     }
     assertEq(keccak256(tokenTransfer.tokenReceiver), keccak256(tokenReceiver));
@@ -79,7 +79,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
       uint16(uint8(encoded[extraDataLengthOffset])) << 8 | uint16(uint8(encoded[extraDataLengthOffset + 1]))
     );
     bytes memory extraData = new bytes(tokenTransfer.extraData.length);
-    for (uint256 i = 0; i < tokenTransfer.extraData.length; i++) {
+    for (uint256 i = 0; i < tokenTransfer.extraData.length; ++i) {
       extraData[i] = encoded[extraDataLengthOffset + 2 + i];
     }
     assertEq(keccak256(tokenTransfer.extraData), keccak256(extraData));
@@ -139,7 +139,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
   function test__encodeTokenTransferV1_MaxLengthAddresses() public view {
     // Test with maximum uint8 length (255 bytes)
     bytes memory maxLengthAddress = new bytes(255);
-    for (uint256 i = 0; i < 255; i++) {
+    for (uint256 i = 0; i < 255; ++i) {
       maxLengthAddress[i] = bytes1(uint8(i));
     }
 
@@ -170,7 +170,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
   function test__encodeTokenTransferV1_MaxLengthExtraData() public view {
     // Test with maximum uint16 length (65535 bytes)
     bytes memory maxLengthExtraData = new bytes(type(uint16).max);
-    for (uint256 i = 0; i < 100; i++) {
+    for (uint256 i = 0; i < 100; ++i) {
       maxLengthExtraData[i] = bytes1(uint8(i));
     }
 

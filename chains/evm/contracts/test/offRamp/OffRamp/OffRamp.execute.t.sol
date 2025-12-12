@@ -340,7 +340,7 @@ contract OffRamp_execute is OffRampSetup {
 
     // Create mismatched array lengths.
     address[] memory ccvs = new address[](originalCcvs.length + 1);
-    for (uint256 i = 0; i < originalCcvs.length; i++) {
+    for (uint256 i = 0; i < originalCcvs.length; ++i) {
       ccvs[i] = originalCcvs[i];
     }
     // Keep verifierResults the same, creating mismatch.

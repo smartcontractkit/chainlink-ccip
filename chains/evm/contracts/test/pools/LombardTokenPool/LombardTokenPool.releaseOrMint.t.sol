@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../../libraries/Pool.sol";
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {MockMailbox} from "../../mocks/MockMailbox.sol";
+import {MockLombardMailbox} from "../../mocks/MockLombardMailbox.sol";
 import {LombardTokenPoolSetup} from "./LombardTokenPoolSetup.t.sol";
 
 contract LombardTokenPool_releaseOrMint is LombardTokenPoolSetup {
@@ -16,9 +16,10 @@ contract LombardTokenPool_releaseOrMint is LombardTokenPoolSetup {
   bytes32 internal constant PAYLOAD_HASH = bytes32("payload-hash");
 
   function test_releaseOrMint_V1() public {
-    MockMailbox mailbox = new MockMailbox();
+    MockLombardMailbox mailbox = new MockLombardMailbox();
     mailbox.setResult(PAYLOAD_HASH, true, "");
     s_bridge.setMailbox(address(mailbox));
+
     bytes memory rawPayload = bytes("rawPayload");
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       originalSender: abi.encodePacked(OWNER),
@@ -47,7 +48,7 @@ contract LombardTokenPool_releaseOrMint is LombardTokenPoolSetup {
   }
 
   function test_releaseOrMint_V1_RevertWhen_ExecutionError() public {
-    MockMailbox mailbox = new MockMailbox();
+    MockLombardMailbox mailbox = new MockLombardMailbox();
     mailbox.setResult(PAYLOAD_HASH, false, "");
     s_bridge.setMailbox(address(mailbox));
 
@@ -67,7 +68,7 @@ contract LombardTokenPool_releaseOrMint is LombardTokenPoolSetup {
   }
 
   function test_releaseOrMint_V1_RevertWhen_HashMismatch() public {
-    MockMailbox mailbox = new MockMailbox();
+    MockLombardMailbox mailbox = new MockLombardMailbox();
     mailbox.setResult(bytes32("different"), true, "");
     s_bridge.setMailbox(address(mailbox));
 

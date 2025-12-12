@@ -121,7 +121,7 @@ contract ExtraArgsCodec_Test is BaseTest {
 
     address[] memory ccvsDynamic = new address[](ccvs.length);
     bytes[] memory ccvArgsDynamic = new bytes[](ccvs.length);
-    for (uint256 i = 0; i < ccvs.length; i++) {
+    for (uint256 i = 0; i < ccvs.length; ++i) {
       ccvsDynamic[i] = ccvs[i];
       ccvArgsDynamic[i] = ccvArgs[i];
       vm.assume(ccvArgs[i].length <= type(uint16).max);

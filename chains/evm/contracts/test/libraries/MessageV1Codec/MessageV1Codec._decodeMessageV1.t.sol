@@ -205,7 +205,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     // version(1) + sourceChain(8) + destChain(8) + msgNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + onRampLen(1) = 68
     uint256 truncatePoint = 68;
     bytes memory truncated = new bytes(truncatePoint + 12); // Not enough for the 20-byte address
-    for (uint256 i = 0; i < truncated.length; i++) {
+    for (uint256 i = 0; i < truncated.length; ++i) {
       truncated[i] = encoded[i];
     }
 
@@ -225,7 +225,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     // version(1) + sourceChain(8) + destChain(8) + msgNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + onRampLen(1) + onRampAddr(20) = 88
     uint256 truncatePoint = 88;
     bytes memory truncated = new bytes(truncatePoint); // Missing offRampAddress length byte
-    for (uint256 i = 0; i < truncated.length; i++) {
+    for (uint256 i = 0; i < truncated.length; ++i) {
       truncated[i] = encoded[i];
     }
 
@@ -245,7 +245,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     // Any message shorter than 77 bytes will fail the MESSAGE_MIN_SIZE check
     uint256 truncatePoint = 34; // Less than MESSAGE_V1_BASE_SIZE (77 bytes)
     bytes memory truncated = new bytes(truncatePoint);
-    for (uint256 i = 0; i < truncated.length; i++) {
+    for (uint256 i = 0; i < truncated.length; ++i) {
       truncated[i] = encoded[i];
     }
 
@@ -265,7 +265,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     // version(1) + sourceChain(8) + destChain(8) + msgNum(8) + execGas(4) + callbackGas(4) + finality(2) + hash(32) + onRampLen(1) + onRampAddr(20) + offRampLen(1) + offRampAddr(20) = 109
     uint256 truncatePoint = 109;
     bytes memory truncated = new bytes(truncatePoint); // Missing sender length
-    for (uint256 i = 0; i < truncated.length; i++) {
+    for (uint256 i = 0; i < truncated.length; ++i) {
       truncated[i] = encoded[i];
     }
 
@@ -283,7 +283,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
 
     // Truncate the data content at the very end
     bytes memory truncated = new bytes(encoded.length - 1); // Remove last byte of data
-    for (uint256 i = 0; i < truncated.length; i++) {
+    for (uint256 i = 0; i < truncated.length; ++i) {
       truncated[i] = encoded[i];
     }
 
@@ -301,7 +301,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
 
     // Add extra bytes at the end to cause offset mismatch
     bytes memory extended = new bytes(encoded.length + 5);
-    for (uint256 i = 0; i < encoded.length; i++) {
+    for (uint256 i = 0; i < encoded.length; ++i) {
       extended[i] = encoded[i];
     }
     // Extra bytes will cause final offset mismatch
@@ -333,7 +333,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     // Find token transfer section and truncate at version byte
     uint256 tokenVersionOffset = _findTokenTransferVersionOffset(encoded);
     bytes memory truncated = new bytes(tokenVersionOffset); // Cut off at version byte
-    for (uint256 i = 0; i < truncated.length; i++) {
+    for (uint256 i = 0; i < truncated.length; ++i) {
       truncated[i] = encoded[i];
     }
 
@@ -364,7 +364,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     // Truncate in the middle of the amount field (32 bytes)
     uint256 tokenVersionOffset = _findTokenTransferVersionOffset(encoded);
     bytes memory truncated = new bytes(tokenVersionOffset + 1 + 16); // Version + partial amount
-    for (uint256 i = 0; i < truncated.length; i++) {
+    for (uint256 i = 0; i < truncated.length; ++i) {
       truncated[i] = encoded[i];
     }
 
@@ -392,7 +392,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
 
     // Truncate the encoded data to include length but not full content
     bytes memory truncated = new bytes(offset + 1 + offRampLength - 5); // -5 to truncate content
-    for (uint256 i = 0; i < truncated.length; i++) {
+    for (uint256 i = 0; i < truncated.length; ++i) {
       truncated[i] = encoded[i];
     }
 
@@ -422,7 +422,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     offset += 1 + message.sender.length; // sender length + content
     // Truncate the encoded data to include length but only partial content
     bytes memory truncated = new bytes(offset + 1 + 10); // Include length + only 10 bytes (less than full 20 bytes)
-    for (uint256 i = 0; i < truncated.length; i++) {
+    for (uint256 i = 0; i < truncated.length; ++i) {
       truncated[i] = encoded[i];
     }
 
@@ -454,7 +454,7 @@ contract MessageV1Codec__decodeMessageV1 is MessageV1CodecSetup {
     offset += 1 + message.receiver.length; // receiver length + content
     // Truncate the encoded data to include length but only partial content
     bytes memory truncated = new bytes(offset + 2 + 10); // Include length + only 10 bytes (less than full blob)
-    for (uint256 i = 0; i < truncated.length; i++) {
+    for (uint256 i = 0; i < truncated.length; ++i) {
       truncated[i] = encoded[i];
     }
 

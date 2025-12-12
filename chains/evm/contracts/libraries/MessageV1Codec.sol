@@ -132,7 +132,8 @@ library MessageV1Codec {
     // Configurable per-message finality value.
     uint16 finality;
     // A hash of the verifiers and executor addresses. This is used by the offchain systems to validate the list of CCVs
-    // and executor that should be used for this message.
+    // and executor that should be used for this message. This has no meaning on the destination chain ans is not
+    // checked against anything.
     bytes32 ccvAndExecutorHash;
     // Variable length fields - must match wire format order.
     // Source chain onRamp, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.

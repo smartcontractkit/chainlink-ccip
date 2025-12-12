@@ -20,7 +20,7 @@ contract BaseVerifier_getFee is BaseVerifierSetup {
     uint64 wrongDestChainSelector = DEST_CHAIN_SELECTOR + 1;
     Client.EVM2AnyMessage memory message;
 
-    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.DestinationNotSupported.selector, wrongDestChainSelector));
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.RemoteChainNotSupported.selector, wrongDestChainSelector));
     s_baseVerifier.getFee(wrongDestChainSelector, message, "", 0);
   }
 }

@@ -4,14 +4,15 @@ pragma solidity ^0.8.24;
 import {Router} from "../../../Router.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
-import {MockLombardBridgeV1} from "../../mocks/MockLombardBridgeV1.sol";
+import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
 
 contract LombardTokenPoolSetup is TokenPoolSetup {
   LombardTokenPoolHelper internal s_pool;
   MockVerifier internal s_verifierResolver;
-  MockLombardBridgeV1 internal s_bridge;
+  MockLombardBridge internal s_bridge;
+
   address internal constant VERIFIER_IMPL = address(0x2345);
   address internal s_remotePool = makeAddr("remotePool");
   address internal s_remoteToken = makeAddr("remoteToken");
@@ -23,7 +24,7 @@ contract LombardTokenPoolSetup is TokenPoolSetup {
     super.setUp();
 
     s_verifierResolver = new MockVerifier("");
-    s_bridge = new MockLombardBridgeV1(1, address(0));
+    s_bridge = new MockLombardBridge();
 
     s_pool = new LombardTokenPoolHelper(
       s_token,

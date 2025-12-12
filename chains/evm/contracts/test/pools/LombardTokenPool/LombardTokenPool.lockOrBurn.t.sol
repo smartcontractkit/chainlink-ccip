@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBridgeV1} from "../../../pools/Lombard/interfaces/IBridgeV1.sol";
+import {IBridgeV1} from "../../../interfaces/lombard/IBridgeV1.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
@@ -106,6 +106,21 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     uint256 amount = 1e18;
     deal(address(s_token), address(adapterPool), amount);
 
+    vm.expectCall(
+      address(s_bridge),
+      abi.encodeCall(
+        IBridgeV1.deposit,
+        (
+          L_CHAIN_ID,
+          tokenAdapter,
+          OWNER,
+          bytes32(uint256(uint160(s_adapterReceiver))),
+          amount,
+          bytes32(uint256(uint160(s_initialRemotePool)))
+        )
+      )
+    );
+
     vm.expectEmit();
     emit TokenPool.LockedOrBurned({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -125,7 +140,6 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     );
 
     assertEq(out.destTokenAddress, abi.encode(s_initialRemoteToken));
-    assertEq(s_bridge.s_lastDepositToken(), tokenAdapter);
   }
 
   function test_lockOrBurn_V2_RevertWhen_OutboundImplementationNotFoundForVerifier() public {

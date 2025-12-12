@@ -26,25 +26,25 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
     address[] memory receiverCCVs = new address[](receiverRequired.length);
     address[] memory poolCCVs = new address[](pool.length);
 
-    for (uint256 i = 0; i < defaults.length; i++) {
+    for (uint256 i = 0; i < defaults.length; ++i) {
       defaultCCVs[i] = address(uint160(defaults[i]) + 1);
     }
 
-    for (uint256 i = 0; i < receiverRequired.length; i++) {
+    for (uint256 i = 0; i < receiverRequired.length; ++i) {
       receiverCCVs[i] = address(uint160(receiverRequired[i]));
     }
 
-    for (uint256 i = 0; i < pool.length; i++) {
+    for (uint256 i = 0; i < pool.length; ++i) {
       poolCCVs[i] = address(uint160(pool[i]));
     }
 
     // Check for address(0) BEFORE removing duplicates
     bool hadZeroInReceiver = false;
     bool hadZeroInPool = false;
-    for (uint256 i = 0; i < receiverCCVs.length; i++) {
+    for (uint256 i = 0; i < receiverCCVs.length; ++i) {
       if (receiverCCVs[i] == address(0)) hadZeroInReceiver = true;
     }
-    for (uint256 i = 0; i < poolCCVs.length; i++) {
+    for (uint256 i = 0; i < poolCCVs.length; ++i) {
       if (poolCCVs[i] == address(0)) hadZeroInPool = true;
     }
 
@@ -73,7 +73,7 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
     bool defaultsWillBeAdded = hadZeroInReceiver || hadZeroInPool || receiverCCVs.length == 0 || poolCCVs.length == 0;
 
     if (defaultsWillBeAdded) {
-      for (uint256 i = 0; i < defaultCCVs.length; i++) {
+      for (uint256 i = 0; i < defaultCCVs.length; ++i) {
         s_ccvs.add(defaultCCVs[i]);
       }
     }
@@ -81,7 +81,7 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
     // For receiver: if empty, _getCCVsFromReceiver returns defaults (already added above)
     // If not empty, it returns the receiver CCVs
     if (receiverCCVs.length > 0) {
-      for (uint256 i = 0; i < receiverCCVs.length; i++) {
+      for (uint256 i = 0; i < receiverCCVs.length; ++i) {
         s_ccvs.add(receiverCCVs[i]);
       }
     }
@@ -89,7 +89,7 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
     // For pool: if empty, _getCCVsFromPool returns defaults (already added above)
     // If not empty, it returns the pool CCVs
     if (poolCCVs.length > 0) {
-      for (uint256 i = 0; i < poolCCVs.length; i++) {
+      for (uint256 i = 0; i < poolCCVs.length; ++i) {
         s_ccvs.add(poolCCVs[i]);
       }
     }
@@ -103,7 +103,7 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
 
     assertEq(_onlyUniques(requiredCCVs).length, requiredCCVs.length, "still has duplicates");
 
-    for (uint256 i = 0; i < requiredCCVs.length; i++) {
+    for (uint256 i = 0; i < requiredCCVs.length; ++i) {
       assertTrue(s_ccvs.contains(requiredCCVs[i]), "requiredCCVs[i] not found in s_ccvs");
     }
     assertEq(s_ccvs.length(), requiredCCVs.length, "ccvs length mismatch");
@@ -115,9 +115,9 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
     output = new address[](input.length);
     uint256 outputIndex = 0;
 
-    for (uint256 i = 0; i < input.length; i++) {
+    for (uint256 i = 0; i < input.length; ++i) {
       bool isUnique = true;
-      for (uint256 j = 0; j < outputIndex; j++) {
+      for (uint256 j = 0; j < outputIndex; ++j) {
         if (output[j] == input[i] || input[i] == address(0)) {
           isUnique = false;
           break;
@@ -140,9 +140,9 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
     output = new address[](input.length);
     uint256 outputIndex = 0;
 
-    for (uint256 i = 0; i < input.length; i++) {
+    for (uint256 i = 0; i < input.length; ++i) {
       bool isUnique = true;
-      for (uint256 j = 0; j < outputIndex; j++) {
+      for (uint256 j = 0; j < outputIndex; ++j) {
         if (output[j] == input[i]) {
           isUnique = false;
           break;

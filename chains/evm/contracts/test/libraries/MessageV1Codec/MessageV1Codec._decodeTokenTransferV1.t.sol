@@ -43,10 +43,10 @@ contract MessageV1Codec__decodeTokenTransferV1 is MessageV1CodecSetup {
     bytes memory maxExtraDataLength = new bytes(type(uint16).max);
 
     // Fill with test patterns
-    for (uint256 i = 0; i < maxAddressLength.length; i++) {
+    for (uint256 i = 0; i < maxAddressLength.length; ++i) {
       maxAddressLength[i] = bytes1(uint8(i % 256));
     }
-    for (uint256 i = 0; i < 100; i++) {
+    for (uint256 i = 0; i < 100; ++i) {
       maxExtraDataLength[i] = bytes1(uint8(i % 256));
     }
 
