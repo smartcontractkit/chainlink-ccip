@@ -130,6 +130,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     (receipts, messageV1.executionGasLimit,) =
       s_onRamp.getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
+    // Because getReceipts uses msg.sender to set the Router, we must override it here.
+    receipts[receipts.length - 1].issuer = address(s_sourceRouter);
+
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
       MessageV1Codec._encodeMessageV1(messageV1),

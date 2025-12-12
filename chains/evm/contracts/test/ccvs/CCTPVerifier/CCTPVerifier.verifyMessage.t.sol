@@ -5,19 +5,21 @@ import {IMessageTransmitter} from "../../../pools/USDC/interfaces/IMessageTransm
 
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+
+import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
-  CCTPVerifierSetup.CCTPMessage internal s_baseCCTPMessage;
+  CCTPHelper.CCTPMessage internal s_baseCCTPMessage;
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_baseCCTPMessage = CCTPVerifierSetup.CCTPMessage({
-      header: CCTPVerifierSetup.CCTPMessageHeader({
+    s_baseCCTPMessage = CCTPHelper.CCTPMessage({
+      header: CCTPHelper.CCTPMessageHeader({
         version: 1,
         sourceDomain: REMOTE_DOMAIN_IDENTIFIER,
         destinationDomain: LOCAL_DOMAIN_IDENTIFIER,
@@ -28,7 +30,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
         minFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
         finalityThresholdExecuted: CCTP_STANDARD_FINALITY_THRESHOLD
       }),
-      body: CCTPVerifierSetup.CCTPMessageBody({
+      body: CCTPHelper.CCTPMessageBody({
         version: 1,
         burnToken: bytes32(abi.encode(s_USDCToken)),
         mintRecipient: bytes32(abi.encode(s_tokenReceiverAddress)),
@@ -38,10 +40,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
         feeExecuted: 0,
         expirationBlock: block.number + 1000
       }),
-      hookData: CCTPVerifierSetup.CCTPMessageHookData({
-        verifierVersion: s_cctpVerifier.versionTag(),
-        messageId: bytes32(0)
-      })
+      hookData: CCTPHelper.CCTPMessageHookData({verifierVersion: s_cctpVerifier.versionTag(), messageId: bytes32(0)})
     });
 
     // Set the domain for the source chain.
@@ -74,7 +73,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     assertEq(IERC20(address(s_USDCToken)).balanceOf(s_tokenReceiverAddress), 0);
 
     vm.expectEmit();
-    emit MockE2EUSDCTransmitterCCTPV2.MessageReceived(_encodeCCTPMessage(s_baseCCTPMessage), new bytes(65));
+    emit MockE2EUSDCTransmitterCCTPV2.MessageReceived(CCTPHelper._encodeCCTPMessage(s_baseCCTPMessage), new bytes(65));
 
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
 
