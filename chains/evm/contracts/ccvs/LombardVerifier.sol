@@ -103,6 +103,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     uint256,
     bytes calldata
   ) external returns (bytes memory verifierData) {
+    _assertNotCursedByRMN(message.destChainSelector);
     // We only support token transfers.
     if (message.tokenTransfer.length == 0) {
       revert MustTransferTokens();
@@ -160,6 +161,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @dev ccvData format:
   /// [versionTag (4 bytes)][rawPayloadLength (2 bytes)][rawPayload (variable)][proofLength (2 bytes)][proof (variable)]
   function verifyMessage(MessageV1Codec.MessageV1 calldata message, bytes32 messageId, bytes calldata ccvData) external {
+    _assertNotCursedByRMN(message.sourceChainSelector);
     _onlyOffRamp(message.sourceChainSelector);
 
     bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);

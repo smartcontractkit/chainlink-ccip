@@ -91,6 +91,23 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     assertEq(IERC20(address(s_USDCToken)).balanceOf(s_tokenReceiverAddress), 1);
   }
 
+  function test_verifyMessage_RevertWhen_CursedByRMN() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    // verifyMessage checks curse status using message.sourceChainSelector.
+    _setMockRMNChainCurse(message.sourceChainSelector, true);
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, message.sourceChainSelector));
+    s_cctpVerifier.verifyMessage(message, messageHash, "");
+  }
+
   function test_verifyMessage_RevertWhen_InvalidVerifierResults() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,

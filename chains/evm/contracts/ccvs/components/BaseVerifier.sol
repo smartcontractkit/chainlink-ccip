@@ -262,6 +262,14 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     }
   }
 
+  function _assertNotCursedByRMN(
+    uint64 destChainSelector
+  ) internal view virtual {
+    if (i_rmn.isCursed(bytes16(uint128(destChainSelector)))) {
+      revert CursedByRMN(destChainSelector);
+    }
+  }
+
   /// @inheritdoc IERC165
   function supportsInterface(
     bytes4 interfaceId

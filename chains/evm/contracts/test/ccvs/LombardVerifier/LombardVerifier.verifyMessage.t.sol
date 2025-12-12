@@ -95,4 +95,15 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     vm.expectRevert(abi.encodeWithSelector(LombardVerifier.ExecutionError.selector));
     s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), _encodeCcvData("", ""));
   }
+
+  function test_verifyMessage_RevertWhen_CursedByRMN() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    // verifyMessage checks curse status using message.sourceChainSelector.
+    _setMockRMNChainCurse(message.sourceChainSelector, true);
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, message.sourceChainSelector));
+    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData("", ""));
+  }
 }

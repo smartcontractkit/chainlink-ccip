@@ -217,6 +217,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     uint256, // feeTokenAmount
     bytes calldata // verifierArgs
   ) external returns (bytes memory verifierReturnData) {
+    _assertNotCursedByRMN(message.destChainSelector);
     // For EVM, sender is expected to be 20 bytes.
     _assertSenderIsAllowed(message.destChainSelector, address(bytes20(message.sender)));
 
@@ -289,6 +290,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     bytes32 messageHash,
     bytes calldata verifierResults
   ) external {
+    _assertNotCursedByRMN(message.sourceChainSelector);
     _onlyOffRamp(message.sourceChainSelector);
 
     if (verifierResults.length < MINIMUM_VERIFIER_RESULT_SIZE) revert InvalidVerifierResults();

@@ -146,4 +146,14 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CallerIsNotARampOnRouter.selector, randomCaller));
     s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
   }
+
+  function test_forwardToVerifier_RevertWhen_CursedByRMN() public {
+    address receiver = makeAddr("receiver");
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createForwardMessage(address(s_testToken), receiver);
+
+    _setMockRMNChainCurse(message.destChainSelector, true);
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, message.destChainSelector));
+    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+  }
 }
