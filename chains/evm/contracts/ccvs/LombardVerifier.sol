@@ -60,6 +60,15 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   string public constant typeAndVersion = "LombardVerifier 1.7.0-dev";
   /// @notice Version tag used in the verifier payload to indicate the version of this verifier.
   bytes4 private constant VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
+  /// @notice The size of the version tag in bytes.
+  uint256 private constant VERSION_TAG_SIZE = 4;
+  /// @notice The size of a bytes32 in bytes.
+  uint256 private constant BYTES32_SIZE = 32;
+  /// @notice The expected size of the bridged message (version tag + message ID).
+  uint256 private constant BRIDGED_MESSAGE_SIZE = VERSION_TAG_SIZE + BYTES32_SIZE;
+  /// @notice The size of the rawPayload length field in ccvData.
+  uint256 private constant RAW_PAYLOAD_LENGTH_SIZE = 2;
+  uint256 private constant PAYLOAD_START_INDEX = VERSION_TAG_SIZE + RAW_PAYLOAD_LENGTH_SIZE;
 
   /// @notice Supported bridge message version.
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 1;
@@ -143,22 +152,37 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       optionalMessage: bytes.concat(VERSION_TAG_V1_7_0, messageId)
     });
 
-    return abi.encode(payloadHash);
+    // Return raw bytes instead of abi.encode for gas efficiency.
+    return bytes.concat(payloadHash);
   }
 
   /// @inheritdoc ICrossChainVerifierV1
+  /// @dev ccvData format:
+  /// [versionTag (4 bytes)][rawPayloadLength (2 bytes)][rawPayload (variable)][proofLength (2 bytes)][proof (variable)]
   function verifyMessage(MessageV1Codec.MessageV1 calldata message, bytes32 messageId, bytes calldata ccvData) external {
     _onlyOffRamp(message.sourceChainSelector);
 
-    (bytes memory rawPayload, bytes memory proof) = abi.decode(ccvData, (bytes, bytes));
+    bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);
+    if (versionPrefix != VERSION_TAG_V1_7_0) {
+      revert InvalidCCVVersion(VERSION_TAG_V1_7_0, versionPrefix);
+    }
+
+    uint256 rawPayloadLength = uint16(bytes2(ccvData[VERSION_TAG_SIZE:PAYLOAD_START_INDEX]));
+    bytes calldata rawPayload = ccvData[PAYLOAD_START_INDEX:PAYLOAD_START_INDEX + rawPayloadLength];
+
+    uint256 proofDataStartIndex = PAYLOAD_START_INDEX + rawPayloadLength;
+
+    uint256 proofLength = uint16(bytes2(ccvData[proofDataStartIndex:proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE]));
+    uint256 proofStartIndex = proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE;
+    bytes calldata proof = ccvData[proofStartIndex:proofStartIndex + proofLength];
 
     (, bool executed, bytes memory bridgedMessage) = IMailbox(i_bridge.mailbox()).deliverAndHandle(rawPayload, proof);
     if (!executed) {
       revert ExecutionError();
     }
     // The bridged message is expected to be the version tag and message id.
-    if (bridgedMessage.length != 36) {
-      revert InvalidMessageLength(36, bridgedMessage.length);
+    if (bridgedMessage.length != BRIDGED_MESSAGE_SIZE) {
+      revert InvalidMessageLength(BRIDGED_MESSAGE_SIZE, bridgedMessage.length);
     }
     bytes4 version;
     bytes32 returnedMessageId;

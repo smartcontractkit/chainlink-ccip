@@ -25,6 +25,7 @@ contract MockLombardBridge is IBridgeV2 {
     s_mailbox = mailbox_;
   }
 
+  // solhint-disable-next-line func-name-mixedcase
   function MSG_VERSION() external pure override returns (uint8) {
     return 1;
   }

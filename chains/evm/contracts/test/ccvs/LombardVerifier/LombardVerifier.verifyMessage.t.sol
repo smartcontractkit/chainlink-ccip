@@ -9,12 +9,20 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 
 contract LombardVerifier_verifyMessage is LombardVerifierSetup {
+  /// @dev Encodes ccvData in the raw bytes format:
+  /// [versionTag (4 bytes)][rawPayloadLength (2 bytes)][rawPayload][proofLength (2 bytes)][proof]
+  function _encodeCcvData(bytes memory rawPayload, bytes memory proof) internal pure returns (bytes memory) {
+    return bytes.concat(
+      VERSION_TAG_V1_7_0, bytes2(uint16(rawPayload.length)), rawPayload, bytes2(uint16(proof.length)), proof
+    );
+  }
+
   function test_verifyMessage() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));
 
-    // Proofs are not used.
-    bytes memory ccvData = abi.encode("", "");
+    // Proofs are not used. Using raw bytes format.
+    bytes memory ccvData = _encodeCcvData("", "");
 
     vm.startPrank(s_onRamp);
 
@@ -42,7 +50,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       abi.encodeWithSelector(LombardVerifier.InvalidMessageId.selector, keccak256("messageId"), messageId)
     );
     s_lombardVerifier.verifyMessage(
-      message, keccak256("messageId"), abi.encode(abi.encodePacked("", bytes32(uint256(0x01))), "")
+      message, keccak256("messageId"), _encodeCcvData(abi.encodePacked("", bytes32(uint256(0x01))), "")
     );
   }
 
@@ -58,7 +66,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     vm.startPrank(s_offRamp);
 
     vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageLength.selector, 36, shortMessageId.length));
-    s_lombardVerifier.verifyMessage(message, messageId, abi.encode("", ""));
+    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData("", ""));
   }
 
   function test_verifyMessage_RevertWhen_CallerIsNotOffRamp() public {
@@ -74,7 +82,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     vm.startPrank(invalidCaller);
 
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CallerIsNotARampOnRouter.selector, invalidCaller));
-    s_lombardVerifier.verifyMessage(message, bytes32(0), "");
+    // Empty ccvData still needs valid format for parsing (though it will fail before parsing).
+    s_lombardVerifier.verifyMessage(message, bytes32(0), _encodeCcvData("", ""));
   }
 
   function test_verifyMessage_RevertWhen_ExecutionError() public {
@@ -84,6 +93,6 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     vm.startPrank(s_offRamp);
 
     vm.expectRevert(abi.encodeWithSelector(LombardVerifier.ExecutionError.selector));
-    s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), abi.encode("", ""));
+    s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), _encodeCcvData("", ""));
   }
 }
