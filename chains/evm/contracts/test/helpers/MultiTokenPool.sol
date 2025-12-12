@@ -30,9 +30,7 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
   error InvalidSourcePoolAddress(bytes sourcePoolAddress);
   error InvalidToken(address token);
 
-  event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
-  event Released(address indexed sender, address indexed recipient, uint256 amount);
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
   event ChainAdded(
     uint64 remoteChainSelector,

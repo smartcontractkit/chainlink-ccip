@@ -5,7 +5,6 @@ import {Client} from "../../../libraries/Client.sol";
 import {EtherSenderReceiverTestSetup} from "./EtherSenderReceiverTestSetup.t.sol";
 
 contract EtherSenderReceiverTest_validateFeeToken is EtherSenderReceiverTestSetup {
-  error InsufficientMsgValue(uint256 gotAmount, uint256 msgValue);
   error TokenAmountNotEqualToMsgValue(uint256 gotAmount, uint256 msgValue);
 
   function test_validateFeeToken_valid_native() public {

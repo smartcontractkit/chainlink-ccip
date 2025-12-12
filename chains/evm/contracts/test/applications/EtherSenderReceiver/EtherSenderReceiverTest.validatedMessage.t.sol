@@ -5,10 +5,7 @@ import {Client} from "../../../libraries/Client.sol";
 import {EtherSenderReceiverTestSetup} from "./EtherSenderReceiverTestSetup.t.sol";
 
 contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTestSetup {
-  error InvalidDestinationReceiver(bytes destReceiver);
   error InvalidTokenAmounts(uint256 gotAmounts);
-  error InvalidWethAddress(address want, address got);
-  error GasLimitTooLow(uint256 minLimit, uint256 gotLimit);
 
   function testFuzz_validatedMessage_msgSenderOverwrite(
     bytes memory data
