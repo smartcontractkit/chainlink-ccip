@@ -2,6 +2,7 @@ package operations
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -28,6 +29,11 @@ var (
 	EXECUTOR_ROLE     = Role{
 		ID:   evmutils.MustHash(EXECUTOR_ROLE_STR),
 		Name: EXECUTOR_ROLE_STR,
+	}
+	ADMIN_ROLE_STR = "ADMIN_ROLE"
+	ADMIN_ROLE     = Role{
+		ID:   evmutils.MustHash(ADMIN_ROLE_STR),
+		Name: ADMIN_ROLE_STR,
 	}
 )
 
@@ -59,6 +65,10 @@ type OpDeployCallProxyInput struct {
 type OpGrantRoleTimelockInput struct {
 	Account common.Address `json:"account"`
 	RoleID  [32]byte       `json:"roleID"`
+}
+
+type OpRenounceRoleTimelockInput struct {
+	RoleID [32]byte `json:"roleID"`
 }
 
 type OpTransferOwnershipInput struct {
@@ -188,6 +198,9 @@ var OpGrantRoleTimelock = contract.NewWrite(contract.WriteParams[OpGrantRoleTime
 		return contract.HasRole(opts, roleAdmin, caller)
 	},
 	Validate: func(input OpGrantRoleTimelockInput) error {
+		if len(input.RoleID) == 0 {
+			return errors.New("role id cannot be empty")
+		}
 		if input.Account == (common.Address{}) {
 			return utils.ErrZeroAddress
 		}
@@ -195,6 +208,32 @@ var OpGrantRoleTimelock = contract.NewWrite(contract.WriteParams[OpGrantRoleTime
 	},
 	CallContract: func(timelock *bindings.RBACTimelock, opts *bind.TransactOpts, input OpGrantRoleTimelockInput) (*types.Transaction, error) {
 		return timelock.GrantRole(opts, input.RoleID, input.Account)
+	},
+})
+
+var OpRenounceRoleTimelock = contract.NewWrite(contract.WriteParams[OpRenounceRoleTimelockInput, *bindings.RBACTimelock]{
+	Name:         "evm-timelock-renounce-role",
+	Version:      semver.MustParse("1.0.0"),
+	Description:  "Renounces role of the caller key on the deployed Timelock contract",
+	ContractABI:  bindings.RBACTimelockABI,
+	ContractType: "RBACTimelock",
+	NewContract:  bindings.NewRBACTimelock,
+	IsAllowedCaller: func(contract *bindings.RBACTimelock, opts *bind.CallOpts, caller common.Address, input OpRenounceRoleTimelockInput) (bool, error) {
+		roleAdmin, err := contract.GetRoleAdmin(opts, input.RoleID)
+		if err != nil {
+			return false, err
+		}
+		// Check if caller has admin role of the role being granted
+		return contract.HasRole(opts, roleAdmin, caller)
+	},
+	Validate: func(input OpRenounceRoleTimelockInput) error {
+		if len(input.RoleID) == 0 {
+			return errors.New("role id cannot be empty")
+		}
+		return nil
+	},
+	CallContract: func(timelock *bindings.RBACTimelock, opts *bind.TransactOpts, input OpRenounceRoleTimelockInput) (*types.Transaction, error) {
+		return timelock.RenounceRole(opts, input.RoleID, opts.From)
 	},
 })
 
