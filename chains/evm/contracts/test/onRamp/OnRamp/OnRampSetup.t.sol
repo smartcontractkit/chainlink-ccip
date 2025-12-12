@@ -34,6 +34,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   address internal s_defaultCCV;
   address internal s_defaultExecutor;
 
+  mapping(address token => bytes extraData) internal s_extraDataByToken;
+
   function setUp() public virtual override {
     super.setUp();
 
@@ -128,6 +130,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     (receipts, messageV1.executionGasLimit,) =
       s_onRamp.getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
+    // Because getReceipts uses msg.sender to set the Router, we must override it here.
+    receipts[receipts.length - 1].issuer = address(s_sourceRouter);
+
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
       MessageV1Codec._encodeMessageV1(messageV1),
@@ -185,7 +190,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         sourceTokenAddress: abi.encodePacked(token),
         destTokenAddress: abi.encodePacked(s_destTokenBySourceToken[token]),
         tokenReceiver: abi.encodePacked(abi.decode(message.receiver, (address))),
-        extraData: abi.encode(IERC20Metadata(token).decimals())
+        extraData: s_extraDataByToken[token].length != 0
+          ? s_extraDataByToken[token]
+          : abi.encode(IERC20Metadata(token).decimals())
       });
     }
   }
