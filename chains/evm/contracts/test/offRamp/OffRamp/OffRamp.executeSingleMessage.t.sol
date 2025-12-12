@@ -208,6 +208,54 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
   }
 
+  function test_executeSingleMessage_RevertWhen_InvalidDestTokenAddressLength() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    bytes memory invalidDestToken = new bytes(19); // not 20 bytes
+
+    MessageV1Codec.TokenTransferV1[] memory transfers = new MessageV1Codec.TokenTransferV1[](1);
+    transfers[0] = MessageV1Codec.TokenTransferV1({
+      amount: 1,
+      sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
+      sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
+      destTokenAddress: invalidDestToken,
+      tokenReceiver: abi.encodePacked(makeAddr("receiver")),
+      extraData: ""
+    });
+    message.tokenTransfer = transfers;
+
+    bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
+    address[] memory ccvs = _arrayOf(s_defaultCCV);
+    bytes[] memory verifierResults = new bytes[](1);
+
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidDestToken));
+
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
+  }
+
+  function test_executeSingleMessage_RevertWhen_InvalidTokenReceiverLength() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    bytes memory invalidTokenReceiver = new bytes(21); // not 20 bytes
+
+    MessageV1Codec.TokenTransferV1[] memory transfers = new MessageV1Codec.TokenTransferV1[](1);
+    transfers[0] = MessageV1Codec.TokenTransferV1({
+      amount: 1,
+      sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
+      sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
+      destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      tokenReceiver: invalidTokenReceiver,
+      extraData: ""
+    });
+    message.tokenTransfer = transfers;
+
+    bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
+    address[] memory ccvs = _arrayOf(s_defaultCCV);
+    bytes[] memory verifierResults = new bytes[](1);
+
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidTokenReceiver));
+
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
+  }
+
   function test_executeSingleMessage_RevertWhen_OptionalCCVQuorumNotReached() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     address receiver = address(bytes20(message.receiver));
