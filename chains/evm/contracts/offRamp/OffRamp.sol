@@ -38,12 +38,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
   error InvalidVerifierResultsLength(uint256 expected, uint256 got);
-  error InvalidNewState(uint64 sourceChainSelector, uint64 messageNumber, Internal.MessageExecutionState newState);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
   error InsufficientGasToCompleteTx(bytes4 err);
   error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 messageNumber);
-  error InvalidVerifierSelector(bytes4 selector);
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV);
   error InvalidNumberOfTokens(uint256 numTokens);

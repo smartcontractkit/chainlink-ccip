@@ -42,7 +42,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   error InvalidDestChainConfig(uint64 destChainSelector);
   error ReentrancyGuardReentrantCall();
-  error InvalidOptionalCCVThreshold();
   error DestinationChainNotSupported(uint64 destChainSelector);
   error InvalidDestChainAddress(bytes destChainAddress);
   error CustomBlockConfirmationNotSupportedOnPoolV1();

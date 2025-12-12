@@ -58,7 +58,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   error InvalidDestinationDomain(uint32 expected, uint32 got);
   error InvalidReceiver(bytes receiver);
   error InvalidTransmitterInProxy();
-  error InvalidPreviousPool();
   error InvalidMessageLength(uint256 length);
 
   // This data is supplied from offchain and contains everything needed to mint the USDC tokens on the destination chain
