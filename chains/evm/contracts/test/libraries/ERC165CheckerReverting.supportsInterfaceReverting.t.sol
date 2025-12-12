@@ -15,8 +15,6 @@ contract ERC165CheckerReverting_supportsInterfaceReverting is Test {
 
   bytes4 internal constant EXAMPLE_INTERFACE_ID = 0xdeadbeef;
 
-  error InsufficientGasForStaticCall();
-
   constructor() {
     s_receiver = address(new MaybeRevertMessageReceiver(false));
   }
@@ -28,7 +26,7 @@ contract ERC165CheckerReverting_supportsInterfaceReverting is Test {
   // Reverts
 
   function test__supportsInterfaceReverting_RevertWhen_NotEnoughGasForSupportsInterface() public {
-    vm.expectRevert(InsufficientGasForStaticCall.selector);
+    vm.expectRevert(ERC165CheckerReverting.InsufficientGasForStaticCall.selector);
 
     // Library calls cannot be called with gas limit overrides, so a public function must be exposed
     // instead which can proxy the call to the library.

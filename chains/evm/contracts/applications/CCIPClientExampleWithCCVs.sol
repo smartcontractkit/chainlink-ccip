@@ -19,7 +19,6 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
   event CCVConfigSet(
     uint64 indexed sourceChainSelector, address[] requiredCCVs, address[] optionalCCVs, uint8 optionalThreshold
   );
-  event CCVConfigRemoved(uint64 indexed sourceChainSelector);
 
   /// @notice CCV configuration for a source chain.
   /// @dev For incoming messages, this receiver will require this CCV criteria to be met.
