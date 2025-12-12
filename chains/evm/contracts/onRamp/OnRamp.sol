@@ -222,7 +222,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       onRampAddress: abi.encodePacked(address(this)),
       offRampAddress: destChainConfig.offRamp,
       sender: abi.encodePacked(originalSender),
-      receiver: validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
+      receiver: _validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
       // Executor args hold security critical execution args, like Solana accounts or Sui object IDs. Because of this,
       // they have to part of the message that is signed off on by the verifiers.
       destBlob: resolvedExtraArgs.executorArgs,
@@ -423,28 +423,48 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function validateDestChainAddress(
     bytes calldata rawAddress,
     uint8 addressBytesLength
-  ) public pure returns (bytes memory validatedAddress) {
-    if (addressBytesLength < 32) {
-      // We have to account for padding as traditionally EVM addresses have been provided abi encoded.
-      if (rawAddress.length > 32) {
-        // If the expected length is smaller than 32 but the provided address is larger than 32, not even abi encoding
-        // can explain the difference. The address is invalid for this chain.
-        revert InvalidDestChainAddress(rawAddress);
-      }
-      if (rawAddress.length == 32) {
-        // abi encoding can explain this, now we need to check if the first (32 - addressBytesLength) bytes are zero. If
-        // so, we strip them and return the unencoded address.
-        if (bytes32(rawAddress[0:(32 - addressBytesLength)]) != bytes32(0)) {
+  ) external pure returns (bytes memory) {
+    return _validateDestChainAddress(rawAddress, addressBytesLength);
+  }
+
+  /// @notice Validates a destination-chain address and strips leading ABI padding for sub-32-byte addresses.
+  /// @dev Assumes `addressBytesLength < 32` only in the padded branch; otherwise length must match exactly.
+  /// @param rawAddress The address bytes (may be 32-byte ABI-encoded or exact-length raw bytes).
+  /// @param addressBytesLength The expected address length on the destination chain.
+  /// @return validatedAddress The validated address with any leading padding removed.
+  function _validateDestChainAddress(
+    bytes memory rawAddress,
+    uint256 addressBytesLength
+  ) internal pure returns (bytes memory validatedAddress) {
+    // unchecked: addressBytesLength < 32 bounds all arithmetic.
+    unchecked {
+      uint256 len = rawAddress.length;
+      if (addressBytesLength < 32 && len == 32) {
+        uint256 word;
+        // assembly equivalent: word = uint256(bytes32(rawAddress));
+        assembly {
+          word := mload(add(rawAddress, 32))
+        }
+        // Shift out the actual address bytes; any residue means non-zero padding.
+        if (word >> (addressBytesLength * 8) != 0) {
           revert InvalidDestChainAddress(rawAddress);
         }
-        return rawAddress[(32 - addressBytesLength):];
+        validatedAddress = new bytes(addressBytesLength);
+        // assembly equivalent:
+        //  uint256 offset = 32 - addressBytesLength;
+        //  for (uint256 i = 0; i < addressBytesLength; ++i) {
+        //    validatedAddress[i] = rawAddress[offset + i];
+        //  }
+        assembly {
+          let shift := mul(sub(32, addressBytesLength), 8)
+          mstore(add(validatedAddress, 32), shl(shift, word))
+        }
+        return validatedAddress;
       }
-      // If the rawAddress is smaller than 32 bytes we assume there's no padding involved and we fall back to the
-      // general check below that ensures the length must match exactly.
-    }
 
-    if (rawAddress.length != addressBytesLength) {
-      revert InvalidDestChainAddress(rawAddress);
+      if (len != addressBytesLength) {
+        revert InvalidDestChainAddress(rawAddress);
+      }
     }
     return rawAddress;
   }
@@ -463,9 +483,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     if (extraArgs.length >= 4 && bytes4(extraArgs[:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
 
-      if (resolvedArgs.tokenReceiver.length != 0) {
-        this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
-      }
+      resolvedArgs.tokenReceiver = resolvedArgs.tokenReceiver.length != 0
+        ? _validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength)
+        : resolvedArgs.tokenReceiver;
 
       // We need to ensure no duplicate CCVs are present in the ccv list.
       uint256 length = resolvedArgs.ccvs.length;
@@ -683,7 +703,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       amount: destTokenAmount,
       sourcePoolAddress: abi.encodePacked(address(sourcePool)),
       sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
-      destTokenAddress: this.validateDestChainAddress(
+      destTokenAddress: _validateDestChainAddress(
         poolReturnData.destTokenAddress, s_destChainConfigs[destChainSelector].addressBytesLength
       ),
       tokenReceiver: receiver,

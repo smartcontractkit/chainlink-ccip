@@ -78,6 +78,38 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     assertEq(addressBytesLength, validated.length);
   }
 
+  function testFuzz_validateDestChainAddress_FastPathReturnsSame(
+    bytes memory rawAddress
+  ) public view {
+    vm.assume(rawAddress.length > 0 && rawAddress.length < 64);
+
+    uint8 addressBytesLength = uint8(rawAddress.length);
+    bytes memory validated = s_OnRampHelper.validateDestChainAddress(rawAddress, addressBytesLength);
+
+    assertEq(rawAddress, validated);
+  }
+
+  function testFuzz_validateDestChainAddress_Padded_NoOverflow(uint8 addressBytesLength, bytes32 tail) public view {
+    addressBytesLength = uint8(bound(addressBytesLength, 0, 32));
+
+    bytes memory padded = new bytes(32);
+    bytes memory tailBytes = abi.encodePacked(tail);
+    if (addressBytesLength != 0) {
+      uint256 offset = 32 - addressBytesLength;
+      for (uint256 i = 0; i < addressBytesLength; ++i) {
+        padded[offset + i] = tailBytes[offset + i];
+      }
+    }
+
+    bytes memory expected = new bytes(addressBytesLength);
+    for (uint256 i = 0; i < addressBytesLength; ++i) {
+      expected[i] = tailBytes[32 - addressBytesLength + i];
+    }
+
+    bytes memory validated = s_OnRampHelper.validateDestChainAddress(padded, addressBytesLength);
+    assertEq(validated, expected);
+  }
+
   // Reverts
 
   function test_validateDestChainAddress_RevertWhen_NonZeroPadding() public {
@@ -116,5 +148,35 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, rawAddress));
     s_OnRampHelper.validateDestChainAddress(rawAddress, addressBytesLength);
+  }
+
+  function testFuzz_validateDestChainAddress_RevertWhen_PaddedHighBitsNonZero(
+    uint8 addressBytesLength,
+    bytes32 tail
+  ) public {
+    addressBytesLength = uint8(bound(addressBytesLength, 1, 31));
+
+    bytes memory padded = new bytes(32);
+    // Force non-zero padding byte.
+    padded[0] = 0x01;
+    uint256 offset = 32 - addressBytesLength;
+    for (uint256 i = 0; i < addressBytesLength; ++i) {
+      padded[offset + i] = tail[i];
+    }
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, padded));
+    s_OnRampHelper.validateDestChainAddress(padded, addressBytesLength);
+  }
+
+  function test_validateDestChainAddress_RevertWhen_AddressBytesLengthGt32() public {
+    bytes memory rawAddress = new bytes(32);
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, rawAddress));
+    s_OnRampHelper.validateDestChainAddress(rawAddress, 33);
+  }
+
+  function test_validateDestChainAddress_RevertWhen_MismatchAndLengthAbove31() public {
+    bytes memory rawAddress = new bytes(33);
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, rawAddress));
+    s_OnRampHelper.validateDestChainAddress(rawAddress, 32);
   }
 }
