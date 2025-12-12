@@ -428,7 +428,12 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 			"sourceChainSelectors", sourceChainSelectors,
 		)
 	}
-	c.lggr.Debugw("Batch refreshed configs via chainAccessor", "chain", chainSel, "latency", time.Since(start))
+	c.lggr.Debugw("Batch refreshed configs via chainAccessor",
+		"chain", chainSel,
+		"latency", time.Since(start),
+		"chainConfigSnapshot", chainConfigSnapshot,
+		"sourceChainConfigs", sourceChainConfigs,
+	)
 	return nil
 }
 
