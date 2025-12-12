@@ -28,13 +28,10 @@ import (
 
 var (
 	AccessControllerProgramName = "access_controller"
-	AccessControllerProgramSize = 1 * 1024 * 1024
 
 	TimelockProgramName = "timelock"
-	TimelockProgramSize = 1 * 1024 * 1024
 
 	McmProgramName = "mcm"
-	McmProgramSize = 1 * 1024 * 1024
 )
 
 var AccessControllerDeploy = operations.NewOperation(
@@ -49,8 +46,7 @@ var AccessControllerDeploy = operations.NewOperation(
 			utils.AccessControllerProgramType,
 			common_utils.Version_1_6_0,
 			"",
-			AccessControllerProgramName,
-			AccessControllerProgramSize)
+			AccessControllerProgramName)
 	},
 )
 
@@ -66,8 +62,7 @@ var TimelockDeploy = operations.NewOperation(
 			utils.TimelockProgramType,
 			common_utils.Version_1_6_0,
 			"",
-			TimelockProgramName,
-			TimelockProgramSize)
+			TimelockProgramName)
 	},
 )
 
@@ -83,8 +78,7 @@ var McmDeploy = operations.NewOperation(
 			utils.McmProgramType,
 			common_utils.Version_1_6_0,
 			"",
-			McmProgramName,
-			McmProgramSize)
+			McmProgramName)
 	},
 )
 

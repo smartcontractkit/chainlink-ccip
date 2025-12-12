@@ -27,6 +27,10 @@ func (ma *productTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Environm
 	return []byte{}, nil
 }
 
+func (ma *productTest_MockTokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
 func TestRegisterTokenAdapter(t *testing.T) {
 	tests := []struct {
 		desc         string
@@ -39,33 +43,33 @@ func TestRegisterTokenAdapter(t *testing.T) {
 		{
 			desc:         "registering two adapters with different chain families succeeds",
 			chainFamily1: "evm",
-			version1:     semver.MustParse("1.0.0"),
+			version1:     semver.MustParse("1.0.1"),
 			chainFamily2: "solana",
-			version2:     semver.MustParse("1.0.0"),
+			version2:     semver.MustParse("1.0.1"),
 			expectedErr:  "",
 		},
 		{
 			desc:         "registering two adapters with different versions succeeds",
 			chainFamily1: "evm",
-			version1:     semver.MustParse("1.0.0"),
+			version1:     semver.MustParse("1.0.2"),
 			chainFamily2: "evm",
-			version2:     semver.MustParse("2.0.0"),
+			version2:     semver.MustParse("2.0.2"),
 			expectedErr:  "",
 		},
 		{
 			desc:         "registering two adapters with same chain family and version fails",
 			chainFamily1: "evm",
-			version1:     semver.MustParse("1.0.0"),
+			version1:     semver.MustParse("1.0.3"),
 			chainFamily2: "evm",
-			version2:     semver.MustParse("1.0.0"),
-			expectedErr:  "TokenAdapter 'evm 1.0.0' already registered",
+			version2:     semver.MustParse("1.0.3"),
+			expectedErr:  "TokenAdapter 'evm 1.0.3' already registered",
 		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
-			registry := tokens.NewTokenAdapterRegistry()
+			registry := tokens.GetTokenAdapterRegistry()
 
 			// First registration should always succeed
 			require.NotPanics(t, func() {

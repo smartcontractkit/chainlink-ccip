@@ -50,7 +50,7 @@ func (m *MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, _ mcm
 	}, nil
 }
 
-var transfersTest_NewTokenAdapterRegistry = tokens.NewTokenAdapterRegistry()
+var transfersTest_NewTokenAdapterRegistry = tokens.GetTokenAdapterRegistry()
 
 type transfersTest_MockTokenAdapter struct {
 	errorMsg            string
@@ -121,6 +121,10 @@ func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Enviro
 		return nil, errors.New(ma.deriveTokenErrorMsg)
 	}
 	return []byte("mocked-remote-token-address"), nil
+}
+
+func (ma *transfersTest_MockTokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
 var basicMCMSInput = mcms.Input{
@@ -538,19 +542,18 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 	// Register MCMS reader
 	mcmsRegistry := changesets.GetRegistry()
 	mcmsRegistry.RegisterMCMSReader("evm", &MockReader{})
+	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
+	mockAdapter := &transfersTest_MockTokenAdapter{}
+	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.0.0"), mockAdapter)
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
 			// Register token adapter with appropriate error condition
-			tokenAdapterRegistry := tokens.NewTokenAdapterRegistry()
-			mockAdapter := &transfersTest_MockTokenAdapter{}
 
 			// Set error conditions for specific test cases
 			mockAdapter.deriveTokenErrorMsg = tt.expectedTokenDerivationErrorMsg
 			mockAdapter.sequenceErrorMsg = tt.expectedSequenceErrorMsg
-
-			tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.0.0"), mockAdapter)
 
 			// Create environment with datastore
 			ds := tt.makeDataStore(t)

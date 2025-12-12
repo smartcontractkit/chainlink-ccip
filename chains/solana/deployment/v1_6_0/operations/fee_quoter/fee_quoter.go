@@ -21,7 +21,6 @@ import (
 var (
 	ContractType cldf_deployment.ContractType = "FeeQuoter"
 	ProgramName                               = "fee_quoter"
-	ProgramSize                               = 5 * 1024 * 1024
 	Version      *semver.Version              = semver.MustParse("1.6.0")
 )
 
@@ -44,8 +43,7 @@ var Deploy = operations.NewOperation(
 			ContractType,
 			Version,
 			"",
-			ProgramName,
-			ProgramSize)
+			ProgramName)
 	},
 )
 

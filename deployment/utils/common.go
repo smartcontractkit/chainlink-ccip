@@ -21,6 +21,11 @@ const (
 	CapabilitiesRegistry       cldf.ContractType = "CapabilitiesRegistry"
 	CCIPHome                   cldf.ContractType = "CCIPHome"
 	RMNHome                    cldf.ContractType = "RMNHome"
+	BurnMintTokenPool          cldf.ContractType = "BurnMintTokenPool"
+	LockReleaseTokenPool       cldf.ContractType = "LockReleaseTokenPool"
+	TokenPoolLookupTable       cldf.ContractType = "TokenPoolLookupTable"
+	BurnWithFromMintTokenPool  cldf.ContractType = "BurnWithFromMintTokenPool"
+	BurnFromMintTokenPool      cldf.ContractType = "BurnFromMintTokenPool"
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"
 	RMNTimelockQualifier = "RMNMCMS"

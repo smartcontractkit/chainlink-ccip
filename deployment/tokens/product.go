@@ -26,6 +26,9 @@ type TokenAdapter interface {
 	// DeriveTokenAddress derives the token address (in bytes) from the given token pool reference.
 	// For example, if this address is stored on the pool, this method should fetch it.
 	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
+	// ManualRegistration manually registers a customer token with the token admin registry.
+	// This is usally done as they no longer have mint authority over the token.
+	ManualRegistration() *cldf_ops.Sequence[ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
@@ -75,7 +78,7 @@ type TokenAdapterRegistry struct {
 	m  map[tokenAdapterID]TokenAdapter
 }
 
-func NewTokenAdapterRegistry() *TokenAdapterRegistry {
+func newTokenAdapterRegistry() *TokenAdapterRegistry {
 	return &TokenAdapterRegistry{
 		m: make(map[tokenAdapterID]TokenAdapter),
 	}
@@ -104,6 +107,20 @@ func (r *TokenAdapterRegistry) GetTokenAdapter(chainFamily string, version *semv
 	defer r.mu.Unlock()
 	adapter, ok := r.m[id]
 	return adapter, ok
+}
+
+var (
+	singletonRegistry *TokenAdapterRegistry
+	once              sync.Once
+)
+
+// GetTokenAdapterRegistry returns the global singleton instance.
+// The first call creates the registry; subsequent calls return the same pointer.
+func GetTokenAdapterRegistry() *TokenAdapterRegistry {
+	once.Do(func() {
+		singletonRegistry = newTokenAdapterRegistry()
+	})
+	return singletonRegistry
 }
 
 func newTokenAdapterID(chainFamily string, version *semver.Version) tokenAdapterID {
