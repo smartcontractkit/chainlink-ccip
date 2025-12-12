@@ -80,6 +80,13 @@ func GetCurseRegistry() *CurseRegistry {
 	return singletonCurseRegistry
 }
 
+func (c *CurseRegistry) IsFamilyRegistered(family string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, exists := c.CurseSubjects[family]
+	return exists
+}
+
 func (c *CurseRegistry) RegisterNewCurse(
 	in CurseRegistryInput,
 ) {
