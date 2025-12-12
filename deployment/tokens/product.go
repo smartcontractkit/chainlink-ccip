@@ -19,6 +19,7 @@ type tokenAdapterID string
 type TokenAdapter interface {
 	// ConfigureTokenForTransfersSequence returns a sequence that configures a token pool for cross-chain transfers.
 	// The sequence should target a single chain, performing anything required on that chain to enable the token for CCIP transfers.
+	// This assumes that the token and token pool are already deployed and registered on-chain.
 	ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
 	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
@@ -29,6 +30,11 @@ type TokenAdapter interface {
 	// ManualRegistration manually registers a customer token with the token admin registry.
 	// This is usally done as they no longer have mint authority over the token.
 	ManualRegistration() *cldf_ops.Sequence[ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	RegisterToken() *cldf_ops.Sequence[RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SetPool() *cldf_ops.Sequence[SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
