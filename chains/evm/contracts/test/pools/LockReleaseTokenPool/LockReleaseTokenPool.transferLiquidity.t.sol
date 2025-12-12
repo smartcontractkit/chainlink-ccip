@@ -46,7 +46,7 @@ contract LockReleaseTokenPool_transferLiquidity is LockReleaseTokenPoolSetup {
 
     s_oldLockReleaseTokenPool.setRebalancer(address(s_lockReleaseTokenPool));
 
-    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.InsufficientBalance.selector, s_amount + 1, s_amount));
+    vm.expectRevert(LockReleaseTokenPool.InsufficientLiquidity.selector);
     s_lockReleaseTokenPool.transferLiquidity(address(s_oldLockReleaseTokenPool), s_amount + 1);
 
     assertEq(s_token.balanceOf(address(s_lockReleaseTokenPool)), balancePre);
