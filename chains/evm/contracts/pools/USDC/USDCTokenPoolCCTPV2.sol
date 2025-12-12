@@ -21,7 +21,6 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   error InvalidMinFinalityThreshold(uint32 expected, uint32 got);
   error InvalidExecutionFinalityThreshold(uint32 expected, uint32 got);
   error InvalidDepositHash(bytes32 expected, bytes32 got);
-  error InvalidBurnToken(address expected, address got);
 
   /// @dev CCTP's max fee is based on the use of fast-burn. Since this pool does not utilize that feature, max fee should be 0.
   uint32 public constant MAX_FEE = 0;

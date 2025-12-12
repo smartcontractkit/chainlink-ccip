@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {EtherSenderReceiver} from "../../../applications/EtherSenderReceiver.sol";
 import {Client} from "../../../libraries/Client.sol";
 
 import {EtherSenderReceiverTestSetup} from "./EtherSenderReceiverTestSetup.t.sol";
@@ -8,9 +9,6 @@ import {EtherSenderReceiverTestSetup} from "./EtherSenderReceiverTestSetup.t.sol
 contract EtherSenderReceiverTest_ccipReceive is EtherSenderReceiverTestSetup {
   uint64 internal constant SOURCE_CHAIN_SELECTOR = 424242;
   address internal constant XCHAIN_SENDER = 0x9951529C13B01E542f7eE3b6D6665D292e9BA2E0;
-
-  error InvalidTokenAmounts(uint256 gotAmounts);
-  error InvalidToken(address gotToken, address expectedToken);
 
   function testFuzz_ccipReceive(
     uint256 tokenAmount
@@ -93,7 +91,7 @@ contract EtherSenderReceiverTest_ccipReceive is EtherSenderReceiverTestSetup {
       destTokenAmounts: destTokenAmounts
     });
 
-    vm.expectRevert(abi.encodeWithSelector(InvalidTokenAmounts.selector, uint256(2)));
+    vm.expectRevert(abi.encodeWithSelector(EtherSenderReceiver.InvalidTokenAmounts.selector, uint256(2)));
     s_etherSenderReceiver.publicCcipReceive(message);
   }
 
@@ -108,7 +106,9 @@ contract EtherSenderReceiverTest_ccipReceive is EtherSenderReceiverTestSetup {
       destTokenAmounts: destTokenAmounts
     });
 
-    vm.expectRevert(abi.encodeWithSelector(InvalidToken.selector, address(s_someOtherWeth), address(s_weth)));
+    vm.expectRevert(
+      abi.encodeWithSelector(EtherSenderReceiver.InvalidToken.selector, address(s_someOtherWeth), address(s_weth))
+    );
     s_etherSenderReceiver.publicCcipReceive(message);
   }
 }
