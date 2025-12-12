@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {EtherSenderReceiver} from "../../../applications/EtherSenderReceiver.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {EtherSenderReceiverTestSetup} from "./EtherSenderReceiverTestSetup.t.sol";
 
 contract EtherSenderReceiverTest_validateFeeToken is EtherSenderReceiverTestSetup {
-  error TokenAmountNotEqualToMsgValue(uint256 gotAmount, uint256 msgValue);
-
   function test_validateFeeToken_valid_native() public {
     Client.EVMTokenAmount[] memory tokenAmount = new Client.EVMTokenAmount[](1);
     tokenAmount[0] = Client.EVMTokenAmount({token: address(s_weth), amount: AMOUNT});
@@ -46,7 +45,9 @@ contract EtherSenderReceiverTest_validateFeeToken is EtherSenderReceiverTestSetu
       extraArgs: ""
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenAmountNotEqualToMsgValue.selector, AMOUNT, AMOUNT + 1));
+    vm.expectRevert(
+      abi.encodeWithSelector(EtherSenderReceiver.TokenAmountNotEqualToMsgValue.selector, AMOUNT, AMOUNT + 1)
+    );
     s_etherSenderReceiver.validateFeeToken{value: AMOUNT + 1}(message);
   }
 }
