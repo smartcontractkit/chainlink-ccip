@@ -102,6 +102,13 @@ var InitMCMOp = operations.NewOperation(
 	initMCM,
 )
 
+var ConfigureMCMOp = operations.NewOperation(
+	"configure-mcm-program",
+	common_utils.Version_1_6_0,
+	"Configures MCMProgram for solana",
+	configureMCM,
+)
+
 var InitTimelockOp = operations.NewOperation(
 	"init-timelock-program",
 	common_utils.Version_1_6_0,
@@ -150,6 +157,7 @@ type (
 		ChainSel     uint64
 		MCM          solana.PublicKey
 		Qualifier    string
+		Configure    bool
 	}
 
 	InitTimelockInput struct {
@@ -336,45 +344,6 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error)
 		batches = append(batches, batch)
 	}
 
-	encodedAddress := mcms_solana.ContractAddress(in.MCM, mcms_solana.PDASeed(seed))
-	upgradeAuthority, err := utils.GetUpgradeAuthority(deps.Chain.Client, in.MCM)
-	if err != nil {
-		return MCMOutput{}, fmt.Errorf("failed to get upgrade authority: %w", err)
-	}
-
-	var configurer *mcms_solana.Configurer
-	if len(ixns) > 0 {
-		configurer = mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()), mcms_solana.WithDoNotSendInstructionsOnChain())
-	} else {
-		configurer = mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()))
-	}
-	tx, err := configurer.SetConfig(b.GetContext(), encodedAddress, &in.MCMConfig, false)
-	if err != nil {
-		return MCMOutput{}, fmt.Errorf("failed to set config on mcm: %w", err)
-	}
-	if tx.Hash == "" {
-		instructions := tx.RawData.([]solana.Instruction)
-		// override authority to upgrade authority if different from deployer
-		for _, ixn := range instructions {
-			for _, account := range ixn.Accounts() {
-				if account.PublicKey == deps.Chain.DeployerKey.PublicKey() {
-					account.PublicKey = upgradeAuthority
-				}
-			}
-		}
-		batch, err := utils.BuildMCMSBatchOperation(
-			deps.Chain.Selector,
-			instructions,
-			in.MCM.String(),
-			in.ContractType.String(),
-		)
-		if err != nil {
-			return MCMOutput{}, fmt.Errorf("failed to build timelock initialization batch operation: %w", err)
-		}
-		batches = append(batches, batch)
-	}
-	b.Logger.Infow("called SetConfig on MCM", "transaction", tx.Hash)
-
 	return MCMOutput{
 		BatchOps: batches,
 		NewAddresses: []cldf_datastore.AddressRef{
@@ -396,6 +365,30 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error)
 				Version:       common_utils.Version_1_6_0,
 			},
 		}}, nil
+}
+
+func configureMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error) {
+	mcm.SetProgramID(in.MCM)
+	// Should be one of:
+	// BypasserSeed
+	// CancellerSeed
+	// ProposerSeed
+	ref := datastore.GetAddressRef(
+		deps.ExistingAddresses,
+		in.ChainSel,
+		in.ContractType,
+		common_utils.Version_1_6_0,
+		deps.Qualifier,
+	)
+	encodedAddress := mcms_solana.ContractAddress(in.MCM, mcms_solana.PDASeed([]byte(ref.Address)))
+
+	configurer := mcms_solana.NewConfigurer(deps.Chain.Client, *deps.Chain.DeployerKey, types.ChainSelector(deps.Chain.ChainSelector()))
+	tx, err := configurer.SetConfig(b.GetContext(), encodedAddress, &in.MCMConfig, false)
+	if err != nil {
+		return MCMOutput{}, fmt.Errorf("failed to set config on mcm: %w", err)
+	}
+	b.Logger.Infow("called SetConfig on MCM", "transaction", tx.Hash)
+	return MCMOutput{}, nil
 }
 
 func initializeMCM(b operations.Bundle, deps Deps, mcmProgram solana.PublicKey, multisigID state.PDASeed) ([]solana.Instruction, error) {
