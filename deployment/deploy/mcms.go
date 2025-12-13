@@ -77,7 +77,7 @@ func grantAdminRoleToTimelockVerify(_ *DeployerRegistry, _ *changesets.MCMSReade
 	}
 }
 
-func grantAdminRoleToTimelockApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, GrantAdminRoleToTimelockConfig) (cldf.ChangesetOutput, error) {
+func grantAdminRoleToTimelockApply(d *DeployerRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, GrantAdminRoleToTimelockConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg GrantAdminRoleToTimelockConfig) (cldf.ChangesetOutput, error) {
 		for selector, chainCfg := range cfg.Chains {
 			family, err := chain_selectors.GetSelectorFamily(selector)
