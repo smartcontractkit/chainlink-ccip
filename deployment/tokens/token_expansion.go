@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"math/big"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -18,24 +19,38 @@ type TokenExpansionInput struct {
 	RegisterTokenInputs     map[uint64]RegisterTokenInput     `yaml:"register-token-inputs" json:"registerTokenInputs"`
 	SetPoolInputs           map[uint64]SetPoolInput           `yaml:"set-pool-inputs" json:"setPoolInputs"`
 	UpdateAuthoritiesInputs map[uint64]UpdateAuthoritiesInput `yaml:"update-authorities-inputs" json:"updateAuthoritiesInputs"`
-	ExistingAddresses       []datastore.AddressRef
-	MCMS                    mcms.Input `yaml:"mcms,omitempty" json:"mcms,omitempty"`
+	MCMS                    mcms.Input                        `yaml:"mcms,omitempty" json:"mcms,omitempty"`
 }
 
 type DeployTokenInput struct {
-	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	Name     string            `yaml:"name" json:"name"`
+	Symbol   string            `yaml:"symbol" json:"symbol"`
+	Decimals uint8             `yaml:"decimals" json:"decimals"`
+	Supply   *big.Int          `yaml:"supply" json:"supply"`
+	// SPLToken, ERC20, etc.
+	Type     cldf.ContractType `yaml:"type" json:"type"`
+	// not specified by the user, filled in by the deployment system to pass to chain operations
+	ExistingAddresses []datastore.AddressRef
 }
 type DeployTokenPoolInput struct {
 	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	// not specified by the user, filled in by the deployment system to pass to chain operations
+	ExistingAddresses []datastore.AddressRef
 }
 type RegisterTokenInput struct {
 	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	// not specified by the user, filled in by the deployment system to pass to chain operations
+	ExistingAddresses []datastore.AddressRef
 }
 type SetPoolInput struct {
 	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	// not specified by the user, filled in by the deployment system to pass to chain operations
+	ExistingAddresses []datastore.AddressRef
 }
 type UpdateAuthoritiesInput struct {
 	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	// not specified by the user, filled in by the deployment system to pass to chain operations
+	ExistingAddresses []datastore.AddressRef
 }
 
 func TokenExpansion() cldf.ChangeSetV2[TokenExpansionInput] {
