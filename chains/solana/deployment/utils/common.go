@@ -34,6 +34,9 @@ const (
 	ExecutorAccessControllerAccount  cldf_deployment.ContractType = "ExecutorAccessControllerAccount"
 	CancellerAccessControllerAccount cldf_deployment.ContractType = "CancellerAccessControllerAccount"
 	BypasserAccessControllerAccount  cldf_deployment.ContractType = "BypasserAccessControllerAccount"
+	// tokens
+	SPLTokens     cldf_deployment.ContractType = "SPLTokens"
+	SPL2022Tokens cldf_deployment.ContractType = "SPL2022Tokens"
 )
 
 // Common parameters for transferring ownership of a program

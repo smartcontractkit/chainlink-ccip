@@ -26,7 +26,6 @@ import (
 var ContractType cldf_deployment.ContractType = "OffRamp"
 var SourceChainType cldf_deployment.ContractType = "RemoteSource"
 var ProgramName = "ccip_offramp"
-var ProgramSize = int(1.5 * 1024 * 1024)
 var Version *semver.Version = semver.MustParse("1.6.0")
 
 type Params struct {
@@ -61,8 +60,7 @@ var Deploy = operations.NewOperation(
 			ContractType,
 			Version,
 			"",
-			ProgramName,
-			ProgramSize)
+			ProgramName)
 	},
 )
 

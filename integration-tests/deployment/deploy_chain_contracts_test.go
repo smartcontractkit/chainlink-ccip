@@ -210,9 +210,9 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 var solanaProgramIDs = map[string]string{
 	"ccip_router": "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
 	// "test_token_pool":           "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
-	// "burnmint_token_pool":       "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
-	// "lockrelease_token_pool":    "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
-	"fee_quoter": "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
+	"burnmint_token_pool":    "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
+	"lockrelease_token_pool": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
+	"fee_quoter":             "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
 	// "test_ccip_receiver":        "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
 	"ccip_offramp":      "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
 	"mcm":               "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
@@ -224,13 +224,15 @@ var solanaProgramIDs = map[string]string{
 }
 
 var solanaContracts = map[string]datastore.ContractType{
-	"ccip_router":       datastore.ContractType(routerops.ContractType),
-	"fee_quoter":        datastore.ContractType(fqops.ContractType),
-	"ccip_offramp":      datastore.ContractType(offrampops.ContractType),
-	"rmn_remote":        datastore.ContractType(rmnremoteops.ContractType),
-	"mcm":               datastore.ContractType(utils.McmProgramType),
-	"timelock":          datastore.ContractType(utils.TimelockProgramType),
-	"access_controller": datastore.ContractType(utils.AccessControllerProgramType),
+	"ccip_router":            datastore.ContractType(routerops.ContractType),
+	"fee_quoter":             datastore.ContractType(fqops.ContractType),
+	"ccip_offramp":           datastore.ContractType(offrampops.ContractType),
+	"rmn_remote":             datastore.ContractType(rmnremoteops.ContractType),
+	"mcm":                    datastore.ContractType(utils.McmProgramType),
+	"timelock":               datastore.ContractType(utils.TimelockProgramType),
+	"access_controller":      datastore.ContractType(utils.AccessControllerProgramType),
+	"burnmint_token_pool":    datastore.ContractType(common_utils.BurnMintTokenPool),
+	"lockrelease_token_pool": datastore.ContractType(common_utils.LockReleaseTokenPool),
 }
 
 func PreloadSolanaEnvironment(t *testing.T, chainSelector uint64) (string, *datastore.MemoryDataStore, error) {

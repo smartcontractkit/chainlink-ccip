@@ -23,7 +23,6 @@ import (
 var ContractType cldf_deployment.ContractType = "Router"
 var DestChainType cldf_deployment.ContractType = "RemoteDest"
 var ProgramName = "ccip_router"
-var ProgramSize = 5 * 1024 * 1024
 var Version *semver.Version = semver.MustParse("1.6.0")
 
 type ConnectChainsParams struct {
@@ -46,8 +45,7 @@ var Deploy = operations.NewOperation(
 			ContractType,
 			Version,
 			"",
-			ProgramName,
-			ProgramSize)
+			ProgramName)
 	},
 )
 
