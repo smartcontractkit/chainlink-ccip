@@ -157,7 +157,6 @@ type (
 		ChainSel     uint64
 		MCM          solana.PublicKey
 		Qualifier    string
-		Configure    bool
 	}
 
 	InitTimelockInput struct {

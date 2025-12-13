@@ -217,7 +217,6 @@ func doMCMOp(
 				ChainSel:     deps.Chain.ChainSelector(),
 				MCM:          mcmAddress,
 				Qualifier:    deps.Qualifier, // used for testing purposes
-				Configure:    false,
 			})
 		if err != nil {
 			return mcmsops.MCMOutput{}, fmt.Errorf("failed to init config type:%q, err:%w", cfg.ctype, err)
