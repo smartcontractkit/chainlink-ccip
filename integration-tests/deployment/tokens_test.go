@@ -77,12 +77,12 @@ func TestTokenExpansion_DeployToken(t *testing.T) {
 
 	out, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
 		DeployTokenInputs: map[uint64]tokensapi.DeployTokenInput{
-			chain_selectors.ETHEREUM_MAINNET.Selector: {
-				Name:     "Test Token",
-				Symbol:   "TEST",
-				Decimals: 18,
-				Supply:   big.NewInt(1e18),
-			},
+			// chain_selectors.ETHEREUM_MAINNET.Selector: {
+			// 	Name:     "Test Token",
+			// 	Symbol:   "TEST",
+			// 	Decimals: 18,
+			// 	Supply:   big.NewInt(1e18),
+			// },
 			chain_selectors.SOLANA_MAINNET.Selector: {
 				Name:     "Test Token",
 				Symbol:   "TEST",

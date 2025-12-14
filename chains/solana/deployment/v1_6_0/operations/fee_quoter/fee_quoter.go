@@ -179,7 +179,7 @@ var ConnectChains = operations.NewOperation(
 		}
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm connect chains: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -219,7 +219,7 @@ var TransferOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -254,7 +254,7 @@ var AcceptOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept ownership: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},

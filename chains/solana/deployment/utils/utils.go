@@ -8,6 +8,7 @@ import (
 
 	solbinary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/token"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -159,4 +160,17 @@ func DisableFreezeAuthority(chain cldf_solana.Chain, tokenMints []solana.PublicK
 		}
 	}
 	return nil
+}
+
+func GetTokenMintAuthority(chain cldf_solana.Chain, tokenMint solana.PublicKey) solana.PublicKey {
+	var mintData token.Mint
+	var mintAuthority solana.PublicKey
+	err := chain.GetAccountDataBorshInto(context.Background(), tokenMint, &mintData)
+	if err != nil {
+		return solana.PublicKey{}
+	}
+	if mintData.MintAuthority != nil {
+		mintAuthority = *mintData.MintAuthority
+	}
+	return mintAuthority
 }
