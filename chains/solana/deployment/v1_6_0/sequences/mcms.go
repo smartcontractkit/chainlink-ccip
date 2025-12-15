@@ -127,7 +127,7 @@ func (d *SolanaAdapter) FinalizeDeployMCMS() *operations.Sequence[ccipapi.MCMSDe
 			// Configure MCMs
 			mcmRef, err := configureMCM(b, deps, in.MCMSDeploymentConfigPerChain, mcmAddress)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize MCMs: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure MCMs: %w", err)
 			}
 			output.Addresses = append(output.Addresses, mcmRef.NewAddresses...)
 			output.BatchOps = append(output.BatchOps, mcmRef.BatchOps...)
