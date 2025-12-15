@@ -11,7 +11,6 @@ import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
-
 import {Proxy} from "../../Proxy.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";

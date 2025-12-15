@@ -7,7 +7,6 @@ import {IMessageTransmitter} from "../../../pools/USDC/interfaces/IMessageTransm
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
-
 import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
