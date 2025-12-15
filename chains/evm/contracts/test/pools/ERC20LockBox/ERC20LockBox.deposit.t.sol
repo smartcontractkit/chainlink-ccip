@@ -5,7 +5,7 @@ import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {ERC20LockBoxSetup} from "./ERC20LockBoxSetup.t.sol";
 
 contract ERC20LockBox_deposit is ERC20LockBoxSetup {
-  function testFuzz_Deposit_Success(
+  function testFuzz_deposit_Success(
     uint256 amount
   ) public {
     amount = bound(amount, 1, type(uint256).max / 2);
@@ -28,7 +28,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(s_allowedCaller), callerBalanceBefore - amount);
   }
 
-  function test_Deposit_MultipleDeposits() public {
+  function test_deposit_MultipleDeposits() public {
     uint256 amount1 = 1000e18;
     uint256 amount2 = 2000e18;
 
@@ -52,7 +52,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), amount1 + amount2);
   }
 
-  function test_Deposit_FromDifferentCallers() public {
+  function test_deposit_FromDifferentCallers() public {
     uint256 amount = 1000e18;
     address caller1 = makeAddr("caller1");
     address caller2 = makeAddr("caller2");
@@ -92,7 +92,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
   }
 
   // Reverts
-  function test_RevertWhen_Unauthorized() public {
+  function test_deposit_RevertWhen_Unauthorized() public {
     uint256 amount = 1000e18;
 
     vm.startPrank(STRANGER);
@@ -102,11 +102,21 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     s_erc20LockBox.deposit(0, amount);
   }
 
-  function test_RevertWhen_AmountIsZero() public {
+  function test_deposit_RevertWhen_TokenAmountCannotBeZero() public {
     vm.startPrank(s_allowedCaller);
     s_token.approve(address(s_erc20LockBox), 1);
     vm.expectRevert(ERC20LockBox.TokenAmountCannotBeZero.selector);
 
     s_erc20LockBox.deposit(0, 0);
+  }
+
+  function test_deposit_RevertWhen_UnsupportedChainSelector() public {
+    uint256 amount = 1000e18;
+
+    vm.startPrank(s_allowedCaller);
+    s_token.approve(address(s_erc20LockBox), amount);
+
+    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.UnsupportedChainSelector.selector, uint64(123)));
+    s_erc20LockBox.deposit(123, amount);
   }
 }
