@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBridgeV1} from "../../pools/Lombard/interfaces/IBridgeV1.sol";
+import {IBridgeV1} from "../../interfaces/lombard/IBridgeV1.sol";
 
 import {LombardTokenPool} from "../../pools/Lombard/LombardTokenPool.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";

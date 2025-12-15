@@ -123,10 +123,14 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     });
 
     // Populate token transfers
+
     _populateTokenTransfers(messageV1, message);
 
     (receipts, messageV1.executionGasLimit,) =
       s_onRamp.getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
+
+    // Because getReceipts uses msg.sender to set the Router, we must override it here.
+    receipts[receipts.length - 1].issuer = address(s_sourceRouter);
 
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
@@ -164,7 +168,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     assertEq(actualArgs.length, expectedArgs.length, "CCV args arrays have different lengths");
     assertEq(actualAddresses.length, actualArgs.length, "CCV addresses and args have different lengths");
 
-    for (uint256 i = 0; i < actualAddresses.length; i++) {
+    for (uint256 i = 0; i < actualAddresses.length; ++i) {
       assertEq(
         actualAddresses[i], expectedAddresses[i], string.concat("CCV address mismatch at index ", vm.toString(i))
       );

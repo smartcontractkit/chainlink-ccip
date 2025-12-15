@@ -83,6 +83,7 @@ compileContract Proxy
 compileContract CREATE2Factory
 compileContract ccvs/CommitteeVerifier
 compileContract ccvs/CCTPVerifier
+compileContract ccvs/LombardVerifier
 compileContract ccvs/VersionedVerifierResolver
 compileContract onRamp/OnRamp
 compileContract executor/Executor
