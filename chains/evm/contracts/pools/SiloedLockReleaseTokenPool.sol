@@ -19,6 +19,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   error ChainNotSiloed(uint64 remoteChainSelector);
   error InvalidChainSelector(uint64 remoteChainSelector);
   error LiquidityAmountCannotBeZero();
+  error InvalidLockBoxChainSelector(uint64 remoteChainSelector);
+  error LockBoxNotConfigured(uint64 remoteChainSelector);
 
   event LiquidityAdded(uint64 remoteChainSelector, address indexed provider, uint256 amount);
   event LiquidityRemoved(uint64 remoteChainSelector, address indexed remover, uint256 amount);
@@ -33,8 +35,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @notice The rebalancer for unsiloed chains, which can add liquidity to the shared pool.
   address internal s_rebalancer;
 
-  /// @notice The lock box for the token pool.
-  ERC20LockBox internal immutable i_lockBox;
+  /// @notice Lock boxes keyed by chain selector. Chain selector 0 is used for unsiloed liquidity.
+  mapping(uint64 remoteChainSelector => ERC20LockBox lockBox) internal s_lockBoxes;
 
   struct SiloConfigUpdate {
     uint64 remoteChainSelector;
@@ -62,9 +64,12 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
     if (address(lockBoxContract.getToken()) != address(token)) revert InvalidToken(address(lockBoxContract.getToken()));
+    if (lockBoxContract.i_remoteChainSelector() != 0) {
+      revert InvalidLockBoxChainSelector(lockBoxContract.i_remoteChainSelector());
+    }
 
     token.safeApprove(lockBox, type(uint256).max);
-    i_lockBox = lockBoxContract;
+    s_lockBoxes[0] = lockBoxContract;
   }
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
@@ -95,8 +100,9 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
       s_unsiloedTokenBalance += lockOrBurnIn.amount;
     }
 
-    // Transfer the tokens to the lock box.
-    i_lockBox.deposit(lockOrBurnIn.amount);
+    // Transfer the tokens to the appropriate lock box.
+    ERC20LockBox lockBox = _getLockBox(remoteChainSelector);
+    lockBox.deposit(remoteChainSelector, lockOrBurnIn.amount);
 
     return out;
   }
@@ -139,7 +145,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     // Release to the recipient
-    i_lockBox.withdraw(localAmount, releaseOrMintIn.receiver);
+    ERC20LockBox lockBox = _getLockBox(remoteChainSelector);
+    lockBox.withdraw(remoteChainSelector, localAmount, releaseOrMintIn.receiver);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -318,7 +325,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
-    i_lockBox.deposit(amount);
+    ERC20LockBox lockBox = _getLockBox(remoteChainSelector);
+    lockBox.deposit(remoteChainSelector, amount);
 
     emit LiquidityAdded(remoteChainSelector, msg.sender, amount);
   }
@@ -376,7 +384,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     // Withdraw the tokens directly from the lockbox to the rebalancer. This saves gas by avoiding the need to transfer
     // the tokens to the contract first.
-    i_lockBox.withdraw(amount, msg.sender);
+    ERC20LockBox lockBox = _getLockBox(remoteChainSelector);
+    lockBox.withdraw(remoteChainSelector, amount, msg.sender);
 
     emit LiquidityRemoved(remoteChainSelector, msg.sender, amount);
   }
@@ -386,4 +395,30 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
   /// @notice No-op override to purge the unused code path from the contract.
   function _preFlightCheck(Pool.LockOrBurnInV1 calldata, uint16, bytes memory) internal pure virtual override {}
+
+  /// @notice Configure lockboxes for chain selectors. Chain selector 0 represents the unsiloed lockbox.
+  function configureChainLockBoxes(uint64[] calldata chainSelectors, address[] calldata lockBoxes) external onlyOwner {
+    if (chainSelectors.length != lockBoxes.length) revert MismatchedArrayLengths();
+    for (uint256 i = 0; i < chainSelectors.length; ++i) {
+      address lockBox = lockBoxes[i];
+      if (lockBox == address(0)) revert ZeroAddressInvalid();
+      ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
+      if (address(lockBoxContract.getToken()) != address(i_token)) {
+        revert InvalidToken(address(lockBoxContract.getToken()));
+      }
+      if (lockBoxContract.i_remoteChainSelector() != chainSelectors[i]) {
+        revert InvalidLockBoxChainSelector(lockBoxContract.i_remoteChainSelector());
+      }
+      s_lockBoxes[chainSelectors[i]] = lockBoxContract;
+      i_token.safeApprove(lockBox, type(uint256).max);
+    }
+  }
+
+  function _getLockBox(
+    uint64 remoteChainSelector
+  ) internal view returns (ERC20LockBox lockBox) {
+    lockBox = s_lockBoxes[remoteChainSelector];
+    if (address(lockBox) == address(0)) revert LockBoxNotConfigured(remoteChainSelector);
+    return lockBox;
+  }
 }

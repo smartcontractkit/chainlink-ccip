@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
@@ -18,6 +18,7 @@ contract ERC20LockBox is ITypeAndVersion, Ownable2StepMsgSender {
   error TokenAmountCannotBeZero();
   error RecipientCannotBeZeroAddress();
   error ZeroAddressNotAllowed();
+  error UnsupportedChainSelector(uint64 chainSelector);
 
   event AllowedCallerUpdated(address indexed token, address indexed caller, bool allowed);
   event Deposit(address indexed token, address indexed depositor, uint256 amount);
@@ -30,20 +31,20 @@ contract ERC20LockBox is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice The token supported by this lockbox.
   IERC20 public immutable i_token;
+  uint64 public immutable i_remoteChainSelector;
 
   /// @notice Allowed callers that can deposit and withdraw.
   mapping(address caller => bool isAllowed) internal s_allowedCallers;
 
   string public constant typeAndVersion = "ERC20LockBox 1.7.0-dev";
 
-  constructor(
-    address token
-  ) {
+  constructor(address token, uint64 remoteChainSelector) {
     if (token == address(0)) {
       revert ZeroAddressNotAllowed();
     }
 
     i_token = IERC20(token);
+    i_remoteChainSelector = remoteChainSelector;
   }
 
   /// @notice Deposits tokens into this contract. This eases the process of migrating tokens
@@ -51,10 +52,11 @@ contract ERC20LockBox is ITypeAndVersion, Ownable2StepMsgSender {
   /// would need to be manually withdrawn and re-deposited into the new token pool from a legacy pool, which is a
   /// time-consuming and error-prone process.
   /// @param amount The amount of tokens to deposit.
+  /// @param remoteChainSelector The chain selector this lockbox instance is bound to (0 for unsiloed).
   /// @dev This function does NOT support storing native tokens, as the token pool which handles native is expected to
   /// have wrapped it into an ERC20-compatibletoken first.
-  function deposit(uint256 amount) external {
-    _validateDepositWithdraw(amount);
+  function deposit(uint64 remoteChainSelector, uint256 amount) external {
+    _validateDepositWithdraw(remoteChainSelector, amount);
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -64,8 +66,9 @@ contract ERC20LockBox is ITypeAndVersion, Ownable2StepMsgSender {
   /// @notice Withdraws tokens to a specific recipient.
   /// @param amount The amount of tokens to withdraw.
   /// @param recipient The address that will receive the withdrawn tokens.
-  function withdraw(uint256 amount, address recipient) external {
-    _validateDepositWithdraw(amount);
+  /// @param remoteChainSelector The chain selector this lockbox instance is bound to (0 for unsiloed).
+  function withdraw(uint64 remoteChainSelector, uint256 amount, address recipient) external {
+    _validateDepositWithdraw(remoteChainSelector, amount);
 
     if (recipient == address(0)) {
       revert RecipientCannotBeZeroAddress();
@@ -106,11 +109,13 @@ contract ERC20LockBox is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Validates the deposit and withdraw functions.
   /// @param amount The amount of tokens to deposit or withdraw.
-  function _validateDepositWithdraw(uint256 amount) internal view {
+  function _validateDepositWithdraw(uint64 remoteChainSelector, uint256 amount) internal view {
     if (amount == 0) {
       revert TokenAmountCannotBeZero();
     }
-
+    if (remoteChainSelector != i_remoteChainSelector) {
+      revert UnsupportedChainSelector(remoteChainSelector);
+    }
     if (!isAllowedCaller(msg.sender)) {
       revert Unauthorized(msg.sender);
     }

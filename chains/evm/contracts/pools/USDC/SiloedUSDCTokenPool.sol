@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../libraries/Pool.sol";
+
+import {ERC20LockBox} from "../ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -101,8 +103,9 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
       s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= localAmount;
     }
 
-    // Release to the recipient
-    i_lockBox.withdraw(localAmount, releaseOrMintIn.receiver);
+    // Release to the recipient using the lockbox tied to the remote chain selector.
+    ERC20LockBox lockBox = _getLockBox(releaseOrMintIn.remoteChainSelector);
+    lockBox.withdraw(releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -249,7 +252,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
     // from the lock box first otherwise the burn will revert.
-    i_lockBox.withdraw(tokensToBurn, address(this));
+    ERC20LockBox lockBox = _getLockBox(burnChainSelector);
+    lockBox.withdraw(burnChainSelector, tokensToBurn, address(this));
 
     // Even though USDC is a trusted call, ensure CEI by updating state first
     delete s_chainConfigs[burnChainSelector].tokenBalance;

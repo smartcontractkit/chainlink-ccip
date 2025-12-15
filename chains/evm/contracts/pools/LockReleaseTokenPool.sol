@@ -17,6 +17,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
   error InsufficientLiquidity();
+  error InvalidLockBoxChainSelector(uint64 remoteChainSelector);
 
   event LiquidityTransferred(address indexed from, uint256 amount);
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
@@ -43,6 +44,9 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
     if (address(lockBoxContract.getToken()) != address(token)) revert InvalidToken(address(lockBoxContract.getToken()));
+    if (lockBoxContract.i_remoteChainSelector() != 0) {
+      revert InvalidLockBoxChainSelector(lockBoxContract.i_remoteChainSelector());
+    }
 
     token.safeApprove(lockBox, type(uint256).max);
     i_lockBox = lockBoxContract;
@@ -54,12 +58,12 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
-    i_lockBox.deposit(amount);
+    i_lockBox.deposit(0, amount);
   }
 
   function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
     // Release tokens from the lock box to the receiver.
-    i_lockBox.withdraw(amount, receiver);
+    i_lockBox.withdraw(0, amount, receiver);
   }
 
   /// @notice Gets rebalancer, can be address(0) if none is configured.
@@ -89,7 +93,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
-    i_lockBox.deposit(amount);
+    i_lockBox.deposit(0, amount);
     emit LiquidityAdded(msg.sender, amount);
   }
 
@@ -101,7 +105,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     // Withdraw the tokens directly from the lockbox to the rebalancer.
-    i_lockBox.withdraw(amount, msg.sender);
+    i_lockBox.withdraw(0, amount, msg.sender);
     emit LiquidityRemoved(msg.sender, amount);
   }
 
