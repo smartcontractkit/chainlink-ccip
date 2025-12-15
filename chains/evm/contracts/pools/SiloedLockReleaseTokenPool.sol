@@ -62,14 +62,14 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
 
-    ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
-    if (address(lockBoxContract.getToken()) != address(token)) revert InvalidToken(address(lockBoxContract.getToken()));
-    if (lockBoxContract.i_remoteChainSelector() != 0) {
-      revert InvalidLockBoxChainSelector(lockBoxContract.i_remoteChainSelector());
+    ERC20LockBox erc20LockBox = ERC20LockBox(lockBox);
+    if (address(erc20LockBox.getToken()) != address(token)) revert InvalidToken(address(erc20LockBox.getToken()));
+    if (erc20LockBox.i_remoteChainSelector() != 0) {
+      revert InvalidLockBoxChainSelector(erc20LockBox.i_remoteChainSelector());
     }
 
     token.safeApprove(lockBox, type(uint256).max);
-    s_lockBoxes[0] = lockBoxContract;
+    s_lockBoxes[0] = erc20LockBox;
   }
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
@@ -101,8 +101,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     // Transfer the tokens to the appropriate lock box.
-    ERC20LockBox lockBox = _getLockBox(remoteChainSelector);
-    lockBox.deposit(remoteChainSelector, lockOrBurnIn.amount);
+    _getLockBox(remoteChainSelector).deposit(remoteChainSelector, lockOrBurnIn.amount);
 
     return out;
   }
@@ -145,8 +144,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     // Release to the recipient
-    ERC20LockBox lockBox = _getLockBox(remoteChainSelector);
-    lockBox.withdraw(remoteChainSelector, localAmount, releaseOrMintIn.receiver);
+    _getLockBox(remoteChainSelector).withdraw(remoteChainSelector, localAmount, releaseOrMintIn.receiver);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -325,8 +323,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
-    ERC20LockBox lockBox = _getLockBox(remoteChainSelector);
-    lockBox.deposit(remoteChainSelector, amount);
+    _getLockBox(remoteChainSelector).deposit(remoteChainSelector, amount);
 
     emit LiquidityAdded(remoteChainSelector, msg.sender, amount);
   }
@@ -384,8 +381,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     // Withdraw the tokens directly from the lockbox to the rebalancer. This saves gas by avoiding the need to transfer
     // the tokens to the contract first.
-    ERC20LockBox lockBox = _getLockBox(remoteChainSelector);
-    lockBox.withdraw(remoteChainSelector, amount, msg.sender);
+    _getLockBox(remoteChainSelector).withdraw(remoteChainSelector, amount, msg.sender);
 
     emit LiquidityRemoved(remoteChainSelector, msg.sender, amount);
   }
@@ -402,14 +398,14 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     for (uint256 i = 0; i < chainSelectors.length; ++i) {
       address lockBox = lockBoxes[i];
       if (lockBox == address(0)) revert ZeroAddressInvalid();
-      ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
-      if (address(lockBoxContract.getToken()) != address(i_token)) {
-        revert InvalidToken(address(lockBoxContract.getToken()));
+      ERC20LockBox erc20LockBox = ERC20LockBox(lockBox);
+      if (address(erc20LockBox.getToken()) != address(i_token)) {
+        revert InvalidToken(address(erc20LockBox.getToken()));
       }
-      if (lockBoxContract.i_remoteChainSelector() != chainSelectors[i]) {
-        revert InvalidLockBoxChainSelector(lockBoxContract.i_remoteChainSelector());
+      if (erc20LockBox.i_remoteChainSelector() != chainSelectors[i]) {
+        revert InvalidLockBoxChainSelector(erc20LockBox.i_remoteChainSelector());
       }
-      s_lockBoxes[chainSelectors[i]] = lockBoxContract;
+      s_lockBoxes[chainSelectors[i]] = erc20LockBox;
       i_token.safeApprove(lockBox, type(uint256).max);
     }
   }

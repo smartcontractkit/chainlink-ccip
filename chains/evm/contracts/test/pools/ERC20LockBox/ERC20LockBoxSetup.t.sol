@@ -20,10 +20,10 @@ contract ERC20LockBoxSetup is BaseTest {
     deal(address(s_token), OWNER, type(uint256).max);
     deal(address(s_token), s_allowedCaller, type(uint256).max);
 
-    // Deploy the ERC20 lock box (unsiloed selector = 0)
+    // Deploy the ERC20 lock box (unsiloed selector = 0).
     s_erc20LockBox = new ERC20LockBox(address(s_token), 0);
 
-    // Configure the allowed caller
+    // Configure the allowed caller.
     ERC20LockBox.AllowedCallerConfigArgs[] memory configArgs = new ERC20LockBox.AllowedCallerConfigArgs[](1);
     configArgs[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: s_allowedCaller, allowed: true});
     s_erc20LockBox.configureAllowedCallers(configArgs);
