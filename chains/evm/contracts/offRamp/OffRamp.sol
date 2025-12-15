@@ -21,7 +21,6 @@ import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
-import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/ERC165Checker.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
@@ -276,7 +275,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
       }
 
-      balancePre = _getBalanceOfReceiver(address(bytes20(message.tokenTransfer[0].tokenReceiver)), address(bytes20(message.tokenTransfer[0].destTokenAddress)));
+      balancePre = _getBalanceOfReceiver(
+        address(bytes20(message.tokenTransfer[0].tokenReceiver)),
+        address(bytes20(message.tokenTransfer[0].destTokenAddress))
+      );
     }
 
     address receiver = address(bytes20(message.receiver));
@@ -308,13 +310,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         message.tokenTransfer[0], message.sender, message.sourceChainSelector, message.finality
       );
 
+      address tokenReceiver = address(bytes20(message.tokenTransfer[0].tokenReceiver));
       // If a lock-release pool is the receiver, balancePost - balancePre would not reflect the amount transferred.
       // Therefore, if the receiver is the token pool, we trust the value returned by the pool.
       // Otherwise, we trust balancePost - balancePre as the amount given to the receiver.
-      if (address(bytes20(message.tokenTransfer[0].tokenReceiver)) == localPoolAddress) {
+      if (tokenReceiver == localPoolAddress) {
         destTokenAmounts[0] = destTokenAmount;
       } else {
-        uint256 balancePost = _getBalanceOfReceiver(address(bytes20(message.tokenTransfer[0].tokenReceiver)), destTokenAmount.token);
+        uint256 balancePost = _getBalanceOfReceiver(tokenReceiver, destTokenAmount.token);
         destTokenAmounts[0] = Client.EVMTokenAmount({token: destTokenAmount.token, amount: balancePost - balancePre});
       }
     }
@@ -426,35 +429,37 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     // Get the CCVs for the receiver, if any.
-    address[] memory requiredReceiverCCV;
+    address[] memory requiredReceiverCCVs;
     if (isTokenOnlyTransfer) {
       if (tokenTransfer.length > 0) {
         // For token-only transfers, we skip querying the receiver for CCVs, and don't add the defaults. This enables
         // pure token transfers to only require the pool CCVs, as the token issuer is the only party that takes any risk.
-        requiredReceiverCCV = new address[](0);
+        requiredReceiverCCVs = new address[](0);
         optionalCCVs = new address[](0);
         optionalThreshold = 0;
       } else {
         // The transfer is token-only but doesn't contain any tokens. This is a no-op transfer, we fall back to
         // requiring the default CCV.
-        requiredReceiverCCV = new address[](1);
-        requiredReceiverCCV[0] = address(0);
+        requiredReceiverCCVs = new address[](1);
+        // Address(0) indicates that we should use the default CCVs.
+        requiredReceiverCCVs[0] = address(0);
       }
     } else {
       // The transfer is not token-only, we query the receiver for its CCV requirements.
-      (requiredReceiverCCV, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
+      (requiredReceiverCCVs, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
     }
 
     address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
     address[] memory defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
 
     // We allocate the memory for all possible CCVs upfront to avoid multiple allocations.
-    address[] memory allRequiredCCVs =
-      new address[](requiredReceiverCCV.length + requiredPoolCCVs.length + laneMandatedCCVs.length + defaultCCVs.length);
+    address[] memory allRequiredCCVs = new address[](
+      requiredReceiverCCVs.length + requiredPoolCCVs.length + laneMandatedCCVs.length + defaultCCVs.length
+    );
 
     uint256 index = 0;
-    for (uint256 i = 0; i < requiredReceiverCCV.length; ++i) {
-      allRequiredCCVs[index++] = requiredReceiverCCV[i];
+    for (uint256 i = 0; i < requiredReceiverCCVs.length; ++i) {
+      allRequiredCCVs[index++] = requiredReceiverCCVs[i];
     }
 
     for (uint256 i = 0; i < requiredPoolCCVs.length; ++i) {
@@ -616,7 +621,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
       CCVConfigValidation._assertNoDuplicates(optionalCCVs);
 
-      // If the user specified empty required and optional CCVs, we fall back to the default CCVs.
+      // If the receiver specified empty required and optional CCVs, we fall back to the default CCVs.
       // If they did specify something, we use what they specified.
       if (requiredCCV.length != 0 || optionalThreshold != 0) {
         return (requiredCCV, optionalCCVs, optionalThreshold);
