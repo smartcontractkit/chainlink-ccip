@@ -22,7 +22,6 @@ import {CCTPTokenPool} from "../../pools/USDC/CCTPTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../pools/USDC/USDCTokenPoolProxy.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {CCTPHelper} from "../helpers/CCTPHelper.sol";
-
 import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
