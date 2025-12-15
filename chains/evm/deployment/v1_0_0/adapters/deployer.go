@@ -32,12 +32,12 @@ func (a *EVMDeployer) SetOCR3Config() *cldf_ops.Sequence[ccipapi.SetOCR3ConfigIn
 	return nil
 }
 
-func (a *EVMDeployer) GrantAdminRoleToTimelock() *cldf_ops.Sequence[ccipapi.GrantAdminRoleToTimelockConfigPerChainWithAdminRef, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+func (a *EVMDeployer) GrantAdminRoleToTimelock() *cldf_ops.Sequence[ccipapi.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequtil.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"grant-admin-role-of-timelock-to-timelock",
 		semver.MustParse("1.0.0"),
 		"Grants admin role of specified timelock contract to the other specified timelock and renounces admin role of the deployer key",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in ccipapi.GrantAdminRoleToTimelockConfigPerChainWithAdminRef) (output sequtil.OnChainOutput, err error) {
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in ccipapi.GrantAdminRoleToTimelockConfigPerChainWithSelector) (output sequtil.OnChainOutput, err error) {
 			evmChain, ok := chains.EVMChains()[in.ChainSelector]
 			if !ok {
 				return sequtil.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
@@ -46,7 +46,7 @@ func (a *EVMDeployer) GrantAdminRoleToTimelock() *cldf_ops.Sequence[ccipapi.Gran
 			// create sequence input
 			seqInput := seq.SeqGrantAdminRoleOfTimelockToTimelockInput{
 				ChainSelector:           in.ChainSelector,
-				TimelockAddress:         common.HexToAddress(in.TimelockAddress),
+				TimelockAddress:         common.HexToAddress(in.TimelockToTransferRef.Address),
 				NewAdminTimelockAddress: common.HexToAddress(in.NewAdminTimelockRef.Address),
 			}
 			report, err := cldf_ops.ExecuteSequence(b, seq.SeqGrantAdminRoleOfTimelockToTimelock, evmChain, seqInput)

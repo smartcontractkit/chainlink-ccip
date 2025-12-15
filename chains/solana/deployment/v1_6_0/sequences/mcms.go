@@ -327,7 +327,7 @@ func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.Tr
 	return output, nil
 }
 
-func (a *SolanaAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.GrantAdminRoleToTimelockConfigPerChainWithAdminRef, sequences.OnChainOutput, chain.BlockChains] {
+func (a *SolanaAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
 	// Not implemented for Solana
 	return nil
 }

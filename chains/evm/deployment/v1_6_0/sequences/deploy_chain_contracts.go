@@ -47,7 +47,7 @@ func (a *EVMAdapter) FinalizeDeployMCMS() *cldf_ops.Sequence[deployops.MCMSDeplo
 }
 
 // Sets a timelock as admin of a newly deployed timelock
-func (a *EVMAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.GrantAdminRoleToTimelockConfigPerChainWithAdminRef, sequences.OnChainOutput, chain.BlockChains] {
+func (a *EVMAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
 	evmDeployer := &evm1_0_0.EVMDeployer{}
 	return evmDeployer.GrantAdminRoleToTimelock()
 }

@@ -243,14 +243,28 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deployops.GrantAdminRoleToTimelockConfigPerChain{
 			selector1: {
-				TimelockAddress:           timelockAddrs[selector1],
-				NewAdminTimelockVersion:   "1.0.0",
-				NewAdminTimelockQualifier: "CLLCCIP",
+				TimelockToTransferRef: datastore.AddressRef{
+					Type:      datastore.ContractType(deploymentutils.RBACTimelock),
+					Version:   semver.MustParse("1.0.0"),
+					Qualifier: "testQual",
+				},
+				NewAdminTimelockRef: datastore.AddressRef{
+					Type:      datastore.ContractType(deploymentutils.RBACTimelock),
+					Version:   semver.MustParse("1.0.0"),
+					Qualifier: "CLLCCIP",
+				},
 			},
 			selector2: {
-				TimelockAddress:           timelockAddrs[selector2],
-				NewAdminTimelockVersion:   "1.0.0",
-				NewAdminTimelockQualifier: "CLLCCIP",
+				TimelockToTransferRef: datastore.AddressRef{
+					Type:      datastore.ContractType(deploymentutils.RBACTimelock),
+					Version:   semver.MustParse("1.0.0"),
+					Qualifier: "testQual",
+				},
+				NewAdminTimelockRef: datastore.AddressRef{
+					Type:      datastore.ContractType(deploymentutils.RBACTimelock),
+					Version:   semver.MustParse("1.0.0"),
+					Qualifier: "CLLCCIP",
+				},
 			},
 		},
 	})

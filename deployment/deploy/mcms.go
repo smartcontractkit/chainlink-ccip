@@ -45,16 +45,14 @@ type MCMSDeploymentConfigPerChainWithAddress struct {
 	ExistingAddresses []datastore.AddressRef
 }
 
-type GrantAdminRoleToTimelockConfigPerChainWithAdminRef struct {
+type GrantAdminRoleToTimelockConfigPerChainWithSelector struct {
 	GrantAdminRoleToTimelockConfigPerChain
-	ChainSelector       uint64
-	NewAdminTimelockRef datastore.AddressRef
+	ChainSelector uint64
 }
 
 type GrantAdminRoleToTimelockConfigPerChain struct {
-	TimelockAddress           string `json:"timelockAddress"`           // address of timelock for which we would like to grant the role
-	NewAdminTimelockVersion   string `json:"newAdminTimelockVersion"`   // version of timelock to which would like to grant admin role
-	NewAdminTimelockQualifier string `json:"newAdminTimelockQualifier"` // qualifier of timelock to which would like to grant admin role
+	TimelockToTransferRef datastore.AddressRef `json:"timelockToTransferRef"` // ref of the timelock that transfers its admin rights
+	NewAdminTimelockRef   datastore.AddressRef `json:"newAdminTimelockRef"`   // ref of the timelock that will be granted admin
 }
 
 type GrantAdminRoleToTimelockConfig struct {
@@ -76,14 +74,25 @@ func grantAdminRoleToTimelockVerify(_ *DeployerRegistry, _ *changesets.MCMSReade
 		}
 
 		for _, chainCfg := range cfg.Chains {
-			if len(chainCfg.TimelockAddress) == 0 {
-				return fmt.Errorf("timelock address cannot be empty")
+			// validate timelock to transfer ref
+			if chainCfg.TimelockToTransferRef.Type.String() != utils.RBACTimelock.String() {
+				return fmt.Errorf("type of timelock to transfer must be rbactimelock")
 			}
-			if len(chainCfg.NewAdminTimelockVersion) == 0 {
-				return fmt.Errorf("new admin timelock version cannot be empty")
+			if len(chainCfg.TimelockToTransferRef.Qualifier) == 0 {
+				return fmt.Errorf("timelock to transfer qualifier cannot be empty")
 			}
-			if len(chainCfg.NewAdminTimelockQualifier) == 0 {
+			if len(chainCfg.TimelockToTransferRef.Version.String()) == 0 {
+				return fmt.Errorf("timelock to transfer version cannot be empty")
+			}
+			// validate new admin timelock ref
+			if chainCfg.NewAdminTimelockRef.Type.String() != utils.RBACTimelock.String() {
+				return fmt.Errorf("type of new admin timelock must be rbactimelock")
+			}
+			if len(chainCfg.NewAdminTimelockRef.Qualifier) == 0 {
 				return fmt.Errorf("new admin timelock qualifier cannot be empty")
+			}
+			if len(chainCfg.NewAdminTimelockRef.Version.String()) == 0 {
+				return fmt.Errorf("new admin timelock version cannot be empty")
 			}
 		}
 
@@ -103,23 +112,35 @@ func grantAdminRoleToTimelockApply(d *DeployerRegistry, _ *changesets.MCMSReader
 				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, cfg.AdapterVersion.String())
 			}
 
-			// Find new timelock admin ref
-			timelockQualifier := chainCfg.NewAdminTimelockQualifier
-			newAdminTimelockRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			// If partial refs are provided, resolve to full refs
+			timelockQualifier := chainCfg.TimelockToTransferRef.Qualifier
+			timelockRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				ChainSelector: selector,
-				Type:          datastore.ContractType(utils.RBACTimelock),
-				Version:       semver.MustParse(chainCfg.NewAdminTimelockVersion),
+				Type:          chainCfg.TimelockToTransferRef.Type,
+				Version:       chainCfg.TimelockToTransferRef.Version,
 				Qualifier:     timelockQualifier,
 			}, selector, datastore_utils.FullRef)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to find timelock ref with qualifier %s on chain with selector %d", timelockQualifier, selector)
 			}
+			chainCfg.TimelockToTransferRef = timelockRef
+
+			newAdminTimelockQualifier := chainCfg.NewAdminTimelockRef.Qualifier
+			newAdminTimelockRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				ChainSelector: selector,
+				Type:          chainCfg.NewAdminTimelockRef.Type,
+				Version:       chainCfg.NewAdminTimelockRef.Version,
+				Qualifier:     newAdminTimelockQualifier,
+			}, selector, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to find timelock ref with qualifier %s on chain with selector %d", newAdminTimelockQualifier, selector)
+			}
+			chainCfg.NewAdminTimelockRef = newAdminTimelockRef
 
 			// Call the grant role sequence
-			seqCfg := GrantAdminRoleToTimelockConfigPerChainWithAdminRef{
+			seqCfg := GrantAdminRoleToTimelockConfigPerChainWithSelector{
 				GrantAdminRoleToTimelockConfigPerChain: chainCfg,
 				ChainSelector:                          selector,
-				NewAdminTimelockRef:                    newAdminTimelockRef,
 			}
 
 			_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, deployer.GrantAdminRoleToTimelock(), e.BlockChains, seqCfg)
