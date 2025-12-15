@@ -26,4 +26,13 @@ contract CommitteeVerifier_forwardToVerifier is CommitteeVerifierSetup {
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CallerIsNotARampOnRouter.selector, STRANGER));
     s_committeeVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 1000, "");
   }
+
+  function test_forwardToVerifier_RevertWhen_CursedByRMN() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _generateBasicMessageV1();
+
+    _setMockRMNChainCurse(message.destChainSelector, true);
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, message.destChainSelector));
+    s_committeeVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 1000, "");
+  }
 }

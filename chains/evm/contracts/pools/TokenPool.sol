@@ -92,6 +92,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   );
   event FeeTokenWithdrawn(address indexed recipient, address indexed feeToken, uint256 amount);
   event MinBlockConfirmationSet(uint16 minBlockConfirmation);
+  event AdvancedPoolHooksUpdated(IAdvancedPoolHooks oldHook, IAdvancedPoolHooks newHook);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // Remote chain selector.
@@ -132,11 +133,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   uint8 internal immutable i_tokenDecimals;
   /// @dev The address of the RMN proxy.
   address internal immutable i_rmnProxy;
-  /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
-  IAdvancedPoolHooks internal immutable i_advancedPoolHooks;
 
   /// @dev The address of the router.
   IRouter internal s_router;
+  /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
+  IAdvancedPoolHooks internal s_advancedPoolHooks;
   /// @dev Minimum block confirmation on the source chain, 0 means the default finality.
   uint16 internal s_minBlockConfirmation;
   // Separate buckets provide isolated rate limits for transfers with custom block confirmation, as their risk profiles differ from default transfers.
@@ -173,7 +174,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
       // assume the supplied token decimals are correct.
     }
     i_tokenDecimals = localTokenDecimals;
-    i_advancedPoolHooks = IAdvancedPoolHooks(advancedPoolHooks);
+    s_advancedPoolHooks = IAdvancedPoolHooks(advancedPoolHooks);
 
     s_router = IRouter(router);
   }
@@ -207,6 +208,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     return s_minBlockConfirmation;
   }
 
+  /// @notice Gets the advanced pool hook contract address used by this pool.
+  function getAdvancedPoolHooks() public view returns (IAdvancedPoolHooks advancedPoolHook) {
+    return s_advancedPoolHooks;
+  }
+
   /// @notice Sets the dynamic configuration for the pool.
   /// @param router The address of the router contract.
   /// @param rateLimitAdmin The address of the rate limiter admin.
@@ -225,6 +231,14 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     // Since 0 means default finality it is a valid value.
     s_minBlockConfirmation = minBlockConfirmation;
     emit MinBlockConfirmationSet(minBlockConfirmation);
+  }
+
+  /// @notice Updates the advanced pool hook.
+  function updateAdvancedPoolHooks(
+    IAdvancedPoolHooks newHook
+  ) public onlyOwner {
+    emit AdvancedPoolHooksUpdated(s_advancedPoolHooks, newHook);
+    s_advancedPoolHooks = newHook;
   }
 
   /// @notice Signals which version of the pool interface is supported.
@@ -394,8 +408,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     uint16 blockConfirmationRequested,
     bytes memory tokenArgs
   ) internal virtual {
-    if (address(i_advancedPoolHooks) != address(0)) {
-      i_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+    if (address(s_advancedPoolHooks) != address(0)) {
+      s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
     }
   }
 
@@ -444,8 +458,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     uint256 localAmount,
     uint16 blockConfirmationRequested
   ) internal virtual {
-    if (address(i_advancedPoolHooks) != address(0)) {
-      i_advancedPoolHooks.postFlightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
+    if (address(s_advancedPoolHooks) != address(0)) {
+      s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
     }
   }
 
@@ -843,10 +857,10 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     bytes calldata extraData,
     IPoolV2.MessageDirection direction
   ) external view virtual returns (address[] memory requiredCCVs) {
-    if (address(i_advancedPoolHooks) == address(0)) {
+    if (address(s_advancedPoolHooks) == address(0)) {
       return new address[](0);
     }
-    return i_advancedPoolHooks.getRequiredCCVs(
+    return s_advancedPoolHooks.getRequiredCCVs(
       localToken, remoteChainSelector, amount, blockConfirmationRequested, extraData, direction
     );
   }
