@@ -6,9 +6,10 @@ import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/I
 
 import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
-import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
+
 import {BurnFromMintTokenPool} from "../../../pools/BurnFromMintTokenPool.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
+import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
@@ -61,6 +62,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -129,6 +131,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode, // Token Init Code
       s_poolInitCode, // Pool Init Code
+      address(0), // lockBox
       FAKE_SALT // Salt
     );
 
@@ -169,6 +172,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -268,6 +272,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -308,6 +313,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -356,6 +362,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -404,8 +411,8 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     FactoryBurnMintERC20 newRemoteToken =
       new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
-    ERC20LockBox localLockBox = new ERC20LockBox(address(newLocalToken));
-    ERC20LockBox remoteLockBox = new ERC20LockBox(address(newRemoteToken));
+    ERC20LockBox localLockBox = new ERC20LockBox(address(newLocalToken), 0);
+    ERC20LockBox remoteLockBox = new ERC20LockBox(address(newRemoteToken), 0);
 
     TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
       remotePoolFactory: address(newTokenPoolFactory),
@@ -440,6 +447,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.LOCK_RELEASE,
       remoteTokenPools,
       type(LockReleaseTokenPool).creationCode,
+      address(localLockBox),
       FAKE_SALT
     );
 
@@ -465,6 +473,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.LOCK_RELEASE,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0), // No existing remote pools
       type(LockReleaseTokenPool).creationCode, // Pool Init Code
+      address(remoteLockBox), // lockBox
       FAKE_SALT // Salt
     );
 
@@ -527,6 +536,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -607,6 +617,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -647,6 +658,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 

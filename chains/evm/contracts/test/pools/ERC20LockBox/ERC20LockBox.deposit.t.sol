@@ -19,7 +19,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount);
 
-    s_erc20LockBox.deposit(amount);
+    s_erc20LockBox.deposit(0, amount);
 
     vm.stopPrank();
 
@@ -38,13 +38,13 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     // First deposit
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount1);
-    s_erc20LockBox.deposit(amount1);
+    s_erc20LockBox.deposit(0, amount1);
 
     // Second deposit
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount2);
 
-    s_erc20LockBox.deposit(amount2);
+    s_erc20LockBox.deposit(0, amount2);
 
     vm.stopPrank();
 
@@ -74,7 +74,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), caller1, amount);
 
-    s_erc20LockBox.deposit(amount);
+    s_erc20LockBox.deposit(0, amount);
     vm.stopPrank();
 
     // Second caller deposits
@@ -84,7 +84,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), caller2, amount);
 
-    s_erc20LockBox.deposit(amount);
+    s_erc20LockBox.deposit(0, amount);
     vm.stopPrank();
 
     // Verify balances
@@ -99,7 +99,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     s_token.approve(address(s_erc20LockBox), amount);
     vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.Unauthorized.selector, STRANGER));
 
-    s_erc20LockBox.deposit(amount);
+    s_erc20LockBox.deposit(0, amount);
   }
 
   function test_RevertWhen_AmountIsZero() public {
@@ -107,6 +107,6 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     s_token.approve(address(s_erc20LockBox), 1);
     vm.expectRevert(ERC20LockBox.TokenAmountCannotBeZero.selector);
 
-    s_erc20LockBox.deposit(0);
+    s_erc20LockBox.deposit(0, 0);
   }
 }

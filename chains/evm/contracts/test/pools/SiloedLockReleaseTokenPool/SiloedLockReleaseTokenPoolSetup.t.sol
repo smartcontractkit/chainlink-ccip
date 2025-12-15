@@ -26,13 +26,15 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
   uint64 internal constant SILOED_CHAIN_SELECTOR = DEST_CHAIN_SELECTOR + 1;
 
   ERC20LockBox internal s_lockBox;
+  ERC20LockBox internal s_siloLockBox;
 
   function setUp() public virtual override {
     super.setUp();
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_lockBox = new ERC20LockBox(address(s_token));
+    s_lockBox = new ERC20LockBox(address(s_token), 0);
+    s_siloLockBox = new ERC20LockBox(address(s_token), SILOED_CHAIN_SELECTOR);
 
     s_siloedLockReleaseTokenPool = new SiloedLockReleaseTokenPool(
       s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
@@ -42,6 +44,13 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
     allowedCallers[0] =
       ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_siloedLockReleaseTokenPool), allowed: true});
     s_lockBox.configureAllowedCallers(allowedCallers);
+    s_siloLockBox.configureAllowedCallers(allowedCallers);
+
+    uint64[] memory selectors = new uint64[](1);
+    selectors[0] = SILOED_CHAIN_SELECTOR;
+    address[] memory lockBoxes = new address[](1);
+    lockBoxes[0] = address(s_siloLockBox);
+    s_siloedLockReleaseTokenPool.configureChainLockBoxes(selectors, lockBoxes);
 
     // Set the rebalancer for the token pool
     s_siloedLockReleaseTokenPool.setRebalancer(OWNER);

@@ -13,11 +13,15 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
   SiloedUSDCTokenPool internal s_usdcTokenPoolTransferLiquidity;
 
   ERC20LockBox internal s_lockBox;
+  ERC20LockBox internal s_sourceLockBox;
+  ERC20LockBox internal s_destLockBox;
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_lockBox = new ERC20LockBox(address(s_USDCToken));
+    s_lockBox = new ERC20LockBox(address(s_USDCToken), 0);
+    s_sourceLockBox = new ERC20LockBox(address(s_USDCToken), SOURCE_CHAIN_SELECTOR);
+    s_destLockBox = new ERC20LockBox(address(s_USDCToken), DEST_CHAIN_SELECTOR);
 
     s_usdcTokenPool = new SiloedUSDCTokenPool(
       s_USDCToken,
@@ -67,12 +71,22 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
 
     _poolApplyChainUpdates(address(s_usdcTokenPoolTransferLiquidity));
 
-    // Allow both pools to interact with the shared lockbox.
+    // Allow both pools to interact with the lockboxes.
     ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    allowedCallers[0] =
-      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
+    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
     allowedCallers[1] =
       ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPoolTransferLiquidity), allowed: true});
     ERC20LockBox(s_lockBox).configureAllowedCallers(allowedCallers);
+    ERC20LockBox(s_sourceLockBox).configureAllowedCallers(allowedCallers);
+    ERC20LockBox(s_destLockBox).configureAllowedCallers(allowedCallers);
+
+    uint64[] memory selectors = new uint64[](2);
+    selectors[0] = SOURCE_CHAIN_SELECTOR;
+    selectors[1] = DEST_CHAIN_SELECTOR;
+    address[] memory lockBoxes = new address[](2);
+    lockBoxes[0] = address(s_sourceLockBox);
+    lockBoxes[1] = address(s_destLockBox);
+    s_usdcTokenPool.configureChainLockBoxes(selectors, lockBoxes);
+    s_usdcTokenPoolTransferLiquidity.configureChainLockBoxes(selectors, lockBoxes);
   }
 }

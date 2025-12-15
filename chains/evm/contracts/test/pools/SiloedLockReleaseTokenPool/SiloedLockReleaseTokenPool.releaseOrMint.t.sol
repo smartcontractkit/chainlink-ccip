@@ -12,9 +12,10 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     super.setUp();
 
     IERC20(address(s_token)).approve(address(s_lockBox), type(uint256).max);
+    IERC20(address(s_token)).approve(address(s_siloLockBox), type(uint256).max);
 
-    s_lockBox.deposit(10e18);
-    s_lockBox.deposit(10e18);
+    s_lockBox.deposit(0, 10e18);
+    s_siloLockBox.deposit(SILOED_CHAIN_SELECTOR, 10e18);
   }
 
   function test_ReleaseOrMint_SiloedChain() public {
@@ -40,7 +41,7 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     vm.startPrank(s_allowedOffRamp);
 
     vm.expectEmit();
-    emit IERC20.Transfer(address(s_lockBox), OWNER, amount);
+    emit IERC20.Transfer(address(s_siloLockBox), OWNER, amount);
 
     s_siloedLockReleaseTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({

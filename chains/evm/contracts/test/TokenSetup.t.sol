@@ -144,13 +144,14 @@ contract TokenSetup is BaseTest {
         s_sourceTokens[i]
       );
     }
-
   }
 
-  function _getOrDeployLockBox(address token) internal returns (ERC20LockBox) {
+  function _getOrDeployLockBox(
+    address token
+  ) internal returns (ERC20LockBox) {
     ERC20LockBox lockBox = s_lockBoxes[token];
     if (address(lockBox) == address(0)) {
-      lockBox = new ERC20LockBox(token);
+      lockBox = new ERC20LockBox(token, 0);
       s_lockBoxes[token] = lockBox;
     }
     return lockBox;

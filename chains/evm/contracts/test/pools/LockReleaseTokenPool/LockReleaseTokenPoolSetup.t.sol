@@ -31,7 +31,7 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_lockBox = new ERC20LockBox(address(s_token));
+    s_lockBox = new ERC20LockBox(address(s_token), 0);
 
     s_lockReleaseTokenPool = new LockReleaseTokenPool(
       s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
@@ -51,8 +51,7 @@ contract LockReleaseTokenPoolSetup is BaseTest {
 
     // Configure allowed callers for the lockBox - both pools.
     ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    allowedCallers[0] =
-      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_lockReleaseTokenPool), allowed: true});
+    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_lockReleaseTokenPool), allowed: true});
     allowedCallers[1] =
       ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_lockReleaseTokenPoolWithAllowList), allowed: true});
     s_lockBox.configureAllowedCallers(allowedCallers);
