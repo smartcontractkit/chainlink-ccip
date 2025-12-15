@@ -74,6 +74,7 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 			output.Addresses = append(output.Addresses, initAccessRef...)
 			deps.ExistingAddresses = append(deps.ExistingAddresses, initAccessRef...)
 
+			// Initialize MCMs
 			initMcmRef, err := initMCM(b, deps, in.MCMSDeploymentConfigPerChain, mcmAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize MCMs: %w", err)
@@ -82,7 +83,7 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 			output.BatchOps = append(output.BatchOps, initMcmRef.BatchOps...)
 			deps.ExistingAddresses = append(deps.ExistingAddresses, initMcmRef.NewAddresses...)
 
-			// Assume access Controller and MCM have already been initialized
+			// Initialize Timelock
 			initTimelockRef, err := initTimelock(b, deps, in.TimelockMinDelay, timelockAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize Timelock: %w", err)
@@ -123,6 +124,15 @@ func (d *SolanaAdapter) FinalizeDeployMCMS() *operations.Sequence[ccipapi.MCMSDe
 				Qualifier:         *in.Qualifier,
 			}
 
+			// Configure MCMs
+			mcmRef, err := configureMCM(b, deps, in.MCMSDeploymentConfigPerChain, mcmAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure MCMs: %w", err)
+			}
+			output.Addresses = append(output.Addresses, mcmRef.NewAddresses...)
+			output.BatchOps = append(output.BatchOps, mcmRef.BatchOps...)
+			deps.ExistingAddresses = append(deps.ExistingAddresses, mcmRef.NewAddresses...)
+
 			// roles
 			setupRolesOutput, err := setupRoles(b, deps, mcmAddress)
 			if err != nil {
@@ -162,6 +172,19 @@ func initAccessController(b operations.Bundle, deps mcmsops.Deps, accessControll
 }
 
 func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentConfigPerChain, mcmAddress solana.PublicKey) (mcmsops.MCMOutput, error) {
+	return doMCMOp(b, deps, cfg, mcmAddress, false)
+}
+
+func configureMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentConfigPerChain, mcmAddress solana.PublicKey) (mcmsops.MCMOutput, error) {
+	return doMCMOp(b, deps, cfg, mcmAddress, true)
+}
+
+func doMCMOp(
+	b operations.Bundle,
+	deps mcmsops.Deps,
+	cfg ccipapi.MCMSDeploymentConfigPerChain,
+	mcmAddress solana.PublicKey,
+	configure bool) (mcmsops.MCMOutput, error) {
 	var output mcmsops.MCMOutput
 	configs := []struct {
 		ctype cldf_deployment.ContractType
@@ -181,8 +204,13 @@ func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentC
 		},
 	}
 
+	op := mcmsops.InitMCMOp
+	if configure {
+		op = mcmsops.ConfigureMCMOp
+	}
+
 	for _, cfg := range configs {
-		ref, err := operations.ExecuteOperation(b, mcmsops.InitMCMOp, deps,
+		ref, err := operations.ExecuteOperation(b, op, deps,
 			mcmsops.InitMCMInput{
 				ContractType: cfg.ctype,
 				MCMConfig:    cfg.cfg,
@@ -277,8 +305,8 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 
 // assume refs are in the order returned by GetAllMCMS
 func transferAllMCMS(
-	b operations.Bundle, 
-	chain cldf_solana.Chain, 
+	b operations.Bundle,
+	chain cldf_solana.Chain,
 	in deployops.TransferOwnershipPerChainInput,
 	transferAccessController bool) (sequences.OnChainOutput, error) {
 	var output sequences.OnChainOutput
