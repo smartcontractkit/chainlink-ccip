@@ -118,7 +118,7 @@ contract e2e is OnRampSetup {
     deal(s_sourceFeeToken, s_defaultExecutor, 1);
   }
 
-  function test_e2e() public virtual {
+  function test_e2e() public {
     vm.pauseGasMetering();
     uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
 
