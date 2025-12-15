@@ -77,7 +77,7 @@ contract OnRamp_getReceipts is OnRampSetup {
   ) internal view returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
     address[] memory ccvs = new address[](ccvAddresses.length);
     bytes[] memory ccvArgs = new bytes[](ccvAddresses.length);
-    for (uint256 i = 0; i < ccvAddresses.length; i++) {
+    for (uint256 i = 0; i < ccvAddresses.length; ++i) {
       ccvs[i] = ccvAddresses[i];
     }
 

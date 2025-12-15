@@ -62,13 +62,13 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     addressBytesLength = uint8(bound(addressBytesLength, 1, 31));
 
     bytes memory actualAddress = new bytes(addressBytesLength);
-    for (uint256 i = 0; i < addressBytesLength; i++) {
+    for (uint256 i = 0; i < addressBytesLength; ++i) {
       actualAddress[i] = bytes1(uint8(i + 1));
     }
 
     bytes memory paddedAddress = new bytes(32);
     uint256 paddingLength = 32 - addressBytesLength;
-    for (uint256 i = 0; i < addressBytesLength; i++) {
+    for (uint256 i = 0; i < addressBytesLength; ++i) {
       paddedAddress[paddingLength + i] = actualAddress[i];
     }
 
@@ -86,7 +86,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     // Set first byte to non-zero (invalid padding)
     paddedAddress[0] = 0x01;
     // Fill the address part with valid data
-    for (uint256 i = 12; i < 32; i++) {
+    for (uint256 i = 12; i < 32; ++i) {
       paddedAddress[i] = bytes1(uint8(i));
     }
 

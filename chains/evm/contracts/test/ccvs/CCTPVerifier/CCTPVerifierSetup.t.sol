@@ -65,17 +65,17 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       address(s_mockRMNRemote)
     );
 
-    // Apply dest chain config updates.
-    CCTPVerifier.DestChainConfigArgs[] memory destChainConfigArgs = new CCTPVerifier.DestChainConfigArgs[](1);
-    destChainConfigArgs[0] = BaseVerifier.DestChainConfigArgs({
+    // Apply remote chain config updates.
+    CCTPVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new CCTPVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigArgs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: s_router,
-      destChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
-    s_cctpVerifier.applyDestChainConfigUpdates(destChainConfigArgs);
+    s_cctpVerifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
 
     // Set the domains.
     CCTPVerifier.SetDomainArgs[] memory domains = new CCTPVerifier.SetDomainArgs[](1);

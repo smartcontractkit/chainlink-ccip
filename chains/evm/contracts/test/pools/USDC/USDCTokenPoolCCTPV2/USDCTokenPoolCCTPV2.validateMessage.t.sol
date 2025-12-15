@@ -171,7 +171,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
   ) public {
     // Generate 280 pseudo-random bytes using the seed which will become the message body
     bytes memory randomBytes = new bytes(260);
-    for (uint256 i = 0; i < 260; i++) {
+    for (uint256 i = 0; i < 260; ++i) {
       randomBytes[i] = bytes1(uint8(uint256(keccak256(abi.encodePacked(seed, i))) % 256));
     }
 

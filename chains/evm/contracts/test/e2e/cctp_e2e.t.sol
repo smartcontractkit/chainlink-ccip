@@ -289,17 +289,28 @@ contract cctp_e2e is e2e {
     });
     s_destCCTPSetup.verifierResolver.applyInboundImplementationUpdates(inboundImpls);
 
-    // Apply dest chain config updates on the source CCTP verifier.
-    CCTPVerifier.DestChainConfigArgs[] memory destChainConfigArgs = new BaseVerifier.DestChainConfigArgs[](1);
-    destChainConfigArgs[0] = BaseVerifier.DestChainConfigArgs({
+    // Apply remote chain config updates on the each CCTP verifier.
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigArgs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: IRouter(s_sourceCCTPSetup.router),
-      destChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
-    s_sourceCCTPSetup.verifier.applyDestChainConfigUpdates(destChainConfigArgs);
+    s_sourceCCTPSetup.verifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
+
+    remoteChainConfigArgs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigArgs[0] = BaseVerifier.RemoteChainConfigArgs({
+      router: IRouter(s_destCCTPSetup.router),
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      allowlistEnabled: false,
+      feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
+      gasForVerification: DEFAULT_CCV_GAS_LIMIT,
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+    });
+    s_destCCTPSetup.verifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
 
     // Set the destination domain on the source CCTP verifier.
     CCTPVerifier.SetDomainArgs[] memory destDomainArgs = new CCTPVerifier.SetDomainArgs[](1);
