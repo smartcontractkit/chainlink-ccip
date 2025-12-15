@@ -6,7 +6,6 @@ import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
