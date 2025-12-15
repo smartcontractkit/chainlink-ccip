@@ -22,22 +22,26 @@ import {CCTPTokenPool} from "../../pools/USDC/CCTPTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../pools/USDC/USDCTokenPoolProxy.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {CCTPHelper} from "../helpers/CCTPHelper.sol";
+
+import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
-import {e2e} from "./e2e.t.sol";
+import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-contract cctp_e2e is e2e {
+contract cctp_e2e is OnRampSetup {
   uint32 private constant CCTP_VERSION = 1;
   uint16 private constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
 
   uint32 private constant SOURCE_DOMAIN = 1;
   uint32 private constant DEST_DOMAIN = 2;
 
+  OffRampHelper private s_offRamp;
+  MockVerifier private s_defaultSourceVerifier;
   address private s_feeAggregator = makeAddr("feeAggregator");
   address private s_allowlistAdmin = makeAddr("allowlistAdmin");
 
@@ -60,12 +64,23 @@ contract cctp_e2e is e2e {
   function setUp() public override {
     super.setUp();
 
+    s_offRamp = new OffRampHelper(
+      OffRamp.StaticConfig({
+        localChainSelector: DEST_CHAIN_SELECTOR,
+        gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
+        rmnRemote: s_mockRMNRemote,
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
+      })
+    );
+
     s_sourceCCTPSetup =
       _deployCCTPSetup(address(s_sourceRouter), address(s_mockRMNRemote), address(s_tokenAdminRegistry), SOURCE_DOMAIN);
     s_destCCTPSetup =
       _deployCCTPSetup(address(s_sourceRouter), address(s_mockRMNRemote), address(s_tokenAdminRegistry), DEST_DOMAIN);
 
     _connectCCTPSetups();
+
+    s_defaultSourceVerifier = new MockVerifier("");
 
     // Deal some USDC to the OWNER.
     deal(address(s_sourceCCTPSetup.token), OWNER, 1000e6); // 1000 USDC.
@@ -77,13 +92,53 @@ contract cctp_e2e is e2e {
     s_extraDataByToken[address(s_sourceCCTPSetup.token)] =
       abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG);
 
-    // Apply off ramp updates on the source router.
+    // Apply off ramp and on ramp updates on the source router.
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+
+    // Set the default CCV on the off ramp.
+    address[] memory defaultDestCCVs = new address[](1);
+    defaultDestCCVs[0] = address(s_destCCTPSetup.verifierResolver);
+
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encodePacked(s_onRamp);
+
+    OffRamp.SourceChainConfigArgs[] memory sourceChainUpdates = new OffRamp.SourceChainConfigArgs[](1);
+    sourceChainUpdates[0] = OffRamp.SourceChainConfigArgs({
+      router: s_destRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      isEnabled: true,
+      onRamps: onRamps,
+      defaultCCV: defaultDestCCVs,
+      laneMandatedCCVs: new address[](0)
+    });
+    s_offRamp.applySourceChainConfigUpdates(sourceChainUpdates);
+
+    // Set dest chain config on the on ramp.
+    address[] memory defaultSourceCCVs = new address[](1);
+    defaultSourceCCVs[0] = address(s_defaultSourceVerifier);
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      laneMandatedCCVs: new address[](0),
+      defaultCCVs: defaultSourceCCVs,
+      defaultExecutor: s_defaultExecutor,
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+    destChainConfigArgs[0].offRamp = abi.encodePacked(address(s_offRamp));
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
-  function test_e2e() public override {
+  function test_e2e() public {
     uint256 amount = 1e6;
 
     vm.pauseGasMetering();
@@ -182,26 +237,18 @@ contract cctp_e2e is e2e {
       })
     });
 
-    // Default CCV is applied because receiver is an EOA.
-    // Therefore, we need to include a verifier result for the mock verifier here as well.
-    address[] memory ccvAddresses = new address[](2);
+    address[] memory ccvAddresses = new address[](1);
     ccvAddresses[0] = address(s_destCCTPSetup.verifierResolver);
-    ccvAddresses[1] = address(s_destVerifier);
-    bytes[] memory verifierResults = new bytes[](2);
+    bytes[] memory verifierResults = new bytes[](1);
     verifierResults[0] = abi.encodePacked(
       s_sourceCCTPSetup.verifier.versionTag(), CCTPHelper._encodeCCTPMessage(cctpMessage), new bytes(65)
     );
-    verifierResults[1] = "";
 
     MessageV1Codec.MessageV1 memory messageV1 = this._decodeMessageV1(encodedMessage);
 
     vm.expectCall(
       address(s_destCCTPSetup.verifier),
       abi.encodeCall(CCTPVerifier.verifyMessage, (messageV1, messageId, verifierResults[0]))
-    );
-    vm.expectCall(
-      address(Proxy(s_destVerifier).getTarget()),
-      abi.encodeCall(MockVerifier.verifyMessage, (messageV1, messageId, verifierResults[1]))
     );
     vm.expectCall(
       address(s_destCCTPSetup.messageTransmitter),
