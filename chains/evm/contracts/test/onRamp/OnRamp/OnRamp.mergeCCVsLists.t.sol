@@ -20,6 +20,7 @@ contract OnRamp_mergeCCVLists is OnRampSetup {
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: laneMandatedCCVs,
       defaultCCVs: defaultCCVs,

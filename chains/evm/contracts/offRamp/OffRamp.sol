@@ -269,22 +269,20 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
-    /////// SECURITY CRITICAL CHECKS ///////
-    address receiver = address(bytes20(message.receiver));
-
     // We track the balance of the receiver prior to verification because a verifier may be responsible for releasing or minting the token.
     uint256 balancePre = 0;
-    address tokenReceiver;
     if (message.tokenTransfer.length > 0) {
       if (message.tokenTransfer[0].destTokenAddress.length != 20) {
         revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
       }
-      tokenReceiver = address(bytes20(message.tokenTransfer[0].tokenReceiver));
-      balancePre = _getBalanceOfReceiver(tokenReceiver, address(bytes20(message.tokenTransfer[0].destTokenAddress)));
+
+      balancePre = _getBalanceOfReceiver(address(bytes20(message.tokenTransfer[0].tokenReceiver)), address(bytes20(message.tokenTransfer[0].destTokenAddress)));
     }
 
+    address receiver = address(bytes20(message.receiver));
     bool isTokenOnlyTransfer = _isTokenOnlyTransfer(message.data.length, message.ccipReceiveGasLimit, receiver);
 
+    /////// SECURITY CRITICAL CHECKS ///////
     {
       (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) = _ensureCCVQuorumIsReached(
         message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs, isTokenOnlyTransfer
@@ -313,10 +311,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       // If a lock-release pool is the receiver, balancePost - balancePre would not reflect the amount transferred.
       // Therefore, if the receiver is the token pool, we trust the value returned by the pool.
       // Otherwise, we trust balancePost - balancePre as the amount given to the receiver.
-      if (tokenReceiver == localPoolAddress) {
+      if (address(bytes20(message.tokenTransfer[0].tokenReceiver)) == localPoolAddress) {
         destTokenAmounts[0] = destTokenAmount;
       } else {
-        uint256 balancePost = _getBalanceOfReceiver(tokenReceiver, destTokenAmount.token);
+        uint256 balancePost = _getBalanceOfReceiver(address(bytes20(message.tokenTransfer[0].tokenReceiver)), destTokenAmount.token);
         destTokenAmounts[0] = Client.EVMTokenAmount({token: destTokenAmount.token, amount: balancePost - balancePre});
       }
     }

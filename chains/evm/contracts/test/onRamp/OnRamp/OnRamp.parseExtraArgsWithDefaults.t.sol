@@ -43,6 +43,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
       messageNumber: 0,
       addressBytesLength: EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: true,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultExecutor: s_defaultExecutor,
       laneMandatedCCVs: s_laneMandatedCCVs,
@@ -71,7 +72,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
 
     ExtraArgsCodec.GenericExtraArgsV3 memory result =
-      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
+      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs, false);
 
     // User-provided CCVs should be used (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(userCCVAddresses.length, result.ccvs.length);
@@ -86,7 +87,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
 
     ExtraArgsCodec.GenericExtraArgsV3 memory result =
-      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
+      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs, false);
 
     // Default CCVs should be applied (no lane mandated CCVs added in parseExtraArgsWithDefaults anymore)
     assertEq(s_defaultCCVs.length, result.ccvs.length);
@@ -109,7 +110,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     bytes memory legacyExtraArgs = Client._argsToBytes(v2Args);
 
     ExtraArgsCodec.GenericExtraArgsV3 memory result =
-      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, legacyExtraArgs);
+      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, legacyExtraArgs, false);
 
     assertEq(s_defaultCCVs.length, result.ccvs.length);
     assertEq(result.ccvs[0], s_defaultCCVs[0]);
@@ -131,10 +132,49 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
     bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
     ExtraArgsCodec.GenericExtraArgsV3 memory result =
-      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
+      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs, false);
 
     // Should have default CCVs
     assertEq(s_defaultCCVs.length, result.ccvs.length);
+  }
+
+  function test_parseExtraArgsWithDefaults_V3DoesNotAddDefaults_WhenHasNoDataButHasTokenAndGasLimitZero() public view {
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
+    inputArgs.gasLimit = 0;
+
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory result =
+      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs, true);
+
+    assertEq(result.ccvs.length, 0, "Should not inject default CCVs for token-only transfer");
+    assertEq(result.ccvArgs.length, 0, "Should not inject default CCV args for token-only transfer");
+  }
+
+  function test_parseExtraArgsWithDefaults_LegacyDoesNotAddDefaults_WhenHasNoDataButHasTokenAndGasLimitZero()
+    public
+    view
+  {
+    // Legacy GenericExtraArgsV2 can explicitly set gasLimit=0 (unlike empty extraArgs which uses defaults).
+    bytes memory legacyExtraArgs =
+      Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 0, allowOutOfOrderExecution: false}));
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory result =
+      s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, legacyExtraArgs, true);
+
+    assertEq(result.ccvs.length, 0, "Should not inject default CCVs for token-only transfer");
+    assertEq(result.ccvArgs.length, 0, "Should not inject default CCV args for token-only transfer");
+  }
+
+  function test_parseExtraArgsWithDefaults_RevertWhen_TokenReceiverNotAllowed() public {
+    OnRamp.DestChainConfig memory cfg = s_destChainConfig;
+    cfg.tokenReceiverAllowed = false;
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
+    inputArgs.tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
+    bytes memory extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs);
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.TokenReceiverNotAllowed.selector, DEST_CHAIN_SELECTOR));
+    s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, cfg, extraArgs, false);
   }
 
   // Reverts
@@ -155,6 +195,6 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
     // Should revert due to duplicate CCVs
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, duplicateCCV));
-    s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs);
+    s_OnRampHelper.parseExtraArgsWithDefaults(DEST_CHAIN_SELECTOR, s_destChainConfig, extraArgs, false);
   }
 }

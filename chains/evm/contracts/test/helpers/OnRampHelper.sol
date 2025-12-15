@@ -13,9 +13,10 @@ contract OnRampHelper is OnRamp {
   function parseExtraArgsWithDefaults(
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
-    bytes calldata extraArgs
+    bytes calldata extraArgs,
+    bool hasNoDataButHasToken
   ) external view returns (ExtraArgsCodec.GenericExtraArgsV3 memory) {
-    return _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, extraArgs);
+    return _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, extraArgs, hasNoDataButHasToken);
   }
 
   /// @notice Exposes the internal _mergeCCVLists function for testing.

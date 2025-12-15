@@ -47,6 +47,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error CustomBlockConfirmationNotSupportedOnPoolV1();
   error TokenArgsNotSupportedOnPoolV1();
   error InsufficientFeeTokenAmount();
+  error TokenReceiverNotAllowed(uint64 destChainSelector);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -99,7 +100,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 0 is not a valid message number for any real transaction as this value will be incremented before use.
     uint64 messageNumber; //       │
     uint8 addressBytesLength; //   │ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
-    uint16 networkFeeUSDCents; // ─╯ Network fee in USD cents for messages to this destination chain.
+    uint16 networkFeeUSDCents; //  │ Network fee in USD cents for messages to this destination chain.
+    bool tokenReceiverAllowed; // ─╯Whether token receiver different from message receiver is allowed.
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address defaultExecutor; // Default executor to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
@@ -115,6 +117,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     IRouter router; //  Source router address  that is allowed to send messages to the destination chain.
     uint8 addressBytesLength; // The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
     uint16 networkFeeUSDCents; // Network fee in USD cents for messages to this destination chain.
+    bool tokenReceiverAllowed; // Whether token receiver different from message receiver is allowed.
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
@@ -208,8 +211,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 1. parse extraArgs.
 
-    ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs =
-      _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(
+      destChainSelector,
+      destChainConfig,
+      message.extraArgs,
+      (message.data.length == 0 && message.tokenAmounts.length > 0)
+    );
 
     MessageV1Codec.MessageV1 memory newMessage = MessageV1Codec.MessageV1({
       sourceChainSelector: i_localChainSelector,
@@ -458,13 +465,21 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function _parseExtraArgsWithDefaults(
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
-    bytes calldata extraArgs
+    bytes calldata extraArgs,
+    bool hasNoDataButHasToken
   ) internal view returns (ExtraArgsCodec.GenericExtraArgsV3 memory resolvedArgs) {
+    // If ExtraArgsV3 are provided, decode them.
     if (extraArgs.length >= 4 && bytes4(extraArgs[:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
 
+      // Normalize and validate tokenReceiver if specified.
       if (resolvedArgs.tokenReceiver.length != 0) {
-        this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
+        // Not all chains allow tokenReceiver to be specified differently from receiver.
+        if (!destChainConfig.tokenReceiverAllowed) {
+          revert TokenReceiverNotAllowed(destChainSelector);
+        }
+        resolvedArgs.tokenReceiver =
+          this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
       }
 
       // We need to ensure no duplicate CCVs are present in the ccv list.
@@ -477,8 +492,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         }
       }
 
-      // When users don't specify any CCVs, default CCVs are chosen.
-      if (resolvedArgs.ccvs.length == 0) {
+      // When users don't specify any CCVs, default CCVs are chosen unless the transfer is a token-only transfer.
+      // If it's a token-only transfer, we leave the CCV list empty to allow pool-required CCVs to be the only CCVs for
+      // the message.
+      if (resolvedArgs.ccvs.length == 0 && !(hasNoDataButHasToken && resolvedArgs.gasLimit == 0)) {
         resolvedArgs.ccvs = new address[](destChainConfig.defaultCCVs.length);
         resolvedArgs.ccvArgs = new bytes[](destChainConfig.defaultCCVs.length);
         for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
@@ -487,16 +504,15 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         }
       }
     } else {
-      resolvedArgs.ccvs = new address[](destChainConfig.defaultCCVs.length);
-      resolvedArgs.ccvArgs = new bytes[](destChainConfig.defaultCCVs.length);
-      for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-        resolvedArgs.ccvs[i] = destChainConfig.defaultCCVs[i];
-        resolvedArgs.ccvArgs[i] = "";
-      }
-
       // Populate the fields that could be present in legacy extraArgs.
       (resolvedArgs.tokenReceiver, resolvedArgs.gasLimit, resolvedArgs.executorArgs) =
         IFeeQuoter(s_dynamicConfig.feeQuoter).resolveLegacyArgs(destChainSelector, extraArgs);
+
+      // If older or no args are provided, use defaults if it's not a token-only transfer.
+      if (!(hasNoDataButHasToken && resolvedArgs.gasLimit == 0)) {
+        resolvedArgs.ccvs = destChainConfig.defaultCCVs;
+        resolvedArgs.ccvArgs = new bytes[](destChainConfig.defaultCCVs.length);
+      }
     }
 
     // When users don't specify an executor, default executor is chosen.
@@ -575,6 +591,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       destChainConfig.router = destChainConfigArg.router;
       destChainConfig.addressBytesLength = destChainConfigArg.addressBytesLength;
       destChainConfig.networkFeeUSDCents = destChainConfigArg.networkFeeUSDCents;
+      destChainConfig.tokenReceiverAllowed = destChainConfigArg.tokenReceiverAllowed;
       destChainConfig.baseExecutionGasCost = destChainConfigArg.baseExecutionGasCost;
       destChainConfig.defaultCCVs = destChainConfigArg.defaultCCVs;
       destChainConfig.laneMandatedCCVs = destChainConfigArg.laneMandatedCCVs;
@@ -767,8 +784,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       revert DestinationChainNotSupported(destChainSelector);
     }
 
-    ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs =
-      _parseExtraArgsWithDefaults(destChainSelector, destChainConfig, message.extraArgs);
+    ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(
+      destChainSelector,
+      destChainConfig,
+      message.extraArgs,
+      (message.data.length == 0 && message.tokenAmounts.length > 0)
+    );
     // Update the CCVs list to include lane mandated and pool required CCVs.
     address[] memory poolRequiredCCVs = new address[](0);
     if (message.tokenAmounts.length != 0) {
