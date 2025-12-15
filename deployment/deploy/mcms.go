@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -70,29 +71,29 @@ func GrantAdminRoleToTimelock(deployerReg *DeployerRegistry, mcmsRegistry *chang
 func grantAdminRoleToTimelockVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, GrantAdminRoleToTimelockConfig) error {
 	return func(e cldf.Environment, cfg GrantAdminRoleToTimelockConfig) error {
 		if cfg.AdapterVersion == nil {
-			return fmt.Errorf("adapter version is required")
+			return errors.New("adapter version is required")
 		}
 
 		for _, chainCfg := range cfg.Chains {
 			// validate timelock to transfer ref
 			if chainCfg.TimelockToTransferRef.Type.String() != utils.RBACTimelock.String() {
-				return fmt.Errorf("type of timelock to transfer must be rbactimelock")
+				return errors.New("type of timelock to transfer must be rbactimelock")
 			}
 			if len(chainCfg.TimelockToTransferRef.Qualifier) == 0 {
-				return fmt.Errorf("timelock to transfer qualifier cannot be empty")
+				return errors.New("timelock to transfer qualifier cannot be empty")
 			}
 			if len(chainCfg.TimelockToTransferRef.Version.String()) == 0 {
-				return fmt.Errorf("timelock to transfer version cannot be empty")
+				return errors.New("timelock to transfer version cannot be empty")
 			}
 			// validate new admin timelock ref
 			if chainCfg.NewAdminTimelockRef.Type.String() != utils.RBACTimelock.String() {
-				return fmt.Errorf("type of new admin timelock must be rbactimelock")
+				return errors.New("type of new admin timelock must be rbactimelock")
 			}
 			if len(chainCfg.NewAdminTimelockRef.Qualifier) == 0 {
-				return fmt.Errorf("new admin timelock qualifier cannot be empty")
+				return errors.New("new admin timelock qualifier cannot be empty")
 			}
 			if len(chainCfg.NewAdminTimelockRef.Version.String()) == 0 {
-				return fmt.Errorf("new admin timelock version cannot be empty")
+				return errors.New("new admin timelock version cannot be empty")
 			}
 		}
 
@@ -170,7 +171,7 @@ func deployMCMSVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistry) fun
 	return func(e cldf.Environment, cfg MCMSDeploymentConfig) error {
 		// TODO: implement
 		if cfg.AdapterVersion == nil {
-			return fmt.Errorf("adapter version is required for MCMS deployment verification")
+			return errors.New("adapter version is required for MCMS deployment verification")
 		}
 		return nil
 	}
