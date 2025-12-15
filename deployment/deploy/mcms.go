@@ -71,10 +71,22 @@ func GrantAdminRoleToTimelock(deployerReg *DeployerRegistry, mcmsRegistry *chang
 
 func grantAdminRoleToTimelockVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, GrantAdminRoleToTimelockConfig) error {
 	return func(e cldf.Environment, cfg GrantAdminRoleToTimelockConfig) error {
-		// TODO: implement
 		if cfg.AdapterVersion == nil {
 			return fmt.Errorf("adapter version is required")
 		}
+
+		for _, chainCfg := range cfg.Chains {
+			if len(chainCfg.TimelockAddress) == 0 {
+				return fmt.Errorf("timelock address cannot be empty")
+			}
+			if len(chainCfg.NewAdminTimelockVersion) == 0 {
+				return fmt.Errorf("new admin timelock version cannot be empty")
+			}
+			if len(chainCfg.NewAdminTimelockQualifier) == 0 {
+				return fmt.Errorf("new admin timelock qualifier cannot be empty")
+			}
+		}
+
 		return nil
 	}
 }
