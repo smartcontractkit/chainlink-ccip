@@ -26,7 +26,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
-    configs[0].defaultCCV[0] = makeAddr("ccv1");
+    configs[0].defaultCCVs[0] = makeAddr("ccv1");
 
     configs[1] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
@@ -36,7 +36,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](2)
     });
-    configs[1].defaultCCV[0] = makeAddr("ccv2");
+    configs[1].defaultCCVs[0] = makeAddr("ccv2");
     configs[1].laneMandatedCCVs[0] = makeAddr("mandatedCCV1");
     configs[1].laneMandatedCCVs[1] = makeAddr("mandatedCCV2");
 
@@ -59,8 +59,8 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     assertEq(config1.onRamps[0], configs[0].onRamps[0]);
     assertEq(config2.onRamps[0], configs[1].onRamps[0]);
 
-    assertEq(config1.defaultCCVs[0], configs[0].defaultCCV[0]);
-    assertEq(config2.defaultCCVs[0], configs[1].defaultCCV[0]);
+    assertEq(config1.defaultCCVs[0], configs[0].defaultCCVs[0]);
+    assertEq(config2.defaultCCVs[0], configs[1].defaultCCVs[0]);
 
     assertEq(config1.laneMandatedCCVs.length, 0);
     assertEq(config2.laneMandatedCCVs.length, 2);
@@ -81,8 +81,8 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       defaultCCV: new address[](2),
       laneMandatedCCVs: new address[](1)
     });
-    configs[0].defaultCCV[0] = makeAddr("ccv1");
-    configs[0].defaultCCV[1] = makeAddr("ccv2");
+    configs[0].defaultCCVs[0] = makeAddr("ccv1");
+    configs[0].defaultCCVs[1] = makeAddr("ccv2");
     configs[0].laneMandatedCCVs[0] = makeAddr("mandatedCCV");
 
     s_offRamp.applySourceChainConfigUpdates(configs);
@@ -106,7 +106,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
-    configs[0].defaultCCV[0] = makeAddr("ccv");
+    configs[0].defaultCCVs[0] = makeAddr("ccv");
 
     vm.expectRevert(OffRamp.ZeroChainSelectorNotAllowed.selector);
     s_offRamp.applySourceChainConfigUpdates(configs);
@@ -125,7 +125,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
-    configs[0].defaultCCV[0] = makeAddr("ccv");
+    configs[0].defaultCCVs[0] = makeAddr("ccv");
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
     s_offRamp.applySourceChainConfigUpdates(configs);
@@ -162,7 +162,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
-    configs[0].defaultCCV[0] = makeAddr("ccv");
+    configs[0].defaultCCVs[0] = makeAddr("ccv");
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
     s_offRamp.applySourceChainConfigUpdates(configs);

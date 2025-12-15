@@ -129,7 +129,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     (receipts, messageV1.executionGasLimit,) =
       s_onRamp.getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
-    // Because getReceipts uses msg.sender to set the Router, we must override it here.
+    // `getReceipts` uses `msg.sender` as the issuer for the network-fee receipt.
+    // Since this helper calls it directly (not through the router), override the issuer to reflect the router address.
     receipts[receipts.length - 1].issuer = address(s_sourceRouter);
 
     return (

@@ -89,8 +89,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector; // │ Source chain selector of the config to update.
     bool isEnabled; // ────────────╯ Flag whether the source chain is enabled or not.
     bytes[] onRamps; // OnRamp address on the source chain.
-    address[] defaultCCV; // Default CCV to use for messages from this source chain.
-    address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
+    address[] defaultCCVs; // Default CCVs to use for messages from this source chain.
+    address[] laneMandatedCCVs; // Required CCVs to use for all messages from this source chain.
   }
 
   // STATIC CONFIG
@@ -227,7 +227,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   function _callWithGasBuffer(
     bytes memory payload
   ) internal returns (bool success, bytes memory retData) {
-    // allocate retData memory ahead of time
+    // allocate retData memory ahead of time.
     retData = new bytes(Internal.MAX_RET_BYTES);
     uint16 maxReturnBytes = Internal.MAX_RET_BYTES;
 
@@ -239,16 +239,16 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint256 gasLimit = gasLeft - MAX_GAS_BUFFER_TO_UPDATE_STATE;
 
     assembly {
-      // call and return whether we succeeded. ignore return data
-      // call(gas, addr, value, argsOffset, argsLength, retOffset, retLength)
+      // Call and return whether we succeeded.
+      // call(gas, addr, value, argsOffset, argsLength, retOffset, retLength).
       success := call(gasLimit, address(), 0, add(payload, 0x20), mload(payload), 0x0, 0x0)
 
-      // limit our copy to maxReturnBytes bytes
+      // Limit our copy to maxReturnBytes bytes.
       let toCopy := returndatasize()
       if gt(toCopy, maxReturnBytes) { toCopy := maxReturnBytes }
-      // Store the length of the copied bytes
+      // Store the length of the copied bytes.
       mstore(retData, toCopy)
-      // copy the bytes from retData[0:_toCopy]
+      // copy the bytes from retData[0:_toCopy].
       returndatacopy(add(retData, 0x20), 0x0, toCopy)
     }
     return (success, retData);
@@ -271,7 +271,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     /////// SECURITY CRITICAL CHECKS ///////
     address receiver = address(bytes20(message.receiver));
 
-    // We track the balance of the receiver prior to verification because a verifier may be responsible for releasing or minting the token.
+    // We track the balance of the receiver prior to verification because a verifier may be responsible for releasing or
+    // minting the token.
     uint256 balancePre = 0;
     address tokenReceiver;
     if (message.tokenTransfer.length > 0) {
@@ -754,12 +755,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       if (configUpdate.sourceChainSelector == 0) {
         revert ZeroChainSelectorNotAllowed();
       }
-      if (address(configUpdate.router) == address(0) || configUpdate.defaultCCV.length == 0) {
+      if (address(configUpdate.router) == address(0) || configUpdate.defaultCCVs.length == 0) {
         revert ZeroAddressNotAllowed();
       }
 
-      for (uint256 j = 0; j < configUpdate.defaultCCV.length; ++j) {
-        if (configUpdate.defaultCCV[j] == address(0)) {
+      for (uint256 j = 0; j < configUpdate.defaultCCVs.length; ++j) {
+        if (configUpdate.defaultCCVs[j] == address(0)) {
           revert ZeroAddressNotAllowed();
         }
       }
@@ -768,7 +769,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
           revert ZeroAddressNotAllowed();
         }
       }
-      CCVConfigValidation._validateDefaultAndMandatedCCVs(configUpdate.defaultCCV, configUpdate.laneMandatedCCVs);
+      CCVConfigValidation._validateDefaultAndMandatedCCVs(configUpdate.defaultCCVs, configUpdate.laneMandatedCCVs);
 
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[configUpdate.sourceChainSelector];
       EnumerableSet.Bytes32Set storage allowedOnRampHashes = s_allowedOnRampHashes[configUpdate.sourceChainSelector];
@@ -790,7 +791,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       currentConfig.onRamps = configUpdate.onRamps;
       currentConfig.isEnabled = configUpdate.isEnabled;
       currentConfig.router = configUpdate.router;
-      currentConfig.defaultCCVs = configUpdate.defaultCCV;
+      currentConfig.defaultCCVs = configUpdate.defaultCCVs;
       currentConfig.laneMandatedCCVs = configUpdate.laneMandatedCCVs;
 
       // We don't need to check the return value, as inserting the item twice has no effect.

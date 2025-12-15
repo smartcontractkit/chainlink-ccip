@@ -54,7 +54,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
       laneMandatedCCVs: new address[](1)
     });
     configs[0].laneMandatedCCVs[0] = s_laneMandatedCCV;
-    configs[0].defaultCCV[0] = s_defaultCCV;
+    configs[0].defaultCCVs[0] = s_defaultCCV;
 
     s_offRamp.applySourceChainConfigUpdates(configs);
 

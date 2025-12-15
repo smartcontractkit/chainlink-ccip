@@ -33,7 +33,7 @@ contract OffRamp_getAllSourceChainConfigs is OffRampSetup {
       defaultCCV: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
-    configs[0].defaultCCV[0] = makeAddr("ccv2");
+    configs[0].defaultCCVs[0] = makeAddr("ccv2");
 
     s_offRamp.applySourceChainConfigUpdates(configs);
 

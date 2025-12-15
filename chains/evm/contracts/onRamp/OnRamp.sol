@@ -135,7 +135,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     address issuer; // ───────────╮
     uint32 destGasLimit; //       │ The gas limit for the actions taken on the destination chain for this entity.
     uint32 destBytesOverhead; // ─╯ The byte overhead for the actions taken on the destination chain for this entity.
-    uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
+    // The fee amount for this entity, in smallest denomination of the fee token.
+    // NOTE: While building receipts in `_getReceipts`, this field is temporarily populated with a USD-cent value
+    // (and converted to fee token amount later in the same function).
+    uint256 feeTokenAmount;
     bytes extraArgs; // Extra args that have been passed in on the source chain. May be empty.
   }
 
@@ -200,7 +203,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
 
-    // NOTE: assumes the message has already been validated through the getFee call.
+    // NOTE: The router is expected to call `getFee` prior to `forwardFromRouter`.
+    // This function still performs its own checks (e.g. router/originalSender, dest address validation, CCV list
+    // finalization) but relies on the router's pre-checks to avoid duplicating validation work.
     // Validate originalSender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause, which should stop all messages.
@@ -809,7 +814,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     Client.EVM2AnyMessage calldata message,
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) internal view returns (Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeTokenAmount) {
-    // Already ensure there's room for verifiers, token transfer, executor, and network fee.
+    // Preallocate receipts with room for: verifiers, token transfer (0 or 1), executor, and network fee.
     receipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 2);
     uint32 bytesOverheadSum = 0;
 
