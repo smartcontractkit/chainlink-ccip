@@ -15,6 +15,7 @@ import (
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf_datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -352,6 +353,11 @@ func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.Tr
 		output.BatchOps = append(output.BatchOps, report.Output...)
 	}
 	return output, nil
+}
+
+func (a *SolanaAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
+	// Not implemented for Solana
+	return nil
 }
 
 func getRefsAsOwnable(
