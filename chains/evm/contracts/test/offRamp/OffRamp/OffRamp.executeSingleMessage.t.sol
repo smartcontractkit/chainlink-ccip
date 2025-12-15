@@ -189,7 +189,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: _arrayOf(s_defaultCCV),
+      defaultCCVs: _arrayOf(s_defaultCCV),
       laneMandatedCCVs: _arrayOf(laneMandatedCCV)
     });
 

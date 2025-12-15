@@ -296,7 +296,7 @@ contract OffRamp_execute is OffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: defaultCCVs,
+      defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0)
     });
     OffRamp(offRampWithZeroBytes).applySourceChainConfigUpdates(updates);

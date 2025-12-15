@@ -37,6 +37,7 @@ library MessageV1Codec {
   enum EncodingErrorLocation {
     // Message-level components.
     MESSAGE_MIN_SIZE,
+    MESSAGE_ONRAMP_ADDRESS_LENGTH,
     MESSAGE_ONRAMP_ADDRESS_CONTENT,
     MESSAGE_OFFRAMP_ADDRESS_LENGTH,
     MESSAGE_OFFRAMP_ADDRESS_CONTENT,
@@ -422,7 +423,7 @@ library MessageV1Codec {
 
       // onRampAddressLength and onRampAddress.
       uint256 offset = 67;
-      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_ONRAMP_ADDRESS_CONTENT);
+      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_ONRAMP_ADDRESS_LENGTH);
       uint8 onRampAddressLength = uint8(encoded[offset++]);
       if (offset + onRampAddressLength > encoded.length) {
         revert InvalidDataLength(EncodingErrorLocation.MESSAGE_ONRAMP_ADDRESS_CONTENT);

@@ -102,7 +102,7 @@ contract e2e is OnRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: defaultDestCCVs,
+      defaultCCVs: defaultDestCCVs,
       laneMandatedCCVs: new address[](0)
     });
     s_offRamp.applySourceChainConfigUpdates(updates);

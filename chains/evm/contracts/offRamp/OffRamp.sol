@@ -631,19 +631,19 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// token is unknown to the registry, the offRamp will revert. The tx, and the tokens, can be retrieved by registering
   /// the token on this chain, and re-trying the msg.
   /// @dev Returns the local pool address so that the registry doesn't have to be queried again by executeSingleMessage.
-  /// @param sourceTokenAmount Amount and source data of the token to be released/minted.
+  /// @param tokenTransfer Amount and source data of the token to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param sourceChainSelector The remote source chain selector
   /// @param blockConfirmationRequested Requested block confirmation.
   function _releaseOrMintSingleToken(
-    MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
+    MessageV1Codec.TokenTransferV1 memory tokenTransfer,
     bytes memory originalSender,
     uint64 sourceChainSelector,
     uint16 blockConfirmationRequested
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount, address localPoolAddress) {
-    address receiver = address(bytes20(sourceTokenAmount.tokenReceiver));
+    address receiver = address(bytes20(tokenTransfer.tokenReceiver));
 
-    address localToken = address(bytes20(sourceTokenAmount.destTokenAddress));
+    address localToken = address(bytes20(tokenTransfer.destTokenAddress));
     // We check with the token admin registry if the token has a pool on this chain.
     localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
     // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
@@ -659,14 +659,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     Pool.ReleaseOrMintInV1 memory releaseOrMintInput = Pool.ReleaseOrMintInV1({
       originalSender: originalSender,
       receiver: receiver,
-      sourceDenominatedAmount: sourceTokenAmount.amount,
+      sourceDenominatedAmount: tokenTransfer.amount,
       localToken: localToken,
       remoteChainSelector: sourceChainSelector,
       // This re-encodes the address as bytes, but now with the zero prefix to make it 32 bytes long.
       // We have to cast it to an address to ensure the bytes are padded on the left with zeros, bytes objects get
       // padded on the right.
-      sourcePoolAddress: abi.encode(address(bytes20(sourceTokenAmount.sourcePoolAddress))),
-      sourcePoolData: sourceTokenAmount.extraData,
+      sourcePoolAddress: abi.encode(address(bytes20(tokenTransfer.sourcePoolAddress))),
+      sourcePoolData: tokenTransfer.extraData,
       // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
       offchainTokenData: ""
     });

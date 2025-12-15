@@ -23,7 +23,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       sourceChainSelector: chain1,
       isEnabled: true,
       onRamps: onRamps1,
-      defaultCCV: new address[](1),
+      defaultCCVs: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
     configs[0].defaultCCVs[0] = makeAddr("ccv1");
@@ -33,7 +33,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       sourceChainSelector: chain2,
       isEnabled: false,
       onRamps: onRamps2,
-      defaultCCV: new address[](1),
+      defaultCCVs: new address[](1),
       laneMandatedCCVs: new address[](2)
     });
     configs[1].defaultCCVs[0] = makeAddr("ccv2");
@@ -78,7 +78,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: false,
       onRamps: onRamps,
-      defaultCCV: new address[](2),
+      defaultCCVs: new address[](2),
       laneMandatedCCVs: new address[](1)
     });
     configs[0].defaultCCVs[0] = makeAddr("ccv1");
@@ -103,7 +103,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       sourceChainSelector: 0,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: new address[](1),
+      defaultCCVs: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
     configs[0].defaultCCVs[0] = makeAddr("ccv");
@@ -122,7 +122,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: new address[](1),
+      defaultCCVs: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
     configs[0].defaultCCVs[0] = makeAddr("ccv");
@@ -141,7 +141,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: new address[](0),
+      defaultCCVs: new address[](0),
       laneMandatedCCVs: new address[](0)
     });
 
@@ -159,7 +159,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: new address[](1),
+      defaultCCVs: new address[](1),
       laneMandatedCCVs: new address[](0)
     });
     configs[0].defaultCCVs[0] = makeAddr("ccv");
