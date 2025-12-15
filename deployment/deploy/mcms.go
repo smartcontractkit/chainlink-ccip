@@ -52,7 +52,9 @@ type GrantAdminRoleToTimelockConfigPerChainWithAdminRef struct {
 }
 
 type GrantAdminRoleToTimelockConfigPerChain struct {
-	TimelockAddress common.Address // address of timelock for which we would like to grant the role
+	TimelockAddress           string `json:"timelockAddress"`           // address of timelock for which we would like to grant the role
+	NewAdminTimelockVersion   string `json:"newAdminTimelockVersion"`   // version of timelock to which would like to grant admin role
+	NewAdminTimelockQualifier string `json:"newAdminTimelockQualifier"` // qualifier of timelock to which would like to grant admin role
 }
 
 type GrantAdminRoleToTimelockConfig struct {
@@ -90,11 +92,11 @@ func grantAdminRoleToTimelockApply(d *DeployerRegistry, _ *changesets.MCMSReader
 			}
 
 			// Find new timelock admin ref
-			timelockQualifier := utils.CLLQualifier
+			timelockQualifier := chainCfg.NewAdminTimelockQualifier
 			newAdminTimelockRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				ChainSelector: selector,
 				Type:          datastore.ContractType(utils.RBACTimelock),
-				Version:       semver.MustParse("1.0.0"),
+				Version:       semver.MustParse(chainCfg.NewAdminTimelockVersion),
 				Qualifier:     timelockQualifier,
 			}, selector, datastore_utils.FullRef)
 			if err != nil {

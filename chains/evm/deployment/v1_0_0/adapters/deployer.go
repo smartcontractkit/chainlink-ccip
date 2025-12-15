@@ -46,7 +46,7 @@ func (a *EVMDeployer) GrantAdminRoleToTimelock() *cldf_ops.Sequence[ccipapi.Gran
 			// create sequence input
 			seqInput := seq.SeqGrantAdminRoleOfTimelockToTimelockInput{
 				ChainSelector:           in.ChainSelector,
-				TimelockAddress:         in.TimelockAddress,
+				TimelockAddress:         common.HexToAddress(in.TimelockAddress),
 				NewAdminTimelockAddress: common.HexToAddress(in.NewAdminTimelockRef.Address),
 			}
 			report, err := cldf_ops.ExecuteSequence(b, seq.SeqGrantAdminRoleOfTimelockToTimelock, evmChain, seqInput)

@@ -243,10 +243,14 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]deployops.GrantAdminRoleToTimelockConfigPerChain{
 			selector1: {
-				TimelockAddress: common.HexToAddress(timelockAddrs[selector1]),
+				TimelockAddress:           timelockAddrs[selector1],
+				NewAdminTimelockVersion:   "1.0.0",
+				NewAdminTimelockQualifier: "CLLCCIP",
 			},
 			selector2: {
-				TimelockAddress: common.HexToAddress(timelockAddrs[selector2]),
+				TimelockAddress:           timelockAddrs[selector2],
+				NewAdminTimelockVersion:   "1.0.0",
+				NewAdminTimelockQualifier: "CLLCCIP",
 			},
 		},
 	})
