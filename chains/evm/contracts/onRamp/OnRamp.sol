@@ -229,7 +229,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       sender: abi.encodePacked(originalSender),
       receiver: validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
       // Executor args hold security critical execution args, like Solana accounts or Sui object IDs. Because of this,
-      // they have to part of the message that is signed off on by the verifiers.
+      // they have to be part of the message that is signed off on by the verifiers.
       destBlob: resolvedExtraArgs.executorArgs,
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length), //  values are populated with _lockOrBurnSingleToken.
       data: message.data
@@ -857,7 +857,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         extraArgs: extraArgs.tokenArgs
       });
 
-      // Try to call `IPoolV2.getFee` to fetch fee components if the pool supports IPoolV2.
+      // Try to call `IPoolV2.getFee` to fetch fee components if the pool supports IPoolV2. If the specified pool is not
+      // a contract, we want it to revert. Using `ERC165Checker` here would mean it doesn't revert, and it costs more
+      // gas.
       if (pool.supportsInterface(type(IPoolV2).interfaceId)) {
         (
           receipts[poolReceiptIndex].feeTokenAmount,

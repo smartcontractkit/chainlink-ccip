@@ -98,6 +98,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
 
   /// @inheritdoc IPoolV2
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
@@ -108,6 +111,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
 
   /// @inheritdoc IPoolV1
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
@@ -116,6 +120,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   }
 
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Additional token arguments.
   function _lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
@@ -171,6 +178,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   }
 
   /// @inheritdoc IPoolV1
+  /// @param remoteChainSelector The remote chain selector to check.
   function isSupportedChain(
     uint64 remoteChainSelector
   ) external view returns (bool) {
@@ -180,6 +188,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   }
 
   /// @inheritdoc IPoolV1
+  /// @param token The token address to check.
   function isSupportedToken(
     address token
   ) external view returns (bool) {
@@ -187,6 +196,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   }
 
   /// @notice Signals which version of the pool interface is supported
+  /// @param interfaceId The interface identifier, as specified in ERC-165.
   function supportsInterface(
     bytes4 interfaceId
   ) public pure override returns (bool) {
@@ -195,6 +205,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   }
 
   /// @inheritdoc IPoolV2
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
+  /// @param blockConfirmationRequested Requested block confirmation.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
@@ -265,6 +277,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   }
 
   /// @inheritdoc IPoolV1
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
@@ -426,6 +439,12 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   }
 
   /// @inheritdoc IPoolV2
+  /// @param localToken The local asset being transferred.
+  /// @param destChainSelector The destination lane selector.
+  /// @param amount The amount of tokens being bridged on this lane.
+  /// @param feeToken The token used to pay feeUSDCents.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Opaque token arguments supplied by the caller.
   function getFee(
     address localToken,
     uint64 destChainSelector,
@@ -445,6 +464,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   }
 
   /// @inheritdoc IPoolV2
+  /// @param localToken The local asset being transferred.
+  /// @param destChainSelector The chain selector of the destination chain.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Additional token argument from the CCIP message.
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
@@ -457,6 +480,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   }
 
   /// @inheritdoc IPoolV2
+  /// @param remoteChainSelector Remote chain selector.
   function getRemoteToken(
     uint64 remoteChainSelector
   ) external view onlyWithCCVCompatiblePool returns (bytes memory) {

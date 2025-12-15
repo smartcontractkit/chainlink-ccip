@@ -42,6 +42,9 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   /// @dev The _validateLockOrBurn check is an essential security check.
   /// @dev The call to _lockOrBurn(amount) is omitted because this pool is not responsible for token management.
   /// LockedOrBurned is still emitted for consumers that expect it.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
@@ -70,6 +73,8 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   /// @dev The _validateReleaseOrMint check is an essential security check.
   /// @dev The call to _releaseOrMint is omitted because this pool is not responsible for token management.
   /// ReleasedOrMinted is still emitted for consumers that expect it.
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
+  /// @param blockConfirmationRequested Requested block confirmation.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
@@ -108,6 +113,7 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   /// @inheritdoc IPoolV2
   /// @dev Uses the CCTPVerifier to determine the bps charged by CCTP on destination.
   /// getFee will not actually account for these bps. Otherwise users would be doubly charged, on source and destination.
+  /// @param destChainSelector The chain selector of the destination chain.
   function getTokenTransferFeeConfig(
     address, // localToken
     uint64 destChainSelector,

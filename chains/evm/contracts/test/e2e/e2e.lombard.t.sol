@@ -304,7 +304,7 @@ contract e2e_lombard is OnRampSetup {
     deal(s_sourceFeeToken, s_defaultExecutor, 1);
   }
 
-  function testE2eLombard() public {
+  function test_e2e_Lombard() public {
     vm.pauseGasMetering();
     uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
 

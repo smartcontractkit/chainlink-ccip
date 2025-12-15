@@ -75,6 +75,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @param adapter Optional source-chain token address override. Used for non-upgradeable tokens like BTC.b
   /// on Avalanche where an adapter contract performs mint/burn on behalf of the actual token. When set, this
   /// address is passed to bridge.deposit() instead of the pool's token address. Set to address(0) if not needed.
+  /// @param token The token managed by this pool.
+  /// @param advancedPoolHooks Optional advanced pool hooks contract (can be address(0)).
+  /// @param rmnProxy The RMN proxy address.
+  /// @param router The router address.
+  /// @param fallbackDecimals Fallback decimals used if the token does not implement `decimals()`.
   constructor(
     IERC20Metadata token,
     address verifier,
@@ -107,6 +112,9 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
 
   /// @notice For IPoolV2.lockOrBurn call, this contract only forwards tokens to the verifier.
   /// @dev Forward the net amount to the verifier; actual burn/bridge is done there.
+  /// @param lockOrBurnIn The lock or burn input parameters.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
@@ -125,6 +133,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @notice Backwards compatible lockOrBurn for lanes using the V1 flow.
   /// @dev Token minting is performed by the Lombard bridge's mailbox during deliverAndHandle.
   /// This pool only validates the proof and emits events; no _lockOrBurn call is needed.
+  /// @param lockOrBurnIn The lock or burn input parameters.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public override(TokenPool) returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut) {
@@ -176,6 +185,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   // ================================================================
 
   /// @notice Backwards compatible releaseOrMint for CCIP 1.5/1.6 lanes. Verifies the bridge payload proof.
+  /// @param releaseOrMintIn The release or mint input parameters.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {

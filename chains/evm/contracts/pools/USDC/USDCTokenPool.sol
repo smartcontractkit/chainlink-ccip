@@ -162,6 +162,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   /// The allowedCaller is preconfigured per destination domain and token pool version refer Domain struct.
   /// @dev Emits ITokenMessenger.DepositForBurn event.
   /// @dev Assumes caller has validated the destinationReceiver.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
@@ -225,6 +226,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned onRamp for the given chain on the Router.
+  /// @param remoteChainSelector The remote chain selector.
   function _onlyOnRamp(
     uint64 remoteChainSelector
   ) internal view virtual override {
@@ -234,6 +236,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned offRamp for the given chain on the Router.
+  /// @param remoteChainSelector The remote chain selector.
   function _onlyOffRamp(
     uint64 remoteChainSelector
   ) internal view virtual override {
@@ -243,6 +246,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
   /// @inheritdoc TokenPool
   /// @dev This function proxies the message to the message transmitter, which will mint the tokens through CCTP's contracts.
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
