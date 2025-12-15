@@ -50,15 +50,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error TokenReceiverNotAllowed(uint64 destChainSelector);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
-  event DestChainConfigSet(
-    uint64 indexed destChainSelector,
-    uint64 messageNumber,
-    IRouter router,
-    address[] defaultCCVs,
-    address[] laneMandatedCCVs,
-    address defaultExecutor,
-    bytes offRamp
-  );
+  event DestChainConfigSet(uint64 indexed destChainSelector, uint64 messageNumber, DestChainConfigArgs config);
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   event CCIPMessageSent(
     uint64 indexed destChainSelector,
@@ -101,7 +93,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 messageNumber; //       │
     uint8 addressBytesLength; //   │ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
     uint16 networkFeeUSDCents; //  │ Network fee in USD cents for messages to this destination chain.
-    bool tokenReceiverAllowed; // ─╯Whether token receiver different from message receiver is allowed.
+    bool tokenReceiverAllowed; // ─╯ Whether specifying `tokenReceiver` in extraArgs is allowed at all.
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address defaultExecutor; // Default executor to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
@@ -117,7 +109,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     IRouter router; //  Source router address  that is allowed to send messages to the destination chain.
     uint8 addressBytesLength; // The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
     uint16 networkFeeUSDCents; // Network fee in USD cents for messages to this destination chain.
-    bool tokenReceiverAllowed; // Whether token receiver different from message receiver is allowed.
+    bool tokenReceiverAllowed; // Whether specifying `tokenReceiver` in extraArgs is allowed at all.
     uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
@@ -474,7 +466,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
       // Normalize and validate tokenReceiver if specified.
       if (resolvedArgs.tokenReceiver.length != 0) {
-        // Not all chains allow tokenReceiver to be specified differently from receiver.
+        // Some lanes disallow specifying tokenReceiver entirely.
         if (!destChainConfig.tokenReceiverAllowed) {
           revert TokenReceiverNotAllowed(destChainSelector);
         }
@@ -507,6 +499,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // Populate the fields that could be present in legacy extraArgs.
       (resolvedArgs.tokenReceiver, resolvedArgs.gasLimit, resolvedArgs.executorArgs) =
         IFeeQuoter(s_dynamicConfig.feeQuoter).resolveLegacyArgs(destChainSelector, extraArgs);
+
+      // We do not check for tokenReceiverAllowed here as legacy args are per dest chain and only allow setting the
+      // tokenReceiver when the chain supports it.
+      if (resolvedArgs.tokenReceiver.length != 0) {
+        resolvedArgs.tokenReceiver =
+          this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
+      }
 
       // If older or no args are provided, use defaults if it's not a token-only transfer.
       if (!(hasNoDataButHasToken && resolvedArgs.gasLimit == 0)) {
@@ -601,15 +600,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       destChainConfig.defaultExecutor = destChainConfigArg.defaultExecutor;
       destChainConfig.offRamp = destChainConfigArg.offRamp;
 
-      emit DestChainConfigSet(
-        destChainSelector,
-        destChainConfig.messageNumber,
-        destChainConfigArg.router,
-        destChainConfigArg.defaultCCVs,
-        destChainConfigArg.laneMandatedCCVs,
-        destChainConfigArg.defaultExecutor,
-        destChainConfigArg.offRamp
-      );
+      emit DestChainConfigSet(destChainSelector, destChainConfig.messageNumber, destChainConfigArg);
     }
   }
 

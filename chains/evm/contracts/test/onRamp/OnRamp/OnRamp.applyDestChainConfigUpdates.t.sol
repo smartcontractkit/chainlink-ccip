@@ -31,15 +31,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
     });
 
     vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(
-      NEW_DEST_SELECTOR,
-      0,
-      IRouter(router),
-      defaultCCVs,
-      laneMandated,
-      defaultExecutor,
-      abi.encodePacked(address(s_offRampOnRemoteChain))
-    );
+    emit OnRamp.DestChainConfigSet(NEW_DEST_SELECTOR, 0, args[0]);
     s_onRamp.applyDestChainConfigUpdates(args);
 
     OnRamp.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR);
