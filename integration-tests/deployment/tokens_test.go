@@ -12,6 +12,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 
@@ -87,6 +88,7 @@ func TestTokenExpansion_DeployToken(t *testing.T) {
 				Name:     "Test Token",
 				Symbol:   "TEST",
 				Decimals: 9,
+				Type:     utils.SPLTokens,
 			},
 		},
 		MCMS: mcms.Input{

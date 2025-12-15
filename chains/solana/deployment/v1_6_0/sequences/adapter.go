@@ -13,8 +13,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	laneapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 func init() {
@@ -26,6 +27,7 @@ func init() {
 	deployapi.GetRegistry().RegisterDeployer(chain_selectors.FamilySolana, v, &SolanaAdapter{})
 	deployapi.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
 	mcmsreaderapi.GetRegistry().RegisterMCMSReader(chain_selectors.FamilySolana, &SolanaAdapter{})
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
 }
 
 type SolanaAdapter struct {
