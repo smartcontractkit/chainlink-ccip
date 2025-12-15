@@ -21,8 +21,6 @@ import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 contract TokenPoolFactory is ITypeAndVersion {
   using Create2 for bytes32;
 
-  event RemoteChainConfigUpdated(uint64 indexed remoteChainSelector, RemoteChainConfig remoteChainConfig);
-
   error InvalidZeroAddress();
   error InvalidLockBoxToken(address lockBoxToken, address poolToken);
   error InvalidLockBoxChainSelector(uint64 lockBoxSelector);

@@ -40,10 +40,10 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
     assertEq(retRequiredCCVs.length, requiredCCVs.length);
     assertEq(retOptionalCCVs.length, optionalCCVs.length);
     assertEq(retOptionalThreshold, optionalThreshold);
-    for (uint256 i = 0; i < requiredCCVs.length; i++) {
+    for (uint256 i = 0; i < requiredCCVs.length; ++i) {
       assertEq(retRequiredCCVs[i], requiredCCVs[i]);
     }
-    for (uint256 i = 0; i < optionalCCVs.length; i++) {
+    for (uint256 i = 0; i < optionalCCVs.length; ++i) {
       assertEq(retOptionalCCVs[i], optionalCCVs[i]);
     }
   }

@@ -7,8 +7,6 @@ import {Client} from "../../../libraries/Client.sol";
 import {EtherSenderReceiverTestSetup} from "./EtherSenderReceiverTestSetup.t.sol";
 
 contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTestSetup {
-  error InsufficientFee(uint256 gotFee, uint256 fee);
-
   uint64 internal constant DESTINATION_CHAIN_SELECTOR = 424242;
   uint256 internal constant FEE_WEI = 121212;
   uint256 internal constant FEE_JUELS = 232323;

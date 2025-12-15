@@ -31,17 +31,17 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
 
     s_committeeVerifier.applySignatureConfigs(new uint64[](0), updates);
 
-    BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
-    destChainConfigs[0] = BaseVerifier.DestChainConfigArgs({
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: s_router,
-      destChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
 
-    s_committeeVerifier.applyDestChainConfigUpdates(destChainConfigs);
+    s_committeeVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
   }
 
   /// @notice Helper to create a minimal dynamic config.

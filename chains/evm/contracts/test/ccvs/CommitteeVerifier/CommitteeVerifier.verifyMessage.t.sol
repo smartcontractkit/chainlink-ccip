@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {CommitteeVerifier} from "../../../ccvs/CommitteeVerifier.sol";
+import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CommitteeVerifierSetup} from "./CommitteeVerifierSetup.t.sol";
 
@@ -66,5 +67,16 @@ contract CommitteeVerifier_verifyMessage is CommitteeVerifierSetup {
     // Should revert with InvalidCCVVersion when the version is incorrect.
     vm.expectRevert(abi.encodeWithSelector(CommitteeVerifier.InvalidCCVVersion.selector, bytes4(0x01020304)));
     s_committeeVerifier.verifyMessage(message, messageHash, verifierResults);
+  }
+
+  function test_verifyMessage_RevertWhen_CursedByRMN() public {
+    (MessageV1Codec.MessageV1 memory message,) = _generateBasicMessageV1();
+    bytes32 messageHash = _generateMessageHash(message);
+
+    // verifyMessage checks curse status using message.sourceChainSelector.
+    _setMockRMNChainCurse(message.sourceChainSelector, true);
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, message.sourceChainSelector));
+    s_committeeVerifier.verifyMessage(message, messageHash, "");
   }
 }

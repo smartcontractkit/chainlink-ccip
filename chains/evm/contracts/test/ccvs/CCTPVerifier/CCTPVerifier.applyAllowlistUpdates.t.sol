@@ -10,9 +10,9 @@ contract CCTPVerifier_applyAllowlistUpdates is CCTPVerifierSetup {
     super.setUp();
 
     // Enable allowlist for destination chain once.
-    BaseVerifier.DestChainConfigArgs[] memory destChainConfigs = new BaseVerifier.DestChainConfigArgs[](1);
-    destChainConfigs[0] = _getDestChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
-    s_cctpVerifier.applyDestChainConfigUpdates(destChainConfigs);
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigs[0] = _getRemoteChainConfig(s_router, DEST_CHAIN_SELECTOR, true);
+    s_cctpVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
   }
 
   function test_applyAllowlistUpdates_AsOwner() public {
@@ -32,7 +32,8 @@ contract CCTPVerifier_applyAllowlistUpdates is CCTPVerifierSetup {
 
     s_cctpVerifier.applyAllowlistUpdates(allowlistConfigs);
 
-    (bool allowlistEnabled,, address[] memory allowlistSender) = s_cctpVerifier.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    (bool allowlistEnabled,, address[] memory allowlistSender) =
+      s_cctpVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(allowlistEnabled, allowlistConfigs[0].allowlistEnabled);
     assertEq(allowlistSender.length, allowlistConfigs[0].addedAllowlistedSenders.length);
     assertEq(allowlistSender[0], allowlistConfigs[0].addedAllowlistedSenders[0]);
@@ -61,17 +62,8 @@ contract CCTPVerifier_applyAllowlistUpdates is CCTPVerifierSetup {
 
   function test_applyAllowlistUpdates_RevertWhen_OnlyCallableByOwnerOrAllowlistAdmin() public {
     vm.stopPrank();
-    vm.startPrank(STRANGER);
-
-    BaseVerifier.AllowlistConfigArgs[] memory allowlistConfigs = new BaseVerifier.AllowlistConfigArgs[](1);
-    allowlistConfigs[0] = BaseVerifier.AllowlistConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      allowlistEnabled: true,
-      addedAllowlistedSenders: new address[](0),
-      removedAllowlistedSenders: new address[](0)
-    });
 
     vm.expectRevert(CCTPVerifier.OnlyCallableByOwnerOrAllowlistAdmin.selector);
-    s_cctpVerifier.applyAllowlistUpdates(allowlistConfigs);
+    s_cctpVerifier.applyAllowlistUpdates(new BaseVerifier.AllowlistConfigArgs[](1));
   }
 }
