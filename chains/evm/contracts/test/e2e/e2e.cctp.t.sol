@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
 
-import {Proxy} from "../../Proxy.sol";
 import {Router} from "../../Router.sol";
 import {CCTPVerifier} from "../../ccvs/CCTPVerifier.sol";
 import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
