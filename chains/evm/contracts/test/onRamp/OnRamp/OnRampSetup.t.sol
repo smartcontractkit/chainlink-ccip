@@ -115,7 +115,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(resolvedExtraArgs.ccvs, resolvedExtraArgs.executor),
       onRampAddress: abi.encodePacked(address(s_onRamp)),
       offRampAddress: s_onRamp.getDestChainConfig(destChainSelector).offRamp,
-      sender: abi.encodePacked(originalSender),
+      sender: abi.encode(originalSender),
       receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
       destBlob: "",
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length),

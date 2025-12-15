@@ -221,7 +221,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       ccvAndExecutorHash: bytes32(0), // Will be set after CCV list is finalized.
       onRampAddress: abi.encodePacked(address(this)),
       offRampAddress: destChainConfig.offRamp,
-      sender: abi.encodePacked(originalSender),
+      sender: abi.encode(originalSender), // Notice only encode to keep backwards compatability.
       receiver: _validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
       // Executor args hold security critical execution args, like Solana accounts or Sui object IDs. Because of this,
       // they have to part of the message that is signed off on by the verifiers.
