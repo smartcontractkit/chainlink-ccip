@@ -6,13 +6,12 @@ import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
-import {TokenPool} from "../../pools/TokenPool.sol";
 import {ERC20LockBox} from "../../pools/ERC20LockBox.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
 import {RegistryModuleOwnerCustom} from "../RegistryModuleOwnerCustom.sol";
 import {FactoryBurnMintERC20} from "./FactoryBurnMintERC20.sol";
 
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 /// @notice A contract for deploying new tokens and token pools, and configuring them with the token admin registry.
 /// @dev At the end of the transaction, the ownership transfer process will begin, but the user must accept the
@@ -26,6 +25,7 @@ contract TokenPoolFactory is ITypeAndVersion {
 
   error InvalidZeroAddress();
   error InvalidLockBoxToken(address lockBoxToken, address poolToken);
+  error InvalidLockBoxChainSelector(uint64 lockBoxSelector);
 
   /// @notice The type of pool to deploy. Types may be expanded in future versions.
   enum PoolType {
@@ -53,15 +53,25 @@ contract TokenPoolFactory is ITypeAndVersion {
     address remotePoolFactory; // The factory contract on the remote chain which will make the deployment.
     address remoteRouter; // The router on the remote chain.
     address remoteRMNProxy; // The RMNProxy contract on the remote chain.
+    address remoteLockBox; // The lockBox contract on the remote chain (for LOCK_RELEASE pools).
     uint8 remoteTokenDecimals; // The number of decimals for the token on the remote chain.
   }
 
+  struct LocalPoolConfig {
+    address token;
+    uint8 localTokenDecimals;
+    PoolType localPoolType;
+    address lockBox;
+    bytes32 salt;
+  }
+
   string public constant typeAndVersion = "TokenPoolFactory 1.6.0-dev";
+  bytes private constant LOCKBOX_INIT_CODE = type(ERC20LockBox).creationCode;
+  address private immutable i_rmnProxy;
 
   ITokenAdminRegistry private immutable i_tokenAdminRegistry;
   RegistryModuleOwnerCustom private immutable i_registryModuleOwnerCustom;
 
-  address private immutable i_rmnProxy;
   address private immutable i_ccipRouter;
 
   /// @notice Construct the TokenPoolFactory.
@@ -101,6 +111,7 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @param localPoolType The type of pool to deploy locally (BURN_MINT or LOCK_RELEASE).
   /// @param tokenInitCode The creation code for the token, which includes the constructor parameters already appended.
   /// @param tokenPoolInitCode The creation code for the token pool, without the constructor parameters appended.
+  /// @param lockBox The lockbox associated with the token, required for lock/release pools.
   /// @param salt The salt to be used in the create2 deployment of the token and token pool to ensure a unique address.
   /// @return token The address of the token that was deployed.
   /// @return pool The address of the token pool that was deployed.
@@ -110,6 +121,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     PoolType localPoolType,
     bytes memory tokenInitCode,
     bytes calldata tokenPoolInitCode,
+    address lockBox,
     bytes32 salt
   ) external returns (address, address) {
     // Ensure a unique deployment between senders even if the same input parameter is used to prevent
@@ -119,9 +131,16 @@ contract TokenPoolFactory is ITypeAndVersion {
     // Deploy the token. The constructor parameters are already provided in the tokenInitCode.
     address token = Create2.deploy(0, salt, tokenInitCode);
 
+    LocalPoolConfig memory localConfig = LocalPoolConfig({
+      token: token,
+      localTokenDecimals: localTokenDecimals,
+      localPoolType: localPoolType,
+      lockBox: lockBox,
+      salt: salt
+    });
+
     // Deploy the token pool.
-    address pool =
-      _createTokenPool(token, localTokenDecimals, localPoolType, remoteTokenPools, tokenPoolInitCode, salt);
+    address pool = _createTokenPool(remoteTokenPools, tokenPoolInitCode, localConfig);
 
     // Grant the mint and burn roles to the pool for the token.
     FactoryBurnMintERC20(token).grantMintAndBurnRoles(pool);
@@ -146,6 +165,7 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @param localPoolType The type of pool to deploy locally (BURN_MINT or LOCK_RELEASE).
   /// @param remoteTokenPools An array of remote token pools info to be used in the pool's applyChainUpdates function.
   /// @param tokenPoolInitCode The creation code for the token pool.
+  /// @param lockBox The lockbox associated with the token, required for lock/release pools.
   /// @param salt The salt to be used in the create2 deployment of the token pool.
   /// @return poolAddress The address of the token pool that was deployed.
   function deployTokenPoolWithExistingToken(
@@ -154,14 +174,23 @@ contract TokenPoolFactory is ITypeAndVersion {
     PoolType localPoolType,
     RemoteTokenPoolInfo[] calldata remoteTokenPools,
     bytes calldata tokenPoolInitCode,
+    address lockBox,
     bytes32 salt
   ) external returns (address poolAddress) {
     // Ensure a unique deployment between senders even if the same input parameter is used to prevent
     // DOS/front running attacks.
     salt = keccak256(abi.encodePacked(salt, msg.sender));
 
+    LocalPoolConfig memory localConfig = LocalPoolConfig({
+      token: token,
+      localTokenDecimals: localTokenDecimals,
+      localPoolType: localPoolType,
+      lockBox: lockBox,
+      salt: salt
+    });
+
     // create the token pool and return the address.
-    return _createTokenPool(token, localTokenDecimals, localPoolType, remoteTokenPools, tokenPoolInitCode, salt);
+    return _createTokenPool(remoteTokenPools, tokenPoolInitCode, localConfig);
   }
 
   // ================================================================
@@ -169,80 +198,48 @@ contract TokenPoolFactory is ITypeAndVersion {
   // ================================================================
 
   /// @notice Deploys a token pool with the given token information and remote token pools.
-  /// @param token The token to be used in the token pool.
-  /// @param localPoolType The type of pool to deploy locally (BURN_MINT or LOCK_RELEASE).
   /// @param remoteTokenPools An array of remote token pools info to be used in the pool's applyChainUpdates function.
   /// @param tokenPoolInitCode The creation code for the token pool.
-  /// @param salt The salt to be used in the create2 deployment of the token pool.
+  /// @param localConfig Local deployment config including token, decimals, pool type, lockbox, and salt.
   /// @return poolAddress The address of the token pool that was deployed.
   function _createTokenPool(
-    address token,
-    uint8 localTokenDecimals,
-    PoolType localPoolType,
     RemoteTokenPoolInfo[] calldata remoteTokenPools,
     bytes calldata tokenPoolInitCode,
-    bytes32 salt
+    LocalPoolConfig memory localConfig
   ) private returns (address) {
     // Create an array of chain updates to apply to the token pool.
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](remoteTokenPools.length);
 
-    RemoteTokenPoolInfo memory remoteTokenPool;
     for (uint256 i = 0; i < remoteTokenPools.length; ++i) {
-      remoteTokenPool = remoteTokenPools[i];
-
-      // If the user provides an empty byte string, indicated no token has already been deployed,
-      // then the address of the token needs to be predicted. Otherwise the address provided will be used.
-      if (remoteTokenPool.remoteTokenAddress.length == 0) {
-        // The user must provide the initCode for the remote token, so its address can be predicted correctly. It's
-        // provided in the remoteTokenInitCode field for the remoteTokenPool.
-        remoteTokenPool.remoteTokenAddress = abi.encode(
-          salt.computeAddress(
-            keccak256(remoteTokenPool.remoteTokenInitCode), remoteTokenPool.remoteChainConfig.remotePoolFactory
-          )
-        );
-      }
-
-      // If the user provides an empty byte string parameter, indicating the pool has not been deployed yet,
-      // the address of the pool should be predicted. Otherwise use the provided address.
-      if (remoteTokenPool.remotePoolAddress.length == 0) {
-        // Address is predicted based on the init code hash and the deployer, so the hash must first be computed
-        // using the initCode and a concatenated set of constructor parameters.
-        bytes32 remotePoolInitcodeHash = _generatePoolInitcodeHash(
-          remoteTokenPool.remotePoolInitCode,
-          remoteTokenPool.remoteChainConfig,
-          abi.decode(remoteTokenPool.remoteTokenAddress, (address)),
-          remoteTokenPool.poolType
-        );
-
-        // Abi encode the computed remote address so it can be used as bytes in the chain update.
-        remoteTokenPool.remotePoolAddress =
-          abi.encode(salt.computeAddress(remotePoolInitcodeHash, remoteTokenPool.remoteChainConfig.remotePoolFactory));
-      }
-
-      bytes[] memory remotePoolAddresses = new bytes[](1);
-      remotePoolAddresses[0] = remoteTokenPool.remotePoolAddress;
-
-      chainUpdates[i] = TokenPool.ChainUpdate({
-        remoteChainSelector: remoteTokenPool.remoteChainSelector,
-        remotePoolAddresses: remotePoolAddresses,
-        remoteTokenAddress: remoteTokenPool.remoteTokenAddress,
-        outboundRateLimiterConfig: remoteTokenPool.rateLimiterConfig,
-        inboundRateLimiterConfig: remoteTokenPool.rateLimiterConfig
-      });
+      chainUpdates[i] = _buildChainUpdate(remoteTokenPools[i], localConfig.salt);
     }
 
     // Construct the initArgs for the token pool using the immutable contracts for CCIP on the local chain.
     // LockRelease pools need lockBox, BurnMint pools don't.
     bytes memory tokenPoolInitArgs;
-    if (localPoolType == PoolType.LOCK_RELEASE) {
-      address lockBox = address(new ERC20LockBox(token));
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter, lockBox);
+    if (localConfig.localPoolType == PoolType.LOCK_RELEASE) {
+      address localLockBox = localConfig.lockBox;
+      if (localLockBox == address(0)) {
+        localLockBox = _deployLockBox(localConfig.token, 0, localConfig.salt);
+      } else {
+        ERC20LockBox lockBoxContract = ERC20LockBox(localLockBox);
+        if (address(lockBoxContract.getToken()) != localConfig.token) {
+          revert InvalidLockBoxToken(address(lockBoxContract.getToken()), localConfig.token);
+        }
+        if (lockBoxContract.i_remoteChainSelector() != 0) {
+          revert InvalidLockBoxChainSelector(lockBoxContract.i_remoteChainSelector());
+        }
+      }
+      tokenPoolInitArgs = abi.encode(
+        localConfig.token, localConfig.localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter, localLockBox
+      );
     } else {
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter);
+      tokenPoolInitArgs =
+        abi.encode(localConfig.token, localConfig.localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter);
     }
 
     // Construct the deployment code from the initCode and the initArgs and then deploy.
-    address poolAddress = Create2.deploy(0, salt, abi.encodePacked(tokenPoolInitCode, tokenPoolInitArgs));
+    address poolAddress = Create2.deploy(0, localConfig.salt, abi.encodePacked(tokenPoolInitCode, tokenPoolInitArgs));
 
     // Apply the chain updates to the token pool.
     TokenPool(poolAddress).applyChainUpdates(new uint64[](0), chainUpdates);
@@ -251,6 +248,85 @@ contract TokenPoolFactory is ITypeAndVersion {
     IOwnable(poolAddress).transferOwnership(address(msg.sender));
 
     return poolAddress;
+  }
+
+  function _buildChainUpdate(
+    RemoteTokenPoolInfo memory remoteTokenPool,
+    bytes32 salt
+  ) private pure returns (TokenPool.ChainUpdate memory) {
+    address remoteLockBox = remoteTokenPool.remoteChainConfig.remoteLockBox;
+
+    // If the user provides an empty byte string, indicated no token has already been deployed,
+    // then the address of the token needs to be predicted. Otherwise the address provided will be used.
+    if (remoteTokenPool.remoteTokenAddress.length == 0) {
+      // The user must provide the initCode for the remote token, so its address can be predicted correctly. It's
+      // provided in the remoteTokenInitCode field for the remoteTokenPool.
+      remoteTokenPool.remoteTokenAddress = abi.encode(
+        salt.computeAddress(
+          keccak256(remoteTokenPool.remoteTokenInitCode), remoteTokenPool.remoteChainConfig.remotePoolFactory
+        )
+      );
+    }
+
+    // For lock/release pools, predict the remote lockbox if none is provided.
+    if (remoteTokenPool.poolType == PoolType.LOCK_RELEASE && remoteLockBox == address(0)) {
+      address decodedRemoteToken = abi.decode(remoteTokenPool.remoteTokenAddress, (address));
+      (remoteLockBox,) = _computeLockBoxAddress(
+        decodedRemoteToken,
+        remoteTokenPool.remoteChainSelector,
+        salt,
+        remoteTokenPool.remoteChainConfig.remotePoolFactory
+      );
+      remoteTokenPool.remoteChainConfig.remoteLockBox = remoteLockBox;
+    }
+
+    // If the user provides an empty byte string parameter, indicating the pool has not been deployed yet,
+    // the address of the pool should be predicted. Otherwise use the provided address.
+    if (remoteTokenPool.remotePoolAddress.length == 0) {
+      // Address is predicted based on the init code hash and the deployer, so the hash must first be computed
+      // using the initCode and a concatenated set of constructor parameters.
+      bytes32 remotePoolInitcodeHash = _generatePoolInitcodeHash(
+        remoteTokenPool.remotePoolInitCode,
+        remoteTokenPool.remoteChainConfig,
+        abi.decode(remoteTokenPool.remoteTokenAddress, (address)),
+        remoteTokenPool.poolType
+      );
+
+      // Abi encode the computed remote address so it can be used as bytes in the chain update.
+      remoteTokenPool.remotePoolAddress =
+        abi.encode(salt.computeAddress(remotePoolInitcodeHash, remoteTokenPool.remoteChainConfig.remotePoolFactory));
+    }
+
+    bytes[] memory remotePoolAddresses = new bytes[](1);
+    remotePoolAddresses[0] = remoteTokenPool.remotePoolAddress;
+
+    return TokenPool.ChainUpdate({
+      remoteChainSelector: remoteTokenPool.remoteChainSelector,
+      remotePoolAddresses: remotePoolAddresses,
+      remoteTokenAddress: remoteTokenPool.remoteTokenAddress,
+      outboundRateLimiterConfig: remoteTokenPool.rateLimiterConfig,
+      inboundRateLimiterConfig: remoteTokenPool.rateLimiterConfig
+    });
+  }
+
+  function _deployLockBox(address token, uint64 remoteChainSelector, bytes32 salt) private returns (address lockBox) {
+    (address predicted, bytes memory creationCode) =
+      _computeLockBoxAddress(token, remoteChainSelector, salt, address(this));
+    lockBox = Create2.deploy(0, salt, creationCode);
+    // If deployment fails Create2 reverts; address mismatch is impossible since salt and init code are deterministic.
+    if (lockBox != predicted) revert InvalidZeroAddress();
+    return lockBox;
+  }
+
+  function _computeLockBoxAddress(
+    address token,
+    uint64 remoteChainSelector,
+    bytes32 salt,
+    address deployer
+  ) private pure returns (address predicted, bytes memory creationCode) {
+    creationCode = abi.encodePacked(LOCKBOX_INIT_CODE, abi.encode(token, remoteChainSelector));
+    predicted = salt.computeAddress(keccak256(creationCode), deployer);
+    return (predicted, creationCode);
   }
 
   /// @notice Generates the hash of the init code the pool will be deployed with.
