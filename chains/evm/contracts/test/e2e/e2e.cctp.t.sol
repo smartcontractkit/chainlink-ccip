@@ -126,6 +126,7 @@ contract cctp_e2e is OnRampSetup {
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultSourceCCVs,
@@ -136,7 +137,7 @@ contract cctp_e2e is OnRampSetup {
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
-  function test_e2e() public {
+  function test_cctp_e2e() public {
     uint256 amount = 1e6;
 
     vm.pauseGasMetering();

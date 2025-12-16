@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {Client} from "../../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
@@ -34,6 +35,18 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     });
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+  }
+
+  function test_forwardFromRouter_RevertWhen_TokenReceiverNotAllowed() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.receiver = abi.encode(OWNER);
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
+    extraArgs.tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.TokenReceiverNotAllowed.selector, DEST_CHAIN_SELECTOR));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e18, STRANGER);
   }
 
   function test_forwardFromRouter_messageNumberPersistsAndIncrements() public {

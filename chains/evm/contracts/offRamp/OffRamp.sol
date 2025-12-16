@@ -14,17 +14,17 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
+import {ERC165CheckerReverting} from "../libraries/ERC165CheckerReverting.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
-import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/ERC165Checker.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
-  using ERC165Checker for address;
+  using ERC165CheckerReverting for address;
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
@@ -268,23 +268,27 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
-    /////// SECURITY CRITICAL CHECKS ///////
-    address receiver = address(bytes20(message.receiver));
-
     // We track the balance of the receiver prior to verification because a verifier may be responsible for releasing or minting the token.
     uint256 balancePre = 0;
-    address tokenReceiver;
     if (message.tokenTransfer.length > 0) {
       if (message.tokenTransfer[0].destTokenAddress.length != 20) {
         revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
       }
-      tokenReceiver = address(bytes20(message.tokenTransfer[0].tokenReceiver));
-      balancePre = _getBalanceOfReceiver(tokenReceiver, address(bytes20(message.tokenTransfer[0].destTokenAddress)));
+
+      balancePre = _getBalanceOfReceiver(
+        address(bytes20(message.tokenTransfer[0].tokenReceiver)),
+        address(bytes20(message.tokenTransfer[0].destTokenAddress))
+      );
     }
 
+    address receiver = address(bytes20(message.receiver));
+    bool isTokenOnlyTransfer = _isTokenOnlyTransfer(message.data.length, message.ccipReceiveGasLimit, receiver);
+
+    /////// SECURITY CRITICAL CHECKS ///////
     {
-      (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) =
-        _ensureCCVQuorumIsReached(message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs);
+      (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) = _ensureCCVQuorumIsReached(
+        message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs, isTokenOnlyTransfer
+      );
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         address implAddress =
@@ -306,6 +310,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         message.tokenTransfer[0], message.sender, message.sourceChainSelector, message.finality
       );
 
+      address tokenReceiver = address(bytes20(message.tokenTransfer[0].tokenReceiver));
       // If a lock-release pool is the receiver, balancePost - balancePre would not reflect the amount transferred.
       // Therefore, if the receiver is the token pool, we trust the value returned by the pool.
       // Otherwise, we trust balancePost - balancePre as the amount given to the receiver.
@@ -317,22 +322,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       }
     }
 
-    // There are three cases in which we skip calling the receiver:
-    // 1. If the message data is empty AND the gas limit is 0.
-    //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
-    //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
-    //          receiver without any gas, which would revert the transaction.
-    // 2. If the receiver is not a contract.
-    // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
-    //
-    // The ordering of these checks is important, as the first check is the cheapest to execute.
-    //
-    // To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
-    // which checks for sufficient gas before making the external call.
-    if (
-      (message.data.length == 0 && message.ccipReceiveGasLimit == 0) || receiver.code.length == 0
-        || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
-    ) return;
+    // Short circuit if we don't need to call the receiver.
+    if (isTokenOnlyTransfer) return;
 
     (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
       Client.Any2EVMMessage({
@@ -351,6 +342,31 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (!success) revert ReceiverError(returnData);
   }
 
+  /// @notice There are three cases in which we skip calling the receiver:
+  /// 1. If the message data is empty AND the gas limit is 0.
+  ///          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
+  ///          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
+  ///          receiver without any gas, which would revert the transaction.
+  /// 2. If the receiver is not a contract.
+  /// 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
+  ///
+  /// The ordering of these checks is important, as the first check is the cheapest to execute.
+  ///
+  /// To prevent message delivery bypass issues, a modified version of the ERC165Checker is used
+  /// which checks for sufficient gas before making the external call.
+  /// @param dataLength The length of the message data.
+  /// @param ccipReceiveGasLimit The gas limit specified for the CCIP receive call.
+  /// @param receiver The receiver address.
+  /// @return Whether the message is a token-only transfer.
+  function _isTokenOnlyTransfer(
+    uint256 dataLength,
+    uint256 ccipReceiveGasLimit,
+    address receiver
+  ) internal view returns (bool) {
+    return (dataLength == 0 && ccipReceiveGasLimit == 0) || receiver.code.length == 0
+      || !receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId);
+  }
+
   // ================================================================
   // │                            CCVs                              │
   // ================================================================
@@ -362,9 +378,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes calldata encodedMessage
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
+    address receiver = address(bytes20(message.receiver));
 
     return _getCCVsForMessage(
-      message.sourceChainSelector, address(bytes20(message.receiver)), message.tokenTransfer, message.finality
+      message.sourceChainSelector,
+      receiver,
+      message.tokenTransfer,
+      message.finality,
+      _isTokenOnlyTransfer(message.data.length, message.ccipReceiveGasLimit, receiver)
     );
   }
 
@@ -373,6 +394,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param sourceChainSelector The source chain selector of the message.
   /// @param receiver The receiver of the message.
   /// @param tokenTransfer The tokens transferred in the message.
+  /// @param finality The finality requirement of the message.
+  /// @param isTokenOnlyTransfer Whether the message is a token-only transfer (no exec).
   /// @return requiredCCVs The deduplicated list of required CCVs for the message.
   /// @return optionalCCVs The list of optional CCVs for the message, with duplicates removed against required CCVs.
   /// @return optionalThreshold The threshold of optional CCVs, adjusted for any duplicates with required CCVs.
@@ -385,7 +408,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
-    uint16 finality
+    uint16 finality,
+    bool isTokenOnlyTransfer
   ) internal view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
     address[] memory requiredPoolCCVs = new address[](0);
     if (tokenTransfer.length > 0) {
@@ -403,18 +427,37 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         localTokenAddress, sourceChainSelector, tokenTransfer[0].amount, finality, tokenTransfer[0].extraData
       );
     }
-    address[] memory requiredReceiverCCV;
-    (requiredReceiverCCV, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
+
+    // Get the CCVs for the receiver, if any.
+    address[] memory requiredReceiverCCVs;
+    if (isTokenOnlyTransfer) {
+      if (tokenTransfer.length > 0) {
+        // For token-only transfers, we skip querying the receiver for CCVs, and don't add the defaults. This enables
+        // pure token transfers to only require the pool CCVs, as the token issuer is the only party that takes any risk.
+        requiredReceiverCCVs = new address[](0);
+        optionalCCVs = new address[](0);
+        optionalThreshold = 0;
+      } else {
+        // The transfer is token-only but doesn't contain any tokens. This is a no-op transfer, we fall back to
+        // requiring the default CCV.
+        requiredReceiverCCVs = new address[](1);
+      }
+    } else {
+      // The transfer is not token-only, we query the receiver for its CCV requirements.
+      (requiredReceiverCCVs, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
+    }
+
     address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
-    address[] memory defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
+    address[] storage defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
 
     // We allocate the memory for all possible CCVs upfront to avoid multiple allocations.
-    address[] memory allRequiredCCVs =
-      new address[](requiredReceiverCCV.length + requiredPoolCCVs.length + laneMandatedCCVs.length + defaultCCVs.length);
+    address[] memory allRequiredCCVs = new address[](
+      requiredReceiverCCVs.length + requiredPoolCCVs.length + laneMandatedCCVs.length + defaultCCVs.length
+    );
 
     uint256 index = 0;
-    for (uint256 i = 0; i < requiredReceiverCCV.length; ++i) {
-      allRequiredCCVs[index++] = requiredReceiverCCV[i];
+    for (uint256 i = 0; i < requiredReceiverCCVs.length; ++i) {
+      allRequiredCCVs[index++] = requiredReceiverCCVs[i];
     }
 
     for (uint256 i = 0; i < requiredPoolCCVs.length; ++i) {
@@ -428,9 +471,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // Add defaults if any address(0) was found.
     for (uint256 i = 0; i < index; ++i) {
       if (allRequiredCCVs[i] == address(0)) {
-        for (uint256 j = 0; j < defaultCCVs.length; ++j) {
+        uint256 numberOfDefaults = defaultCCVs.length;
+        for (uint256 j = 0; j < numberOfDefaults; ++j) {
           allRequiredCCVs[index++] = defaultCCVs[j];
         }
+        // Break to ensure they're only added once.
         break;
       }
     }
@@ -505,10 +550,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address receiver,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
     uint16 finality,
-    address[] calldata ccvs
+    address[] calldata ccvs,
+    bool isTokenOnlyTransfer
   ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndexes) {
     (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
-      _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer, finality);
+      _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer, finality, isTokenOnlyTransfer);
 
     ccvsToQuery = new address[](ccvs.length);
     dataIndexes = new uint256[](ccvs.length);
@@ -568,24 +614,22 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    // If the receiver is a contract
-    if (receiver.code.length != 0) {
-      // And the contract implements the IAny2EVMMessageReceiverV2 interface.
-      if (receiver.supportsInterface(type(IAny2EVMMessageReceiverV2).interfaceId)) {
-        (requiredCCV, optionalCCVs, optionalThreshold) =
-          IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
+    // Only query for custom CCVs if the receiver supports the interface..
+    if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
+      (requiredCCV, optionalCCVs, optionalThreshold) = IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
 
-        CCVConfigValidation._assertNoDuplicates(requiredCCV);
-        CCVConfigValidation._assertNoDuplicates(optionalCCVs);
+      CCVConfigValidation._assertNoDuplicates(requiredCCV);
+      CCVConfigValidation._assertNoDuplicates(optionalCCVs);
 
-        // If the user specified empty required and optional CCVs, we fall back to the default CCVs.
-        // If they did specify something, we use what they specified.
-        if (requiredCCV.length != 0 || optionalThreshold != 0) {
-          return (requiredCCV, optionalCCVs, optionalThreshold);
-        }
+      // If the receiver specified empty required and optional CCVs, we fall back to the default CCVs.
+      // If they did specify something, we use what they specified.
+      if (requiredCCV.length != 0 || optionalThreshold != 0) {
+        return (requiredCCV, optionalCCVs, optionalThreshold);
       }
     }
-    return (s_sourceChainConfigs[sourceChainSelector].defaultCCVs, new address[](0), 0);
+
+    // Returning new address[](1) means we add the default, as address(0) is the marker for that.
+    return (new address[](1), new address[](0), 0);
   }
 
   /// @notice Retrieves the required CCVs from a pool. If the pool does not specify any CCVs, we fall back to the
@@ -605,7 +649,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   ) internal view returns (address[] memory requiredCCV) {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
 
-    if (pool.supportsInterface(type(IPoolV2).interfaceId)) {
+    if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
       requiredCCV = IPoolV2(pool).getRequiredCCVs(
         localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.MessageDirection.Inbound
       );
@@ -616,7 +660,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // default CCVs. If this wasn't done, any pool not specifying CCVs would allow any arbitrary CCV to mint infinite
     // tokens by fabricating messages. Since CCVs are permissionless, this would mean anyone would be able to mint.
     if (requiredCCV.length == 0) {
-      requiredCCV = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
+      // A list with address(0) indicates that we should use the default CCVs.
+      return new address[](1);
     }
     return requiredCCV;
   }
@@ -670,7 +715,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       offchainTokenData: ""
     });
 
-    if (localPoolAddress.supportsInterface(type(IPoolV2).interfaceId)) {
+    // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
+    // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
+    // The call gets a max or 30k gas per instance, of which there are three. This means offchain gas estimations should
+    // account for 90k gas overhead due to the interface check.
+    if (localPoolAddress._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
       try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationRequested) returns (
         Pool.ReleaseOrMintOutV1 memory result
       ) {
@@ -678,7 +727,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       } catch (bytes memory err) {
         revert TokenHandlingError(localToken, err);
       }
-    } else if (localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
+    } else if (localPoolAddress._supportsInterfaceReverting(Pool.CCIP_POOL_V1)) {
       try IPoolV1(localPoolAddress).releaseOrMint(releaseOrMintInput) returns (Pool.ReleaseOrMintOutV1 memory result) {
         returnData = result;
       } catch (bytes memory err) {
