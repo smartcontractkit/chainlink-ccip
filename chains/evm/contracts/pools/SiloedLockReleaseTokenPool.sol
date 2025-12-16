@@ -412,8 +412,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
   function _getLockBox(
     uint64 remoteChainSelector
-  ) internal view returns (ERC20LockBox lockBox) {
-    lockBox = s_lockBoxes[remoteChainSelector];
+  ) internal view returns (ERC20LockBox) {
+    ERC20LockBox lockBox = s_lockBoxes[remoteChainSelector];
     if (address(lockBox) == address(0)) revert LockBoxNotConfigured(remoteChainSelector);
     return lockBox;
   }

@@ -38,6 +38,22 @@ contract LockReleaseTokenPool_transferLiquidity is LockReleaseTokenPoolSetup {
     assertEq(s_token.balanceOf(address(s_lockReleaseTokenPool)), balancePre + s_amount);
   }
 
+  function test_transferLiquidity_Uint256MaxAmountInput() public {
+    deal(address(s_token), address(s_oldLockReleaseTokenPool), s_amount);
+    uint256 balancePre = s_token.balanceOf(address(s_lockReleaseTokenPool));
+
+    s_oldLockReleaseTokenPool.setRebalancer(address(s_lockReleaseTokenPool));
+
+    uint256 balanceOldPool = s_token.balanceOf(address(s_oldLockReleaseTokenPool));
+
+    vm.expectEmit();
+    emit LockReleaseTokenPool.LiquidityTransferred(address(s_oldLockReleaseTokenPool), balanceOldPool);
+
+    s_lockReleaseTokenPool.transferLiquidity(address(s_oldLockReleaseTokenPool), type(uint256).max);
+
+    assertEq(s_token.balanceOf(address(s_lockReleaseTokenPool)), balancePre + balanceOldPool);
+  }
+
   function test_transferLiquidity_RevertWhen_InsufficientBalance() public {
     uint256 balancePre = s_token.balanceOf(address(s_lockReleaseTokenPool));
 
