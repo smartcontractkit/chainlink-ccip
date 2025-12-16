@@ -513,12 +513,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // For example, token-only USDC transfers can use only CCTP (without committee verification), since CCTP is fully
       // trusted for that token flow.
       if (resolvedArgs.ccvs.length == 0 && !(hasNoDataButHasToken && resolvedArgs.gasLimit == 0)) {
-        resolvedArgs.ccvs = new address[](destChainConfig.defaultCCVs.length);
-        resolvedArgs.ccvArgs = new bytes[](destChainConfig.defaultCCVs.length);
-        for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
-          resolvedArgs.ccvs[i] = destChainConfig.defaultCCVs[i];
-          resolvedArgs.ccvArgs[i] = "";
-        }
+        resolvedArgs.ccvs = destChainConfig.defaultCCVs;
+        resolvedArgs.ccvArgs = new bytes[](resolvedArgs.ccvs.length);
       }
     } else {
       // Populate the fields that could be present in legacy extraArgs.

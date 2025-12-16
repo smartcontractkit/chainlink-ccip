@@ -441,8 +441,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         // The transfer is token-only but doesn't contain any tokens. This is a no-op transfer, we fall back to
         // requiring the default CCV.
         requiredReceiverCCVs = new address[](1);
-        // Address(0) indicates that we should use the default CCVs.
-        requiredReceiverCCVs[0] = address(0);
       }
     } else {
       // The transfer is not token-only, we query the receiver for its CCV requirements.
@@ -450,7 +448,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
-    address[] memory defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
+    address[] storage defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
 
     // We allocate the memory for all possible CCVs upfront to avoid multiple allocations.
     address[] memory allRequiredCCVs = new address[](
@@ -473,9 +471,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // Add defaults if any address(0) was found.
     for (uint256 i = 0; i < index; ++i) {
       if (allRequiredCCVs[i] == address(0)) {
-        for (uint256 j = 0; j < defaultCCVs.length; ++j) {
+        uint256 numberOfDefaults = defaultCCVs.length;
+        for (uint256 j = 0; j < numberOfDefaults; ++j) {
           allRequiredCCVs[index++] = defaultCCVs[j];
         }
+        // Break to ensure they're only added once.
         break;
       }
     }
@@ -627,7 +627,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
         return (requiredCCV, optionalCCVs, optionalThreshold);
       }
     }
-    return (s_sourceChainConfigs[sourceChainSelector].defaultCCVs, new address[](0), 0);
+
+    // Returning new address[](1) means we add the default, as address(0) is the marker for that.
+    return (new address[](1), new address[](0), 0);
   }
 
   /// @notice Retrieves the required CCVs from a pool. If the pool does not specify any CCVs, we fall back to the
@@ -658,7 +660,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // default CCVs. If this wasn't done, any pool not specifying CCVs would allow any arbitrary CCV to mint infinite
     // tokens by fabricating messages. Since CCVs are permissionless, this would mean anyone would be able to mint.
     if (requiredCCV.length == 0) {
-      requiredCCV = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
+      // A list with address(0) indicates that we should use the default CCVs.
+      return new address[](1);
     }
     return requiredCCV;
   }

@@ -137,7 +137,7 @@ contract cctp_e2e is OnRampSetup {
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
-  function test_e2e() public {
+  function test_cctp_e2e() public {
     uint256 amount = 1e6;
 
     vm.pauseGasMetering();

@@ -23,7 +23,8 @@ contract OffRamp_getCCVsFromPool is OffRampSetup {
 
     address[] memory result = s_offRamp.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
     assertEq(result.length, 1);
-    assertEq(result[0], s_defaultCCV);
+    // address(0) is the sentinel indicating the OffRamp should expand to the configured default CCVs.
+    assertEq(result[0], address(0));
   }
 
   function test_getCCVsFromPool_ReturnsPoolCCVs_WhenPoolSupportsV2() public {
@@ -45,7 +46,8 @@ contract OffRamp_getCCVsFromPool is OffRampSetup {
 
     address[] memory result = s_offRamp.getCCVsFromPool(s_token, SOURCE_CHAIN_SELECTOR, 100, 0, "");
     assertEq(result.length, 1);
-    assertEq(result[0], s_defaultCCV);
+    // address(0) is the sentinel indicating the OffRamp should expand to the configured default CCVs.
+    assertEq(result[0], address(0));
   }
 
   function _deployPoolV2(
