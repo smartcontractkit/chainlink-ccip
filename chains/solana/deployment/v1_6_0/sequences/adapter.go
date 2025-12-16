@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
+	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	laneapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -67,6 +68,18 @@ func (a *SolanaAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector u
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),
 		Version:       router.Version,
+	}, chainSelector, utils.ToByteArray)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
+func (a *SolanaAdapter) GetRMNRemoteAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(rmnremoteops.ContractType),
+		Version:       rmnremoteops.Version,
 	}, chainSelector, utils.ToByteArray)
 	if err != nil {
 		return nil, err

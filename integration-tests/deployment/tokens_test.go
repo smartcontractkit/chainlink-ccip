@@ -79,24 +79,19 @@ func TestTokenExpansion(t *testing.T) {
 
 	sender, _ := solana.NewRandomPrivateKey()
 	out, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
-		DeployTokenInputs: map[uint64]tokensapi.DeployTokenInput{
-			chain_selectors.SOLANA_MAINNET.Selector: {
-				Name:     "Test Token",
-				Symbol:   "TEST",
-				Decimals: 9,
-				Type:     utils.SPLTokens,
-				Senders: []string{
-					sender.PublicKey().String(),
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			chain_selectors.SOLANA_MAINNET.Selector: tokensapi.TokenExpansionInputPerChain{
+				DeployTokenInput: tokensapi.DeployTokenInput{
+					Name:     "Test Token",
+					Symbol:   "TEST",
+					Decimals: 9,
+					Type:     utils.SPLTokens,
+					Senders: []string{
+						sender.PublicKey().String(),
+					},
+					DisableFreezeAuthority: true,
 				},
-				DisableFreezeAuthority: true,
-			},
-		},
-		DeployTokenPoolInputs: map[uint64]tokensapi.DeployTokenPoolInput{
-			chain_selectors.SOLANA_MAINNET.Selector: {
-				RegisterTokenConfig: tokensapi.RegisterTokenConfig{
-					TokenSymbol: "TEST",
-					PoolType:    common_utils.BurnMintTokenPool.String(),
-				},
+				PoolType:           common_utils.BurnMintTokenPool.String(),
 			},
 		},
 		MCMS: mcms.Input{

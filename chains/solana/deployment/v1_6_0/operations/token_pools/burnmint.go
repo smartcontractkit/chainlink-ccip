@@ -44,15 +44,29 @@ var InitializeBurnMint = operations.NewOperation(
 	common_utils.Version_1_6_0,
 	"Initializes the BurnMintTokenPool program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
+		batches := make([]types.BatchOperation, 0)
+		out, err := operations.ExecuteOperation(b, InitGlobalConfigBurnMint, chain, input)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize global config: %w", err)
+		}
+		batches = append(batches, out.Output.BatchOps...)
 		burnmint_token_pool.SetProgramID(input.TokenPool)
 		programData, err := utils.GetSolProgramData(chain.Client, input.TokenPool)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
+		var chainConfig test_token_pool.State
+		err = chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &chainConfig)
+		if err == nil {
+			b.Logger.Info("BurnMintTokenPool already initialized for token mint:", input.TokenMint.String())
+			return sequences.OnChainOutput{}, nil
+		}
 		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
-		batches := make([]types.BatchOperation, 0)
 		ixn, err := burnmint_token_pool.NewInitializeInstruction(
 			poolConfigPDA,
 			input.TokenMint,
@@ -76,6 +90,7 @@ var InitializeBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
@@ -97,7 +112,17 @@ var InitGlobalConfigBurnMint = operations.NewOperation(
 			return sequences.OnChainOutput{}, err
 		}
 		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
 		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
+		var chainConfig base_token_pool.BaseConfig
+		err = chain.GetAccountDataBorshInto(context.Background(), configPDA, &chainConfig)
+		// already initialized
+		if !chainConfig.TokenProgram.IsZero() {
+			b.Logger.Info("BurnMintTokenPool global config already initialized for token pool:", input.TokenPool.String())
+			return sequences.OnChainOutput{}, nil
+		}
 		batches := make([]types.BatchOperation, 0)
 		ixn, err := burnmint_token_pool.NewInitGlobalConfigInstruction(
 			input.Router,
@@ -122,6 +147,7 @@ var InitGlobalConfigBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
@@ -170,6 +196,7 @@ var TransferMintAuthorityBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
@@ -203,11 +230,11 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
 		isSuportedChain := false
 		existingConfig := base_token_pool.BaseChain{}
-		var remoteChainConfigAccount test_token_pool.ChainConfig
+		var remoteChainConfigAccount base_token_pool.BaseChain
 		err := chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount)
 		if err == nil {
 			isSuportedChain = true
-			existingConfig = remoteChainConfigAccount.Base
+			existingConfig = remoteChainConfigAccount
 		}
 		batches := make([]types.BatchOperation, 0)
 		var ixn solana.Instruction
@@ -277,6 +304,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
@@ -331,6 +359,7 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
