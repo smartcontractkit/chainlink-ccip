@@ -419,19 +419,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     return (ccvs, ccvArgs);
   }
 
-  /// @notice This function takes in a raw dest chain address and validates the address is valid for the destination
-  /// chain. User supplied addresses on EVM are always abi.encoded. This function strips the abi encoding to have a
-  /// chain agnostic address.
-  /// @param rawAddress The raw dest chain address provided by the user.
-  /// @param addressBytesLength The expected length of the address on the destination chain.
-  /// @return validatedAddress The validated dest chain address, stripped of any abi encoding.
-  function validateDestChainAddress(
-    bytes calldata rawAddress,
-    uint8 addressBytesLength
-  ) external pure returns (bytes memory) {
-    return _validateDestChainAddress(rawAddress, addressBytesLength);
-  }
-
   /// @notice Validates a destination-chain address and strips leading ABI padding for sub-32-byte addresses.
   /// @dev Assumes `addressBytesLength < 32` only in the padded branch; otherwise length must match exactly.
   /// @param rawAddress The address bytes (may be 32-byte ABI-encoded or exact-length raw bytes).
@@ -490,10 +477,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     if (extraArgs.length >= 4 && bytes4(extraArgs[:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
 
-      if (resolvedArgs.tokenReceiver.length != 0) {
-        resolvedArgs.tokenReceiver =
-          _validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
-      }
       // We need to ensure no duplicate CCVs are present in the ccv list.
       CCVConfigValidation._assertNoDuplicates(resolvedArgs.ccvs);
     } else {
@@ -533,7 +516,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         revert TokenReceiverNotAllowed(destChainSelector);
       }
       resolvedArgs.tokenReceiver =
-        this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
+        _validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
     }
 
     // When users don't specify an executor, default executor is chosen.
