@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 type TokenExpansionInput struct {
@@ -27,6 +29,14 @@ type DeployTokenInput struct {
 	Symbol   string   `yaml:"symbol" json:"symbol"`
 	Decimals uint8    `yaml:"decimals" json:"decimals"`
 	Supply   *big.Int `yaml:"supply" json:"supply"`
+	//
+	PreMint *big.Int `yaml:"pre-mint" json:"preMint"`
+	// Address to be set as the CCIP admin on the token contract
+	// who will be allowed to register the token pool for this token in the TokenAdminRegistry
+	// if not specified, defaults to the timelock address
+	CCIPAdmin common.Address `yaml:"ccip-admin" json:"ccipAdmin"`
+	// Customer admin who will be granted admin rights on the token
+	ExternalAdmin common.Address `yaml:"external-admin" json:"externalAdmin"`
 	// list of addresses who may need special processing in order to send tokens
 	// e.g. for Solana, addresses that need associated token accounts created
 	Senders []string `yaml:"senders" json:"senders"`
