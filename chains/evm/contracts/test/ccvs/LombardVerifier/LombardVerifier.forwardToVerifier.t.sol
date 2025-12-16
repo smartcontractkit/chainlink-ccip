@@ -52,6 +52,8 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     address tokenWithAdapter = address(new BurnMintERC20("Token With Adapter", "TWA", 18, 0, 0));
     address adapter = address(new BurnMintERC20("Adapter", "ADP", 18, 0, 0));
 
+    deal(adapter, address(s_lombardVerifier), TRANSFER_AMOUNT);
+
     vm.stopPrank();
     vm.startPrank(OWNER);
 
