@@ -138,6 +138,17 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, verifierArgs);
   }
 
+  function test_forwardToVerifier_RevertWhen_CursedByRMN() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
+      SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, 0, address(s_USDCToken), TRANSFER_AMOUNT, s_tokenReceiver
+    );
+
+    _setMockRMNChainCurse(message.destChainSelector, true);
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, message.destChainSelector));
+    s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
+  }
+
   function test_forwardToVerifier_RevertWhen_CallerIsNotARampOnRouter() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
       SOURCE_CHAIN_SELECTOR,
@@ -187,7 +198,7 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     );
 
     vm.startPrank(s_onRamp);
-    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.DestinationNotSupported.selector, unknownDestChainSelector));
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.RemoteChainNotSupported.selector, unknownDestChainSelector));
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
   }
 

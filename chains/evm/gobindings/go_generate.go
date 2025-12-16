@@ -6,6 +6,7 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip CREATE2Factory create2_factory latest
 //go:generate go run generation/generate/wrap.go ccip CommitteeVerifier committee_verifier latest
 //go:generate go run generation/generate/wrap.go ccip CCTPVerifier cctp_verifier latest
+//go:generate go run generation/generate/wrap.go ccip LombardVerifier lombard_verifier latest
 //go:generate go run generation/generate/wrap.go ccip VersionedVerifierResolver versioned_verifier_resolver latest
 //go:generate go run generation/generate/wrap.go ccip Executor executor latest
 

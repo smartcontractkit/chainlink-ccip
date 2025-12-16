@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
 import {IRouter} from "../../interfaces/IRouter.sol";
@@ -11,6 +11,7 @@ import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
 import {Client} from "../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
@@ -19,59 +20,26 @@ import {CCTPMessageTransmitterProxy} from "../../pools/USDC/CCTPMessageTransmitt
 import {CCTPTokenPool} from "../../pools/USDC/CCTPTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../pools/USDC/USDCTokenPoolProxy.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
+import {CCTPHelper} from "../helpers/CCTPHelper.sol";
+import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
-import {e2e} from "./e2e.t.sol";
+import {MockVerifier} from "../mocks/MockVerifier.sol";
+import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
-contract cctp_e2e is e2e {
-  // solhint-disable-next-line gas-struct-packing
-  struct CCTPMessageHeader {
-    uint32 version;
-    uint32 sourceDomain;
-    uint32 destinationDomain;
-    bytes32 nonce;
-    bytes32 sender;
-    bytes32 recipient;
-    bytes32 destinationCaller;
-    uint32 minFinalityThreshold;
-    uint32 finalityThresholdExecuted;
-  }
-
-  // solhint-disable-next-line gas-struct-packing
-  struct CCTPMessageBody {
-    uint32 version;
-    bytes32 burnToken;
-    bytes32 mintRecipient;
-    uint256 amount;
-    bytes32 messageSender;
-    uint256 maxFee;
-    uint256 feeExecuted;
-    uint256 expirationBlock;
-  }
-
-  // solhint-disable-next-line gas-struct-packing
-  struct CCTPMessageHookData {
-    bytes4 verifierVersion;
-    bytes32 messageId;
-  }
-
-  // solhint-disable-next-line gas-struct-packing
-  struct CCTPMessage {
-    CCTPMessageHeader header;
-    CCTPMessageBody body;
-    CCTPMessageHookData hookData;
-  }
-
+contract cctp_e2e is OnRampSetup {
   uint32 private constant CCTP_VERSION = 1;
   uint16 private constant CCTP_FAST_FINALITY_BPS = 2; // 0.02%
 
   uint32 private constant SOURCE_DOMAIN = 1;
   uint32 private constant DEST_DOMAIN = 2;
 
+  OffRampHelper private s_offRamp;
+  MockVerifier private s_defaultSourceVerifier;
   address private s_feeAggregator = makeAddr("feeAggregator");
   address private s_allowlistAdmin = makeAddr("allowlistAdmin");
 
@@ -94,12 +62,23 @@ contract cctp_e2e is e2e {
   function setUp() public override {
     super.setUp();
 
+    s_offRamp = new OffRampHelper(
+      OffRamp.StaticConfig({
+        localChainSelector: DEST_CHAIN_SELECTOR,
+        gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
+        rmnRemote: s_mockRMNRemote,
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
+      })
+    );
+
     s_sourceCCTPSetup =
       _deployCCTPSetup(address(s_sourceRouter), address(s_mockRMNRemote), address(s_tokenAdminRegistry), SOURCE_DOMAIN);
     s_destCCTPSetup =
       _deployCCTPSetup(address(s_sourceRouter), address(s_mockRMNRemote), address(s_tokenAdminRegistry), DEST_DOMAIN);
 
     _connectCCTPSetups();
+
+    s_defaultSourceVerifier = new MockVerifier("");
 
     // Deal some USDC to the OWNER.
     deal(address(s_sourceCCTPSetup.token), OWNER, 1000e6); // 1000 USDC.
@@ -111,13 +90,53 @@ contract cctp_e2e is e2e {
     s_extraDataByToken[address(s_sourceCCTPSetup.token)] =
       abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG);
 
-    // Apply off ramp updates on the source router.
+    // Apply off ramp and on ramp updates on the source router.
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+
+    // Set the default CCV on the off ramp.
+    address[] memory defaultDestCCVs = new address[](1);
+    defaultDestCCVs[0] = address(s_destCCTPSetup.verifierResolver);
+
+    bytes[] memory onRamps = new bytes[](1);
+    onRamps[0] = abi.encodePacked(s_onRamp);
+
+    OffRamp.SourceChainConfigArgs[] memory sourceChainUpdates = new OffRamp.SourceChainConfigArgs[](1);
+    sourceChainUpdates[0] = OffRamp.SourceChainConfigArgs({
+      router: s_destRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      isEnabled: true,
+      onRamps: onRamps,
+      defaultCCV: defaultDestCCVs,
+      laneMandatedCCVs: new address[](0)
+    });
+    s_offRamp.applySourceChainConfigUpdates(sourceChainUpdates);
+
+    // Set dest chain config on the on ramp.
+    address[] memory defaultSourceCCVs = new address[](1);
+    defaultSourceCCVs[0] = address(s_defaultSourceVerifier);
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      laneMandatedCCVs: new address[](0),
+      defaultCCVs: defaultSourceCCVs,
+      defaultExecutor: s_defaultExecutor,
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+    destChainConfigArgs[0].offRamp = abi.encodePacked(address(s_offRamp));
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
-  function test_e2e() public override {
+  function test_e2e() public {
     uint256 amount = 1e6;
 
     vm.pauseGasMetering();
@@ -128,7 +147,6 @@ contract cctp_e2e is e2e {
     // Specify the CCTP verifier so that it is the only verifier included.
     address[] memory userCCVAddresses = new address[](1);
     userCCVAddresses[0] = address(s_sourceCCTPSetup.verifierResolver);
-    bytes[] memory userCCVArgs = new bytes[](1);
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
@@ -138,7 +156,7 @@ contract cctp_e2e is e2e {
       extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(
         ExtraArgsCodec.GenericExtraArgsV3({
           ccvs: userCCVAddresses,
-          ccvArgs: userCCVArgs,
+          ccvArgs: new bytes[](1),
           blockConfirmations: 0,
           gasLimit: GAS_LIMIT,
           executor: address(0),
@@ -157,7 +175,6 @@ contract cctp_e2e is e2e {
       msgNum: expectedMsgNum,
       originalSender: OWNER
     });
-    receipts[receipts.length - 1].issuer = address(s_sourceRouter);
 
     vm.expectEmit();
     emit ITokenMessenger.DepositForBurn(
@@ -190,8 +207,8 @@ contract cctp_e2e is e2e {
 
     assertEq(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber, expectedMsgNum);
 
-    CCTPMessage memory cctpMessage = CCTPMessage({
-      header: CCTPMessageHeader({
+    CCTPHelper.CCTPMessage memory cctpMessage = CCTPHelper.CCTPMessage({
+      header: CCTPHelper.CCTPMessageHeader({
         version: CCTP_VERSION,
         sourceDomain: SOURCE_DOMAIN,
         destinationDomain: DEST_DOMAIN,
@@ -202,7 +219,7 @@ contract cctp_e2e is e2e {
         minFinalityThreshold: 2000,
         finalityThresholdExecuted: 2000
       }),
-      body: CCTPMessageBody({
+      body: CCTPHelper.CCTPMessageBody({
         version: CCTP_VERSION,
         burnToken: bytes32(abi.encode(address(s_sourceCCTPSetup.token))),
         mintRecipient: bytes32(abi.encode(OWNER)),
@@ -212,18 +229,31 @@ contract cctp_e2e is e2e {
         feeExecuted: 0,
         expirationBlock: block.number + 1000
       }),
-      hookData: CCTPMessageHookData({verifierVersion: s_sourceCCTPSetup.verifier.versionTag(), messageId: messageId})
+      hookData: CCTPHelper.CCTPMessageHookData({
+        verifierVersion: s_sourceCCTPSetup.verifier.versionTag(),
+        messageId: messageId
+      })
     });
 
-    // Default CCV is applied because receiver is an EOA.
-    // Therefore, we need to include a verifier result for the mock verifier here as well.
-    address[] memory ccvAddresses = new address[](2);
+    address[] memory ccvAddresses = new address[](1);
     ccvAddresses[0] = address(s_destCCTPSetup.verifierResolver);
-    ccvAddresses[1] = address(s_destVerifier);
-    bytes[] memory verifierResults = new bytes[](2);
-    verifierResults[0] =
-      abi.encodePacked(s_sourceCCTPSetup.verifier.versionTag(), _encodeCCTPMessage(cctpMessage), new bytes(65));
-    verifierResults[1] = "";
+    bytes[] memory verifierResults = new bytes[](1);
+    verifierResults[0] = abi.encodePacked(
+      s_sourceCCTPSetup.verifier.versionTag(), CCTPHelper._encodeCCTPMessage(cctpMessage), new bytes(65)
+    );
+
+    MessageV1Codec.MessageV1 memory messageV1 = this._decodeMessageV1(encodedMessage);
+
+    vm.expectCall(
+      address(s_destCCTPSetup.verifier),
+      abi.encodeCall(CCTPVerifier.verifyMessage, (messageV1, messageId, verifierResults[0]))
+    );
+    vm.expectCall(
+      address(s_destCCTPSetup.messageTransmitter),
+      abi.encodeCall(
+        MockE2EUSDCTransmitterCCTPV2.receiveMessage, (CCTPHelper._encodeCCTPMessage(cctpMessage), new bytes(65))
+      )
+    );
 
     vm.expectEmit();
     emit OffRamp.ExecutionStateChanged({
@@ -303,17 +333,28 @@ contract cctp_e2e is e2e {
     });
     s_destCCTPSetup.verifierResolver.applyInboundImplementationUpdates(inboundImpls);
 
-    // Apply dest chain config updates on the source CCTP verifier.
-    CCTPVerifier.DestChainConfigArgs[] memory destChainConfigArgs = new BaseVerifier.DestChainConfigArgs[](1);
-    destChainConfigArgs[0] = BaseVerifier.DestChainConfigArgs({
+    // Apply remote chain config updates on the each CCTP verifier.
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigArgs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: IRouter(s_sourceCCTPSetup.router),
-      destChainSelector: DEST_CHAIN_SELECTOR,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowlistEnabled: false,
       feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
       gasForVerification: DEFAULT_CCV_GAS_LIMIT,
       payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
     });
-    s_sourceCCTPSetup.verifier.applyDestChainConfigUpdates(destChainConfigArgs);
+    s_sourceCCTPSetup.verifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
+
+    remoteChainConfigArgs = new BaseVerifier.RemoteChainConfigArgs[](1);
+    remoteChainConfigArgs[0] = BaseVerifier.RemoteChainConfigArgs({
+      router: IRouter(s_destCCTPSetup.router),
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      allowlistEnabled: false,
+      feeUSDCents: DEFAULT_CCV_FEE_USD_CENTS,
+      gasForVerification: DEFAULT_CCV_GAS_LIMIT,
+      payloadSizeBytes: DEFAULT_CCV_PAYLOAD_SIZE
+    });
+    s_destCCTPSetup.verifier.applyRemoteChainConfigUpdates(remoteChainConfigArgs);
 
     // Set the destination domain on the source CCTP verifier.
     CCTPVerifier.SetDomainArgs[] memory destDomainArgs = new CCTPVerifier.SetDomainArgs[](1);
@@ -416,50 +457,10 @@ contract cctp_e2e is e2e {
     BurnMintERC20(address(s_destCCTPSetup.token)).grantMintAndBurnRoles(address(s_destCCTPSetup.messageTransmitter));
   }
 
-  function _encodeCCTPMessage(
-    CCTPMessage memory cctpMessage
-  ) internal pure returns (bytes memory) {
-    return abi.encodePacked(
-      _encodeCCTPMessageHeader(cctpMessage.header),
-      _encodeCCTPMessageBody(cctpMessage.body),
-      _encodeCCTPMessageHookData(cctpMessage.hookData)
-    );
-  }
-
-  function _encodeCCTPMessageHeader(
-    CCTPMessageHeader memory header
-  ) private pure returns (bytes memory) {
-    return abi.encodePacked(
-      header.version,
-      header.sourceDomain,
-      header.destinationDomain,
-      header.nonce,
-      header.sender,
-      header.recipient,
-      header.destinationCaller,
-      header.minFinalityThreshold,
-      header.finalityThresholdExecuted
-    );
-  }
-
-  function _encodeCCTPMessageBody(
-    CCTPMessageBody memory body
-  ) private pure returns (bytes memory) {
-    return abi.encodePacked(
-      body.version,
-      body.burnToken,
-      body.mintRecipient,
-      body.amount,
-      body.messageSender,
-      body.maxFee,
-      body.feeExecuted,
-      body.expirationBlock
-    );
-  }
-
-  function _encodeCCTPMessageHookData(
-    CCTPMessageHookData memory hookData
-  ) private pure returns (bytes memory) {
-    return abi.encodePacked(hookData.verifierVersion, hookData.messageId);
+  // External so we can pass `bytes memory` as calldata (for MessageV1Codec._decodeMessageV1).
+  function _decodeMessageV1(
+    bytes calldata encodedMessage
+  ) external pure returns (MessageV1Codec.MessageV1 memory) {
+    return MessageV1Codec._decodeMessageV1(encodedMessage);
   }
 }

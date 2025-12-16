@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
-import {IBridgeV1} from "./interfaces/IBridgeV1.sol";
-import {IMailbox} from "./interfaces/IMailbox.sol";
+import {IBridgeV1} from "../../interfaces/lombard/IBridgeV1.sol";
+import {IMailbox} from "../../interfaces/lombard/IMailbox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../../libraries/Pool.sol";

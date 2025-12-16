@@ -20,8 +20,6 @@ import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 contract TokenPoolFactory is ITypeAndVersion {
   using Create2 for bytes32;
 
-  event RemoteChainConfigUpdated(uint64 indexed remoteChainSelector, RemoteChainConfig remoteChainConfig);
-
   error InvalidZeroAddress();
 
   /// @notice The type of pool to deploy. Types may be expanded in future versions.

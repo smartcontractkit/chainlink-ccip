@@ -5,6 +5,7 @@ import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IMessageTransmitter} from "../pools/USDC/interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "../pools/USDC/interfaces/ITokenMessenger.sol";
 
+import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
@@ -36,7 +37,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidFastFinalityBps(uint16 fastFinalityBps);
   error InvalidSetDomainArgs(SetDomainArgs args);
   error UnknownDomain(uint64 chainSelector);
-  error UnsupportedFinality(uint32 finality);
 
   event DomainsSet(SetDomainArgs[] domains);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
@@ -55,7 +55,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @notice The arguments required to update a remote domain.
   struct SetDomainArgs {
     bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
-    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the corresponding v1.7.0 verifier).
+    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain.
     bytes32 mintRecipientOnDest; // Address to mint USDC to on the destination chain.
     uint64 chainSelector; // The corresponding CCIP destination chain selector for the domain.
     uint32 domainIdentifier; // Unique domain ID used across CCTP.
@@ -73,7 +73,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @dev Zero is a valid domain identifier.
   struct Domain {
     bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
-    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the corresponding v1.7.0 verifier).
+    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain.
     bytes32 mintRecipientOnDest; // Address to mint USDC to on the destination chain.
     uint32 domainIdentifier; // ─╮ Unique domain ID used across CCTP.
     bool enabled; // ────────────╯ Whether or not the domain is enabled.
@@ -217,6 +217,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     uint256, // feeTokenAmount
     bytes calldata verifierArgs
   ) external returns (bytes memory verifierReturnData) {
+    _assertNotCursedByRMN(message.destChainSelector);
     // For EVM, sender is expected to be 20 bytes.
     _assertSenderIsAllowed(message.destChainSelector, address(bytes20(message.sender)));
 
@@ -243,8 +244,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     if (domain.mintRecipientOnDest != bytes32(0)) {
       decodedReceiver = domain.mintRecipientOnDest;
     } else {
-      decodedReceiver =
-        bytes32(uint256(bytes32(tokenTransfer.tokenReceiver)) >> (256 - tokenTransfer.tokenReceiver.length * 8));
+      decodedReceiver = Internal._leftPadBytesToBytes32(tokenTransfer.tokenReceiver);
     }
 
     DepositForBurnParams memory params = DepositForBurnParams({
@@ -302,6 +302,9 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     bytes32 messageHash,
     bytes calldata verifierResults
   ) external {
+    _assertNotCursedByRMN(message.sourceChainSelector);
+    _onlyOffRamp(message.sourceChainSelector);
+
     if (verifierResults.length < MINIMUM_VERIFIER_RESULT_SIZE) revert InvalidVerifierResults();
 
     bytes4 versionPrefix = bytes4(verifierResults[:VERIFIER_VERSION_SIZE]);
@@ -421,12 +424,12 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     emit DomainsSet(domains);
   }
 
-  /// @notice Updates destination chain configurations.
-  /// @param destChainConfigArgs Array of destination chain configurations.
-  function applyDestChainConfigUpdates(
-    DestChainConfigArgs[] calldata destChainConfigArgs
+  /// @notice Updates remote chain configurations.
+  /// @param remoteChainConfigArgs Array of destination chain configurations.
+  function applyRemoteChainConfigUpdates(
+    RemoteChainConfigArgs[] calldata remoteChainConfigArgs
   ) external onlyOwner {
-    _applyDestChainConfigUpdates(destChainConfigArgs);
+    _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }
 
   /// @notice Updates senders that are allowed to use this verifier.

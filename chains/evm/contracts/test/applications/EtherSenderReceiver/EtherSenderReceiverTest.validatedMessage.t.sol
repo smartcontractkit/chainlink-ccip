@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {EtherSenderReceiver} from "../../../applications/EtherSenderReceiver.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {EtherSenderReceiverTestSetup} from "./EtherSenderReceiverTestSetup.t.sol";
 
 contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTestSetup {
-  error InvalidDestinationReceiver(bytes destReceiver);
-  error InvalidTokenAmounts(uint256 gotAmounts);
-  error InvalidWethAddress(address want, address got);
-  error GasLimitTooLow(uint256 minLimit, uint256 gotLimit);
-
   function testFuzz_validatedMessage_msgSenderOverwrite(
     bytes memory data
   ) public view {
@@ -165,7 +161,7 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTestSetu
       extraArgs: ""
     });
 
-    vm.expectRevert(abi.encodeWithSelector(InvalidTokenAmounts.selector, uint256(2)));
+    vm.expectRevert(abi.encodeWithSelector(EtherSenderReceiver.InvalidTokenAmounts.selector, uint256(2)));
     s_etherSenderReceiver.validatedMessage(message);
   }
 }

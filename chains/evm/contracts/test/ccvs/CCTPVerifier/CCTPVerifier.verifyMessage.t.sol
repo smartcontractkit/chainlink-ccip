@@ -1,23 +1,30 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IRouter} from "../../../interfaces/IRouter.sol";
 import {IMessageTransmitter} from "../../../pools/USDC/interfaces/IMessageTransmitter.sol";
 
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
+import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
-  CCTPVerifierSetup.CCTPMessage internal s_baseCCTPMessage;
+  CCTPHelper.CCTPMessage internal s_baseCCTPMessage;
+  address internal constant OFFRAMP = address(0x001001001001);
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_baseCCTPMessage = CCTPVerifierSetup.CCTPMessage({
-      header: CCTPVerifierSetup.CCTPMessageHeader({
+    // Mock the offRamp check.
+    vm.mockCall(address(s_router), abi.encodeCall(IRouter.isOffRamp, (DEST_CHAIN_SELECTOR, OFFRAMP)), abi.encode(true));
+
+    s_baseCCTPMessage = CCTPHelper.CCTPMessage({
+      header: CCTPHelper.CCTPMessageHeader({
         version: 1,
         sourceDomain: REMOTE_DOMAIN_IDENTIFIER,
         destinationDomain: LOCAL_DOMAIN_IDENTIFIER,
@@ -28,7 +35,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
         minFinalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD,
         finalityThresholdExecuted: CCTP_STANDARD_FINALITY_THRESHOLD
       }),
-      body: CCTPVerifierSetup.CCTPMessageBody({
+      body: CCTPHelper.CCTPMessageBody({
         version: 1,
         burnToken: bytes32(abi.encode(s_USDCToken)),
         mintRecipient: bytes32(abi.encode(s_tokenReceiverAddress)),
@@ -38,10 +45,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
         feeExecuted: 0,
         expirationBlock: block.number + 1000
       }),
-      hookData: CCTPVerifierSetup.CCTPMessageHookData({
-        verifierVersion: s_cctpVerifier.versionTag(),
-        messageId: bytes32(0)
-      })
+      hookData: CCTPHelper.CCTPMessageHookData({verifierVersion: s_cctpVerifier.versionTag(), messageId: bytes32(0)})
     });
 
     // Set the domain for the source chain.
@@ -55,6 +59,8 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
       enabled: true
     });
     s_cctpVerifier.setDomains(domainUpdates);
+
+    vm.startPrank(OFFRAMP);
   }
 
   function test_verifyMessage() public {
@@ -74,13 +80,30 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     assertEq(IERC20(address(s_USDCToken)).balanceOf(s_tokenReceiverAddress), 0);
 
     vm.expectEmit();
-    emit MockE2EUSDCTransmitterCCTPV2.MessageReceived(_encodeCCTPMessage(s_baseCCTPMessage), new bytes(65));
+    emit MockE2EUSDCTransmitterCCTPV2.MessageReceived(CCTPHelper._encodeCCTPMessage(s_baseCCTPMessage), new bytes(65));
 
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
 
     // Ensure that the mint recipient received the tokens.
     // Mock transmitter always just mints 1 token.
     assertEq(IERC20(address(s_USDCToken)).balanceOf(s_tokenReceiverAddress), 1);
+  }
+
+  function test_verifyMessage_RevertWhen_CursedByRMN() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    // verifyMessage checks curse status using message.sourceChainSelector.
+    _setMockRMNChainCurse(message.sourceChainSelector, true);
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, message.sourceChainSelector));
+    s_cctpVerifier.verifyMessage(message, messageHash, "");
   }
 
   function test_verifyMessage_RevertWhen_InvalidVerifierResults() public {
@@ -176,7 +199,10 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
       chainSelector: DEST_CHAIN_SELECTOR,
       enabled: false
     });
+
+    vm.startPrank(OWNER);
     s_cctpVerifier.setDomains(domainUpdates);
+    vm.startPrank(OFFRAMP);
 
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.UnknownDomain.selector, DEST_CHAIN_SELECTOR));
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
@@ -223,5 +249,30 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     );
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.ReceiveMessageCallFailed.selector));
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+  }
+
+  function test_verifyMessage_RevertWhen_CallerIsNotOffRamp() public {
+    address invalidCaller = makeAddr("invalidCaller");
+
+    // Mock the router to return false for isOffRamp with the invalid caller. If we don't mock the call reverts because
+    // it's not a real router.
+    vm.mockCall(
+      address(s_router), abi.encodeCall(IRouter.isOffRamp, (DEST_CHAIN_SELECTOR, invalidCaller)), abi.encode(false)
+    );
+
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    vm.stopPrank();
+    vm.startPrank(invalidCaller);
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CallerIsNotARampOnRouter.selector, invalidCaller));
+    s_cctpVerifier.verifyMessage(message, messageHash, "");
   }
 }
