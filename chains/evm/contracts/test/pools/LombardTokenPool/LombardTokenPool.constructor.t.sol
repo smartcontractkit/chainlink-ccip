@@ -32,6 +32,7 @@ contract LombardTokenPool_constructor is Test {
     assertEq(tokenAdapter, adapter);
     assertEq(pool.typeAndVersion(), "LombardTokenPool 1.7.0-dev");
     assertEq(s_token.allowance(address(pool), adapter), type(uint256).max);
+    assertEq(s_token.allowance(address(pool), bridge), 0);
     assertEq(s_token.allowance(address(pool), address(s_bridge)), 0);
   }
 
