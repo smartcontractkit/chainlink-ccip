@@ -1,4 +1,5 @@
 GETH_VERSION: 1.15.3
+advanced_pool_hooks: ../solc/ccip/AdvancedPoolHooks/AdvancedPoolHooks.sol/AdvancedPoolHooks.abi.json ../solc/ccip/AdvancedPoolHooks/AdvancedPoolHooks.sol/AdvancedPoolHooks.bin 19f7926aa992df13d41aee6fbd6513bac6c5e66efe3f5e3d292a1e147bf3d26e
 burn_from_mint_token_pool: ../solc/ccip/BurnFromMintTokenPool/BurnFromMintTokenPool.sol/BurnFromMintTokenPool.abi.json ../solc/ccip/BurnFromMintTokenPool/BurnFromMintTokenPool.sol/BurnFromMintTokenPool.bin 5c6f50c18aa3fb838badcd6e24f1b2f354ebfae6aa3d7a180e1ea318c7724a85
 burn_mint_token_pool: ../solc/ccip/BurnMintTokenPool/BurnMintTokenPool.sol/BurnMintTokenPool.abi.json ../solc/ccip/BurnMintTokenPool/BurnMintTokenPool.sol/BurnMintTokenPool.bin 8aabb895ee8746905a9d5ca4132f78580d6dc12bd2fddd9afc21a8f0c6dc31de
 burn_mint_with_lock_release_flag_token_pool: ../solc/ccip/BurnMintWithLockReleaseFlagTokenPool/BurnMintWithLockReleaseFlagTokenPool.sol/BurnMintWithLockReleaseFlagTokenPool.abi.json ../solc/ccip/BurnMintWithLockReleaseFlagTokenPool/BurnMintWithLockReleaseFlagTokenPool.sol/BurnMintWithLockReleaseFlagTokenPool.bin d4dbce8c43836cd57ed16cd056c9a51e4341df0031a68b8ec2c1166e08a3ee0b
