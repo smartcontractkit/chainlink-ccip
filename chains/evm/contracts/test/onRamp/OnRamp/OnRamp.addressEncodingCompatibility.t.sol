@@ -39,10 +39,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     VmSafe.Log[] memory logs = vm.getRecordedLogs();
     bytes memory encodedMessage;
     for (uint256 i = 0; i < logs.length; ++i) {
-      if (
-        logs[i].emitter == address(s_onRamp) && logs[i].topics.length != 0
-          && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC
-      ) {
+      if (logs[i].topics.length != 0 && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC) {
         (, encodedMessage,,) = abi.decode(logs[i].data, (address, bytes, OnRamp.Receipt[], bytes[]));
         break;
       }
@@ -86,7 +83,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     }
   }
 
-  function test_sender_is_abi_encoded_for_evm_dest() public {
+  function test_forwardFromRouter_SenderAbiEncodedForEvmDest() public {
     _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
     address originalSender = makeAddr("originalSender");
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -97,9 +94,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     assertEq(decoded.sender, abi.encode(originalSender), "sender should be abi.encode(address)");
   }
 
-  // ===================== Receiver =====================
-
-  function test_receiver_abiEncoded_trims_to_dest_length() public {
+  function test_forwardFromRouter_ReceiverAbiEncodedTrimsToDestLength() public {
     _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
     address receiver = makeAddr("receiver");
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -109,31 +104,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     _expectTrimmed(decoded.receiver, receiver, EVM_ADDRESS_LENGTH);
   }
 
-  function test_receiver_revert_when_padded_bytes_nonzero() public {
-    _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
-    bytes memory bad = abi.encode(bytes32(type(uint256).max)); // high bits non-zero
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.receiver = bad;
-
-    vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, bad));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
-    vm.stopPrank();
-  }
-
-  function test_receiver_revert_when_length_not_dest_or_32() public {
-    _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    address receiver = makeAddr("receiver");
-    message.receiver = abi.encodePacked(receiver, uint8(0));
-
-    vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, message.receiver));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
-    vm.stopPrank();
-  }
-
-  function test_receiver_accepts_exact_dest_length() public {
+  function test_forwardFromRouter_ReceiverAcceptsExactDestLength() public {
     _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
     address receiver = makeAddr("receiverPacked");
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -143,21 +114,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     _expectTrimmed(decoded.receiver, receiver, EVM_ADDRESS_LENGTH);
   }
 
-  function test_receiver_revert_when_short_for_32byte_chain() public {
-    _setDestChainAddressLength(NON_EVM_ADDRESS_LENGTH);
-    address receiver = makeAddr("receiverShort");
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.receiver = abi.encodePacked(receiver); // 20 bytes, but dest expects 32
-
-    vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, message.receiver));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
-    vm.stopPrank();
-  }
-
-  // ===================== Token Receiver =====================
-
-  function test_tokenReceiver_abiEncoded_trims_to_dest_length() public {
+  function test_forwardFromRouter_TokenReceiverAbiEncodedTrimsToDestLength() public {
     _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
     address tokenReceiver = makeAddr("tokenReceiver");
 
@@ -185,67 +142,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     _expectTrimmed(decoded.receiver, makeAddr("receiver"), EVM_ADDRESS_LENGTH);
   }
 
-  function test_tokenReceiver_revert_when_padded_bytes_nonzero() public {
-    _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
-    bytes memory bad = abi.encode(bytes32(type(uint256).max));
-
-    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new address[](0),
-      ccvArgs: new bytes[](0),
-      blockConfirmations: 0,
-      gasLimit: GAS_LIMIT,
-      executor: address(0),
-      executorArgs: "",
-      tokenReceiver: bad,
-      tokenArgs: ""
-    });
-
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(makeAddr("receiver")),
-      data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      feeToken: s_sourceFeeToken,
-      extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs)
-    });
-
-    vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, bad));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
-    vm.stopPrank();
-  }
-
-  function test_tokenReceiver_revert_when_length_not_dest_or_32() public {
-    _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
-    bytes memory wrongLen = bytes("wronglengthhere!"); // 17 bytes
-
-    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
-      ccvs: new address[](0),
-      ccvArgs: new bytes[](0),
-      blockConfirmations: 0,
-      gasLimit: GAS_LIMIT,
-      executor: address(0),
-      executorArgs: "",
-      tokenReceiver: wrongLen,
-      tokenArgs: ""
-    });
-
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(makeAddr("receiver")),
-      data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      feeToken: s_sourceFeeToken,
-      extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs)
-    });
-
-    vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, wrongLen));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
-    vm.stopPrank();
-  }
-
-  // ===================== Token Transfer destTokenAddress =====================
-
-  function test_tokenTransfer_destToken_trims_to_dest_length_when_pool_returns_abiEncoded() public {
+  function test_forwardFromRouter_DestTokenTrimsToDestLengthWhenPoolReturnsAbiEncoded() public {
     _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
     address token = s_sourceFeeToken;
     address pool = makeAddr("mockPool");
@@ -302,9 +199,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     _expectTrimmed(decoded.tokenTransfer[0].destTokenAddress, destToken, EVM_ADDRESS_LENGTH);
   }
 
-  // ===================== Non-EVM custom length acceptance =====================
-
-  function test_receiver_accepts_custom_non_evm_length() public {
+  function test_forwardFromRouter_ReceiverAcceptsCustomNonEvmLength() public {
     uint8 customLen = 24;
     _setDestChainAddressLength(customLen);
 
@@ -321,7 +216,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     assertEq(decoded.receiver.length, customLen);
   }
 
-  function test_tokenReceiver_accepts_custom_non_evm_length() public {
+  function test_forwardFromRouter_TokenReceiverAcceptsCustomNonEvmLength() public {
     uint8 customLen = 24;
     _setDestChainAddressLength(customLen);
 
@@ -352,5 +247,103 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     MessageV1Codec.MessageV1 memory decoded = _forwardAndDecode(message, STRANGER);
     assertEq(decoded.receiver, tokenReceiver);
     assertEq(decoded.receiver.length, customLen);
+  }
+
+  // ================================================================
+  // │                          Reverts                             │
+  // ================================================================
+
+  function test_forwardFromRouter_RevertWhen_ReceiverPaddingNonZero() public {
+    _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
+    bytes memory bad = abi.encode(bytes32(type(uint256).max)); // high bits non-zero
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.receiver = bad;
+
+    vm.startPrank(address(s_sourceRouter));
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, bad));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
+    vm.stopPrank();
+  }
+
+  function test_forwardFromRouter_RevertWhen_ReceiverLengthNotDestOr32() public {
+    _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    address receiver = makeAddr("receiver");
+    message.receiver = abi.encodePacked(receiver, uint8(0));
+
+    vm.startPrank(address(s_sourceRouter));
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, message.receiver));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
+    vm.stopPrank();
+  }
+
+  function test_forwardFromRouter_RevertWhen_ReceiverShortFor32ByteChain() public {
+    _setDestChainAddressLength(NON_EVM_ADDRESS_LENGTH);
+    address receiver = makeAddr("receiverShort");
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.receiver = abi.encodePacked(receiver); // 20 bytes, but dest expects 32
+
+    vm.startPrank(address(s_sourceRouter));
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, message.receiver));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
+    vm.stopPrank();
+  }
+
+  function test_forwardFromRouter_RevertWhen_TokenReceiverPaddingNonZero() public {
+    _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
+    bytes memory bad = abi.encode(bytes32(type(uint256).max));
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
+      blockConfirmations: 0,
+      gasLimit: GAS_LIMIT,
+      executor: address(0),
+      executorArgs: "",
+      tokenReceiver: bad,
+      tokenArgs: ""
+    });
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(makeAddr("receiver")),
+      data: "",
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs)
+    });
+
+    vm.startPrank(address(s_sourceRouter));
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, bad));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
+    vm.stopPrank();
+  }
+
+  function test_forwardFromRouter_RevertWhen_TokenReceiverLengthNotDestOr32() public {
+    _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
+    bytes memory wrongLen = bytes("wronglengthhere!"); // 17 bytes
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: new address[](0),
+      ccvArgs: new bytes[](0),
+      blockConfirmations: 0,
+      gasLimit: GAS_LIMIT,
+      executor: address(0),
+      executorArgs: "",
+      tokenReceiver: wrongLen,
+      tokenArgs: ""
+    });
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(makeAddr("receiver")),
+      data: "",
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs)
+    });
+
+    vm.startPrank(address(s_sourceRouter));
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, wrongLen));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
+    vm.stopPrank();
   }
 }

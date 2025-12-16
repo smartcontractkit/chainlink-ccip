@@ -436,35 +436,32 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     bytes memory rawAddress,
     uint256 addressBytesLength
   ) internal pure returns (bytes memory validatedAddress) {
-    // unchecked: addressBytesLength < 32 bounds all arithmetic.
-    unchecked {
-      uint256 len = rawAddress.length;
-      if (addressBytesLength < 32 && len == 32) {
-        uint256 word;
-        // assembly equivalent: word = uint256(bytes32(rawAddress));
-        assembly {
-          word := mload(add(rawAddress, 32))
-        }
-        // Shift out the actual address bytes; any residue means non-zero padding.
-        if (word >> (addressBytesLength * 8) != 0) {
-          revert InvalidDestChainAddress(rawAddress);
-        }
-        validatedAddress = new bytes(addressBytesLength);
-        // assembly equivalent:
-        //  uint256 offset = 32 - addressBytesLength;
-        //  for (uint256 i = 0; i < addressBytesLength; ++i) {
-        //    validatedAddress[i] = rawAddress[offset + i];
-        //  }
-        assembly {
-          let shift := mul(sub(32, addressBytesLength), 8)
-          mstore(add(validatedAddress, 32), shl(shift, word))
-        }
-        return validatedAddress;
+    uint256 len = rawAddress.length;
+    if (addressBytesLength < 32 && len == 32) {
+      uint256 word;
+      // assembly equivalent: word = uint256(bytes32(rawAddress));
+      assembly {
+        word := mload(add(rawAddress, 32))
       }
-
-      if (len != addressBytesLength) {
+      // Shift out the actual address bytes; any residue means non-zero padding.
+      if (word >> (addressBytesLength * 8) != 0) {
         revert InvalidDestChainAddress(rawAddress);
       }
+      validatedAddress = new bytes(addressBytesLength);
+      // assembly equivalent:
+      //  uint256 offset = 32 - addressBytesLength;
+      //  for (uint256 i = 0; i < addressBytesLength; ++i) {
+      //    validatedAddress[i] = rawAddress[offset + i];
+      //  }
+      assembly {
+        let shift := mul(sub(32, addressBytesLength), 8)
+        mstore(add(validatedAddress, 32), shl(shift, word))
+      }
+      return validatedAddress;
+    }
+
+    if (len != addressBytesLength) {
+      revert InvalidDestChainAddress(rawAddress);
     }
     return rawAddress;
   }

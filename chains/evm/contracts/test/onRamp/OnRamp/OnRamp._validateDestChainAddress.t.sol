@@ -33,7 +33,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     assertEq(rawAddress, validated);
   }
 
-  function testFuzz_validateDestChainAddress(
+  function testFuzz_validateDestChainAddress_MatchesInputLength(
     bytes calldata rawAddress
   ) public view {
     vm.assume(rawAddress.length > 0);
@@ -56,7 +56,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     assertEq(20, validated.length);
   }
 
-  function testFuzz_validateDestChainAddress_AbiEncoded(
+  function testFuzz_validateDestChainAddress_StripsAbiPadding(
     uint8 addressBytesLength
   ) public view {
     addressBytesLength = uint8(bound(addressBytesLength, 1, 31));
@@ -89,7 +89,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     assertEq(rawAddress, validated);
   }
 
-  function testFuzz_validateDestChainAddress_Padded_NoOverflow(uint8 addressBytesLength, bytes32 tail) public view {
+  function testFuzz_validateDestChainAddress_PaddedNoOverflow(uint8 addressBytesLength, bytes32 tail) public view {
     addressBytesLength = uint8(bound(addressBytesLength, 0, 32));
 
     bytes memory padded = new bytes(32);
@@ -110,7 +110,9 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     assertEq(validated, expected);
   }
 
-  // Reverts
+  // ================================================================
+  // │                          Reverts                             │
+  // ================================================================
 
   function test_validateDestChainAddress_RevertWhen_NonZeroPadding() public {
     uint8 addressBytesLength = 20;
