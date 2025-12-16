@@ -24,15 +24,6 @@ func basicParams() sequences.CommitteeVerifierParams {
 		FeeAggregator:   common.HexToAddress("0x02"),
 		AllowlistAdmin:  common.HexToAddress("0x03"),
 		StorageLocation: "https://test.chain.link.fake",
-		SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
-			Threshold: 1,
-			Signers: []common.Address{
-				common.HexToAddress("0x02"),
-				common.HexToAddress("0x03"),
-				common.HexToAddress("0x04"),
-				common.HexToAddress("0x05"),
-			},
-		},
 	}
 }
 
@@ -73,7 +64,7 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 				sequences.DeployCommitteeVerifier,
 				e.BlockChains.EVMChains()[chainSelector],
 				sequences.DeployCommitteeVerifierInput{
-					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 					ChainSelector:     chainSelector,
 					ExistingAddresses: test.existingAddresses,
 					Params:            params,
@@ -139,8 +130,8 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 		e.BlockChains.EVMChains()[chainSelector],
 		sequences.DeployCommitteeVerifierInput{
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-			ChainSelector:   chainSelector,
-			Params:          params,
+			ChainSelector:  chainSelector,
+			Params:         params,
 		},
 	)
 	require.NoError(t, err, "Failed to pre-deploy CommitteeVerifier stack")
@@ -151,7 +142,7 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSelector],
 		sequences.DeployCommitteeVerifierInput{
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 			ChainSelector:     chainSelector,
 			ExistingAddresses: deployReport.Output.Addresses,
 			Params:            params,
@@ -215,7 +206,7 @@ func TestDeployCommitteeVerifier_MultipleDeployments(t *testing.T) {
 			params := basicParams()
 			params.Qualifier = "alpha"
 			input := sequences.DeployCommitteeVerifierInput{
-				CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 				ChainSelector:     evmChain.Selector,
 				ExistingAddresses: nil,
 				Params:            params,
@@ -268,7 +259,7 @@ func TestDeployCommitteeVerifier_MultipleDeployments(t *testing.T) {
 				params := basicParams()
 				params.Qualifier = "alpha"
 				input := sequences.DeployCommitteeVerifierInput{
-					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 					ChainSelector:     chainSel,
 					ExistingAddresses: nil,
 					Params:            params,
@@ -320,7 +311,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployCommitteeVerifierInput{
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 			ChainSelector:     chainSel,
 			ExistingAddresses: nil,
 			Params:            paramsAlpha,
@@ -353,7 +344,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployCommitteeVerifierInput{
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 			ChainSelector:     chainSel,
 			ExistingAddresses: addrs1,
 			Params:            paramsBeta,
@@ -379,7 +370,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 		sequences.DeployCommitteeVerifier,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployCommitteeVerifierInput{
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 			ChainSelector:     chainSel,
 			ExistingAddresses: append(addrs1, addrs2...),
 			Params:            paramsAlpha,

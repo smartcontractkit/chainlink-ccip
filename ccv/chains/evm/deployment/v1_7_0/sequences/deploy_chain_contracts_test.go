@@ -216,28 +216,14 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	params := testsetup.CreateBasicContractParams()
 	params.CommitteeVerifiers = []sequences.CommitteeVerifierParams{
 		{
-			Version:       semver.MustParse("1.7.0"),
-			FeeAggregator: common.HexToAddress("0x01"),
-			SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
-				Threshold: 1,
-				Signers: []common.Address{
-					common.HexToAddress("0x02"),
-					common.HexToAddress("0x03"),
-				},
-			},
+			Version:         semver.MustParse("1.7.0"),
+			FeeAggregator:   common.HexToAddress("0x01"),
 			StorageLocation: "https://test.chain.link.fake",
 			Qualifier:       "alpha",
 		},
 		{
-			Version:       semver.MustParse("1.7.0"),
-			FeeAggregator: common.HexToAddress("0x01"),
-			SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
-				Threshold: 1,
-				Signers: []common.Address{
-					common.HexToAddress("0x02"),
-					common.HexToAddress("0x03"),
-				},
-			},
+			Version:         semver.MustParse("1.7.0"),
+			FeeAggregator:   common.HexToAddress("0x01"),
 			StorageLocation: "https://test.chain.link.fake",
 			Qualifier:       "beta",
 		},

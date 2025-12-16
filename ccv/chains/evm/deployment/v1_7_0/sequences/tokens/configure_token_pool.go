@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -22,6 +23,8 @@ type ConfigureTokenPoolInput struct {
 	ChainSelector uint64
 	// TokenPoolAddress is the address of the token pool.
 	TokenPoolAddress common.Address
+	// AdvancedPoolHooks is the address of the AdvancedPoolHooks contract.
+	AdvancedPoolHooks common.Address
 	// AllowList is the list of addresses allowed to transfer tokens.
 	// If empty upon deployment, an allow-list can never be set.
 	// Likewise, if populated upon deployment, the allow-list can never be disabled.
@@ -46,44 +49,66 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 
 		// First, check if the allow-list is enabled
 		if len(input.AllowList) != 0 {
-			allowListEnabledReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowListEnabled, chain, evm_contract.FunctionInput[any]{
+			allowListEnabledReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllowListEnabled, chain, evm_contract.FunctionInput[any]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allow-list status from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allow-list status from advanced pool hooks with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
 			if allowListEnabledReport.Output {
 				// Allow-list is enabled, so we first check the current allow-list
-				currentAllowListReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowList, chain, evm_contract.FunctionInput[any]{
+				currentAllowListReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllowList, chain, evm_contract.FunctionInput[any]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get current allow-list from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get current allow-list from advanced pool hooks with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 				}
 				adds, removes := makeAllowListUpdates(currentAllowListReport.Output, input.AllowList)
 
 				// Apply any updates to the allow-list if they exist
 				if len(adds) != 0 || len(removes) != 0 {
-					applyAllowListUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyAllowListUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyAllowListUpdatesArgs]{
+					applyAllowListUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAllowlistUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AllowlistUpdatesArgs]{
 						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
-						Args: token_pool.ApplyAllowListUpdatesArgs{
+						Args: advanced_pool_hooks.AllowlistUpdatesArgs{
 							Adds:    adds,
 							Removes: removes,
 						},
 					})
 					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allow-list updates to token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allow-list updates to advanced pool hooks with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 					}
 					writes = append(writes, applyAllowListUpdatesReport.Output)
 				}
 			}
 		}
 
+		// Set threshold amount for additional CCVs (if necessary)
+		if input.ThresholdAmountForAdditionalCCVs != nil {
+			currentThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[any]{
+				ChainSelector: input.ChainSelector,
+				Address:       input.TokenPoolAddress,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+			}
+			if currentThresholdAmountReport.Output != input.ThresholdAmountForAdditionalCCVs {
+				setThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.SetThresholdAmount, chain, evm_contract.FunctionInput[*big.Int]{
+					ChainSelector: input.ChainSelector,
+					Address:       input.TokenPoolAddress,
+					Args:          input.ThresholdAmountForAdditionalCCVs,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+				}
+				writes = append(writes, setThresholdAmountReport.Output)
+			}
+		}
+
 		// Set dynamic config (if necessary)
-		if input.RouterAddress != (common.Address{}) || input.ThresholdAmountForAdditionalCCVs != nil {
+		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) {
 			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[any]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
@@ -93,60 +118,30 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			}
 
 			currentDynamicConfig := currentDynamicConfigReport.Output
+
 			desiredRouter := currentDynamicConfig.Router
 			if input.RouterAddress != (common.Address{}) {
 				desiredRouter = input.RouterAddress
 			}
 
-			currentThreshold := big.NewInt(0)
-			if currentDynamicConfig.ThresholdAmountForAdditionalCCVs != nil {
-				currentThreshold = new(big.Int).Set(currentDynamicConfig.ThresholdAmountForAdditionalCCVs)
-			}
-			desiredThreshold := new(big.Int).Set(currentThreshold)
-			if input.ThresholdAmountForAdditionalCCVs != nil {
-				desiredThreshold = new(big.Int).Set(input.ThresholdAmountForAdditionalCCVs)
+			desiredRateLimitAdmin := currentDynamicConfig.RateLimitAdmin
+			if input.RateLimitAdmin != (common.Address{}) {
+				desiredRateLimitAdmin = input.RateLimitAdmin
 			}
 
-			routerChanged := desiredRouter != currentDynamicConfig.Router
-			thresholdChanged := desiredThreshold.Cmp(currentThreshold) != 0
-
-			if routerChanged || thresholdChanged {
+			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin {
 				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.DynamicConfigArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
 					Args: token_pool.DynamicConfigArgs{
-						Router:                           desiredRouter,
-						ThresholdAmountForAdditionalCCVs: desiredThreshold,
+						Router:         desiredRouter,
+						RateLimitAdmin: desiredRateLimitAdmin,
 					},
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 				}
 				writes = append(writes, setDynamicConfigReport.Output)
-			}
-		}
-
-		// Set rate limit admin (if necessary)
-		// Check the rate limit admin currently set on the token pool
-		if input.RateLimitAdmin != (common.Address{}) {
-			currentRateLimitAdminReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRateLimitAdmin, chain, evm_contract.FunctionInput[any]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current rate limit admin from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
-			}
-			if currentRateLimitAdminReport.Output != input.RateLimitAdmin {
-				// Rate limit admin is not set to desired, so update it
-				setRateLimitAdminReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitAdmin, chain, evm_contract.FunctionInput[common.Address]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-					Args:          input.RateLimitAdmin,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
-				}
-				writes = append(writes, setRateLimitAdminReport.Output)
 			}
 		}
 

@@ -49,7 +49,7 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 	require.Len(t, supportedChains, 1, "There should be 1 supported remote chain in the token pool")
 	require.Equal(t, remoteChainSel, supportedChains[0], "Remote chain in token pool should match expected")
 
-	currentRateLimiterState, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel)
+	currentRateLimiterState, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
 	require.NoError(t, err, "Failed to get current rate limiter state from token pool")
 	inboundRateLimiterReport := currentRateLimiterState.InboundRateLimiterState
 	require.NoError(t, err, "Failed to get inbound rate limiter config from token pool")
@@ -163,9 +163,9 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 			// Deploy token and token pool
 			tokenAndPoolReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
-				tokens.DeployBurnMintTokenAndPool,
+				tokens.DeployTokenAndPool,
 				e.BlockChains.EVMChains()[chainSel],
-				basicDeployBurnMintTokenAndPoolInput(chainReport),
+				basicDeployTokenAndPoolInput(chainReport),
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 			tokenPoolAddress := common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address)

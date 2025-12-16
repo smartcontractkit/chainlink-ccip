@@ -83,8 +83,8 @@ func TestTokenAdapter(t *testing.T) {
 				}
 
 				e.DataStore = ds.Seal()
-				deployTokenAndPoolOut, err := v1_7_0.DeployBurnMintTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployBurnMintTokenAndPoolCfg]{
-					Cfg: v1_7_0.DeployBurnMintTokenAndPoolCfg{
+				deployTokenAndPoolOut, err := v1_7_0.DeployTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployTokenAndPoolCfg]{
+					Cfg: v1_7_0.DeployTokenAndPoolCfg{
 						Accounts: map[common.Address]*big.Int{
 							e.BlockChains.EVMChains()[chainSel].DeployerKey.From: big.NewInt(1_000_000),
 						},
@@ -93,22 +93,21 @@ func TestTokenAdapter(t *testing.T) {
 							MaxSupply: big.NewInt(10_000_000),
 							Name:      "TEST",
 						},
-						DeployTokenPoolCfg: v1_7_0.DeployTokenPoolCfg{
-							ChainSel:           chainSel,
-							TokenPoolType:      datastore.ContractType(burn_mint_token_pool.ContractType),
-							TokenPoolVersion:   version,
-							TokenSymbol:        "TEST",
-							LocalTokenDecimals: 18,
-							Router: datastore.AddressRef{
-								ChainSelector: chainSel,
-								Type:          datastore.ContractType(router.ContractType),
-								Version:       semver.MustParse("1.2.0"),
-							},
+						ChainSel:           chainSel,
+						TokenPoolType:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+						TokenPoolVersion:   version,
+						TokenSymbol:        "TEST",
+						LocalTokenDecimals: 18,
+						Router: datastore.AddressRef{
+							ChainSelector: chainSel,
+							Type:          datastore.ContractType(router.ContractType),
+							Version:       semver.MustParse("1.2.0"),
 						},
 					},
 				})
 				require.NoError(t, err, "Failed to apply DeployBurnMintTokenAndPool changeset")
 				err = ds.Merge(deployTokenAndPoolOut.DataStore.Seal())
+				require.NoError(t, err, "Failed to merge datastore from DeployTokenAndPool changeset")
 			}
 
 			// Overwrite datastore in the environment
@@ -130,7 +129,7 @@ func TestTokenAdapter(t *testing.T) {
 				return tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 					RemoteToken: remoteToken,
 					RemotePool: &datastore.AddressRef{
-						Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
+						Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 						Version:   remotePoolVersion,
 						Qualifier: "TEST",
 					},
@@ -154,7 +153,7 @@ func TestTokenAdapter(t *testing.T) {
 					{
 						ChainSelector: chainA,
 						TokenPoolRef: datastore.AddressRef{
-							Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
+							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 							Version:   semver.MustParse("1.7.0"),
 							Qualifier: "TEST",
 						},
@@ -174,7 +173,7 @@ func TestTokenAdapter(t *testing.T) {
 					{
 						ChainSelector: chainB,
 						TokenPoolRef: datastore.AddressRef{
-							Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
+							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 							Version:   semver.MustParse("1.6.1"),
 							Qualifier: "TEST",
 						},
@@ -206,7 +205,7 @@ func TestTokenAdapter(t *testing.T) {
 
 				tokenPoolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 					ChainSelector: chainSel,
-					Type:          datastore.ContractType(burn_mint_token_pool.ContractType),
+					Type:          datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 					Version:       version,
 					Qualifier:     "TEST",
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
@@ -256,10 +255,13 @@ func TestTokenAdapter(t *testing.T) {
 
 				// GetCurrentRateLimiterState is only available in version 1.7.0+
 				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("1.7.0")) {
-					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[uint64]{
+					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
 						ChainSelector: chainSel,
 						Address:       tokenPoolAddr,
-						Args:          remoteChainSel,
+						Args: token_pool.GetCurrentRateLimiterStateArgs{
+							RemoteChainSelector:     remoteChainSel,
+							CustomBlockConfirmation: false,
+						},
 					})
 					require.NoError(t, err, "Failed to get rate limiter config from token pool")
 					currentStates := rateLimiterStateReport.Output

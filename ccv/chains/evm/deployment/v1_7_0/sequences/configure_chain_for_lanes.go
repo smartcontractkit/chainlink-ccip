@@ -35,7 +35,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// Create inputs for each operation
 		offRampArgs := make([]offramp.SourceChainConfigArgs, 0, len(input.RemoteChains))
 		onRampArgs := make([]onramp.DestChainConfigArgs, 0, len(input.RemoteChains))
-		committeeVerifierDestConfigArgs := make([]committee_verifier.DestChainConfigArgs, 0, len(input.RemoteChains))
+		committeeVerifierRemoteChainConfigArgs := make([]committee_verifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
 		committeeVerifierAllowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
 		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, len(input.RemoteChains))
 		gasPriceUpdates := make([]fee_quoter.GasPriceUpdate, 0, len(input.RemoteChains))
@@ -55,9 +55,10 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				Router:              common.HexToAddress(input.Router),
 				SourceChainSelector: remoteSelector,
 				IsEnabled:           remoteConfig.AllowTrafficFrom,
-				OnRamp:              remoteConfig.OnRamp,
-				DefaultCCV:          defaultInboundCCVs,
-				LaneMandatedCCVs:    laneMandatedInboundCCVs,
+				// TODO: Update deployment pkg to allow for multiple onRamps
+				OnRamps:          [][]byte{remoteConfig.OnRamp},
+				DefaultCCV:       defaultInboundCCVs,
+				LaneMandatedCCVs: laneMandatedInboundCCVs,
 			})
 			defaultOutboundCCVs := make([]common.Address, 0, len(remoteConfig.DefaultOutboundCCVs))
 			for _, ccv := range remoteConfig.DefaultOutboundCCVs {
@@ -77,9 +78,10 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				DefaultExecutor:      common.HexToAddress(remoteConfig.DefaultExecutor),
 				OffRamp:              remoteConfig.OffRamp,
 			})
-			committeeVerifierDestConfigArgs = append(committeeVerifierDestConfigArgs, committee_verifier.DestChainConfigArgs{
-				Router:             common.HexToAddress(input.Router),
-				DestChainSelector:  remoteSelector,
+			committeeVerifierRemoteChainConfigArgs = append(committeeVerifierRemoteChainConfigArgs, committee_verifier.RemoteChainConfigArgs{
+				Router:              common.HexToAddress(input.Router),
+				RemoteChainSelector: remoteSelector,
+				// TODO: Update deployment pkg to use RemoteChainConfig instead of DestChainConfig
 				AllowlistEnabled:   remoteConfig.CommitteeVerifierDestChainConfig.AllowlistEnabled,
 				FeeUSDCents:        remoteConfig.CommitteeVerifierDestChainConfig.FeeUSDCents,
 				GasForVerification: remoteConfig.CommitteeVerifierDestChainConfig.GasForVerification,
@@ -148,14 +150,14 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		writes = append(writes, onRampReport.Output)
 
 		for _, committeeVerifier := range input.CommitteeVerifiers {
-			// ApplyDestChainConfigUpdates on each CommitteeVerifier
-			committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.DestChainConfigArgs]{
+			// ApplyRemoteChainConfigUpdates on each CommitteeVerifier
+			committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(committeeVerifier.Implementation),
-				Args:          committeeVerifierDestConfigArgs,
+				Args:          committeeVerifierRemoteChainConfigArgs,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply remote chain config updates to CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
 			}
 			writes = append(writes, committeeVerifierReport.Output)
 

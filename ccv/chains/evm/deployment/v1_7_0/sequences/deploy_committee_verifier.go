@@ -21,11 +21,10 @@ import (
 )
 
 type CommitteeVerifierParams struct {
-	Version             *semver.Version
-	AllowlistAdmin      common.Address
-	FeeAggregator       common.Address
-	SignatureConfigArgs committee_verifier.SetSignatureConfigArgs
-	StorageLocation     string
+	Version         *semver.Version
+	AllowlistAdmin  common.Address
+	FeeAggregator   common.Address
+	StorageLocation string
 	// Qualifier distinguishes between multiple deployments of the committee verifier and proxy
 	// on the same chain.
 	Qualifier string
@@ -34,7 +33,7 @@ type CommitteeVerifierParams struct {
 type DeployCommitteeVerifierInput struct {
 	ChainSelector     uint64
 	ExistingAddresses []datastore.AddressRef
-	CREATE2Factory   common.Address
+	CREATE2Factory    common.Address
 	Params            CommitteeVerifierParams
 }
 
@@ -67,17 +66,6 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
 		}
 		addresses = append(addresses, committeeVerifierRef)
-
-		// Set signature config on the CommitteeVerifier
-		setSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetSignatureConfigs, chain, contract.FunctionInput[committee_verifier.SetSignatureConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierRef.Address),
-			Args:          input.Params.SignatureConfigArgs,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set signature config on CommitteeVerifier: %w", err)
-		}
-		writes = append(writes, setSignatureConfigReport.Output)
 
 		// Deploy CommitteeVerifierResolver
 		committeeVerifierResolverRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.DeployResolver, chain, contract.DeployInput[committee_verifier.ResolverConstructorArgs]{

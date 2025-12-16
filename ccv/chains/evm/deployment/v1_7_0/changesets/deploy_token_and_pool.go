@@ -2,10 +2,10 @@ package changesets
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
@@ -17,7 +17,7 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-type DeployTokenPoolCfg struct {
+type DeployTokenAndPoolCfg struct {
 	// ChainSel is the chain selector for the chain being configured.
 	ChainSel uint64
 	// TokenPoolType is the type of the token pool to deploy.
@@ -37,47 +37,59 @@ type DeployTokenPoolCfg struct {
 	// Router is a reference to the desired router contract.
 	// Sometimes we may want to connect to a test router, other times a main router.
 	Router datastore.AddressRef
+	// ThresholdAmountForAdditionalCCVs is the transfer amount above which additional CCVs are required.
+	ThresholdAmountForAdditionalCCVs *big.Int
 	// Allowlist is the list of addresses allowed to transfer the token.
 	Allowlist []common.Address
+	// Accounts is a map of account addresses to initial mint amounts.
+	Accounts map[common.Address]*big.Int
+	// TokenInfo is the information about the token to be deployed.
+	// Token symbol will be taken from DeployTokenPoolInput.TokenSymbol.
+	TokenInfo tokens.TokenInfo
 }
 
-func (c DeployTokenPoolCfg) ChainSelector() uint64 {
+func (c DeployTokenAndPoolCfg) ChainSelector() uint64 {
 	return c.ChainSel
 }
 
-var DeployTokenPool = changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[
-	tokens.DeployTokenPoolInput,
+var DeployTokenAndPool = changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[
+	tokens.DeployTokenAndPoolInput,
 	evm.Chain,
-	DeployTokenPoolCfg,
+	DeployTokenAndPoolCfg,
 ]{
-	Sequence: tokens.DeployTokenPool,
-	ResolveInput: func(e cldf_deployment.Environment, cfg DeployTokenPoolCfg) (tokens.DeployTokenPoolInput, error) {
+	Sequence: tokens.DeployTokenAndPool,
+	ResolveInput: func(e cldf_deployment.Environment, cfg DeployTokenAndPoolCfg) (tokens.DeployTokenAndPoolInput, error) {
 		rmnProxy, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(rmn_proxy.ContractType),
 			Version: semver.MustParse("1.0.0"),
 		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
-			return tokens.DeployTokenPoolInput{}, fmt.Errorf("failed to resolve rmn proxy ref: %w", err)
+			return tokens.DeployTokenAndPoolInput{}, fmt.Errorf("failed to resolve rmn proxy ref: %w", err)
 		}
 		router, err := datastore_utils.FindAndFormatRef(e.DataStore, cfg.Router, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
-			return tokens.DeployTokenPoolInput{}, fmt.Errorf("failed to resolve router ref: %w", err)
+			return tokens.DeployTokenAndPoolInput{}, fmt.Errorf("failed to resolve router ref: %w", err)
 		}
 
-		return tokens.DeployTokenPoolInput{
-			ChainSel:         cfg.ChainSel,
-			TokenPoolType:    cfg.TokenPoolType,
-			TokenPoolVersion: cfg.TokenPoolVersion,
-			TokenSymbol:      cfg.TokenSymbol,
-			RateLimitAdmin:   cfg.RateLimitAdmin,
-			ConstructorArgs: token_pool.ConstructorArgs{
-				Token:              cfg.TokenAddress,
-				LocalTokenDecimals: cfg.LocalTokenDecimals,
-				Allowlist:          cfg.Allowlist,
-				RMNProxy:           rmnProxy,
-				Router:             router,
+		return tokens.DeployTokenAndPoolInput{
+			Accounts:  cfg.Accounts,
+			TokenInfo: cfg.TokenInfo,
+			DeployTokenPoolInput: tokens.DeployTokenPoolInput{
+				ChainSel:                         cfg.ChainSel,
+				TokenPoolType:                    cfg.TokenPoolType,
+				TokenPoolVersion:                 cfg.TokenPoolVersion,
+				TokenSymbol:                      cfg.TokenSymbol,
+				RateLimitAdmin:                   cfg.RateLimitAdmin,
+				ThresholdAmountForAdditionalCCVs: cfg.ThresholdAmountForAdditionalCCVs,
+				ConstructorArgs: tokens.ConstructorArgs{
+					Token:              cfg.TokenAddress,
+					LocalTokenDecimals: cfg.LocalTokenDecimals,
+					Allowlist:          cfg.Allowlist,
+					RMNProxy:           rmnProxy,
+					Router:             router,
+				},
 			},
 		}, nil
 	},
-	ResolveDep: evm_seq.ResolveEVMChainDep[DeployTokenPoolCfg],
+	ResolveDep: evm_seq.ResolveEVMChainDep[DeployTokenAndPoolCfg],
 })

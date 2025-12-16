@@ -52,9 +52,9 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		// Deploy token and token pool
 		tokenAndPoolReport, err := operations.ExecuteSequence(
 			e.OperationsBundle,
-			tokens.DeployBurnMintTokenAndPool,
+			tokens.DeployTokenAndPool,
 			e.BlockChains.EVMChains()[chainSel],
-			basicDeployBurnMintTokenAndPoolInput(chainReport),
+			basicDeployTokenAndPoolInput(chainReport),
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
 		require.Len(t, tokenAndPoolReport.Output.Addresses, 2, "Expected 2 addresses (token and pool)")
@@ -230,9 +230,9 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		tokenAndPoolReport, err := operations.ExecuteSequence(
 			e.OperationsBundle,
-			tokens.DeployBurnMintTokenAndPool,
+			tokens.DeployTokenAndPool,
 			e.BlockChains.EVMChains()[chainSel],
-			basicDeployBurnMintTokenAndPoolInput(chainReport),
+			basicDeployTokenAndPoolInput(chainReport),
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
 		require.Len(t, tokenAndPoolReport.Output.Addresses, 2, "Expected 2 addresses (token and pool)")
@@ -305,7 +305,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 // checkRemoteChainConfiguration verifies the configuration for a remote chain on the token pool
 func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remoteChainSel uint64, config tokens_core.RemoteChainConfig[[]byte, string]) {
-	rateLimiterStates, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel)
+	rateLimiterStates, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
 	require.NoError(t, err, "Failed to get rate limiter state")
 
 	// Check inbound rate limiter
@@ -353,7 +353,7 @@ func assertCustomBlockConfirmationBucket(
 ) {
 	require.NotNil(t, expected, "expected custom block confirmation config must be provided for selector %d", remoteChainSel)
 
-	states, err := tp.GetCurrentCustomBlockConfirmationRateLimiterState(nil, remoteChainSel)
+	states, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
 	require.NoError(t, err, "Failed to get custom block confirmation buckets for selector %d", remoteChainSel)
 
 	assertBucketMatchesConfig(t, states.OutboundRateLimiterState, expected.Outbound)

@@ -65,17 +65,8 @@ func CreateBasicContractParams() sequences.ContractParams {
 		},
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 			{
-				Version:       semver.MustParse("1.7.0"),
-				FeeAggregator: common.HexToAddress("0x01"),
-				SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
-					Threshold: 1,
-					Signers: []common.Address{
-						common.HexToAddress("0x02"),
-						common.HexToAddress("0x03"),
-						common.HexToAddress("0x04"),
-						common.HexToAddress("0x05"),
-					},
-				},
+				Version:         semver.MustParse("1.7.0"),
+				FeeAggregator:   common.HexToAddress("0x01"),
 				StorageLocation: "https://test.chain.link.fake",
 				Qualifier:       "alpha",
 			},

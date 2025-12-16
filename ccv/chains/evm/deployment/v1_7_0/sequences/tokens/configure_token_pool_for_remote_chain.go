@@ -8,6 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -28,6 +29,8 @@ type ConfigureTokenPoolForRemoteChainInput struct {
 	ChainSelector uint64
 	// TokenPoolAddress is the address of the token pool.
 	TokenPoolAddress common.Address
+	// AdvancedPoolHooks is the address of the AdvancedPoolHooks contract.
+	AdvancedPoolHooks common.Address
 	// RemoteChainSelector is the selector of the remote chain to configure.
 	RemoteChainSelector uint64
 	// RemoteChainConfig is the configuration for the remote chain.
@@ -61,10 +64,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			outboundCCVs[i] = common.HexToAddress(addr)
 		}
 		if len(inboundCCVs) > 0 || len(outboundCCVs) > 0 {
-			setCCVsReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyCCVConfigUpdates, chain, evm_contract.FunctionInput[[]token_pool.CCVConfigArg]{
+			setCCVsReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyCCVConfigUpdates, chain, evm_contract.FunctionInput[[]advanced_pool_hooks.CCVConfigArg]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
-				Args: []token_pool.CCVConfigArg{
+				Args: []advanced_pool_hooks.CCVConfigArg{
 					{
 						RemoteChainSelector: input.RemoteChainSelector,
 						OutboundCCVs:        outboundCCVs,
@@ -109,10 +112,13 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			// Only proceed further if we do NOT need to remove and re-add the chain
 			if len(removes) == 0 {
 				// Check existing rate limiters
-				rateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
+				rateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentRateLimiterState, chain, evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
-					Args:          input.RemoteChainSelector,
+					Args: token_pool.GetCurrentRateLimiterStateArgs{
+						RemoteChainSelector:     input.RemoteChainSelector,
+						CustomBlockConfirmation: false,
+					},
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get rate limiter state: %w", err)
@@ -120,10 +126,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				currentStates := rateLimiterStateReport.Output
 				// Update the rate limiters if they do not match the desired config
 				if !rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, input.RemoteChainConfig.InboundRateLimiterConfig) || !rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, input.RemoteChainConfig.OutboundRateLimiterConfig) {
-					setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetChainRateLimiterConfigs, chain, evm_contract.FunctionInput[[]token_pool.SetChainRateLimiterConfigArg]{
+					setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.SetRateLimitConfigArg]{
 						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
-						Args: []token_pool.SetChainRateLimiterConfigArg{
+						Args: []token_pool.SetRateLimitConfigArg{
 							{
 								RemoteChainSelector:       input.RemoteChainSelector,
 								InboundRateLimiterConfig:  input.RemoteChainConfig.InboundRateLimiterConfig,

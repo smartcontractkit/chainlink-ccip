@@ -27,15 +27,6 @@ func basicDeployCommitteeVerifierParams() sequences.CommitteeVerifierParams {
 		FeeAggregator:   common.HexToAddress("0x02"),
 		AllowlistAdmin:  common.HexToAddress("0x03"),
 		StorageLocation: "https://test.chain.link.fake",
-		SignatureConfigArgs: committee_verifier.SetSignatureConfigArgs{
-			Threshold: 1,
-			Signers: []common.Address{
-				common.HexToAddress("0x02"),
-				common.HexToAddress("0x03"),
-				common.HexToAddress("0x04"),
-				common.HexToAddress("0x05"),
-			},
-		},
 	}
 }
 
@@ -58,9 +49,9 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 			input: cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployCommitteeVerifierCfg{
-					ChainSel:        5009297550715157269,
+					ChainSel:       5009297550715157269,
 					CREATE2Factory: common.HexToAddress("0x01"),
-					Params:          basicDeployCommitteeVerifierParams(),
+					Params:         basicDeployCommitteeVerifierParams(),
 				},
 			},
 		},
@@ -114,9 +105,9 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	out1, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
-			ChainSel:        5009297550715157269,
+			ChainSel:       5009297550715157269,
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-			Params:          paramsAlpha,
+			Params:         paramsAlpha,
 		},
 	})
 	require.NoError(t, err, "First apply failed")
@@ -153,9 +144,9 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	out2, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
-			ChainSel:        5009297550715157269,
+			ChainSel:       5009297550715157269,
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-			Params:          paramsBeta,
+			Params:         paramsBeta,
 		},
 	})
 	require.NoError(t, err, "Second apply failed")
@@ -188,9 +179,9 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	out3, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployCommitteeVerifierCfg{
-			ChainSel:        5009297550715157269,
+			ChainSel:       5009297550715157269,
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-			Params:          paramsAlpha, // same qualifier as first run
+			Params:         paramsAlpha, // same qualifier as first run
 		},
 	})
 	require.NoError(t, err, "Third apply (repeat qualifier) failed")

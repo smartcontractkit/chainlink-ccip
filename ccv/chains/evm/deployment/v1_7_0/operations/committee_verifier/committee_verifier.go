@@ -35,7 +35,7 @@ type SetDynamicConfigArgs struct {
 	DynamicConfig DynamicConfig
 }
 
-type DestChainConfigArgs = committee_verifier.BaseVerifierDestChainConfigArgs
+type RemoteChainConfigArgs = committee_verifier.BaseVerifierRemoteChainConfigArgs
 
 type AllowlistConfigArgs = committee_verifier.BaseVerifierAllowlistConfigArgs
 
@@ -43,11 +43,11 @@ type WithdrawFeeTokensArgs struct {
 	FeeTokens []common.Address
 }
 
-type DestChainConfig = committee_verifier.GetDestChainConfig
+type RemoteChainConfig = committee_verifier.GetRemoteChainConfig
 
-type SetSignatureConfigArgs struct {
-	Signers   []common.Address
-	Threshold uint8
+type SignatureConfigArgs struct {
+	SourceChainSelectorsToRemove []uint64
+	SignatureConfigUpdates       []committee_verifier.SignatureQuorumValidatorSignatureConfig
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
@@ -103,17 +103,17 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigAr
 	},
 })
 
-var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestChainConfigArgs, *committee_verifier.CommitteeVerifier]{
-	Name:            "committee-verifier:apply-dest-chain-config-updates",
+var ApplyRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]RemoteChainConfigArgs, *committee_verifier.CommitteeVerifier]{
+	Name:            "committee-verifier:apply-remote-chain-config-updates",
 	Version:         semver.MustParse("1.7.0"),
-	Description:     "Applies updates to destination chain configurations on the CommitteeVerifier",
+	Description:     "Applies updates to remote chain configurations on the CommitteeVerifier",
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
 	NewContract:     committee_verifier.NewCommitteeVerifier,
-	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, []DestChainConfigArgs],
-	Validate:        func([]DestChainConfigArgs) error { return nil },
-	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
-		return committeeVerifier.ApplyDestChainConfigUpdates(opts, args)
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, []RemoteChainConfigArgs],
+	Validate:        func([]RemoteChainConfigArgs) error { return nil },
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []RemoteChainConfigArgs) (*types.Transaction, error) {
+		return committeeVerifier.ApplyRemoteChainConfigUpdates(opts, args)
 	},
 })
 
@@ -145,28 +145,28 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 	},
 })
 
-var SetSignatureConfigs = contract.NewWrite(contract.WriteParams[SetSignatureConfigArgs, *committee_verifier.CommitteeVerifier]{
-	Name:            "committee-verifier:set-signature-config",
+var ApplySignatureConfigs = contract.NewWrite(contract.WriteParams[SignatureConfigArgs, *committee_verifier.CommitteeVerifier]{
+	Name:            "committee-verifier:apply-signature-configs",
 	Version:         semver.MustParse("1.7.0"),
-	Description:     "Sets the signature configuration on the CommitteeVerifier",
+	Description:     "Applies the signature configurations on the CommitteeVerifier",
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
 	NewContract:     committee_verifier.NewCommitteeVerifier,
-	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, SetSignatureConfigArgs],
-	Validate:        func(SetSignatureConfigArgs) error { return nil },
-	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SetSignatureConfigArgs) (*types.Transaction, error) {
-		return committeeVerifier.SetSignatureConfig(opts, args.Signers, args.Threshold)
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, SignatureConfigArgs],
+	Validate:        func(SignatureConfigArgs) error { return nil },
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SignatureConfigArgs) (*types.Transaction, error) {
+		return committeeVerifier.ApplySignatureConfigs(opts, args.SourceChainSelectorsToRemove, args.SignatureConfigUpdates)
 	},
 })
 
-var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainConfig, *committee_verifier.CommitteeVerifier]{
-	Name:         "committee-verifier:get-dest-chain-config",
+var GetRemoteChainConfig = contract.NewRead(contract.ReadParams[uint64, RemoteChainConfig, *committee_verifier.CommitteeVerifier]{
+	Name:         "committee-verifier:get-remote-chain-config",
 	Version:      semver.MustParse("1.7.0"),
-	Description:  "Gets the destination chain configuration for a given destination chain selector",
+	Description:  "Gets the remote chain configuration for a given remote chain selector",
 	ContractType: ContractType,
 	NewContract:  committee_verifier.NewCommitteeVerifier,
-	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args uint64) (DestChainConfig, error) {
-		return committeeVerifier.GetDestChainConfig(opts, args)
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args uint64) (RemoteChainConfig, error) {
+		return committeeVerifier.GetRemoteChainConfig(opts, args)
 	},
 })
 

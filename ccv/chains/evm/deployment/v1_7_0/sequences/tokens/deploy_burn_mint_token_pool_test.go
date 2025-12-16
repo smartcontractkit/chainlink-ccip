@@ -6,8 +6,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
@@ -45,11 +45,11 @@ func TestDeployTokenPool(t *testing.T) {
 				}
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
+					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 					TokenPoolVersion: semver.MustParse("1.7.0"),
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					RateLimitAdmin:   common.HexToAddress("0x01"),
-					ConstructorArgs: token_pool.ConstructorArgs{
+					ConstructorArgs: tokens.ConstructorArgs{
 						Token:              common.HexToAddress(tokenReport.Output.Address),
 						LocalTokenDecimals: 18,
 						Allowlist: []common.Address{
@@ -62,6 +62,7 @@ func TestDeployTokenPool(t *testing.T) {
 			},
 			expectedErr: "",
 		},
+		/* TODO: Enable when the lockbox is finalized
 		{
 			desc: "happy path with lock release token pool",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
@@ -81,7 +82,7 @@ func TestDeployTokenPool(t *testing.T) {
 					TokenPoolVersion: semver.MustParse("1.7.0"),
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					RateLimitAdmin:   common.HexToAddress("0x01"),
-					ConstructorArgs: token_pool.ConstructorArgs{
+					ConstructorArgs: tokens.ConstructorArgs{
 						Token:              common.HexToAddress(tokenReport.Output.Address),
 						LocalTokenDecimals: 18,
 						Allowlist: []common.Address{
@@ -94,6 +95,7 @@ func TestDeployTokenPool(t *testing.T) {
 			},
 			expectedErr: "",
 		},
+		*/
 		{
 			desc: "incorrect chain selector",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
@@ -128,7 +130,7 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:      chainReport.Input.ChainSelector,
 					TokenSymbol:   tokenReport.Input.Args.Symbol,
-					TokenPoolType: datastore.ContractType(burn_mint_token_pool.ContractType),
+					TokenPoolType: datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 				}
 			},
 			expectedErr: "token pool version must be defined",
@@ -139,7 +141,7 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
+					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 					TokenPoolVersion: semver.MustParse("1.7.0"),
 				}
 			},
@@ -151,9 +153,9 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
+					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 					TokenPoolVersion: semver.MustParse("1.7.0"),
-					ConstructorArgs: token_pool.ConstructorArgs{
+					ConstructorArgs: tokens.ConstructorArgs{
 						Token: common.HexToAddress(tokenReport.Output.Address),
 					},
 				}
@@ -172,9 +174,9 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
+					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 					TokenPoolVersion: semver.MustParse("1.7.0"),
-					ConstructorArgs: token_pool.ConstructorArgs{
+					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						RMNProxy: rmnProxyAddress,
 					},
@@ -226,7 +228,7 @@ func TestDeployTokenPool(t *testing.T) {
 			input := test.makeInput(tokenReport, chainReport)
 			poolReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
-				tokens.DeployTokenPool,
+				tokens.DeployBurnMintTokenPool,
 				e.BlockChains.EVMChains()[chainSel],
 				input,
 			)
@@ -236,7 +238,10 @@ func TestDeployTokenPool(t *testing.T) {
 				return
 			}
 			require.NoError(t, err, "ExecuteSequence should not error")
-			require.Len(t, poolReport.Output.Addresses, 1, "Expected 1 address in output")
+			require.Len(t, poolReport.Output.Addresses, 2, "Expected 2 addresses in output")
+
+			poolAddress := poolReport.Output.Addresses[0].Address
+			hooksAddress := poolReport.Output.Addresses[1].Address
 
 			// Check token
 			getTokenReport, err := operations.ExecuteOperation(
@@ -245,7 +250,7 @@ func TestDeployTokenPool(t *testing.T) {
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
 					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolReport.Output.Addresses[0].Address),
+					Address:       common.HexToAddress(poolAddress),
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -258,12 +263,12 @@ func TestDeployTokenPool(t *testing.T) {
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
 					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolReport.Output.Addresses[0].Address),
+					Address:       common.HexToAddress(poolAddress),
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ConstructorArgs.Router, getDynamicConfigReport.Output.Router, "Expected router address to be the same as the deployed router")
-			require.Zero(t, getDynamicConfigReport.Output.ThresholdAmountForAdditionalCCVs.Sign(), "Expected default threshold to be zero")
+			require.Equal(t, getDynamicConfigReport.Output.RateLimitAdmin, input.RateLimitAdmin, "Expected rate limit admin address to be the same as the inputted rate limit admin")
 
 			// Check rmn proxy
 			getRmnProxyReport, err := operations.ExecuteOperation(
@@ -272,7 +277,7 @@ func TestDeployTokenPool(t *testing.T) {
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
 					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolReport.Output.Addresses[0].Address),
+					Address:       common.HexToAddress(poolAddress),
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -281,11 +286,11 @@ func TestDeployTokenPool(t *testing.T) {
 			// Check allowlist
 			getAllowlistReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetAllowList,
+				advanced_pool_hooks.GetAllowList,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
 					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolReport.Output.Addresses[0].Address),
+					Address:       common.HexToAddress(hooksAddress),
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -295,19 +300,6 @@ func TestDeployTokenPool(t *testing.T) {
 			for _, addr := range getAllowlistReport.Output {
 				require.Contains(t, input.ConstructorArgs.Allowlist, addr, "Expected on-chain allowlist address to be in the inputted allowlist")
 			}
-
-			// Check rate limit admin
-			getRateLimitAdminReport, err := operations.ExecuteOperation(
-				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetRateLimitAdmin,
-				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(poolReport.Output.Addresses[0].Address),
-				},
-			)
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, input.RateLimitAdmin, getRateLimitAdminReport.Output, "Expected rate limit admin address to be the same as the deployed rate limit admin")
 		})
 	}
 }
