@@ -115,7 +115,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       ccipReceiveGasLimit: GAS_LIMIT,
       finality: 0,
       ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(resolvedExtraArgs.ccvs, resolvedExtraArgs.executor),
-      onRampAddress: abi.encodePacked(address(s_onRamp)),
+      onRampAddress: abi.encode(address(s_onRamp)),
       offRampAddress: s_onRamp.getDestChainConfig(destChainSelector).offRamp,
       sender: abi.encode(originalSender),
       receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
@@ -187,8 +187,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       address token = message.tokenAmounts[i].token;
       messageV1.tokenTransfer[i] = MessageV1Codec.TokenTransferV1({
         amount: message.tokenAmounts[i].amount,
-        sourcePoolAddress: abi.encodePacked(s_sourcePoolByToken[token]),
-        sourceTokenAddress: abi.encodePacked(token),
+        sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+        sourceTokenAddress: abi.encode(token),
         destTokenAddress: abi.encodePacked(s_destTokenBySourceToken[token]),
         tokenReceiver: abi.encodePacked(abi.decode(message.receiver, (address))),
         extraData: s_extraDataByToken[token].length != 0

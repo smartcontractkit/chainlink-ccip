@@ -219,7 +219,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       ccipReceiveGasLimit: resolvedExtraArgs.gasLimit,
       finality: resolvedExtraArgs.blockConfirmations,
       ccvAndExecutorHash: bytes32(0), // Will be set after CCV list is finalized.
-      onRampAddress: abi.encodePacked(address(this)),
+      onRampAddress: abi.encode(address(this)),
       offRampAddress: destChainConfig.offRamp,
       sender: abi.encode(originalSender), // Notice only encode to keep backwards compatability.
       receiver: _validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
@@ -599,6 +599,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // executor. A zero executor would break backward compatibility and cause otherwise-valid traffic to revert.
       if (destChainConfigArg.defaultExecutor == address(0)) revert InvalidConfig();
       destChainConfig.defaultExecutor = destChainConfigArg.defaultExecutor;
+
+      // Make sure that offRamp length matches addressBytesLength.
+      if (destChainConfigArg.offRamp.length != destChainConfigArg.addressBytesLength) {
+        revert InvalidDestChainAddress(destChainConfigArg.offRamp);
+      }
       destChainConfig.offRamp = destChainConfigArg.offRamp;
 
       emit DestChainConfigSet(
@@ -698,8 +703,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     return MessageV1Codec.TokenTransferV1({
       amount: destTokenAmount,
-      sourcePoolAddress: abi.encodePacked(address(sourcePool)),
-      sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
+      sourcePoolAddress: abi.encode(sourcePool),
+      sourceTokenAddress: abi.encode(tokenAndAmount.token),
       destTokenAddress: _validateDestChainAddress(
         poolReturnData.destTokenAddress, s_destChainConfigs[destChainSelector].addressBytesLength
       ),

@@ -70,8 +70,8 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer = new MessageV1Codec.TokenTransferV1[](1);
     tokenTransfer[0] = MessageV1Codec.TokenTransferV1({
       amount: TRANSFER_AMOUNT,
-      sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
-      sourceTokenAddress: abi.encodePacked(sourceToken),
+      sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
+      sourceTokenAddress: abi.encode(sourceToken),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
       tokenReceiver: abi.encodePacked(receiver),
       extraData: ""
@@ -85,9 +85,9 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       ccipReceiveGasLimit: GAS_LIMIT,
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: abi.encodePacked(s_onRamp),
+      onRampAddress: abi.encode(s_onRamp),
       offRampAddress: abi.encodePacked(s_offRamp),
-      sender: abi.encodePacked(OWNER),
+      sender: abi.encode(OWNER),
       receiver: abi.encodePacked(receiver),
       destBlob: "",
       tokenTransfer: tokenTransfer,

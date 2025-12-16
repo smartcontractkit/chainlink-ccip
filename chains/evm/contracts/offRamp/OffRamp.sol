@@ -664,10 +664,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       sourceDenominatedAmount: sourceTokenAmount.amount,
       localToken: localToken,
       remoteChainSelector: sourceChainSelector,
-      // This re-encodes the address as bytes, but now with the zero prefix to make it 32 bytes long.
-      // We have to cast it to an address to ensure the bytes are padded on the left with zeros, bytes objects get
-      // padded on the right.
-      sourcePoolAddress: abi.encode(address(bytes20(sourceTokenAmount.sourcePoolAddress))),
+      // If the source pool is from an evm, the bytes are already abi encoded.
+      sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
       sourcePoolData: sourceTokenAmount.extraData,
       // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
       offchainTokenData: ""

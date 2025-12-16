@@ -65,9 +65,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
       laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultCCVs,
       defaultExecutor: s_defaultExecutor,
-      offRamp: addressBytesLength == EVM_ADDRESS_LENGTH
-        ? abi.encodePacked(address(s_offRampOnRemoteChain))
-        : abi.encode(address(s_offRampOnRemoteChain))
+      offRamp: _encodeAddressToLength(address(s_offRampOnRemoteChain), addressBytesLength)
     });
 
     s_onRamp.applyDestChainConfigUpdates(args);
@@ -77,10 +75,26 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     assertEq(actual.length, addressBytesLength);
     if (addressBytesLength <= 20) {
       assertEq(actual, abi.encodePacked(addr));
-    } else {
+    } else if (addressBytesLength == 32) {
       // For 32 bytes we expect abi.encode(addr)
       assertEq(actual, abi.encode(addr));
+    } else {
+      assertEq(actual, _encodeAddressToLength(addr, addressBytesLength));
     }
+  }
+
+  function _encodeAddressToLength(address addr, uint8 addressBytesLength) internal pure returns (bytes memory) {
+    if (addressBytesLength == 20) return abi.encodePacked(addr);
+    if (addressBytesLength == 32) return abi.encode(addr);
+
+    // addressBytesLength must be between 21 and 31 here. Left-pad zeros and place the address in the last 20 bytes.
+    bytes memory out = new bytes(addressBytesLength);
+    bytes20 addrBytes = bytes20(addr);
+    uint256 start = addressBytesLength - 20;
+    for (uint256 i = 0; i < 20; ++i) {
+      out[start + i] = addrBytes[i];
+    }
+    return out;
   }
 
   function test_forwardFromRouter_SenderAbiEncodedForEvmDest() public {
@@ -345,5 +359,28 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, wrongLen));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
     vm.stopPrank();
+  }
+
+  function test_applyDestChainConfigUpdates_RevertWhen_OffRampLengthMismatch() public {
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = s_defaultCCV;
+
+    bytes memory offRamp = abi.encode(address(s_offRampOnRemoteChain)); // 32 bytes, expected 20 for EVM
+
+    OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
+    args[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      laneMandatedCCVs: new address[](0),
+      defaultCCVs: defaultCCVs,
+      defaultExecutor: s_defaultExecutor,
+      offRamp: offRamp
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, offRamp));
+    s_onRamp.applyDestChainConfigUpdates(args);
   }
 }

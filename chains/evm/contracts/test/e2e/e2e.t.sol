@@ -94,7 +94,7 @@ contract e2e is OnRampSetup {
     defaultDestCCVs[0] = s_destVerifier;
 
     bytes[] memory onRamps = new bytes[](1);
-    onRamps[0] = abi.encodePacked(s_onRamp);
+    onRamps[0] = abi.encode(s_onRamp);
 
     OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
     updates[0] = OffRamp.SourceChainConfigArgs({

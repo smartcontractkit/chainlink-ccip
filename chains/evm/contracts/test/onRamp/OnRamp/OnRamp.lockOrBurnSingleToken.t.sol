@@ -93,8 +93,8 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     );
 
     assertEq(transfer.amount, destAmount);
-    assertEq(transfer.sourcePoolAddress, abi.encodePacked(address(s_pool)));
-    assertEq(transfer.sourceTokenAddress, abi.encodePacked(s_sourceToken));
+    assertEq(transfer.sourcePoolAddress, abi.encode(address(s_pool)));
+    assertEq(transfer.sourceTokenAddress, abi.encode(s_sourceToken));
     assertEq(transfer.destTokenAddress, abi.encodePacked(s_destToken));
     assertEq(transfer.tokenReceiver, receiver);
     assertEq(transfer.extraData, abi.encode("poolData"));
@@ -129,8 +129,8 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     );
 
     assertEq(transfer.amount, expectedInput.amount);
-    assertEq(transfer.sourcePoolAddress, abi.encodePacked(address(s_pool)));
-    assertEq(transfer.sourceTokenAddress, abi.encodePacked(s_sourceToken));
+    assertEq(transfer.sourcePoolAddress, abi.encode(address(s_pool)));
+    assertEq(transfer.sourceTokenAddress, abi.encode(s_sourceToken));
     assertEq(transfer.destTokenAddress, abi.encodePacked(s_destToken));
     assertEq(transfer.tokenReceiver, receiver);
     assertEq(transfer.extraData, abi.encode("poolData"));

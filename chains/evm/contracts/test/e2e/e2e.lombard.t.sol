@@ -281,7 +281,7 @@ contract e2e_lombard is OnRampSetup {
     defaultDestCCVs[0] = s_committeeCCV;
 
     bytes[] memory onRamps = new bytes[](1);
-    onRamps[0] = abi.encodePacked(s_onRamp);
+    onRamps[0] = abi.encode(s_onRamp);
 
     OffRamp.SourceChainConfigArgs[] memory sourceChainUpdates = new OffRamp.SourceChainConfigArgs[](1);
     sourceChainUpdates[0] = OffRamp.SourceChainConfigArgs({

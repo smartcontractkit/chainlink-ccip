@@ -139,8 +139,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
       amount: amount,
-      sourcePoolAddress: abi.encodePacked(pool),
-      sourceTokenAddress: abi.encodePacked(sourceToken),
+      sourcePoolAddress: abi.encode(pool),
+      sourceTokenAddress: abi.encode(sourceToken),
       destTokenAddress: abi.encodePacked(token),
       tokenReceiver: abi.encodePacked(tokenReceiver),
       extraData: ""
@@ -215,8 +215,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory transfers = new MessageV1Codec.TokenTransferV1[](1);
     transfers[0] = MessageV1Codec.TokenTransferV1({
       amount: 1,
-      sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
-      sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
+      sourcePoolAddress: abi.encode(makeAddr("pool")),
+      sourceTokenAddress: abi.encode(makeAddr("sourceToken")),
       destTokenAddress: invalidDestToken,
       tokenReceiver: abi.encodePacked(makeAddr("receiver")),
       extraData: ""
@@ -239,8 +239,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory transfers = new MessageV1Codec.TokenTransferV1[](1);
     transfers[0] = MessageV1Codec.TokenTransferV1({
       amount: 1,
-      sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
-      sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
+      sourcePoolAddress: abi.encode(makeAddr("pool")),
+      sourceTokenAddress: abi.encode(makeAddr("sourceToken")),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
       tokenReceiver: invalidTokenReceiver,
       extraData: ""
@@ -315,8 +315,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
       amount: amount,
-      sourcePoolAddress: abi.encodePacked(makeAddr("pool1")),
-      sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken1")),
+      sourcePoolAddress: abi.encode(makeAddr("pool1")),
+      sourceTokenAddress: abi.encode(makeAddr("sourceToken1")),
       destTokenAddress: abi.encodePacked(destToken),
       tokenReceiver: abi.encodePacked(tokenReceiver),
       extraData: ""
@@ -349,8 +349,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
       amount: amount,
-      sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
-      sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
+      sourcePoolAddress: abi.encode(makeAddr("pool")),
+      sourceTokenAddress: abi.encode(makeAddr("sourceToken")),
       destTokenAddress: hex"1234", // Invalid length (not 20 bytes).
       tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: ""
@@ -395,9 +395,9 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       ccipReceiveGasLimit: 0,
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: abi.encodePacked(makeAddr("onRamp")),
+      onRampAddress: abi.encode(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
-      sender: abi.encodePacked(makeAddr("sender")),
+      sender: abi.encode(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "",
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
@@ -431,8 +431,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
       amount: amount,
-      sourcePoolAddress: abi.encodePacked(pool),
-      sourceTokenAddress: abi.encodePacked(sourceToken),
+      sourcePoolAddress: abi.encode(pool),
+      sourceTokenAddress: abi.encode(sourceToken),
       destTokenAddress: abi.encodePacked(destToken),
       tokenReceiver: abi.encodePacked(tokenReceiver),
       extraData: ""

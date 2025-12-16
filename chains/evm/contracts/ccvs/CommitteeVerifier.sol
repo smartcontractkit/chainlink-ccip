@@ -66,7 +66,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     _assertNotCursedByRMN(message.destChainSelector);
 
     // For EVM, sender is expected to be 20 bytes.
-    address senderAddress = address(bytes20(message.sender));
+    address senderAddress = abi.decode(message.sender, (address));
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
     return abi.encodePacked(VERSION_TAG_V1_7_0);
