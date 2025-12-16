@@ -473,30 +473,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     if (extraArgs.length >= 4 && bytes4(extraArgs[:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
 
-      // Normalize and validate tokenReceiver if specified.
-      if (resolvedArgs.tokenReceiver.length != 0) {
-        // Some lanes disallow specifying tokenReceiver entirely.
-        if (!destChainConfig.tokenReceiverAllowed) {
-          revert TokenReceiverNotAllowed(destChainSelector);
-        }
-        resolvedArgs.tokenReceiver =
-          this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
-      }
-
       // We need to ensure no duplicate CCVs are present in the ccv list.
       CCVConfigValidation._assertNoDuplicates(resolvedArgs.ccvs);
     } else {
       // Populate the fields that could be present in legacy extraArgs.
       (resolvedArgs.tokenReceiver, resolvedArgs.gasLimit, resolvedArgs.executorArgs) =
         IFeeQuoter(s_dynamicConfig.feeQuoter).resolveLegacyArgs(destChainSelector, extraArgs);
-
-      // We do not check for tokenReceiverAllowed here as legacy args are per dest chain and only allow setting the
-      // tokenReceiver when the chain supports it.
-      if (resolvedArgs.tokenReceiver.length != 0) {
-        resolvedArgs.tokenReceiver =
-          this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
-      }
-      // CCVs are populated below.
     }
 
     // We remove the need for sender/receiver CCVs if the transfer is a pure token transfer.
@@ -521,6 +503,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     if (resolvedArgs.ccvs.length == 0 && !(isTokenTransferWithoutData && resolvedArgs.gasLimit == 0)) {
       resolvedArgs.ccvs = destChainConfig.defaultCCVs;
       resolvedArgs.ccvArgs = new bytes[](resolvedArgs.ccvs.length);
+    }
+
+    // Normalize and validate tokenReceiver if specified.
+    if (resolvedArgs.tokenReceiver.length != 0) {
+      // Some lanes disallow specifying tokenReceiver entirely.
+      if (!destChainConfig.tokenReceiverAllowed) {
+        revert TokenReceiverNotAllowed(destChainSelector);
+      }
+      resolvedArgs.tokenReceiver =
+        this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
     }
 
     // When users don't specify an executor, default executor is chosen.
