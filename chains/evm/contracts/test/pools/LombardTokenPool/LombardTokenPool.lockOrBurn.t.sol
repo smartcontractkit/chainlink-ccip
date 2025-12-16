@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBridgeV1} from "../../../interfaces/lombard/IBridgeV1.sol";
+import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
@@ -49,7 +49,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     vm.expectCall(
       address(s_bridge),
       abi.encodeCall(
-        IBridgeV1.deposit,
+        IBridgeV2.deposit,
         (
           L_CHAIN_ID,
           address(s_token),
@@ -109,7 +109,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     vm.expectCall(
       address(s_bridge),
       abi.encodeCall(
-        IBridgeV1.deposit,
+        IBridgeV2.deposit,
         (
           L_CHAIN_ID,
           tokenAdapter,

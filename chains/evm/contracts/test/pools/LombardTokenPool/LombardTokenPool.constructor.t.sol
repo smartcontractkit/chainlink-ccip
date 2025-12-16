@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBridgeV1} from "../../../interfaces/lombard/IBridgeV1.sol";
+import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
@@ -31,6 +31,15 @@ contract LombardTokenPool_constructor is Test {
     assertEq(bridge, address(s_bridge));
     assertEq(tokenAdapter, adapter);
     assertEq(pool.typeAndVersion(), "LombardTokenPool 1.7.0-dev");
+    assertEq(s_token.allowance(address(pool), adapter), type(uint256).max);
+    assertEq(s_token.allowance(address(pool), address(s_bridge)), 0);
+  }
+
+  function test_constructor_WithoutAdapterApprovesBridge() public {
+    LombardTokenPool pool = new LombardTokenPool(s_token, s_resolver, s_bridge, address(0), address(0), RMN, ROUTER, 18);
+
+    assertEq(s_token.allowance(address(pool), address(s_bridge)), type(uint256).max);
+    assertEq(s_token.allowance(address(pool), address(0)), 0);
   }
 
   function test_constructor_ZeroVerifierNotAllowed() public {
@@ -40,7 +49,7 @@ contract LombardTokenPool_constructor is Test {
 
   function test_constructor_RevertsWhen_InvalidMessageVersion() public {
     uint8 wrongVersion = 2;
-    vm.mockCall(address(s_bridge), abi.encodeWithSelector(IBridgeV1.MSG_VERSION.selector), abi.encode(wrongVersion));
+    vm.mockCall(address(s_bridge), abi.encodeWithSelector(IBridgeV2.MSG_VERSION.selector), abi.encode(wrongVersion));
 
     vm.expectRevert(abi.encodeWithSelector(LombardTokenPool.InvalidMessageVersion.selector, 1, wrongVersion));
     new LombardTokenPool(s_token, s_resolver, s_bridge, address(0), address(0), RMN, ROUTER, 18);
@@ -48,6 +57,6 @@ contract LombardTokenPool_constructor is Test {
 
   function test_constructor_RevertsWhen_ZeroBridge() public {
     vm.expectRevert(LombardTokenPool.ZeroBridge.selector);
-    new LombardTokenPool(s_token, s_resolver, IBridgeV1(address(0)), address(0), address(0), RMN, ROUTER, 18);
+    new LombardTokenPool(s_token, s_resolver, IBridgeV2(address(0)), address(0), address(0), RMN, ROUTER, 18);
   }
 }

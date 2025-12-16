@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IBridgeV2} from "../../interfaces/lombard/IBridgeV2.sol";
+import {IBridgeV3} from "../../interfaces/lombard/IBridgeV3.sol";
 import {MockLombardMailbox} from "./MockLombardMailbox.sol";
 
-contract MockLombardBridge is IBridgeV2 {
+contract MockLombardBridge is IBridgeV3 {
   address public s_mailbox;
   bytes32 public s_lastPayloadHash;
 

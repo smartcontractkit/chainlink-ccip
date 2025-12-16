@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
-import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
+import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
@@ -26,7 +26,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     vm.expectCall(
       address(s_mockBridge),
       abi.encodeCall(
-        IBridgeV2.deposit,
+        IBridgeV3.deposit,
         (
           LOMBARD_CHAIN_ID,
           address(s_testToken),

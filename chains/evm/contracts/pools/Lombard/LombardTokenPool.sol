@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
-import {IBridgeV1} from "../../interfaces/lombard/IBridgeV1.sol";
+import {IBridgeV2} from "../../interfaces/lombard/IBridgeV2.sol";
 import {IMailbox} from "../../interfaces/lombard/IMailbox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
@@ -59,7 +59,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @notice Supported bridge message version.
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 1;
   /// @notice The address of bridge contract.
-  IBridgeV1 public immutable i_bridge;
+  IBridgeV2 public immutable i_bridge;
   /// @notice Lombard verifier resolver address. lockOrBurn fetches the outbound implementation and forwards tokens to it.
   address internal immutable i_lombardVerifierResolver;
   /// @notice Optional token adapter used for chains like Avalanche BTC.b. Since each pool manages a single token,
@@ -78,7 +78,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   constructor(
     IERC20Metadata token,
     address verifier,
-    IBridgeV1 bridge,
+    IBridgeV2 bridge,
     address adapter,
     address advancedPoolHooks,
     address rmnProxy,
@@ -98,6 +98,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     i_bridge = bridge;
     i_lombardVerifierResolver = verifier;
     i_tokenAdapter = adapter;
+    if (adapter != address(0)) {
+      token.safeIncreaseAllowance(adapter, type(uint256).max);
+    } else {
+      token.safeIncreaseAllowance(address(bridge), type(uint256).max);
+    }
     emit LombardConfigurationSet(verifier, address(bridge), adapter);
   }
 
