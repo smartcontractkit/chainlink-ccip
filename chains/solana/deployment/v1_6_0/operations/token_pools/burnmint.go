@@ -56,6 +56,9 @@ var InitializeBurnMint = operations.NewOperation(
 			return sequences.OnChainOutput{}, err
 		}
 		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		var chainConfig test_token_pool.State
 		err = chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &chainConfig)
@@ -87,6 +90,7 @@ var InitializeBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
@@ -108,6 +112,9 @@ var InitGlobalConfigBurnMint = operations.NewOperation(
 			return sequences.OnChainOutput{}, err
 		}
 		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
 		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
 		var chainConfig base_token_pool.BaseConfig
 		err = chain.GetAccountDataBorshInto(context.Background(), configPDA, &chainConfig)
@@ -140,6 +147,7 @@ var InitGlobalConfigBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
@@ -188,6 +196,7 @@ var TransferMintAuthorityBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
@@ -295,6 +304,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
@@ -349,6 +359,7 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
