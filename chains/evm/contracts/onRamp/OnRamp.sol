@@ -484,38 +484,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
 
       // We need to ensure no duplicate CCVs are present in the ccv list.
-      uint256 length = resolvedArgs.ccvs.length;
-      for (uint256 i = 0; i < length; ++i) {
-        for (uint256 j = i + 1; j < length; ++j) {
-          if (resolvedArgs.ccvs[i] == resolvedArgs.ccvs[j]) {
-            revert CCVConfigValidation.DuplicateCCVNotAllowed(resolvedArgs.ccvs[i]);
-          }
-        }
-      }
-
-      // We remove the need for sender/receiver CCVs if the transfer is a pure token transfer.
-      //
-      // A pure token transfer is defined as:
-      // - receiver callback gas limit is 0
-      // - the message has no data
-      // - the message sends a token
-      //
-      // This has always existed in CCIP: the earliest versions skipped calling the receiver when this was true, and on
-      // the destination chain also checked (via ERC165) whether the receiver is a contract and supports the required
-      // interfaces. Those destination-side checks are not available on the source chain, so we use the three
-      // conditions above as the source-chain definition of a pure token transfer.
-      //
-      // When a transfer is pure, we do not add sender/receiver (default) CCVs. This is safe because the only entity at
-      // risk is the token issuer, who already defines their required CCVs (or falls back to defaults), so their risk is
-      // not increased by omitting sender/receiver CCVs in this case. This enables token-only transfers to use
-      // token-specific CCVs (e.g. CCTP) without the user having to know about CCVs or use the new extraArgs format.
-      //
-      // For example, token-only USDC transfers can use only CCTP (without committee verification), since CCTP is fully
-      // trusted for that token flow.
-      if (resolvedArgs.ccvs.length == 0 && !(isTokenTransferWithoutData && resolvedArgs.gasLimit == 0)) {
-        resolvedArgs.ccvs = destChainConfig.defaultCCVs;
-        resolvedArgs.ccvArgs = new bytes[](resolvedArgs.ccvs.length);
-      }
+      CCVConfigValidation._assertNoDuplicates(resolvedArgs.ccvs);
     } else {
       // Populate the fields that could be present in legacy extraArgs.
       (resolvedArgs.tokenReceiver, resolvedArgs.gasLimit, resolvedArgs.executorArgs) =
@@ -527,12 +496,31 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         resolvedArgs.tokenReceiver =
           this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
       }
+      // CCVs are populated below.
+    }
 
-      // If older or no args are provided, use defaults if it's not a token-only transfer.
-      if (!(isTokenTransferWithoutData && resolvedArgs.gasLimit == 0)) {
-        resolvedArgs.ccvs = destChainConfig.defaultCCVs;
-        resolvedArgs.ccvArgs = new bytes[](resolvedArgs.ccvs.length);
-      }
+    // We remove the need for sender/receiver CCVs if the transfer is a pure token transfer.
+    //
+    // A pure token transfer is defined as:
+    // - receiver callback gas limit is 0
+    // - the message has no data
+    // - the message sends a token
+    //
+    // This has always existed in CCIP: the earliest versions skipped calling the receiver when this was true, and on
+    // the destination chain also checked (via ERC165) whether the receiver is a contract and supports the required
+    // interfaces. Those destination-side checks are not available on the source chain, so we use the three
+    // conditions above as the source-chain definition of a pure token transfer.
+    //
+    // When a transfer is pure, we do not add sender/receiver (default) CCVs. This is safe because the only entity at
+    // risk is the token issuer, who already defines their required CCVs (or falls back to defaults), so their risk is
+    // not increased by omitting sender/receiver CCVs in this case. This enables token-only transfers to use
+    // token-specific CCVs (e.g. CCTP) without the user having to know about CCVs or use the new extraArgs format.
+    //
+    // For example, token-only USDC transfers can use only CCTP (without committee verification), since CCTP is fully
+    // trusted for that token flow.
+    if (resolvedArgs.ccvs.length == 0 && !(isTokenTransferWithoutData && resolvedArgs.gasLimit == 0)) {
+      resolvedArgs.ccvs = destChainConfig.defaultCCVs;
+      resolvedArgs.ccvArgs = new bytes[](resolvedArgs.ccvs.length);
     }
 
     // When users don't specify an executor, default executor is chosen.
