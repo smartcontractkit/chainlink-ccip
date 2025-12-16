@@ -22,8 +22,8 @@ var (
 
 type CurseAdapter interface {
 	Initialize(e cldf.Environment, selector uint64) error
-	// IsSubjectCursedOnChain has the default RMN behavior.
-	// Returns true if subject is cursed or chain is globally cursed. False otherwise.
+	// IsSubjectCursedOnChain do not follow EVM RMN behavior which return true if subject is cursed or chain is globally cursed. False otherwise.
+	// Instead, it returns true if subject is cursed. To check if chain is globally cursed call IsSubjectCursedOnChain with the GlobalCurseSubject() as the subject.
 	IsSubjectCursedOnChain(e cldf.Environment, selector uint64, subject Subject) (bool, error)
 	// IsChainConnectedToTargetChain returns true if the chain with selector `selector` is connected to the chain with selector `targetSel`
 	// For example, in case of EVM chains, router.isChainSupported(targetSel) should return true when called on the chain with selector `selector`
@@ -78,6 +78,13 @@ func GetCurseRegistry() *CurseRegistry {
 		singletonCurseRegistry = newCurseRegistry()
 	})
 	return singletonCurseRegistry
+}
+
+func (c *CurseRegistry) IsFamilyRegistered(family string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, exists := c.CurseSubjects[family]
+	return exists
 }
 
 func (c *CurseRegistry) RegisterNewCurse(
@@ -151,6 +158,12 @@ func (cr *CurseRegistry) groupRMNSubjectBySelector(e cldf.Environment, rmnSubjec
 				curseAdapter: adapter,
 				subjects:     []Subject{GlobalCurseSubject()},
 			}
+			continue
+		}
+		// Skip specific subjects if global curse is already set for this chain
+		if slices.ContainsFunc(grouped[s.ChainSelector].subjects, func(subj Subject) bool {
+			return IfSubjectEqual(subj, GlobalCurseSubject())
+		}) {
 			continue
 		}
 		// find if target subject is connected if not global
