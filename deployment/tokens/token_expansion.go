@@ -23,34 +23,48 @@ type TokenExpansionInput struct {
 }
 
 type DeployTokenInput struct {
-	Name     string            `yaml:"name" json:"name"`
-	Symbol   string            `yaml:"symbol" json:"symbol"`
-	Decimals uint8             `yaml:"decimals" json:"decimals"`
-	Supply   *big.Int          `yaml:"supply" json:"supply"`
+	Name     string   `yaml:"name" json:"name"`
+	Symbol   string   `yaml:"symbol" json:"symbol"`
+	Decimals uint8    `yaml:"decimals" json:"decimals"`
+	Supply   *big.Int `yaml:"supply" json:"supply"`
+	// list of addresses who may need special processing in order to send tokens
+	// e.g. for Solana, addresses that need associated token accounts created
+	Senders []string `yaml:"senders" json:"senders"`
 	// SPLToken, ERC20, etc.
-	Type     cldf.ContractType `yaml:"type" json:"type"`
-	// not specified by the user, filled in by the deployment system to pass to chain operations
-	ExistingAddresses []datastore.AddressRef
+	Type cldf.ContractType `yaml:"type" json:"type"`
+	// Solana Specific
+	// private key in base58 encoding for vanity addresses
+	TokenPrivKey string `yaml:"token-priv-key" json:"tokenPrivKey"`
+	// if true, the freeze authority will be revoked on token creation
+	// and it will be disabled FOREVER
+	DisableFreezeAuthority bool `yaml:"disable-freeze-authority" json:"disableFreezeAuthority"`
+	// below are not specified by the user, filled in by the deployment system to pass to chain operations
+	ChainSelector     uint64
+	ExistingDataStore datastore.DataStore
 }
 type DeployTokenPoolInput struct {
-	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
-	// not specified by the user, filled in by the deployment system to pass to chain operations
-	ExistingAddresses []datastore.AddressRef
+	RegisterTokenConfig RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	// below are not specified by the user, filled in by the deployment system to pass to chain operations
+	ChainSelector     uint64
+	ExistingDataStore datastore.DataStore
 }
 type RegisterTokenInput struct {
-	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
-	// not specified by the user, filled in by the deployment system to pass to chain operations
-	ExistingAddresses []datastore.AddressRef
+	RegisterTokenConfig RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	// below are not specified by the user, filled in by the deployment system to pass to chain operations
+	ChainSelector     uint64
+	ExistingDataStore datastore.DataStore
 }
 type SetPoolInput struct {
-	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
-	// not specified by the user, filled in by the deployment system to pass to chain operations
-	ExistingAddresses []datastore.AddressRef
+	RegisterTokenConfig RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	// below are not specified by the user, filled in by the deployment system to pass to chain operations
+	ChainSelector     uint64
+	ExistingDataStore datastore.DataStore
 }
 type UpdateAuthoritiesInput struct {
-	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
-	// not specified by the user, filled in by the deployment system to pass to chain operations
-	ExistingAddresses []datastore.AddressRef
+	RegisterTokenConfig RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	// below are not specified by the user, filled in by the deployment system to pass to chain operations
+	ChainSelector     uint64
+	ExistingDataStore datastore.DataStore
 }
 
 func TokenExpansion() cldf.ChangeSetV2[TokenExpansionInput] {
@@ -68,9 +82,11 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 	return func(e cldf.Environment, cfg TokenExpansionInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
+		ds := datastore.NewMemoryDataStore()
 		tokenPoolRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
 		for selector, input := range cfg.DeployTokenInputs {
+			tmpDatastore := datastore.NewMemoryDataStore()
 			family, err := chain_selectors.GetSelectorFamily(selector)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
@@ -79,8 +95,39 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
 			}
-			input.ExistingAddresses = e.DataStore.Addresses().Filter()
+			input.ExistingDataStore = e.DataStore
+			input.ChainSelector = selector
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, input)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
+			}
+			batchOps = append(batchOps, report.Output.BatchOps...)
+			reports = append(reports, report.ExecutionReports...)
+			for _, r := range report.Output.Addresses {
+				if err := tmpDatastore.Addresses().Add(r); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				}
+				if err := ds.Addresses().Add(r); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				}
+			}
+			// merge tmpDatastore into e.DataStore
+			tmpDatastore.Merge(e.DataStore)
+			e.DataStore = tmpDatastore.Seal()
+		}
+
+		for selector, input := range cfg.DeployTokenPoolInputs {
+			family, err := chain_selectors.GetSelectorFamily(selector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, &TokenAdminRegistryVersion)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+			}
+			input.ExistingDataStore = e.DataStore
+			input.ChainSelector = selector
+			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, input)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
 			}

@@ -39,7 +39,7 @@ var DeployBurnMint = operations.NewOperation(
 	},
 )
 
-var Initialize = operations.NewOperation(
+var InitializeBurnMint = operations.NewOperation(
 	"burnmint:initialize",
 	common_utils.Version_1_6_0,
 	"Initializes the BurnMintTokenPool program",

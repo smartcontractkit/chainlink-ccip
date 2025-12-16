@@ -76,17 +76,15 @@ var DeploySolanaToken = operations.NewOperation(
 			freezeAuthority = chain.DeployerKey.PublicKey()
 		}
 		var mint solana.PublicKey
-		var mintPrivKey solana.PrivateKey
 		privKey := input.TokenPrivKey
 		if privKey.IsValid() {
 			mint = privKey.PublicKey()
-			mintPrivKey = privKey
 		} else {
-			mintPrivKey, err = solana.NewRandomPrivateKey()
+			privKey, err = solana.NewRandomPrivateKey()
 			if err != nil {
 				return datastore.AddressRef{}, err
 			}
-			mint = mintPrivKey.PublicKey()
+			mint = privKey.PublicKey()
 		}
 		instructions, err := soltokens.CreateTokenWith(
 			context.Background(),
@@ -102,7 +100,7 @@ var DeploySolanaToken = operations.NewOperation(
 		if err != nil {
 			return datastore.AddressRef{}, err
 		}
-		err = chain.Confirm(instructions, common.AddSigners(input.TokenPrivKey))
+		err = chain.Confirm(instructions, common.AddSigners(privKey))
 		if err != nil {
 			return datastore.AddressRef{}, err
 		}

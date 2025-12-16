@@ -22,11 +22,11 @@ type ManualRegistrationInput struct {
 }
 
 type RegisterTokenConfig struct {
-	TokenAddress  string        `yaml:"token-address" json:"tokenAddress"`
-	ProposedOwner string        `yaml:"proposed-owner" json:"proposedOwner"`
-	Metadata      string        `yaml:"metadata" json:"metadata"`
-	PoolType      string        `yaml:"pool-type" json:"poolType"`
-	SVMExtraArgs  *SVMExtraArgs `yaml:"svm-extra-args,omitempty" json:"svmExtraArgs,omitempty"`
+	TokenSymbol        string        `yaml:"token-symbol" json:"tokenSymbol"`
+	ProposedOwner      string        `yaml:"proposed-owner" json:"proposedOwner"`
+	TokenPoolQualifier string        `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType           string        `yaml:"pool-type" json:"poolType"`
+	SVMExtraArgs       *SVMExtraArgs `yaml:"svm-extra-args,omitempty" json:"svmExtraArgs,omitempty"`
 }
 
 type SVMExtraArgs struct {

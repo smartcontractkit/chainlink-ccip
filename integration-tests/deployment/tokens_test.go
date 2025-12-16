@@ -14,13 +14,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
-func TestTokenExpansion_DeployToken(t *testing.T) {
+func TestTokenExpansion(t *testing.T) {
 	t.Parallel()
 	programsPath, ds, err := PreloadSolanaEnvironment(t, chain_selectors.SOLANA_MAINNET.Selector)
 	require.NoError(t, err, "Failed to set up Solana environment")
@@ -76,19 +77,26 @@ func TestTokenExpansion_DeployToken(t *testing.T) {
 	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 	// EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 
+	sender, _ := solana.NewRandomPrivateKey()
 	out, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
 		DeployTokenInputs: map[uint64]tokensapi.DeployTokenInput{
-			// chain_selectors.ETHEREUM_MAINNET.Selector: {
-			// 	Name:     "Test Token",
-			// 	Symbol:   "TEST",
-			// 	Decimals: 18,
-			// 	Supply:   big.NewInt(1e18),
-			// },
 			chain_selectors.SOLANA_MAINNET.Selector: {
 				Name:     "Test Token",
 				Symbol:   "TEST",
 				Decimals: 9,
 				Type:     utils.SPLTokens,
+				Senders: []string{
+					sender.PublicKey().String(),
+				},
+				DisableFreezeAuthority: true,
+			},
+		},
+		DeployTokenPoolInputs: map[uint64]tokensapi.DeployTokenPoolInput{
+			chain_selectors.SOLANA_MAINNET.Selector: {
+				RegisterTokenConfig: tokensapi.RegisterTokenConfig{
+					TokenSymbol: "TEST",
+					PoolType:    common_utils.BurnMintTokenPool.String(),
+				},
 			},
 		},
 		MCMS: mcms.Input{
