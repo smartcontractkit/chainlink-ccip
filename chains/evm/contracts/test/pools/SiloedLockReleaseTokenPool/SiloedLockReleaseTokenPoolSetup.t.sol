@@ -7,6 +7,8 @@ import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -40,11 +42,14 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
       s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
     );
 
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
-    allowedCallers[0] =
-      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_siloedLockReleaseTokenPool), allowed: true});
-    s_lockBox.configureAllowedCallers(allowedCallers);
-    s_siloLockBox.configureAllowedCallers(allowedCallers);
+    address[] memory allowedCallers = new address[](1);
+    allowedCallers[0] = address(s_siloedLockReleaseTokenPool);
+    s_lockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
+    s_siloLockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
 
     uint64[] memory selectors = new uint64[](1);
     selectors[0] = SILOED_CHAIN_SELECTOR;

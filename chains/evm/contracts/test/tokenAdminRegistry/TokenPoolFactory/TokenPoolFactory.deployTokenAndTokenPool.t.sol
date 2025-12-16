@@ -17,6 +17,8 @@ import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry
 import {FactoryBurnMintERC20} from "../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
 import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
@@ -479,12 +481,16 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     );
 
     // Allow both pools to interact with their respective lockboxes.
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: poolAddress, allowed: true});
-    localLockBox.configureAllowedCallers(allowedCallers);
+    address[] memory allowedCallers = new address[](1);
+    allowedCallers[0] = poolAddress;
+    localLockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
 
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: newPoolAddress, allowed: true});
-    remoteLockBox.configureAllowedCallers(allowedCallers);
+    allowedCallers[0] = newPoolAddress;
+    remoteLockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
 
     assertEq(
       LockReleaseTokenPool(poolAddress).getRemotePools(DEST_CHAIN_SELECTOR)[0],

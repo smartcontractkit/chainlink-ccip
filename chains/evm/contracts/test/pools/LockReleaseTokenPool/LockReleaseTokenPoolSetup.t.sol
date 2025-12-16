@@ -7,6 +7,8 @@ import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -49,11 +51,12 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     );
 
     // Configure allowed callers for the lockBox - both pools.
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_lockReleaseTokenPool), allowed: true});
-    allowedCallers[1] =
-      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_lockReleaseTokenPoolWithAllowList), allowed: true});
-    s_lockBox.configureAllowedCallers(allowedCallers);
+    address[] memory allowedCallers = new address[](2);
+    allowedCallers[0] = address(s_lockReleaseTokenPool);
+    allowedCallers[1] = address(s_lockReleaseTokenPoolWithAllowList);
+    s_lockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
 
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = abi.encode(s_destPoolAddress);

@@ -8,6 +8,8 @@ import {TokenPool} from "../pools/TokenPool.sol";
 import {TokenAdminRegistry} from "../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {MaybeRevertingBurnMintTokenPool} from "./helpers/MaybeRevertingBurnMintTokenPool.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -52,9 +54,12 @@ contract TokenSetup is BaseTest {
     LockReleaseTokenPool pool = new LockReleaseTokenPool(
       IERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router, address(lockBox)
     );
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(pool), allowed: true});
-    lockBox.configureAllowedCallers(allowedCallers);
+
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = address(pool);
+    AuthorizedCallers.AuthorizedCallerArgs memory args =
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)});
+    lockBox.applyAuthorizedCallerUpdates(args);
 
     if (isSourcePool) {
       s_sourcePoolByToken[address(token)] = address(pool);

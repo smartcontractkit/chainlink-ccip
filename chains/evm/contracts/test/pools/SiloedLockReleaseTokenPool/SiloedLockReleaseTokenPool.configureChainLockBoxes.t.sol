@@ -6,6 +6,8 @@ import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
@@ -30,9 +32,11 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
       address(s_unsiloed)
     );
 
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_pool), allowed: true});
-    s_unsiloed.configureAllowedCallers(allowedCallers);
+    address[] memory allowedCallers = new address[](1);
+    allowedCallers[0] = address(s_pool);
+    s_unsiloed.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
 
     // basic router config to allow on/off ramps
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
@@ -64,9 +68,11 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
 
   function test_configureChainLockBoxes() public {
     ERC20LockBox siloLockBox = new ERC20LockBox(address(s_token), SILOED_CHAIN_SELECTOR);
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_pool), allowed: true});
-    siloLockBox.configureAllowedCallers(allowedCallers);
+    address[] memory allowedCallers = new address[](1);
+    allowedCallers[0] = address(s_pool);
+    siloLockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
 
     uint64[] memory selectors = new uint64[](1);
     selectors[0] = SILOED_CHAIN_SELECTOR;

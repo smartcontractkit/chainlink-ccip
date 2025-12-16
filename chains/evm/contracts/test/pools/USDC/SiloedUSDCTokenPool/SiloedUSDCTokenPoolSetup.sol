@@ -72,13 +72,18 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
     _poolApplyChainUpdates(address(s_usdcTokenPoolTransferLiquidity));
 
     // Allow both pools to interact with the lockboxes.
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPool), allowed: true});
-    allowedCallers[1] =
-      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_usdcTokenPoolTransferLiquidity), allowed: true});
-    ERC20LockBox(s_lockBox).configureAllowedCallers(allowedCallers);
-    ERC20LockBox(s_sourceLockBox).configureAllowedCallers(allowedCallers);
-    ERC20LockBox(s_destLockBox).configureAllowedCallers(allowedCallers);
+    address[] memory allowedCallers = new address[](2);
+    allowedCallers[0] = address(s_usdcTokenPool);
+    allowedCallers[1] = address(s_usdcTokenPoolTransferLiquidity);
+    ERC20LockBox(s_lockBox).applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
+    ERC20LockBox(s_sourceLockBox).applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
+    ERC20LockBox(s_destLockBox).applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
 
     uint64[] memory selectors = new uint64[](2);
     selectors[0] = SOURCE_CHAIN_SELECTOR;

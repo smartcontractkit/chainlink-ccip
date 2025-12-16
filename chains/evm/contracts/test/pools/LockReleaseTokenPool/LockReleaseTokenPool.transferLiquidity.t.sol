@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract LockReleaseTokenPool_transferLiquidity is LockReleaseTokenPoolSetup {
   LockReleaseTokenPool internal s_oldLockReleaseTokenPool;
@@ -17,10 +18,11 @@ contract LockReleaseTokenPool_transferLiquidity is LockReleaseTokenPoolSetup {
     );
 
     // Configure old pool as allowed caller in the lockBox.
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
-    allowedCallers[0] =
-      ERC20LockBox.AllowedCallerConfigArgs({caller: address(s_oldLockReleaseTokenPool), allowed: true});
-    s_lockBox.configureAllowedCallers(allowedCallers);
+    address[] memory allowedCallers = new address[](1);
+    allowedCallers[0] = address(s_oldLockReleaseTokenPool);
+    s_lockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
 
     deal(address(s_token), address(s_lockBox), s_amount);
   }

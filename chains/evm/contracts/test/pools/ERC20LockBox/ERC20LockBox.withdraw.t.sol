@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {ERC20LockBoxSetup} from "./ERC20LockBoxSetup.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
   function testFuzz_withdraw_Success(
@@ -133,7 +134,7 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     _depositTokens(amount);
 
     vm.startPrank(STRANGER);
-    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.Unauthorized.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
 
     s_erc20LockBox.withdraw(0, amount, s_recipient);
   }

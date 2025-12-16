@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 
 import {BaseTest} from "../../BaseTest.t.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -24,9 +26,11 @@ contract ERC20LockBoxSetup is BaseTest {
     s_erc20LockBox = new ERC20LockBox(address(s_token), 0);
 
     // Configure the allowed caller.
-    ERC20LockBox.AllowedCallerConfigArgs[] memory configArgs = new ERC20LockBox.AllowedCallerConfigArgs[](1);
-    configArgs[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: s_allowedCaller, allowed: true});
-    s_erc20LockBox.configureAllowedCallers(configArgs);
+    address[] memory callers = new address[](1);
+    callers[0] = s_allowedCaller;
+    s_erc20LockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: callers, removedCallers: new address[](0)})
+    );
   }
 
   function _depositTokens(

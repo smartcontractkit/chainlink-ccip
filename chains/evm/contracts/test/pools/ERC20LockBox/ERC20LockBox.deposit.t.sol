@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {ERC20LockBoxSetup} from "./ERC20LockBoxSetup.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract ERC20LockBox_deposit is ERC20LockBoxSetup {
   function testFuzz_deposit_Success(
@@ -62,10 +63,12 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     deal(address(s_token), caller2, amount);
 
     // Configure both callers as allowed
-    ERC20LockBox.AllowedCallerConfigArgs[] memory configArgs = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    configArgs[0] = ERC20LockBox.AllowedCallerConfigArgs({caller: caller1, allowed: true});
-    configArgs[1] = ERC20LockBox.AllowedCallerConfigArgs({caller: caller2, allowed: true});
-    s_erc20LockBox.configureAllowedCallers(configArgs);
+    address[] memory callers = new address[](2);
+    callers[0] = caller1;
+    callers[1] = caller2;
+    s_erc20LockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: callers, removedCallers: new address[](0)})
+    );
 
     // First caller deposits
     vm.startPrank(caller1);
@@ -97,7 +100,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
 
     vm.startPrank(STRANGER);
     s_token.approve(address(s_erc20LockBox), amount);
-    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.Unauthorized.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
 
     s_erc20LockBox.deposit(0, amount);
   }
