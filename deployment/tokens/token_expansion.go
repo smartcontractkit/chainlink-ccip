@@ -14,12 +14,17 @@ import (
 )
 
 type TokenExpansionInput struct {
-	DeployTokenInputs       map[uint64]DeployTokenInput       `yaml:"deploy-token-inputs" json:"deployTokenInputs"`
-	DeployTokenPoolInputs   map[uint64]DeployTokenPoolInput   `yaml:"deploy-token-pool-inputs" json:"deployTokenPoolInputs"`
-	RegisterTokenInputs     map[uint64]RegisterTokenInput     `yaml:"register-token-inputs" json:"registerTokenInputs"`
-	SetPoolInputs           map[uint64]SetPoolInput           `yaml:"set-pool-inputs" json:"setPoolInputs"`
-	UpdateAuthoritiesInputs map[uint64]UpdateAuthoritiesInput `yaml:"update-authorities-inputs" json:"updateAuthoritiesInputs"`
-	MCMS                    mcms.Input                        `yaml:"mcms,omitempty" json:"mcms,omitempty"`
+	TokenExpansionInputPerChain map[uint64]TokenExpansionInputPerChain `yaml:"token-expansion-input-per-chain" json:"tokenExpansionInputPerChain"`
+	MCMS                        mcms.Input                             `yaml:"mcms,omitempty" json:"mcms,omitempty"`
+}
+
+type TokenExpansionInputPerChain struct {
+	DeployTokenInput        DeployTokenInput `yaml:"deploy-token-input" json:"deployTokenInput"`
+	TokenPoolQualifier      string           `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType                string           `yaml:"pool-type" json:"poolType"`
+	TARAdmin                string           `yaml:"tar-admin" json:"tarAdmin"`
+	TokenPoolAdmin          string           `yaml:"token-pool-admin" json:"tokenPoolAdmin"`
+	TokenPoolRateLimitAdmin string           `yaml:"token-pool-rate-limit-admin" json:"tokenPoolRateLimitAdmin"`
 }
 
 type DeployTokenInput struct {
@@ -43,19 +48,24 @@ type DeployTokenInput struct {
 	ExistingDataStore datastore.DataStore
 }
 type DeployTokenPoolInput struct {
-	RegisterTokenConfig RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	TokenSymbol        string `yaml:"token-symbol" json:"tokenSymbol"`
+	TokenPoolQualifier string `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType           string `yaml:"pool-type" json:"poolType"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
 type RegisterTokenInput struct {
-	RegisterTokenConfig RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	TokenSymbol string `yaml:"token-symbol" json:"tokenSymbol"`
+	TokenAdmin  string `yaml:"token-admin" json:"tokenAdmin"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
 type SetPoolInput struct {
-	RegisterTokenConfig RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	TokenSymbol        string `yaml:"token-symbol" json:"tokenSymbol"`
+	TokenPoolQualifier string `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType           string `yaml:"pool-type" json:"poolType"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
@@ -82,10 +92,12 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 	return func(e cldf.Environment, cfg TokenExpansionInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
+		// ds to collect all addresses created during this changeset
+		// this gets passed as output
 		ds := datastore.NewMemoryDataStore()
 		tokenPoolRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
-		for selector, input := range cfg.DeployTokenInputs {
+		for selector, input := range cfg.TokenExpansionInputPerChain {
 			tmpDatastore := datastore.NewMemoryDataStore()
 			family, err := chain_selectors.GetSelectorFamily(selector)
 			if err != nil {
@@ -95,15 +107,17 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
 			}
-			input.ExistingDataStore = e.DataStore
-			input.ChainSelector = selector
-			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, input)
+			// deploy token
+			deployTokenInput := input.DeployTokenInput
+			deployTokenInput.ExistingDataStore = e.DataStore
+			deployTokenInput.ChainSelector = selector
+			deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, deployTokenInput)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
 			}
-			batchOps = append(batchOps, report.Output.BatchOps...)
-			reports = append(reports, report.ExecutionReports...)
-			for _, r := range report.Output.Addresses {
+			batchOps = append(batchOps, deployTokenReport.Output.BatchOps...)
+			reports = append(reports, deployTokenReport.ExecutionReports...)
+			for _, r := range deployTokenReport.Output.Addresses {
 				if err := tmpDatastore.Addresses().Add(r); err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 				}
@@ -111,32 +125,90 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 				}
 			}
-			// merge tmpDatastore into e.DataStore
+			tmpDatastore.Merge(e.DataStore)
+			e.DataStore = tmpDatastore.Seal()
+
+			// deploy token pool
+			tmpDatastore = datastore.NewMemoryDataStore()
+			deployTokenPoolInput := DeployTokenPoolInput{
+				TokenSymbol:        deployTokenInput.Symbol,
+				TokenPoolQualifier: input.TokenPoolQualifier,
+				PoolType:           input.PoolType,
+			}
+			deployTokenPoolInput.ExistingDataStore = e.DataStore
+			deployTokenPoolInput.ChainSelector = selector
+			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, deployTokenPoolInput)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
+			}
+			batchOps = append(batchOps, deployTokenPoolReport.Output.BatchOps...)
+			reports = append(reports, deployTokenPoolReport.ExecutionReports...)
+			for _, r := range deployTokenPoolReport.Output.Addresses {
+				if err := tmpDatastore.Addresses().Add(r); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				}
+				if err := ds.Addresses().Add(r); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				}
+			}
+			tmpDatastore.Merge(e.DataStore)
+			e.DataStore = tmpDatastore.Seal()
+
+			// register token
+			tmpDatastore = datastore.NewMemoryDataStore()
+			registerTokenInput := RegisterTokenInput{
+				TokenSymbol: deployTokenInput.Symbol,
+				TokenAdmin:  input.TARAdmin,
+			}
+			registerTokenInput.ExistingDataStore = e.DataStore
+			registerTokenInput.ChainSelector = selector
+			registerTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.RegisterToken(), e.BlockChains, registerTokenInput)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
+			}
+			batchOps = append(batchOps, registerTokenReport.Output.BatchOps...)
+			reports = append(reports, registerTokenReport.ExecutionReports...)
+			for _, r := range registerTokenReport.Output.Addresses {
+				if err := tmpDatastore.Addresses().Add(r); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				}
+				if err := ds.Addresses().Add(r); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				}
+			}
+			tmpDatastore.Merge(e.DataStore)
+			e.DataStore = tmpDatastore.Seal()
+
+			// set pool
+			tmpDatastore = datastore.NewMemoryDataStore()
+			setPoolInput := SetPoolInput{
+				TokenSymbol:        deployTokenInput.Symbol,
+				TokenPoolQualifier: input.TokenPoolQualifier,
+				PoolType:           input.PoolType,
+			}
+			setPoolInput.ExistingDataStore = e.DataStore
+			setPoolInput.ChainSelector = selector
+			setPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.SetPool(), e.BlockChains, setPoolInput)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
+			}
+			batchOps = append(batchOps, setPoolReport.Output.BatchOps...)
+			reports = append(reports, setPoolReport.ExecutionReports...)
+			for _, r := range setPoolReport.Output.Addresses {
+				if err := tmpDatastore.Addresses().Add(r); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				}
+				if err := ds.Addresses().Add(r); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				}
+			}
 			tmpDatastore.Merge(e.DataStore)
 			e.DataStore = tmpDatastore.Seal()
 		}
 
-		for selector, input := range cfg.DeployTokenPoolInputs {
-			family, err := chain_selectors.GetSelectorFamily(selector)
-			if err != nil {
-				return cldf.ChangesetOutput{}, err
-			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, &TokenAdminRegistryVersion)
-			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
-			}
-			input.ExistingDataStore = e.DataStore
-			input.ChainSelector = selector
-			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, input)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, report.Output.BatchOps...)
-			reports = append(reports, report.ExecutionReports...)
-		}
-
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
+			WithDataStore(ds).
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}

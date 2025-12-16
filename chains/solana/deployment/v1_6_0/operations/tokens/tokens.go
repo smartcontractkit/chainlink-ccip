@@ -129,7 +129,7 @@ var DeploySolanaToken = operations.NewOperation(
 		return datastore.AddressRef{
 			ChainSelector: chain.Selector,
 			Address:       mint.String(),
-			Type:          datastore.ContractType(tokenProgramID.String()),
+			Type:          datastore.ContractType(input.TokenProgramName),
 			Qualifier:     input.TokenSymbol,
 		}, nil
 	},

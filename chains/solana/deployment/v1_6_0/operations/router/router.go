@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -397,7 +398,7 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 	"router:register-token-admin-registry",
 	Version,
 	"Registers a Token Admin Registry with the Router 1.6.0 contract",
-	func(b operations.Bundle, chain cldf_solana.Chain, input TokenAdminRegistryParams) (sequences.OnChainOutput, error) {
+	func(b operations.Bundle, chain cldf_solana.Chain, input TokenAdminRegistryParams) (TokenAdminRegistryOut, error) {
 		ccip_router.SetProgramID(input.Router)
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
@@ -412,8 +413,14 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 		var pendingAdmin solana.PublicKey
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
 		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+			if input.Admin == tokenAdminRegistryAccount.Administrator {
+				b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
+				return TokenAdminRegistryOut{}, nil
+			}
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
 		}
+		// this is the key that will need to accept the admin registration
+		pendingSigner := input.Admin
 		var ixn solana.Instruction
 		var needProposal bool
 		// we need to override the admin if there is a pending admin
@@ -429,11 +436,11 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to build override pending admin instruction: %w", err)
+					return TokenAdminRegistryOut{}, fmt.Errorf("failed to build override pending admin instruction: %w", err)
 				}
 				ixData, err := tmp.Data()
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to extract data payload from override pending admin instruction: %w", err)
+					return TokenAdminRegistryOut{}, fmt.Errorf("failed to extract data payload from override pending admin instruction: %w", err)
 				}
 				ixn = solana.NewInstruction(input.Router, tmp.Accounts(), ixData)
 				if ccipAdmin != chain.DeployerKey.PublicKey() {
@@ -450,11 +457,11 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to build override pending admin instruction: %w", err)
+					return TokenAdminRegistryOut{}, fmt.Errorf("failed to build override pending admin instruction: %w", err)
 				}
 				ixData, err := tmp.Data()
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to extract data payload from override pending admin instruction: %w", err)
+					return TokenAdminRegistryOut{}, fmt.Errorf("failed to extract data payload from override pending admin instruction: %w", err)
 				}
 				ixn = solana.NewInstruction(input.Router, tmp.Accounts(), ixData)
 				if tokenMintAuthority != chain.DeployerKey.PublicKey() {
@@ -474,11 +481,11 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to build propose administrator instruction: %w", err)
+					return TokenAdminRegistryOut{}, fmt.Errorf("failed to build propose administrator instruction: %w", err)
 				}
 				ixData, err := tmp.Data()
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to extract data payload from propose administrator instruction: %w", err)
+					return TokenAdminRegistryOut{}, fmt.Errorf("failed to extract data payload from propose administrator instruction: %w", err)
 				}
 				ixn = solana.NewInstruction(input.Router, tmp.Accounts(), ixData)
 				if ccipAdmin != chain.DeployerKey.PublicKey() {
@@ -495,11 +502,11 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to build propose administrator instruction: %w", err)
+					return TokenAdminRegistryOut{}, fmt.Errorf("failed to build propose administrator instruction: %w", err)
 				}
 				ixData, err := tmp.Data()
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to extract data payload from propose administrator instruction: %w", err)
+					return TokenAdminRegistryOut{}, fmt.Errorf("failed to extract data payload from propose administrator instruction: %w", err)
 				}
 				ixn = solana.NewInstruction(input.Router, tmp.Accounts(), ixData)
 				if tokenMintAuthority != chain.DeployerKey.PublicKey() {
@@ -515,18 +522,23 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 				ContractType.String(),
 			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+				return TokenAdminRegistryOut{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
-			return sequences.OnChainOutput{
-				BatchOps: []types.BatchOperation{batches},
+			return TokenAdminRegistryOut{
+				PendingSigner: pendingSigner,
+				OnChainOutput: sequences.OnChainOutput{
+					BatchOps: []types.BatchOperation{batches},
+				},
 			}, nil
 		}
 
 		err := chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
 		}
-		return sequences.OnChainOutput{}, nil
+		return TokenAdminRegistryOut{
+			PendingSigner: pendingSigner,
+		}, nil
 	},
 )
 
@@ -542,6 +554,21 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
 		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
+		}
+		timelockSigner := utils.GetTimelockSignerPDA(
+			input.ExistingAddresses,
+			chain.Selector,
+			common_utils.CLLQualifier,
+		)
+		if pendingAdmin.IsZero() {
+			// if there is no pending admin, we assume the authority is timelock
+			// but we need to confirm that timelock is indeed the authority
+			if input.Admin != timelockSigner {
+				return sequences.OnChainOutput{}, fmt.Errorf("no pending admin found for token admin registry, expected timelock signer %s but got %s", timelockSigner.String(), input.Admin.String())
+			}
+		} else if pendingAdmin != timelockSigner && pendingAdmin != chain.DeployerKey.PublicKey() {
+			// we can only sign as either the deployer or timelock
+			return sequences.OnChainOutput{}, fmt.Errorf("pending admin %s does not match timelock signer %s or deployer %s", pendingAdmin.String(), timelockSigner.String(), chain.DeployerKey.PublicKey().String())
 		}
 		// sign as the pending admin to accept
 		// when there is no pending admin, we assume the authority is timelock
@@ -671,7 +698,13 @@ type PoolParams struct {
 }
 
 type TokenAdminRegistryParams struct {
-	Router    solana.PublicKey
-	TokenMint solana.PublicKey
-	Admin     solana.PublicKey
+	Router            solana.PublicKey
+	TokenMint         solana.PublicKey
+	Admin             solana.PublicKey
+	ExistingAddresses []datastore.AddressRef
+}
+
+type TokenAdminRegistryOut struct {
+	sequences.OnChainOutput
+	PendingSigner solana.PublicKey
 }
