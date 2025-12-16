@@ -138,7 +138,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertEq(s_defaultCCVs.length, result.ccvs.length);
   }
 
-  function test_parseExtraArgsWithDefaults_V3DoesNotAddDefaults_WhenHasNoDataButHasTokenAndGasLimitZero() public view {
+  function test_parseExtraArgsWithDefaults_V3DoesNotAddDefaults_IsTokenTransferWithoutDataAndGasLimitZero() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
     inputArgs.gasLimit = 0;
 
@@ -150,7 +150,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertEq(result.ccvArgs.length, 0, "Should not inject default CCV args for token-only transfer");
   }
 
-  function test_parseExtraArgsWithDefaults_LegacyDoesNotAddDefaults_WhenHasNoDataButHasTokenAndGasLimitZero()
+  function test_parseExtraArgsWithDefaults_LegacyDoesNotAddDefaults_IsTokenTransferWithoutDataAndGasLimitZero()
     public
     view
   {

@@ -460,14 +460,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param destChainSelector The destination chain selector.
   /// @param destChainConfig Configuration for the destination chain including default values.
   /// @param extraArgs User-provided extra arguments in either V3 or legacy format.
-  /// @param hasNoDataButHasToken Indicates if the message has no data but includes a token transfer. This is meant to
+  /// @param isTokenTransferWithoutData Indicates if the message has no data but includes a token transfer. This is meant to
   /// signal token-only transfers to avoid adding default CCVs when not needed.
   /// @return resolvedArgs Complete EVMExtraArgsV3 struct with all defaults applied.
   function _parseExtraArgsWithDefaults(
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
     bytes calldata extraArgs,
-    bool hasNoDataButHasToken
+    bool isTokenTransferWithoutData
   ) internal view returns (ExtraArgsCodec.GenericExtraArgsV3 memory resolvedArgs) {
     // If ExtraArgsV3 are provided, decode them.
     if (extraArgs.length >= 4 && bytes4(extraArgs[:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
@@ -512,7 +512,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       //
       // For example, token-only USDC transfers can use only CCTP (without committee verification), since CCTP is fully
       // trusted for that token flow.
-      if (resolvedArgs.ccvs.length == 0 && !(hasNoDataButHasToken && resolvedArgs.gasLimit == 0)) {
+      if (resolvedArgs.ccvs.length == 0 && !(isTokenTransferWithoutData && resolvedArgs.gasLimit == 0)) {
         resolvedArgs.ccvs = destChainConfig.defaultCCVs;
         resolvedArgs.ccvArgs = new bytes[](resolvedArgs.ccvs.length);
       }
@@ -529,7 +529,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
 
       // If older or no args are provided, use defaults if it's not a token-only transfer.
-      if (!(hasNoDataButHasToken && resolvedArgs.gasLimit == 0)) {
+      if (!(isTokenTransferWithoutData && resolvedArgs.gasLimit == 0)) {
         resolvedArgs.ccvs = destChainConfig.defaultCCVs;
         resolvedArgs.ccvArgs = new bytes[](resolvedArgs.ccvs.length);
       }
