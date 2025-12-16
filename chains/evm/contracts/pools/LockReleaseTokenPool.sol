@@ -44,8 +44,8 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
     if (address(lockBoxContract.getToken()) != address(token)) revert InvalidToken(address(lockBoxContract.getToken()));
-    if (lockBoxContract.i_remoteChainSelector() != 0) {
-      revert InvalidLockBoxChainSelector(lockBoxContract.i_remoteChainSelector());
+    if (lockBoxContract.getRemoteChainSelector() != 0) {
+      revert InvalidLockBoxChainSelector(lockBoxContract.getRemoteChainSelector());
     }
 
     token.safeApprove(lockBox, type(uint256).max);

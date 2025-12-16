@@ -224,8 +224,8 @@ contract TokenPoolFactory is ITypeAndVersion {
         if (address(lockBoxContract.getToken()) != localConfig.token) {
           revert InvalidLockBoxToken(address(lockBoxContract.getToken()), localConfig.token);
         }
-        if (lockBoxContract.i_remoteChainSelector() != 0) {
-          revert InvalidLockBoxChainSelector(lockBoxContract.i_remoteChainSelector());
+        if (lockBoxContract.getRemoteChainSelector() != 0) {
+          revert InvalidLockBoxChainSelector(lockBoxContract.getRemoteChainSelector());
         }
       }
       tokenPoolInitArgs = abi.encode(
