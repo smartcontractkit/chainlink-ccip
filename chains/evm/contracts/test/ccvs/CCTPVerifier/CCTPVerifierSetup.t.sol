@@ -7,49 +7,13 @@ import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract CCTPVerifierSetup is BaseVerifierSetup {
-  // solhint-disable-next-line gas-struct-packing
-  struct CCTPMessageHeader {
-    uint32 version;
-    uint32 sourceDomain;
-    uint32 destinationDomain;
-    bytes32 nonce;
-    bytes32 sender;
-    bytes32 recipient;
-    bytes32 destinationCaller;
-    uint32 minFinalityThreshold;
-    uint32 finalityThresholdExecuted;
-  }
-
-  // solhint-disable-next-line gas-struct-packing
-  struct CCTPMessageBody {
-    uint32 version;
-    bytes32 burnToken;
-    bytes32 mintRecipient;
-    uint256 amount;
-    bytes32 messageSender;
-    uint256 maxFee;
-    uint256 feeExecuted;
-    uint256 expirationBlock;
-  }
-
-  // solhint-disable-next-line gas-struct-packing
-  struct CCTPMessageHookData {
-    bytes4 verifierVersion;
-    bytes32 messageId;
-  }
-
-  struct CCTPMessage {
-    CCTPMessageHeader header;
-    CCTPMessageBody body;
-    CCTPMessageHookData hookData;
-  }
-
   CCTPVerifier internal s_cctpVerifier;
   MockUSDCTokenMessenger internal s_mockTokenMessenger;
   MockE2EUSDCTransmitterCCTPV2 internal s_mockMessageTransmitter;
@@ -138,53 +102,12 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
 
   function _createVerifierResults(
     bytes4 verifierVersion,
-    CCTPVerifierSetup.CCTPMessage memory cctpMessage
+    CCTPHelper.CCTPMessage memory cctpMessage
   ) internal pure returns (bytes memory) {
     return abi.encodePacked(
       verifierVersion, // Prefix for routing.
-      _encodeCCTPMessage(cctpMessage),
+      CCTPHelper._encodeCCTPMessage(cctpMessage),
       new bytes(65) // Signature.
-    );
-  }
-
-  function _encodeCCTPMessage(
-    CCTPVerifierSetup.CCTPMessage memory cctpMessage
-  ) internal pure returns (bytes memory) {
-    return abi.encodePacked(
-      _encodeCCTPMessageHeader(cctpMessage.header),
-      _encodeCCTPMessageBody(cctpMessage.body),
-      abi.encodePacked(cctpMessage.hookData.verifierVersion, cctpMessage.hookData.messageId)
-    );
-  }
-
-  function _encodeCCTPMessageHeader(
-    CCTPVerifierSetup.CCTPMessageHeader memory header
-  ) private pure returns (bytes memory) {
-    return abi.encodePacked(
-      header.version,
-      header.sourceDomain,
-      header.destinationDomain,
-      header.nonce,
-      header.sender,
-      header.recipient,
-      header.destinationCaller,
-      header.minFinalityThreshold,
-      header.finalityThresholdExecuted
-    );
-  }
-
-  function _encodeCCTPMessageBody(
-    CCTPVerifierSetup.CCTPMessageBody memory body
-  ) private pure returns (bytes memory) {
-    return abi.encodePacked(
-      body.version,
-      body.burnToken,
-      body.mintRecipient,
-      body.amount,
-      body.messageSender,
-      body.maxFee,
-      body.feeExecuted,
-      body.expirationBlock
     );
   }
 
