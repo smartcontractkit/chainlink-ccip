@@ -233,4 +233,6 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, version)
 	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
 	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
+	// should add a new entry for remote source and remote dest in solana
+	require.Equal(t, 2, len(connectOut.DataStore.Addresses().Filter()))
 }
