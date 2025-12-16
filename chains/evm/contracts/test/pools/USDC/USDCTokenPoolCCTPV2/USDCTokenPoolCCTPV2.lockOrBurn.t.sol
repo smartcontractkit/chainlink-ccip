@@ -135,57 +135,6 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
   }
 
-  function test_lockOrBurn_PadsPackedEvmReceiverTo32Bytes() public {
-    address evmReceiver = makeAddr("receiver20");
-    bytes memory receiver20 = abi.encodePacked(evmReceiver); // 20-byte input
-
-    uint256 amount = 1;
-    s_USDCToken.transfer(address(s_usdcTokenPool), amount);
-    vm.startPrank(s_routerAllowedOnRamp);
-
-    USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
-    bytes32 expectedPaddedReceiver = bytes32(uint256(uint160(evmReceiver)));
-
-    vm.expectEmit();
-    emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_USDCToken),
-      amount: amount
-    });
-
-    vm.expectEmit();
-    emit ITokenMessenger.DepositForBurn(
-      address(s_USDCToken),
-      amount,
-      address(s_usdcTokenPool),
-      expectedPaddedReceiver,
-      expectedDomain.domainIdentifier,
-      s_mockUSDCTokenMessenger.DESTINATION_TOKEN_MESSENGER(),
-      expectedDomain.allowedCaller,
-      s_usdcTokenPool.MAX_FEE(),
-      s_usdcTokenPool.FINALITY_THRESHOLD(),
-      ""
-    );
-
-    vm.expectEmit();
-    emit TokenPool.LockedOrBurned({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_USDCToken),
-      sender: address(s_routerAllowedOnRamp),
-      amount: amount
-    });
-
-    s_usdcTokenPool.lockOrBurn(
-      Pool.LockOrBurnInV1({
-        originalSender: OWNER,
-        receiver: receiver20,
-        amount: amount,
-        remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_USDCToken)
-      })
-    );
-  }
-
   function testFuzz_lockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
     amount = bound(amount, 1, _getOutboundRateLimiterConfig().capacity);

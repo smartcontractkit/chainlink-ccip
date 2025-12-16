@@ -60,21 +60,17 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
 
-    uint256 len = lockOrBurnIn.receiver.length;
-    if (len == 0 || len > 32) {
+    if (lockOrBurnIn.receiver.length != 32) {
       revert InvalidReceiver(lockOrBurnIn.receiver);
     }
 
     bytes32 decodedReceiver;
-
     // For EVM chains, the mintRecipient is not used, but is needed for Solana, where the mintRecipient will
     // be a PDA owned by the pool, and will forward the tokens to its final destination after minting.
     if (domain.mintRecipient != bytes32(0)) {
       decodedReceiver = domain.mintRecipient;
     } else {
-      bytes32 raw = bytes32(lockOrBurnIn.receiver); // data in the high bytes, zeros on the right
-      uint256 shift = (32 - len) * 8;
-      decodedReceiver = len == 32 ? raw : bytes32(uint256(raw) >> shift);
+      decodedReceiver = abi.decode(lockOrBurnIn.receiver, (bytes32));
     }
 
     // Deposit the tokens for burn into CCTP.
