@@ -117,7 +117,7 @@ var InitGlobalConfigBurnMint = operations.NewOperation(
 		}
 		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
 		var chainConfig base_token_pool.BaseConfig
-		err = chain.GetAccountDataBorshInto(context.Background(), configPDA, &chainConfig)
+		_ = chain.GetAccountDataBorshInto(context.Background(), configPDA, &chainConfig)
 		// already initialized
 		if !chainConfig.TokenProgram.IsZero() {
 			b.Logger.Info("BurnMintTokenPool global config already initialized for token pool:", input.TokenPool.String())

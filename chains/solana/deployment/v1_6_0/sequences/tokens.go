@@ -44,6 +44,15 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 			b.Logger.Info("SVM Deploying token:", input)
 			chain := chains.SolanaChains()[input.ChainSelector]
 
+			tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
+				ChainSelector: chain.Selector,
+				Qualifier:     input.Symbol,
+			}, chain.Selector, datastore_utils.FullRef)
+			if err == nil {
+				b.Logger.Info("Token already deployed at address:", tokenAddr.Address)
+				return result, nil
+			}
+
 			var privateKey solana.PrivateKey
 			if input.TokenPrivKey != "" {
 				privateKey = solana.MustPrivateKeyFromBase58(input.TokenPrivKey)

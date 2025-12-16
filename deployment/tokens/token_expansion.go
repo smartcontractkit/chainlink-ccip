@@ -14,17 +14,25 @@ import (
 )
 
 type TokenExpansionInput struct {
+	// per-chain configuration for token expansion
 	TokenExpansionInputPerChain map[uint64]TokenExpansionInputPerChain `yaml:"token-expansion-input-per-chain" json:"tokenExpansionInputPerChain"`
 	MCMS                        mcms.Input                             `yaml:"mcms,omitempty" json:"mcms,omitempty"`
 }
 
 type TokenExpansionInputPerChain struct {
-	DeployTokenInput        DeployTokenInput `yaml:"deploy-token-input" json:"deployTokenInput"`
-	TokenPoolQualifier      string           `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType                string           `yaml:"pool-type" json:"poolType"`
-	TARAdmin                string           `yaml:"tar-admin" json:"tarAdmin"`
-	TokenPoolAdmin          string           `yaml:"token-pool-admin" json:"tokenPoolAdmin"`
-	TokenPoolRateLimitAdmin string           `yaml:"token-pool-rate-limit-admin" json:"tokenPoolRateLimitAdmin"`
+	DeployTokenInput DeployTokenInput `yaml:"deploy-token-input" json:"deployTokenInput"`
+	// only necessary if we want to specifically query for a token pool with a given type + qualifier
+	TokenPoolQualifier string `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType           string `yaml:"pool-type" json:"poolType"`
+	// only necessary if we want to set specific admin authorities. Will default to timelock admin otherwise
+	TARAdmin                string `yaml:"tar-admin" json:"tarAdmin"`
+	TokenPoolAdmin          string `yaml:"token-pool-admin" json:"tokenPoolAdmin"`
+	TokenPoolRateLimitAdmin string `yaml:"token-pool-rate-limit-admin" json:"tokenPoolRateLimitAdmin"`
+	// rate lmiter config per remote chain
+	// we will look up the remote token from the top level token expansion config
+	RemoteCounterpartUpdates map[uint64]RateLimiterConfig `yaml:"remote-counterpart-updates" json:"remoteCounterpartUpdates"`
+	// if true, will delete the remote counterpart token pool on the specified chains
+	RemoteCounterpartDeletes []uint64 `yaml:"remote-counterpart-deletes" json:"remoteCounterpartDeletes"`
 }
 
 type DeployTokenInput struct {
@@ -71,7 +79,8 @@ type SetPoolInput struct {
 	ExistingDataStore datastore.DataStore
 }
 type UpdateAuthoritiesInput struct {
-	RegisterTokenConfig RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	TokenPoolAdmin          string `yaml:"token-pool-admin" json:"tokenPoolAdmin"`
+	TokenPoolRateLimitAdmin string `yaml:"token-pool-rate-limit-admin" json:"tokenPoolRateLimitAdmin"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
