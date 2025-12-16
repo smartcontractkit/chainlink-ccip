@@ -483,10 +483,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     if (extraArgs.length >= 4 && bytes4(extraArgs[:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
 
-      resolvedArgs.tokenReceiver = resolvedArgs.tokenReceiver.length != 0
-        ? _validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength)
-        : resolvedArgs.tokenReceiver;
-
+      if (resolvedArgs.tokenReceiver.length != 0) {
+        resolvedArgs.tokenReceiver =
+          _validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
+      }
       // We need to ensure no duplicate CCVs are present in the ccv list.
       uint256 length = resolvedArgs.ccvs.length;
       for (uint256 i = 0; i < length; ++i) {
