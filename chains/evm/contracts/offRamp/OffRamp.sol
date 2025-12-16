@@ -277,8 +277,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       if (message.tokenTransfer[0].tokenReceiver.length != 20) {
         revert Internal.InvalidEVMAddress(message.tokenTransfer[0].tokenReceiver);
       }
-      tokenReceiver = address(bytes20(message.tokenTransfer[0].tokenReceiver));
-      balancePre = _getBalanceOfReceiver(tokenReceiver, address(bytes20(message.tokenTransfer[0].destTokenAddress)));
+      balancePre = _getBalanceOfReceiver(
+        address(bytes20(message.tokenTransfer[0].tokenReceiver)),
+        address(bytes20(message.tokenTransfer[0].destTokenAddress))
+      );
     }
 
     address receiver = address(bytes20(message.receiver));
