@@ -15,14 +15,14 @@ contract OffRampSetup is BaseTest {
   address internal s_defaultCCV;
   address internal s_tokenAdminRegistry;
 
-  bytes internal ON_RAMP;
+  bytes internal s_onRamp;
 
   function setUp() public virtual override {
     BaseTest.setUp();
 
     s_defaultCCV = makeAddr("defaultCCV");
     s_tokenAdminRegistry = makeAddr("tokenAdminRegistry");
-    ON_RAMP = abi.encode(makeAddr("onRamp"));
+    s_onRamp = abi.encode(makeAddr("onRamp"));
 
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
@@ -36,7 +36,7 @@ contract OffRampSetup is BaseTest {
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = s_defaultCCV;
 
-    _applySourceConfig(ON_RAMP, true, defaultCCVs, new address[](0));
+    _applySourceConfig(s_onRamp, true, defaultCCVs, new address[](0));
   }
 
   function _applySourceConfig(
