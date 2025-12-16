@@ -606,4 +606,4 @@ VersionedVerifierResolver_applyInboundImplementationUpdates:test_applyInboundImp
 VersionedVerifierResolver_applyOutboundImplementationUpdates:test_applyOutboundImplementationUpdates() (gas: 108154)
 cctp_e2e:test_cctp_e2e() (gas: 667702)
 e2e:test_e2e() (gas: 560018)
-e2e_lombard:testE2eLombard() (gas: 729632)
+e2e_lombard:testE2eLombard() (gas: 737847)
