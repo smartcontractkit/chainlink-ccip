@@ -63,10 +63,14 @@ func (p *processor) Observation(
 	results := p.runner.Run(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
 	now := time.Now().UTC()
 
-	feeComponents = asynclib.Extract[map[cciptypes.ChainSelector]types.ChainFeeComponents](results, opGetChainsFeeComponents)
-	nativeTokenPrices = asynclib.Extract[map[cciptypes.ChainSelector]cciptypes.BigInt](results, opGetNativeTokenPrices)
-	chainFeeUpdates = asynclib.Extract[map[cciptypes.ChainSelector]Update](results, opGetChainFeePriceUpdates)
-	fChain = asynclib.Extract[map[cciptypes.ChainSelector]int](results, opObserveFChain)
+	feeComponents = asynclib.Extract[
+		map[cciptypes.ChainSelector]types.ChainFeeComponents](results, opGetChainsFeeComponents)
+	nativeTokenPrices = asynclib.Extract[
+		map[cciptypes.ChainSelector]cciptypes.BigInt](results, opGetNativeTokenPrices)
+	chainFeeUpdates = asynclib.Extract[
+		map[cciptypes.ChainSelector]Update](results, opGetChainFeePriceUpdates)
+	fChain = asynclib.Extract[
+		map[cciptypes.ChainSelector]int](results, opObserveFChain)
 
 	chainsWithNativeTokenPrices := mapset.NewSet(slices.Collect(maps.Keys(feeComponents))...).
 		Intersect(

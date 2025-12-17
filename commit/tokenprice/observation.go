@@ -52,9 +52,12 @@ func (p *processor) Observation(
 	results := p.runner.Run(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
 	now := time.Now().UTC()
 
-	feedTokenPrices = asynclib.Extract[cciptypes.TokenPriceMap](results, opObserveFeedTokenPrices)
-	feeQuoterUpdates = asynclib.Extract[map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig](results, opObserveFeeQuoterTokenUpdates)
-	fChain = asynclib.Extract[map[cciptypes.ChainSelector]int](results, opObserveFChain)
+	feedTokenPrices = asynclib.Extract[
+		cciptypes.TokenPriceMap](results, opObserveFeedTokenPrices)
+	feeQuoterUpdates = asynclib.Extract[
+		map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig](results, opObserveFeeQuoterTokenUpdates)
+	fChain = asynclib.Extract[
+		map[cciptypes.ChainSelector]int](results, opObserveFChain)
 
 	lggr.Infow(
 		"observed token prices",

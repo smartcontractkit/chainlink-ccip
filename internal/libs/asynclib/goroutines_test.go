@@ -51,7 +51,7 @@ func TestWaitForAllNoErrOperations_ContextTimeoutRespected(t *testing.T) {
 			case <-ctx.Done():
 			case <-time.After(24 * time.Hour):
 			}
-			return nil
+			return struct{}{}
 		},
 	}
 
@@ -73,7 +73,7 @@ func TestWaitForAllNoErrOperations_ContextIsPropagated(t *testing.T) {
 			_, ok := ctx.Deadline()
 			assert.True(t, ok, "context should have a deadline")
 			close(done)
-			return nil
+			return struct{}{}
 		},
 	}
 
@@ -107,7 +107,7 @@ func TestAsyncOpsRunner_TimeoutRespected(t *testing.T) {
 		// Simulate work that takes much longer than the timeout
 		// and deliberately ignores ctx.Done()
 		time.Sleep(2 * time.Second)
-		return nil
+		return struct{}{}
 	}
 
 	ops := AsyncNoErrOperationsMap{
@@ -137,7 +137,7 @@ func TestAsyncOpsRunner_NormalCompletion(t *testing.T) {
 	// Define a fast operation
 	fastOp := func(_ context.Context, _ logger.Logger) any {
 		time.Sleep(10 * time.Millisecond)
-		return nil
+		return struct{}{}
 	}
 
 	ops := AsyncNoErrOperationsMap{
@@ -167,7 +167,7 @@ func TestAsyncOpsRunner_PoolFullDoesNotBlock(t *testing.T) {
 	blockingOp := func(_ context.Context, _ logger.Logger) any {
 		close(startedCh)
 		time.Sleep(500 * time.Millisecond) // Occupy the worker
-		return nil
+		return struct{}{}
 	}
 
 	// Launch it in a separate goroutine so we can try to schedule another one immediately
@@ -189,7 +189,7 @@ func TestAsyncOpsRunner_PoolFullDoesNotBlock(t *testing.T) {
 	// Because of our "continue" fix, Run should just skip this task and return immediately
 	// since there are no other tasks to wait for.
 	start := time.Now()
-	ops := AsyncNoErrOperationsMap{"op1": func(ctx context.Context, l logger.Logger) any { return nil }}
+	ops := AsyncNoErrOperationsMap{"op1": func(ctx context.Context, l logger.Logger) any { return struct{}{} }}
 
 	// This should return quickly, NOT block waiting for the first op to finish
 	runner.Run(context.Background(), 2*time.Second, ops, lggr)
