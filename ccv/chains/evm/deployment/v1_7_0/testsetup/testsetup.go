@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -50,6 +51,28 @@ func CreateBasicCommitteeVerifierRemoteChainConfig() adapters.CommitteeVerifierR
 			Signers:   []string{common.HexToAddress("0x01").String()},
 			Threshold: 1,
 		},
+	}
+}
+
+// CreateBasicTokenTransferFeeConfig creates a basic token transfer fee config with reasonable defaults for testing
+func CreateBasicTokenTransferFeeConfig() tokens.TokenTransferFeeConfig {
+	return tokens.TokenTransferFeeConfig{
+		IsEnabled:                     true,
+		DestGasOverhead:               200_000,
+		DestBytesOverhead:             32,
+		DefaultFinalityFeeUSDCents:    100, // $1.00
+		CustomFinalityFeeUSDCents:     200, // $2.00
+		DefaultFinalityTransferFeeBps: 100, // 2%
+		CustomFinalityTransferFeeBps:  100, // 1%
+	}
+}
+
+// CreateRateLimiterConfig creates a rate limiter config
+func CreateRateLimiterConfig(rate int64, capacity int64) tokens.RateLimiterConfig {
+	return tokens.RateLimiterConfig{
+		IsEnabled: true,
+		Rate:      big.NewInt(rate),
+		Capacity:  big.NewInt(capacity),
 	}
 }
 
