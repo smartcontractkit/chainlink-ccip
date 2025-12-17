@@ -10,6 +10,7 @@ import {ERC20LockBox} from "../../pools/ERC20LockBox.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {RegistryModuleOwnerCustom} from "../RegistryModuleOwnerCustom.sol";
 import {FactoryBurnMintERC20} from "./FactoryBurnMintERC20.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 
@@ -215,8 +216,9 @@ contract TokenPoolFactory is ITypeAndVersion {
     // Construct the initArgs for the token pool using the immutable contracts for CCIP on the local chain.
     // LockRelease pools need lockBox, BurnMint pools don't.
     bytes memory tokenPoolInitArgs;
+    address localLockBox;
     if (localConfig.localPoolType == PoolType.LOCK_RELEASE) {
-      address localLockBox = localConfig.lockBox;
+      localLockBox = localConfig.lockBox;
       if (localLockBox == address(0)) {
         localLockBox = _deployLockBox(localConfig.token, 0, localConfig.salt);
       } else {
@@ -241,6 +243,16 @@ contract TokenPoolFactory is ITypeAndVersion {
 
     // Apply the chain updates to the token pool.
     TokenPool(poolAddress).applyChainUpdates(new uint64[](0), chainUpdates);
+
+    // Authorize the new pool to interact with the local lockbox and transfer ownership to the caller for future admin.
+    if (localConfig.localPoolType == PoolType.LOCK_RELEASE) {
+      ERC20LockBox lockBoxContract = ERC20LockBox(localLockBox);
+      // We check the owner as user supplied lockboxes can be different.
+      if (lockBoxContract.owner() == address(this)) {
+        _authorizePoolInLockBox(localLockBox, poolAddress);
+        lockBoxContract.transferOwnership(msg.sender);
+      }
+    }
 
     // Begin the 2 step ownership transfer of the token pool to the msg.sender.
     IOwnable(poolAddress).transferOwnership(address(msg.sender));
@@ -325,6 +337,20 @@ contract TokenPoolFactory is ITypeAndVersion {
     creationCode = abi.encodePacked(LOCKBOX_INIT_CODE, abi.encode(token, remoteChainSelector));
     predicted = salt.computeAddress(keccak256(creationCode), deployer);
     return (predicted, creationCode);
+  }
+
+  function _authorizePoolInLockBox(address lockBox, address pool) private {
+    ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
+    // Skip if this factory is not the owner; user-supplied lockboxes must already authorize the pool.
+    if (lockBoxContract.owner() != address(this)) {
+      return;
+    }
+
+    address[] memory added = new address[](1);
+    added[0] = pool;
+    lockBoxContract.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: added, removedCallers: new address[](0)})
+    );
   }
 
   /// @notice Generates the hash of the init code the pool will be deployed with.

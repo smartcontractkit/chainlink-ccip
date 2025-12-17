@@ -8,10 +8,12 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
-/// @title ERC20 Lock Box.
-/// @notice A per-token lockbox that holds ERC20 liquidity so pools can be upgraded without migrating funds.
-/// @dev One token per lockbox. Only the owner can update the allowed caller list; allowed callers (or the owner) can
-/// deposit and withdraw the supported token.
+/// @title ERC20 Lock Box
+/// @notice Per-token/per-chain lockbox that holds ERC20 liquidity so pools can be upgraded without migrating funds.
+/// @dev Each lockbox is bound to one token and one remote chain selector:
+/// - Selector 0 represents unsiloed liquidity shared across non-siloed chains.
+/// - Non-zero selectors represent a specific remote chain for siloed flows.
+/// Only the owner can manage the allowlist; allowed callers (or the owner) can deposit/withdraw after the selector check.
 contract ERC20LockBox is ITypeAndVersion, AuthorizedCallers {
   using SafeERC20 for IERC20;
 
@@ -25,6 +27,7 @@ contract ERC20LockBox is ITypeAndVersion, AuthorizedCallers {
 
   /// @notice The token supported by this lockbox.
   IERC20 internal immutable i_token;
+  /// @notice Chain selector this lockbox is bound to (0 = unsiloed, non-zero = specific remote chain).
   uint64 internal immutable i_remoteChainSelector;
 
   string public constant typeAndVersion = "ERC20LockBox 1.7.0-dev";

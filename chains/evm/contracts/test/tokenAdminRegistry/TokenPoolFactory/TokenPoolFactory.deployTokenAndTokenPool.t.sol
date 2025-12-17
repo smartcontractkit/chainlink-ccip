@@ -19,7 +19,9 @@ import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/Tok
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
@@ -393,6 +395,72 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     assertEq(IOwner(tokenAddress).owner(), OWNER, "Token should be owned by the owner");
 
     assertEq(IOwner(poolAddress).owner(), OWNER, "Token should be owned by the owner");
+  }
+
+  function test_deployTokenPoolWithExistingToken_LockRelease_UserLockBoxOwnershipPreserved() public {
+    vm.startPrank(OWNER);
+    FactoryBurnMintERC20 token =
+      new FactoryBurnMintERC20("TestToken", "TEST", LOCAL_TOKEN_DECIMALS, type(uint256).max, PREMINT_AMOUNT, OWNER);
+    ERC20LockBox userLockBox = new ERC20LockBox(address(token), 0);
+
+    address poolAddress = s_tokenPoolFactory.deployTokenPoolWithExistingToken(
+      address(token),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.LOCK_RELEASE,
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCK_RELEASE_INIT_CODE,
+      address(userLockBox),
+      FAKE_SALT
+    );
+
+    // Ownership remains with the user since the factory should not take over user-provided lockboxes.
+    assertEq(userLockBox.owner(), OWNER, "lockbox owner should remain user");
+
+    // Manually authorize the pool and verify liquidity flows through the lockbox.
+    address[] memory added = new address[](1);
+    added[0] = poolAddress;
+    userLockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: added, removedCallers: new address[](0)})
+    );
+
+    Ownable2Step(poolAddress).acceptOwnership();
+    LockReleaseTokenPool(poolAddress).setRebalancer(OWNER);
+    token.approve(poolAddress, 1e18);
+    LockReleaseTokenPool(poolAddress).provideLiquidity(1e18);
+
+    assertEq(token.balanceOf(address(userLockBox)), 1e18, "lockbox should receive liquidity after manual auth");
+  }
+
+  function test_deployTokenAndTokenPool_LockRelease_AuthorizesPoolForLockBox() public {
+    vm.startPrank(OWNER);
+    bytes32 dynamicSalt = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
+
+    (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.LOCK_RELEASE,
+      s_tokenInitCode,
+      LOCK_RELEASE_INIT_CODE,
+      address(0),
+      FAKE_SALT
+    );
+
+    // Compute the deployed lockbox address to validate access configuration.
+    bytes memory lockBoxCreationCode =
+      abi.encodePacked(type(ERC20LockBox).creationCode, abi.encode(tokenAddress, uint64(0)));
+    address predictedLockBox = dynamicSalt.computeAddress(keccak256(lockBoxCreationCode), address(s_tokenPoolFactory));
+
+    // Accept ownership of token/pool and configure rebalancer.
+    Ownable2Step(tokenAddress).acceptOwnership();
+    Ownable2Step(poolAddress).acceptOwnership();
+    LockReleaseTokenPool(poolAddress).setRebalancer(OWNER);
+
+    // Provide liquidity should succeed because the pool was authorized on the lockbox by the factory.
+    BurnMintERC20 token = BurnMintERC20(tokenAddress);
+    token.approve(poolAddress, 1e18);
+    LockReleaseTokenPool(poolAddress).provideLiquidity(1e18);
+
+    assertEq(token.balanceOf(predictedLockBox), 1e18, "lockbox did not receive liquidity");
   }
 
   function test_deployTokenPoolWithExistingToken_LockRelease_ExistingToken_Predict() public {
