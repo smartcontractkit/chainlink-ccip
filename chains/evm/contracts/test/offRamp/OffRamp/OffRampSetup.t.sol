@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageReceiverV2.sol";
 
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
@@ -80,6 +81,11 @@ contract OffRampSetup is BaseTest {
 
     // Mock supportsInterface to return true for IERC165 interface.
     vm.mockCall(receiver, abi.encodeCall(IERC165.supportsInterface, (type(IERC165).interfaceId)), abi.encode(true));
+
+    // Mock supportsInterface to return true for IAny2EVMMessageReceiver (V1 - used for isTokenOnlyTransfer check).
+    vm.mockCall(
+      receiver, abi.encodeCall(IERC165.supportsInterface, (type(IAny2EVMMessageReceiver).interfaceId)), abi.encode(true)
+    );
 
     // Mock supportsInterface to return true for IAny2EVMMessageReceiverV2.
     vm.mockCall(

@@ -94,7 +94,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     ccvs[3] = s_poolRequiredCCV;
     ccvs[4] = s_defaultCCV;
 
-    // Mock receiver to return no required CCVs (so it falls back to defaults).
+    // Mock receiver to return no required CCVs (so it falls back to defaults via address(0)).
     vm.mockCall(
       s_receiver,
       abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVs.selector, SOURCE_CHAIN_SELECTOR),
@@ -131,18 +131,19 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     );
 
     (address[] memory ccvsToQuery, uint256[] memory dataIndexes) =
-      s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
+      s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs, false);
 
     // Since we have 1 default, 1 lane mandated, and 1 pool required.
     assertEq(ccvsToQuery.length, 3);
-    assertEq(ccvsToQuery[0], s_defaultCCV);
-    assertEq(ccvsToQuery[1], s_poolRequiredCCV);
-    assertEq(ccvsToQuery[2], s_laneMandatedCCV);
+    // Order matches OffRamp's required CCV construction: receiver (sentinel) + pool + lane + defaults (appended).
+    assertEq(ccvsToQuery[0], s_poolRequiredCCV);
+    assertEq(ccvsToQuery[1], s_laneMandatedCCV);
+    assertEq(ccvsToQuery[2], s_defaultCCV);
 
     assertEq(dataIndexes.length, 3, "right number of data indexes");
-    assertEq(dataIndexes[0], 4);
-    assertEq(dataIndexes[1], 3);
-    assertEq(dataIndexes[2], 2);
+    assertEq(dataIndexes[0], 3);
+    assertEq(dataIndexes[1], 2);
+    assertEq(dataIndexes[2], 4);
   }
 
   function test_ensureCCVQuorumIsReached_OptionalIsAlsoRequired() public {
@@ -164,7 +165,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     );
 
     (address[] memory ccvsToQuery, uint256[] memory dataIndexes) =
-      s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
+      s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs, false);
 
     assertEq(ccvsToQuery.length, 2);
     assertEq(ccvsToQuery[0], s_laneMandatedCCV);
@@ -192,7 +193,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     );
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, s_requiredCCV));
-    s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
+    s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs, false);
   }
 
   function test_ensureCCVQuorumIsReached_RevertWhen_RequiredCCVMissing_Pool() public {
@@ -224,7 +225,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     );
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, s_poolRequiredCCV));
-    s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
+    s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs, false);
   }
 
   function test_ensureCCVQuorumIsReached_RevertWhen_RequiredCCVMissing_LaneMandated() public {
@@ -235,7 +236,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](0);
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, s_laneMandatedCCV));
-    s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
+    s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs, false);
   }
 
   function test_ensureCCVQuorumIsReached_RevertWhen_OptionalCCVQuorumNotReached() public {
@@ -257,7 +258,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.OptionalCCVQuorumNotReached.selector, receiverOptional.length, 1));
     s_offRamp.ensureCCVQuorumIsReached(
-      SOURCE_CHAIN_SELECTOR, s_receiver, new MessageV1Codec.TokenTransferV1[](0), FINALITY, ccvs
+      SOURCE_CHAIN_SELECTOR, s_receiver, new MessageV1Codec.TokenTransferV1[](0), FINALITY, ccvs, false
     );
   }
 
@@ -280,7 +281,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     );
 
     (address[] memory ccvsToQuery, uint256[] memory dataIndexes) =
-      s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs);
+      s_offRamp.ensureCCVQuorumIsReached(SOURCE_CHAIN_SELECTOR, s_receiver, tokenTransfers, FINALITY, ccvs, false);
 
     assertEq(ccvsToQuery.length, 2);
     assertEq(ccvsToQuery[0], s_laneMandatedCCV);

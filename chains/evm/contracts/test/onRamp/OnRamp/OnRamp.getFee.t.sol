@@ -90,6 +90,7 @@ contract OnRamp_getFee is OnRampSetup {
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: laneMandatedCCVs,
       defaultCCVs: defaultCCVs,
@@ -139,6 +140,46 @@ contract OnRamp_getFee is OnRampSetup {
 
     assertLt(feeAmount, 1e19);
     assertGt(feeAmount, 5e17);
+  }
+
+  function test_getFee_RevertWhen_TokenReceiverNotAllowed() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.receiver = abi.encode(OWNER);
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
+    extraArgs.tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.TokenReceiverNotAllowed.selector, DEST_CHAIN_SELECTOR));
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+  }
+
+  function test_getFee_AllowsTokenReceiverWhenEnabled() public {
+    // Enable tokenReceiver on lane config.
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    OnRamp.DestChainConfig memory existing = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: existing.router,
+      addressBytesLength: existing.addressBytesLength,
+      networkFeeUSDCents: existing.networkFeeUSDCents,
+      tokenReceiverAllowed: true,
+      baseExecutionGasCost: existing.baseExecutionGasCost,
+      laneMandatedCCVs: existing.laneMandatedCCVs,
+      defaultCCVs: existing.defaultCCVs,
+      defaultExecutor: existing.defaultExecutor,
+      offRamp: existing.offRamp
+    });
+    s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.receiver = abi.encode(OWNER);
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
+    extraArgs.tokenReceiver = abi.encodePacked(makeAddr("tokenReceiver"));
+    message.extraArgs = ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs);
+
+    // Should not revert.
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
 
   // Reverts
