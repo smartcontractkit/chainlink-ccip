@@ -21,6 +21,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var thresholdAmountForAdditionalCCVs = big.NewInt(1e18)
+
 func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenAndPoolInput {
 	var rmnProxyAddress common.Address
 	var routerAddress common.Address
@@ -48,7 +50,7 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 			TokenPoolVersion:                 semver.MustParse("1.7.0"),
 			TokenSymbol:                      "TEST",
 			RateLimitAdmin:                   common.HexToAddress("0x01"),
-			ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+			ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs,
 			ConstructorArgs: tokens.ConstructorArgs{
 				LocalTokenDecimals: 18,
 				Allowlist: []common.Address{

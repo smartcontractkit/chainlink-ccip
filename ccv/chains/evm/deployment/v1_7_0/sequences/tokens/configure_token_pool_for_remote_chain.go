@@ -85,7 +85,15 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		for i, addr := range input.RemoteChainConfig.OutboundCCVs {
 			outboundCCVs[i] = common.HexToAddress(addr)
 		}
-		if len(inboundCCVs) > 0 || len(outboundCCVs) > 0 {
+		outboundCCVsToAddAboveThreshold := make([]common.Address, len(input.RemoteChainConfig.OutboundCCVsToAddAboveThreshold))
+		for i, addr := range input.RemoteChainConfig.OutboundCCVsToAddAboveThreshold {
+			outboundCCVsToAddAboveThreshold[i] = common.HexToAddress(addr)
+		}
+		inboundCCVsToAddAboveThreshold := make([]common.Address, len(input.RemoteChainConfig.InboundCCVsToAddAboveThreshold))
+		for i, addr := range input.RemoteChainConfig.InboundCCVsToAddAboveThreshold {
+			inboundCCVsToAddAboveThreshold[i] = common.HexToAddress(addr)
+		}
+		if len(inboundCCVs) > 0 || len(outboundCCVs) > 0 || len(outboundCCVsToAddAboveThreshold) > 0 || len(inboundCCVsToAddAboveThreshold) > 0 {
 			setCCVsReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyCCVConfigUpdates, chain, evm_contract.FunctionInput[[]advanced_pool_hooks.CCVConfigArg]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.AdvancedPoolHooks,
@@ -93,9 +101,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					{
 						RemoteChainSelector:             input.RemoteChainSelector,
 						OutboundCCVs:                    outboundCCVs,
-						OutboundCCVsToAddAboveThreshold: []common.Address{},
+						OutboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
 						InboundCCVs:                     inboundCCVs,
-						InboundCCVsToAddAboveThreshold:  []common.Address{},
+						InboundCCVsToAddAboveThreshold:  inboundCCVsToAddAboveThreshold,
 					},
 				},
 			})

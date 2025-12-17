@@ -8,7 +8,6 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -118,7 +117,7 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 }
 
 func convertRemoteChainConfig(
-	e deployment.Environment,
+	e cldf.Environment,
 	chainSelector uint64,
 	remoteAdapter TokenAdapter,
 	remoteChainSelector uint64,

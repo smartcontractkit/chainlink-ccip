@@ -51,7 +51,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				SourceChainSelector: remoteSelector,
 				IsEnabled:           remoteConfig.AllowTrafficFrom,
 				OnRamps:             remoteConfig.OnRamps,
-				DefaultCCV:          defaultInboundCCVs,
+				DefaultCCVs:         defaultInboundCCVs,
 				LaneMandatedCCVs:    laneMandatedInboundCCVs,
 			})
 			defaultOutboundCCVs := make([]common.Address, 0, len(remoteConfig.DefaultOutboundCCVs))

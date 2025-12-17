@@ -32,6 +32,8 @@ func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress
 			CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(200, 2000),
 			OutboundCCVs:                             []string{"0x789"},
 			InboundCCVs:                              []string{"0xabc"},
+			OutboundCCVsToAddAboveThreshold:          []string{"0xdef"},
+			InboundCCVsToAddAboveThreshold:           []string{"0xace"},
 			TokenTransferFeeConfig:                   testsetup.CreateBasicTokenTransferFeeConfig(),
 		},
 	}
@@ -69,6 +71,18 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 	require.NoError(t, err, "Failed to get outbound CCVs from token pool")
 	for _, ccv := range input.RemoteChainConfig.OutboundCCVs {
 		require.Contains(t, outboundCCVs, common.HexToAddress(ccv), "Outbound CCV should be in the list of required outbound CCVs")
+	}
+
+	inboundCCVsToAddAboveThreshold, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, thresholdAmountForAdditionalCCVs, 0, []byte{}, inbound)
+	require.NoError(t, err, "Failed to get inbound CCVs to add above threshold from token pool")
+	for _, ccv := range input.RemoteChainConfig.InboundCCVsToAddAboveThreshold {
+		require.Contains(t, inboundCCVsToAddAboveThreshold, common.HexToAddress(ccv), "Inbound CCV to add above threshold should be in the list of required inbound CCVs to add above threshold")
+	}
+
+	outboundCCVsToAddAboveThreshold, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, thresholdAmountForAdditionalCCVs, 0, []byte{}, outbound)
+	require.NoError(t, err, "Failed to get outbound CCVs to add above threshold from token pool")
+	for _, ccv := range input.RemoteChainConfig.OutboundCCVsToAddAboveThreshold {
+		require.Contains(t, outboundCCVsToAddAboveThreshold, common.HexToAddress(ccv), "Outbound CCV to add above threshold should be in the list of required outbound CCVs to add above threshold")
 	}
 
 	remoteToken, err := tp.GetRemoteToken(nil, remoteChainSel)
